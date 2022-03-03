@@ -1,0 +1,78 @@
+specVersion: 0.1.0
+description: PancakeSwap substreams
+codeType: wasm/rust-v1
+
+genesisBlock: 6809737
+
+protoFiles:
+  - ./pancakeswap.proto
+
+streams:
+  - name: pairExtractor
+    kind: Mapper
+    code:
+      file: ./test/code/pairExtractor.wasm
+    inputs:
+      - proto:sf.ethereum.types.v1.Block
+    output:
+      type: proto:pcs.types.v1.Pairs
+
+  - name: pairs
+    kind: StateBuilder
+    code:
+      file: ./test/code/pairsState.wasm
+    inputs:
+      - stream:pairExtractor
+    output:
+      storeMergeStrategy: LAST_KEY   # SUM_INTS, SUM_FLOATS
+
+  - name: reservesExtractor
+    kind: Mapper
+    code:
+      file: ./reservesExtractor.wasm
+    inputs:
+      - proto:sf.ethereum.types.v1.Block
+      #- store:pairs
+    output:
+      type: proto:pcs.types.v1.ReserveUpdates
+
+  - name: prices
+    kind: StateBuilder
+    code:
+      file: ./pricesState.wasm
+    inputs:
+      - stream:reservesExtractor
+      - store:pairs
+    output:
+      storeMergeStrategy: LAST_KEY
+
+  - name: mintBurnSwapsExtractor
+    kind: Mapper
+    code:
+      file: ./mintBurnSwapsExtractor.wasm
+    inputs:
+      - proto:sf.ethereum.types.v1.Block
+      - store:pairs
+      - store:prices
+    output:
+      type: proto:pcs.types.v1.MintBurnSwaps
+
+  - name: totals
+    kind: StateBuilder
+    code:
+      file: ./totalsState.wasm
+    inputs:
+      - stream:pairExtractor
+      - stream:mintBurnSwapsExtractor
+    output:
+      storeMergeStrategy: SUM_INTS
+
+  - name: volumes
+    kind: StateBuilder
+    code:
+      file: ./volumesState.wasm
+    inputs:
+      - proto:sf.ethereum.types.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
+      - stream:mintBurnSwapsExtractor
+    output:
+      storeMergeStrategy: SUM_FLOATS

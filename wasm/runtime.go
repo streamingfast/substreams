@@ -78,6 +78,25 @@ func (m *Module) NewInstance(functionName string) (*Instance, error) {
 
 func (i *Instance) newImports() *wasmer.ImportObject {
 	imports := wasmer.NewImportObject()
+	imports.Register("logger", map[string]wasmer.IntoExtern{
+		"debug": wasmer.NewFunction(
+			i.wasmStore,
+			wasmer.NewFunctionType(
+				params(wasmer.I32, wasmer.I32),
+				returns(),
+			),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading string: %w", err)
+				}
+
+				fmt.Println(message)
+
+				return nil, nil
+			},
+		),
+	})
 	imports.Register("env", map[string]wasmer.IntoExtern{
 		"register_panic": wasmer.NewFunction(
 			i.wasmStore,

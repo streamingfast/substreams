@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/streamingfast/substreams/state"
@@ -167,8 +168,12 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 		"state_get_at": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
-				params(wasmer.I32 /* store index */, wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */),
-				returns(wasmer.I32, wasmer.I32, wasmer.I32),
+				params(wasmer.I32, /* store index */
+					wasmer.I64, /* ordinal */
+					wasmer.I32, /* key offset */
+					wasmer.I32, /* key length */
+					wasmer.I32 /* return pointer */),
+				returns(wasmer.I32),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
 				readStore := i.inputStores[int(args[0].I32())]
@@ -178,25 +183,30 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
 
-				val, found := readStore.GetAt(uint64(ord), key)
+				value, found := readStore.GetAt(uint64(ord), key)
 				if !found {
 					zero := wasmer.NewI32(0)
-					return []wasmer.Value{zero, zero, zero}, nil
-				} else {
-					ptr, err := i.heap.Write(val)
-					if err != nil {
-						return nil, err
-					}
-
-					return []wasmer.Value{wasmer.NewI32(ptr), wasmer.NewI32(len(val)), wasmer.NewI32(1)}, nil
+					return []wasmer.Value{zero}, nil
 				}
+
+				outputPtr := args[4].I32()
+				err = i.writeOutputToHeap(outputPtr, value)
+				if err != nil {
+					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
+				}
+
+				return []wasmer.Value{wasmer.NewI32(1)}, nil
+
 			},
 		),
 		"state_get_first": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
-				params(wasmer.I32 /* store index */, wasmer.I32, wasmer.I32 /* key */),
-				returns(wasmer.I32, wasmer.I32, wasmer.I32),
+				params(wasmer.I32,
+					wasmer.I32,
+					wasmer.I32,
+					wasmer.I32),
+				returns(wasmer.I32),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
 				readStore := i.inputStores[int(args[0].I32())]
@@ -205,26 +215,31 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
 
-				val, found := readStore.GetFirst(key)
+				value, found := readStore.GetFirst(key)
 				if !found {
 					zero := wasmer.NewI32(0)
 					return []wasmer.Value{zero, zero, zero}, nil
-				} else {
-					ptr, err := i.heap.Write(val)
-					if err != nil {
-						return nil, err
-					}
-
-					return []wasmer.Value{wasmer.NewI32(ptr), wasmer.NewI32(len(val)), wasmer.NewI32(1)}, nil
 				}
+				outputPtr := args[3].I32()
+				err = i.writeOutputToHeap(outputPtr, value)
+				if err != nil {
+					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
+				}
+
+				return []wasmer.Value{wasmer.NewI32(1)}, nil
+
 			},
 		),
 		"state_get_last": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
-				params(wasmer.I32 /* store index */, wasmer.I32, wasmer.I32 /* key */),
-				returns(wasmer.I32, wasmer.I32, wasmer.I32),
+				params(wasmer.I32,
+					wasmer.I32,
+					wasmer.I32,
+					wasmer.I32),
+				returns(wasmer.I32),
 			),
+
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
 				readStore := i.inputStores[int(args[0].I32())]
 				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
@@ -232,22 +247,40 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
 
-				val, found := readStore.GetLast(key)
+				value, found := readStore.GetLast(key)
 				if !found {
 					zero := wasmer.NewI32(0)
 					return []wasmer.Value{zero, zero, zero}, nil
-				} else {
-					ptr, err := i.heap.Write(val)
-					if err != nil {
-						return nil, err
-					}
-
-					return []wasmer.Value{wasmer.NewI32(ptr), wasmer.NewI32(len(val)), wasmer.NewI32(1)}, nil
 				}
+				outputPtr := args[3].I32()
+				err = i.writeOutputToHeap(outputPtr, value)
+				if err != nil {
+					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
+				}
+
+				return []wasmer.Value{wasmer.NewI32(1)}, nil
 			},
 		),
 	})
 	return imports
+}
+
+func (i *Instance) writeOutputToHeap(outputPtr int32, value []byte) error {
+
+	valuePtr, err := i.heap.Write(value)
+	if err != nil {
+		return fmt.Errorf("writting value to heap: %w", err)
+	}
+	returnValue := make([]byte, 8)
+	binary.LittleEndian.PutUint32(returnValue[0:4], uint32(valuePtr))
+	binary.LittleEndian.PutUint32(returnValue[4:], uint32(len(value)))
+
+	_, err = i.heap.WriteAtPtr(returnValue, outputPtr)
+	if err != nil {
+		return fmt.Errorf("writing response at valuePtr %d: %w", err)
+	}
+
+	return nil
 }
 
 func (i *Instance) Execute(inputs []*Input) (err error) {
@@ -271,8 +304,6 @@ func (i *Instance) Execute(inputs []*Input) (err error) {
 			i.outputStore = input.Store
 		}
 	}
-	fmt.Println("")
-
 	_, err = i.entrypoint.Call(args...)
 	return
 }

@@ -17,7 +17,7 @@ func Register(name string, f FactoryFunc) {
 func Init(imp *imports.Imports) map[string]reflect.Value {
 	out := make(map[string]reflect.Value)
 	for name, f := range registry {
-		out[name] = reflect.ValueOf(f(imp))
+		out[name] = f(imp)
 	}
 	return out
 }

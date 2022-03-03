@@ -72,7 +72,6 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 	for _, stream := range streams {
 		f, found := nativeStreams[stream.Code.Native]
 		if !found {
-			// TODO: eventually, LOAD the CODE Into WASM boom!
 			return fmt.Errorf("native code not found for %q", stream.Code)
 		}
 
@@ -86,6 +85,9 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 		switch stream.Kind {
 		case "Mapper":
 			method := f.MethodByName("Map")
+			if method.Kind() == reflect.Invalid {
+				return fmt.Errorf("Map() method not found on %T", f.Interface())
+			}
 			if method.IsZero() {
 				return fmt.Errorf("Map() method not found on %T", f.Interface())
 			}
@@ -95,6 +97,9 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 			})
 		case "StateBuilder":
 			method := f.MethodByName("BuildState")
+			if method.Kind() == reflect.Invalid {
+				return fmt.Errorf("BuildState() method not found on %T", f.Interface())
+			}
 			if method.IsZero() {
 				return fmt.Errorf("BuildState() method not found on %T", f.Interface())
 			}

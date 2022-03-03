@@ -69,7 +69,7 @@ func DoRPCCalls(noArchiveNode bool, blockNum uint64, rpcClient *rpc.Client, rpcC
 				for i, resp := range rpcResp {
 					resp.CopyDecoder(reqs[i])
 				}
-				resps := toSubgraphRPCResponse(rpcResp)
+				resps := toRPCResponse(rpcResp)
 				return resps, nil
 			}
 		}

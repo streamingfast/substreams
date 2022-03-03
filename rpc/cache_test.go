@@ -12,7 +12,7 @@ import (
 )
 
 func TestRpcCacheNewLoadSave(t *testing.T) {
-	dir, err := ioutil.TempDir("", "sparkle_test")
+	dir, err := ioutil.TempDir("", "substreams_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 

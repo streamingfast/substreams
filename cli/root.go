@@ -19,9 +19,11 @@ import (
 	"github.com/streamingfast/substreams/state"
 )
 
+var ProtobufBlockType string = "block"
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:          "substream [manifest] [stream_name] [block_count]",
+	Use:          "substreams [manifest] [stream_name] [block_count]",
 	Short:        "A substreams runner",
 	RunE:         runRoot,
 	Args:         cobra.ExactArgs(3),
@@ -93,7 +95,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	ioFactory := state.NewStoreStateIOFactory(stateStore)
 
-	pipe := pipeline.New(uint64(startBlockNum), rpcClient, rpcCache, manif, outputStreamName)
+	pipe := pipeline.New(uint64(startBlockNum), rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType)
 	if manif.CodeType == "native" {
 		if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {
 			return fmt.Errorf("building pipeline: %w", err)

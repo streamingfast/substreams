@@ -10,7 +10,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
-	pbcodec "github.com/streamingfast/sparkle/pb/sf/ethereum/codec/v1"
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
 	"github.com/streamingfast/substreams/registry"
@@ -23,6 +22,8 @@ import (
 type Pipeline struct {
 	vmType        string // wasm, native
 	startBlockNum uint64
+
+	blockType string
 
 	rpcClient *rpc.Client
 	rpcCache  *ssrpc.Cache
@@ -38,7 +39,7 @@ type Pipeline struct {
 	wasmOutputs   map[string][]byte
 }
 
-func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string) *Pipeline {
+func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string) *Pipeline {
 	pipe := &Pipeline{
 		startBlockNum:    startBlockNum,
 		rpcClient:        rpcClient,
@@ -48,6 +49,7 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 		manifest:         manif,
 		outputStreamName: outputStreamName,
 		vmType:           manif.CodeType,
+		blockType:        blockType,
 	}
 	// pipe.setupSubscriptionHub()
 	// pipe.setupPrintPairUpdates()
@@ -250,27 +252,27 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 			return io.EOF
 		}
 
-		p.intr.SetCurrentBlock(block)
+		p.nativeImports.SetCurrentBlock(block)
 
-		blk := block.ToProtocol().(*pbcodec.Block)
+		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs["sf.ethereum.types.v1.Block"] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.codec.v1.Block" */] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?
-			blkBytes, err := proto.Marshal(blk)
+			blkBytes, err := proto.Marshal(blk.(proto.Message))
 			if err != nil {
 				return fmt.Errorf("packing block: %w", err)
 			}
 
-			p.wasmOutputs["sf.ethereum.types.v1.Block"] = blkBytes
+			p.wasmOutputs[p.blockType] = blkBytes
 		default:
 			panic("unsupported vmType " + p.vmType)
 		}
 
 		fmt.Println("-------------------------------------------------------------------")
-		fmt.Printf("BLOCK +%d %d %s\n", blk.Num()-p.startBlockNum, blk.Num(), blk.ID())
+		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.startBlockNum, block.Num(), block.ID())
 
 		// LockOSThread is to avoid this goroutine to be MOVED by the Go runtime to another system thread,
 		// while wasmer is using some instances in a given thread. Wasmer will not be happy if the goroutine

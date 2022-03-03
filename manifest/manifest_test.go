@@ -33,14 +33,14 @@ kind: Mapper
 code:
   file: ./pairExtractor.wasm
 inputs:
-  - proto:sf.ethereum.types.v1.Block
+  - proto:sf.ethereum.codec.v1.Block
 output:
   type: proto:pcs.types.v1.Pairs`,
 			expectedOutput: Stream{
 				Name:   "pairExtractor",
 				Kind:   "Mapper",
 				Code:   Code{File: "./pairExtractor.wasm"},
-				Inputs: []string{"proto:sf.ethereum.types.v1.Block"},
+				Inputs: []string{"proto:sf.ethereum.codec.v1.Block"},
 				Output: StreamOutput{Type: "proto:pcs.types.v1.Pairs"},
 			},
 		},
@@ -52,7 +52,7 @@ kind: StateBuilder
 code:
   file: ./pricesState.wasm
 inputs:
-  - proto:sf.ethereum.types.v1.Block
+  - proto:sf.ethereum.codec.v1.Block
   - store:pairs
 output:
   storeMergeStrategy: LAST_KEY`,
@@ -60,7 +60,7 @@ output:
 				Name:   "prices",
 				Kind:   "StateBuilder",
 				Code:   Code{File: "./pricesState.wasm"},
-				Inputs: []string{"proto:sf.ethereum.types.v1.Block", "store:pairs"},
+				Inputs: []string{"proto:sf.ethereum.codec.v1.Block", "store:pairs"},
 				Output: StreamOutput{StoreMergeStrategy: "LAST_KEY"},
 			},
 		},

@@ -13,7 +13,7 @@ streams:
     code:
       file: ./test/code/pairExtractor.wasm
     inputs:
-      - proto:sf.ethereum.types.v1.Block
+      - proto:sf.ethereum.codec.v1.Block
     output:
       type: proto:pcs.types.v1.Pairs
 
@@ -31,7 +31,7 @@ streams:
     code:
       file: ./reservesExtractor.wasm
     inputs:
-      - proto:sf.ethereum.types.v1.Block
+      - proto:sf.ethereum.codec.v1.Block
       #- store:pairs
     output:
       type: proto:pcs.types.v1.ReserveUpdates
@@ -51,7 +51,7 @@ streams:
     code:
       file: ./mintBurnSwapsExtractor.wasm
     inputs:
-      - proto:sf.ethereum.types.v1.Block
+      - proto:sf.ethereum.codec.v1.Block
       - store:pairs
       - store:prices
     output:
@@ -72,7 +72,7 @@ streams:
     code:
       file: ./volumesState.wasm
     inputs:
-      - proto:sf.ethereum.types.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
+      - proto:sf.ethereum.codec.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
       - stream:mintBurnSwapsExtractor
     output:
       storeMergeStrategy: SUM_FLOATS

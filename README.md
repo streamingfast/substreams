@@ -15,6 +15,3 @@ Examples
 https://github.com/streamingfast/substream-pancakeswap
 https://github.com/streamingfast/substream-erc20
 
-
-test
-

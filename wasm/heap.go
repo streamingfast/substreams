@@ -28,6 +28,10 @@ func (h *Heap) Write(bytes []byte) (int32, error) {
 
 	ptr := allocation.(int32)
 
+	return h.WriteAtPtr(bytes, ptr)
+}
+func (h *Heap) WriteAtPtr(bytes []byte, ptr int32) (int32, error) {
+
 	memoryData := h.memory.Data()
 	copy(memoryData[ptr:], bytes)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -167,7 +168,7 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 		}
 		streamName := stream.Name // to ensure it's enclosed
 
-		mod, err := wasm.NewModule(stream.Code.Content)
+		mod, err := wasm.NewModule(stream.Code.Content, filepath.Base(stream.Code.File))
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}

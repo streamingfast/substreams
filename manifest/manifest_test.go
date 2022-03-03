@@ -61,7 +61,7 @@ output:
 				Kind:   "StateBuilder",
 				Code:   Code{File: "./pricesState.wasm"},
 				Inputs: []string{"proto:sf.ethereum.codec.v1.Block", "store:pairs"},
-				Output: StreamOutput{StoreMergeStrategy: "LAST_KEY"},
+				Output: StreamOutput{UpdatePolicy: "LAST_KEY"},
 			},
 		},
 	}

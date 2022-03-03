@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/state"
 	"github.com/wasmerio/wasmer-go/wasmer"
 )
@@ -18,17 +20,19 @@ type Instance struct {
 	inputStores []state.Reader
 	outputStore *state.Builder
 
-	returnValue []byte
-	panicError  *PanicError
+	returnValue  []byte
+	panicError   *PanicError
+	functionName string
 }
 
 type Module struct {
 	engine *wasmer.Engine
 	store  *wasmer.Store
 	module *wasmer.Module
+	name   string
 }
 
-func NewModule(wasmCode []byte) (*Module, error) {
+func NewModule(wasmCode []byte, name string) (*Module, error) {
 	engine := wasmer.NewUniversalEngine()
 	store := wasmer.NewStore(engine)
 
@@ -41,14 +45,16 @@ func NewModule(wasmCode []byte) (*Module, error) {
 		engine: engine,
 		store:  store,
 		module: module,
+		name:   name,
 	}, nil
 }
 
 func (m *Module) NewInstance(functionName string) (*Instance, error) {
 	// WARN: An instance needs to be created on the same thread that it is consumed.
 	instance := &Instance{
-		wasmStore: m.store,
-		module:    m,
+		wasmStore:    m.store,
+		module:       m,
+		functionName: functionName,
 	}
 	imports := instance.newImports()
 	vmInstance, err := wasmer.NewInstance(m.module, imports)
@@ -90,8 +96,22 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-
-				fmt.Println(message)
+				zlog.Debug(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
+				return nil, nil
+			},
+		),
+		"info": wasmer.NewFunction(
+			i.wasmStore,
+			wasmer.NewFunctionType(
+				params(wasmer.I32, wasmer.I32),
+				returns(),
+			),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading string: %w", err)
+				}
+				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
 
 				return nil, nil
 			},
@@ -296,7 +316,7 @@ func (i *Instance) writeOutputToHeap(outputPtr int32, value []byte) error {
 
 	_, err = i.heap.WriteAtPtr(returnValue, outputPtr)
 	if err != nil {
-		return fmt.Errorf("writing response at valuePtr %d: %w", err)
+		return fmt.Errorf("writing response at valuePtr %d: %w", valuePtr, err)
 	}
 
 	return nil

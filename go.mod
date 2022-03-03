@@ -2,6 +2,8 @@ module github.com/streamingfast/substreams
 
 go 1.17
 
+require gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+
 require (
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/compute v1.3.0 // indirect
@@ -68,6 +70,9 @@ require (
 	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
+	github.com/tidwall/gjson v1.6.5 // indirect
+	github.com/tidwall/match v1.0.3 // indirect
+	github.com/tidwall/pretty v1.0.2 // indirect
 	github.com/wasmerio/wasmer-go v1.0.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect

@@ -11,9 +11,9 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	pbcodec "github.com/streamingfast/sparkle/pb/sf/ethereum/codec/v1"
-	"github.com/streamingfast/substreams/exchange"
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
+	"github.com/streamingfast/substreams/registry"
 	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
@@ -61,16 +61,6 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 	}
 
 	nativeStreams := registry.Init(p.nativeImports)
-	nativeStreams := map[string]reflect.Value{
-		"pcs_pair_extractor":               reflect.ValueOf(&exchange.PairExtractor{Imports: p.intr}),
-		"pcs_pairs_state_builder":          reflect.ValueOf(&exchange.PairsStateBuilder{Imports: p.intr}),
-		"pcs_reserves_extractor":           reflect.ValueOf(&exchange.ReservesExtractor{Imports: p.intr}),
-		"pcs_reserves_state_builder":       reflect.ValueOf(&exchange.ReservesStateBuilder{Imports: p.intr}),
-		"pcs_derived_prices_state_builder": reflect.ValueOf(&exchange.DerivedPricesStateBuilder{Imports: p.intr}),
-		"pcs_mint_burn_swaps_extractor":    reflect.ValueOf(&exchange.SwapsExtractor{Imports: p.intr}),
-		"pcs_totals_state_builder":         reflect.ValueOf(&exchange.TotalsStateBuilder{Imports: p.intr}),
-		"pcs_volumes_state_builder":        reflect.ValueOf(&exchange.PCSVolume24hStateBuilder{Imports: p.intr}),
-	}
 
 	if err := p.setupStores(streams, ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)

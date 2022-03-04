@@ -84,39 +84,10 @@ func (m *Module) NewInstance(functionName string) (*Instance, error) {
 
 func (i *Instance) newImports() *wasmer.ImportObject {
 	imports := wasmer.NewImportObject()
-	imports.Register("logger", map[string]wasmer.IntoExtern{
-		"debug": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				zlog.Debug(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
-				return nil, nil
-			},
-		),
-		"info": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
 
-				return nil, nil
-			},
-		),
-	})
+	i.registerLoggerImports(imports)
+	i.registerStateImports(imports)
+
 	imports.Register("env", map[string]wasmer.IntoExtern{
 		"register_panic": wasmer.NewFunction(
 			i.wasmStore,
@@ -182,7 +153,48 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 				return nil, nil
 			},
 		),
-		"state_set": wasmer.NewFunction(
+	})
+	return imports
+}
+
+func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
+	imports.Register("logger", map[string]wasmer.IntoExtern{
+		"debug": wasmer.NewFunction(
+			i.wasmStore,
+			wasmer.NewFunctionType(
+				params(wasmer.I32, wasmer.I32),
+				returns(),
+			),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading string: %w", err)
+				}
+				zlog.Debug(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
+				return nil, nil
+			},
+		),
+		"info": wasmer.NewFunction(
+			i.wasmStore,
+			wasmer.NewFunctionType(
+				params(wasmer.I32, wasmer.I32),
+				returns(),
+			),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading string: %w", err)
+				}
+				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
+
+				return nil, nil
+			},
+		),
+	})
+}
+func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
+	imports.Register("state", map[string]wasmer.IntoExtern{
+		"set": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
@@ -204,7 +216,10 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 				return nil, nil
 			},
 		),
-		"state_get_at": wasmer.NewFunction(
+	})
+
+	imports.Register("state", map[string]wasmer.IntoExtern{
+		"get_at": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32, /* store index */
@@ -238,7 +253,7 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 
 			},
 		),
-		"state_get_first": wasmer.NewFunction(
+		"get_first": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32,
@@ -269,7 +284,7 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 
 			},
 		),
-		"state_get_last": wasmer.NewFunction(
+		"get_last": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32,
@@ -301,7 +316,6 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 			},
 		),
 	})
-	return imports
 }
 
 func (i *Instance) writeOutputToHeap(outputPtr int32, value []byte) error {

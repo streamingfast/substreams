@@ -19,7 +19,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: big.NewInt(3),
 			value:         big.NewInt(4),
@@ -27,7 +27,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: big.NewInt(5),
 			value:         big.NewInt(4),
@@ -35,7 +35,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewInt(4),
@@ -85,7 +85,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: int64ptr(3),
 			value:         4,
@@ -93,7 +93,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: int64ptr(5),
 			value:         4,
@@ -101,7 +101,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4,
@@ -152,7 +152,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: float64ptr(3.0),
 			value:         4.0,
@@ -160,7 +160,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: float64ptr(5.0),
 			value:         4.0,
@@ -168,7 +168,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4.0,
@@ -212,7 +212,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(3),
 			value:         big.NewFloat(4),
@@ -220,7 +220,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(5),
 			value:         big.NewFloat(4),
@@ -228,7 +228,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewFloat(4),

@@ -19,7 +19,7 @@ func TestBuilderSumBigInt(t *testing.T) {
 	}{
 		{
 			name:          "found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: big.NewInt(3),
 			value:         big.NewInt(4),
@@ -27,7 +27,7 @@ func TestBuilderSumBigInt(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewInt(4),
@@ -52,7 +52,7 @@ func TestBuilderSumBigInt(t *testing.T) {
 				t.Errorf("value not found")
 			}
 
-			actualInt, _ := new(big.Int).SetString(string(actual), 10)
+			actualInt := new(big.Int).SetBytes(actual)
 
 			assert.Equal(t, 0, actualInt.Cmp(test.expectedValue))
 		})
@@ -77,7 +77,7 @@ func TestBuilderSumInt64(t *testing.T) {
 	}{
 		{
 			name:          "found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: int64ptr(3),
 			value:         4,
@@ -85,7 +85,7 @@ func TestBuilderSumInt64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4,
@@ -136,7 +136,7 @@ func TestBuilderSumFloat64(t *testing.T) {
 	}{
 		{
 			name:          "found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: float64ptr(3.0),
 			value:         4.0,
@@ -144,7 +144,7 @@ func TestBuilderSumFloat64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4.0,
@@ -188,7 +188,7 @@ func TestBuilderSumBigFloat(t *testing.T) {
 	}{
 		{
 			name:          "found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(3),
 			value:         big.NewFloat(4),
@@ -196,7 +196,7 @@ func TestBuilderSumBigFloat(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       New("b", "", "", "", nil),
+			builder:       NewBuilder("b", "", "", "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewFloat(4),

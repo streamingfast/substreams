@@ -67,3 +67,27 @@ type SumBigFloatSetter interface {
 type Mergeable interface {
 	Merge(other *Builder) error
 }
+
+//compile-time check that Builder implements all interfaces
+var _ interface {
+	Reader
+
+	UpdateKeySetter
+
+	MaxBigIntSetter
+	MaxInt64Setter
+	MaxFloat64Setter
+	MaxBigFloatSetter
+
+	MinBigIntSetter
+	MinInt64Setter
+	MinFloat64Setter
+	MinBigFloatSetter
+
+	SumBigIntSetter
+	SumInt64Setter
+	SumFloat64Setter
+	SumBigFloatSetter
+
+	Mergeable
+} = (*Builder)(nil)

@@ -1,0 +1,9 @@
+[package]
+name = "testing-substreams"
+version = "0.1.0"
+description = "Testing substreams base library"
+edition = "2018"
+
+[dependencies]
+substreams={path="../substreams"}
+num-bigint = "0.4"

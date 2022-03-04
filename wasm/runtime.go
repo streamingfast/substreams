@@ -3,6 +3,7 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
 
 	"go.uber.org/zap"
 
@@ -212,6 +213,52 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				}
 
 				i.outputStore.SetBytes(uint64(ord), key, value)
+
+				return nil, nil
+			},
+		),
+		"sum_big_int": wasmer.NewFunction(
+			i.wasmStore,
+			wasmer.NewFunctionType(
+				params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+				returns(),
+			),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+				ord := args[0].I64()
+				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading string: %w", err)
+				}
+				value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading bytes: %w", err)
+				}
+
+				sum := new(big.Int).SetBytes(value)
+				i.outputStore.SumBigInt(uint64(ord), key, sum)
+
+				return nil, nil
+			},
+		),
+		"sum_int_64": wasmer.NewFunction(
+			i.wasmStore,
+			wasmer.NewFunctionType(
+				params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+				returns(),
+			),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+				ord := args[0].I64()
+				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading string: %w", err)
+				}
+				value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
+				if err != nil {
+					return nil, fmt.Errorf("reading bytes: %w", err)
+				}
+
+				sum := new(big.Int).SetBytes(value)
+				i.outputStore.SumInt64(uint64(ord), key, sum.Int64())
 
 				return nil, nil
 			},

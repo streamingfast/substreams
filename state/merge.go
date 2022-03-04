@@ -20,7 +20,9 @@ const (
 	OutputValueTypeString   = "string"
 )
 
-func (latest *Builder) Merge(previous *Builder) error {
+func (b *Builder) Merge(previous *Builder) error {
+	latest := b
+
 	if latest.updatePolicy != previous.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", latest.updatePolicy, previous.updatePolicy)
 	}

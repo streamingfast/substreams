@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/streamingfast/bstream"
@@ -178,54 +176,6 @@ func (b *Builder) bumpOrdinal(ord uint64) {
 		panic("cannot Set or Del a value on a state.Builder with an ordinal lower than the previous")
 	}
 	b.lastOrdinal = ord
-}
-
-func (b *Builder) SumBigInt(ord uint64, key string, value *big.Int) {
-	sum := new(big.Int)
-	val, found := b.GetAt(ord, key)
-	if !found {
-		sum = value
-	} else {
-		prev := new(big.Int).SetBytes(val)
-		if prev == nil {
-			sum = value
-		} else {
-			sum.Add(prev, value)
-		}
-	}
-	b.set(ord, key, sum.Bytes())
-}
-
-func (b *Builder) SumInt64(ord uint64, key string, value int64) {
-	var sum int64
-	val, found := b.GetAt(ord, key)
-	if !found {
-		sum = value
-	} else {
-		prev, err := strconv.ParseInt(string(val), 10, 64)
-		if err != nil {
-			sum = value
-		} else {
-			sum = prev + value
-		}
-	}
-	b.set(ord, key, []byte(fmt.Sprintf("%d", sum)))
-}
-
-func (b *Builder) SumBigFloat(ord uint64, key string, value *big.Float) {
-	sum := new(big.Float)
-	val, found := b.GetAt(ord, key)
-	if !found {
-		sum = value
-	} else {
-		prev, _, err := big.ParseFloat(string(val), 10, 100, big.ToNearestEven)
-		if prev == nil || err != nil {
-			sum = value
-		} else {
-			sum.Add(prev, value)
-		}
-	}
-	b.set(ord, key, []byte(sum.Text('g', -1)))
 }
 
 func (b *Builder) SetBytes(ord uint64, key string, value []byte) {

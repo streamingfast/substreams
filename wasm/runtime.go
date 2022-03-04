@@ -234,8 +234,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 					return nil, fmt.Errorf("reading bytes: %w", err)
 				}
 
-				sum := new(big.Int).SetBytes(value)
-				i.outputStore.SumBigInt(uint64(ord), key, sum)
+				toAdd := new(big.Int).SetBytes(value)
+				i.outputStore.SumBigInt(uint64(ord), key, toAdd)
 
 				return nil, nil
 			},
@@ -422,4 +422,8 @@ func (i *Instance) PrintDeltas() {
 	}
 
 	i.outputStore.Print()
+}
+
+func (i *Instance) SetBuilder(builder *state.Builder) {
+	i.outputStore = builder
 }

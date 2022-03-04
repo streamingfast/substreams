@@ -30,7 +30,7 @@ type Builder struct {
 	lastOrdinal uint64
 }
 
-func New(name string, updatePolicy, valueType, protoType string, ioFactory IOFactory) *Builder {
+func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactory IOFactory) *Builder {
 	b := &Builder{
 		Name:         name,
 		KV:           make(map[string][]byte),
@@ -186,14 +186,14 @@ func (b *Builder) SumBigInt(ord uint64, key string, value *big.Int) {
 	if !found {
 		sum = value
 	} else {
-		prev, _ := new(big.Int).SetString(string(val), 10)
+		prev := new(big.Int).SetBytes(val)
 		if prev == nil {
 			sum = value
 		} else {
 			sum.Add(prev, value)
 		}
 	}
-	b.set(ord, key, []byte(sum.String()))
+	b.set(ord, key, sum.Bytes())
 }
 
 func (b *Builder) SumInt64(ord uint64, key string, value int64) {

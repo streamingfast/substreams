@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Testing substreams base library"
 edition = "2018"
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
 substreams={path="../substreams"}
 num-bigint = "0.4"

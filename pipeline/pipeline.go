@@ -216,7 +216,7 @@ func (p *Pipeline) setupStores(streams []*manifest.Stream, ioFactory state.IOFac
 			continue
 		}
 		output := s.Output
-		store := state.New(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory)
+		store := state.NewBuilder(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory)
 		if forceLoadState {
 			// Use AN ABSOLUTE store, or SQUASH ALL PARTIAL!
 

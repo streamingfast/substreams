@@ -13,6 +13,7 @@ require (
 	github.com/streamingfast/logging v0.0.0-20220222131651-12c3943aac2e
 	github.com/streamingfast/merger v0.0.3-0.20220301162603-c0129b6f1ad4
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
+	github.com/test-go/testify v1.1.4
 	github.com/wasmerio/wasmer-go v1.0.4
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5

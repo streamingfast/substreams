@@ -7,107 +7,154 @@ import (
 )
 
 const (
-	MergeStrategyLastKey   = "LAST_KEY"
-	MergeStrategySumInts   = "SUM_INTS"
-	MergeStrategySumFloats = "SUM_FLOATS"
-	MergeStrategyMinInt    = "MIN_INT"
-	MergeStrategyMinFloat  = "MIN_FLOAT"
+	UpdatePolicyReplace = "replace"
+	UpdatePolicyIgnore  = "ignore"
+	UpdatePolicySum     = "sum"
+	UpdatePolicyMax     = "max"
+	UpdatePolicyMin     = "min"
 )
 
-func (b *Builder) Merge(next *Builder) error {
-	if b.updatePolicy != next.updatePolicy {
-		return fmt.Errorf("incompatible update policies: policy %s cannot merge policy %s", b.updatePolicy, next.updatePolicy)
+const (
+	OutputValueTypeInt64    = "int64"
+	OutputValueTypeBigFloat = "bigFloat"
+	OutputValueTypeString   = "string"
+)
+
+func (latest *Builder) Merge(previous *Builder) error {
+	if latest.updatePolicy != previous.updatePolicy {
+		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", latest.updatePolicy, previous.updatePolicy)
 	}
 
-	switch b.updatePolicy {
-	case "replace":
-		// Last key wins merge strategy
-		first := next
-		last := b
-		for k, v := range first.KV {
-			if _, found := last.KV[k]; !found {
-				last.KV[k] = v
+	if latest.valueType != previous.valueType { //TODO: will we one day want to be able to merge numeric types int and float?
+		return fmt.Errorf("incompatible value types: cannot merge %q and %q", latest.valueType, previous.valueType)
+	}
+
+	switch latest.updatePolicy {
+	case UpdatePolicyReplace:
+		for k, v := range previous.KV {
+			if _, found := latest.KV[k]; !found {
+				latest.KV[k] = v
 			}
 		}
-	case "ignore":
-		// First key wins merge strategy
-		first := next
-		last := b
-		for k, v := range first.KV {
-			if _, found := last.KV[k]; found {
-				last.KV[k] = v
+	case UpdatePolicyIgnore:
+		for k, v := range previous.KV {
+			if _, found := latest.KV[k]; found {
+				latest.KV[k] = v
 			}
 		}
-	case "sum":
+	case UpdatePolicySum:
 		// check valueType to do the right thing
-	case "max":
-		// check valueType to do the right thing
-	case "min":
-		// check valueType to do the right thing
+		switch latest.valueType {
+		case OutputValueTypeInt64:
+			sum := func(a, b uint64) uint64 {
+				return a + b
+			}
+			for k, v := range previous.KV {
+				v0b, fv0 := latest.KV[k]
+				v0 := foundOrZeroUint64(v0b, fv0)
+				v1 := foundOrZeroUint64(v, true)
+				latest.KV[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
+			}
+		case OutputValueTypeBigFloat:
+			sum := func(a, b *big.Float) *big.Float {
+				return bf().Add(a, b).SetPrec(100)
+			}
+			for k, v := range previous.KV {
+				v0b, fv0 := latest.KV[k]
+				v0 := foundOrZeroFloat(v0b, fv0)
+				v1 := foundOrZeroFloat(v, true)
+				latest.KV[k] = []byte(floatToStr(sum(v0, v1)))
+			}
+		default:
+			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
+		}
+	case UpdatePolicyMax:
+		switch latest.valueType {
+		case OutputValueTypeInt64:
+			max := func(a, b uint64) uint64 {
+				if a >= b {
+					return a
+				}
+				return b
+			}
+			for k, v := range previous.KV {
+				v1 := foundOrZeroUint64(v, true)
+				v, found := latest.KV[k]
+				if !found {
+					latest.KV[k] = []byte(fmt.Sprintf("%d", v1))
+					continue
+				}
+				v0 := foundOrZeroUint64(v, true)
 
-	// case MergeStrategySumInts:
-	// 	first := next
-	// 	last := b
+				latest.KV[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
+			}
+		case OutputValueTypeBigFloat:
+			max := func(a, b *big.Float) *big.Float {
+				if a.Cmp(b) <= 0 {
+					return b
+				}
+				return a
+			}
+			for k, v := range previous.KV {
+				v1 := foundOrZeroFloat(v, true)
+				v, found := latest.KV[k]
+				if !found {
+					latest.KV[k] = []byte(floatToStr(v1))
+					continue
+				}
+				v0 := foundOrZeroFloat(v, true)
 
-	// 	for k, v := range first.KV {
-	// 		latestVal, found := last.KV[k]
-	// 		if !found {
-	// 			last.KV[k] = v
-	// 		} else {
-	// 			// decode `v` as big.Int, decode `latestVal` as big.Int
-	// 			// last.KV[k] = bi().Add(vbigint, latestbigint).String()
-	// 		}
-	// 	}
-	// case MergeStrategySumFloats:
-	// 	for k, v := range next.KV {
-	// 		v0 := foundOrZeroFloat(b.GetLast(k))
-	// 		v1 := foundOrZeroFloat(v, true)
-	// 		sum := bf().Add(v0, v1).SetPrec(100)
-	// 		b.Set(next.lastOrdinal, k, floatToStr(sum))
-	// 	}
-	// case MergeStrategyMinInt:
-	// 	minInt := func(a, b uint64) uint64 {
-	// 		if a < b {
-	// 			return a
-	// 		}
-	// 		return b
-	// 	}
-	// 	for k, v := range next.KV {
-	// 		v1 := foundOrZeroUint64(v, true)
+				latest.KV[k] = []byte(floatToStr(max(v0, v1)))
+			}
+		default:
+			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
+		}
+	case UpdatePolicyMin:
+		switch latest.valueType {
+		case OutputValueTypeInt64:
+			min := func(a, b uint64) uint64 {
+				if a <= b {
+					return a
+				}
+				return b
+			}
+			for k, v := range previous.KV {
+				v1 := foundOrZeroUint64(v, true)
+				v, found := latest.KV[k]
+				if !found {
+					latest.KV[k] = []byte(fmt.Sprintf("%d", v1))
+					continue
+				}
+				v0 := foundOrZeroUint64(v, true)
 
-	// 		_, found := b.GetLast(k)
-	// 		if !found {
-	// 			b.Set(next.lastOrdinal, k, fmt.Sprintf("%d", v1))
-	// 		}
-	// 		v0 := foundOrZeroUint64(b.GetLast(k))
-	// 		b.Set(next.lastOrdinal, k, fmt.Sprintf("%d", minInt(v0, v1)))
-	// 	}
-	// case MergeStrategyMinFloat:
-	// 	minFloat := func(a, b *big.Float) *big.Float {
-	// 		if a.Cmp(b) < 1 {
-	// 			return a
-	// 		}
-	// 		return b
-	// 	}
-	// 	for k, v := range next.KV {
-	// 		v1 := foundOrZeroFloat(v, true)
+				latest.KV[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
+			}
+		case OutputValueTypeBigFloat:
+			min := func(a, b *big.Float) *big.Float {
+				if a.Cmp(b) <= 0 {
+					return a
+				}
+				return b
+			}
+			for k, v := range previous.KV {
+				v1 := foundOrZeroFloat(v, true)
+				v, found := latest.KV[k]
+				if !found {
+					latest.KV[k] = []byte(floatToStr(v1))
+					continue
+				}
+				v0 := foundOrZeroFloat(v, true)
 
-	// 		_, found := b.GetLast(k)
-	// 		if !found {
-	// 			b.Set(next.lastOrdinal, k, floatToStr(v1))
-	// 		}
-
-	// 		v0 := foundOrZeroFloat(b.GetLast(k))
-
-	// 		m := minFloat(v0, v1).SetPrec(100)
-	// 		b.Set(next.lastOrdinal, k, floatToStr(m))
-	// 	}
+				latest.KV[k] = []byte(floatToStr(min(v0, v1)))
+			}
+		default:
+			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
+		}
 	default:
-		return fmt.Errorf("unsupported update policy %q", b.updatePolicy) // should have been validated already
+		return fmt.Errorf("update policy %q not supported", latest.updatePolicy) // should have been validated already
 	}
 
-	b.bundler = nil
-
+	latest.bundler = nil //todo(colin): is this required?
 	return nil
 }
 

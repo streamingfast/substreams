@@ -38,7 +38,7 @@ func TestBuilderSumBigInt(t *testing.T) {
 	initTestBuilder := func(b *Builder, key string, value *big.Int) {
 		b.KV = map[string][]byte{}
 		if value != nil {
-			b.KV[key] = []byte(value.String())
+			b.KV[key] = []byte(value.Bytes())
 		}
 	}
 

@@ -125,7 +125,6 @@ dependencies = [
 [[package]]
 name = "substreams"
 version = "0.1.0"
-source = "git+https://github.com/streamingfast/substreams-rust#fe5f3ad38e4a9710d794f3ca031990ee5ef4c61b"
 dependencies = [
  "hex",
  "num-bigint",

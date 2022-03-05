@@ -55,13 +55,14 @@ inputs:
   - proto:sf.ethereum.codec.v1.Block
   - store:pairs
 output:
-  storeMergeStrategy: LAST_KEY`,
+  updatePolicy: sum
+  valueType: bigint`,
 			expectedOutput: Stream{
 				Name:   "prices",
 				Kind:   "StateBuilder",
 				Code:   Code{File: "./pricesState.wasm"},
 				Inputs: []string{"proto:sf.ethereum.codec.v1.Block", "store:pairs"},
-				Output: StreamOutput{UpdatePolicy: "LAST_KEY"},
+				Output: StreamOutput{UpdatePolicy: "sum", ValueType: "bigint"},
 			},
 		},
 	}
@@ -80,7 +81,7 @@ func TestStream_Signature_Basic(t *testing.T) {
 
 	pairExtractorStream := manifest.Graph.streams["pairExtractor"]
 	sig := pairExtractorStream.Signature(manifest.Graph)
-	assert.Equal(t, "6udco/e0Cs9WlTak8aVqDEaLf5w=", base64.StdEncoding.EncodeToString(sig))
+	assert.Equal(t, "9Sdn9wyVddnTCFAMRwhgCXrJ3+k=", base64.StdEncoding.EncodeToString(sig))
 }
 
 func TestStream_Signature_Composed(t *testing.T) {
@@ -89,7 +90,7 @@ func TestStream_Signature_Composed(t *testing.T) {
 
 	pairsStream := manifest.Graph.streams["pairs"]
 	sig := pairsStream.Signature(manifest.Graph)
-	assert.Equal(t, "pHzwn8h6952T5++c0mTLarIwb54=", base64.StdEncoding.EncodeToString(sig))
+	assert.Equal(t, "LKtX3dNYKlsZTmhNd/3qMCYx7E4=", base64.StdEncoding.EncodeToString(sig))
 }
 
 func TestStreamLinks_Streams(t *testing.T) {

@@ -24,7 +24,8 @@ streams:
     inputs:
       - stream:pairExtractor
     output:
-      storeMergeStrategy: LAST_KEY   # SUM_INTS, SUM_FLOATS
+      updatePolicy: replace
+      valueType: string
 
   - name: reservesExtractor
     kind: Mapper
@@ -44,7 +45,8 @@ streams:
       - stream:reservesExtractor
       - store:pairs
     output:
-      storeMergeStrategy: LAST_KEY
+      updatePolicy: replace
+      valueType: bytes
 
   - name: mintBurnSwapsExtractor
     kind: Mapper
@@ -65,7 +67,8 @@ streams:
       - stream:pairExtractor
       - stream:mintBurnSwapsExtractor
     output:
-      storeMergeStrategy: SUM_INTS
+      updatePolicy: replace
+      valueType: bytes
 
   - name: volumes
     kind: StateBuilder
@@ -75,4 +78,5 @@ streams:
       - proto:sf.ethereum.codec.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
       - stream:mintBurnSwapsExtractor
     output:
-      storeMergeStrategy: SUM_FLOATS
+      updatePolicy: sum
+      valueType: float64

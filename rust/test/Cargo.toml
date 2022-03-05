@@ -8,5 +8,6 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-substreams={ git = "https://github.com/streamingfast/substreams-rust"}
+#substreams={ path = "/Users/abourget/sf/substreams-rust" }
+substreams={ git = "https://github.com/streamingfast/substreams-rust" }
 num-bigint = "0.4"

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"strconv"
 
 	"go.uber.org/zap"
 
@@ -283,6 +282,36 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigfloat" {
+				return nil, fmt.Errorf("invalid store operation: 'sum_bigfloat' only valid for stores with updatePolicy == 'sum' and valueType == 'bigfloat'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigFloat's read of the kv value
+			if err != nil {
+				return nil, fmt.Errorf("parsing bigfloat value %q: %w", value, err)
+			}
+
+			i.outputStore.SumBigFloat(uint64(ord), key, toAdd)
+
+			return nil, nil
+		},
+	)
+	functions["sum_bigint"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'bigint'")
 			}
@@ -305,7 +334,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["sum_int64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
 			returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
@@ -317,17 +346,9 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
-			if err != nil {
-				return nil, fmt.Errorf("reading bytes: %w", err)
-			}
+			value := args[3].I64()
 
-			add, err := strconv.ParseInt(string(value), 10, 64) // corresponds to SumInt64's read from store
-			if err != nil {
-				return nil, fmt.Errorf("error parsing int %q: %w", string(value), err)
-			}
-
-			i.outputStore.SumInt64(uint64(ord), key, add)
+			i.outputStore.SumInt64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -366,7 +387,6 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 				}
 				return []wasmer.Value{wasmer.NewI32(1)}, nil
-
 			},
 		)
 		functions["get_first"] = wasmer.NewFunction(
@@ -474,6 +494,6 @@ func (i *Instance) PrintDeltas() {
 	i.outputStore.Print()
 }
 
-func (i *Instance) SetBuilder(builder *state.Builder) {
-	i.outputStore = builder
+func (i *Instance) SetOutputStore(store *state.Builder) {
+	i.outputStore = store
 }

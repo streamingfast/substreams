@@ -27,8 +27,7 @@ func TestRustScript(t *testing.T) {
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("test.key.1")
 				require.True(t, found)
-				bi := new(big.Int).SetBytes(data)
-				require.Equal(t, big.NewInt(20).String(), bi.String())
+				require.Equal(t, big.NewInt(20).String(), string(data))
 			},
 		},
 	}
@@ -42,14 +41,13 @@ func TestRustScript(t *testing.T) {
 			module, err := wasm.NewModule(byteCode, c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(c.functionName)
+			instance, err := module.NewInstance(c.functionName, nil)
 			require.NoError(t, err)
-
-			instance.SetBuilder(c.builder)
-			err = instance.Execute(nil)
+			instance.SetOutputStore(c.builder)
+			err = instance.Execute()
+			require.NoError(t, err)
 
 			c.assert(t, module, instance, c.builder)
-			require.NoError(t, err)
 		})
 	}
 }

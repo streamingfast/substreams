@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"go.uber.org/zap"
 
@@ -12,14 +13,18 @@ import (
 )
 
 type Instance struct {
-	module     *Module
-	wasmStore  *wasmer.Store
-	memory     *wasmer.Memory
-	heap       *Heap
-	entrypoint *wasmer.Function
+	module    *Module
+	wasmStore *wasmer.Store
+	memory    *wasmer.Memory
+	heap      *Heap
 
-	inputStores []state.Reader
-	outputStore *state.Builder
+	inputStores  []state.Reader
+	outputStore  *state.Builder
+	updatePolicy string
+	valueType    string
+
+	entrypoint *wasmer.Function
+	args       []interface{} // to the `entrypoint` function
 
 	returnValue  []byte
 	panicError   *PanicError
@@ -50,7 +55,7 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 	}, nil
 }
 
-func (m *Module) NewInstance(functionName string) (*Instance, error) {
+func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, error) {
 	// WARN: An instance needs to be created on the same thread that it is consumed.
 	instance := &Instance{
 		wasmStore:    m.store,
@@ -80,7 +85,33 @@ func (m *Module) NewInstance(functionName string) (*Instance, error) {
 		return nil, fmt.Errorf("getting wasm module function %q: %w", functionName, err)
 	}
 
+	var args []interface{}
+	for _, input := range inputs {
+		switch input.Type {
+		case InputStream:
+			ptr, err := instance.heap.Write(input.StreamData)
+			if err != nil {
+				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
+			}
+			len := int32(len(input.StreamData))
+			args = append(args, ptr, len)
+		case InputStore:
+			instance.inputStores = append(instance.inputStores, input.Store)
+			args = append(args, len(instance.inputStores)-1)
+		case OutputStore:
+			instance.outputStore = input.Store
+			instance.updatePolicy = input.UpdatePolicy
+			instance.valueType = input.ValueType
+		}
+	}
+	instance.args = args
+
 	return instance, nil
+}
+
+func (i *Instance) Execute() (err error) {
+	_, err = i.entrypoint.Call(i.args...)
+	return
 }
 
 func (i *Instance) newImports() *wasmer.ImportObject {
@@ -194,79 +225,116 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 	})
 }
 func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
-	imports.Register("state", map[string]wasmer.IntoExtern{
-		"set": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				ord := args[0].I64()
-				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading bytes: %w", err)
-				}
-
-				i.outputStore.SetBytes(uint64(ord), key, value)
-
-				return nil, nil
-			},
+	functions := map[string]wasmer.IntoExtern{}
+	functions["set"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
+			returns(),
 		),
-		"sum_big_int": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				ord := args[0].I64()
-				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading bytes: %w", err)
-				}
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "replace" {
+				return nil, fmt.Errorf("invalid store operation: 'set' only valid for stores with updatePolicy == 'replace'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
 
-				toAdd := new(big.Int).SetBytes(value)
-				i.outputStore.SumBigInt(uint64(ord), key, toAdd)
+			i.outputStore.SetBytes(uint64(ord), key, value)
 
-				return nil, nil
-			},
+			return nil, nil
+		},
+	)
+	functions["set_if_not_exists"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
+			returns(),
 		),
-		"sum_int_64": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				ord := args[0].I64()
-				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading bytes: %w", err)
-				}
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "ignore" {
+				return nil, fmt.Errorf("invalid store operation: 'set_if_not_exists' only valid for stores with updatePolicy == 'ignore'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
 
-				sum := new(big.Int).SetBytes(value)
-				i.outputStore.SumInt64(uint64(ord), key, sum.Int64())
+			i.outputStore.SetBytesIfNotExists(uint64(ord), key, value)
 
-				return nil, nil
-			},
+			return nil, nil
+		},
+	)
+	functions["sum_bigint"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
 		),
-	})
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigint" {
+				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'bigint'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
 
-	imports.Register("state", map[string]wasmer.IntoExtern{
-		"get_at": wasmer.NewFunction(
+			toAdd, _ := new(big.Int).SetString(value, 10) // corresponds to SumBigInt's read of the kv value
+			i.outputStore.SumBigInt(uint64(ord), key, toAdd)
+
+			return nil, nil
+		},
+	)
+	functions["sum_int64"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "int64" {
+				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'int64'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadBytes(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			add, err := strconv.ParseInt(string(value), 10, 64) // corresponds to SumInt64's read from store
+			if err != nil {
+				return nil, fmt.Errorf("error parsing int %q: %w", string(value), err)
+			}
+
+			i.outputStore.SumInt64(uint64(ord), key, add)
+
+			return nil, nil
+		},
+	)
+
+	if len(i.inputStores) != 0 {
+		functions["get_at"] = wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32, /* store index */
@@ -277,30 +345,31 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				returns(wasmer.I32),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				readStore := i.inputStores[int(args[0].I32())]
+				storeIndex := int(args[0].I32())
+				if storeIndex+1 > len(i.inputStores) {
+					return nil, fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+				}
+				readStore := i.inputStores[storeIndex]
 				ord := args[1].I64()
 				key, err := i.heap.ReadString(args[2].I32(), args[3].I32())
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-
 				value, found := readStore.GetAt(uint64(ord), key)
 				if !found {
 					zero := wasmer.NewI32(0)
 					return []wasmer.Value{zero}, nil
 				}
-
 				outputPtr := args[4].I32()
 				err = i.writeOutputToHeap(outputPtr, value)
 				if err != nil {
 					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 				}
-
 				return []wasmer.Value{wasmer.NewI32(1)}, nil
 
 			},
-		),
-		"get_first": wasmer.NewFunction(
+		)
+		functions["get_first"] = wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32,
@@ -310,12 +379,15 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				returns(wasmer.I32),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				readStore := i.inputStores[int(args[0].I32())]
+				storeIndex := int(args[0].I32())
+				if storeIndex+1 > len(i.inputStores) {
+					return nil, fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+				}
+				readStore := i.inputStores[storeIndex]
 				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-
 				value, found := readStore.GetFirst(key)
 				if !found {
 					zero := wasmer.NewI32(0)
@@ -326,12 +398,11 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				if err != nil {
 					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 				}
-
 				return []wasmer.Value{wasmer.NewI32(1)}, nil
 
 			},
-		),
-		"get_last": wasmer.NewFunction(
+		)
+		functions["get_last"] = wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32,
@@ -342,12 +413,15 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			),
 
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				readStore := i.inputStores[int(args[0].I32())]
+				storeIndex := int(args[0].I32())
+				if storeIndex+1 > len(i.inputStores) {
+					return nil, fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+				}
+				readStore := i.inputStores[storeIndex]
 				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-
 				value, found := readStore.GetLast(key)
 				if !found {
 					zero := wasmer.NewI32(0)
@@ -358,11 +432,12 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				if err != nil {
 					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 				}
-
 				return []wasmer.Value{wasmer.NewI32(1)}, nil
 			},
-		),
-	})
+		)
+	}
+
+	imports.Register("state", functions)
 }
 
 func (i *Instance) writeOutputToHeap(outputPtr int32, value []byte) error {
@@ -381,31 +456,6 @@ func (i *Instance) writeOutputToHeap(outputPtr int32, value []byte) error {
 	}
 
 	return nil
-}
-
-func (i *Instance) Execute(inputs []*Input) (err error) {
-	i.returnValue = nil
-	i.panicError = nil
-
-	var args []interface{}
-	for _, input := range inputs {
-		switch input.Type {
-		case InputStream:
-			ptr, err := i.heap.Write(input.StreamData)
-			if err != nil {
-				return fmt.Errorf("writing %q to heap: %w", input.Name, err)
-			}
-			len := int32(len(input.StreamData))
-			args = append(args, ptr, len)
-		case InputStore:
-			i.inputStores = append(i.inputStores, input.Store)
-			args = append(args, len(i.inputStores)-1)
-		case OutputStore:
-			i.outputStore = input.Store
-		}
-	}
-	_, err = i.entrypoint.Call(args...)
-	return
 }
 
 func (i *Instance) Err() error {

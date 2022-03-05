@@ -178,6 +178,14 @@ func (b *Builder) bumpOrdinal(ord uint64) {
 	b.lastOrdinal = ord
 }
 
+func (b *Builder) SetBytesIfNotExists(ord uint64, key string, value []byte) {
+	b.setIfNotExists(ord, key, value)
+}
+
+func (b *Builder) SetIfNotExists(ord uint64, key string, value string) {
+	b.setIfNotExists(ord, key, []byte(value))
+}
+
 func (b *Builder) SetBytes(ord uint64, key string, value []byte) {
 	b.set(ord, key, value)
 }
@@ -216,6 +224,25 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 	b.Deltas = append(b.Deltas, *delta)
 }
 
+func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
+	b.bumpOrdinal(ord)
+
+	_, found := b.GetLast(key)
+	if found {
+		return
+	}
+
+	delta := &StateDelta{
+		Op:       "c",
+		Ordinal:  ord,
+		Key:      key,
+		OldValue: nil,
+		NewValue: value,
+	}
+	b.applyDelta(delta)
+	b.Deltas = append(b.Deltas, *delta)
+}
+
 func (b *Builder) applyDelta(delta *StateDelta) {
 	switch delta.Op {
 	case "u", "c":
@@ -223,7 +250,6 @@ func (b *Builder) applyDelta(delta *StateDelta) {
 	case "d":
 		delete(b.KV, delta.Key)
 	}
-
 }
 
 func (b *Builder) Flush() {

@@ -27,7 +27,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", latest.updatePolicy, previous.updatePolicy)
 	}
 
-	if latest.valueType != previous.valueType { //TODO: will we one day want to be able to merge numeric types int and float?
+	if latest.valueType != previous.valueType { //TODO: will we one day want to be able to merge numeric types int and float? (abourget: A store has a fixed valueType for any partial stores of different segments (remember this is for parallel ops), so this should never happen just like `updatePolicy` should never be different)
 		return fmt.Errorf("incompatible value types: cannot merge %q and %q", latest.valueType, previous.valueType)
 	}
 

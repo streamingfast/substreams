@@ -360,10 +360,14 @@ func wasmMapper(vals map[string][]byte, mod *wasm.Module, entrypoint string, nam
 	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs); err != nil {
 		return err
 	}
-	out := vm.Output()
-	vals[name] = out
-	if len(out) != 0 && printOutputs {
-		fmt.Printf("Stream output %q:\n    %v\n", name, out)
+	if vm != nil {
+		out := vm.Output()
+		vals[name] = out
+		if len(out) != 0 && printOutputs {
+			fmt.Printf("Stream output %q:\n    %v\n", name, out)
+		}
+	} else {
+		vals[name] = nil
 	}
 	return nil
 }
@@ -373,18 +377,13 @@ func wasmStateBuilder(vals map[string][]byte, mod *wasm.Module, entrypoint strin
 	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs); err != nil {
 		return err
 	}
-	if printOutputs {
+	if vm != nil && printOutputs {
 		vm.PrintDeltas()
 	}
 	return nil
 }
 
-func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name string, inputs []*wasm.Input) (*wasm.Instance, error) {
-	vmInst, err := mod.NewInstance(entrypoint)
-	if err != nil {
-		return nil, fmt.Errorf("new wasm instance: %w", err)
-	}
-
+func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name string, inputs []*wasm.Input) (out *wasm.Instance, err error) {
 	hasInput := false
 	for _, input := range inputs {
 		switch input.Type {
@@ -405,10 +404,13 @@ func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name 
 	//  state builders will not be called if their input streams are 0 bytes length (and there's no
 	//  state store in read mode)
 	if hasInput {
-		if err = vmInst.Execute(inputs); err != nil {
+		out, err = mod.NewInstance(entrypoint, inputs)
+		if err != nil {
+			return nil, fmt.Errorf("new wasm instance: %w", err)
+		}
+		if err = out.Execute(); err != nil {
 			return nil, fmt.Errorf("stream %s: wasm execution failed: %w", name, err)
 		}
 	}
-
-	return vmInst, err
+	return
 }

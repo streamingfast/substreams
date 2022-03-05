@@ -12,14 +12,14 @@ func (b *Builder) SumBigInt(ord uint64, key string, value *big.Int) {
 	if !found {
 		sum = value
 	} else {
-		prev := new(big.Int).SetBytes(val)
+		prev, _ := new(big.Int).SetString(string(val), 10)
 		if prev == nil {
 			sum = value
 		} else {
 			sum.Add(prev, value)
 		}
 	}
-	b.set(ord, key, sum.Bytes())
+	b.set(ord, key, []byte(sum.String()))
 }
 
 func (b *Builder) SumInt64(ord uint64, key string, value int64) {

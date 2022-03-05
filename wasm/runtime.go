@@ -354,108 +354,106 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 
-	if len(i.inputStores) != 0 {
-		functions["get_at"] = wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32, /* store index */
-					wasmer.I64, /* ordinal */
-					wasmer.I32, /* key offset */
-					wasmer.I32, /* key length */
-					wasmer.I32 /* return pointer */),
-				returns(wasmer.I32),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				storeIndex := int(args[0].I32())
-				if storeIndex+1 > len(i.inputStores) {
-					return nil, fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
-				}
-				readStore := i.inputStores[storeIndex]
-				ord := args[1].I64()
-				key, err := i.heap.ReadString(args[2].I32(), args[3].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				value, found := readStore.GetAt(uint64(ord), key)
-				if !found {
-					zero := wasmer.NewI32(0)
-					return []wasmer.Value{zero}, nil
-				}
-				outputPtr := args[4].I32()
-				err = i.writeOutputToHeap(outputPtr, value)
-				if err != nil {
-					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
-				}
-				return []wasmer.Value{wasmer.NewI32(1)}, nil
-			},
-		)
-		functions["get_first"] = wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32,
-					wasmer.I32,
-					wasmer.I32,
-					wasmer.I32),
-				returns(wasmer.I32),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				storeIndex := int(args[0].I32())
-				if storeIndex+1 > len(i.inputStores) {
-					return nil, fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
-				}
-				readStore := i.inputStores[storeIndex]
-				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				value, found := readStore.GetFirst(key)
-				if !found {
-					zero := wasmer.NewI32(0)
-					return []wasmer.Value{zero, zero, zero}, nil
-				}
-				outputPtr := args[3].I32()
-				err = i.writeOutputToHeap(outputPtr, value)
-				if err != nil {
-					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
-				}
-				return []wasmer.Value{wasmer.NewI32(1)}, nil
+	functions["get_at"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I32, /* store index */
+				wasmer.I64, /* ordinal */
+				wasmer.I32, /* key offset */
+				wasmer.I32, /* key length */
+				wasmer.I32 /* return pointer */),
+			returns(wasmer.I32),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			storeIndex := int(args[0].I32())
+			if storeIndex+1 > len(i.inputStores) {
+				return nil, fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+			}
+			readStore := i.inputStores[storeIndex]
+			ord := args[1].I64()
+			key, err := i.heap.ReadString(args[2].I32(), args[3].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, found := readStore.GetAt(uint64(ord), key)
+			if !found {
+				zero := wasmer.NewI32(0)
+				return []wasmer.Value{zero}, nil
+			}
+			outputPtr := args[4].I32()
+			err = i.writeOutputToHeap(outputPtr, value)
+			if err != nil {
+				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
+			}
+			return []wasmer.Value{wasmer.NewI32(1)}, nil
+		},
+	)
+	functions["get_first"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I32,
+				wasmer.I32,
+				wasmer.I32,
+				wasmer.I32),
+			returns(wasmer.I32),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			storeIndex := int(args[0].I32())
+			if storeIndex+1 > len(i.inputStores) {
+				return nil, fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+			}
+			readStore := i.inputStores[storeIndex]
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, found := readStore.GetFirst(key)
+			if !found {
+				zero := wasmer.NewI32(0)
+				return []wasmer.Value{zero, zero, zero}, nil
+			}
+			outputPtr := args[3].I32()
+			err = i.writeOutputToHeap(outputPtr, value)
+			if err != nil {
+				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
+			}
+			return []wasmer.Value{wasmer.NewI32(1)}, nil
 
-			},
-		)
-		functions["get_last"] = wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32,
-					wasmer.I32,
-					wasmer.I32,
-					wasmer.I32),
-				returns(wasmer.I32),
-			),
+		},
+	)
+	functions["get_last"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I32,
+				wasmer.I32,
+				wasmer.I32,
+				wasmer.I32),
+			returns(wasmer.I32),
+		),
 
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				storeIndex := int(args[0].I32())
-				if storeIndex+1 > len(i.inputStores) {
-					return nil, fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
-				}
-				readStore := i.inputStores[storeIndex]
-				key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				value, found := readStore.GetLast(key)
-				if !found {
-					zero := wasmer.NewI32(0)
-					return []wasmer.Value{zero, zero, zero}, nil
-				}
-				outputPtr := args[3].I32()
-				err = i.writeOutputToHeap(outputPtr, value)
-				if err != nil {
-					return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
-				}
-				return []wasmer.Value{wasmer.NewI32(1)}, nil
-			},
-		)
-	}
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			storeIndex := int(args[0].I32())
+			if storeIndex+1 > len(i.inputStores) {
+				return nil, fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+			}
+			readStore := i.inputStores[storeIndex]
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, found := readStore.GetLast(key)
+			if !found {
+				zero := wasmer.NewI32(0)
+				return []wasmer.Value{zero, zero, zero}, nil
+			}
+			outputPtr := args[3].I32()
+			err = i.writeOutputToHeap(outputPtr, value)
+			if err != nil {
+				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
+			}
+			return []wasmer.Value{wasmer.NewI32(1)}, nil
+		},
+	)
 
 	imports.Register("state", functions)
 }

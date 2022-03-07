@@ -115,6 +115,48 @@ func TestRustScript(t *testing.T) {
 				require.Equal(t, "11.04", string(data))
 			},
 		},
+		{
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_set_max_int64",
+			builder:      state.NewBuilder("builder.name.1", "max", "int64", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				data, found := builder.GetLast("set_max_int64")
+				require.True(t, found)
+				require.Equal(t, "5", string(data))
+			},
+		},
+		{
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_set_max_bigint",
+			builder:      state.NewBuilder("builder.name.1", "min", "bigInt", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				data, found := builder.GetLast("set_max_bigint")
+				require.True(t, found)
+				require.Equal(t, "5", string(data))
+			},
+		},
+		{
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_set_max_float64",
+			builder:      state.NewBuilder("builder.name.1", "min", "float64", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				data, found := builder.GetLast("set_max_float64")
+				require.True(t, found)
+				actual, err := strconv.ParseFloat(string(data), 100)
+				require.NoError(t, err)
+				require.Equal(t, 10.05, actual)
+			},
+		},
+		{
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_set_max_bigfloat",
+			builder:      state.NewBuilder("builder.name.1", "min", "bigFloat", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				data, found := builder.GetLast("set_max_bigfloat")
+				require.True(t, found)
+				require.Equal(t, "11.05", string(data))
+			},
+		},
 	}
 
 	for _, c := range cases {

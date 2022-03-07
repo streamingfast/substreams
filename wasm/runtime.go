@@ -144,7 +144,6 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 				columnNumber := int(args[5].I32())
 
 				i.panicError = &PanicError{message, filename, lineNumber, columnNumber}
-				//fmt.Println(i.panicError.Error())
 
 				return nil, i.panicError
 			},
@@ -504,6 +503,104 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 
 			toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
 			i.outputStore.SetMinBigFloat(uint64(ord), key, toSet)
+
+			return nil, nil
+		},
+	)
+
+	functions["set_max_int64"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "int64" {
+				return nil, fmt.Errorf("invalid store operation: 'set_max_int64' only valid for stores with updatePolicy == 'max' and valueType == 'int64'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value := args[3].I64()
+
+			i.outputStore.SetMaxInt64(uint64(ord), key, value)
+
+			return nil, nil
+		},
+	)
+
+	functions["set_max_bigint"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "bigint" {
+				return nil, fmt.Errorf("invalid store operation: 'set_max_bigint' only valid for stores with updatePolicy == 'max' and valueType == 'bigint'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			toSet, _ := new(big.Int).SetString(value, 10)
+			i.outputStore.SetMaxBigInt(uint64(ord), key, toSet)
+
+			return nil, nil
+		},
+	)
+	functions["set_max_float64"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "float" {
+				return nil, fmt.Errorf("invalid store operation: 'set_max_float64' only valid for stores with updatePolicy == 'max' and valueType == 'float64'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value := args[3].F64()
+			i.outputStore.SetMaxFloat64(uint64(ord), key, value)
+
+			return nil, nil
+		},
+	)
+
+	functions["set_max_bigfloat"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "bigint" {
+				return nil, fmt.Errorf("invalid store operation: 'set_max_bigfloat' only valid for stores with updatePolicy == 'max' and valueType == 'bigfloat'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
+			i.outputStore.SetMaxBigFloat(uint64(ord), key, toSet)
 
 			return nil, nil
 		},

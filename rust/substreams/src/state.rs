@@ -170,4 +170,51 @@ pub fn set_min_bigfloat(ord: i64, key: String, value: BigDecimal) {
     }
 }
 
+pub fn set_max_int64(ord: i64, key: String, value: i64) {
+    unsafe {
+        externs::state::set_max_int64(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            value,
+        )
+    }
+}
 
+pub fn set_max_bigint(ord: i64, key: String, value: BigUint) {
+    let data = value.to_string();
+    unsafe {
+        externs::state::set_max_bigint(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            data.as_ptr(),
+            data.len() as u32,
+        )
+    }
+}
+
+
+pub fn set_max_float64(ord: i64, key: String, value: f64) {
+    unsafe {
+        externs::state::set_max_float64(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            value,
+        )
+    }
+}
+
+pub fn set_max_bigfloat(ord: i64, key: String, value: BigDecimal) {
+    let data = value.to_string();
+    unsafe {
+        externs::state::set_max_bigfloat(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            data.as_ptr(),
+            data.len() as u32,
+        )
+    }
+}

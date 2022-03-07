@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 #substreams={ path = "/Users/abourget/sf/substreams-rust" }
 substreams={ path = "../substreams" }
 num-bigint = "0.4"
+bigdecimal = "0.3"

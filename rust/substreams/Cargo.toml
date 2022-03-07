@@ -9,3 +9,4 @@ prost = { version = "0.6" }
 prost-types = "0.6"
 hex = "0.4.3"
 num-bigint = "0.4"
+bigdecimal = "0.3"

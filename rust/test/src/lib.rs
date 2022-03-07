@@ -14,7 +14,7 @@ extern "C" fn test_sum_float64() {
     substreams::state::sum_float64(1, "sum.float.64".to_string(), 10.75)
 }
 
-#[no_mangle]
-extern "C" fn test_sum_big_float() {
-    substreams::state::sum_bigfloat(1, "sum.big.float".to_string(), 12345678987654321.50)
-}
+// #[no_mangle]
+// extern "C" fn test_sum_big_float() {
+//     substreams::state::sum_bigfloat(1, "sum.big.float".to_string(), 12345678987654321.50)
+// }

@@ -1,4 +1,6 @@
-package rust
+package test
+
+//go:generate ./build.sh
 
 import (
 	"io/ioutil"

@@ -44,7 +44,7 @@ func (b *Builder) SetMinFloat64(ord uint64, key string, value float64) {
 	if !found {
 		min = value
 	} else {
-		prev, err := strconv.ParseFloat(string(val), 100)
+		prev, err := strconv.ParseFloat(string(val), 64)
 
 		if err != nil || value <= prev {
 			min = value
@@ -52,7 +52,7 @@ func (b *Builder) SetMinFloat64(ord uint64, key string, value float64) {
 			min = prev
 		}
 	}
-	valString, _ := strconv.ParseFloat(string(val), 100)
+	valString, _ := strconv.ParseFloat(string(val), 64)
 	fmt.Println("Patate", min, valString)
 	b.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }

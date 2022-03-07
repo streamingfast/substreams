@@ -48,7 +48,7 @@ func TestBuilder_Merge(t *testing.T) {
 			},
 		},
 		{
-			name:   "ignore (previous wins if key exists)",
+			name:   "ignore (previous wins)",
 			latest: NewBuilder("b1", UpdatePolicyIgnore, OutputValueTypeString, "", nil),
 			latestKV: map[string][]byte{
 				"one": []byte("foo"),
@@ -61,8 +61,9 @@ func TestBuilder_Merge(t *testing.T) {
 			},
 			expectedError: false,
 			expectedKV: map[string][]byte{
-				"one": []byte("baz"),
-				"two": []byte("bar"),
+				"one":   []byte("baz"),
+				"two":   []byte("bar"),
+				"three": []byte("lol"),
 			},
 		},
 		{

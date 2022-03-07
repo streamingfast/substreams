@@ -40,9 +40,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		}
 	case UpdatePolicyIgnore:
 		for k, v := range previous.KV {
-			if _, found := latest.KV[k]; found {
-				latest.KV[k] = v
-			}
+			latest.KV[k] = v
 		}
 	case UpdatePolicySum:
 		// check valueType to do the right thing

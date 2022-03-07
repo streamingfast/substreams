@@ -158,8 +158,6 @@ func (b *Builder) Merge(previous *Builder) error {
 	return nil
 }
 
-//TODO(colin): all funcs below are copied from other parts of this repo.  de-duplicate this!
-
 func foundOrZeroUint64(in []byte, found bool) uint64 {
 	if !found {
 		return 0

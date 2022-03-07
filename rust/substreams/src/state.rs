@@ -102,8 +102,18 @@ pub fn sum_int64(ord: i64, key: String, value: i64) {
             ord,
             key.as_ptr(),
             key.len() as u32,
-	    value,
+	        value,
         )
     }
 }
 
+pub fn sum_float64(ord: i64, key: String, value: f64) {
+    unsafe {
+        externs::state::sum_float64(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            value
+        )
+    }
+}

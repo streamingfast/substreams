@@ -54,7 +54,13 @@ pub mod state {
             ord: i64,
             key_ptr: *const u8,
             key_len: u32,
-	    value: i64,
+	        value: i64,
+        );
+        pub fn sum_float64(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value: f64,
         );
     }
 }

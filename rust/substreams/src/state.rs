@@ -83,7 +83,7 @@ pub fn sum_bigint(ord: i64, key: String, value: BigUint) {
     //
     // Also, the serialization would be as a base-10 string, so the runtime can properly decode it
     // agnostic to the memory layout of the Rust BigWhatever library.
-    let data = value.to_bytes_le();
+    let data = value.to_string();
     unsafe {
         externs::state::sum_bigint(
             ord,

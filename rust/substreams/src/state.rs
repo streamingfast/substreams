@@ -3,7 +3,6 @@ use crate::memory::memory;
 use num_bigint::BigUint;
 
 pub fn get_at(store_idx: u32, ord: i64, key: String) -> Option<Vec<u8>> {
-    foo.bar
     unsafe {
         let key_bytes = key.as_bytes();
         let output_ptr = memory::alloc(8);

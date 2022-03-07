@@ -9,5 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 #substreams={ path = "/Users/abourget/sf/substreams-rust" }
-substreams={ git = "https://github.com/streamingfast/substreams-rust" }
+substreams={ path = "../substreams" }
 num-bigint = "0.4"

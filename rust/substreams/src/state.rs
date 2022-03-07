@@ -1,6 +1,7 @@
 use crate::externs;
 use crate::memory::memory;
 use num_bigint::BigUint;
+use bigdecimal::BigDecimal;
 
 pub fn get_at(store_idx: u32, ord: i64, key: String) -> Option<Vec<u8>> {
     unsafe {
@@ -72,17 +73,6 @@ pub fn set(ord: i64, key: String, value: Vec<u8>) {
 }
 
 pub fn sum_bigint(ord: i64, key: String, value: BigUint) {
-    // TODO: here we should use
-    // https://docs.rs/num-bigint/0.2.0/num_bigint/struct.BigInt.html
-    // because it's what is used below https://docs.rs/bigdecimal/0.0.14/bigdecimal/struct.BigDecimal.html
-    // and that's what's used in the `graph-node`, unless we have very strong reasons to choose something
-    // else.
-    //
-    // Also, we started with `bigint` that means it supports negative numbers. BigUint would be
-    // only positif integers, which might be annoying if a segment ends up in the negative.
-    //
-    // Also, the serialization would be as a base-10 string, so the runtime can properly decode it
-    // agnostic to the memory layout of the Rust BigWhatever library.
     let data = value.to_string();
     unsafe {
         externs::state::sum_bigint(
@@ -118,8 +108,8 @@ pub fn sum_float64(ord: i64, key: String, value: f64) {
     }
 }
 
-pub fn sum_bigfloat(ord: i64, key: String, value: BigUint) {
-    let data = value.to_bytes_le();
+pub fn sum_bigfloat(ord: i64, key: String, value: BigDecimal) {
+    let data = value.to_string();
     unsafe {
         externs::state::sum_bigfloat(
             ord,

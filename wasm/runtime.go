@@ -249,6 +249,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			return nil, nil
 		},
 	)
+
 	functions["set_if_not_exists"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
@@ -274,6 +275,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			return nil, nil
 		},
 	)
+
 	functions["sum_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
@@ -304,6 +306,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			return nil, nil
 		},
 	)
+
 	functions["sum_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
@@ -324,12 +327,13 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
-			toAdd, _ := new(big.Int).SetString(value, 10) // corresponds to SumBigInt's read of the kv value
+			toAdd, _ := new(big.Int).SetString(value, 10)
 			i.outputStore.SumBigInt(uint64(ord), key, toAdd)
 
 			return nil, nil
 		},
 	)
+
 	functions["sum_int64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
@@ -361,7 +365,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "float64" {
-				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'int64'")
+				return nil, fmt.Errorf("invalid store operation: 'sum_float64' only valid for stores with updatePolicy == 'sum' and valueType == 'float64'")
 			}
 			ord := args[0].I64()
 			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
@@ -379,6 +383,33 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 
+	functions["sum_bigfloat"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigfloat" {
+				return nil, fmt.Errorf("invalid store operation: 'sum_bigfloat' only valid for stores with updatePolicy == 'sum' and valueType == 'bigfloat'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
+			i.outputStore.SumBigFloat(uint64(ord), key, toAdd)
+
+			return nil, nil
+		},
+	)
+
 	functions["get_at"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
@@ -386,7 +417,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				wasmer.I64, /* ordinal */
 				wasmer.I32, /* key offset */
 				wasmer.I32, /* key length */
-				wasmer.I32  /* return pointer */),
+				wasmer.I32 /* return pointer */),
 			returns(wasmer.I32),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {

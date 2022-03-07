@@ -4,7 +4,6 @@ package test
 
 import (
 	"io/ioutil"
-	"math/big"
 	"os"
 	"strconv"
 	"testing"
@@ -23,46 +22,55 @@ func TestRustScript(t *testing.T) {
 		assert       func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder)
 	}{
 		{
-			wasmFile:     "./test/target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_big_int",
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			builder:      state.NewBuilder("builder.name.1", "sum", "bigint", "", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("test.key.1")
 				require.True(t, found)
-				require.Equal(t, big.NewInt(20).String(), string(data))
+				require.Equal(t, "20", string(data))
 			},
 		},
 		{
-			wasmFile:     "./test/target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_int64",
 			builder:      state.NewBuilder("builder.name.1", "sum", "int64", "", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.int.64")
 				require.True(t, found)
 				val, _ := strconv.ParseInt(string(data), 10, 64)
-				require.Equal(t, int64(10), val)
+				require.Equal(t, int64(20), val)
 			},
 		},
 		{
-			wasmFile:     "./test/target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_float64",
 			builder:      state.NewBuilder("builder.name.1", "sum", "float64", "", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.float.64")
 				require.True(t, found)
 				val, _ := strconv.ParseFloat(string(data), 64)
-				require.Equal(t, 10.75, val)
+				require.Equal(t, 21.5, val)
 			},
 		},
 		{
-			wasmFile:     "./test/target/wasm32-unknown-unknown/release/testing_substreams.wasm",
-			functionName: "test_sum_big_float",
-			builder:      state.NewBuilder("builder.name.1", "sum", "float64", "", nil),
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_sum_big_float_small_number",
+			builder:      state.NewBuilder("builder.name.1", "sum", "bigFloat", "", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
-				data, found := builder.GetLast("sum.float.64")
+				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)
-				val, _ := strconv.ParseFloat(string(data), 64)
-				require.Equal(t, 10.75, val)
+				require.Equal(t, "21", string(data))
+			},
+		},
+		{
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_sum_big_float_big_number",
+			builder:      state.NewBuilder("builder.name.1", "sum", "bigFloat", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				data, found := builder.GetLast("sum.big.float")
+				require.True(t, found)
+				require.Equal(t, "24691357975308643", string(data))
 			},
 		},
 	}

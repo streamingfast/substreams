@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/streamingfast/substreams/state"
-
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/test-go/testify/require"
 )

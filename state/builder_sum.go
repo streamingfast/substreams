@@ -1,7 +1,6 @@
 package state
 
 import (
-	"fmt"
 	"math/big"
 	"strconv"
 )
@@ -35,7 +34,7 @@ func (b *Builder) SumInt64(ord uint64, key string, value int64) {
 			sum = prev + value
 		}
 	}
-	b.set(ord, key, []byte(fmt.Sprintf("%d", sum)))
+	b.set(ord, key, []byte(strconv.FormatInt(sum, 10)))
 }
 
 func (b *Builder) SumFloat64(ord uint64, key string, value float64) {

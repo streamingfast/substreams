@@ -3,9 +3,8 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
-
 	"go.uber.org/zap"
+	"math/big"
 
 	"github.com/streamingfast/substreams/state"
 	"github.com/wasmerio/wasmer-go/wasmer"
@@ -354,6 +353,32 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 
+	functions["sum_float64"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "float64" {
+				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'int64'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+
+			value := args[3].F64()
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+			i.outputStore.SumFloat64(uint64(ord), key, value)
+
+			return nil, nil
+		},
+	)
+
 	functions["get_at"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
@@ -361,7 +386,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				wasmer.I64, /* ordinal */
 				wasmer.I32, /* key offset */
 				wasmer.I32, /* key length */
-				wasmer.I32 /* return pointer */),
+				wasmer.I32  /* return pointer */),
 			returns(wasmer.I32),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {

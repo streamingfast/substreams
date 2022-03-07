@@ -66,5 +66,5 @@ func (b *Builder) SumBigFloat(ord uint64, key string, value *big.Float) {
 			sum.Add(prev, value)
 		}
 	}
-	b.set(ord, key, []byte(sum.Text('g', -1)))
+	b.set(ord, key, []byte(sum.Text('g', 100)))
 }

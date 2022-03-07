@@ -52,7 +52,7 @@ type StreamOutput struct {
 
 	// For state builders
 	ValueType    string `yaml:"valueType"`
-	ProtoType    string `yaml":protoType"` // when `ValueType` == "proto"
+	ProtoType    string `yaml:"protoType"` // when `ValueType` == "proto"
 	UpdatePolicy string `yaml:"updatePolicy"`
 }
 

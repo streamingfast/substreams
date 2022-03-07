@@ -62,5 +62,31 @@ pub mod state {
             value_ptr: *const u8,
             value_len: u32,
         );
+        pub fn set_min_int64(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value: i64,
+        );
+        pub fn set_min_bigint(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value_ptr: *const u8,
+            value_len: u32,
+        );
+        pub fn set_min_float64(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value: f64,
+        );
+        pub fn set_min_bigfloat(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value_ptr: *const u8,
+            value_len: u32,
+        );
     }
 }

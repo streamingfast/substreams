@@ -3,11 +3,11 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
-	"go.uber.org/zap"
 	"math/big"
 
 	"github.com/streamingfast/substreams/state"
 	"github.com/wasmerio/wasmer-go/wasmer"
+	"go.uber.org/zap"
 )
 
 type Instance struct {
@@ -405,6 +405,105 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 
 			toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
 			i.outputStore.SumBigFloat(uint64(ord), key, toAdd)
+
+			return nil, nil
+		},
+	)
+
+	functions["set_min_int64"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "int64" {
+				return nil, fmt.Errorf("invalid store operation: 'set_min_int64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value := args[3].I64()
+
+			i.outputStore.SetMinInt64(uint64(ord), key, value)
+
+			return nil, nil
+		},
+	)
+
+	functions["set_min_bigint"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "bigfloat" {
+				return nil, fmt.Errorf("invalid store operation: 'set_min_bigint' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			toSet, _ := new(big.Int).SetString(value, 10)
+			i.outputStore.SetMinBigInt(uint64(ord), key, toSet)
+
+			return nil, nil
+		},
+	)
+	functions["set_min_float64"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "float" {
+				return nil, fmt.Errorf("invalid store operation: 'set_min_float64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value := args[3].F64()
+			fmt.Println("parse float", value)
+			i.outputStore.SetMinFloat64(uint64(ord), key, value)
+
+			return nil, nil
+		},
+	)
+
+	functions["set_min_bigfloat"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "bigint" {
+				return nil, fmt.Errorf("invalid store operation: 'set_min_bigfloat' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
+			}
+			ord := args[0].I64()
+			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string: %w", err)
+			}
+			value, err := i.heap.ReadString(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
+			i.outputStore.SetMinBigFloat(uint64(ord), key, toSet)
 
 			return nil, nil
 		},

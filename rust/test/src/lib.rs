@@ -32,7 +32,6 @@ extern "C" fn test_sum_big_float_big_number() {
 }
 
 
-
 #[no_mangle]
 extern "C" fn test_set_min_int64() {
     substreams::state::set_min_int64(1, "set_min_int64".to_string(), 5);

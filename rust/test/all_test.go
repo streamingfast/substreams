@@ -56,7 +56,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_big_float_small_number",
-			builder:      state.NewBuilder("builder.name.1", "min", "bigFloat", "", nil),
+			builder:      state.NewBuilder("builder.name.1", "sum", "bigFloat", "", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)
@@ -66,7 +66,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_big_float_big_number",
-			builder:      state.NewBuilder("builder.name.1", "min", "bigFloat", "", nil),
+			builder:      state.NewBuilder("builder.name.1", "sum", "bigFloat", "", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)

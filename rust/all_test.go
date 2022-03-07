@@ -53,6 +53,17 @@ func TestRustScript(t *testing.T) {
 				require.Equal(t, 10.75, val)
 			},
 		},
+		{
+			wasmFile:     "./test/target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_sum_big_float",
+			builder:      state.NewBuilder("builder.name.1", "sum", "float64", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				data, found := builder.GetLast("sum.float.64")
+				require.True(t, found)
+				val, _ := strconv.ParseFloat(string(data), 64)
+				require.Equal(t, 10.75, val)
+			},
+		},
 	}
 
 	for _, c := range cases {

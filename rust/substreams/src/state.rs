@@ -117,3 +117,16 @@ pub fn sum_float64(ord: i64, key: String, value: f64) {
         )
     }
 }
+
+pub fn sum_bigfloat(ord: i64, key: String, value: BigUint) {
+    let data = value.to_bytes_le();
+    unsafe {
+        externs::state::sum_bigfloat(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            data.as_ptr(),
+            data.len() as u32,
+        )
+    }
+}

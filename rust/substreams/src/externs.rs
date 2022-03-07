@@ -43,13 +43,6 @@ pub mod state {
             value_ptr: *const u8,
             value_len: u32,
         );
-        pub fn sum_bigfloat(
-            ord: i64,
-            key_ptr: *const u8,
-            key_len: u32,
-            value_ptr: *const u8,
-            value_len: u32,
-        );
         pub fn sum_int64(
             ord: i64,
             key_ptr: *const u8,
@@ -61,6 +54,13 @@ pub mod state {
             key_ptr: *const u8,
             key_len: u32,
             value: f64,
+        );
+        pub fn sum_bigfloat(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value_ptr: *const u8,
+            value_len: u32,
         );
     }
 }

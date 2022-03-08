@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package sf.ethereum.substreams.v1;
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1;pbsubstreams";
+
+message Rpc {
+  int32 ver = 1;
+}

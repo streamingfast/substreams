@@ -30,6 +30,59 @@ type Imports interface {
 	RPC(calls []*RPCCall) ([]*RPCResponse, error)
 }
 
+// RPCCallsFromWASM ( blockNum, rpcClient, rpcCache, calls []*pbsubstream.RpcCall) ([]*pbsubstream.RPCResponse) {
+/*
+ 	var reqs []*rpc.RPCRequest
+	for _, call := range calls {
+
+		reqs =
+		  // I need a []*rpc.RPCRequest
+		  // 	Params:  []interface{[]interface{call.ToAddress, call.method_signature}, blockNum}
+    	  //    Method: "eth_call"
+
+	}
+
+
+	var delay time.Duration
+	var attemptNumber int
+	for {
+		time.Sleep(delay)
+
+		attemptNumber += 1
+		delay = minDuration(time.Duration(attemptNumber*500)*time.Millisecond, 10*time.Second)
+
+		out, err := rpcClient.DoRequests(reqs)
+		if err != nil {
+			zlog.Warn("retrying RPCCall on RPC error", zap.Error(err), zap.Uint64("at_block", blockNum))
+			continue
+		}
+
+		var nonDeterministicResp bool
+		for _, resp := range out {
+			if !resp.Deterministic() {
+				zlog.Warn("retrying RPCCall on non-deterministic RPC call error", zap.Error(resp.Err), zap.Uint64("at_block", blockNum))
+				nonDeterministicResp = true
+				break
+			}
+		}
+		if nonDeterministicResp {
+			continue
+		}
+		if rpcCache != nil {
+			rpcCache.Set(cacheKey, out)
+		}
+		resp := toPBRPCResponse(out)
+		return resp, nil
+	}
+
+func toPBRPCResponse(rpc.Response) pbsubstream.RPCResponse {
+// ... error content becomes a boolean failed: true
+// if failed is true,  omit content to be sure we are deterministic
+}
+*/
+
+// }
+
 func DoRPCCalls(noArchiveNode bool, blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls []*RPCCall) ([]*RPCResponse, error) {
 	opts := []rpc.ETHCallOption{}
 	if noArchiveNode {

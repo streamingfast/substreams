@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/merger/bundle"
 )
@@ -18,8 +20,8 @@ type Builder struct {
 	bundler *bundle.Bundler
 	io      StateIO
 
-	KV     map[string][]byte // KV is the state, and assumes all Deltas were already applied to it.
-	Deltas []StateDelta      // Deltas are always deltas for the given block.
+	KV     map[string][]byte         // KV is the state, and assumes all Deltas were already applied to it.
+	Deltas []pbsubstreams.StateDelta // Deltas are always deltas for the given block.
 
 	updatePolicy string
 	valueType    string
@@ -53,8 +55,8 @@ func (b *Builder) Print() {
 	}
 }
 
-func (b *Builder) PrintDelta(delta *StateDelta) {
-	fmt.Printf("  %s (%d) KEY: %q\n", strings.ToUpper(delta.Op), delta.Ordinal, delta.Key)
+func (b *Builder) PrintDelta(delta *pbsubstreams.StateDelta) {
+	fmt.Printf("  %s (%d) KEY: %q\n", strings.ToUpper(delta.Operation), delta.Ordinal, delta.Key)
 	fmt.Printf("    OLD: %s\n", string(delta.OldValue))
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
@@ -96,27 +98,19 @@ func (b *Builder) Init(startBlockNum uint64) error {
 	return nil
 }
 
-type StateDelta struct {
-	Op       string // "c"reate, "u"pdate, "d"elete, same as https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/debezium/#how-to-use-debezium-format
-	Ordinal  uint64 // a sorting key to order deltas, and provide pointers to changes midway
-	Key      string
-	OldValue []byte
-	NewValue []byte
-}
-
 var NotFound = errors.New("state key not found")
 
 func (b *Builder) GetFirst(key string) ([]byte, bool) {
 	for _, delta := range b.Deltas {
 		if delta.Key == key {
-			switch delta.Op {
+			switch delta.Operation {
 			case "d", "u":
 				return delta.OldValue, true
 			case "c":
 				return nil, false
 			default:
 				// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-				panic(fmt.Sprintf("invalid value %q for StateDelta::Op for key %q", delta.Op, delta.Key))
+				panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 			}
 		}
 	}
@@ -138,7 +132,7 @@ func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool) {
 			break
 		}
 		if delta.Key == key {
-			switch delta.Op {
+			switch delta.Operation {
 			case "d", "u":
 				out = delta.OldValue
 				found = true
@@ -147,7 +141,7 @@ func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool) {
 				found = false
 			default:
 				// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-				panic(fmt.Sprintf("invalid value %q for StateDelta::Op for key %q", delta.Op, delta.Key))
+				panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 			}
 		}
 	}
@@ -159,12 +153,12 @@ func (b *Builder) Del(ord uint64, key string) {
 
 	val, found := b.GetLast(key)
 	if found {
-		delta := &StateDelta{
-			Op:       "d",
-			Ordinal:  ord,
-			Key:      key,
-			OldValue: val,
-			NewValue: nil,
+		delta := &pbsubstreams.StateDelta{
+			Operation: "d",
+			Ordinal:   ord,
+			Key:       key,
+			OldValue:  val,
+			NewValue:  nil,
 		}
 		b.applyDelta(delta)
 		b.Deltas = append(b.Deltas, *delta)
@@ -198,26 +192,26 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 
 	val, found := b.GetLast(key)
 
-	var delta *StateDelta
+	var delta *pbsubstreams.StateDelta
 	if found {
 		//Uncomment when finished debugging:
 		if bytes.Compare(value, val) == 0 {
 			return
 		}
-		delta = &StateDelta{
-			Op:       "u",
-			Ordinal:  ord,
-			Key:      key,
-			OldValue: val,
-			NewValue: value,
+		delta = &pbsubstreams.StateDelta{
+			Operation: "u",
+			Ordinal:   ord,
+			Key:       key,
+			OldValue:  val,
+			NewValue:  value,
 		}
 	} else {
-		delta = &StateDelta{
-			Op:       "c",
-			Ordinal:  ord,
-			Key:      key,
-			OldValue: nil,
-			NewValue: value,
+		delta = &pbsubstreams.StateDelta{
+			Operation: "c",
+			Ordinal:   ord,
+			Key:       key,
+			OldValue:  nil,
+			NewValue:  value,
 		}
 	}
 	b.applyDelta(delta)
@@ -232,19 +226,19 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 		return
 	}
 
-	delta := &StateDelta{
-		Op:       "c",
-		Ordinal:  ord,
-		Key:      key,
-		OldValue: nil,
-		NewValue: value,
+	delta := &pbsubstreams.StateDelta{
+		Operation: "c",
+		Ordinal:   ord,
+		Key:       key,
+		OldValue:  nil,
+		NewValue:  value,
 	}
 	b.applyDelta(delta)
 	b.Deltas = append(b.Deltas, *delta)
 }
 
-func (b *Builder) applyDelta(delta *StateDelta) {
-	switch delta.Op {
+func (b *Builder) applyDelta(delta *pbsubstreams.StateDelta) {
+	switch delta.Operation {
 	case "u", "c":
 		b.KV[delta.Key] = delta.NewValue
 	case "d":

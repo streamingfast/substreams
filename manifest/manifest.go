@@ -24,19 +24,15 @@ type Stream struct {
 	Name   string       `yaml:"name"`
 	Kind   string       `yaml:"kind"`
 	Code   Code         `yaml:"code"`
-	Inputs []string     `yaml:"inputs"`
+	Inputs []Input      `yaml:"inputs"`
 	Output StreamOutput `yaml:"output"`
 }
 
-type StreamInput string
-
-func (si StreamInput) Parse() (kind string, name string, err error) {
-	parts := strings.Split(string(si), ":")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid input. should be of format {kind}:{name}")
-	}
-
-	return parts[0], parts[1], nil
+type Input struct {
+	Source string `yaml:"source"`
+	Store  string `yaml:"store"`
+	Map    string `yaml:"map"`
+	Mode   string `yaml:"mode"`
 }
 
 type Code struct {

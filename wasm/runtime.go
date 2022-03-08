@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -94,8 +95,21 @@ func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, e
 			len := int32(len(input.StreamData))
 			args = append(args, ptr, len)
 		case InputStore:
-			instance.inputStores = append(instance.inputStores, input.Store)
-			args = append(args, len(instance.inputStores)-1)
+			if input.Deltas {
+				// Make it a proto thing before sending in
+				cnt, _ := json.Marshal(input.Store.StateDeltas)
+
+				ptr, err := instance.heap.Write(cnt)
+				if err != nil {
+					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
+				}
+
+				instance.stateDeltas = append(instance.stateDeltas, input.Store)
+				args = append(args, ptr, len(cnt))
+			} else {
+				instance.inputStores = append(instance.inputStores, input.Store)
+				args = append(args, len(instance.inputStores)-1)
+			}
 		case OutputStore:
 			instance.outputStore = input.Store
 			instance.updatePolicy = input.UpdatePolicy

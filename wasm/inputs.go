@@ -18,7 +18,8 @@ type Input struct {
 	StreamData []byte
 
 	// InputType == InputStore || OutputStore
-	Store *state.Builder
+	Store  *state.Builder
+	Deltas bool // whether we want to have the Deltas instead of an access to the store
 
 	// If InputType == OutputStore
 	UpdatePolicy string

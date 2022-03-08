@@ -139,31 +139,34 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 		debugOutput := stream.Name == p.outputStreamName
 		var inputs []*wasm.Input
 		for _, in := range stream.Inputs {
-			streamInput := manifest.StreamInput(in)
-			inputKind, inputName, err := streamInput.Parse()
-			if err != nil {
-				return err
-			}
-
-			switch inputKind {
-			case "stream":
+			if in.Map != "" {
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputStream,
-					Name: inputName,
+					Name: in.Map,
 				})
-			case "store":
-				inputs = append(inputs, &wasm.Input{
-					Type:  wasm.InputStore,
-					Name:  inputName,
-					Store: p.stores[inputName],
-				})
-			case "proto":
+			} else if in.Store != "" {
+				inputName := in.Store
+				if in.Mode == "deltas" {
+					inputs = append(inputs, &wasm.Input{
+						Type:   wasm.InputStore,
+						Name:   inputName,
+						Store:  p.stores[inputName],
+						Deltas: true,
+					})
+				} else {
+					inputs = append(inputs, &wasm.Input{
+						Type:  wasm.InputStore,
+						Name:  inputName,
+						Store: p.stores[inputName],
+					})
+				}
+			} else if in.Source != "" {
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputStream,
-					Name: inputName,
+					Name: in.Source,
 				})
-			default:
-				return fmt.Errorf("invalid input type %q for stream %q in input %q", inputKind, stream.Name, in)
+			} else {
+				return fmt.Errorf("invalid input struct for stream %q", stream.Name)
 			}
 		}
 		streamName := stream.Name // to ensure it's enclosed

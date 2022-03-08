@@ -201,22 +201,7 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 
 func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 	imports.Register("logger", map[string]wasmer.IntoExtern{
-		"debug": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-				zlog.Debug(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
-				return nil, nil
-			},
-		),
-		"info": wasmer.NewFunction(
+		"println": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
 				params(wasmer.I32, wasmer.I32),

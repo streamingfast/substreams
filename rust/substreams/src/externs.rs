@@ -13,8 +13,7 @@ extern "C" {
 
 #[link(wasm_import_module = "logger")]
 extern "C" {
-    pub fn debug(ptr: *const u8, len: usize);
-    pub fn info(ptr: *const u8, len: usize);
+    pub fn println(ptr: *const u8, len: usize);
 }
 
 pub mod state {

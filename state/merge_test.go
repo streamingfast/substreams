@@ -86,6 +86,25 @@ func TestBuilder_Merge(t *testing.T) {
 			},
 		},
 		{
+			name:   "sum_big_int",
+			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeBigInt, "", nil),
+			latestKV: map[string][]byte{
+				"one": []byte("1"),
+				"two": []byte("2"),
+			},
+			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeBigInt, "", nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("1"),
+				"three": []byte("3"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("2"),
+				"two":   []byte("2"),
+				"three": []byte("3"),
+			},
+		},
+		{
 			name:   "min_int",
 			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeInt64, "", nil),
 			latestKV: map[string][]byte{
@@ -93,6 +112,25 @@ func TestBuilder_Merge(t *testing.T) {
 				"two": []byte("2"),
 			},
 			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeInt64, "", nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("2"),
+				"three": []byte("3"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("1"),
+				"two":   []byte("2"),
+				"three": []byte("3"),
+			},
+		},
+		{
+			name:   "min_big_int",
+			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeBigInt, "", nil),
+			latestKV: map[string][]byte{
+				"one": []byte("1"),
+				"two": []byte("2"),
+			},
+			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeBigInt, "", nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -124,60 +162,136 @@ func TestBuilder_Merge(t *testing.T) {
 			},
 		},
 		{
-			name:   "sum_float",
-			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeBigFloat, "", nil),
+			name:   "max_big_int",
+			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeBigInt, "", nil),
 			latestKV: map[string][]byte{
-				"one": []byte("10.0"),
-				"two": []byte("20.0"),
+				"one": []byte("1"),
+				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeBigFloat, "", nil),
+			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeBigInt, "", nil),
 			prevKV: map[string][]byte{
-				"one":   []byte("10.0"),
-				"three": []byte("30.0"),
+				"one":   []byte("2"),
+				"three": []byte("3"),
 			},
 			expectedError: false,
 			expectedKV: map[string][]byte{
-				"one":   []byte("20.0"),
-				"two":   []byte("20.0"),
-				"three": []byte("30.0"),
+				"one":   []byte("2"),
+				"two":   []byte("2"),
+				"three": []byte("3"),
+			},
+		},
+		{
+			name:   "sum_float",
+			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeFloat64, "", nil),
+			latestKV: map[string][]byte{
+				"one": []byte("10.1"),
+				"two": []byte("20.1"),
+			},
+			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeFloat64, "", nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("10.1"),
+				"three": []byte("30.1"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("20.2"),
+				"two":   []byte("20.1"),
+				"three": []byte("30.1"),
+			},
+		},
+		{
+			name:   "sum_big_float",
+			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeBigFloat, "", nil),
+			latestKV: map[string][]byte{
+				"one": []byte("10.1"),
+				"two": []byte("20.1"),
+			},
+			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeBigFloat, "", nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("10.1"),
+				"three": []byte("30.1"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("20.2"),
+				"two":   []byte("20.1"),
+				"three": []byte("30.1"),
 			},
 		},
 		{
 			name:   "min_float",
-			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeBigFloat, "", nil),
+			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeFloat64, "", nil),
 			latestKV: map[string][]byte{
-				"one": []byte("10.0"),
-				"two": []byte("20.0"),
+				"one": []byte("10.1"),
+				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeBigFloat, "", nil),
+			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeFloat64, "", nil),
 			prevKV: map[string][]byte{
-				"one":   []byte("20.0"),
-				"three": []byte("30.0"),
+				"one":   []byte("20.1"),
+				"three": []byte("30.1"),
 			},
 			expectedError: false,
 			expectedKV: map[string][]byte{
-				"one":   []byte("10.0"),
-				"two":   []byte("20.0"),
-				"three": []byte("30.0"),
+				"one":   []byte("10.1"),
+				"two":   []byte("20.1"),
+				"three": []byte("30.1"),
+			},
+		},
+		{
+			name:   "min_big_float",
+			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeBigFloat, "", nil),
+			latestKV: map[string][]byte{
+				"one": []byte("10.1"),
+				"two": []byte("20.1"),
+			},
+			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeBigFloat, "", nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("20.1"),
+				"three": []byte("30.1"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("10.1"),
+				"two":   []byte("20.1"),
+				"three": []byte("30.1"),
 			},
 		},
 		{
 			name:   "max_float",
-			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeBigFloat, "", nil),
+			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeFloat64, "", nil),
 			latestKV: map[string][]byte{
-				"one": []byte("10.0"),
-				"two": []byte("20.0"),
+				"one": []byte("10.1"),
+				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeBigFloat, "", nil),
+			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeFloat64, "", nil),
 			prevKV: map[string][]byte{
-				"one":   []byte("20.0"),
-				"three": []byte("30.0"),
+				"one":   []byte("20.1"),
+				"three": []byte("30.1"),
 			},
 			expectedError: false,
 			expectedKV: map[string][]byte{
-				"one":   []byte("20.0"),
-				"two":   []byte("20.0"),
-				"three": []byte("30.0"),
+				"one":   []byte("20.1"),
+				"two":   []byte("20.1"),
+				"three": []byte("30.1"),
+			},
+		},
+		{
+			name:   "max_big_float",
+			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeBigFloat, "", nil),
+			latestKV: map[string][]byte{
+				"one": []byte("10.1"),
+				"two": []byte("20.1"),
+			},
+			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeBigFloat, "", nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("20.1"),
+				"three": []byte("30.1"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("20.1"),
+				"two":   []byte("20.1"),
+				"three": []byte("30.1"),
 			},
 		},
 	}
@@ -199,8 +313,8 @@ func TestBuilder_Merge(t *testing.T) {
 
 			for k, v := range test.latest.KV {
 				if test.latest.valueType == OutputValueTypeBigFloat {
-					actual, _ := foundOrZeroFloat(v, true).Float64()
-					expected, _ := foundOrZeroFloat(test.expectedKV[k], true).Float64()
+					actual, _ := foundOrZeroBigFloat(v, true).Float64()
+					expected, _ := foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)
 				} else {
 					expected := string(test.expectedKV[k])
@@ -211,8 +325,8 @@ func TestBuilder_Merge(t *testing.T) {
 
 			for k, v := range test.expectedKV {
 				if test.latest.valueType == OutputValueTypeBigFloat {
-					actual, _ := foundOrZeroFloat(v, true).Float64()
-					expected, _ := foundOrZeroFloat(test.latest.KV[k], true).Float64()
+					actual, _ := foundOrZeroBigFloat(v, true).Float64()
+					expected, _ := foundOrZeroBigFloat(test.latest.KV[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)
 				} else {
 					expected := string(test.latest.KV[k])

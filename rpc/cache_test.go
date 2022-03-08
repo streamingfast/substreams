@@ -1,23 +1,34 @@
 package rpc
 
 import (
+	"bytes"
 	"context"
-	"io/ioutil"
-	"os"
+	"fmt"
+	"io"
 	"testing"
 
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRpcCacheNewLoadSave(t *testing.T) {
-	dir, err := ioutil.TempDir("", "substreams_test")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	cache := map[string][]byte{}
 
-	writeStore, err := dstore.NewStore(dir, "json.zst", "zstd", true)
-	require.NoError(t, err)
+	writeStore := dstore.NewMockStore(nil)
+	writeStore.WriteObjectFunc = func(ctx context.Context, base string, f io.Reader) error {
+		data, err := io.ReadAll(f)
+		if err != nil {
+			return err
+		}
+
+		_, exists := cache[base]
+		if exists && !writeStore.Overwrite() {
+			return nil
+		}
+
+		cache[base] = data
+		return nil
+	}
 
 	ctx := context.Background()
 	wc := NewCache(nil, writeStore, 1000, 11000)
@@ -28,8 +39,14 @@ func TestRpcCacheNewLoadSave(t *testing.T) {
 	}
 	wc.Save(ctx)
 
-	readStore, err := dstore.NewStore(dir, "json.zst", "zstd", false)
-	require.NoError(t, err)
+	readStore := dstore.NewMockStore(nil)
+	readStore.OpenObjectFunc = func(ctx context.Context, name string) (out io.ReadCloser, err error) {
+		if _, exists := cache[name]; !exists {
+			return nil, fmt.Errorf("%s does not exist", name)
+		}
+		r := bytes.NewReader(cache[name])
+		return io.NopCloser(r), nil
+	}
 
 	rc := NewCache(readStore, nil, 1000, 11000)
 	rc.Load(ctx)

@@ -5,12 +5,19 @@ package sf.substreams.v1;
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
 
 message StateDeltas {
-  repeated StateDelta deltas =1;
+  repeated StateDelta deltas = 1;
 }
+
 message StateDelta {
-  string operation = 1;
-  uint64  ordinal =2;
+  enum Operation {
+    UNSET = 0;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
+  }
+  Operation operation = 1;
+  uint64 ordinal = 2;
   string key = 3;
   bytes old_value = 4;
-  bytes new_value =5;
+  bytes new_value = 5;
 }

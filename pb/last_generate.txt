@@ -1,2 +1,2 @@
-generate.sh - Tue Mar  8 18:29:51 EST 2022 - cbillett
-streamingfast/proto revision: 2b128c7b3c4743b51c955ead59bdf7107ca2e760
+generate.sh - Tue  8 Mar 2022 18:51:02 EST - abourget
+streamingfast/proto revision: e1e8f437d6e80ac33ea0a84e26b5e1ec2c8c8066

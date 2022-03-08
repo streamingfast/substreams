@@ -29,6 +29,9 @@ type Stream struct {
 }
 
 type Input struct {
+	// source, store, and map are mutually exclusive
+	// mode must be set only if "store" is set
+	// mode must be one of "get", "deltas
 	Source string `yaml:"source"`
 	Store  string `yaml:"store"`
 	Map    string `yaml:"map"`

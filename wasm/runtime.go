@@ -96,16 +96,15 @@ func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, e
 			args = append(args, ptr, len)
 		case InputStore:
 			if input.Deltas {
-				// Make it a proto thing before sending in
-				cnt, _ := json.Marshal(input.Store.StateDeltas)
+				// TODO: Make it a proto thing before sending in
+				cnt, _ := json.Marshal(input.Store.Deltas)
 
 				ptr, err := instance.heap.Write(cnt)
 				if err != nil {
 					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
 				}
 
-				instance.stateDeltas = append(instance.stateDeltas, input.Store)
-				args = append(args, ptr, len(cnt))
+				args = append(args, ptr, int32(len(cnt)))
 			} else {
 				instance.inputStores = append(instance.inputStores, input.Store)
 				args = append(args, len(instance.inputStores)-1)

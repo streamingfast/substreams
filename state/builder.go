@@ -11,14 +11,12 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/merger/bundle"
 )
 
 type Builder struct {
 	Name string
 
-	bundler *bundle.Bundler
-	io      StateIO
+	io StateIO
 
 	KV           map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas       []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -33,7 +31,6 @@ func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactor
 	b := &Builder{
 		Name:         name,
 		KV:           make(map[string][]byte),
-		bundler:      nil,
 		updatePolicy: updatePolicy,
 		valueType:    valueType,
 		protoType:    protoType,
@@ -244,37 +241,6 @@ func (b *Builder) Flush() {
 	}
 	b.Deltas = nil
 	b.lastOrdinal = 0
-}
-
-func (b *Builder) StoreBlock(ctx context.Context, block *bstream.Block) error {
-	//TODO: unused func
-
-	//blockNumber := block.Number
-	//
-	//if b.bundler == nil {
-	//	exclusiveHighestBlockLimit := ((blockNumber / 100) * 100) + 100
-	//	b.bundler = bundle.NewBundler(100, exclusiveHighestBlockLimit)
-	//}
-	//
-	//bundleCompleted, highestBlockLimit := b.bundler.BundleCompleted()
-	//if bundleCompleted {
-	//	_ = b.bundler.ToBundle(highestBlockLimit)
-	//	b.bundler.Commit(highestBlockLimit)
-	//	b.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
-	//		return
-	//	})
-	//
-	//}
-	//
-	//obf := mustBlockToOneBlockFile(b.Name, block)
-	//b.bundler.AddOneBlockFile(obf)
-	//
-	//if err := b.WriteState(ctx, block); err != nil {
-	//	return err
-	//}
-	//
-	//return nil
-	return nil
 }
 
 func (b *Builder) ReadState(ctx context.Context, startBlockNum uint64) error {

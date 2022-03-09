@@ -248,7 +248,6 @@ func (b *Builder) Merge(previous *Builder) error {
 		return fmt.Errorf("update policy %q not supported", latest.updatePolicy) // should have been validated already
 	}
 
-	latest.bundler = nil //todo(colin): is this required?
 	return nil
 }
 

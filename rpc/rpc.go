@@ -1,8 +1,10 @@
 package rpc
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/streamingfast/eth-go"
@@ -32,7 +34,13 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pb
 	var reqs []*rpc.RPCRequest
 	for _, call := range calls.Calls {
 		req := &rpc.RPCRequest{
-			Params: []interface{}{call.ToAddr, call.MethodSignature, blockNum},
+			Params: []interface{}{
+				map[string]interface{}{
+					"to":   eth.Hex(call.ToAddr).Pretty(),
+					"data": eth.Hex(call.MethodSignature).Pretty(),
+				},
+				blockNum,
+			},
 			Method: "eth_call",
 		}
 		reqs = append(reqs, req)
@@ -109,12 +117,22 @@ func ToProtoCalls(in []*RPCCall) (out *pbsubstreams.RpcCalls) {
 }
 
 func toProtoResponses(in []*rpc.RPCResponse) (out *pbsubstreams.RpcResponses) {
+	out = &pbsubstreams.RpcResponses{}
 	for _, resp := range in {
 		newResp := &pbsubstreams.RpcResponse{}
 		if resp.Err != nil {
 			newResp.Failed = true
 		} else {
-			newResp.Raw = []byte(resp.Content)
+			if !strings.HasPrefix(resp.Content, "0x") {
+				newResp.Failed = true
+			} else {
+				bytes, err := hex.DecodeString(resp.Content[2:])
+				if err != nil {
+					newResp.Failed = true
+				} else {
+					newResp.Raw = bytes
+				}
+			}
 		}
 		out.Responses = append(out.Responses, newResp)
 	}

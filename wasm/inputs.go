@@ -5,7 +5,7 @@ import "github.com/streamingfast/substreams/state"
 type InputType int
 
 const (
-	InputStream InputType = iota
+	InputSource InputType = iota
 	InputStore
 	OutputStore
 )

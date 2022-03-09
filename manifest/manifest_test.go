@@ -33,14 +33,14 @@ kind: map
 code:
   file: ./pairExtractor.wasm
 inputs:
-  - source: proto:sf.ethereum.codec.v1.Block
+  - source: proto:sf.ethereum.type.v1.Block
 output:
   type: proto:pcs.types.v1.Pairs`,
 			expectedOutput: Module{
 				Name:   "pairExtractor",
 				Kind:   "map",
 				Code:   Code{File: "./pairExtractor.wasm"},
-				Inputs: []*Input{{Source: "proto:sf.ethereum.codec.v1.Block"}},
+				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}},
 				Output: StreamOutput{Type: "proto:pcs.types.v1.Pairs"},
 			},
 		},
@@ -52,7 +52,7 @@ kind: store
 code:
   file: ./pricesState.wasm
 inputs:
-  - source: proto:sf.ethereum.codec.v1.Block
+  - source: proto:sf.ethereum.type.v1.Block
   - store: pairs
 output:
   updatePolicy: sum
@@ -61,7 +61,7 @@ output:
 				Name:   "prices",
 				Kind:   "store",
 				Code:   Code{File: "./pricesState.wasm"},
-				Inputs: []*Input{{Source: "proto:sf.ethereum.codec.v1.Block"}, {Store: "pairs"}},
+				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}},
 				Output: StreamOutput{UpdatePolicy: "sum", ValueType: "bigint"},
 			},
 		},

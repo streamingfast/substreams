@@ -88,7 +88,7 @@ func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, e
 	var args []interface{}
 	for _, input := range inputs {
 		switch input.Type {
-		case InputStream:
+		case InputSource:
 			ptr, err := instance.heap.Write(input.StreamData)
 			if err != nil {
 				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
@@ -125,8 +125,10 @@ func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, e
 }
 
 func (i *Instance) Execute() (err error) {
-	_, err = i.entrypoint.Call(i.args...)
-	return
+	if _, err = i.entrypoint.Call(i.args...); err != nil {
+		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)
+	}
+	return nil
 }
 
 func (i *Instance) newImports() *wasmer.ImportObject {

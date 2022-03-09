@@ -141,7 +141,7 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 		for _, in := range mod.Inputs {
 			if in.Map != "" {
 				inputs = append(inputs, &wasm.Input{
-					Type: wasm.InputStream,
+					Type: wasm.InputSource,
 					Name: in.Map,
 				})
 			} else if in.Store != "" {
@@ -162,14 +162,14 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 				}
 			} else if in.Source != "" {
 				inputs = append(inputs, &wasm.Input{
-					Type: wasm.InputStream,
+					Type: wasm.InputSource,
 					Name: in.Source,
 				})
 			} else {
-				return fmt.Errorf("invalid input struct for stream %q", mod.Name)
+				return fmt.Errorf("invalid input struct for module %q", mod.Name)
 			}
 		}
-		streamName := mod.Name // to ensure it's enclosed
+		modName := mod.Name // to ensure it's enclosed
 
 		wasmModule, err := wasm.NewModule(mod.Code.Content, filepath.Base(mod.Code.File))
 		if err != nil {
@@ -178,10 +178,10 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 
 		switch mod.Kind {
 		case "map":
-			fmt.Printf("Adding mapper for stream %q\n", streamName)
+			fmt.Printf("Adding mapper for module %q\n", modName)
 			entrypoint := mod.Code.Entrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, streamName, inputs, debugOutput)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput)
 			})
 		case "store":
 			updatePolicy := mod.Output.UpdatePolicy
@@ -191,20 +191,20 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 			entrypoint := mod.Code.Entrypoint
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
-				Name:         streamName,
-				Store:        p.stores[streamName],
+				Name:         modName,
+				Store:        p.stores[modName],
 				UpdatePolicy: updatePolicy,
 				ValueType:    valueType,
 				ProtoType:    protoType,
 			})
-			fmt.Printf("Adding state builder for stream %q\n", streamName)
+			fmt.Printf("Adding state builder for module %q\n", modName)
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, streamName, inputs, debugOutput)
+				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput)
 			})
 
 		default:
-			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
+			return fmt.Errorf("unknown value %q for 'kind' in module %q", mod.Kind, mod.Name)
 		}
 
 	}
@@ -266,7 +266,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.codec.v1.Block" */] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?
@@ -390,7 +390,7 @@ func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name 
 	hasInput := false
 	for _, input := range inputs {
 		switch input.Type {
-		case wasm.InputStream:
+		case wasm.InputSource:
 			val := vals[input.Name]
 			if len(val) != 0 {
 				input.StreamData = val
@@ -407,12 +407,13 @@ func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name 
 	//  state builders will not be called if their input streams are 0 bytes length (and there's no
 	//  state store in read mode)
 	if hasInput {
+		fmt.Println("ENTRYPOINT", entrypoint, inputs)
 		out, err = mod.NewInstance(entrypoint, inputs)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
 		if err = out.Execute(); err != nil {
-			return nil, fmt.Errorf("stream %s: wasm execution failed: %w", name, err)
+			return nil, fmt.Errorf("module %q: wasm execution failed: %w", name, err)
 		}
 	}
 	return

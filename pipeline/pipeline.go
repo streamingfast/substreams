@@ -274,7 +274,7 @@ func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFac
 		if forceLoadState {
 			// Use AN ABSOLUTE store, or SQUASH ALL PARTIAL!
 
-			if err := store.Init(p.startBlockNum); err != nil {
+			if err := store.Init(p.startBlockNum, p.partialMode); err != nil {
 				return fmt.Errorf("could not load state for store %s at block num %d: %w", mod.Name, p.startBlockNum, err)
 			}
 		}

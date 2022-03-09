@@ -60,39 +60,11 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-func (b *Builder) Init(startBlockNum uint64) error {
-	relativeKvStartBlock := (startBlockNum / 100) * 100
+func (b *Builder) Init(startBlockNum uint64, partialMode bool) error {
 
-	if err := b.ReadState(context.TODO(), relativeKvStartBlock); err != nil {
+	if err := b.ReadState(context.TODO(), startBlockNum); err != nil {
 		return err
 	}
-
-	//var deltas []*bundle.OneBlockFile
-	//
-	//// walk from last kv checkpoint to current start block
-	//err := b.io.WalkDeltas(context.TODO(), relativeKvStartBlock+1, startBlockNum-1, func(obf *bundle.OneBlockFile) error {
-	//	deltas = append(deltas, obf)
-	//	return nil
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//sort.Slice(deltas, func(i, j int) bool {
-	//	return deltas[i].Num < deltas[j].Num
-	//})
-	//
-	//for _, delta := range deltas {
-	//	data, err := b.io.ReadDelta(context.TODO(), delta)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	err = json.Unmarshal(data, &b.Deltas)
-	//	if err != nil {
-	//		return fmt.Errorf("unmarshalling delta for %s at block %d: %w", b.Name, relativeKvStartBlock, err)
-	//	}
-	//	b.Flush()
-	//}
 
 	return nil
 }

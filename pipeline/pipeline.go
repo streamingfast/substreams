@@ -24,6 +24,8 @@ type Pipeline struct {
 	vmType        string // wasm, native
 	startBlockNum uint64
 
+	partialMode bool
+
 	blockType string
 
 	rpcClient *rpc.Client
@@ -266,7 +268,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */ ] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?

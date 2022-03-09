@@ -275,29 +275,33 @@ func (b *Builder) Flush() {
 }
 
 func (b *Builder) StoreBlock(ctx context.Context, block *bstream.Block) error {
-	blockNumber := block.Number
+	//TODO: unused func
 
-	if b.bundler == nil {
-		exclusiveHighestBlockLimit := ((blockNumber / 100) * 100) + 100
-		b.bundler = bundle.NewBundler(100, exclusiveHighestBlockLimit)
-	}
-
-	bundleCompleted, highestBlockLimit := b.bundler.BundleCompleted()
-	if bundleCompleted {
-		_ = b.bundler.ToBundle(highestBlockLimit)
-		b.bundler.Commit(highestBlockLimit)
-		b.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
-			return
-		})
-
-		if err := b.WriteState(ctx, block); err != nil {
-			return err
-		}
-	}
-
-	obf := mustBlockToOneBlockFile(b.Name, block)
-	b.bundler.AddOneBlockFile(obf)
-
+	//blockNumber := block.Number
+	//
+	//if b.bundler == nil {
+	//	exclusiveHighestBlockLimit := ((blockNumber / 100) * 100) + 100
+	//	b.bundler = bundle.NewBundler(100, exclusiveHighestBlockLimit)
+	//}
+	//
+	//bundleCompleted, highestBlockLimit := b.bundler.BundleCompleted()
+	//if bundleCompleted {
+	//	_ = b.bundler.ToBundle(highestBlockLimit)
+	//	b.bundler.Commit(highestBlockLimit)
+	//	b.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
+	//		return
+	//	})
+	//
+	//}
+	//
+	//obf := mustBlockToOneBlockFile(b.Name, block)
+	//b.bundler.AddOneBlockFile(obf)
+	//
+	//if err := b.WriteState(ctx, block); err != nil {
+	//	return err
+	//}
+	//
+	//return nil
 	return nil
 }
 

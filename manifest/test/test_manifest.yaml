@@ -1,6 +1,6 @@
 specVersion: 0.1.0
-description: PancakeSwap substreams
-codeType: native
+description: Test WASM substream
+codeType: wasm/rust-v1
 
 genesisBlock: 6809737
 
@@ -8,10 +8,11 @@ protoFiles:
   - ./pancakeswap.proto
 
 modules:
-  - name: block_to_pairs
+  - name: pair_extractor
     kind: map
     code:
-      native: pcs_pair_extractor
+      file: ./pcs-rust/pkg/pcs_substreams_bg.wasm
+      entrypoint: map_pairs
     inputs:
       - source: sf.ethereum.type.v1.Block
     output:
@@ -20,90 +21,21 @@ modules:
   - name: pairs
     kind: store
     code:
-      native: pcs_pairs_state_builder
-    inputs:
-      - map: block_to_pairs
-      - store: pairs
-        mode: deltas
-    output:
-      updatePolicy: replace
-      valueType: string
-
-  - name: block_to_reserves
-    kind: map
-    code:
-      native: pcs_reserves_extractor
-    inputs:
-      - source: sf.ethereum.type.v1.Block
-      - store: pairs
-    output:
-      type: proto:pcs.types.v1.ReserveUpdates
-
-  - name: reserves
-    kind: store
-    code:
-      native: pcs_reserves_state_builder
-    inputs:
-      - map: block_to_reserves
-      - store: pairs
-    output:
-      updatePolicy: replace
-      valueType: string
-
-  - name: prices
-    kind: store
-    code:
-      native: pcs_derived_prices_state_builder
-    inputs:
-      - map: block_to_reserves
-      - store: pairs
-      - store: reserves
-    output:
-      updatePolicy: replace
-      valueType: string
-
-  - name: mint_burn_swaps_extractor
-    kind: map
-    code:
-      native: pcs_mint_burn_swaps_extractor
-    inputs:
-      - source: sf.ethereum.type.v1.Block
-      - store: pairs
-      - store: prices
-    output:
-      type: proto:pcs.types.v1.MintBurnSwaps
-
-  - name: totals
-    kind: store
-    code:
-      native: pcs_totals_state_builder
+      file: ./pcs-rust/pkg/pcs_substreams_bg.wasm
+      entrypoint: build_pairs_state
     inputs:
       - map: pair_extractor
-      - map: mint_burn_swaps_extractor
     output:
-      updatePolicy: sum
-      valueType: int64
+      updatePolicy: replace
+      valueType: bytes
 
-  - name: volumes
-    kind: store
-    code:
-      native: pcs_volumes_state_builder
-    inputs:
-      - source: sf.ethereum.type.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
-      - map: mint_burn_swaps_extractor
-    output:
-      updatePolicy: sum
-      valueType: bigfloat
-
-  - name: database_output
+  - name: reserves_extractor
     kind: map
+    code:
+      file:  ./pcs-rust/pkg/pcs_substreams_bg.wasm
+      entrypoint: map_reserves
     inputs:
-      - store: volumes
-        mode: get
-      - store: volumes
-        mode: deltas
-      - map: mint_burn_swaps_extractor
+      - source: sf.ethereum.type.v1.Block
+      - store: pairs
     output:
-      type: proto:sf.substreams.v1.DebeziumCDC
-
-# $ program manifest.yaml pairsExtractor
+      type: proto:pcs.types.v1.Reserves

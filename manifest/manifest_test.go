@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -97,7 +98,9 @@ func TestStreamLinks_Streams(t *testing.T) {
 	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
 	require.NoError(t, err)
 
-	manifest.Graph.ModulesDownTo("prices")
+	res, err := manifest.Graph.ModulesDownTo("reserves_extractor")
+	require.NoError(t, err)
+	fmt.Println(res)
 }
 
 func TestStreamLinks_StreamsFor(t *testing.T) {

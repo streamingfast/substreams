@@ -13,7 +13,7 @@ import (
 func TestManifest_YamlUnmarshal(t *testing.T) {
 	_, manifest, err := DecodeYamlManifestFromFile("./test/test_manifest.yaml")
 	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, len(manifest.Streams), 1)
+	assert.GreaterOrEqual(t, len(manifest.Modules), 1)
 	assert.Equal(t, manifest.GenesisBlock, 6809737)
 }
 
@@ -21,7 +21,7 @@ func TestStreamYamlDecode(t *testing.T) {
 	type test struct {
 		name           string
 		rawYamlInput   string
-		expectedOutput Stream
+		expectedOutput Module
 	}
 
 	tests := []test{
@@ -36,11 +36,11 @@ inputs:
   - proto:sf.ethereum.codec.v1.Block
 output:
   type: proto:pcs.types.v1.Pairs`,
-			expectedOutput: Stream{
+			expectedOutput: Module{
 				Name:   "pairExtractor",
 				Kind:   "Mapper",
 				Code:   Code{File: "./pairExtractor.wasm"},
-				Inputs: []string{"proto:sf.ethereum.codec.v1.Block"},
+				Inputs: []Input{{Source: "proto:sf.ethereum.codec.v1.Block"}},
 				Output: StreamOutput{Type: "proto:pcs.types.v1.Pairs"},
 			},
 		},
@@ -57,18 +57,18 @@ inputs:
 output:
   updatePolicy: sum
   valueType: bigint`,
-			expectedOutput: Stream{
+			expectedOutput: Module{
 				Name:   "prices",
 				Kind:   "StateBuilder",
 				Code:   Code{File: "./pricesState.wasm"},
-				Inputs: []string{"proto:sf.ethereum.codec.v1.Block", "store:pairs"},
+				Inputs: []Input{{Source: "proto:sf.ethereum.codec.v1.Block"}, {Store: "pairs"}},
 				Output: StreamOutput{UpdatePolicy: "sum", ValueType: "bigint"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		var tstream Stream
+		var tstream Module
 		err := yaml.NewDecoder(strings.NewReader(tt.rawYamlInput)).Decode(&tstream)
 		assert.NoError(t, err)
 		assert.Equal(t, tt.expectedOutput, tstream)
@@ -102,7 +102,7 @@ func TestStreamLinks_Streams(t *testing.T) {
 
 func TestStreamLinks_StreamsFor(t *testing.T) {
 	streamGraph := &StreamsGraph{
-		streams: map[string]*Stream{
+		streams: map[string]*Module{
 			"A": {Name: "A"},
 			"B": {Name: "B"},
 			"C": {Name: "C"},
@@ -113,16 +113,16 @@ func TestStreamLinks_StreamsFor(t *testing.T) {
 			"H": {Name: "H"},
 			"I": {Name: "I"},
 		},
-		links: map[string][]*Stream{
-			"A": {&Stream{Name: "B"}, &Stream{Name: "C"}},
-			"B": {&Stream{Name: "D"}, &Stream{Name: "E"}, &Stream{Name: "F"}},
-			"C": {&Stream{Name: "F"}},
+		links: map[string][]*Module{
+			"A": {&Module{Name: "B"}, &Module{Name: "C"}},
+			"B": {&Module{Name: "D"}, &Module{Name: "E"}, &Module{Name: "F"}},
+			"C": {&Module{Name: "F"}},
 			"D": {},
 			"E": {},
-			"F": {&Stream{Name: "G"}, &Stream{Name: "H"}},
+			"F": {&Module{Name: "G"}, &Module{Name: "H"}},
 			"G": {},
 			"H": {},
-			"I": {&Stream{Name: "H"}},
+			"I": {&Module{Name: "H"}},
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestStreamLinks_StreamsFor(t *testing.T) {
 
 func TestStreamLinks_GroupedStreamsFor(t *testing.T) {
 	streamGraph := &StreamsGraph{
-		streams: map[string]*Stream{
+		streams: map[string]*Module{
 			"A": {Name: "A"},
 			"B": {Name: "B"},
 			"C": {Name: "C"},
@@ -145,16 +145,16 @@ func TestStreamLinks_GroupedStreamsFor(t *testing.T) {
 			"H": {Name: "H"},
 			"I": {Name: "I"},
 		},
-		links: map[string][]*Stream{
-			"A": {&Stream{Name: "B"}, &Stream{Name: "C"}},
-			"B": {&Stream{Name: "D"}, &Stream{Name: "E"}, &Stream{Name: "F"}},
-			"C": {&Stream{Name: "F"}},
+		links: map[string][]*Module{
+			"A": {&Module{Name: "B"}, &Module{Name: "C"}},
+			"B": {&Module{Name: "D"}, &Module{Name: "E"}, &Module{Name: "F"}},
+			"C": {&Module{Name: "F"}},
 			"D": {},
 			"E": {},
-			"F": {&Stream{Name: "G"}, &Stream{Name: "H"}},
+			"F": {&Module{Name: "G"}, &Module{Name: "H"}},
 			"G": {},
 			"H": {},
-			"I": {&Stream{Name: "H"}},
+			"I": {&Module{Name: "H"}},
 		},
 	}
 

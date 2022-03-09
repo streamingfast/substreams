@@ -1,82 +1,107 @@
 specVersion: 0.1.0
 description: PancakeSwap substreams
-codeType: wasm/rust-v1
+codeType: native
 
 genesisBlock: 6809737
 
 protoFiles:
   - ./pancakeswap.proto
 
-streams:
-  - name: pairExtractor
-    kind: Mapper
+modules:
+  - name: block_to_pairs
+    kind: map
     code:
-      file: ./test/code/pairExtractor.wasm
+      native: pcs_pair_extractor
     inputs:
-      - proto:sf.ethereum.codec.v1.Block
+      - source: sf.ethereum.type.v1.Block
     output:
       type: proto:pcs.types.v1.Pairs
 
   - name: pairs
-    kind: StateBuilder
+    kind: store
     code:
-      file: ./test/code/pairsState.wasm
+      native: pcs_pairs_state_builder
     inputs:
-      - stream:pairExtractor
+      - map: block_to_pairs
+      - store: pairs
+        mode: deltas
     output:
       updatePolicy: replace
       valueType: string
 
-  - name: reservesExtractor
-    kind: Mapper
+  - name: block_to_reserves
+    kind: map
     code:
-      file: ./reservesExtractor.wasm
+      native: pcs_reserves_extractor
     inputs:
-      - proto:sf.ethereum.codec.v1.Block
-      #- store:pairs
+      - source: sf.ethereum.type.v1.Block
+      - store: pairs
     output:
       type: proto:pcs.types.v1.ReserveUpdates
 
-  - name: prices
-    kind: StateBuilder
+  - name: reserves
+    kind: store
     code:
-      file: ./pricesState.wasm
+      native: pcs_reserves_state_builder
     inputs:
-      - stream:reservesExtractor
-      - store:pairs
+      - map: block_to_reserves
+      - store: pairs
     output:
       updatePolicy: replace
-      valueType: bytes
+      valueType: string
 
-  - name: mintBurnSwapsExtractor
-    kind: Mapper
+  - name: prices
+    kind: store
     code:
-      file: ./mintBurnSwapsExtractor.wasm
+      native: pcs_derived_prices_state_builder
     inputs:
-      - proto:sf.ethereum.codec.v1.Block
-      - store:pairs
-      - store:prices
+      - map: block_to_reserves
+      - store: pairs
+      - store: reserves
+    output:
+      updatePolicy: replace
+      valueType: string
+
+  - name: mint_burn_swaps_extractor
+    kind: map
+    code:
+      native: pcs_mint_burn_swaps_extractor
+    inputs:
+      - source: sf.ethereum.type.v1.Block
+      - store: pairs
+      - store: prices
     output:
       type: proto:pcs.types.v1.MintBurnSwaps
 
   - name: totals
-    kind: StateBuilder
+    kind: store
     code:
-      file: ./totalsState.wasm
+      native: pcs_totals_state_builder
     inputs:
-      - stream:pairExtractor
-      - stream:mintBurnSwapsExtractor
-    output:
-      updatePolicy: replace
-      valueType: bytes
-
-  - name: volumes
-    kind: StateBuilder
-    code:
-      file: ./volumesState.wasm
-    inputs:
-      - proto:sf.ethereum.codec.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
-      - stream:mintBurnSwapsExtractor
+      - map: pair_extractor
+      - map: mint_burn_swaps_extractor
     output:
       updatePolicy: sum
-      valueType: float64
+      valueType: int64
+
+  - name: volumes
+    kind: store
+    code:
+      native: pcs_volumes_state_builder
+    inputs:
+      - source: sf.ethereum.type.v1.Block  # Only needed for Number/Timestamp, so a smaller stream would be just as fine.
+      - map: mint_burn_swaps_extractor
+    output:
+      updatePolicy: sum
+      valueType: bigfloat
+
+  - name: database_output
+    kind: map
+    inputs:
+      - store: volumes
+        mode: get
+      - store: volumes
+        mode: deltas
+      - map: mint_burn_swaps_extractor
+
+# $ program manifest.yaml pairsExtractor

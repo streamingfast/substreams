@@ -15,12 +15,12 @@ type Manifest struct {
 	Description  string    `yaml:"description"`
 	CodeType     string    `yaml:"codeType"`
 	GenesisBlock int       `yaml:"genesisBlock"`
-	Streams      []*Stream `yaml:"streams"`
+	Modules      []*Module `yaml:"modules"`
 
 	Graph *StreamsGraph `yaml:"-"`
 }
 
-type Stream struct {
+type Module struct {
 	Name   string       `yaml:"name"`
 	Kind   string       `yaml:"kind"`
 	Code   Code         `yaml:"code"`
@@ -36,6 +36,22 @@ type Input struct {
 	Store  string `yaml:"store"`
 	Map    string `yaml:"map"`
 	Mode   string `yaml:"mode"`
+
+	name string
+}
+
+func (i *Input) parse() {
+	if i.Map != "" && i.Store == "" {
+		i.name = fmt.Sprintf("map:%s", i.Map)
+		return
+	} else if i.Store != "" && i.Map == "" {
+		i.name = fmt.Sprintf("store:%s", i.Store)
+		return
+	} else if i.Source != "" {
+		i.name = fmt.Sprintf("source:%s", i.Source)
+		return
+	}
+	i.name = fmt.Sprintf("unknown:%s-%s-%s-%s", i.Map, i.Store, i.Source, i.Mode)
 }
 
 type Code struct {
@@ -61,7 +77,10 @@ func New(path string) (m *Manifest, err error) {
 		return nil, err
 	}
 
-	for _, s := range m.Streams {
+	for _, s := range m.Modules {
+		for _, input := range s.Inputs {
+			input.parse()
+		}
 		if s.Code.File != "" {
 			cnt, err := ioutil.ReadFile(s.Code.File)
 			if err != nil {
@@ -88,16 +107,16 @@ func newWithoutLoad(path string) (*Manifest, error) {
 		return nil, fmt.Errorf("invalid value %q for 'codeType'", m.CodeType)
 	}
 
-	for _, s := range m.Streams {
+	for _, s := range m.Modules {
 		switch s.Kind {
-		case "Mapper":
+		case "map":
 			if s.Output.Type == "" {
 				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind Mapper", s.Name)
 			}
 			if s.Code.Entrypoint == "" {
 				s.Code.Entrypoint = "map"
 			}
-		case "StateBuilder":
+		case "store":
 			if err := validateStateBuilderOutput(s.Output); err != nil {
 				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
 			}
@@ -111,7 +130,7 @@ func newWithoutLoad(path string) (*Manifest, error) {
 		}
 	}
 
-	graph, err := NewStreamsGraph(m.Streams)
+	graph, err := NewStreamsGraph(m.Modules)
 	if err != nil {
 		return nil, fmt.Errorf("computing streams graph: %w", err)
 	}
@@ -167,27 +186,31 @@ func validateStateBuilderOutput(output StreamOutput) error {
 }
 
 func (m *Manifest) PrintMermaid() {
-	fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
+	//DEACTIVATE FOR NOW
 
-	for _, s := range m.Streams {
-		for _, in := range s.Inputs {
-			fmt.Printf("  %s -- %q --> %s\n", strings.Split(in, ":")[1], in, s.Name)
-		}
-	}
-
-	fmt.Println("```")
-	fmt.Println("")
+	//fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
+	//
+	//for _, s := range m.Streams {
+	//	for _, in := range s.Inputs {
+	//		fmt.Printf("  %s -- %q --> %s\n", strings.Split(in, ":")[1], in, s.Name)
+	//	}
+	//}
+	//
+	//fmt.Println("```")
+	//fmt.Println("")
 }
 
-func (s *Stream) Signature(graph *StreamsGraph) []byte {
+func (s *Module) Signature(graph *StreamsGraph) []byte {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteString(s.Kind)
 	buf.Write(s.Code.Content)
 	buf.Write([]byte(s.Code.Entrypoint))
 
-	sort.Strings(s.Inputs)
+	sort.Slice(s.Inputs, func(i, j int) bool {
+		return s.Inputs[i].name < s.Inputs[j].name
+	})
 	for _, input := range s.Inputs {
-		buf.WriteString(input)
+		buf.WriteString(input.name)
 	}
 
 	ancestors := graph.AncestorsOf(s.Name)
@@ -202,19 +225,19 @@ func (s *Stream) Signature(graph *StreamsGraph) []byte {
 	return h.Sum(nil)
 }
 
-func (s *Stream) String() string {
+func (s *Module) String() string {
 	return s.Name
 }
 
 type StreamsGraph struct {
-	streams map[string]*Stream
-	links   map[string][]*Stream
+	streams map[string]*Module
+	links   map[string][]*Module
 }
 
-func NewStreamsGraph(streams []*Stream) (*StreamsGraph, error) {
+func NewStreamsGraph(streams []*Module) (*StreamsGraph, error) {
 	sg := &StreamsGraph{
-		streams: map[string]*Stream{},
-		links:   map[string][]*Stream{},
+		streams: map[string]*Module{},
+		links:   map[string][]*Module{},
 	}
 
 	for _, stream := range streams {
@@ -222,14 +245,14 @@ func NewStreamsGraph(streams []*Stream) (*StreamsGraph, error) {
 	}
 
 	for _, stream := range streams {
-		var links []*Stream
+		var links []*Module
 		for _, input := range stream.Inputs {
-			for _, streamPrefix := range []string{"stream:", "store:"} {
-				if strings.HasPrefix(input, streamPrefix) {
-					linkName := strings.TrimPrefix(input, streamPrefix)
+			for _, streamPrefix := range []string{"map:", "store:"} {
+				if strings.HasPrefix(input.name, streamPrefix) {
+					linkName := strings.TrimPrefix(input.name, streamPrefix)
 					linkedStream, ok := sg.streams[linkName]
 					if !ok {
-						return nil, fmt.Errorf("stream %s does not exist", linkName)
+						return nil, fmt.Errorf("%s does not exist", linkName)
 					}
 					links = append(links, linkedStream)
 				}
@@ -242,7 +265,7 @@ func NewStreamsGraph(streams []*Stream) (*StreamsGraph, error) {
 	return sg, nil
 }
 
-func (g *StreamsGraph) StreamsFor(streamName string) ([]*Stream, error) {
+func (g *StreamsGraph) StreamsFor(streamName string) ([]*Module, error) {
 	thisStream, found := g.streams[streamName]
 	if !found {
 		return nil, fmt.Errorf("stream %q not found", streamName)
@@ -253,29 +276,29 @@ func (g *StreamsGraph) StreamsFor(streamName string) ([]*Stream, error) {
 }
 
 //TODO: use this in pipeline and deduplicate everything
-func (g *StreamsGraph) GroupedStreamsFor(streamName string) ([][]*Stream, error) {
+func (g *StreamsGraph) GroupedStreamsFor(streamName string) ([][]*Module, error) {
 	thisStream, found := g.streams[streamName]
 	if !found {
 		return nil, fmt.Errorf("stream %q not found", streamName)
 	}
 
 	parents := g.groupedAncestorsOf(streamName)
-	return append(parents, []*Stream{thisStream}), nil
+	return append(parents, []*Module{thisStream}), nil
 }
 
-func (g *StreamsGraph) AncestorsOf(streamName string) []*Stream {
+func (g *StreamsGraph) AncestorsOf(streamName string) []*Module {
 	parents := g.ancestorsOf(streamName)
 	return parents
 }
 
-func (g *StreamsGraph) GroupedAncestorsOf(streamName string) []*Stream {
+func (g *StreamsGraph) GroupedAncestorsOf(streamName string) []*Module {
 	parents := g.ancestorsOf(streamName)
 	return parents
 }
 
-func (g *StreamsGraph) ancestorsOf(streamName string) []*Stream {
+func (g *StreamsGraph) ancestorsOf(streamName string) []*Module {
 	type streamWithTreeDepth struct {
-		stream *Stream
+		stream *Module
 		depth  int
 	}
 
@@ -306,7 +329,7 @@ func (g *StreamsGraph) ancestorsOf(streamName string) []*Stream {
 	})
 
 	seen := map[string]struct{}{}
-	var result []*Stream
+	var result []*Module
 	for _, parent := range parentsWithDepth {
 		if _, ok := seen[parent.stream.Name]; ok {
 			continue
@@ -318,9 +341,9 @@ func (g *StreamsGraph) ancestorsOf(streamName string) []*Stream {
 	return result
 }
 
-func (g *StreamsGraph) groupedAncestorsOf(streamName string) [][]*Stream {
+func (g *StreamsGraph) groupedAncestorsOf(streamName string) [][]*Module {
 	type streamWithTreeDepth struct {
-		stream *Stream
+		stream *Module
 		depth  int
 	}
 
@@ -350,7 +373,7 @@ func (g *StreamsGraph) groupedAncestorsOf(streamName string) [][]*Stream {
 		return parentsWithDepth[i].depth > parentsWithDepth[j].depth
 	})
 
-	grouped := map[int][]*Stream{}
+	grouped := map[int][]*Module{}
 	seen := map[string]struct{}{}
 	for _, parent := range parentsWithDepth {
 		if _, ok := seen[parent.stream.Name]; ok {
@@ -360,7 +383,7 @@ func (g *StreamsGraph) groupedAncestorsOf(streamName string) [][]*Stream {
 		seen[parent.stream.Name] = struct{}{}
 	}
 
-	result := make([][]*Stream, len(grouped), len(grouped))
+	result := make([][]*Module, len(grouped), len(grouped))
 	for i, streams := range grouped {
 		result[len(grouped)-1-i] = streams
 	}

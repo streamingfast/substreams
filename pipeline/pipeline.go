@@ -212,7 +212,7 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 	return nil
 }
 
-func (p *Pipeline) setupStores(streams []*manifest.Stream, ioFactory state.IOFactory, forceLoadState bool) error {
+func (p *Pipeline) setupStores(streams []*manifest.Module, ioFactory state.IOFactory, forceLoadState bool) error {
 	p.stores = make(map[string]*state.Builder)
 	for _, s := range streams {
 		if s.Kind != "StateBuilder" {

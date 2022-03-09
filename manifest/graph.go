@@ -3,6 +3,7 @@ package manifest
 import (
 	"fmt"
 	"github.com/yourbasic/graph"
+	"sort"
 	"strings"
 )
 
@@ -155,6 +156,11 @@ func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*Module, erro
 		}
 		distmap[int(dist[mix])] = append(distmap[int(dist[mix])], mod)
 	}
+
+	//reverse sort
+	sort.Slice(distkeys, func(i, j int) bool {
+		return distkeys[j] < distkeys[i]
+	})
 
 	res := make([][]*Module, 0, len(distmap))
 	for _, ix := range distkeys {

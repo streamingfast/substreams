@@ -5,7 +5,7 @@ codeType: wasm/rust-v1
 startBlock: 6809737
 
 protoFiles:
-  - ./pancakeswap.proto
+  - ./test/code/pancakeswap.proto
 
 modules:
   - name: pair_extractor

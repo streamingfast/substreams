@@ -304,7 +304,7 @@ func (b *Builder) WriteState(ctx context.Context, block *bstream.Block) error {
 		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	if err = b.io.WriteState(ctx, content, block); err != nil {
+	if err = b.io.WriteState(ctx, content, block.Num()); err != nil {
 		return fmt.Errorf("writing %s kv at block %d: %w", b.Name, block.Num(), err)
 	}
 

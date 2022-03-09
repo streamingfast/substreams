@@ -2,7 +2,7 @@ specVersion: 0.1.0
 description: Test WASM substream
 codeType: wasm/rust-v1
 
-genesisBlock: 6809737
+startBlock: 6809737
 
 protoFiles:
   - ./pancakeswap.proto

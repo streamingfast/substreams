@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -9,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/wasmerio/wasmer-go/wasmer"
-
+	pd "github.com/emicklei/protobuf2map"
+	oldproto "github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/manifest"
@@ -20,6 +22,7 @@ import (
 	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/wasmerio/wasmer-go/wasmer"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -143,6 +146,7 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 	}
 
 	p.wasmOutputs = map[string][]byte{}
+	protoDefs := p.manifest.ProtoDefinitions
 
 	for _, mod := range modules {
 		debugOutput := mod.Name == p.outputStreamName
@@ -189,9 +193,30 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 		switch mod.Kind {
 		case "map":
 			fmt.Printf("Adding mapper for module %q\n", modName)
+
+			outType := mod.Output.Type
+			if strings.HasPrefix(outType, "proto:") {
+				outType = outType[6:]
+			}
+			parts := strings.Split(outType, ".")
+			ns := strings.Join(parts[:len(parts)-1], ".")
+			msg := parts[len(parts)-1]
+			protoDecode := func(in []byte) (string, error) {
+				dec := pd.NewDecoder(protoDefs, oldproto.NewBuffer(in))
+				result, err := dec.Decode(ns, msg)
+				if err != nil {
+					return "", fmt.Errorf("error decoding protobuf %s.%s to map: %w", ns, msg, err)
+				}
+				cnt, err := json.MarshalIndent(result, "", "  ")
+				if err != nil {
+					return "", fmt.Errorf("error encoding protobuf %s.%s into json: %w", ns, msg, err)
+				}
+				return string(cnt), nil
+			}
+
 			entrypoint := mod.Code.Entrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, protoDecode, outType)
 			})
 		case "store":
 			updatePolicy := mod.Output.UpdatePolicy
@@ -417,7 +442,10 @@ func wasmMapCall(vals map[string][]byte,
 	name string,
 	inputs []*wasm.Input,
 	printOutputs bool,
-	rpcFactory wasm.WasmerFunctionFactory) (err error) {
+	rpcFactory wasm.WasmerFunctionFactory,
+	protoDecode func(in []byte) (string, error),
+	msgType string,
+) (err error) {
 
 	var vm *wasm.Instance
 	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
@@ -427,7 +455,13 @@ func wasmMapCall(vals map[string][]byte,
 		out := vm.Output()
 		vals[name] = out
 		if len(out) != 0 && printOutputs {
-			fmt.Printf("Module output %q:\n    %v\n", name, out)
+			js, err := protoDecode(out)
+			if err != nil {
+				fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
+				fmt.Printf("Module output %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, base64.StdEncoding.EncodeToString(out), msgType)
+			} else {
+				fmt.Printf("Module output %q:\n    %s\n", name, js)
+			}
 		}
 	} else {
 		vals[name] = nil
@@ -441,7 +475,8 @@ func wasmStoreCall(vals map[string][]byte,
 	name string,
 	inputs []*wasm.Input,
 	printOutputs bool,
-	rpcFactory wasm.WasmerFunctionFactory) (err error) {
+	rpcFactory wasm.WasmerFunctionFactory,
+) (err error) {
 
 	var vm *wasm.Instance
 	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {

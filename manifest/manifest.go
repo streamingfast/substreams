@@ -8,16 +8,20 @@ import (
 	"io/ioutil"
 	"sort"
 	"strings"
+
+	pd "github.com/emicklei/protobuf2map"
 )
 
 type Manifest struct {
-	SpecVersion  string    `yaml:"specVersion"`
-	Description  string    `yaml:"description"`
-	CodeType     string    `yaml:"codeType"`
-	GenesisBlock int       `yaml:"genesisBlock"`
-	Modules      []*Module `yaml:"modules"`
+	SpecVersion string    `yaml:"specVersion"`
+	Description string    `yaml:"description"`
+	CodeType    string    `yaml:"codeType"`
+	StartBlock  int       `yaml:"startBlock"` // TODO: This needs to go on the actual module, perhaps can be inferred from its dependencies
+	ProtoFiles  []string  `yaml:"protoFiles"`
+	Modules     []*Module `yaml:"modules"`
 
-	Graph *ModuleGraph `yaml:"-"`
+	Graph            *ModuleGraph    `yaml:"-"`
+	ProtoDefinitions *pd.Definitions `yaml:"-"`
 }
 
 type Module struct {
@@ -29,37 +33,16 @@ type Module struct {
 }
 
 type Input struct {
-	// source, store, and map are mutually exclusive
-	// mode must be set only if "store" is set
-	// mode must be one of "get", "deltas
+	// TODO: implement the checks to enforce these clauses:
+	// * source, store, and map are mutually exclusive
+	// * mode must be set only if "store" is set
+	// * mode must be one of "get", "deltas
 	Source string `yaml:"source"`
 	Store  string `yaml:"store"`
 	Map    string `yaml:"map"`
 	Mode   string `yaml:"mode"`
 
 	Name string `yaml:"-"`
-}
-
-func (i *Input) parse() error {
-	if i.Map != "" && i.Store == "" && i.Source == "" {
-		i.Name = fmt.Sprintf("map:%s", i.Map)
-		return nil
-	}
-	if i.Store != "" && i.Map == "" && i.Source == "" {
-		i.Name = fmt.Sprintf("store:%s", i.Store)
-		if i.Mode == "" {
-			i.Mode = "get"
-		}
-		if i.Mode != "get" && i.Mode != "deltas" {
-			return fmt.Errorf("input %q: 'mode' parameter must be one of: 'get', 'deltas'", i.Name)
-		}
-		return nil
-	}
-	if i.Source != "" && i.Map == "" && i.Store == "" {
-		i.Name = fmt.Sprintf("source:%s", i.Source)
-		return nil
-	}
-	return fmt.Errorf("one, and only one of 'map', 'store' or 'source' must be specified")
 }
 
 type Code struct {
@@ -70,10 +53,10 @@ type Code struct {
 }
 
 type StreamOutput struct {
-	// For mappers
+	// For 'map'
 	Type string `yaml:"type"`
 
-	// For state builders
+	// For 'store'
 	ValueType    string `yaml:"valueType"`
 	ProtoType    string `yaml:"protoType"` // when `ValueType` == "proto"
 	UpdatePolicy string `yaml:"updatePolicy"`
@@ -83,6 +66,13 @@ func New(path string) (m *Manifest, err error) {
 	m, err = newWithoutLoad(path)
 	if err != nil {
 		return nil, err
+	}
+
+	m.ProtoDefinitions = pd.NewDefinitions()
+	for _, fl := range m.ProtoFiles {
+		if err := m.ProtoDefinitions.ReadFile(fl); err != nil {
+			return nil, fmt.Errorf("reading proto file %q: %w", fl, err)
+		}
 	}
 
 	for _, s := range m.Modules {
@@ -149,6 +139,28 @@ func newWithoutLoad(path string) (*Manifest, error) {
 	m.Graph = graph
 
 	return m, nil
+}
+
+func (i *Input) parse() error {
+	if i.Map != "" && i.Store == "" && i.Source == "" {
+		i.Name = fmt.Sprintf("map:%s", i.Map)
+		return nil
+	}
+	if i.Store != "" && i.Map == "" && i.Source == "" {
+		i.Name = fmt.Sprintf("store:%s", i.Store)
+		if i.Mode == "" {
+			i.Mode = "get"
+		}
+		if i.Mode != "get" && i.Mode != "deltas" {
+			return fmt.Errorf("input %q: 'mode' parameter must be one of: 'get', 'deltas'", i.Name)
+		}
+		return nil
+	}
+	if i.Source != "" && i.Map == "" && i.Store == "" {
+		i.Name = fmt.Sprintf("source:%s", i.Source)
+		return nil
+	}
+	return fmt.Errorf("one, and only one of 'map', 'store' or 'source' must be specified")
 }
 
 func validateStoreBuilderOutput(output StreamOutput) error {

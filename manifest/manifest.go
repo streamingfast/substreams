@@ -16,7 +16,7 @@ type Manifest struct {
 	SpecVersion string    `yaml:"specVersion"`
 	Description string    `yaml:"description"`
 	CodeType    string    `yaml:"codeType"`
-	StartBlock  int       `yaml:"startBlock"` // TODO: This needs to go on the actual module, perhaps can be inferred from its dependencies
+	StartBlock  uint64    `yaml:"startBlock"` // TODO: This needs to go on the actual module, perhaps can be inferred from its dependencies
 	ProtoFiles  []string  `yaml:"protoFiles"`
 	Modules     []*Module `yaml:"modules"`
 

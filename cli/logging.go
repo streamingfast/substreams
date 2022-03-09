@@ -8,7 +8,7 @@ import (
 var zlog *zap.Logger
 
 func init() {
-	zlog, _ = logging.ApplicationLogger("substreams", "github.com/streamingfast/substreams/cmd/substreams",
+	zlog, _ = logging.ApplicationLogger("substreams", "github.com/streamingfast/substreams/cli",
 		logging.WithSwitcherServerAutoStart(),
 	)
 }

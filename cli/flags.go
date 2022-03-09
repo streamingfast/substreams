@@ -1,11 +1,12 @@
 package cli
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"strings"
 )
 
 func autoBind(root *cobra.Command, prefix string) {
@@ -14,7 +15,7 @@ func autoBind(root *cobra.Command, prefix string) {
 	replacer := strings.NewReplacer("-", "_")
 	viper.SetEnvKeyReplacer(replacer)
 
-	recurseCommands(root, nil)
+	recurseCommands(root, nil) // []string{strings.ToLower(prefix)}) how does it wweeeerrkk?
 }
 
 func recurseCommands(root *cobra.Command, segments []string) {
@@ -25,7 +26,7 @@ func recurseCommands(root *cobra.Command, segments []string) {
 
 	zlog.Debug("re-binding flags", zap.String("cmd", root.Name()), zap.String("prefix", segmentPrefix))
 	defer func() {
-		zlog.Debug("reboung flags terminated", zap.String("cmd", root.Name()))
+		zlog.Debug("rebinding flags terminated", zap.String("cmd", root.Name()))
 	}()
 
 	root.PersistentFlags().VisitAll(func(f *pflag.Flag) {

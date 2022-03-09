@@ -52,9 +52,15 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		blockCount = uint64(val)
 	}
 
+	modulesStartBlock := int64(manif.StartBlock)
+
 	startBlockNum := viper.GetInt64("start-block")
+	if startBlockNum == 0 {
+		startBlockNum = modulesStartBlock
+	}
+	fmt.Println("START BLOCK NUM", startBlockNum)
 	forceLoadState := false
-	if startBlockNum > genesisBlock {
+	if startBlockNum > modulesStartBlock {
 		forceLoadState = true
 	}
 
@@ -86,6 +92,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	rpcClient := rpc.NewClient(rpcEndpoint, rpc.WithHttpClient(httpClient))
 	rpcCache := ssrpc.NewCache(rpcCacheStore, rpcCacheStore, 0, 999)
 	rpcCache.Load(ctx)
+
+	fmt.Println("Using RPC endpoint:", rpcEndpoint)
 
 	stateStorePath := viper.GetString("state-store-url")
 	stateStore, err := dstore.NewStore(stateStorePath, "", "", false)

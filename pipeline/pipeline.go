@@ -372,8 +372,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 			}
 		}
 
-		// Prep for next block, clean-up all deltas. This ought to be
-		// done by the runtime, when doing clean-up between blocks.
+		// Prep for next block, clean-up all deltas.
 		for _, s := range p.stores {
 			s.Flush()
 		}

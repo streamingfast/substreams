@@ -474,7 +474,7 @@ func wasmCall(vals map[string][]byte,
 		case wasm.OutputStore:
 
 		default:
-			panic(fmt.Sprintf("Invalid input type %s", input.Type))
+			panic(fmt.Sprintf("Invalid input type %d", input.Type))
 		}
 	}
 

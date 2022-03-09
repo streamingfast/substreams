@@ -38,6 +38,16 @@ type Module struct {
 	name   string
 }
 
+func (i *Instance) Heap() *Heap {
+	return i.heap
+}
+
+func (i *Instance) Store() *wasmer.Store {
+	return i.wasmStore
+}
+
+type WasmerFunctionFactory func(*Instance) (namespace string, name string, wasmerFunc *wasmer.Function)
+
 func NewModule(wasmCode []byte, name string) (*Module, error) {
 	engine := wasmer.NewUniversalEngine()
 	store := wasmer.NewStore(engine)
@@ -55,7 +65,7 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 	}, nil
 }
 
-func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, error) {
+func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory WasmerFunctionFactory) (*Instance, error) {
 	// WARN: An instance needs to be created on the same thread that it is consumed.
 	instance := &Instance{
 		wasmStore:    m.store,
@@ -63,6 +73,12 @@ func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, e
 		functionName: functionName,
 	}
 	imports := instance.newImports()
+
+	if rpcFactory != nil {
+		namespace, name, f := rpcFactory(instance)
+		imports.Register(namespace, map[string]wasmer.IntoExtern{name: f})
+	}
+
 	vmInstance, err := wasmer.NewInstance(m.module, imports)
 	if err != nil {
 		return nil, fmt.Errorf("creating instance: %w", err)
@@ -141,8 +157,8 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 		"register_panic": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
-				returns(),
+				Params(wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
+				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
 				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
@@ -170,8 +186,8 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 		"output": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32),
-				returns(),
+				Params(wasmer.I32, wasmer.I32),
+				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
 				message, err := i.heap.ReadBytes(args[0].I32(), args[1].I32())
@@ -193,14 +209,15 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 		"println": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32),
-				returns(),
+				Params(wasmer.I32, wasmer.I32),
+				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
 				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
+				fmt.Println("HEYEHEEHEYE", message, "moustache")
 				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
 
 				return nil, nil
@@ -213,8 +230,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
-			returns(),
+			Params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "replace" {
@@ -239,8 +256,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_if_not_exists"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
-			returns(),
+			Params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "ignore" {
@@ -264,12 +281,12 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["delete_prefix"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(
+			Params(
 				wasmer.I64, /* ordinal */
 				wasmer.I32, /* prefix offset */
 				wasmer.I32, /* prefix length */
 			),
-			returns(),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			prefix, err := i.heap.ReadString(args[1].I32(), args[2].I32())
@@ -284,8 +301,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["sum_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigfloat" {
@@ -315,8 +332,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["sum_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigint" {
@@ -342,8 +359,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["sum_int64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "int64" {
@@ -365,8 +382,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["sum_float64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "float64" {
@@ -391,8 +408,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["sum_bigfloat"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "sum" && i.valueType != "bigfloat" {
@@ -418,8 +435,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_min_int64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "int64" {
@@ -441,8 +458,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_min_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "bigfloat" {
@@ -467,8 +484,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_min_float64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "float" {
@@ -489,8 +506,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_min_bigfloat"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "min" && i.valueType != "bigint" {
@@ -516,8 +533,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_max_int64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "int64" {
@@ -539,8 +556,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_max_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "bigint" {
@@ -565,8 +582,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_max_float64"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "float" {
@@ -587,8 +604,8 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["set_max_bigfloat"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
-			returns(),
+			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
+			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			if i.outputStore == nil && i.updatePolicy != "max" && i.valueType != "bigint" {
@@ -614,12 +631,12 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["get_at"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I32, /* store index */
+			Params(wasmer.I32, /* store index */
 				wasmer.I64, /* ordinal */
 				wasmer.I32, /* key offset */
 				wasmer.I32, /* key length */
 				wasmer.I32 /* return pointer */),
-			returns(wasmer.I32),
+			Returns(wasmer.I32),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			storeIndex := int(args[0].I32())
@@ -638,7 +655,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[4].I32()
-			err = i.writeOutputToHeap(outputPtr, value)
+			err = i.WriteOutputToHeap(outputPtr, value)
 			if err != nil {
 				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 			}
@@ -648,11 +665,11 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["get_first"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I32,
+			Params(wasmer.I32,
 				wasmer.I32,
 				wasmer.I32,
 				wasmer.I32),
-			returns(wasmer.I32),
+			Returns(wasmer.I32),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			storeIndex := int(args[0].I32())
@@ -670,7 +687,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[3].I32()
-			err = i.writeOutputToHeap(outputPtr, value)
+			err = i.WriteOutputToHeap(outputPtr, value)
 			if err != nil {
 				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 			}
@@ -681,11 +698,11 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions["get_last"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(
-			params(wasmer.I32,
+			Params(wasmer.I32,
 				wasmer.I32,
 				wasmer.I32,
 				wasmer.I32),
-			returns(wasmer.I32),
+			Returns(wasmer.I32),
 		),
 
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
@@ -704,7 +721,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[3].I32()
-			err = i.writeOutputToHeap(outputPtr, value)
+			err = i.WriteOutputToHeap(outputPtr, value)
 			if err != nil {
 				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 			}
@@ -715,7 +732,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	imports.Register("state", functions)
 }
 
-func (i *Instance) writeOutputToHeap(outputPtr int32, value []byte) error {
+func (i *Instance) WriteOutputToHeap(outputPtr int32, value []byte) error {
 
 	valuePtr, err := i.heap.Write(value)
 	if err != nil {

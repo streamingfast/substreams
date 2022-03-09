@@ -8,6 +8,10 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/streamingfast/bstream"
+	imports "github.com/streamingfast/substreams/native-imports"
+	"github.com/streamingfast/substreams/pipeline"
+
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/test-go/testify/require"
@@ -179,7 +183,10 @@ func TestRustScript(t *testing.T) {
 			module, err := wasm.NewModule(byteCode, c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(c.functionName, nil)
+			imps := &imports.Imports{}
+			imps.SetCurrentBlock(bstream.NewBlockRef("test", 42))
+
+			instance, err := module.NewInstance(c.functionName, nil, pipeline.GetRPCWasmFunctionFactory(nil))
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
 			err = instance.Execute()

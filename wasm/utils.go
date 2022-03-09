@@ -6,11 +6,11 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 )
 
-func params(kinds ...wasmer.ValueKind) []*wasmer.ValueType {
+func Params(kinds ...wasmer.ValueKind) []*wasmer.ValueType {
 	return wasmer.NewValueTypes(kinds...)
 }
 
-func returns(kinds ...wasmer.ValueKind) []*wasmer.ValueType {
+func Returns(kinds ...wasmer.ValueKind) []*wasmer.ValueType {
 	return wasmer.NewValueTypes(kinds...)
 }
 

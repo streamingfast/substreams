@@ -9,10 +9,13 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/wasmerio/wasmer-go/wasmer"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
 	"github.com/streamingfast/substreams/registry"
 	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
@@ -40,6 +43,10 @@ type Pipeline struct {
 	streamFuncs   []StreamFunc
 	nativeOutputs map[string]reflect.Value
 	wasmOutputs   map[string][]byte
+}
+
+type RpcProvider interface {
+	RPC(calls *pbsubstreams.RpcCalls) *pbsubstreams.RpcResponses
 }
 
 func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string) *Pipeline {
@@ -178,12 +185,13 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
+		rpcWasmFuncFact := GetRPCWasmFunctionFactory(p.nativeImports)
 		switch mod.Kind {
 		case "map":
 			fmt.Printf("Adding mapper for module %q\n", modName)
 			entrypoint := mod.Code.Entrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact)
 			})
 		case "store":
 			updatePolicy := mod.Output.UpdatePolicy
@@ -202,7 +210,7 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 			fmt.Printf("Adding state builder for module %q\n", modName)
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput)
+				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact)
 			})
 
 		default:
@@ -212,6 +220,47 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 	}
 
 	return nil
+}
+
+func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
+	return func(instance *wasm.Instance) (namespace string, name string, wasmerFunc *wasmer.Function) {
+		namespace = "rpc"
+		name = "eth_call"
+		wasmerFunc = wasmer.NewFunction(
+			instance.Store(),
+			wasmer.NewFunctionType(
+				wasm.Params(wasmer.I32, wasmer.I32, wasmer.I32), // 0(READ): proto RPCCalls offset,  1(READ): proto RPCCalls len, 2(WRITE): offset for proto RPCResponses
+				wasm.Returns()),
+			func(args []wasmer.Value) ([]wasmer.Value, error) {
+
+				heap := instance.Heap()
+
+				message, err := heap.ReadBytes(args[0].I32(), args[1].I32())
+				if err != nil {
+					return nil, fmt.Errorf("read message argument: %w", err)
+				}
+
+				rpcCalls := &pbsubstreams.RpcCalls{}
+				err = proto.Unmarshal(message, rpcCalls)
+				if err != nil {
+					return nil, fmt.Errorf("unmarshal message %w", err)
+				}
+
+				responses := rpcProv.RPC(rpcCalls)
+				responsesBytes, err := proto.Marshal(responses)
+				if err != nil {
+					return nil, fmt.Errorf("marshall message: %w", err)
+				}
+
+				err = instance.WriteOutputToHeap(args[2].I32(), responsesBytes)
+				if err != nil {
+					return nil, fmt.Errorf("write output to heap %w", err)
+				}
+				return nil, nil
+			},
+		)
+		return
+	}
 }
 
 func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFactory, forceLoadState bool) error {
@@ -264,11 +313,12 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		}
 
 		p.nativeImports.SetCurrentBlock(block)
+		//clock := toClock(block)
 
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */ ] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?
@@ -278,6 +328,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 			}
 
 			p.wasmOutputs[p.blockType] = blkBytes
+			//p.wasmOutputs["sf.substreams.v1.Clock"] = clock //FIXME stepd implement clock
 		default:
 			panic("unsupported vmType " + p.vmType)
 		}
@@ -360,9 +411,16 @@ func nativeStoreCall(vals map[string]reflect.Value, method reflect.Value, name s
 	return nil
 }
 
-func wasmMapCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name string, inputs []*wasm.Input, printOutputs bool) (err error) {
+func wasmMapCall(vals map[string][]byte,
+	mod *wasm.Module,
+	entrypoint string,
+	name string,
+	inputs []*wasm.Input,
+	printOutputs bool,
+	rpcFactory wasm.WasmerFunctionFactory) (err error) {
+
 	var vm *wasm.Instance
-	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs); err != nil {
+	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
 		return err
 	}
 	if vm != nil {
@@ -377,9 +435,16 @@ func wasmMapCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, na
 	return nil
 }
 
-func wasmStoreCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name string, inputs []*wasm.Input, printOutputs bool) (err error) {
+func wasmStoreCall(vals map[string][]byte,
+	mod *wasm.Module,
+	entrypoint string,
+	name string,
+	inputs []*wasm.Input,
+	printOutputs bool,
+	rpcFactory wasm.WasmerFunctionFactory) (err error) {
+
 	var vm *wasm.Instance
-	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs); err != nil {
+	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
 		return err
 	}
 	if vm != nil && printOutputs {
@@ -388,7 +453,13 @@ func wasmStoreCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, 
 	return nil
 }
 
-func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name string, inputs []*wasm.Input) (out *wasm.Instance, err error) {
+func wasmCall(vals map[string][]byte,
+	mod *wasm.Module,
+	entrypoint string,
+	name string,
+	inputs []*wasm.Input,
+	rpcFactory wasm.WasmerFunctionFactory) (out *wasm.Instance, err error) {
+
 	hasInput := false
 	for _, input := range inputs {
 		switch input.Type {
@@ -412,8 +483,7 @@ func wasmCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, name 
 	//  state builders will not be called if their input streams are 0 bytes length (and there's no
 	//  state store in read mode)
 	if hasInput {
-		fmt.Println("ENTRYPOINT", entrypoint, inputs)
-		out, err = mod.NewInstance(entrypoint, inputs)
+		out, err = mod.NewInstance(entrypoint, inputs, rpcFactory)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}

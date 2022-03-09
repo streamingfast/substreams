@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	eth "github.com/streamingfast/eth-go"
+	"github.com/streamingfast/eth-go"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
+
 	rpc "github.com/streamingfast/eth-go/rpc"
 	"go.uber.org/zap"
 )
@@ -26,90 +28,22 @@ type RPCResponse struct {
 	CallError     error // always deterministic
 }
 
-type Imports interface {
-	RPC(calls []*RPCCall) ([]*RPCResponse, error)
-}
-
-// RPCCallsFromWASM ( blockNum, rpcClient, rpcCache, calls []*pbsubstream.RpcCall) ([]*pbsubstream.RPCResponse) {
-/*
- 	var reqs []*rpc.RPCRequest
-	for _, call := range calls {
-
-		reqs =
-		  // I need a []*rpc.RPCRequest
-		  // 	Params:  []interface{[]interface{call.ToAddress, call.method_signature}, blockNum}
-    	  //    Method: "eth_call"
-
-	}
-
-
-	var delay time.Duration
-	var attemptNumber int
-	for {
-		time.Sleep(delay)
-
-		attemptNumber += 1
-		delay = minDuration(time.Duration(attemptNumber*500)*time.Millisecond, 10*time.Second)
-
-		out, err := rpcClient.DoRequests(reqs)
-		if err != nil {
-			zlog.Warn("retrying RPCCall on RPC error", zap.Error(err), zap.Uint64("at_block", blockNum))
-			continue
-		}
-
-		var nonDeterministicResp bool
-		for _, resp := range out {
-			if !resp.Deterministic() {
-				zlog.Warn("retrying RPCCall on non-deterministic RPC call error", zap.Error(resp.Err), zap.Uint64("at_block", blockNum))
-				nonDeterministicResp = true
-				break
-			}
-		}
-		if nonDeterministicResp {
-			continue
-		}
-		if rpcCache != nil {
-			rpcCache.Set(cacheKey, out)
-		}
-		resp := toPBRPCResponse(out)
-		return resp, nil
-	}
-
-func toPBRPCResponse(rpc.Response) pbsubstream.RPCResponse {
-// ... error content becomes a boolean failed: true
-// if failed is true,  omit content to be sure we are deterministic
-}
-*/
-
-// }
-
-func DoRPCCalls(noArchiveNode bool, blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls []*RPCCall) ([]*RPCResponse, error) {
-	opts := []rpc.ETHCallOption{}
-	if noArchiveNode {
-		opts = append(opts, rpc.AtBlockNum(blockNum))
-	}
-
+func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pbsubstreams.RpcCalls) (out *pbsubstreams.RpcResponses) {
 	var reqs []*rpc.RPCRequest
-	for _, call := range calls {
-		method, err := eth.NewMethodDef(call.MethodSignature)
-		if err != nil {
-			return nil, fmt.Errorf("invalid method signature %s: %w", call.MethodSignature, err)
+	for _, call := range calls.Calls {
+		req := &rpc.RPCRequest{
+			Params: []interface{}{call.ToAddr, call.MethodSignature, blockNum},
+			Method: "eth_call",
 		}
-		addr, err := eth.NewAddress(call.ToAddr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid address %s: %w", call.ToAddr, err)
-		}
-		reqs = append(reqs, rpc.NewETHCall(addr, method, opts...).ToRequest())
+		reqs = append(reqs, req)
 	}
 
 	var cacheKey CacheKey
 	if rpcCache != nil {
 		var cacheKeyParts []interface{}
-		if noArchiveNode {
-			cacheKeyParts = append(cacheKeyParts, blockNum)
-		}
-		for _, call := range calls {
-			cacheKeyParts = append(cacheKeyParts, call.ToString())
+		cacheKeyParts = append(cacheKeyParts, blockNum)
+		for _, call := range calls.Calls {
+			cacheKeyParts = append(cacheKeyParts, callToString(call))
 		}
 		cacheKey = rpcCache.Key("rpc", cacheKeyParts...)
 
@@ -122,8 +56,8 @@ func DoRPCCalls(noArchiveNode bool, blockNum uint64, rpcClient *rpc.Client, rpcC
 				for i, resp := range rpcResp {
 					resp.CopyDecoder(reqs[i])
 				}
-				resps := toRPCResponse(rpcResp)
-				return resps, nil
+				resps := toProtoResponses(rpcResp)
+				return resps
 			}
 		}
 	}
@@ -156,10 +90,39 @@ func DoRPCCalls(noArchiveNode bool, blockNum uint64, rpcClient *rpc.Client, rpcC
 		if rpcCache != nil {
 			rpcCache.Set(cacheKey, out)
 		}
-		resp := toRPCResponse(out)
-		return resp, nil
+		resp := toProtoResponses(out)
+		return resp
 	}
+}
 
+// ToProtoCalls is a wrapper for previous format
+func ToProtoCalls(in []*RPCCall) (out *pbsubstreams.RpcCalls) {
+	for _, call := range in {
+		methodSig := eth.MustNewMethodDef(call.MethodSignature).MethodID()
+		toAddr := eth.MustNewAddress(call.ToAddr)
+		out.Calls = append(out.Calls, &pbsubstreams.RpcCall{
+			ToAddr:          toAddr,
+			MethodSignature: methodSig,
+		})
+	}
+	return
+}
+
+func toProtoResponses(in []*rpc.RPCResponse) (out *pbsubstreams.RpcResponses) {
+	for _, resp := range in {
+		newResp := &pbsubstreams.RpcResponse{}
+		if resp.Err != nil {
+			newResp.Failed = true
+		} else {
+			newResp.Raw = []byte(resp.Content)
+		}
+		out.Responses = append(out.Responses, newResp)
+	}
+	return
+}
+
+func callToString(c *pbsubstreams.RpcCall) string {
+	return fmt.Sprintf("%x:%x", c.ToAddr, c.MethodSignature)
 }
 
 func toRPCResponse(in []*rpc.RPCResponse) (out []*RPCResponse) {

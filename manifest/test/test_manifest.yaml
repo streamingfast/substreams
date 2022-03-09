@@ -103,5 +103,7 @@ modules:
       - store: volumes
         mode: deltas
       - map: mint_burn_swaps_extractor
+    output:
+      type: proto:sf.substreams.v1.DebeziumCDC
 
 # $ program manifest.yaml pairsExtractor

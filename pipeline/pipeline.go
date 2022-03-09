@@ -58,33 +58,32 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 }
 
 func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) error {
-	streams, err := p.manifest.Graph.StreamsFor(p.outputStreamName)
+	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("whoops: %w", err)
 	}
 
 	nativeStreams := registry.Init(p.nativeImports)
 
-	if err := p.setupStores(streams, ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(modules, ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 	p.nativeOutputs = map[string]reflect.Value{}
 
-	for _, stream := range streams {
-		f, found := nativeStreams[stream.Code.Native]
+	for _, mod := range modules {
+		f, found := nativeStreams[mod.Code.Native]
 		if !found {
-			return fmt.Errorf("native code not found for %q", stream.Code)
+			return fmt.Errorf("native code not found for %q", mod.Code)
 		}
 
-		debugOutput := stream.Name == p.outputStreamName
+		debugOutput := mod.Name == p.outputStreamName
 		inputs := []string{}
-		for _, in := range stream.Inputs {
-			fmt.Println("INPUT IS THIS:", in.Name)
+		for _, in := range mod.Inputs {
 			inputs = append(inputs, strings.Split(in.Name, ":")[1])
 		}
-		streamName := stream.Name // to ensure it's enclosed
+		modName := mod.Name // to ensure it's enclosed
 
-		switch stream.Kind {
+		switch mod.Kind {
 		case "map":
 			method := f.MethodByName("Map")
 			if method.Kind() == reflect.Invalid {
@@ -93,9 +92,9 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 			if method.IsZero() {
 				return fmt.Errorf("Map() method not found on %T", f.Interface())
 			}
-			fmt.Printf("Adding mapper for stream %q\n", stream.Name)
+			fmt.Printf("Adding mapper for module %q\n", mod.Name)
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return nativeMapCall(p.nativeOutputs, method, streamName, inputs, debugOutput)
+				return nativeMapCall(p.nativeOutputs, method, modName, inputs, debugOutput)
 			})
 		case "store":
 			method := f.MethodByName("Store")
@@ -106,15 +105,15 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 				return fmt.Errorf("Store() method not found on %T", f.Interface())
 			}
 
-			p.nativeOutputs[stream.Name] = reflect.ValueOf(p.stores[stream.Name])
+			p.nativeOutputs[mod.Name] = reflect.ValueOf(p.stores[mod.Name])
 
-			fmt.Printf("Adding state builder for stream %q\n", stream.Name)
+			fmt.Printf("Adding state builder for stream %q\n", mod.Name)
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return nativeStoreCall(p.nativeOutputs, method, streamName, inputs, debugOutput)
+				return nativeStoreCall(p.nativeOutputs, method, modName, inputs, debugOutput)
 			})
 
 		default:
-			return fmt.Errorf("unknown value %q for 'kind' in stream %q", stream.Kind, stream.Name)
+			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
 		}
 
 	}
@@ -125,21 +124,21 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 }
 
 func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) error {
-	streams, err := p.manifest.Graph.StreamsFor(p.outputStreamName)
+	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(streams, ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(modules, ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
 	p.wasmOutputs = map[string][]byte{}
 
-	for _, stream := range streams {
-		debugOutput := stream.Name == p.outputStreamName
+	for _, mod := range modules {
+		debugOutput := mod.Name == p.outputStreamName
 		var inputs []*wasm.Input
-		for _, in := range stream.Inputs {
+		for _, in := range mod.Inputs {
 			if in.Map != "" {
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputStream,
@@ -167,29 +166,29 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 					Name: in.Source,
 				})
 			} else {
-				return fmt.Errorf("invalid input struct for stream %q", stream.Name)
+				return fmt.Errorf("invalid input struct for stream %q", mod.Name)
 			}
 		}
-		streamName := stream.Name // to ensure it's enclosed
+		streamName := mod.Name // to ensure it's enclosed
 
-		mod, err := wasm.NewModule(stream.Code.Content, filepath.Base(stream.Code.File))
+		wasmModule, err := wasm.NewModule(mod.Code.Content, filepath.Base(mod.Code.File))
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
-		switch stream.Kind {
+		switch mod.Kind {
 		case "map":
 			fmt.Printf("Adding mapper for stream %q\n", streamName)
-			entrypoint := stream.Code.Entrypoint
+			entrypoint := mod.Code.Entrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, mod, entrypoint, streamName, inputs, debugOutput)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, streamName, inputs, debugOutput)
 			})
 		case "store":
-			updatePolicy := stream.Output.UpdatePolicy
-			valueType := stream.Output.ValueType
-			protoType := stream.Output.ProtoType
+			updatePolicy := mod.Output.UpdatePolicy
+			valueType := mod.Output.ValueType
+			protoType := mod.Output.ProtoType
 
-			entrypoint := stream.Code.Entrypoint
+			entrypoint := mod.Code.Entrypoint
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         streamName,
@@ -201,11 +200,11 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 			fmt.Printf("Adding state builder for stream %q\n", streamName)
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmStoreCall(p.wasmOutputs, mod, entrypoint, streamName, inputs, debugOutput)
+				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, streamName, inputs, debugOutput)
 			})
 
 		default:
-			return fmt.Errorf("unknown value %q for 'kind' in stream %q", stream.Kind, stream.Name)
+			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
 		}
 
 	}
@@ -213,22 +212,22 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 	return nil
 }
 
-func (p *Pipeline) setupStores(streams []*manifest.Module, ioFactory state.IOFactory, forceLoadState bool) error {
+func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFactory, forceLoadState bool) error {
 	p.stores = make(map[string]*state.Builder)
-	for _, s := range streams {
-		if s.Kind != "store" {
+	for _, mod := range modules {
+		if mod.Kind != "store" {
 			continue
 		}
-		output := s.Output
-		store := state.NewBuilder(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory)
+		output := mod.Output
+		store := state.NewBuilder(mod.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory)
 		if forceLoadState {
 			// Use AN ABSOLUTE store, or SQUASH ALL PARTIAL!
 
 			if err := store.Init(p.startBlockNum); err != nil {
-				return fmt.Errorf("could not load state for store %s at block num %d: %w", s.Name, p.startBlockNum, err)
+				return fmt.Errorf("could not load state for store %s at block num %d: %w", mod.Name, p.startBlockNum, err)
 			}
 		}
-		p.stores[s.Name] = store
+		p.stores[mod.Name] = store
 	}
 	return nil
 }
@@ -322,7 +321,7 @@ func nativeMapCall(vals map[string]reflect.Value, method reflect.Value, name str
 	}
 	out := method.Call(inputVals)
 	if len(out) != 2 {
-		return fmt.Errorf("invalid number of outputs for Map call in code for stream %q, should be 2 (data, error)", name)
+		return fmt.Errorf("invalid number of outputs for Map call in code for module %q, should be 2 (data, error)", name)
 	}
 	vals[name] = out[0]
 
@@ -332,7 +331,7 @@ func nativeMapCall(vals map[string]reflect.Value, method reflect.Value, name str
 	}
 
 	if err, ok := out[1].Interface().(error); ok && err != nil {
-		return fmt.Errorf("mapper stream %q: %w", name, err)
+		return fmt.Errorf("mapper module %q: %w", name, err)
 	}
 	return nil
 }
@@ -347,14 +346,14 @@ func nativeStoreCall(vals map[string]reflect.Value, method reflect.Value, name s
 	// TODO: we can cache the `Method` retrieved on the stream.
 	out := method.Call(inputVals)
 	if len(out) != 1 {
-		return fmt.Errorf("invalid number of outputs for 'Store' call in code for stream %q, should be 1 (error)", name)
+		return fmt.Errorf("invalid number of outputs for 'Store' call in code for module %q, should be 1 (error)", name)
 	}
 	p, ok := vals[name].Interface().(Printer)
 	if ok && printOutputs {
 		p.Print()
 	}
 	if err, ok := out[0].Interface().(error); ok && err != nil {
-		return fmt.Errorf("state builder stream %q: %w", name, err)
+		return fmt.Errorf("state builder module %q: %w", name, err)
 	}
 	return nil
 }
@@ -368,7 +367,7 @@ func wasmMapCall(vals map[string][]byte, mod *wasm.Module, entrypoint string, na
 		out := vm.Output()
 		vals[name] = out
 		if len(out) != 0 && printOutputs {
-			fmt.Printf("Stream output %q:\n    %v\n", name, out)
+			fmt.Printf("Module output %q:\n    %v\n", name, out)
 		}
 	} else {
 		vals[name] = nil

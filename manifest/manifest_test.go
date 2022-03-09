@@ -79,7 +79,7 @@ func TestStream_Signature_Basic(t *testing.T) {
 	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
 	require.NoError(t, err)
 
-	pairExtractorStream := manifest.Graph.streams["pairExtractor"]
+	pairExtractorStream := manifest.Graph.modules["pairExtractor"]
 	sig := pairExtractorStream.Signature(manifest.Graph)
 	assert.Equal(t, "9Sdn9wyVddnTCFAMRwhgCXrJ3+k=", base64.StdEncoding.EncodeToString(sig))
 }
@@ -88,7 +88,7 @@ func TestStream_Signature_Composed(t *testing.T) {
 	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
 	require.NoError(t, err)
 
-	pairsStream := manifest.Graph.streams["pairs"]
+	pairsStream := manifest.Graph.modules["pairs"]
 	sig := pairsStream.Signature(manifest.Graph)
 	assert.Equal(t, "LKtX3dNYKlsZTmhNd/3qMCYx7E4=", base64.StdEncoding.EncodeToString(sig))
 }
@@ -97,12 +97,12 @@ func TestStreamLinks_Streams(t *testing.T) {
 	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
 	require.NoError(t, err)
 
-	manifest.Graph.StreamsFor("prices")
+	manifest.Graph.ModulesDownTo("prices")
 }
 
 func TestStreamLinks_StreamsFor(t *testing.T) {
 	streamGraph := &StreamsGraph{
-		streams: map[string]*Module{
+		modules: map[string]*Module{
 			"A": {Name: "A"},
 			"B": {Name: "B"},
 			"C": {Name: "C"},
@@ -126,7 +126,7 @@ func TestStreamLinks_StreamsFor(t *testing.T) {
 		},
 	}
 
-	res, err := streamGraph.StreamsFor("A")
+	res, err := streamGraph.ModulesDownTo("A")
 	assert.NoError(t, err)
 
 	_ = res
@@ -134,7 +134,7 @@ func TestStreamLinks_StreamsFor(t *testing.T) {
 
 func TestStreamLinks_GroupedStreamsFor(t *testing.T) {
 	streamGraph := &StreamsGraph{
-		streams: map[string]*Module{
+		modules: map[string]*Module{
 			"A": {Name: "A"},
 			"B": {Name: "B"},
 			"C": {Name: "C"},

@@ -86,11 +86,6 @@ func New(path string) (m *Manifest, err error) {
 	}
 
 	for _, s := range m.Modules {
-		for _, input := range s.Inputs {
-			if err := input.parse(); err != nil {
-				return nil, fmt.Errorf("module %q: %w", s.Name, err)
-			}
-		}
 		if s.Code.File != "" {
 			cnt, err := ioutil.ReadFile(s.Code.File)
 			if err != nil {
@@ -138,11 +133,17 @@ func newWithoutLoad(path string) (*Manifest, error) {
 		default:
 			return nil, fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
 		}
+
+		for _, input := range s.Inputs {
+			if err := input.parse(); err != nil {
+				return nil, fmt.Errorf("module %q: %w", s.Name, err)
+			}
+		}
 	}
 
-	graph, err := NewStreamsGraph(m.Modules)
+	graph, err := NewModuleGraph(m.Modules)
 	if err != nil {
-		return nil, fmt.Errorf("computing streams graph: %w", err)
+		return nil, fmt.Errorf("computing modules graph: %w", err)
 	}
 
 	m.Graph = graph
@@ -200,7 +201,11 @@ func (m *Manifest) PrintMermaid() {
 
 	for _, s := range m.Modules {
 		for _, in := range s.Inputs {
-			fmt.Printf("  %s -- %q --> %s\n", strings.Split(in.Name, ":")[1], in.Name, s.Name)
+			dataPassed := in.Name
+			if in.Mode != "" {
+				dataPassed = dataPassed + ":" + in.Mode
+			}
+			fmt.Printf("  %s -- %q --> %s\n", strings.Split(in.Name, ":")[1], dataPassed, s.Name)
 		}
 	}
 
@@ -238,27 +243,27 @@ func (s *Module) String() string {
 }
 
 type StreamsGraph struct {
-	streams map[string]*Module
+	modules map[string]*Module
 	links   map[string][]*Module
 }
 
-func NewStreamsGraph(streams []*Module) (*StreamsGraph, error) {
+func NewModuleGraph(modules []*Module) (*StreamsGraph, error) {
 	sg := &StreamsGraph{
-		streams: map[string]*Module{},
+		modules: map[string]*Module{},
 		links:   map[string][]*Module{},
 	}
 
-	for _, stream := range streams {
-		sg.streams[stream.Name] = stream
+	for _, mod := range modules {
+		sg.modules[mod.Name] = mod
 	}
 
-	for _, stream := range streams {
+	for _, mod := range modules {
 		var links []*Module
-		for _, input := range stream.Inputs {
+		for _, input := range mod.Inputs {
 			for _, streamPrefix := range []string{"map:", "store:"} {
 				if strings.HasPrefix(input.Name, streamPrefix) {
 					linkName := strings.TrimPrefix(input.Name, streamPrefix)
-					linkedStream, ok := sg.streams[linkName]
+					linkedStream, ok := sg.modules[linkName]
 					if !ok {
 						return nil, fmt.Errorf("%s does not exist", linkName)
 					}
@@ -267,25 +272,25 @@ func NewStreamsGraph(streams []*Module) (*StreamsGraph, error) {
 			}
 
 		}
-		sg.links[stream.Name] = links
+		sg.links[mod.Name] = links
 	}
 
 	return sg, nil
 }
 
-func (g *StreamsGraph) StreamsFor(streamName string) ([]*Module, error) {
-	thisStream, found := g.streams[streamName]
+func (g *StreamsGraph) ModulesDownTo(modName string) ([]*Module, error) {
+	thisModule, found := g.modules[modName]
 	if !found {
-		return nil, fmt.Errorf("stream %q not found", streamName)
+		return nil, fmt.Errorf("module %q not found", modName)
 	}
 
-	parents := g.ancestorsOf(streamName)
-	return append(parents, thisStream), nil
+	parents := g.ancestorsOf(modName)
+	return append(parents, thisModule), nil
 }
 
 //TODO: use this in pipeline and deduplicate everything
 func (g *StreamsGraph) GroupedStreamsFor(streamName string) ([][]*Module, error) {
-	thisStream, found := g.streams[streamName]
+	thisStream, found := g.modules[streamName]
 	if !found {
 		return nil, fmt.Errorf("stream %q not found", streamName)
 	}

@@ -476,7 +476,6 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
 			value := args[3].F64()
-			fmt.Println("parse float", value)
 			i.outputStore.SetMinFloat64(uint64(ord), key, value)
 
 			return nil, nil

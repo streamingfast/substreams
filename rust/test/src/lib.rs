@@ -78,3 +78,10 @@ extern "C" fn test_set_max_bigfloat() {
     substreams::state::set_max_bigfloat(1, "set_max_bigfloat".to_string(), BigDecimal::parse_bytes(b"11.05", 10).unwrap());
     substreams::state::set_max_bigfloat(1, "set_max_bigfloat".to_string(), BigDecimal::parse_bytes(b"11.04", 10).unwrap());
 }
+
+#[no_mangle]
+extern "C" fn test_set_delete_prefix() {
+    substreams::state::set(1, "1:key_to_keep".to_string(), [1, 2, 3, 4].to_vec());
+    substreams::state::set(2, "2:key_to_delete".to_string(), [5, 6, 7, 8].to_vec());
+    substreams::state::delete_prefix(3, "2:".to_string());
+}

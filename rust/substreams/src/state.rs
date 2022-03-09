@@ -72,6 +72,16 @@ pub fn set(ord: i64, key: String, value: Vec<u8>) {
     }
 }
 
+pub fn delete_prefix(ord: i64, prefix: String){
+    unsafe {
+        externs::state::delete_prefix(
+            ord,
+            prefix.as_ptr(),
+            prefix.len() as u32,
+        )
+    }
+}
+
 pub fn sum_bigint(ord: i64, key: String, value: BigUint) {
     let data = value.to_string();
     unsafe {

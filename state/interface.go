@@ -19,10 +19,11 @@ type ConditionalKeySetter interface {
 }
 
 type Deleter interface {
-	// Deletes a range of keys, lexicographically between `lowKey` and `highKey`
-	DeleteRange(lowKey, highKey string)
-	// Deletes a range of keys, first considering the _value_ of such keys as a _pointerSeparator_-separated list of keys to _also_ delete.
-	DeleteRangePointers(lowKey, highKey, pointerSeparator string)
+	DeletePrefix(ord uint64, prefix string)
+	//// Deletes a range of keys, lexicographically between `lowKey` and `highKey`
+	//DeleteRange(lowKey, highKey string)
+	//// Deletes a range of keys, first considering the _value_ of such keys as a _pointerSeparator_-separated list of keys to _also_ delete.
+	//DeleteRangePointers(lowKey, highKey, pointerSeparator string)
 }
 
 type MaxBigIntSetter interface {

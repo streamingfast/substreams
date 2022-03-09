@@ -157,6 +157,17 @@ func TestRustScript(t *testing.T) {
 				require.Equal(t, "11.05", string(data))
 			},
 		},
+		{
+			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
+			functionName: "test_set_delete_prefix",
+			builder:      state.NewBuilder("builder.name.1", "ignore", "some object", "", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
+				_, found := builder.GetLast("1:key_to_keep")
+				require.True(t, found, "key_to_keep")
+				_, found = builder.GetLast("2:key_to_delete")
+				require.False(t, found, "key_to_delete")
+			},
+		},
 	}
 
 	for _, c := range cases {

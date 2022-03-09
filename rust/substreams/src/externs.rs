@@ -35,6 +35,7 @@ pub mod state {
             value_ptr: *const u8,
             value_len: u32,
         );
+        pub fn delete_prefix(ord: i64, prefix_ptr: *const u8, prefix_len: u32);
         pub fn sum_bigint(
             ord: i64,
             key_ptr: *const u8,
@@ -46,7 +47,7 @@ pub mod state {
             ord: i64,
             key_ptr: *const u8,
             key_len: u32,
-	        value: i64,
+            value: i64,
         );
         pub fn sum_float64(
             ord: i64,

@@ -261,7 +261,26 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			return nil, nil
 		},
 	)
-
+	functions["delete_prefix"] = wasmer.NewFunction(
+		i.wasmStore,
+		wasmer.NewFunctionType(
+			params(
+				wasmer.I64, /* ordinal */
+				wasmer.I32, /* prefix offset */
+				wasmer.I32, /* prefix length */
+			),
+			returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			prefix, err := i.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading prefix: %w", err)
+			}
+			ord := args[0].I64()
+			i.outputStore.DeletePrefix(uint64(ord), prefix)
+			return nil, nil
+		},
+	)
 	functions["sum_bigint"] = wasmer.NewFunction(
 		i.wasmStore,
 		wasmer.NewFunctionType(

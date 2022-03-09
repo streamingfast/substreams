@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
@@ -19,14 +20,13 @@ type Builder struct {
 	bundler *bundle.Bundler
 	io      StateIO
 
-	KV     map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
-	Deltas []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
-
+	KV           map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
+	Deltas       []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
+	DeletedKeys  map[string]interface{}
 	updatePolicy string
 	valueType    string
 	protoType    string
-
-	lastOrdinal uint64
+	lastOrdinal  uint64
 }
 
 func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactory IOFactory) *Builder {
@@ -161,6 +161,27 @@ func (b *Builder) Del(ord uint64, key string) {
 		}
 		b.applyDelta(delta)
 		b.Deltas = append(b.Deltas, delta)
+	}
+}
+
+func (b *Builder) DeletePrefix(ord uint64, prefix string) {
+	b.bumpOrdinal(ord)
+
+	for key, val := range b.KV {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		delta := &pbsubstreams.StoreDelta{
+			Operation: pbsubstreams.StoreDelta_DELETE,
+			Ordinal:   ord,
+			Key:       key,
+			OldValue:  val,
+			NewValue:  nil,
+		}
+		b.applyDelta(delta)
+		b.Deltas = append(b.Deltas, delta)
+
+		//todo: if builder in batch mode. we need to add the deleted key to the b.DeletedKeys
 	}
 }
 

@@ -5,7 +5,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/streamingfast/dstore"
+	"io"
 	"io/ioutil"
+	"strconv"
+	"strings"
 )
 
 type IOFactory interface {
@@ -70,10 +73,47 @@ func (s *StoreStateIO) ReadPartial(ctx context.Context, startBlockNum, endBlockN
 	return data, err
 }
 
+func (s *StoreStateIO) WalkPartials(ctx context.Context, startBlock, endBlock uint64, f func(startBlock, endBlock uint64, data io.ReadCloser) error) error {
+	err := s.store.Walk(ctx, fmt.Sprintf("%s-", s.name), ".tmp", func(filename string) (err error) {
+		if !strings.HasSuffix(filename, ".partial") {
+			return
+		}
+
+		start, end := ParsePartialFileName(filename)
+		if start < startBlock {
+			return
+		}
+		if end > endBlock {
+			return
+		}
+
+		data, err := s.store.OpenObject(ctx, filename)
+		if err != nil {
+			return err
+		}
+
+		return f(start, end, data)
+	})
+
+	return err
+}
+
 func GetStateFileName(name string, blockNum uint64) string {
-	return fmt.Sprintf("%d-%s.kv", blockNum, name)
+	return fmt.Sprintf("%s-%d.kv", name, blockNum)
 }
 
 func GetPartialFileName(name string, startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%d-%d-%s.partial", startBlockNum, endBlockNum, name)
+	return fmt.Sprintf("%s-%d-%d.partial", name, startBlockNum, endBlockNum)
+}
+
+func ParsePartialFileName(name string) (uint64, uint64) {
+	name = strings.TrimSuffix(name, ".partial")
+	parts := strings.Split(name, "-")
+	if len(parts) != 3 {
+		panic(fmt.Sprintf("invalid partial filename %s", name))
+	}
+
+	start, _ := strconv.Atoi(parts[1])
+	end, _ := strconv.Atoi(parts[2])
+	return uint64(start), uint64(end)
 }

@@ -11,7 +11,7 @@ modules:
   - name: pair_extractor
     kind: map
     code:
-      file: ./pcs-rust/pkg/pcs_substreams_bg.wasm
+      file: ./test/code/pcs_substreams_bg.wasm
       entrypoint: map_pairs
     inputs:
       - source: sf.ethereum.type.v1.Block
@@ -21,7 +21,7 @@ modules:
   - name: pairs
     kind: store
     code:
-      file: ./pcs-rust/pkg/pcs_substreams_bg.wasm
+      file: ./test/code/pcs_substreams_bg.wasm
       entrypoint: build_pairs_state
     inputs:
       - map: pair_extractor
@@ -32,7 +32,7 @@ modules:
   - name: reserves_extractor
     kind: map
     code:
-      file:  ./pcs-rust/pkg/pcs_substreams_bg.wasm
+      file:  ./test/code/pcs_substreams_bg.wasm
       entrypoint: map_reserves
     inputs:
       - source: sf.ethereum.type.v1.Block

@@ -32,7 +32,7 @@ func TestStreamYamlDecode(t *testing.T) {
 name: pairExtractor
 kind: map
 code:
-  file: ./pairExtractor.wasm
+  file: ./pcs_substreams_bg.wasm.wasm
 inputs:
   - source: proto:sf.ethereum.type.v1.Block
 output:
@@ -40,7 +40,7 @@ output:
 			expectedOutput: Module{
 				Name:   "pairExtractor",
 				Kind:   "map",
-				Code:   Code{File: "./pairExtractor.wasm"},
+				Code:   Code{File: "./pcs_substreams_bg.wasm.wasm"},
 				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}},
 				Output: StreamOutput{Type: "proto:pcs.types.v1.Pairs"},
 			},

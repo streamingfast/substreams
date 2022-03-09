@@ -4,11 +4,11 @@ package sf.substreams.v1;
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
 
-message StateDeltas {
-  repeated StateDelta deltas = 1;
+message StoreDeltas {
+  repeated StoreDelta deltas = 1;
 }
 
-message StateDelta {
+message StoreDelta {
   enum Operation {
     UNSET = 0;
     CREATE = 1;

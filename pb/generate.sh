@@ -25,7 +25,7 @@ function main() {
   pushd "$ROOT/pb" &> /dev/null
 
   generate "sf/ethereum/substreams/v1/rpc.proto"
-  generate "sf/substreams/v1/substream.proto"
+  generate "sf/substreams/v1/substreams.proto"
 
 
   echo "generate.sh - `date` - `whoami`" > $ROOT/pb/last_generate.txt

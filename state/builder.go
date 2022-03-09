@@ -284,20 +284,10 @@ func (b *Builder) StoreBlock(ctx context.Context, block *bstream.Block) error {
 
 	bundleCompleted, highestBlockLimit := b.bundler.BundleCompleted()
 	if bundleCompleted {
-		files := b.bundler.ToBundle(highestBlockLimit)
-
-		//todo: currently no-op.
-		err := b.io.MergeDeltas(ctx, b.bundler.BundleInclusiveLowerBlock(), files)
-		if err != nil {
-			return err
-		}
-
+		_ = b.bundler.ToBundle(highestBlockLimit)
 		b.bundler.Commit(highestBlockLimit)
 		b.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
-			for _, file := range oneBlockFilesToDelete {
-				//todo: currently no-op.
-				_ = b.io.DeleteDelta(ctx, file)
-			}
+			return
 		})
 
 		if err := b.WriteState(ctx, block); err != nil {
@@ -306,13 +296,6 @@ func (b *Builder) StoreBlock(ctx context.Context, block *bstream.Block) error {
 	}
 
 	obf := mustBlockToOneBlockFile(b.Name, block)
-
-	//content, _ := json.MarshalIndent(b.Deltas, "", "  ")
-	//err := b.io.WriteDelta(ctx, content, obf)
-	//if err != nil {
-	//	return fmt.Errorf("writing %s delta at block %d: %w", b.Name, blockNumber, err)
-	//}
-
 	b.bundler.AddOneBlockFile(obf)
 
 	return nil

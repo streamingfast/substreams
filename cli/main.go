@@ -38,4 +38,5 @@ func init() {
 	rootCmd.PersistentFlags().String("irr-indexes-url", defaultIrrIndexStore, "URL of blocks store")
 
 	rootCmd.PersistentFlags().Int64P("start-block", "s", defaultStartBlock, "Start block for blockchain firehose")
+	rootCmd.PersistentFlags().BoolP("partial", "p", false, "Start block for blockchain firehose")
 }

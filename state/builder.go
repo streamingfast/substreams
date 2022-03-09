@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
@@ -20,8 +19,8 @@ type Builder struct {
 	bundler *bundle.Bundler
 	io      StateIO
 
-	KV     map[string][]byte         // KV is the state, and assumes all Deltas were already applied to it.
-	Deltas []pbsubstreams.StateDelta // Deltas are always deltas for the given block.
+	KV     map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
+	Deltas []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
 
 	updatePolicy string
 	valueType    string
@@ -51,12 +50,12 @@ func (b *Builder) Print() {
 	}
 	fmt.Printf("State deltas for %q\n", b.Name)
 	for _, delta := range b.Deltas {
-		b.PrintDelta(&delta)
+		b.PrintDelta(delta)
 	}
 }
 
-func (b *Builder) PrintDelta(delta *pbsubstreams.StateDelta) {
-	fmt.Printf("  %s (%d) KEY: %q\n", strings.ToUpper(delta.Operation), delta.Ordinal, delta.Key)
+func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
+	fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
 	fmt.Printf("    OLD: %s\n", string(delta.OldValue))
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
@@ -104,13 +103,13 @@ func (b *Builder) GetFirst(key string) ([]byte, bool) {
 	for _, delta := range b.Deltas {
 		if delta.Key == key {
 			switch delta.Operation {
-			case "d", "u":
+			case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
 				return delta.OldValue, true
-			case "c":
+			case pbsubstreams.StoreDelta_CREATE:
 				return nil, false
 			default:
 				// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-				panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
+				panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 			}
 		}
 	}
@@ -133,10 +132,10 @@ func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool) {
 		}
 		if delta.Key == key {
 			switch delta.Operation {
-			case "d", "u":
+			case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
 				out = delta.OldValue
 				found = true
-			case "c":
+			case pbsubstreams.StoreDelta_CREATE:
 				out = nil
 				found = false
 			default:
@@ -153,15 +152,15 @@ func (b *Builder) Del(ord uint64, key string) {
 
 	val, found := b.GetLast(key)
 	if found {
-		delta := &pbsubstreams.StateDelta{
-			Operation: "d",
+		delta := &pbsubstreams.StoreDelta{
+			Operation: pbsubstreams.StoreDelta_DELETE,
 			Ordinal:   ord,
 			Key:       key,
 			OldValue:  val,
 			NewValue:  nil,
 		}
 		b.applyDelta(delta)
-		b.Deltas = append(b.Deltas, *delta)
+		b.Deltas = append(b.Deltas, delta)
 	}
 }
 
@@ -192,22 +191,22 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 
 	val, found := b.GetLast(key)
 
-	var delta *pbsubstreams.StateDelta
+	var delta *pbsubstreams.StoreDelta
 	if found {
 		//Uncomment when finished debugging:
 		if bytes.Compare(value, val) == 0 {
 			return
 		}
-		delta = &pbsubstreams.StateDelta{
-			Operation: "u",
+		delta = &pbsubstreams.StoreDelta{
+			Operation: pbsubstreams.StoreDelta_UPDATE,
 			Ordinal:   ord,
 			Key:       key,
 			OldValue:  val,
 			NewValue:  value,
 		}
 	} else {
-		delta = &pbsubstreams.StateDelta{
-			Operation: "c",
+		delta = &pbsubstreams.StoreDelta{
+			Operation: pbsubstreams.StoreDelta_CREATE,
 			Ordinal:   ord,
 			Key:       key,
 			OldValue:  nil,
@@ -215,7 +214,7 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 		}
 	}
 	b.applyDelta(delta)
-	b.Deltas = append(b.Deltas, *delta)
+	b.Deltas = append(b.Deltas, delta)
 }
 
 func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
@@ -226,29 +225,29 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 		return
 	}
 
-	delta := &pbsubstreams.StateDelta{
-		Operation: "c",
+	delta := &pbsubstreams.StoreDelta{
+		Operation: pbsubstreams.StoreDelta_CREATE,
 		Ordinal:   ord,
 		Key:       key,
 		OldValue:  nil,
 		NewValue:  value,
 	}
 	b.applyDelta(delta)
-	b.Deltas = append(b.Deltas, *delta)
+	b.Deltas = append(b.Deltas, delta)
 }
 
-func (b *Builder) applyDelta(delta *pbsubstreams.StateDelta) {
+func (b *Builder) applyDelta(delta *pbsubstreams.StoreDelta) {
 	switch delta.Operation {
-	case "u", "c":
+	case pbsubstreams.StoreDelta_UPDATE, pbsubstreams.StoreDelta_CREATE:
 		b.KV[delta.Key] = delta.NewValue
-	case "d":
+	case pbsubstreams.StoreDelta_DELETE:
 		delete(b.KV, delta.Key)
 	}
 }
 
 func (b *Builder) Flush() {
 	for _, delta := range b.Deltas {
-		b.applyDelta(&delta)
+		b.applyDelta(delta)
 	}
 	b.Deltas = nil
 	b.lastOrdinal = 0

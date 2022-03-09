@@ -2,13 +2,14 @@ package wasm
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math/big"
 
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/wasmerio/wasmer-go/wasmer"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type Instance struct {
@@ -97,7 +98,10 @@ func (m *Module) NewInstance(functionName string, inputs []*Input) (*Instance, e
 		case InputStore:
 			if input.Deltas {
 				// TODO: Make it a proto thing before sending in
-				cnt, _ := json.Marshal(input.Store.Deltas)
+				cnt, err := proto.Marshal(&pbsubstreams.StoreDeltas{Deltas: input.Store.Deltas})
+				if err != nil {
+					return nil, fmt.Errorf("marshaling store deltas: %w", err)
+				}
 
 				ptr, err := instance.heap.Write(cnt)
 				if err != nil {

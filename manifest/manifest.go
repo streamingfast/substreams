@@ -24,7 +24,7 @@ type Module struct {
 	Name   string       `yaml:"name"`
 	Kind   string       `yaml:"kind"`
 	Code   Code         `yaml:"code"`
-	Inputs []Input      `yaml:"inputs"`
+	Inputs []*Input     `yaml:"inputs"`
 	Output StreamOutput `yaml:"output"`
 }
 
@@ -37,21 +37,29 @@ type Input struct {
 	Map    string `yaml:"map"`
 	Mode   string `yaml:"mode"`
 
-	name string
+	Name string `yaml:"-"`
 }
 
-func (i *Input) parse() {
-	if i.Map != "" && i.Store == "" {
-		i.name = fmt.Sprintf("map:%s", i.Map)
-		return
-	} else if i.Store != "" && i.Map == "" {
-		i.name = fmt.Sprintf("store:%s", i.Store)
-		return
-	} else if i.Source != "" {
-		i.name = fmt.Sprintf("source:%s", i.Source)
-		return
+func (i *Input) parse() error {
+	if i.Map != "" && i.Store == "" && i.Source == "" {
+		i.Name = fmt.Sprintf("map:%s", i.Map)
+		return nil
 	}
-	i.name = fmt.Sprintf("unknown:%s-%s-%s-%s", i.Map, i.Store, i.Source, i.Mode)
+	if i.Store != "" && i.Map == "" && i.Source == "" {
+		i.Name = fmt.Sprintf("store:%s", i.Store)
+		if i.Mode == "" {
+			i.Mode = "get"
+		}
+		if i.Mode != "get" && i.Mode != "deltas" {
+			return fmt.Errorf("input %q: 'mode' parameter must be one of: 'get', 'deltas'", i.Name)
+		}
+		return nil
+	}
+	if i.Source != "" && i.Map == "" && i.Store == "" {
+		i.Name = fmt.Sprintf("source:%s", i.Source)
+		return nil
+	}
+	return fmt.Errorf("one, and only one of 'map', 'store' or 'source' must be specified")
 }
 
 type Code struct {
@@ -79,7 +87,9 @@ func New(path string) (m *Manifest, err error) {
 
 	for _, s := range m.Modules {
 		for _, input := range s.Inputs {
-			input.parse()
+			if err := input.parse(); err != nil {
+				return nil, fmt.Errorf("module %q: %w", s.Name, err)
+			}
 		}
 		if s.Code.File != "" {
 			cnt, err := ioutil.ReadFile(s.Code.File)
@@ -111,13 +121,13 @@ func newWithoutLoad(path string) (*Manifest, error) {
 		switch s.Kind {
 		case "map":
 			if s.Output.Type == "" {
-				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind Mapper", s.Name)
+				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
 			if s.Code.Entrypoint == "" {
 				s.Code.Entrypoint = "map"
 			}
 		case "store":
-			if err := validateStateBuilderOutput(s.Output); err != nil {
+			if err := validateStoreBuilderOutput(s.Output); err != nil {
 				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
 			}
 
@@ -140,12 +150,12 @@ func newWithoutLoad(path string) (*Manifest, error) {
 	return m, nil
 }
 
-func validateStateBuilderOutput(output StreamOutput) error {
+func validateStoreBuilderOutput(output StreamOutput) error {
 	if output.UpdatePolicy == "" {
-		return errors.New("missing 'output.updatePolicy' for kind StateBuilder")
+		return errors.New("missing 'output.updatePolicy' for kind 'store'")
 	}
 	if output.ValueType == "" {
-		return errors.New("missing 'output.valueType' for kind StateBuilder")
+		return errors.New("missing 'output.valueType' for kind 'store'")
 	}
 	if output.ValueType == "proto" && output.ProtoType == "" {
 		return errors.New("missing 'output.protoType' for kind StateBuidler, required when 'output.valueType' set to 'proto'")
@@ -186,18 +196,16 @@ func validateStateBuilderOutput(output StreamOutput) error {
 }
 
 func (m *Manifest) PrintMermaid() {
-	//DEACTIVATE FOR NOW
+	fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
 
-	//fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
-	//
-	//for _, s := range m.Streams {
-	//	for _, in := range s.Inputs {
-	//		fmt.Printf("  %s -- %q --> %s\n", strings.Split(in, ":")[1], in, s.Name)
-	//	}
-	//}
-	//
-	//fmt.Println("```")
-	//fmt.Println("")
+	for _, s := range m.Modules {
+		for _, in := range s.Inputs {
+			fmt.Printf("  %s -- %q --> %s\n", strings.Split(in.Name, ":")[1], in.Name, s.Name)
+		}
+	}
+
+	fmt.Println("```")
+	fmt.Println("")
 }
 
 func (s *Module) Signature(graph *StreamsGraph) []byte {
@@ -207,10 +215,10 @@ func (s *Module) Signature(graph *StreamsGraph) []byte {
 	buf.Write([]byte(s.Code.Entrypoint))
 
 	sort.Slice(s.Inputs, func(i, j int) bool {
-		return s.Inputs[i].name < s.Inputs[j].name
+		return s.Inputs[i].Name < s.Inputs[j].Name
 	})
 	for _, input := range s.Inputs {
-		buf.WriteString(input.name)
+		buf.WriteString(input.Name)
 	}
 
 	ancestors := graph.AncestorsOf(s.Name)
@@ -248,8 +256,8 @@ func NewStreamsGraph(streams []*Module) (*StreamsGraph, error) {
 		var links []*Module
 		for _, input := range stream.Inputs {
 			for _, streamPrefix := range []string{"map:", "store:"} {
-				if strings.HasPrefix(input.name, streamPrefix) {
-					linkName := strings.TrimPrefix(input.name, streamPrefix)
+				if strings.HasPrefix(input.Name, streamPrefix) {
+					linkName := strings.TrimPrefix(input.Name, streamPrefix)
 					linkedStream, ok := sg.streams[linkName]
 					if !ok {
 						return nil, fmt.Errorf("%s does not exist", linkName)

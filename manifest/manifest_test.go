@@ -29,18 +29,18 @@ func TestStreamYamlDecode(t *testing.T) {
 			name: "basic mapper",
 			rawYamlInput: `---
 name: pairExtractor
-kind: Mapper
+kind: map
 code:
   file: ./pairExtractor.wasm
 inputs:
-  - proto:sf.ethereum.codec.v1.Block
+  - source: proto:sf.ethereum.codec.v1.Block
 output:
   type: proto:pcs.types.v1.Pairs`,
 			expectedOutput: Module{
 				Name:   "pairExtractor",
-				Kind:   "Mapper",
+				Kind:   "map",
 				Code:   Code{File: "./pairExtractor.wasm"},
-				Inputs: []Input{{Source: "proto:sf.ethereum.codec.v1.Block"}},
+				Inputs: []*Input{{Source: "proto:sf.ethereum.codec.v1.Block"}},
 				Output: StreamOutput{Type: "proto:pcs.types.v1.Pairs"},
 			},
 		},
@@ -48,20 +48,20 @@ output:
 			name: "basic store",
 			rawYamlInput: `---
 name: prices
-kind: StateBuilder
+kind: store
 code:
   file: ./pricesState.wasm
 inputs:
-  - proto:sf.ethereum.codec.v1.Block
-  - store:pairs
+  - source: proto:sf.ethereum.codec.v1.Block
+  - store: pairs
 output:
   updatePolicy: sum
   valueType: bigint`,
 			expectedOutput: Module{
 				Name:   "prices",
-				Kind:   "StateBuilder",
+				Kind:   "store",
 				Code:   Code{File: "./pricesState.wasm"},
-				Inputs: []Input{{Source: "proto:sf.ethereum.codec.v1.Block"}, {Store: "pairs"}},
+				Inputs: []*Input{{Source: "proto:sf.ethereum.codec.v1.Block"}, {Store: "pairs"}},
 				Output: StreamOutput{UpdatePolicy: "sum", ValueType: "bigint"},
 			},
 		},

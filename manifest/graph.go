@@ -14,7 +14,7 @@ type ModuleGraph struct {
 	indexIndex  map[int]*Module
 }
 
-func NewModulesGraph(modules []*Module) (*ModuleGraph, error) {
+func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
 	g := &ModuleGraph{
 		Mutable:     graph.New(len(modules)),
 		modules:     modules,
@@ -78,6 +78,32 @@ func (g *ModuleGraph) topSort() ([]*Module, bool) {
 	}
 
 	return res, ok
+}
+
+func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*Module, error) {
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
+
+	sorted, ok := g.topSort()
+	if !ok {
+		return nil, fmt.Errorf("could not determine topological sort of graph")
+	}
+
+	revSorted := make([]*Module, len(sorted), len(sorted))
+	for i, m := range sorted {
+		revSorted[len(sorted)-i-1] = m
+	}
+
+	var res []*Module
+	for _, m := range revSorted {
+		if m.Name == moduleName {
+			break
+		}
+		res = append(res, m)
+	}
+
+	return res, nil
 }
 
 func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {

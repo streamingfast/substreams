@@ -17,7 +17,7 @@ type Manifest struct {
 	GenesisBlock int       `yaml:"genesisBlock"`
 	Modules      []*Module `yaml:"modules"`
 
-	Graph *StreamsGraph `yaml:"-"`
+	Graph *ModuleGraph `yaml:"-"`
 }
 
 type Module struct {
@@ -213,7 +213,7 @@ func (m *Manifest) PrintMermaid() {
 	fmt.Println("")
 }
 
-func (s *Module) Signature(graph *StreamsGraph) []byte {
+func (s *Module) Signature(graph *ModuleGraph) []byte {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteString(s.Kind)
 	buf.Write(s.Code.Content)
@@ -226,7 +226,7 @@ func (s *Module) Signature(graph *StreamsGraph) []byte {
 		buf.WriteString(input.Name)
 	}
 
-	ancestors := graph.AncestorsOf(s.Name)
+	ancestors, _ := graph.AncestorsOf(s.Name)
 	for _, ancestor := range ancestors {
 		sig := ancestor.Signature(graph)
 		buf.Write(sig)
@@ -240,166 +240,4 @@ func (s *Module) Signature(graph *StreamsGraph) []byte {
 
 func (s *Module) String() string {
 	return s.Name
-}
-
-type StreamsGraph struct {
-	modules map[string]*Module
-	links   map[string][]*Module
-}
-
-func NewModuleGraph(modules []*Module) (*StreamsGraph, error) {
-	sg := &StreamsGraph{
-		modules: map[string]*Module{},
-		links:   map[string][]*Module{},
-	}
-
-	for _, mod := range modules {
-		sg.modules[mod.Name] = mod
-	}
-
-	for _, mod := range modules {
-		var links []*Module
-		for _, input := range mod.Inputs {
-			for _, streamPrefix := range []string{"map:", "store:"} {
-				if strings.HasPrefix(input.Name, streamPrefix) {
-					linkName := strings.TrimPrefix(input.Name, streamPrefix)
-					linkedStream, ok := sg.modules[linkName]
-					if !ok {
-						return nil, fmt.Errorf("%s does not exist", linkName)
-					}
-					links = append(links, linkedStream)
-				}
-			}
-
-		}
-		sg.links[mod.Name] = links
-	}
-
-	return sg, nil
-}
-
-func (g *StreamsGraph) ModulesDownTo(modName string) ([]*Module, error) {
-	thisModule, found := g.modules[modName]
-	if !found {
-		return nil, fmt.Errorf("module %q not found", modName)
-	}
-
-	parents := g.ancestorsOf(modName)
-	return append(parents, thisModule), nil
-}
-
-//TODO: use this in pipeline and deduplicate everything
-func (g *StreamsGraph) GroupedStreamsFor(streamName string) ([][]*Module, error) {
-	thisStream, found := g.modules[streamName]
-	if !found {
-		return nil, fmt.Errorf("stream %q not found", streamName)
-	}
-
-	parents := g.groupedAncestorsOf(streamName)
-	return append(parents, []*Module{thisStream}), nil
-}
-
-func (g *StreamsGraph) AncestorsOf(streamName string) []*Module {
-	parents := g.ancestorsOf(streamName)
-	return parents
-}
-
-func (g *StreamsGraph) GroupedAncestorsOf(streamName string) []*Module {
-	parents := g.ancestorsOf(streamName)
-	return parents
-}
-
-func (g *StreamsGraph) ancestorsOf(streamName string) []*Module {
-	type streamWithTreeDepth struct {
-		stream *Module
-		depth  int
-	}
-
-	var dfs func(rootName string, depth int) []streamWithTreeDepth
-	dfs = func(rootName string, depth int) []streamWithTreeDepth {
-		var result []streamWithTreeDepth
-		for _, link := range g.links[rootName] {
-			result = append(result, streamWithTreeDepth{
-				stream: link,
-				depth:  depth,
-			})
-
-			result = append(result, dfs(link.Name, depth+1)...)
-		}
-
-		return result
-	}
-
-	parentsWithDepth := dfs(streamName, 0)
-
-	//sort by depth in descending order
-	sort.Slice(parentsWithDepth, func(i, j int) bool {
-		//tie break alphabetically by name
-		if parentsWithDepth[i].depth == parentsWithDepth[j].depth {
-			return parentsWithDepth[i].stream.Name < parentsWithDepth[j].stream.Name
-		}
-		return parentsWithDepth[i].depth > parentsWithDepth[j].depth
-	})
-
-	seen := map[string]struct{}{}
-	var result []*Module
-	for _, parent := range parentsWithDepth {
-		if _, ok := seen[parent.stream.Name]; ok {
-			continue
-		}
-		result = append(result, parent.stream)
-		seen[parent.stream.Name] = struct{}{}
-	}
-
-	return result
-}
-
-func (g *StreamsGraph) groupedAncestorsOf(streamName string) [][]*Module {
-	type streamWithTreeDepth struct {
-		stream *Module
-		depth  int
-	}
-
-	var dfs func(rootName string, depth int) []streamWithTreeDepth
-	dfs = func(rootName string, depth int) []streamWithTreeDepth {
-		var result []streamWithTreeDepth
-		for _, link := range g.links[rootName] {
-			result = append(result, streamWithTreeDepth{
-				stream: link,
-				depth:  depth,
-			})
-
-			result = append(result, dfs(link.Name, depth+1)...)
-		}
-
-		return result
-	}
-
-	parentsWithDepth := dfs(streamName, 0)
-
-	//sort by depth in descending order
-	sort.Slice(parentsWithDepth, func(i, j int) bool {
-		//tie break alphabetically by name
-		if parentsWithDepth[i].depth == parentsWithDepth[j].depth {
-			return parentsWithDepth[i].stream.Name < parentsWithDepth[j].stream.Name
-		}
-		return parentsWithDepth[i].depth > parentsWithDepth[j].depth
-	})
-
-	grouped := map[int][]*Module{}
-	seen := map[string]struct{}{}
-	for _, parent := range parentsWithDepth {
-		if _, ok := seen[parent.stream.Name]; ok {
-			continue
-		}
-		grouped[parent.depth] = append(grouped[parent.depth], parent.stream)
-		seen[parent.stream.Name] = struct{}{}
-	}
-
-	result := make([][]*Module, len(grouped), len(grouped))
-	for i, streams := range grouped {
-		result[len(grouped)-1-i] = streams
-	}
-
-	return result
 }

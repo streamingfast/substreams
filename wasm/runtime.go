@@ -167,23 +167,6 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 				return nil, i.panicError
 			},
 		),
-		"println": wasmer.NewFunction(
-			i.wasmStore,
-			wasmer.NewFunctionType(
-				params(wasmer.I32, wasmer.I32),
-				returns(),
-			),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := i.heap.ReadString(args[0].I32(), args[1].I32())
-				if err != nil {
-					return nil, fmt.Errorf("reading string: %w", err)
-				}
-
-				fmt.Println(message)
-
-				return nil, nil
-			},
-		),
 		"output": wasmer.NewFunction(
 			i.wasmStore,
 			wasmer.NewFunctionType(
@@ -665,7 +648,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			value, found := readStore.GetFirst(key)
 			if !found {
 				zero := wasmer.NewI32(0)
-				return []wasmer.Value{zero, zero, zero}, nil
+				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[3].I32()
 			err = i.writeOutputToHeap(outputPtr, value)
@@ -689,7 +672,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			storeIndex := int(args[0].I32())
 			if storeIndex+1 > len(i.inputStores) {
-				return nil, fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
+				return nil, fmt.Errorf("'get__last' failed: invalid store index %d, %d stores declared", storeIndex, len(i.inputStores))
 			}
 			readStore := i.inputStores[storeIndex]
 			key, err := i.heap.ReadString(args[1].I32(), args[2].I32())
@@ -699,7 +682,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			value, found := readStore.GetLast(key)
 			if !found {
 				zero := wasmer.NewI32(0)
-				return []wasmer.Value{zero, zero, zero}, nil
+				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[3].I32()
 			err = i.writeOutputToHeap(outputPtr, value)

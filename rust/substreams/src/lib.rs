@@ -32,7 +32,7 @@ pub fn hook(info: &std::panic::PanicInfo<'_>) {
                     file.len() as u32,
                     line,
                     column,
-                )
+                )   
             }
             None => externs::register_panic(
                 error_msg.as_ptr(),

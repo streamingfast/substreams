@@ -217,7 +217,6 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-				fmt.Println("HEYEHEEHEYE", message, "moustache")
 				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
 
 				return nil, nil

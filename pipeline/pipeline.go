@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -11,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	pd "github.com/emicklei/protobuf2map"
-	oldproto "github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/manifest"
@@ -146,7 +145,8 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 	}
 
 	p.wasmOutputs = map[string][]byte{}
-	protoDefs := p.manifest.ProtoDefinitions
+	protoDescs := p.manifest.ProtoDescs
+	protoMsgFactory := dynamic.NewMessageFactoryWithDefaults()
 
 	for _, mod := range modules {
 		debugOutput := mod.Name == p.outputStreamName
@@ -198,20 +198,26 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 			if strings.HasPrefix(outType, "proto:") {
 				outType = outType[6:]
 			}
-			parts := strings.Split(outType, ".")
-			ns := strings.Join(parts[:len(parts)-1], ".")
-			msg := parts[len(parts)-1]
-			protoDecode := func(in []byte) (string, error) {
-				dec := pd.NewDecoder(protoDefs, oldproto.NewBuffer(in))
-				result, err := dec.Decode(ns, msg)
-				if err != nil {
-					return "", fmt.Errorf("error decoding protobuf %s.%s to map: %w", ns, msg, err)
+			var msgDesc *desc.MessageDescriptor
+			for _, file := range protoDescs {
+				msgDesc = file.FindMessage(outType)
+				if msgDesc != nil {
+					break
 				}
-				cnt, err := json.MarshalIndent(result, "", "  ")
-				if err != nil {
-					return "", fmt.Errorf("error encoding protobuf %s.%s into json: %w", ns, msg, err)
+			}
+			var protoDecode func(in []byte) (string, error)
+			if msgDesc != nil {
+				protoDecode = func(in []byte) (string, error) {
+					msg := protoMsgFactory.NewDynamicMessage(msgDesc)
+					if err := msg.Unmarshal(in); err != nil {
+						return "", fmt.Errorf("error unmarshalling protobuf %s to map: %w", outType, err)
+					}
+					cnt, err := msg.MarshalJSONIndent()
+					if err != nil {
+						return "", fmt.Errorf("error encoding protobuf %s into json: %w", outType, err)
+					}
+					return string(cnt), nil
 				}
-				return string(cnt), nil
 			}
 
 			entrypoint := mod.Code.Entrypoint
@@ -454,12 +460,18 @@ func wasmMapCall(vals map[string][]byte,
 		out := vm.Output()
 		vals[name] = out
 		if len(out) != 0 && printOutputs {
-			js, err := protoDecode(out)
-			if err != nil {
-				fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
+			printed := false
+			if protoDecode != nil {
+				js, err := protoDecode(out)
+				if err != nil {
+					fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
+				} else {
+					fmt.Printf("Module output %q:\n    %s\n", name, js)
+					printed = true
+				}
+			}
+			if !printed {
 				fmt.Printf("Module output %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, base64.StdEncoding.EncodeToString(out), msgType)
-			} else {
-				fmt.Printf("Module output %q:\n    %s\n", name, js)
 			}
 		}
 	} else {

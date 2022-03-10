@@ -9,7 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	pd "github.com/emicklei/protobuf2map"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/protoparse"
 )
 
 type Manifest struct {
@@ -20,8 +21,8 @@ type Manifest struct {
 	ProtoFiles  []string  `yaml:"protoFiles"`
 	Modules     []*Module `yaml:"modules"`
 
-	Graph            *ModuleGraph    `yaml:"-"`
-	ProtoDefinitions *pd.Definitions `yaml:"-"`
+	Graph      *ModuleGraph           `yaml:"-"`
+	ProtoDescs []*desc.FileDescriptor `yaml:"-"`
 }
 
 type Module struct {
@@ -68,12 +69,12 @@ func New(path string) (m *Manifest, err error) {
 		return nil, err
 	}
 
-	m.ProtoDefinitions = pd.NewDefinitions()
-	for _, fl := range m.ProtoFiles {
-		if err := m.ProtoDefinitions.ReadFile(fl); err != nil {
-			return nil, fmt.Errorf("reading proto file %q: %w", fl, err)
-		}
+	parser := protoparse.Parser{}
+	fileDescs, err := parser.ParseFiles(m.ProtoFiles...)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing proto files %q: %w", m.ProtoFiles, err)
 	}
+	m.ProtoDescs = fileDescs
 
 	for _, s := range m.Modules {
 		if s.Code.File != "" {

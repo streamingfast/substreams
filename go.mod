@@ -3,8 +3,7 @@ module github.com/streamingfast/substreams
 go 1.17
 
 require (
-	github.com/emicklei/protobuf2map v1.0.0
-	github.com/golang/protobuf v1.5.2
+	github.com/jhump/protoreflect v1.12.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
@@ -13,7 +12,6 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20220307201418-3ad32e685451
 	github.com/streamingfast/eth-go v0.0.0-20220210031611-2c699bfe3163
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
-	github.com/streamingfast/merger v0.0.3-0.20220301162603-c0129b6f1ad4
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
 	github.com/test-go/testify v1.1.4
 	github.com/wasmerio/wasmer-go v1.0.4
@@ -43,9 +41,9 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/emicklei/proto v1.9.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.7 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect

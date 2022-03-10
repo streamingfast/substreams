@@ -11,10 +11,9 @@ pub fn decode_ptr<T: std::default::Default + prost::Message>(
 ) -> Result<T, DecodeError> {
     unsafe {
         let input_data = Vec::from_raw_parts(ptr, size, size);
-        let obj = ::prost::Message::decode(&mut Cursor::new(&input_data));
+	let obj = ::prost::Message::decode(&mut Cursor::new(&input_data));
         std::mem::forget(input_data); // otherwise tries to free that memory at the end and crashes
-
-        obj
+	obj
     }
 }
 

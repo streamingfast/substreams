@@ -466,12 +466,12 @@ func wasmMapCall(vals map[string][]byte,
 				if err != nil {
 					fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
 				} else {
-					fmt.Printf("Module output %q:\n%s\n", name, js)
+					fmt.Printf("Module %q output for type %q:\n%s\n", name, msgType, js)
 					printed = true
 				}
 			}
 			if !printed {
-				fmt.Printf("Module output %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, base64.StdEncoding.EncodeToString(out), msgType)
+				fmt.Printf("Module %q output for type %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, msgType, base64.StdEncoding.EncodeToString(out), msgType)
 			}
 		}
 	} else {

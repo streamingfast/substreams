@@ -18,9 +18,10 @@ type Builder struct {
 
 	io StateIO
 
-	KV           map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
-	Deltas       []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
-	DeletedKeys  map[string]interface{}
+	KV          map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
+	Deltas      []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
+	DeletedKeys map[string]interface{}
+
 	updatePolicy string
 	valueType    string
 	protoType    string

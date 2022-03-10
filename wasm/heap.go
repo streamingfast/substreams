@@ -31,7 +31,6 @@ func (h *Heap) Write(bytes []byte) (int32, error) {
 	return h.WriteAtPtr(bytes, ptr)
 }
 func (h *Heap) WriteAtPtr(bytes []byte, ptr int32) (int32, error) {
-
 	memoryData := h.memory.Data()
 	copy(memoryData[ptr:], bytes)
 

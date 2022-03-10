@@ -466,7 +466,7 @@ func wasmMapCall(vals map[string][]byte,
 				if err != nil {
 					fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
 				} else {
-					fmt.Printf("Module output %q:\n    %s\n", name, js)
+					fmt.Printf("Module output %q:\n%s\n", name, js)
 					printed = true
 				}
 			}

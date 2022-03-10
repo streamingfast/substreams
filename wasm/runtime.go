@@ -32,10 +32,10 @@ type Instance struct {
 }
 
 type Module struct {
-	// engine *wasmer.Engine
+	engine *wasmer.Engine
 	// store  *wasmer.Store
 	// module *wasmer.Module
-	name   string
+	name string
 
 	wasmCode []byte
 }
@@ -51,7 +51,7 @@ func (i *Instance) Store() *wasmer.Store {
 type WasmerFunctionFactory func(*Instance) (namespace string, name string, wasmerFunc *wasmer.Function)
 
 func NewModule(wasmCode []byte, name string) (*Module, error) {
-	// engine := wasmer.NewUniversalEngine()
+	engine := wasmer.NewUniversalEngine()
 	// store := wasmer.NewStore(engine)
 
 	// module, err := wasmer.NewModule(store, wasmCode)
@@ -60,7 +60,7 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 	// }
 
 	return &Module{
-		// engine:   engine,
+		engine: engine,
 		// store:    store,
 		// module:   module,
 		name:     name,
@@ -69,7 +69,7 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 }
 
 func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory WasmerFunctionFactory) (*Instance, error) {
-	engine := wasmer.NewUniversalEngine()
+	engine := m.engine
 	store := wasmer.NewStore(engine)
 
 	module, err := wasmer.NewModule(store, m.wasmCode)

@@ -54,7 +54,7 @@ type RpcProvider interface {
 	RPC(calls *pbsubstreams.RpcCalls) *pbsubstreams.RpcResponses
 }
 
-func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string) *Pipeline {
+func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string, partialMode bool) *Pipeline {
 	pipe := &Pipeline{
 		startBlockNum:    startBlockNum,
 		rpcClient:        rpcClient,
@@ -65,6 +65,7 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 		outputStreamName: outputStreamName,
 		vmType:           manif.CodeType,
 		blockType:        blockType,
+		partialMode:      partialMode,
 	}
 	return pipe
 }
@@ -306,11 +307,13 @@ func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFac
 			continue
 		}
 		output := mod.Output
-		store := state.NewBuilder(mod.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory)
+		store := state.NewBuilder(mod.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory,
+			state.WithPartialMode(p.partialMode),
+		)
+
 		if forceLoadState {
 			// Use AN ABSOLUTE store, or SQUASH ALL PARTIAL!
-
-			if err := store.Init(p.startBlockNum, p.partialMode); err != nil {
+			if err := store.Init(p.startBlockNum); err != nil {
 				return fmt.Errorf("could not load state for store %s at block num %d: %w", mod.Name, p.startBlockNum, err)
 			}
 		}
@@ -362,7 +365,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */ ] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?

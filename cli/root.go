@@ -101,9 +101,10 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up store for data: %w", err)
 	}
 
-	ioFactory := state.NewStoreStateIOFactory(stateStore)
+	partialMode := viper.GetBool("partial")
+	pipe := pipeline.New(uint64(startBlockNum), rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType, partialMode)
 
-	pipe := pipeline.New(uint64(startBlockNum), rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType)
+	ioFactory := state.NewStoreStateIOFactory(stateStore)
 	if manif.CodeType == "native" {
 		pipe.SetInitFunc(func() error {
 			if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {

@@ -16,7 +16,8 @@ import (
 type Builder struct {
 	Name string
 
-	io StateIO
+	io          StateIO
+	partialMode bool
 
 	KV          map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas      []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -28,7 +29,15 @@ type Builder struct {
 	lastOrdinal  uint64
 }
 
-func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactory IOFactory) *Builder {
+type BuilderOption func(b *Builder)
+
+func WithPartialMode(partialMode bool) BuilderOption {
+	return func(b *Builder) {
+		b.partialMode = partialMode
+	}
+}
+
+func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactory IOFactory, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:         name,
 		KV:           make(map[string][]byte),
@@ -39,6 +48,11 @@ func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactor
 	if ioFactory != nil {
 		b.io = ioFactory.New(name)
 	}
+
+	for _, opt := range opts {
+		opt(b)
+	}
+
 	return b
 }
 
@@ -58,7 +72,7 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-func (b *Builder) Init(startBlockNum uint64, partialMode bool) error {
+func (b *Builder) Init(startBlockNum uint64) error {
 
 	if err := b.ReadState(context.TODO(), startBlockNum); err != nil {
 		return err

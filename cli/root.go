@@ -105,13 +105,19 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	pipe := pipeline.New(uint64(startBlockNum), rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType)
 	if manif.CodeType == "native" {
-		if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {
-			return fmt.Errorf("building pipeline: %w", err)
-		}
+		pipe.SetInitFunc(func() error {
+			if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {
+				return fmt.Errorf("building pipeline: %w", err)
+			}
+			return nil
+		})
 	} else {
-		if err := pipe.BuildWASM(ioFactory, forceLoadState); err != nil {
-			return fmt.Errorf("building pipeline: %w", err)
-		}
+		pipe.SetInitFunc(func() error {
+			if err := pipe.BuildWASM(ioFactory, forceLoadState); err != nil {
+				return fmt.Errorf("building pipeline: %w", err)
+			}
+			return nil
+		})
 	}
 
 	handler := pipe.HandlerFactory(blockCount)

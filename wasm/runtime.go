@@ -33,9 +33,9 @@ type Instance struct {
 
 type Module struct {
 	engine *wasmer.Engine
-	// store  *wasmer.Store
-	// module *wasmer.Module
-	name string
+	store  *wasmer.Store
+	module *wasmer.Module
+	name   string
 
 	wasmCode []byte
 }
@@ -52,34 +52,26 @@ type WasmerFunctionFactory func(*Instance) (namespace string, name string, wasme
 
 func NewModule(wasmCode []byte, name string) (*Module, error) {
 	engine := wasmer.NewUniversalEngine()
-	// store := wasmer.NewStore(engine)
+	store := wasmer.NewStore(engine)
 
-	// module, err := wasmer.NewModule(store, wasmCode)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("loading wasm module: %w", err)
-	// }
+	module, err := wasmer.NewModule(store, wasmCode)
+	if err != nil {
+		return nil, fmt.Errorf("loading wasm module: %w", err)
+	}
 
 	return &Module{
-		engine: engine,
-		// store:    store,
-		// module:   module,
+		engine:   engine,
+		store:    store,
+		module:   module,
 		name:     name,
 		wasmCode: wasmCode,
 	}, nil
 }
 
 func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory WasmerFunctionFactory) (*Instance, error) {
-	engine := m.engine
-	store := wasmer.NewStore(engine)
-
-	module, err := wasmer.NewModule(store, m.wasmCode)
-	if err != nil {
-		return nil, fmt.Errorf("loading wasm module: %w", err)
-	}
-
 	// WARN: An instance needs to be created on the same thread that it is consumed.
 	instance := &Instance{
-		wasmStore:    store,
+		wasmStore:    m.store,
 		module:       m,
 		functionName: functionName,
 	}
@@ -90,7 +82,7 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 		imports.Register(namespace, map[string]wasmer.IntoExtern{name: f})
 	}
 
-	vmInstance, err := wasmer.NewInstance(module, imports)
+	vmInstance, err := wasmer.NewInstance(m.module, imports)
 	if err != nil {
 		return nil, fmt.Errorf("creating instance: %w", err)
 	}

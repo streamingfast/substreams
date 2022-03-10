@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -28,6 +29,8 @@ import (
 type Pipeline struct {
 	vmType        string // wasm, native
 	startBlockNum uint64
+
+	initFunc func() error
 
 	partialMode bool
 
@@ -63,9 +66,11 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 		vmType:           manif.CodeType,
 		blockType:        blockType,
 	}
-	// pipe.setupSubscriptionHub()
-	// pipe.setupPrintPairUpdates()
 	return pipe
+}
+
+func (p *Pipeline) SetInitFunc(f func() error) {
+	p.initFunc = f
 }
 
 func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) error {
@@ -324,7 +329,15 @@ func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFac
 type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
+	initFunc := sync.Once{}
+
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		initFunc.Do(func() {
+			// All blocks will be processed in this goroutine
+			runtime.LockOSThread()
+			p.initFunc()
+		})
+
 		// defer func() {
 		// 	if r := recover(); r != nil {
 		// 		err = fmt.Errorf("panic: %w", r)

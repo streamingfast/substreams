@@ -17,7 +17,7 @@ import (
 var ModuleNameRegexp *regexp.Regexp
 
 func init() {
-	ModuleNameRegexp = regexp.MustCompile(`^[a-zA-Z]+[\w\d]*$`)
+	ModuleNameRegexp = regexp.MustCompile(`^[a-zA-Z]+[\w]*$`)
 }
 
 type Manifest struct {

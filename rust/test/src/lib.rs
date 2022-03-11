@@ -225,6 +225,6 @@ extern "C" fn test_make_it_crash(data_ptr: *mut u8, data_len: usize) {
      unsafe {
         let input_data = Vec::from_raw_parts(data_ptr, data_len, data_len);
         let cloned_data = input_data.clone();
-        substreams::outputRaw(cloned_data);
+        substreams::output_raw(cloned_data);
     };
 }

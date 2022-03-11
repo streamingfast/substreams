@@ -4,13 +4,14 @@ mod memory;
 pub mod proto;
 pub mod state;
 pub mod rpc;
+pub mod pb;
 
 pub fn output<M: prost::Message>(msg: &M) {
     let (ptr, len) = proto::encode_to_ptr(msg).unwrap();
     unsafe { externs::output(ptr, len as u32) }
 }
 
-pub fn outputRaw(data: Vec<u8>) {
+pub fn output_raw(data: Vec<u8>) {
     unsafe { externs::output(data.as_ptr(), data.len() as u32) }
 }
 

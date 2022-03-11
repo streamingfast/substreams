@@ -205,9 +205,9 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 					break
 				}
 			}
-			var protoDecode func(in []byte) (string, error)
+			var protoDecoder func(in []byte) (string, error)
 			if msgDesc != nil {
-				protoDecode = func(in []byte) (string, error) {
+				protoDecoder = func(in []byte) (string, error) {
 					msg := protoMsgFactory.NewDynamicMessage(msgDesc)
 					if err := msg.Unmarshal(in); err != nil {
 						return "", fmt.Errorf("error unmarshalling protobuf %s to map: %w", outType, err)
@@ -222,7 +222,7 @@ func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) err
 
 			entrypoint := mod.Code.Entrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, protoDecode, outType)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, protoDecoder, outType)
 			})
 		case "store":
 			updatePolicy := mod.Output.UpdatePolicy
@@ -450,7 +450,7 @@ func wasmMapCall(vals map[string][]byte,
 	inputs []*wasm.Input,
 	printOutputs bool,
 	rpcFactory wasm.WasmerFunctionFactory,
-	protoDecode func(in []byte) (string, error),
+	protoDecoder func(in []byte) (string, error),
 	msgType string,
 ) (err error) {
 
@@ -463,8 +463,8 @@ func wasmMapCall(vals map[string][]byte,
 		vals[name] = out
 		if len(out) != 0 && printOutputs {
 			printed := false
-			if protoDecode != nil {
-				js, err := protoDecode(out)
+			if protoDecoder != nil {
+				js, err := protoDecoder(out)
 				if err != nil {
 					fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
 				} else {
@@ -472,7 +472,7 @@ func wasmMapCall(vals map[string][]byte,
 					printed = true
 				}
 			}
-			if !printed {
+			if !printed && protoDecoder != nil {
 				fmt.Printf("Module %q output for type %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, msgType, base64.StdEncoding.EncodeToString(out), msgType)
 			}
 		}

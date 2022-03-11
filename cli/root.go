@@ -106,19 +106,13 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	ioFactory := state.NewStoreStateIOFactory(stateStore)
 	if manif.CodeType == "native" {
-		pipe.SetInitFunc(func() error {
-			if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {
-				return fmt.Errorf("building pipeline: %w", err)
-			}
-			return nil
-		})
+		if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {
+			return fmt.Errorf("building pipeline: %w", err)
+		}
 	} else {
-		pipe.SetInitFunc(func() error {
-			if err := pipe.BuildWASM(ioFactory, forceLoadState); err != nil {
-				return fmt.Errorf("building pipeline: %w", err)
-			}
-			return nil
-		})
+		if err := pipe.BuildWASM(ioFactory, forceLoadState); err != nil {
+			return fmt.Errorf("building pipeline: %w", err)
+		}
 	}
 
 	handler := pipe.HandlerFactory(blockCount)

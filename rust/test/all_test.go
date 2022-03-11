@@ -200,6 +200,7 @@ func TestRustScript(t *testing.T) {
 }
 
 func Test_MakeItCrash(t *testing.T) {
+	t.Skip()
 	file, err := os.Open("./target/wasm32-unknown-unknown/release/testing_substreams.wasm")
 	require.NoError(t, err)
 	byteCode, err := ioutil.ReadAll(file)

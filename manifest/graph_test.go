@@ -83,39 +83,6 @@ var testModules = []*Module{
 	},
 }
 
-func TestModuleGraph_FromManifestFile_AncestorsOf(t *testing.T) {
-	man, err := New("./test/test_manifest.yaml")
-	assert.NoError(t, err)
-
-	x, _ := man.Graph.AncestorsOf("reserves_extractor")
-	assert.Equal(t, 2, len(x))
-	assert.Equal(t, "pair_extractor", x[0].Name)
-	assert.Equal(t, "pairs", x[1].Name)
-}
-
-func TestModuleGraph_FromManifestFile_ModulesDownTo(t *testing.T) {
-	man, err := New("./test/test_manifest.yaml")
-	assert.NoError(t, err)
-
-	x, _ := man.Graph.ModulesDownTo("reserves_extractor")
-	assert.Equal(t, 3, len(x))
-	assert.Equal(t, "pair_extractor", x[0].Name)
-	assert.Equal(t, "pairs", x[1].Name)
-	assert.Equal(t, "reserves_extractor", x[2].Name)
-
-}
-
-func TestModuleGraph_FromManifestFile_GroupedModulesDownTo(t *testing.T) {
-	man, err := New("./test/test_manifest.yaml")
-	assert.NoError(t, err)
-
-	xy, _ := man.Graph.GroupedModulesDownTo("reserves_extractor")
-	assert.Equal(t, 3, len(xy))
-	assert.Equal(t, "pair_extractor", xy[0][0].Name)
-	assert.Equal(t, "pairs", xy[1][0].Name)
-	assert.Equal(t, "reserves_extractor", xy[2][0].Name)
-}
-
 func TestModuleGraph_ParentsOf(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
@@ -206,4 +173,21 @@ func TestModuleGraph_ModulesDownTo(t *testing.T) {
 	sort.Strings(res)
 
 	assert.Equal(t, []string{"A", "B", "C", "D", "E", "G"}, res)
+}
+
+func TestModuleGraph_StoresDownTo(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	mods, err := g.StoresDownTo("G")
+	assert.NoError(t, err)
+
+	var res []string
+	for _, p := range mods {
+		res = append(res, p.String())
+	}
+
+	sort.Strings(res)
+
+	assert.Equal(t, []string{"B", "E", "G"}, res)
 }

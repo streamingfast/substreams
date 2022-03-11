@@ -126,6 +126,26 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*Module, error) {
 	return res, nil
 }
 
+func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*Module, error) {
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
+
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+
+	var res []*Module
+	for i, d := range distances {
+		if d >= 0 { // connected node or myself
+			module := g.indexIndex[i]
+			if module.Kind == ModuleKindStore {
+				res = append(res, g.indexIndex[i])
+			}
+		}
+	}
+
+	return res, nil
+}
+
 func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
@@ -135,7 +155,6 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {
 
 	var res []*Module
 	for i, d := range distances {
-
 		if d >= 0 { // connected node or myself
 			res = append(res, g.indexIndex[i])
 		}

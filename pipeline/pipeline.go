@@ -32,6 +32,7 @@ type Pipeline struct {
 	lastStatUpdate time.Time
 
 	partialMode bool
+	fileWaiter  *state.FileWaiter
 
 	blockType string
 
@@ -53,7 +54,16 @@ type RpcProvider interface {
 	RPC(calls *pbsubstreams.RpcCalls) *pbsubstreams.RpcResponses
 }
 
-func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string, partialMode bool) *Pipeline {
+type Option func(p *Pipeline)
+
+func WithPartialMode(ioFactory state.FactoryInterface) Option {
+	return func(p *Pipeline) {
+		p.partialMode = true
+		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.manifest.Graph, p.manifest.StartBlock, ioFactory, p.startBlockNum)
+	}
+}
+
+func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string, opts ...Option) *Pipeline {
 	pipe := &Pipeline{
 		startBlockNum:    startBlockNum,
 		rpcClient:        rpcClient,
@@ -64,14 +74,16 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 		outputStreamName: outputStreamName,
 		vmType:           manif.CodeType,
 		blockType:        blockType,
-		partialMode:      partialMode,
 	}
-	// pipe.setupSubscriptionHub()
-	// pipe.setupPrintPairUpdates()
+
+	for _, opt := range opts {
+		opt(pipe)
+	}
+
 	return pipe
 }
 
-func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) error {
+func (p *Pipeline) BuildNative(ctx context.Context, ioFactory state.FactoryInterface, forceLoadState bool) error {
 	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("whoops: %w", err)
@@ -79,7 +91,7 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 
 	nativeStreams := registry.Init(p.nativeImports)
 
-	if err := p.setupStores(modules, ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(ctx, p.manifest.Graph, ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 	p.nativeOutputs = map[string]reflect.Value{}
@@ -137,13 +149,13 @@ func (p *Pipeline) BuildNative(ioFactory state.IOFactory, forceLoadState bool) e
 	return nil
 }
 
-func (p *Pipeline) BuildWASM(ioFactory state.IOFactory, forceLoadState bool) error {
+func (p *Pipeline) BuildWASM(ctx context.Context, ioFactory state.FactoryInterface, forceLoadState bool) error {
 	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(modules, ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(ctx, p.manifest.Graph, ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
@@ -297,24 +309,45 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 	}
 }
 
-func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFactory, forceLoadState bool) error {
-	p.stores = make(map[string]*state.Builder)
-	for _, mod := range modules {
-		if mod.Kind != "store" {
-			continue
+func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface, forceLoadState bool) error {
+	if p.fileWaiter != nil {
+		err := p.fileWaiter.Wait(ctx) //block until all parent stores have completed their tasks
+		if err != nil {
+			return fmt.Errorf("fileWaiter: %w", err)
 		}
-		output := mod.Output
-		store := state.NewBuilder(mod.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory,
-			state.WithPartialMode(p.partialMode),
+	}
+
+	stores, err := graph.StoresDownTo(p.outputStreamName)
+	if err != nil {
+		return err
+	}
+
+	p.stores = make(map[string]*state.Builder)
+	for _, s := range stores {
+		output := s.Output
+		store := state.NewBuilder(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory,
+			state.WithPartialMode(p.partialMode, p.startBlockNum, p.manifest.StartBlock),
 		)
 
-		if forceLoadState {
-			// Use AN ABSOLUTE store, or SQUASH ALL PARTIAL!
-			if err := store.Init(p.startBlockNum); err != nil {
-				return fmt.Errorf("could not load state for store %s at block num %d: %w", mod.Name, p.startBlockNum, err)
+		var initializeStore bool
+		if p.partialMode {
+			/// initialize all parent store data
+			if p.outputStreamName != s.Name {
+				initializeStore = true
+			}
+		} else {
+			if forceLoadState {
+				initializeStore = true
 			}
 		}
-		p.stores[mod.Name] = store
+
+		if initializeStore {
+			if err := store.Init(ctx, p.startBlockNum); err != nil {
+				return fmt.Errorf("could not load state for store %s at block num %d: %w", s.Name, p.startBlockNum, err)
+			}
+		}
+
+		p.stores[s.Name] = store
 	}
 	return nil
 }
@@ -344,6 +377,10 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		if block.Number >= p.startBlockNum+blockCount {
 			for _, s := range p.stores {
+				if p.partialMode && s.Name != p.outputStreamName {
+					continue
+				}
+
 				err := s.WriteState(context.Background(), block)
 				if err != nil {
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)
@@ -470,7 +507,6 @@ func wasmMapCall(vals map[string][]byte,
 	protoDecoder func(in []byte) (string, error),
 	msgType string,
 ) (err error) {
-
 	var vm *wasm.Instance
 	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
 		return err
@@ -507,7 +543,6 @@ func wasmStoreCall(vals map[string][]byte,
 	printOutputs bool,
 	rpcFactory wasm.WasmerFunctionFactory,
 ) (err error) {
-
 	var vm *wasm.Instance
 	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
 		return err

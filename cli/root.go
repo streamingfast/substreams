@@ -52,9 +52,9 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		blockCount = uint64(val)
 	}
 
-	modulesStartBlock := int64(manif.StartBlock)
+	modulesStartBlock := manif.StartBlock
 
-	startBlockNum := viper.GetInt64("start-block")
+	startBlockNum := viper.GetUint64("start-block")
 	if startBlockNum == 0 {
 		startBlockNum = modulesStartBlock
 	}
@@ -101,23 +101,28 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up store for data: %w", err)
 	}
 
-	partialMode := viper.GetBool("partial")
-	pipe := pipeline.New(uint64(startBlockNum), rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType, partialMode)
+	ioFactory := state.NewStoreFactory(stateStore)
 
-	ioFactory := state.NewStoreStateIOFactory(stateStore)
+	var pipelineOpts []pipeline.Option
+	if partialMode := viper.GetBool("partial"); partialMode {
+		fmt.Println("Starting pipeline in partial mode...")
+		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(ioFactory))
+	}
+	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType, pipelineOpts...)
+
 	if manif.CodeType == "native" {
-		if err := pipe.BuildNative(ioFactory, forceLoadState); err != nil {
+		if err := pipe.BuildNative(ctx, ioFactory, forceLoadState); err != nil {
 			return fmt.Errorf("building pipeline: %w", err)
 		}
 	} else {
-		if err := pipe.BuildWASM(ioFactory, forceLoadState); err != nil {
+		if err := pipe.BuildWASM(ctx, ioFactory, forceLoadState); err != nil {
 			return fmt.Errorf("building pipeline: %w", err)
 		}
 	}
 
 	handler := pipe.HandlerFactory(blockCount)
 
-	hose := firehose.New([]dstore.Store{blocksStore}, startBlockNum, handler,
+	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),
 		firehose.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
 	)

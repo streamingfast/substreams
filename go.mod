@@ -3,6 +3,7 @@ module github.com/streamingfast/substreams
 go 1.17
 
 require (
+	github.com/abourget/llerrgroup v0.2.0
 	github.com/jhump/protoreflect v1.12.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/spf13/cobra v1.3.0

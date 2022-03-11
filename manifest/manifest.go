@@ -121,14 +121,14 @@ func newWithoutLoad(path string) (*Manifest, error) {
 		}
 
 		switch s.Kind {
-		case "map":
+		case ModuleKindMap:
 			if s.Output.Type == "" {
 				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
 			if s.Code.Entrypoint == "" {
 				s.Code.Entrypoint = "map"
 			}
-		case "store":
+		case ModuleKindStore:
 			if err := validateStoreBuilderOutput(s.Output); err != nil {
 				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
 			}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -16,8 +17,13 @@ import (
 type Builder struct {
 	Name string
 
-	io          StateIO
-	partialMode bool
+	store StoreInterface
+
+	partialMode       bool
+	partialStartBlock uint64
+	moduleStartBlock  uint64
+
+	complete bool
 
 	KV          map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas      []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -31,13 +37,15 @@ type Builder struct {
 
 type BuilderOption func(b *Builder)
 
-func WithPartialMode(partialMode bool) BuilderOption {
+func WithPartialMode(partialMode bool, startBlock, moduleStartBlock uint64) BuilderOption {
 	return func(b *Builder) {
 		b.partialMode = partialMode
+		b.partialStartBlock = startBlock
+		b.moduleStartBlock = moduleStartBlock
 	}
 }
 
-func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactory IOFactory, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, updatePolicy, valueType, protoType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:         name,
 		KV:           make(map[string][]byte),
@@ -45,8 +53,8 @@ func NewBuilder(name string, updatePolicy, valueType, protoType string, ioFactor
 		valueType:    valueType,
 		protoType:    protoType,
 	}
-	if ioFactory != nil {
-		b.io = ioFactory.New(name)
+	if storageFactory != nil {
+		b.store = storageFactory.New(name)
 	}
 
 	for _, opt := range opts {
@@ -72,10 +80,108 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-func (b *Builder) Init(startBlockNum uint64) error {
-
-	if err := b.ReadState(context.TODO(), startBlockNum); err != nil {
+func (b *Builder) Init(ctx context.Context, startBlockNum uint64) error {
+	if err := b.ReadState(ctx, startBlockNum); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (b *Builder) clone() *Builder {
+	o := &Builder{
+		Name:         b.Name,
+		KV:           make(map[string][]byte),
+		updatePolicy: b.updatePolicy,
+		valueType:    b.valueType,
+	}
+	return o
+}
+
+func (b *Builder) ReadState(ctx context.Context, blockNumber uint64) error {
+	_, files, err := ContiguousFilesToTargetBlock(ctx, b.Name, b.store, b.moduleStartBlock, blockNumber)
+	if err != nil {
+		return err
+	}
+
+	var builders []*Builder
+	for _, file := range files {
+		data, err := func() ([]byte, error) { //this is an inline func so that we can defer the close call properly
+			rc, err := b.store.OpenObject(ctx, file)
+			if err != nil {
+				return nil, err
+			}
+			defer rc.Close()
+
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				return nil, err
+			}
+
+			return data, nil
+		}()
+
+		if err != nil {
+			return fmt.Errorf("reading file %s in store %s: %w", file, b.Name, err)
+		}
+
+		builder := b.clone()
+		kv := map[string]string{}
+		if err = json.Unmarshal(data, &kv); err != nil {
+			return fmt.Errorf("unmarshalling kv file %s for %s at block %d: %w", file, b.Name, blockNumber, err)
+		}
+
+		builder.KV = byteMap(kv)
+		builders = append(builders, builder)
+	}
+
+	switch len(builders) {
+	case 0:
+		/// nothing to do
+	case 1:
+		b.KV = builders[0].KV
+	default:
+		// merge all builders, sequentially from the start.
+		for i := 0; i < len(builders)-1; i++ {
+			prev := builders[i]
+			next := builders[i+1]
+
+			err := next.Merge(prev)
+			if err != nil {
+				return fmt.Errorf("merging state for %s: %w", b.Name, err)
+			}
+		}
+		b.KV = builders[len(builders)-1].KV
+
+		if !b.partialMode {
+			///TODO(colin): save the merged kv as a full snapshot and delete partials?  if not here, then where?
+		}
+	}
+
+	return nil
+}
+
+func (b *Builder) WriteState(ctx context.Context, block *bstream.Block) error {
+	kv := stringMap(b.KV) // FOR READABILITY ON DISK
+
+	content, err := json.MarshalIndent(kv, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal kv state: %w", err)
+	}
+
+	var writeFunc func() error
+	if b.partialMode {
+		writeFunc = func() error {
+			return b.store.WritePartialState(ctx, content, b.partialStartBlock, block.Num()+1)
+		}
+	} else {
+		writeFunc = func() error {
+			return b.store.WriteState(ctx, content, block.Num())
+		}
+	}
+
+	if err = writeFunc(); err != nil {
+		return fmt.Errorf("writing %s kv at block %d: %w", b.Name, block.Num(), err)
 	}
 
 	return nil
@@ -256,40 +362,6 @@ func (b *Builder) Flush() {
 	}
 	b.Deltas = nil
 	b.lastOrdinal = 0
-}
-
-func (b *Builder) ReadState(ctx context.Context, startBlockNum uint64) error {
-	data, err := b.io.ReadState(ctx, startBlockNum)
-	if err != nil {
-		return err
-	}
-
-	kv := map[string]string{}
-
-	if err = json.Unmarshal(data, &kv); err != nil {
-		return fmt.Errorf("unmarshalling kv for %s at block %d: %w", b.Name, startBlockNum, err)
-	}
-
-	b.KV = byteMap(kv) // FOR READABILITY ON DISK, perhaps should depend on data type.
-
-	fmt.Printf("loading KV from disk for %q: %d entries\n", b.Name, len(b.KV))
-
-	return nil
-}
-
-func (b *Builder) WriteState(ctx context.Context, block *bstream.Block) error {
-	kv := stringMap(b.KV) // FOR READABILITY ON DISK
-
-	content, err := json.MarshalIndent(kv, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal kv state: %w", err)
-	}
-
-	if err = b.io.WriteState(ctx, content, block.Num()); err != nil {
-		return fmt.Errorf("writing %s kv at block %d: %w", b.Name, block.Num(), err)
-	}
-
-	return nil
 }
 
 func stringMap(in map[string][]byte) map[string]string {

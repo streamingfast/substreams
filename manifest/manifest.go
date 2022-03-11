@@ -6,12 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 )
+
+var ModuleNameRegexp *regexp.Regexp
+
+func init() {
+	ModuleNameRegexp = regexp.MustCompile(`^[a-zA-Z]+[\w]*$`)
+}
 
 type Manifest struct {
 	SpecVersion string    `yaml:"specVersion"`
@@ -104,6 +111,10 @@ func newWithoutLoad(path string) (*Manifest, error) {
 	}
 
 	for _, s := range m.Modules {
+		if !ModuleNameRegexp.MatchString(s.Name) {
+			return nil, fmt.Errorf("module name %s does not match regex %s", s.Name, ModuleNameRegexp.String())
+		}
+
 		switch s.Kind {
 		case "map":
 			if s.Output.Type == "" {

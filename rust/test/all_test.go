@@ -3,10 +3,13 @@ package test
 //go:generate ./build.sh
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	imports "github.com/streamingfast/substreams/native-imports"
@@ -191,8 +194,60 @@ func TestRustScript(t *testing.T) {
 			instance.SetOutputStore(c.builder)
 			err = instance.Execute()
 			require.NoError(t, err)
-
 			c.assert(t, module, instance, c.builder)
 		})
 	}
+}
+
+func Test_MakeItCrash(t *testing.T) {
+	file, err := os.Open("./target/wasm32-unknown-unknown/release/testing_substreams.wasm")
+	require.NoError(t, err)
+	byteCode, err := ioutil.ReadAll(file)
+	require.NoError(t, err)
+
+	//done := make(chan interface{})
+
+	//mutex := sync.Mutex{}
+	wg := sync.WaitGroup{}
+	data := make([]byte, (1024*1024)*1)
+	module, err := wasm.NewModule(byteCode, "test_make_it_crash")
+	require.NoError(t, err)
+	for i := 0; i < 100; i++ {
+		fmt.Println("iteration:", i)
+		start := time.Now()
+		for j := 0; j < 100; j++ {
+			wg.Add(1)
+			go func(id int) {
+				//fmt.Print(id, "-")
+				//runtime.LockOSThread()
+
+				instance, err := module.NewInstance("test_make_it_crash", nil, pipeline.GetRPCWasmFunctionFactory(nil))
+				time.Sleep(10 * time.Millisecond)
+				ptr, err := instance.Heap().Write(data)
+
+				require.NoError(t, err)
+				err = instance.ExecuteWithArgs(ptr, int32(len(data)))
+
+				//mutex.Unlock()
+
+				require.NoError(t, err)
+				require.Equal(t, len(data), len(instance.Output()))
+				wg.Done()
+			}(j)
+		}
+		//close(done)
+
+		fmt.Println("waiting")
+		//<-done
+		wg.Wait()
+		//runtime.GC()
+		//time.Sleep(10 * time.Millisecond)
+		fmt.Println("done:", time.Since(start))
+	}
+	////close(done)
+	//
+	//fmt.Println("waiting")
+	////<-done
+	//wg.Wait()
+	//fmt.Println("done")
 }

@@ -10,6 +10,10 @@ pub fn output<M: prost::Message>(msg: &M) {
     unsafe { externs::output(ptr, len as u32) }
 }
 
+pub fn outputRaw(data: Vec<u8>) {
+    unsafe { externs::output(data.as_ptr(), data.len() as u32) }
+}
+
 pub fn hook(info: &std::panic::PanicInfo<'_>) {
     let error_msg = info
         .payload()

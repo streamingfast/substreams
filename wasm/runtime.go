@@ -29,6 +29,23 @@ type Instance struct {
 	returnValue  []byte
 	panicError   *PanicError
 	functionName string
+	vmInstance   *wasmer.Instance
+}
+
+func (i *Instance) Heap() *Heap {
+	return i.heap
+}
+
+func (i *Instance) Store() *wasmer.Store {
+	return i.wasmStore
+}
+
+func (i *Instance) PrintStats() {
+	fmt.Printf("Memory size: %d\n", i.memory.DataSize())
+}
+
+func (i *Instance) Close() {
+	i.vmInstance.Close()
 }
 
 type Module struct {
@@ -38,14 +55,6 @@ type Module struct {
 	name   string
 
 	wasmCode []byte
-}
-
-func (i *Instance) Heap() *Heap {
-	return i.heap
-}
-
-func (i *Instance) Store() *wasmer.Store {
-	return i.wasmStore
 }
 
 type WasmerFunctionFactory func(*Instance) (namespace string, name string, wasmerFunc *wasmer.Function)
@@ -86,6 +95,7 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 	if err != nil {
 		return nil, fmt.Errorf("creating instance: %w", err)
 	}
+	instance.vmInstance = vmInstance
 
 	memory, err := vmInstance.Exports.GetMemory("memory")
 	if err != nil {
@@ -96,7 +106,6 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 	if err != nil {
 		return nil, fmt.Errorf("getting alloc function: %w", err)
 	}
-
 	instance.memory = memory
 	instance.heap = NewHeap(memory, alloc)
 	instance.entrypoint, err = vmInstance.Exports.GetRawFunction(functionName)
@@ -146,6 +155,13 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 func (i *Instance) Execute() (err error) {
 	if _, err = i.entrypoint.Call(i.args...); err != nil {
 		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)
+	}
+	return nil
+}
+
+func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
+	if _, err = i.entrypoint.Call(args...); err != nil {
+		return fmt.Errorf("executing with args entrypoint %q: %w", i.functionName, err)
 	}
 	return nil
 }

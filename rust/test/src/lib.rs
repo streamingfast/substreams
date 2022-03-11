@@ -218,3 +218,13 @@ extern "C" fn test_set_delete_prefix() {
     substreams::state::set(2, "2:key_to_delete".to_string(), [5, 6, 7, 8].to_vec());
     substreams::state::delete_prefix(3, "2:".to_string());
 }
+
+
+#[no_mangle]
+extern "C" fn test_make_it_crash(data_ptr: *mut u8, data_len: usize) {
+     unsafe {
+        let input_data = Vec::from_raw_parts(data_ptr, data_len, data_len);
+        let cloned_data = input_data.clone();
+        substreams::outputRaw(cloned_data);
+    };
+}

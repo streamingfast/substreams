@@ -10,3 +10,6 @@ prost-types = "0.6"
 hex = "0.4.3"
 num-bigint = "0.4"
 bigdecimal = "0.3"
+
+[build-dependencies]
+prost-build = "0.6"

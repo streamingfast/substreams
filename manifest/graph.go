@@ -60,10 +60,6 @@ func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
 		return nil, fmt.Errorf("modules graph has a cycle")
 	}
 
-	if !graph.Connected(g) {
-		return nil, fmt.Errorf("modules graph is not connected")
-	}
-
 	return g, nil
 }
 

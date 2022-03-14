@@ -6,8 +6,13 @@ pub mod state;
 pub mod rpc;
 pub mod pb;
 
-pub fn output<M: prost::Message>(msg: &M) {
-    let (ptr, len) = proto::encode_to_ptr(msg).unwrap();
+pub fn output<M: prost::Message>(msg: M) {
+    // Need to return the buffer and forget about it issue occured when trying to write large data
+    // wasm was "dropping" the data before we could write to it, which causes us to have garbage
+    // value. By forgetting the data we can properly call external output function to write the
+    // msg to heap.
+    let (ptr, len, _buffer) = proto::encode_to_ptr(&msg).unwrap();
+    std::mem::forget(&_buffer);
     unsafe { externs::output(ptr, len as u32) }
 }
 

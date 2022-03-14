@@ -29,9 +29,9 @@ pub fn encode<M: prost::Message>(msg: &M) -> Result<Vec<u8>, EncodeError> {
     }
 }
 
-pub fn encode_to_ptr<M: prost::Message>(msg: &M) -> Result<(*const u8, usize), EncodeError> {
+pub fn encode_to_ptr<M: prost::Message>(msg: &M) -> Result<(*const u8, usize, Vec<u8>), EncodeError> {
     match encode(msg) {
-        Ok(buffer) => Ok((buffer.as_ptr(), buffer.len())),
+        Ok(buffer) => Ok((buffer.as_ptr(), buffer.len(), buffer)),
         Err(e) => Err(e),
     }
 }

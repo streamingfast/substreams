@@ -351,19 +351,16 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		p.nativeImports.SetCurrentBlock(block)
 		//clock := toClock(block)
 
-		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
+			blk := block.ToProtocol()
 			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
-			// block.Payload.Get() could do the same, but does it go through the same
-			// CORRECTIONS of the block, that the BlockDecoder does?
-			blkBytes, err := proto.Marshal(blk.(proto.Message))
+			data, err := block.Payload.Get()
 			if err != nil {
-				return fmt.Errorf("packing block: %w", err)
+				panic("failed to get block payload")
 			}
-
-			p.wasmOutputs[p.blockType] = blkBytes
+			p.wasmOutputs[p.blockType] = data
 			//p.wasmOutputs["sf.substreams.v1.Clock"] = clock //FIXME stepd implement clock
 		default:
 			panic("unsupported vmType " + p.vmType)

@@ -119,7 +119,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	hose := firehose.New([]dstore.Store{blocksStore}, startBlockNum, handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),
-		firehose.WithIrreversibleBlocksIndex(irrStore, true, []uint64{10000, 1000, 100}),
+		firehose.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
 	)
 
 	if err := hose.Run(context.Background()); err != nil {

@@ -471,12 +471,12 @@ func wasmMapCall(vals map[string][]byte,
 				if err != nil {
 					fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
 				} else {
-					fmt.Printf("Module %q output for type %q:\n%s\n", name, msgType, js)
+					fmt.Printf("module %q output for type %q:\n%s\n", name, msgType, js)
 					printed = true
 				}
 			}
 			if !printed && protoDecoder != nil {
-				fmt.Printf("Module %q output for type %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, msgType, base64.StdEncoding.EncodeToString(out), msgType)
+				fmt.Printf("module %q output for type %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, msgType, base64.StdEncoding.EncodeToString(out), msgType)
 			}
 		}
 	} else {
@@ -509,7 +509,7 @@ func wasmCall(vals map[string][]byte,
 	entrypoint string,
 	name string,
 	inputs []*wasm.Input,
-	rpcFactory wasm.WasmerFunctionFactory) (out *wasm.Instance, err error) {
+	rpcFactory wasm.WasmerFunctionFactory) (instance *wasm.Instance, err error) {
 
 	hasInput := false
 	for _, input := range inputs {
@@ -534,13 +534,14 @@ func wasmCall(vals map[string][]byte,
 	//  state builders will not be called if their input streams are 0 bytes length (and there's no
 	//  state store in read mode)
 	if hasInput {
-		out, err = mod.NewInstance(entrypoint, inputs, rpcFactory)
+		instance, err = mod.NewInstance(entrypoint, inputs, rpcFactory)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
-		if err = out.Execute(); err != nil {
+		if err = instance.Execute(); err != nil {
 			return nil, fmt.Errorf("module %q: wasm execution failed: %w", name, err)
 		}
+		instance.Close()
 	}
 	return
 }

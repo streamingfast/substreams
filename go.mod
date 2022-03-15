@@ -8,7 +8,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/streamingfast/bstream v0.0.2-0.20220301162141-6630bbe5996c
+	github.com/streamingfast/bstream v0.0.2-0.20220312192323-e6b8e55c4e99
 	github.com/streamingfast/dstore v0.1.1-0.20220307201418-3ad32e685451
 	github.com/streamingfast/eth-go v0.0.0-20220210031611-2c699bfe3163
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424

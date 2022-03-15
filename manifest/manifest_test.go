@@ -106,7 +106,7 @@ func TestStreamLinks_Streams(t *testing.T) {
 //
 //func TestStreamLinks_StreamsFor(t *testing.T) {
 //	streamGraph := &ModuleGraph{
-//		modules: map[string]*Module{
+//		modules: map[string]*module{
 //			"A": {Name: "A"},
 //			"B": {Name: "B"},
 //			"C": {Name: "C"},
@@ -117,16 +117,16 @@ func TestStreamLinks_Streams(t *testing.T) {
 //			"H": {Name: "H"},
 //			"I": {Name: "I"},
 //		},
-//		links: map[string][]*Module{
-//			"A": {&Module{Name: "B"}, &Module{Name: "C"}},
-//			"B": {&Module{Name: "D"}, &Module{Name: "E"}, &Module{Name: "F"}},
-//			"C": {&Module{Name: "F"}},
+//		links: map[string][]*module{
+//			"A": {&module{Name: "B"}, &module{Name: "C"}},
+//			"B": {&module{Name: "D"}, &module{Name: "E"}, &module{Name: "F"}},
+//			"C": {&module{Name: "F"}},
 //			"D": {},
 //			"E": {},
-//			"F": {&Module{Name: "G"}, &Module{Name: "H"}},
+//			"F": {&module{Name: "G"}, &module{Name: "H"}},
 //			"G": {},
 //			"H": {},
-//			"I": {&Module{Name: "H"}},
+//			"I": {&module{Name: "H"}},
 //		},
 //	}
 //
@@ -138,7 +138,7 @@ func TestStreamLinks_Streams(t *testing.T) {
 //
 //func TestStreamLinks_GroupedStreamsFor(t *testing.T) {
 //	streamGraph := &StreamsGraph{
-//		modules: map[string]*Module{
+//		modules: map[string]*module{
 //			"A": {Name: "A"},
 //			"B": {Name: "B"},
 //			"C": {Name: "C"},
@@ -149,16 +149,16 @@ func TestStreamLinks_Streams(t *testing.T) {
 //			"H": {Name: "H"},
 //			"I": {Name: "I"},
 //		},
-//		links: map[string][]*Module{
-//			"A": {&Module{Name: "B"}, &Module{Name: "C"}},
-//			"B": {&Module{Name: "D"}, &Module{Name: "E"}, &Module{Name: "F"}},
-//			"C": {&Module{Name: "F"}},
+//		links: map[string][]*module{
+//			"A": {&module{Name: "B"}, &module{Name: "C"}},
+//			"B": {&module{Name: "D"}, &module{Name: "E"}, &module{Name: "F"}},
+//			"C": {&module{Name: "F"}},
 //			"D": {},
 //			"E": {},
-//			"F": {&Module{Name: "G"}, &Module{Name: "H"}},
+//			"F": {&module{Name: "G"}, &module{Name: "H"}},
 //			"G": {},
 //			"H": {},
-//			"I": {&Module{Name: "H"}},
+//			"I": {&module{Name: "H"}},
 //		},
 //	}
 //

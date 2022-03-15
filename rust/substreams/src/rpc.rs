@@ -1,5 +1,5 @@
 use crate::externs;
-use crate::memory::memory;
+use crate::memory;
 
 pub fn eth_call(input: Vec<u8>) -> Vec<u8> {
     unsafe {

@@ -1,5 +1,5 @@
 use crate::externs;
-use crate::memory::memory;
+use crate::memory;
 use num_bigint::BigUint;
 use bigdecimal::BigDecimal;
 

@@ -1,6 +1,6 @@
 mod externs;
 pub mod log;
-mod memory;
+pub mod memory;
 pub mod proto;
 pub mod state;
 pub mod rpc;

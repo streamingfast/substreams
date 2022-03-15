@@ -26,9 +26,10 @@ import (
 )
 
 type Pipeline struct {
-	vmType        string // wasm, native
-	startBlockNum uint64
-	blockCount    int
+	vmType         string // wasm, native
+	startBlockNum  uint64
+	blockCount     int
+	lastStatUpdate time.Time
 
 	partialMode bool
 
@@ -328,6 +329,10 @@ func (p *Pipeline) setupStores(modules []*manifest.Module, ioFactory state.IOFac
 type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
+
+	p.lastStatUpdate = time.Now()
+	p.blockCount = 0
+
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		// defer func() {
 		// 	if r := recover(); r != nil {
@@ -375,16 +380,10 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.startBlockNum, block.Num(), block.ID())
 
 		p.blockCount += 1
-
-		go func() {
-			for {
-				select {
-				case <-time.After(time.Second):
-					fmt.Printf("Blocks processed in last second %d", p.blockCount)
-					p.blockCount = 0
-				}
-			}
-		}()
+		if time.Since(p.lastStatUpdate) >= time.Second {
+			fmt.Printf(">>BLOCKS<< Blocks processed in last second %d >>BLOCKS<<", p.blockCount)
+			p.blockCount = 0
+		}
 
 		// LockOSThread is to avoid this goroutine to be MOVED by the Go runtime to another system thread,
 		// while wasmer is using some instances in a given thread. Wasmer will not be happy if the goroutine

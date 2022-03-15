@@ -228,3 +228,8 @@ extern "C" fn test_make_it_crash(data_ptr: *mut u8, data_len: usize) {
         substreams::output_raw(cloned_data);
     };
 }
+
+#[no_mangle]
+extern "C" fn test_memory_leak() {
+    substreams::memory::alloc(10485760); // allocate 1MB on each call
+}

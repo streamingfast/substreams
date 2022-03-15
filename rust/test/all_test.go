@@ -252,3 +252,24 @@ func Test_MakeItCrash(t *testing.T) {
 	//wg.Wait()
 	//fmt.Println("done")
 }
+
+func Test_MemoryLeak(t *testing.T) {
+	wasmBytes, err := os.Open("./target/wasm32-unknown-unknown/release/testing_substreams.wasm")
+	require.NoError(t, err)
+	byteCode, err := ioutil.ReadAll(wasmBytes)
+	require.NoError(t, err)
+
+	module, _ := wasm.NewModule(byteCode, "test_memory_leak")
+	data := make([]byte, (1024*1024)*10)
+	for {
+		instance, err := module.NewInstance("test_memory_leak", nil, pipeline.GetRPCWasmFunctionFactory(nil))
+		require.NoError(t, err)
+		_ = instance
+		_, _ = instance.Heap().Write(data)
+
+		err = instance.Execute()
+		require.NoError(t, err)
+
+		instance.Close()
+	}
+}

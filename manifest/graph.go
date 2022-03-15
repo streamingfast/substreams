@@ -131,21 +131,13 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
-	sorted, ok := g.topSort()
-	if !ok {
-		return nil, fmt.Errorf("could not determine topological sort of graph")
-	}
-
-	revSorted := make([]*Module, len(sorted), len(sorted))
-	for i, m := range sorted {
-		revSorted[len(sorted)-i-1] = m
-	}
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
 	var res []*Module
-	for _, m := range revSorted {
-		res = append(res, m)
-		if m.Name == moduleName {
-			break
+	for i, d := range distances {
+
+		if d >= 0 { // connected node or myself
+			res = append(res, g.indexIndex[i])
 		}
 	}
 

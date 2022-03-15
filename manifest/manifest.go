@@ -20,6 +20,11 @@ func init() {
 	ModuleNameRegexp = regexp.MustCompile(`^[a-zA-Z]+[\w]*$`)
 }
 
+const (
+	ModuleKindStore = "store"
+	ModuleKindMap   = "map"
+)
+
 type Manifest struct {
 	SpecVersion string    `yaml:"specVersion"`
 	Description string    `yaml:"description"`

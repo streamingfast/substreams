@@ -33,10 +33,10 @@ func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
 		var found bool
 		var ix int
 
-		if strings.HasPrefix(inputName, "map:") {
+		if strings.HasPrefix(inputName, fmt.Sprintf("%s:", ModuleKindMap)) {
 			input = strings.TrimPrefix(inputName, "map:")
 		}
-		if strings.HasPrefix(inputName, "store:") {
+		if strings.HasPrefix(inputName, fmt.Sprintf("%s:", ModuleKindStore)) {
 			input = strings.TrimPrefix(inputName, "store:")
 		}
 
@@ -47,11 +47,10 @@ func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
 
 	for i, module := range modules {
 		for _, input := range module.Inputs {
-			inputName, j, found := inputNameToModule(input.Name)
+			_, j, found := inputNameToModule(input.Name)
 			if !found {
 				continue
 			}
-			fmt.Printf("adding edge from %s (%d) to %s (%d) \n", module.Name, i, inputName, j)
 			g.AddCost(i, j, 1)
 		}
 	}
@@ -82,22 +81,46 @@ func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*Module, error) {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
-	sorted, ok := g.topSort()
-	if !ok {
-		return nil, fmt.Errorf("could not determine topological sort of graph")
-	}
-
-	revSorted := make([]*Module, len(sorted), len(sorted))
-	for i, m := range sorted {
-		revSorted[len(sorted)-i-1] = m
-	}
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
 	var res []*Module
-	for _, m := range revSorted {
-		if m.Name == moduleName {
-			break
+	for i, d := range distances {
+		if d >= 1 {
+			res = append(res, g.indexIndex[i])
 		}
-		res = append(res, m)
+	}
+
+	return res, nil
+}
+
+func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*Module, error) {
+	ancestors, err := g.AncestorsOf(moduleName)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*Module, 0, len(ancestors))
+	for _, a := range ancestors {
+		if a.Kind == ModuleKindStore {
+			result = append(result, a)
+		}
+	}
+
+	return result, nil
+}
+
+func (g *ModuleGraph) ParentsOf(moduleName string) ([]*Module, error) {
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
+
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+
+	var res []*Module
+	for i, d := range distances {
+		if d == 1 {
+			res = append(res, g.indexIndex[i])
+		}
 	}
 
 	return res, nil

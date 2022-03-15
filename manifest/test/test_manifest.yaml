@@ -39,3 +39,13 @@ modules:
       - store: pairs
     output:
       type: proto:pcs.types.v1.Reserves
+
+  - name: block_to_tokens
+    kind: map
+    code:
+      file: ./test/code/pcs_substreams_bg.wasm
+      entrypoint: map_block_to_tokens
+    inputs:
+      - source: sf.ethereum.type.v1.Block
+    output:
+      type: proto:sf.substreams.tokens.v1.Tokens

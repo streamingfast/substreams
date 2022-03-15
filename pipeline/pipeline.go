@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -27,6 +28,7 @@ import (
 type Pipeline struct {
 	vmType        string // wasm, native
 	startBlockNum uint64
+	blockCount    int
 
 	partialMode bool
 
@@ -368,6 +370,18 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 
 		fmt.Println("-------------------------------------------------------------------")
 		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.startBlockNum, block.Num(), block.ID())
+
+		p.blockCount += 1
+
+		go func() {
+			for {
+				select {
+				case <-time.After(time.Second):
+					fmt.Printf("Blocks processed in last second %d", p.blockCount)
+					p.blockCount = 0
+				}
+			}
+		}()
 
 		// LockOSThread is to avoid this goroutine to be MOVED by the Go runtime to another system thread,
 		// while wasmer is using some instances in a given thread. Wasmer will not be happy if the goroutine

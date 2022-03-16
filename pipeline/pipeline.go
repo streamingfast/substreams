@@ -381,8 +381,9 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 
 		p.blockCount += 1
 		if time.Since(p.lastStatUpdate) >= time.Second {
-			fmt.Printf(">>BLOCKS<< Blocks processed in last second %d >>BLOCKS<<", p.blockCount)
+			fmt.Printf("\n==> Blocks processed in last second %d <==\n\n", p.blockCount)
 			p.blockCount = 0
+			p.lastStatUpdate = time.Now()
 		}
 
 		// LockOSThread is to avoid this goroutine to be MOVED by the Go runtime to another system thread,

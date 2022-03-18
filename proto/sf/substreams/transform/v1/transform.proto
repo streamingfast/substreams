@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package sf.substreams.transform.v1;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1;pbtransform";
+
+message Transform {
+  string output_module = 1; //todo: stream should always be a module of the map, right?
+  Manifest manifest = 2;
+}
+
+message Manifest {
+  string specVersion = 1;
+  string description = 2;
+  repeated Module modules = 3;
+  repeated ModuleCode modules_code = 4;
+}
+
+message Module {
+  string name = 1;
+  oneof kind = 2 {
+    KindMap map = 1;
+    KindStore = 2;
+  };
+
+  // Refers to the `modules_code` list in the Manifest in which this module is referenced
+  uint32 code_index = 3;
+  string code_entrypoint = 4;
+  repeated Input inputs = 5;
+  oneof output {
+    InputSource source = 1;
+    InputMap map = 2;
+    InputStore store = 3;
+  };
+}
+
+message KindMap {
+  string output_type = 1;
+}
+
+message KindStore {
+  // The UpdatePolicy determines what is possible to do with the store
+  // (the operations permitted no it, like set(), or sum(), etc..)  in
+  // order to ensure parallel operations are deterministic and
+  // possible.
+  //
+  // Say a store cumulates keys from block 0 to 1M, and a second store
+  // cumulates keys from block 1M to 2M. When we want to use this
+  // store as a dependency for a downstream module, we will merge the
+  // two stores according to this policy.
+  enum UpdatePolicy {
+    UNSET = 0;
+    // Provides a store where you can `set()` keys, and the latest key wins
+    REPLACE = 1;
+    // Provides a store where youc an `set_if_not_exists()` keys, and the first key wins
+    IGNORE = 2;
+    // Provides a store where you can `sum_*()` keys, where two stores merge by summing its values.
+    SUM = 3;
+    // Provides a store where you can `min_*()` keys, where two stores merge by leaving the minimum value.
+    MIN = 4;
+    // Provides a store where you can `max_*()` keys, where two stores merge by leaving the maximum value.
+    MAX = 5;
+  }
+  UpdatePolicy update_policy = 1;
+  string value_type = 2;
+}
+
+
+message  Input {
+  oneof input{
+    InputSource source = 1;
+    InputMap map = 2;
+    InputStore store = 3;
+  }
+}
+
+message InputSource {
+  string type = 1; // ex: "sf.ethereum.type.v1.Block"
+}
+message InputMap {
+  string module_name = 1; // ex: "block_to_pairs"
+}
+message InputStore {
+  string module_name = 1;
+  enum Mode {
+    UNSET = 0;
+    GET = 1;
+    DELTAS = 2;
+  }
+  Mode mode = 2;
+}
+
+message ModuleCode {
+  enum CodeType {
+    UNSET = 0;
+    NATIVE = 1;
+    WASM_RUST_V1 = 2;
+  }
+  CodeType code_type = 1;
+  bytes bytecode = 2;
+}

@@ -316,7 +316,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			return nil, nil
 		},
 	)
-	functions["sum_bigint"] = wasmer.NewFunction(
+	functions["sum_bigfloat"] = wasmer.NewFunction(
 		i.module.Store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),

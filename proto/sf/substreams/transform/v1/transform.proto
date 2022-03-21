@@ -12,7 +12,7 @@ message Transform {
 }
 
 message Manifest {
-  string specVersion = 1;
+  string spec_version = 1;
   string description = 2;
   repeated Module modules = 3;
   repeated ModuleCode modules_code = 4;

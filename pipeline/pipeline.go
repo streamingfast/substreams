@@ -361,7 +361,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
+func (p *Pipeline) HandlerFactory(stopBlock uint64) bstream.Handler {
 
 	p.lastStatUpdate = time.Now()
 	p.blockCount = 0
@@ -375,7 +375,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
-		if block.Number >= p.startBlockNum+blockCount {
+		if block.Number >= stopBlock {
 			for _, s := range p.stores {
 				err := s.WriteState(context.Background(), block.Num())
 				if err != nil {

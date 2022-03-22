@@ -43,21 +43,26 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	manif.PrintMermaid()
 
-	var blockCount uint64 = 1000
-	if len(args) > 0 {
-		val, err := strconv.ParseInt(args[2], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid block count %s", args[2])
-		}
-		blockCount = uint64(val)
-	}
-
 	modulesStartBlock := manif.StartBlock
 
 	startBlockNum := viper.GetUint64("start-block")
 	if startBlockNum == 0 {
 		startBlockNum = modulesStartBlock
 	}
+
+	stopBlockNum := viper.GetUint64("stop-block")
+	if stopBlockNum == 0 {
+		var blockCount uint64 = 1000
+		if len(args) > 0 {
+			val, err := strconv.ParseInt(args[2], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid block count %s", args[2])
+			}
+			blockCount = uint64(val)
+		}
+		stopBlockNum = startBlockNum + blockCount
+	}
+
 	fmt.Println("START BLOCK NUM", startBlockNum)
 	forceLoadState := false
 	if startBlockNum > modulesStartBlock {
@@ -120,7 +125,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	handler := pipe.HandlerFactory(blockCount)
+	handler := pipe.HandlerFactory(stopBlockNum)
 
 	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),

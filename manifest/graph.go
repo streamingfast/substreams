@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/yourbasic/graph"
 	"sort"
@@ -164,13 +165,30 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {
 }
 
 func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*Module, error) {
+	return g.groupedModulesDownTo(moduleName, false)
+}
+
+func (g *ModuleGraph) GroupedStoresDownTo(moduleName string) ([][]*Module, error) {
+	return g.groupedModulesDownTo(moduleName, true)
+}
+
+func (g *ModuleGraph) groupedModulesDownTo(moduleName string, storesOnly bool) ([][]*Module, error) {
 	v, found := g.moduleIndex[moduleName]
 
 	if !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
-	mods, err := g.ModulesDownTo(moduleName)
+	g.topSort()
+
+	var modsFunc func(string) ([]*Module, error)
+	if storesOnly {
+		modsFunc = g.StoresDownTo
+	} else {
+		modsFunc = g.ModulesDownTo
+	}
+
+	mods, err := modsFunc(moduleName)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine dependencies graph for %s: %w", moduleName, err)
 	}
@@ -199,3 +217,31 @@ func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*Module, erro
 
 	return res, nil
 }
+
+type ModuleGroupMarhsaler [][]*Module
+
+func (m ModuleGroupMarhsaler) MarshalJSON() ([]byte, error) {
+	l := make([][]string, len(m), len(m))
+	for i, g := range m {
+		sg := make([]string, 0, len(g))
+		for _, mod := range g {
+			sg = append(sg, mod.Name)
+		}
+		l[i] = sg
+	}
+
+	return json.Marshal(l)
+}
+
+type ModuleMarshaler []*Module
+
+func (m ModuleMarshaler) MarshalJSON() ([]byte, error) {
+	l := make([]string, 0, len(m))
+	for _, mod := range m {
+		l = append(l, mod.Name)
+	}
+
+	return json.Marshal(l)
+}
+
+

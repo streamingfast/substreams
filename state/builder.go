@@ -10,8 +10,6 @@ import (
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-
-	"github.com/streamingfast/bstream"
 )
 
 type Builder struct {
@@ -22,6 +20,7 @@ type Builder struct {
 	partialMode       bool
 	partialStartBlock uint64
 	moduleStartBlock  uint64
+	disableWriteState bool
 
 	complete bool
 
@@ -37,11 +36,12 @@ type Builder struct {
 
 type BuilderOption func(b *Builder)
 
-func WithPartialMode(partialMode bool, startBlock, moduleStartBlock uint64) BuilderOption {
+func WithPartialMode(partialMode bool, startBlock, moduleStartBlock uint64, outputStream string) BuilderOption {
 	return func(b *Builder) {
 		b.partialMode = partialMode
 		b.partialStartBlock = startBlock
 		b.moduleStartBlock = moduleStartBlock
+		b.disableWriteState = outputStream != b.Name
 	}
 }
 
@@ -153,15 +153,24 @@ func (b *Builder) ReadState(ctx context.Context, blockNumber uint64) error {
 		}
 		b.KV = builders[len(builders)-1].KV
 
-		if !b.partialMode {
-			///TODO(colin): save the merged kv as a full snapshot and delete partials?  if not here, then where?
+		err := b.writeState(ctx, blockNumber, false)
+		if err != nil {
+			return fmt.Errorf("writing merged kv: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func (b *Builder) WriteState(ctx context.Context, block *bstream.Block) error {
+func (b *Builder) WriteState(ctx context.Context, blockNum uint64) error {
+	if b.disableWriteState {
+		return nil
+	}
+
+	return b.writeState(ctx, blockNum, b.partialMode)
+}
+
+func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode bool) error {
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
 
 	content, err := json.MarshalIndent(kv, "", "  ")
@@ -170,18 +179,18 @@ func (b *Builder) WriteState(ctx context.Context, block *bstream.Block) error {
 	}
 
 	var writeFunc func() error
-	if b.partialMode {
+	if partialMode {
 		writeFunc = func() error {
-			return b.store.WritePartialState(ctx, content, b.partialStartBlock, block.Num()+1)
+			return b.store.WritePartialState(ctx, content, b.partialStartBlock, blockNum+1)
 		}
 	} else {
 		writeFunc = func() error {
-			return b.store.WriteState(ctx, content, block.Num())
+			return b.store.WriteState(ctx, content, blockNum+1)
 		}
 	}
 
 	if err = writeFunc(); err != nil {
-		return fmt.Errorf("writing %s kv at block %d: %w", b.Name, block.Num(), err)
+		return fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
 	}
 
 	return nil

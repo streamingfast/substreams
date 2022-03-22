@@ -23,14 +23,14 @@ type node struct {
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
-	ancestorStores         []*node
-	targetStartBlockNumber uint64
+	ancestorStores    []*node
+	targetBlockNumber uint64
 }
 
-func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, moduleStartBlock uint64, factory FactoryInterface, targetStartBlock uint64) *FileWaiter {
+func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, moduleStartBlock uint64, factory FactoryInterface, targetBlock uint64) *FileWaiter {
 	w := &FileWaiter{
-		ancestorStores:         nil,
-		targetStartBlockNumber: targetStartBlock,
+		ancestorStores:    nil,
+		targetBlockNumber: targetBlock,
 	}
 
 	ancestorStores, _ := moduleGraph.AncestorStoresOf(moduleName)
@@ -81,7 +81,7 @@ func (p *FileWaiter) wait(ctx context.Context, node *node) <-chan error {
 				//
 			}
 
-			exists, _, err := ContiguousFilesToTargetBlock(ctx, node.Name, node.Store, node.StartBlock, p.targetStartBlockNumber)
+			exists, _, err := ContiguousFilesToTargetBlock(ctx, node.Name, node.Store, node.StartBlock, p.targetBlockNumber)
 			if err != nil {
 				done <- &fileWaitResult{ctx.Err()}
 				return
@@ -92,7 +92,7 @@ func (p *FileWaiter) wait(ctx context.Context, node *node) <-chan error {
 			}
 
 			time.Sleep(WaiterSleepInterval)
-			fmt.Printf("waiting for store %s to complete processing to block %d\n", node.Name, p.targetStartBlockNumber)
+			fmt.Printf("waiting for store %s to complete processing to block %d\n", node.Name, p.targetBlockNumber)
 		}
 	}()
 

@@ -326,7 +326,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 	for _, s := range stores {
 		output := s.Output
 		store := state.NewBuilder(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.startBlockNum, p.manifest.StartBlock),
+			state.WithPartialMode(p.partialMode, p.startBlockNum, p.manifest.StartBlock, p.outputStreamName),
 		)
 
 		var initializeStore bool
@@ -381,7 +381,7 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 					continue
 				}
 
-				err := s.WriteState(context.Background(), block)
+				err := s.WriteState(context.Background(), block.Num())
 				if err != nil {
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)
 				}

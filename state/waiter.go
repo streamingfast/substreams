@@ -163,20 +163,28 @@ func ContiguousFilesToTargetBlock(ctx context.Context, storeName string, store S
 	}
 
 	//check if there is a path from any of the full snapshots (start = 0) to our target block
+	var paths [][]int
+	var dists []int64
 	var path []int
 	for t := range targets {
 		for f := range fulls {
-			p, _ := graph.ShortestPath(g, f, t)
-			if len(p) > 0 {
-				path = p
-				break
+			p, d := graph.ShortestPath(g, f, t)
+			if len(p) >= 0 && d >= 0 {
+				paths = append(paths, p)
+				dists = append(dists, d)
 			}
 		}
 	}
 
-	if len(path) == 0 {
+	if len(paths) == 0 {
 		return false, nil, nil
 	}
+
+	sort.Slice(paths, func(i, j int) bool {
+		return dists[i] < dists[j]
+	})
+
+	path = paths[0]
 
 	var pathFileNames []string
 	for _, p := range path {

@@ -222,6 +222,25 @@ func TestContiguousFilesToTargetBlock(t *testing.T) {
 			expectedError:    false,
 		},
 		{
+			name:      "happy path take shortest path",
+			storeName: "A",
+			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, f func(filename string) error) error {
+				files := []string{"A-3000.kv", "A-1000-2000.partial", "C-2000-3000.partial"}
+				for _, bf := range files {
+					err := f(bf)
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}),
+			moduleStartBlock: 1000,
+			targetBlock:      3000,
+			expectedOk:       true,
+			expectedFiles:    []string{"A-3000.kv"},
+			expectedError:    false,
+		},
+		{
 			name:      "no fulls",
 			storeName: "A",
 			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, f func(filename string) error) error {

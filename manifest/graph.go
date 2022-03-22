@@ -2,25 +2,26 @@ package manifest
 
 import (
 	"fmt"
-	"github.com/yourbasic/graph"
 	"sort"
-	"strings"
+
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	"github.com/yourbasic/graph"
 )
 
 type ModuleGraph struct {
 	*graph.Mutable
 
-	modules     []*Module
+	modules     []*pbtransform.Module
 	moduleIndex map[string]int
-	indexIndex  map[int]*Module
+	indexIndex  map[int]*pbtransform.Module
 }
 
-func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
+func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 	g := &ModuleGraph{
 		Mutable:     graph.New(len(modules)),
 		modules:     modules,
 		moduleIndex: make(map[string]int),
-		indexIndex:  make(map[int]*Module),
+		indexIndex:  make(map[int]*pbtransform.Module),
 	}
 
 	for i, module := range modules {
@@ -28,30 +29,22 @@ func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
 		g.indexIndex[i] = module
 	}
 
-	inputNameToModule := func(inputName string) (string, int, bool) {
-		var input string
-		var found bool
-		var ix int
-
-		if strings.HasPrefix(inputName, fmt.Sprintf("%s:", ModuleKindMap)) {
-			input = strings.TrimPrefix(inputName, "map:")
-		}
-		if strings.HasPrefix(inputName, fmt.Sprintf("%s:", ModuleKindStore)) {
-			input = strings.TrimPrefix(inputName, "store:")
-		}
-
-		ix, found = g.moduleIndex[input]
-
-		return input, ix, found
-	}
-
 	for i, module := range modules {
 		for _, input := range module.Inputs {
-			_, j, found := inputNameToModule(input.Name)
-			if !found {
+
+			var moduleName string
+			if v := input.GetMap(); v != nil {
+				moduleName = v.ModuleName
+			} else if v := input.GetStore(); v != nil {
+				moduleName = v.ModuleName
+			}
+			if moduleName == "" {
 				continue
 			}
-			g.AddCost(i, j, 1)
+
+			if j, found := g.moduleIndex[moduleName]; found {
+				g.AddCost(i, j, 1)
+			}
 		}
 	}
 
@@ -62,13 +55,13 @@ func NewModuleGraph(modules []*Module) (*ModuleGraph, error) {
 	return g, nil
 }
 
-func (g *ModuleGraph) topSort() ([]*Module, bool) {
+func (g *ModuleGraph) topSort() ([]*pbtransform.Module, bool) {
 	order, ok := graph.TopSort(g)
 	if !ok {
 		return nil, ok
 	}
 
-	var res []*Module
+	var res []*pbtransform.Module
 	for _, i := range order {
 		res = append(res, g.indexIndex[i])
 	}
@@ -76,14 +69,14 @@ func (g *ModuleGraph) topSort() ([]*Module, bool) {
 	return res, ok
 }
 
-func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*Module, error) {
+func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*pbtransform.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
 	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-	var res []*Module
+	var res []*pbtransform.Module
 	for i, d := range distances {
 		if d >= 1 {
 			res = append(res, g.indexIndex[i])
@@ -93,15 +86,15 @@ func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*Module, error) {
 	return res, nil
 }
 
-func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*Module, error) {
+func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbtransform.Module, error) {
 	ancestors, err := g.AncestorsOf(moduleName)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]*Module, 0, len(ancestors))
+	result := make([]*pbtransform.Module, 0, len(ancestors))
 	for _, a := range ancestors {
-		if a.Kind == ModuleKindStore {
+		if a.GetKindStore() != nil {
 			result = append(result, a)
 		}
 	}
@@ -109,14 +102,14 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*Module, error) {
 	return result, nil
 }
 
-func (g *ModuleGraph) ParentsOf(moduleName string) ([]*Module, error) {
+func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbtransform.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
 	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-	var res []*Module
+	var res []*pbtransform.Module
 	for i, d := range distances {
 		if d == 1 {
 			res = append(res, g.indexIndex[i])
@@ -126,18 +119,18 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*Module, error) {
 	return res, nil
 }
 
-func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*Module, error) {
+func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*pbtransform.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
 	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-	var res []*Module
+	var res []*pbtransform.Module
 	for i, d := range distances {
 		if d >= 0 { // connected node or myself
 			module := g.indexIndex[i]
-			if module.Kind == ModuleKindStore {
+			if module.GetKindStore() != nil {
 				res = append(res, g.indexIndex[i])
 			}
 		}
@@ -146,14 +139,14 @@ func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*Module, error) {
 	return res, nil
 }
 
-func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {
+func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbtransform.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
 	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-	var res []*Module
+	var res []*pbtransform.Module
 	for i, d := range distances {
 		if d >= 0 { // connected node or myself
 			res = append(res, g.indexIndex[i])
@@ -163,7 +156,7 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*Module, error) {
 	return res, nil
 }
 
-func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*Module, error) {
+func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*pbtransform.Module, error) {
 	v, found := g.moduleIndex[moduleName]
 
 	if !found {
@@ -177,7 +170,7 @@ func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*Module, erro
 
 	_, dist := graph.ShortestPaths(g, v)
 
-	distmap := map[int][]*Module{}
+	distmap := map[int][]*pbtransform.Module{}
 	distkeys := []int{}
 	for _, mod := range mods {
 		mix := g.moduleIndex[mod.Name]
@@ -192,7 +185,7 @@ func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*Module, erro
 		return distkeys[j] < distkeys[i]
 	})
 
-	res := make([][]*Module, 0, len(distmap))
+	res := make([][]*pbtransform.Module, 0, len(distmap))
 	for _, ix := range distkeys {
 		res = append(res, distmap[ix])
 	}

@@ -1,13 +1,10 @@
 package manifest
 
 import (
-	"bytes"
-	"crypto/sha1"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
@@ -146,13 +143,6 @@ func newWithoutLoad(path string) (*Manifest, error) {
 			}
 		}
 	}
-
-	graph, err := NewModuleGraph(m.Modules)
-	if err != nil {
-		return nil, fmt.Errorf("computing modules graph: %w", err)
-	}
-
-	m.Graph = graph
 
 	return m, nil
 }
@@ -294,30 +284,30 @@ func (m *Manifest) loadCode(codePath string, pbManifest *pbtransform.Manifest) (
 	return len(pbManifest.ModulesCode) - 1, nil
 }
 
-func (m *Module) Signature(graph *ModuleGraph) []byte {
-	buf := bytes.NewBuffer(nil)
-	buf.WriteString(m.Kind)
-	buf.Write(m.Code.Content)
-	buf.Write([]byte(m.Code.Entrypoint))
-
-	sort.Slice(m.Inputs, func(i, j int) bool {
-		return m.Inputs[i].Name < m.Inputs[j].Name
-	})
-	for _, input := range m.Inputs {
-		buf.WriteString(input.Name)
-	}
-
-	ancestors, _ := graph.AncestorsOf(m.Name)
-	for _, ancestor := range ancestors {
-		sig := ancestor.Signature(graph)
-		buf.Write(sig)
-	}
-
-	h := sha1.New()
-	h.Write(buf.Bytes())
-
-	return h.Sum(nil)
-}
+//func (m *Module) Signature(graph *ModuleGraph) []byte {
+//	buf := bytes.NewBuffer(nil)
+//	buf.WriteString(m.Kind)
+//	buf.Write(m.Code.Content)
+//	buf.Write([]byte(m.Code.Entrypoint))
+//
+//	sort.Slice(m.Inputs, func(i, j int) bool {
+//		return m.Inputs[i].Name < m.Inputs[j].Name
+//	})
+//	for _, input := range m.Inputs {
+//		buf.WriteString(input.Name)
+//	}
+//
+//	ancestors, _ := graph.AncestorsOf(m.Name)
+//	for _, ancestor := range ancestors {
+//		sig := ancestor.Signature(graph)
+//		buf.Write(sig)
+//	}
+//
+//	h := sha1.New()
+//	h.Write(buf.Bytes())
+//
+//	return h.Sum(nil)
+//}
 
 func (m *Module) String() string {
 	return m.Name
@@ -417,3 +407,35 @@ func (m *Module) setKindToProto(pbModule *pbtransform.Module) {
 		}
 	}
 }
+
+// TODO FIXME good luck have fun
+//type stringer interface {
+//	String() string
+//}
+//
+//func Signature(graph *ModuleGraph, m *pbtransform.Module) []byte {
+//	buf := bytes.NewBuffer(nil)
+//	buf.WriteString(m.Kind.(stringer).String())
+//
+//
+//	buf.Write(m.Code.Content)
+//	buf.Write([]byte(m.Code.Entrypoint))
+//
+//	sort.Slice(m.Inputs, func(i, j int) bool {
+//		return m.Inputs[i].Name < m.Inputs[j].Name
+//	})
+//	for _, input := range m.Inputs {
+//		buf.WriteString(input.Name)
+//	}
+//
+//	ancestors, _ := graph.AncestorsOf(m.Name)
+//	for _, ancestor := range ancestors {
+//		sig := ancestor.Signature(graph)
+//		buf.Write(sig)
+//	}
+//
+//	h := sha1.New()
+//	h.Write(buf.Bytes())
+//
+//	return h.Sum(nil)
+//}

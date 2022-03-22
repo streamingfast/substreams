@@ -30,6 +30,7 @@ message Module {
   string code_entrypoint = 5;
   repeated Input inputs = 6;
   Output output  = 7;
+  uint64 initial_block = 8;
 }
 
 message KindMap {

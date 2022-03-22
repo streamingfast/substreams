@@ -2,22 +2,18 @@ package pipeline
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
-	"github.com/streamingfast/substreams/registry"
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
@@ -42,12 +38,11 @@ type Pipeline struct {
 	nativeImports *imports.Imports
 	stores        map[string]*state.Builder
 
-	manifest         *manifest.Manifest
+	manifest         *pbtransform.Manifest
 	outputStreamName string
 
-	streamFuncs   []StreamFunc
-	nativeOutputs map[string]reflect.Value
-	wasmOutputs   map[string][]byte
+	streamFuncs []StreamFunc
+	outputs     map[string]interface{}
 }
 
 type RpcProvider interface {
@@ -56,14 +51,16 @@ type RpcProvider interface {
 
 type Option func(p *Pipeline)
 
-func WithPartialMode(ioFactory state.FactoryInterface) Option {
+func WithPartialMode(ioFactory state.FactoryInterface, graph *manifest.ModuleGraph, reqStartBlock uint64) Option {
 	return func(p *Pipeline) {
 		p.partialMode = true
-		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.manifest.Graph, p.manifest.StartBlock, ioFactory, p.startBlockNum)
+		//FIXME find the right startblocks
+
+		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, graph, ioFactory, reqStartBlock)
 	}
 }
 
-func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *manifest.Manifest, outputStreamName string, blockType string, opts ...Option) *Pipeline {
+func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *pbtransform.Manifest, outputStreamName string, blockType string, opts ...Option) *Pipeline {
 	pipe := &Pipeline{
 		startBlockNum:    startBlockNum,
 		rpcClient:        rpcClient,
@@ -72,8 +69,8 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 		stores:           map[string]*state.Builder{},
 		manifest:         manif,
 		outputStreamName: outputStreamName,
-		vmType:           manif.CodeType,
-		blockType:        blockType,
+		//vmType:           manif.CodeType,
+		blockType: blockType,
 	}
 
 	for _, opt := range opts {
@@ -83,98 +80,97 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 	return pipe
 }
 
-func (p *Pipeline) BuildNative(ctx context.Context, ioFactory state.FactoryInterface, forceLoadState bool) error {
-	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
-	if err != nil {
-		return fmt.Errorf("whoops: %w", err)
-	}
+//func (p *Pipeline) BuildNative(ctx context.Context, ioFactory state.FactoryInterface, forceLoadState bool) error {
+//	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
+//	if err != nil {
+//		return fmt.Errorf("whoops: %w", err)
+//	}
+//
+//	nativeStreams := registry.Init(p.nativeImports)
+//
+//	if err := p.setupStores(ctx, p.manifest.Graph, ioFactory, forceLoadState); err != nil {
+//		return fmt.Errorf("setting up stores: %w", err)
+//	}
+//	p.nativeOutputs = map[string]reflect.Value{}
+//
+//	for _, mod := range modules {
+//		f, found := nativeStreams[mod.Code.Native]
+//		if !found {
+//			return fmt.Errorf("native code not found for %q", mod.Code)
+//		}
+//
+//		debugOutput := mod.Name == p.outputStreamName
+//		inputs := []string{}
+//		for _, in := range mod.Inputs {
+//			inputs = append(inputs, strings.Split(in.Name, ":")[1])
+//		}
+//		modName := mod.Name // to ensure it's enclosed
+//
+//		switch mod.Kind {
+//		case "map":
+//			method := f.MethodByName("Map")
+//			if method.Kind() == reflect.Invalid {
+//				return fmt.Errorf("Map() method not found on %T", f.Interface())
+//			}
+//			if method.IsZero() {
+//				return fmt.Errorf("Map() method not found on %T", f.Interface())
+//			}
+//			fmt.Printf("Adding mapper for module %q\n", mod.Name)
+//			p.streamFuncs = append(p.streamFuncs, func() error {
+//				return nativeMapCall(p.nativeOutputs, method, modName, inputs, debugOutput)
+//			})
+//		case "store":
+//			method := f.MethodByName("Store")
+//			if method.Kind() == reflect.Invalid {
+//				return fmt.Errorf("Store() method not found on %T", f.Interface())
+//			}
+//			if method.IsZero() {
+//				return fmt.Errorf("Store() method not found on %T", f.Interface())
+//			}
+//
+//			p.nativeOutputs[mod.Name] = reflect.ValueOf(p.stores[mod.Name])
+//
+//			fmt.Printf("Adding state builder for stream %q\n", mod.Name)
+//			p.streamFuncs = append(p.streamFuncs, func() error {
+//				return nativeStoreCall(p.nativeOutputs, method, modName, inputs, debugOutput)
+//			})
+//
+//		default:
+//			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
+//		}
+//
+//	}
+//
+//	p.vmType = "native"
+//
+//	return nil
+//}
 
-	nativeStreams := registry.Init(p.nativeImports)
-
-	if err := p.setupStores(ctx, p.manifest.Graph, ioFactory, forceLoadState); err != nil {
-		return fmt.Errorf("setting up stores: %w", err)
-	}
-	p.nativeOutputs = map[string]reflect.Value{}
-
-	for _, mod := range modules {
-		f, found := nativeStreams[mod.Code.Native]
-		if !found {
-			return fmt.Errorf("native code not found for %q", mod.Code)
-		}
-
-		debugOutput := mod.Name == p.outputStreamName
-		inputs := []string{}
-		for _, in := range mod.Inputs {
-			inputs = append(inputs, strings.Split(in.Name, ":")[1])
-		}
-		modName := mod.Name // to ensure it's enclosed
-
-		switch mod.Kind {
-		case "map":
-			method := f.MethodByName("Map")
-			if method.Kind() == reflect.Invalid {
-				return fmt.Errorf("Map() method not found on %T", f.Interface())
-			}
-			if method.IsZero() {
-				return fmt.Errorf("Map() method not found on %T", f.Interface())
-			}
-			fmt.Printf("Adding mapper for module %q\n", mod.Name)
-			p.streamFuncs = append(p.streamFuncs, func() error {
-				return nativeMapCall(p.nativeOutputs, method, modName, inputs, debugOutput)
-			})
-		case "store":
-			method := f.MethodByName("Store")
-			if method.Kind() == reflect.Invalid {
-				return fmt.Errorf("Store() method not found on %T", f.Interface())
-			}
-			if method.IsZero() {
-				return fmt.Errorf("Store() method not found on %T", f.Interface())
-			}
-
-			p.nativeOutputs[mod.Name] = reflect.ValueOf(p.stores[mod.Name])
-
-			fmt.Printf("Adding state builder for stream %q\n", mod.Name)
-			p.streamFuncs = append(p.streamFuncs, func() error {
-				return nativeStoreCall(p.nativeOutputs, method, modName, inputs, debugOutput)
-			})
-
-		default:
-			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
-		}
-
-	}
-
-	p.vmType = "native"
-
-	return nil
-}
-
-func (p *Pipeline) BuildWASM(ctx context.Context, ioFactory state.FactoryInterface, forceLoadState bool) error {
-	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
+func (p *Pipeline) Build(ctx context.Context, manif *pbtransform.Manifest, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface, forceLoadState bool) error {
+	modules, err := graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(ctx, p.manifest.Graph, ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(ctx, graph, ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
-	p.wasmOutputs = map[string][]byte{}
-	protoDescs := p.manifest.ProtoDescs
-	protoMsgFactory := dynamic.NewMessageFactoryWithDefaults()
+	p.outputs = map[string]interface{}{}
 
 	for _, mod := range modules {
 		debugOutput := mod.Name == p.outputStreamName
 		var inputs []*wasm.Input
+
 		for _, in := range mod.Inputs {
-			if in.Map != "" {
+			if inputMap := in.GetMap(); inputMap != nil {
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputSource,
-					Name: in.Map,
+					Name: inputMap.ModuleName,
 				})
-			} else if in.Store != "" {
-				inputName := in.Store
-				if in.Mode == "deltas" {
+			} else if inputStore := in.GetStore(); inputStore != nil {
+				inputName := inputStore.ModuleName
+				if inputStore.Mode == pbtransform.InputStore_DELTAS {
 					inputs = append(inputs, &wasm.Input{
 						Type:   wasm.InputStore,
 						Name:   inputName,
@@ -188,10 +184,10 @@ func (p *Pipeline) BuildWASM(ctx context.Context, ioFactory state.FactoryInterfa
 						Store: p.stores[inputName],
 					})
 				}
-			} else if in.Source != "" {
+			} else if inputSource := in.GetSource(); inputSource != nil {
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputSource,
-					Name: in.Source,
+					Name: inputSource.Type,
 				})
 			} else {
 				return fmt.Errorf("invalid input struct for module %q", mod.Name)
@@ -199,59 +195,37 @@ func (p *Pipeline) BuildWASM(ctx context.Context, ioFactory state.FactoryInterfa
 		}
 		modName := mod.Name // to ensure it's enclosed
 
-		wasmModule, err := wasm.NewModule(mod.Code.Content, filepath.Base(mod.Code.File))
+		code := manif.ModulesCode[mod.CodeIndex]
+		wasmModule, err := wasm.NewModule(code.Bytecode, mod.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
 		rpcWasmFuncFact := GetRPCWasmFunctionFactory(p.nativeImports)
-		switch mod.Kind {
-		case "map":
+		if v := mod.GetKindMap(); v != nil {
 			fmt.Printf("Adding mapper for module %q\n", modName)
 
 			outType := mod.Output.Type
 			if strings.HasPrefix(outType, "proto:") {
 				outType = outType[6:]
 			}
-			var msgDesc *desc.MessageDescriptor
-			for _, file := range protoDescs {
-				msgDesc = file.FindMessage(outType)
-				if msgDesc != nil {
-					break
-				}
-			}
-			var protoDecoder func(in []byte) (string, error)
-			if msgDesc != nil {
-				protoDecoder = func(in []byte) (string, error) {
-					msg := protoMsgFactory.NewDynamicMessage(msgDesc)
-					if err := msg.Unmarshal(in); err != nil {
-						return "", fmt.Errorf("error unmarshalling protobuf %s to map: %w", outType, err)
-					}
-					cnt, err := msg.MarshalJSONIndent()
-					if err != nil {
-						return "", fmt.Errorf("error encoding protobuf %s into json: %w", outType, err)
-					}
-					return string(cnt), nil
-				}
-			}
-
-			entrypoint := mod.Code.Entrypoint
+			entrypoint := mod.CodeEntrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, protoDecoder, outType)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, outType)
 			})
-		case "store":
-			updatePolicy := mod.Output.UpdatePolicy
-			valueType := mod.Output.ValueType
-			protoType := mod.Output.ProtoType
+		}
+		if v := mod.GetKindStore(); v != nil {
 
-			entrypoint := mod.Code.Entrypoint
+			updatePolicy := v.UpdatePolicy
+			valueType := v.ValueType
+
+			entrypoint := mod.CodeEntrypoint
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         modName,
 				Store:        p.stores[modName],
 				UpdatePolicy: updatePolicy,
 				ValueType:    valueType,
-				ProtoType:    protoType,
 			})
 			fmt.Printf("Adding state builder for module %q\n", modName)
 
@@ -259,9 +233,8 @@ func (p *Pipeline) BuildWASM(ctx context.Context, ioFactory state.FactoryInterfa
 				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact)
 			})
 
-		default:
-			return fmt.Errorf("unknown value %q for 'kind' in module %q", mod.Kind, mod.Name)
 		}
+		return fmt.Errorf("unknown value %q for 'kind' in module %q", mod.Kind, mod.Name)
 
 	}
 
@@ -504,7 +477,6 @@ func wasmMapCall(vals map[string][]byte,
 	inputs []*wasm.Input,
 	printOutputs bool,
 	rpcFactory wasm.WasmerFunctionFactory,
-	protoDecoder func(in []byte) (string, error),
 	msgType string,
 ) (err error) {
 	var vm *wasm.Instance
@@ -514,21 +486,7 @@ func wasmMapCall(vals map[string][]byte,
 	if vm != nil {
 		out := vm.Output()
 		vals[name] = out
-		if len(out) != 0 && printOutputs {
-			printed := false
-			if protoDecoder != nil {
-				js, err := protoDecoder(out)
-				if err != nil {
-					fmt.Printf("WARN: Error encoding protobuf module %q's output: %s\n", name, err)
-				} else {
-					fmt.Printf("module %q output for type %q:\n%s\n", name, msgType, js)
-					printed = true
-				}
-			}
-			if !printed && protoDecoder != nil {
-				fmt.Printf("module %q output for type %q:\n    echo %q | base64 -d | protoc -I ./proto proto/*proto --decode=%s\n", name, msgType, base64.StdEncoding.EncodeToString(out), msgType)
-			}
-		}
+		//FIXME printoutput
 	} else {
 		vals[name] = nil
 	}

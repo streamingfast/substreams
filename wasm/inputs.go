@@ -1,6 +1,9 @@
 package wasm
 
-import "github.com/streamingfast/substreams/state"
+import (
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	"github.com/streamingfast/substreams/state"
+)
 
 type InputType int
 
@@ -22,7 +25,6 @@ type Input struct {
 	Deltas bool // whether we want to have the Deltas instead of an access to the store
 
 	// If InputType == OutputStore
-	UpdatePolicy string
+	UpdatePolicy pbtransform.KindStore_UpdatePolicy
 	ValueType    string
-	ProtoType    string
 }

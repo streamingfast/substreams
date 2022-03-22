@@ -27,7 +27,7 @@ type FileWaiter struct {
 	targetStartBlockNumber uint64
 }
 
-func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, moduleStartBlock uint64, factory FactoryInterface, targetStartBlock uint64) *FileWaiter {
+func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory FactoryInterface, targetStartBlock uint64) *FileWaiter {
 	w := &FileWaiter{
 		ancestorStores:         nil,
 		targetStartBlockNumber: targetStartBlock,
@@ -40,7 +40,7 @@ func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, moduleS
 		partialNode := &node{
 			Name:       ancestorStore.Name,
 			Store:      factory.New(ancestorStore.Name),
-			StartBlock: moduleStartBlock,
+			StartBlock: ancestorStore.InitialBlock,
 		}
 		parentNodes = append(parentNodes, partialNode)
 	}

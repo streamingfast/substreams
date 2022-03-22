@@ -42,6 +42,12 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	}
 
 	manif.PrintMermaid()
+	manifProto, err := manif.ToProto()
+	if err != nil {
+		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
+	}
+
+	// this is firehose stuff
 
 	var blockCount uint64 = 1000
 	if len(args) > 0 {
@@ -103,21 +109,20 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	ioFactory := state.NewStoreFactory(stateStore)
 
+	graph, err := manifest.NewModuleGraph(manifProto.Modules)
+	if err != nil {
+		return fmt.Errorf("create module graph %q: %w", err)
+	}
+
 	var pipelineOpts []pipeline.Option
 	if partialMode := viper.GetBool("partial"); partialMode {
 		fmt.Println("Starting pipeline in partial mode...")
-		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(ioFactory))
+		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(ioFactory, graph, startBlockNum))
 	}
-	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, manif, outputStreamName, ProtobufBlockType, pipelineOpts...)
+	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, graph, outputStreamName, ProtobufBlockType, pipelineOpts...)
 
-	if manif.CodeType == "native" {
-		if err := pipe.BuildNative(ctx, ioFactory, forceLoadState); err != nil {
-			return fmt.Errorf("building pipeline: %w", err)
-		}
-	} else {
-		if err := pipe.BuildWASM(ctx, ioFactory, forceLoadState); err != nil {
-			return fmt.Errorf("building pipeline: %w", err)
-		}
+	if err := pipe.Build(ctx, manifProto, graph, ioFactory, forceLoadState); err != nil {
+		return fmt.Errorf("building pipeline: %w", err)
 	}
 
 	handler := pipe.HandlerFactory(blockCount)

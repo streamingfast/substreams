@@ -20,14 +20,13 @@ modules:
 
   - name: pairs
     kind: store
+    updatePolicy: replace
+    valueType: bytes
     code:
       file: ./test/code/pcs_substreams_bg.wasm
       entrypoint: build_pairs_state
     inputs:
       - map: pair_extractor
-    output:
-      updatePolicy: replace
-      valueType: bytes
 
   - name: reserves_extractor
     kind: map

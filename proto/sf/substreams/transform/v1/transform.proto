@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package sf.substreams.transform.v1;
 
-import "google/protobuf/any.proto";
+//import "google/protobuf/any.proto";
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1;pbtransform";
 
@@ -20,20 +20,16 @@ message Manifest {
 
 message Module {
   string name = 1;
-  oneof kind = 2 {
-    KindMap map = 1;
-    KindStore = 2;
+  oneof kind {
+    KindMap kind_map = 2;
+    KindStore kind_store = 3;
   };
 
   // Refers to the `modules_code` list in the Manifest in which this module is referenced
-  uint32 code_index = 3;
-  string code_entrypoint = 4;
-  repeated Input inputs = 5;
-  oneof output {
-    InputSource source = 1;
-    InputMap map = 2;
-    InputStore store = 3;
-  };
+  uint32 code_index = 4;
+  string code_entrypoint = 5;
+  repeated Input inputs = 6;
+  Output output  = 7;
 }
 
 message KindMap {
@@ -74,6 +70,9 @@ message  Input {
     InputMap map = 2;
     InputStore store = 3;
   }
+}
+message  Output {
+  string type = 1;
 }
 
 message InputSource {

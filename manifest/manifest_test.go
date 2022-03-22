@@ -59,11 +59,13 @@ output:
   updatePolicy: sum
   valueType: bigint`,
 			expectedOutput: Module{
-				Name:   "prices",
-				Kind:   "store",
+				Name:         "prices",
+				Kind:         "store",
+				UpdatePolicy: "sum",
+				ValueType:    "bigint",
+
 				Code:   Code{File: "./pricesState.wasm"},
 				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}},
-				Output: StreamOutput{UpdatePolicy: "sum", ValueType: "bigint"},
 			},
 		},
 	}
@@ -101,4 +103,40 @@ func TestStreamLinks_Streams(t *testing.T) {
 	res, err := manifest.Graph.ModulesDownTo("reserves_extractor")
 	require.NoError(t, err)
 	fmt.Println(res)
+}
+
+func TestManifest_ToProto(t *testing.T) {
+	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
+	require.NoError(t, err)
+
+	pbManifest, err := manifest.ToProto()
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(pbManifest.ModulesCode))
+
+	require.Equal(t, 4, len(pbManifest.Modules))
+
+	module := pbManifest.Modules[0]
+	require.Equal(t, "pair_extractor", module.Name)
+	require.Equal(t, "map_pairs", module.CodeEntrypoint)
+	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "proto:pcs.types.v1.Pairs", module.Output.Type)
+
+	module = pbManifest.Modules[1]
+	require.Equal(t, "pairs", module.Name)
+	require.Equal(t, "build_pairs_state", module.CodeEntrypoint)
+	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Nil(t, module.Output)
+
+	module = pbManifest.Modules[2]
+	require.Equal(t, "reserves_extractor", module.Name)
+	require.Equal(t, "map_reserves", module.CodeEntrypoint)
+	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "proto:pcs.types.v1.Reserves", module.Output.Type)
+
+	module = pbManifest.Modules[3]
+	require.Equal(t, "block_to_tokens", module.Name)
+	require.Equal(t, "map_block_to_tokens", module.CodeEntrypoint)
+	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "proto:sf.substreams.tokens.v1.Tokens", module.Output.Type)
 }

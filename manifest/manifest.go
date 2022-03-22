@@ -12,6 +12,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 )
 
 var ModuleNameRegexp *regexp.Regexp
@@ -38,11 +39,14 @@ type Manifest struct {
 }
 
 type Module struct {
-	Name   string       `yaml:"name"`
-	Kind   string       `yaml:"kind"`
-	Code   Code         `yaml:"code"`
-	Inputs []*Input     `yaml:"inputs"`
-	Output StreamOutput `yaml:"output"`
+	Name string `yaml:"name"`
+	Kind string `yaml:"kind"`
+
+	UpdatePolicy string       `yaml:"updatePolicy"`
+	ValueType    string       `yaml:"valueType"`
+	Code         Code         `yaml:"code"`
+	Inputs       []*Input     `yaml:"inputs"`
+	Output       StreamOutput `yaml:"output"`
 }
 
 type Input struct {
@@ -68,11 +72,6 @@ type Code struct {
 type StreamOutput struct {
 	// For 'map'
 	Type string `yaml:"type"`
-
-	// For 'store'
-	ValueType    string `yaml:"valueType"`
-	ProtoType    string `yaml:"protoType"` // when `ValueType` == "proto"
-	UpdatePolicy string `yaml:"updatePolicy"`
 }
 
 func New(path string) (m *Manifest, err error) {
@@ -129,7 +128,7 @@ func newWithoutLoad(path string) (*Manifest, error) {
 				s.Code.Entrypoint = "map"
 			}
 		case ModuleKindStore:
-			if err := validateStoreBuilderOutput(s.Output); err != nil {
+			if err := validateStoreBuilder(s); err != nil {
 				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
 			}
 
@@ -180,15 +179,12 @@ func (i *Input) parse() error {
 	return fmt.Errorf("one, and only one of 'map', 'store' or 'source' must be specified")
 }
 
-func validateStoreBuilderOutput(output StreamOutput) error {
-	if output.UpdatePolicy == "" {
+func validateStoreBuilder(module *Module) error {
+	if module.UpdatePolicy == "" {
 		return errors.New("missing 'output.updatePolicy' for kind 'store'")
 	}
-	if output.ValueType == "" {
+	if module.ValueType == "" {
 		return errors.New("missing 'output.valueType' for kind 'store'")
-	}
-	if output.ValueType == "proto" && output.ProtoType == "" {
-		return errors.New("missing 'output.protoType' for kind StateBuidler, required when 'output.valueType' set to 'proto'")
 	}
 
 	combinations := []string{
@@ -213,7 +209,7 @@ func validateStoreBuilderOutput(output StreamOutput) error {
 	}
 	found := false
 	for _, comb := range combinations {
-		if fmt.Sprintf("%s:%s", output.UpdatePolicy, output.ValueType) == comb {
+		if fmt.Sprintf("%s:%s", module.UpdatePolicy, module.ValueType) == comb {
 			found = true
 		}
 	}
@@ -242,20 +238,76 @@ func (m *Manifest) PrintMermaid() {
 	fmt.Println("")
 }
 
-func (s *Module) Signature(graph *ModuleGraph) []byte {
-	buf := bytes.NewBuffer(nil)
-	buf.WriteString(s.Kind)
-	buf.Write(s.Code.Content)
-	buf.Write([]byte(s.Code.Entrypoint))
+func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
+	pbManifest := &pbtransform.Manifest{
+		SpecVersion: m.SpecVersion,
+		Description: m.Description,
+	}
 
-	sort.Slice(s.Inputs, func(i, j int) bool {
-		return s.Inputs[i].Name < s.Inputs[j].Name
+	moduleCodeIndexes := map[string]int{}
+	//todo: load wasm code and keep a map of the index
+	for _, module := range m.Modules {
+
+		codeIndex, found := moduleCodeIndexes[module.Code.File]
+		if !found {
+			var err error
+			codeIndex, err = m.loadCode(module.Code.File, pbManifest)
+			moduleCodeIndexes[module.Code.File] = codeIndex
+			if err != nil {
+				return nil, fmt.Errorf("loading code: %w", err)
+			}
+		}
+
+		pbModule, err := module.ToProto(uint32(codeIndex))
+		if err != nil {
+			return nil, fmt.Errorf("converting mondule, %s: %w", module.Name, err)
+		}
+		pbManifest.Modules = append(pbManifest.Modules, pbModule)
+	}
+
+	return pbManifest, nil
+}
+
+func (m *Manifest) loadCode(codePath string, pbManifest *pbtransform.Manifest) (int, error) {
+	byteCode, err := ioutil.ReadFile(codePath)
+	if err != nil {
+		return 0, fmt.Errorf("reading code from file, %s: %w", codePath, err)
+	}
+
+	var codeType pbtransform.ModuleCode_CodeType
+	switch m.CodeType {
+	case "wasm/rust-v1":
+		codeType = pbtransform.ModuleCode_WASM_RUST_V1
+	case "native":
+		codeType = pbtransform.ModuleCode_NATIVE
+	default:
+		return 0, fmt.Errorf("invalid code type, %s", codeType)
+	}
+
+	moduleCode := &pbtransform.ModuleCode{
+		CodeType: codeType,
+		Bytecode: byteCode,
+	}
+
+	pbManifest.ModulesCode = append(pbManifest.ModulesCode, moduleCode)
+
+	return len(pbManifest.ModulesCode) - 1, nil
+}
+
+func (m *Module) Signature(graph *ModuleGraph) []byte {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteString(m.Kind)
+	buf.Write(m.Code.Content)
+	buf.Write([]byte(m.Code.Entrypoint))
+
+	sort.Slice(m.Inputs, func(i, j int) bool {
+		return m.Inputs[i].Name < m.Inputs[j].Name
 	})
-	for _, input := range s.Inputs {
+	for _, input := range m.Inputs {
 		buf.WriteString(input.Name)
 	}
 
-	ancestors, _ := graph.AncestorsOf(s.Name)
+	ancestors, _ := graph.AncestorsOf(m.Name)
 	for _, ancestor := range ancestors {
 		sig := ancestor.Signature(graph)
 		buf.Write(sig)
@@ -267,6 +319,101 @@ func (s *Module) Signature(graph *ModuleGraph) []byte {
 	return h.Sum(nil)
 }
 
-func (s *Module) String() string {
-	return s.Name
+func (m *Module) String() string {
+	return m.Name
+}
+
+func (m *Module) ToProto(codeIndex uint32) (*pbtransform.Module, error) {
+	pbModule := &pbtransform.Module{
+		Name:           m.Name,
+		CodeIndex:      codeIndex,
+		CodeEntrypoint: m.Code.Entrypoint,
+	}
+
+	if m.Output.Type != "" {
+		pbModule.Output = &pbtransform.Output{
+			Type: m.Output.Type,
+		}
+	}
+
+	m.setKindToProto(pbModule)
+	err := m.setInputsToProto(pbModule)
+	if err != nil {
+		return nil, fmt.Errorf("setting input for module, %s: %w", m.Name, err)
+	}
+
+	return pbModule, nil
+}
+
+func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
+	for _, input := range m.Inputs {
+		if input.Source != "" {
+			pbInput := &pbtransform.Input{
+				Input: &pbtransform.Input_Source{
+					Source: &pbtransform.InputSource{
+						Type: input.Source,
+					},
+				},
+			}
+			pbModule.Inputs = append(pbModule.Inputs, pbInput)
+			continue
+		}
+		if input.Map != "" {
+			pbInput := &pbtransform.Input{
+				Input: &pbtransform.Input_Map{
+					Map: &pbtransform.InputMap{
+						ModuleName: input.Source,
+					},
+				},
+			}
+			pbModule.Inputs = append(pbModule.Inputs, pbInput)
+			continue
+		}
+		if input.Store != "" {
+
+			var mode pbtransform.InputStore_Mode
+
+			switch input.Mode {
+			case "UNSET":
+				mode = pbtransform.InputStore_UNSET
+			case "GET":
+				mode = pbtransform.InputStore_GET
+			case "Delta":
+				mode = pbtransform.InputStore_DELTAS
+			}
+
+			pbInput := &pbtransform.Input{
+				Input: &pbtransform.Input_Store{
+					Store: &pbtransform.InputStore{
+						ModuleName: m.Name,
+						Mode:       mode,
+					},
+				},
+			}
+			pbModule.Inputs = append(pbModule.Inputs, pbInput)
+			continue
+		}
+
+		return fmt.Errorf("invalid input")
+	}
+
+	return nil
+}
+
+func (m *Module) setKindToProto(pbModule *pbtransform.Module) {
+	switch m.Kind {
+	case ModuleKindMap:
+		pbModule.Kind = &pbtransform.Module_KindMap{
+			KindMap: &pbtransform.KindMap{
+				OutputType: m.Output.Type,
+			},
+		}
+	case ModuleKindStore:
+		pbModule.Kind = &pbtransform.Module_KindStore{
+			KindStore: &pbtransform.KindStore{
+				UpdatePolicy: pbtransform.KindStore_UpdatePolicy(pbtransform.KindStore_UpdatePolicy_value[m.UpdatePolicy]),
+				ValueType:    m.ValueType,
+			},
+		}
+	}
 }

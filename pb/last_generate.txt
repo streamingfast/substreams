@@ -1,7 +1,2 @@
-<<<<<<< HEAD
-generate.sh - Tue  8 Mar 2022 22:50:14 EST - abourget
-streamingfast/proto revision: 2f33f70f113c4d34cc595ad770cd1aaf103c7cb0
-=======
-generate.sh - Wed  9 Mar 2022 09:55:25 EST - stepd
-streamingfast/proto revision: 6dedfbdc0e64af180c8d4a49c9cd1e68a9c74892
->>>>>>> winchester
+generate.sh - Tue Mar 22 13:31:57 EDT 2022 - cbillett
+streamingfast/proto revision: 5287ec462d6a170e1a6c016cfe7030d94b7680a6

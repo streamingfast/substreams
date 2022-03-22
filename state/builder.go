@@ -178,6 +178,10 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
+	if partialMode && b.partialStartBlock == b.moduleStartBlock {
+		partialMode = false //this starts at module start block, therefore consider it a full kv
+	}
+
 	var writeFunc func() error
 	if partialMode {
 		writeFunc = func() error {

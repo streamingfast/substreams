@@ -377,10 +377,6 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		if block.Number >= p.startBlockNum+blockCount {
 			for _, s := range p.stores {
-				if p.partialMode && s.Name != p.outputStreamName {
-					continue
-				}
-
 				err := s.WriteState(context.Background(), block.Num())
 				if err != nil {
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)

@@ -185,11 +185,11 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 	var writeFunc func() error
 	if partialMode {
 		writeFunc = func() error {
-			return b.store.WritePartialState(ctx, content, b.partialStartBlock, blockNum+1)
+			return b.store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
 		}
 	} else {
 		writeFunc = func() error {
-			return b.store.WriteState(ctx, content, blockNum+1)
+			return b.store.WriteState(ctx, content, blockNum)
 		}
 	}
 

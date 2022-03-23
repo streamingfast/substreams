@@ -36,17 +36,17 @@ func (b *Builder) Merge(previous *Builder) error {
 	}
 
 	switch latest.updatePolicy {
-	case pbtransform.KindStore_REPLACE:
+	case pbtransform.KindStore_UPDATE_POLICY_REPLACE:
 		for k, v := range previous.KV {
 			if _, found := latest.KV[k]; !found {
 				latest.KV[k] = v
 			}
 		}
-	case pbtransform.KindStore_IGNORE:
+	case pbtransform.KindStore_UPDATE_POLICY_IGNORE:
 		for k, v := range previous.KV {
 			latest.KV[k] = v
 		}
-	case pbtransform.KindStore_SUM:
+	case pbtransform.KindStore_UPDATE_POLICY_SUM:
 		// check valueType to do the right thing
 		switch latest.valueType {
 		case OutputValueTypeInt64:
@@ -92,7 +92,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
 		}
-	case pbtransform.KindStore_MAX:
+	case pbtransform.KindStore_UPDATE_POLICY_MAX:
 		switch latest.valueType {
 		case OutputValueTypeInt64:
 			max := func(a, b uint64) uint64 {
@@ -169,7 +169,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
 		}
-	case pbtransform.KindStore_MIN:
+	case pbtransform.KindStore_UPDATE_POLICY_MIN:
 		switch latest.valueType {
 		case OutputValueTypeInt64:
 			min := func(a, b uint64) uint64 {

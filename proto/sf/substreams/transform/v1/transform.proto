@@ -57,17 +57,17 @@ message KindStore {
   // store as a dependency for a downstream module, we will merge the
   // two stores according to this policy.
   enum UpdatePolicy {
-    UNSET = 0;
+    UPDATE_POLICY_UNSET = 0;
     // Provides a store where you can `set()` keys, and the latest key wins
-    REPLACE = 1;
+    UPDATE_POLICY_REPLACE = 1;
     // Provides a store where youc an `set_if_not_exists()` keys, and the first key wins
-    IGNORE = 2;
+    UPDATE_POLICY_IGNORE = 2;
     // Provides a store where you can `sum_*()` keys, where two stores merge by summing its values.
-    SUM = 3;
+    UPDATE_POLICY_SUM = 3;
     // Provides a store where you can `min_*()` keys, where two stores merge by leaving the minimum value.
-    MIN = 4;
+    UPDATE_POLICY_MIN = 4;
     // Provides a store where you can `max_*()` keys, where two stores merge by leaving the maximum value.
-    MAX = 5;
+    UPDATE_POLICY_MAX = 5;
   }
   UpdatePolicy update_policy = 1;
   string value_type = 2;

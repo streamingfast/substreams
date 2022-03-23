@@ -253,7 +253,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_REPLACE {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_REPLACE {
 				return nil, fmt.Errorf("invalid store operation: 'set' only valid for stores with updatePolicy == 'replace'")
 			}
 			ord := args[0].I64()
@@ -279,7 +279,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_IGNORE {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_IGNORE {
 				return nil, fmt.Errorf("invalid store operation: 'set_if_not_exists' only valid for stores with updatePolicy == 'ignore'")
 			}
 			ord := args[0].I64()
@@ -324,7 +324,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_SUM && i.valueType != "bigfloat" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && i.valueType != "bigfloat" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigfloat' only valid for stores with updatePolicy == 'sum' and valueType == 'bigfloat'")
 			}
 			ord := args[0].I64()
@@ -355,7 +355,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_SUM && i.valueType != "bigint" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && i.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
@@ -382,7 +382,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_SUM && i.valueType != "int64" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && i.valueType != "int64" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
@@ -405,7 +405,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_SUM && i.valueType != "float64" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && i.valueType != "float64" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_float64' only valid for stores with updatePolicy == 'sum' and valueType == 'float64'")
 			}
 			ord := args[0].I64()
@@ -431,7 +431,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_SUM && i.valueType != "bigfloat" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && i.valueType != "bigfloat" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigfloat' only valid for stores with updatePolicy == 'sum' and valueType == 'bigfloat'")
 			}
 			ord := args[0].I64()
@@ -458,7 +458,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MIN && i.valueType != "int64" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && i.valueType != "int64" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_int64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
@@ -481,7 +481,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MIN && i.valueType != "bigfloat" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && i.valueType != "bigfloat" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_bigint' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
@@ -507,7 +507,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MIN && i.valueType != "float" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && i.valueType != "float" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_float64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
@@ -529,7 +529,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MIN && i.valueType != "bigint" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && i.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_bigfloat' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
@@ -556,7 +556,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MAX && i.valueType != "int64" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && i.valueType != "int64" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_int64' only valid for stores with updatePolicy == 'max' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
@@ -579,7 +579,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MAX && i.valueType != "bigint" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && i.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_bigint' only valid for stores with updatePolicy == 'max' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
@@ -605,7 +605,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MAX && i.valueType != "float" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && i.valueType != "float" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_float64' only valid for stores with updatePolicy == 'max' and valueType == 'float64'")
 			}
 			ord := args[0].I64()
@@ -627,7 +627,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_MAX && i.valueType != "bigint" {
+			if i.outputStore == nil && i.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && i.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_bigfloat' only valid for stores with updatePolicy == 'max' and valueType == 'bigfloat'")
 			}
 			ord := args[0].I64()

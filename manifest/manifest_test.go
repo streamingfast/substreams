@@ -104,7 +104,7 @@ func TestStreamLinks_Streams(t *testing.T) {
 	require.NoError(t, err)
 	res, err := moduleGraph.ModulesDownTo("reserves_extractor")
 	require.NoError(t, err)
-	fmt.Println(res)
+	assert.Equal(t, `[name:"pair_extractor" kind_map:{output_type:"proto:pcs.types.v1.Pairs"} wasm_code:{entrypoint:"map_pairs"} inputs:{source:{type:"sf.ethereum.type.v1.Block"}} output:{type:"proto:pcs.types.v1.Pairs"} name:"pairs" kind_store:{value_type:"bytes"} wasm_code:{entrypoint:"build_pairs_state"} inputs:{map:{module_name:"pair_extractor"}} name:"reserves_extractor" kind_map:{output_type:"proto:pcs.types.v1.Reserves"} wasm_code:{entrypoint:"map_reserves"} inputs:{source:{type:"sf.ethereum.type.v1.Block"}} inputs:{store:{module_name:"pairs"}} output:{type:"proto:pcs.types.v1.Reserves"}]`, fmt.Sprint(res))
 }
 
 func TestManifest_ToProto(t *testing.T) {
@@ -120,22 +120,22 @@ func TestManifest_ToProto(t *testing.T) {
 
 	module := pbManifest.Modules[0]
 	require.Equal(t, "pair_extractor", module.Name)
-	require.Equal(t, "map_pairs", module.CodeEntrypoint)
-	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "map_pairs", module.GetWasmCode().Entrypoint)
+	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, "proto:pcs.types.v1.Pairs", module.Output.Type)
 
 	module = pbManifest.Modules[1]
 	require.Equal(t, "pairs", module.Name)
-	require.Equal(t, "build_pairs_state", module.CodeEntrypoint)
-	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "build_pairs_state", module.GetWasmCode().Entrypoint)
+	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, 1, len(module.Inputs))
 	require.Equal(t, "pair_extractor", module.Inputs[0].GetMap().ModuleName)
 	require.Nil(t, module.Output)
 
 	module = pbManifest.Modules[2]
 	require.Equal(t, "reserves_extractor", module.Name)
-	require.Equal(t, "map_reserves", module.CodeEntrypoint)
-	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "map_reserves", module.GetWasmCode().Entrypoint)
+	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, 2, len(module.Inputs))
 	require.Equal(t, "sf.ethereum.type.v1.Block", module.Inputs[0].GetSource().Type)
 	require.Equal(t, "pairs", module.Inputs[1].GetStore().ModuleName)
@@ -143,7 +143,7 @@ func TestManifest_ToProto(t *testing.T) {
 
 	module = pbManifest.Modules[3]
 	require.Equal(t, "block_to_tokens", module.Name)
-	require.Equal(t, "map_block_to_tokens", module.CodeEntrypoint)
-	require.Equal(t, uint32(0), module.CodeIndex)
+	require.Equal(t, "map_block_to_tokens", module.GetWasmCode().Entrypoint)
+	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, "proto:sf.substreams.tokens.v1.Tokens", module.Output.Type)
 }

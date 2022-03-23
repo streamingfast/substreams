@@ -246,7 +246,7 @@ func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
 			}
 			pbManifest.Modules = append(pbManifest.Modules, modProto)
 
-		case "wasm":
+		case "wasm/rust-v1":
 			codeIndex, found := moduleCodeIndexes[module.Code.File]
 			if !found {
 				var err error

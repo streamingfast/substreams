@@ -3,6 +3,8 @@ package state
 import (
 	"testing"
 
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,24 +20,24 @@ func TestBuilder_Merge(t *testing.T) {
 	}{
 		{
 			name:          "incompatible merge strategies",
-			latest:        NewBuilder("b1", UpdatePolicyIgnore, OutputValueTypeString, "", nil),
-			prev:          NewBuilder("b2", UpdatePolicyReplace, OutputValueTypeString, "", nil),
+			latest:        NewBuilder("b1", pbtransform.KindStore_IGNORE, OutputValueTypeString, nil),
+			prev:          NewBuilder("b2", pbtransform.KindStore_REPLACE, OutputValueTypeString, nil),
 			expectedError: true,
 		},
 		{
 			name:          "incompatible value types",
-			latest:        NewBuilder("b1", UpdatePolicyIgnore, OutputValueTypeString, "", nil),
-			prev:          NewBuilder("b2", UpdatePolicyIgnore, OutputValueTypeBigFloat, "", nil),
+			latest:        NewBuilder("b1", pbtransform.KindStore_IGNORE, OutputValueTypeString, nil),
+			prev:          NewBuilder("b2", pbtransform.KindStore_IGNORE, OutputValueTypeBigFloat, nil),
 			expectedError: true,
 		},
 		{
 			name:   "replace (latest wins)",
-			latest: NewBuilder("b1", UpdatePolicyReplace, OutputValueTypeString, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_REPLACE, OutputValueTypeString, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("foo"),
 				"two": []byte("bar"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyReplace, OutputValueTypeString, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_REPLACE, OutputValueTypeString, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("baz"),
 				"three": []byte("lol"),
@@ -49,12 +51,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "ignore (previous wins)",
-			latest: NewBuilder("b1", UpdatePolicyIgnore, OutputValueTypeString, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_IGNORE, OutputValueTypeString, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("foo"),
 				"two": []byte("bar"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyIgnore, OutputValueTypeString, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_IGNORE, OutputValueTypeString, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("baz"),
 				"three": []byte("lol"),
@@ -68,12 +70,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_int",
-			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeInt64, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_SUM, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeInt64, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_SUM, OutputValueTypeInt64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("1"),
 				"three": []byte("3"),
@@ -87,12 +89,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_big_int",
-			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeBigInt, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_SUM, OutputValueTypeBigInt, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeBigInt, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_SUM, OutputValueTypeBigInt, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("1"),
 				"three": []byte("3"),
@@ -106,12 +108,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_int",
-			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeInt64, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MIN, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeInt64, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MIN, OutputValueTypeInt64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -125,12 +127,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_big_int",
-			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeBigInt, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MIN, OutputValueTypeBigInt, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeBigInt, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MIN, OutputValueTypeBigInt, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -144,12 +146,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_int",
-			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeInt64, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MAX, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeInt64, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MAX, OutputValueTypeInt64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -163,12 +165,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_big_int",
-			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeBigInt, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MAX, OutputValueTypeBigInt, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeBigInt, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MAX, OutputValueTypeBigInt, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -182,12 +184,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_float",
-			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeFloat64, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_SUM, OutputValueTypeFloat64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeFloat64, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_SUM, OutputValueTypeFloat64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("10.1"),
 				"three": []byte("30.1"),
@@ -201,12 +203,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_big_float",
-			latest: NewBuilder("b1", UpdatePolicySum, OutputValueTypeBigFloat, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_SUM, OutputValueTypeBigFloat, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicySum, OutputValueTypeBigFloat, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_SUM, OutputValueTypeBigFloat, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("10.1"),
 				"three": []byte("30.1"),
@@ -220,12 +222,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_float",
-			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeFloat64, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MIN, OutputValueTypeFloat64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeFloat64, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MIN, OutputValueTypeFloat64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -239,12 +241,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_big_float",
-			latest: NewBuilder("b1", UpdatePolicyMin, OutputValueTypeBigFloat, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MIN, OutputValueTypeBigFloat, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMin, OutputValueTypeBigFloat, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MIN, OutputValueTypeBigFloat, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -258,12 +260,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_float",
-			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeFloat64, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MAX, OutputValueTypeFloat64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeFloat64, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MAX, OutputValueTypeFloat64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -277,12 +279,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_big_float",
-			latest: NewBuilder("b1", UpdatePolicyMax, OutputValueTypeBigFloat, "", nil),
+			latest: NewBuilder("b1", pbtransform.KindStore_MAX, OutputValueTypeBigFloat, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: NewBuilder("b2", UpdatePolicyMax, OutputValueTypeBigFloat, "", nil),
+			prev: NewBuilder("b2", pbtransform.KindStore_MAX, OutputValueTypeBigFloat, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),

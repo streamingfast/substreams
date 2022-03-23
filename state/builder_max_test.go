@@ -2,10 +2,13 @@ package state
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"strconv"
 	"testing"
+
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBuilderSetMaxBigInt(t *testing.T) {
@@ -19,7 +22,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(3),
 			value:         big.NewInt(4),
@@ -27,7 +30,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(5),
 			value:         big.NewInt(4),
@@ -35,7 +38,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewInt(4),
@@ -85,7 +88,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(3),
 			value:         4,
@@ -93,7 +96,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(5),
 			value:         4,
@@ -101,7 +104,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4,
@@ -152,7 +155,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(3.0),
 			value:         4.0,
@@ -160,7 +163,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(5.0),
 			value:         4.0,
@@ -168,7 +171,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4.0,
@@ -212,7 +215,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(3),
 			value:         big.NewFloat(4),
@@ -220,7 +223,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(5),
 			value:         big.NewFloat(4),
@@ -228,7 +231,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", "", "", "", nil),
+			builder:       NewBuilder("b", pbtransform.KindStore_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewFloat(4),

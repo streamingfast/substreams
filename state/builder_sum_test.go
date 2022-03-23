@@ -5,11 +5,13 @@ import (
 	"strconv"
 	"testing"
 
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func initTestBuilder(key string, value []byte) *Builder {
-	b := NewBuilder("b", "", "", "", nil)
+	b := NewBuilder("b", pbtransform.KindStore_UNSET, "", nil)
 	if value != nil {
 		b.KV[key] = value
 	}

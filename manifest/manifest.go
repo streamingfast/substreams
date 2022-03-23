@@ -352,7 +352,7 @@ func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
 			pbInput := &pbtransform.Input{
 				Input: &pbtransform.Input_Map{
 					Map: &pbtransform.InputMap{
-						ModuleName: input.Source,
+						ModuleName: input.Map,
 					},
 				},
 			}
@@ -375,7 +375,7 @@ func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
 			pbInput := &pbtransform.Input{
 				Input: &pbtransform.Input_Store{
 					Store: &pbtransform.InputStore{
-						ModuleName: m.Name,
+						ModuleName: input.Store,
 						Mode:       mode,
 					},
 				},

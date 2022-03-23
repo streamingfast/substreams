@@ -7,10 +7,11 @@
 package pbtransform
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -334,31 +335,31 @@ type Module struct {
 	InitialBlock   uint64   `protobuf:"varint,8,opt,name=initial_block,json=initialBlock,proto3" json:"initial_block,omitempty"`
 }
 
-func (x *Module) Reset() {
-	*x = Module{}
+func (m *Module) Reset() {
+	*m = Module{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_sf_substreams_transform_v1_transform_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(m))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *Module) String() string {
-	return protoimpl.X.MessageStringOf(x)
+func (m *Module) String() string {
+	return protoimpl.X.MessageStringOf(m)
 }
 
 func (*Module) ProtoMessage() {}
 
-func (x *Module) ProtoReflect() protoreflect.Message {
+func (m *Module) ProtoReflect() protoreflect.Message {
 	mi := &file_sf_substreams_transform_v1_transform_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	if protoimpl.UnsafeEnabled && m != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(m))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
 		}
 		return ms
 	}
-	return mi.MessageOf(x)
+	return mi.MessageOf(m)
 }
 
 // Deprecated: Use Module.ProtoReflect.Descriptor instead.
@@ -366,9 +367,9 @@ func (*Module) Descriptor() ([]byte, []int) {
 	return file_sf_substreams_transform_v1_transform_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Module) GetName() string {
-	if x != nil {
-		return x.Name
+func (m *Module) GetName() string {
+	if m != nil {
+		return m.Name
 	}
 	return ""
 }
@@ -380,51 +381,51 @@ func (m *Module) GetKind() isModule_Kind {
 	return nil
 }
 
-func (x *Module) GetKindMap() *KindMap {
-	if x, ok := x.GetKind().(*Module_KindMap); ok {
+func (m *Module) GetKindMap() *KindMap {
+	if x, ok := m.GetKind().(*Module_KindMap); ok {
 		return x.KindMap
 	}
 	return nil
 }
 
-func (x *Module) GetKindStore() *KindStore {
-	if x, ok := x.GetKind().(*Module_KindStore); ok {
+func (m *Module) GetKindStore() *KindStore {
+	if x, ok := m.GetKind().(*Module_KindStore); ok {
 		return x.KindStore
 	}
 	return nil
 }
 
-func (x *Module) GetCodeIndex() uint32 {
-	if x != nil {
-		return x.CodeIndex
+func (m *Module) GetCodeIndex() uint32 {
+	if m != nil {
+		return m.CodeIndex
 	}
 	return 0
 }
 
-func (x *Module) GetCodeEntrypoint() string {
-	if x != nil {
-		return x.CodeEntrypoint
+func (m *Module) GetCodeEntrypoint() string {
+	if m != nil {
+		return m.CodeEntrypoint
 	}
 	return ""
 }
 
-func (x *Module) GetInputs() []*Input {
-	if x != nil {
-		return x.Inputs
+func (m *Module) GetInputs() []*Input {
+	if m != nil {
+		return m.Inputs
 	}
 	return nil
 }
 
-func (x *Module) GetOutput() *Output {
-	if x != nil {
-		return x.Output
+func (m *Module) GetOutput() *Output {
+	if m != nil {
+		return m.Output
 	}
 	return nil
 }
 
-func (x *Module) GetInitialBlock() uint64 {
-	if x != nil {
-		return x.InitialBlock
+func (m *Module) GetInitialBlock() uint64 {
+	if m != nil {
+		return m.InitialBlock
 	}
 	return 0
 }

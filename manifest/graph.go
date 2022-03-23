@@ -41,6 +41,7 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 			}
 			if moduleName == "" {
 				continue
+				//return nil, fmt.Errorf("module name should be set")
 			}
 
 			if j, found := g.moduleIndex[moduleName]; found {
@@ -95,7 +96,8 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbtransform.Module
 
 	result := make([]*pbtransform.Module, 0, len(ancestors))
 	for _, a := range ancestors {
-		if a.GetKindStore() != nil {
+		kind := a.GetKindStore()
+		if kind != nil {
 			result = append(result, a)
 		}
 	}

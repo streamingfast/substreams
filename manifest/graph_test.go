@@ -1,84 +1,91 @@
 package manifest
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sort"
 	"testing"
+
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	"github.com/stretchr/testify/assert"
 )
 
-var testModules = []*Module{
-	&Module{
-		Name:   "A",
-		Kind:   ModuleKindMap,
-		Inputs: nil,
+var testModules = []*pbtransform.Module{
+	{
+		Name: "A",
 	},
-	&Module{
+	{
 		Name: "B",
-		Kind: ModuleKindStore,
-		Inputs: []*Input{
-			&Input{
-				Map:  "A",
-				Name: "map:A",
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "A",
+				}},
 			},
 		},
 	},
-	&Module{
+	{
 		Name: "C",
-		Kind: ModuleKindMap,
-		Inputs: []*Input{
-			&Input{
-				Map:  "A",
-				Name: "map:A",
+		Kind: &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "A",
+				}},
 			},
 		},
 	},
-	&Module{
+	{
 		Name: "D",
-		Kind: ModuleKindMap,
-		Inputs: []*Input{
-			&Input{
-				Name:  "store:B",
-				Store: "B",
+		Kind: &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "B",
+				}},
 			},
 		},
 	},
-	&Module{
+	{
 		Name: "E",
-		Kind: ModuleKindStore,
-		Inputs: []*Input{
-			&Input{
-				Map:  "C",
-				Name: "map:C",
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "C",
+				}},
 			},
 		},
 	},
-	&Module{
+	{
 		Name: "F",
-		Kind: ModuleKindStore,
-		Inputs: []*Input{
-			&Input{
-				Name: "map:C",
-				Map:  "C",
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "C",
+				}},
 			},
 		},
 	},
-	&Module{
+	{
 		Name: "G",
-		Kind: ModuleKindStore,
-		Inputs: []*Input{
-			&Input{
-				Map:  "D",
-				Name: "map:D",
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "D",
+				}},
 			},
-			&Input{
-				Store: "E",
-				Name:  "store:E",
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "E",
+				}},
 			},
 		},
 	},
-	&Module{
+	{
 		Name:   "H",
-		Kind:   ModuleKindMap,
+		Kind:   &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
 		Inputs: nil,
 	},
 }
@@ -92,7 +99,7 @@ func TestModuleGraph_ParentsOf(t *testing.T) {
 
 	var res []string
 	for _, p := range parents {
-		res = append(res, p.String())
+		res = append(res, p.Name)
 	}
 
 	sort.Strings(res)
@@ -109,7 +116,7 @@ func TestModuleGraph_AncestorsOf(t *testing.T) {
 
 	var res []string
 	for _, p := range parents {
-		res = append(res, p.String())
+		res = append(res, p.Name)
 	}
 
 	sort.Strings(res)
@@ -126,7 +133,7 @@ func TestModuleGraph_AncestorStoresOf(t *testing.T) {
 
 	var res []string
 	for _, a := range ancestors {
-		res = append(res, a.String())
+		res = append(res, a.Name)
 	}
 
 	sort.Strings(res)
@@ -145,7 +152,7 @@ func TestModuleGraph_GroupedModulesDownTo(t *testing.T) {
 	for _, modgroup := range modgroups {
 		var mods []string
 		for _, p := range modgroup {
-			mods = append(mods, p.String())
+			mods = append(mods, p.Name)
 		}
 		sort.Strings(mods)
 		res = append(res, mods)
@@ -191,7 +198,7 @@ func TestModuleGraph_ModulesDownTo(t *testing.T) {
 
 	var res []string
 	for _, p := range mods {
-		res = append(res, p.String())
+		res = append(res, p.Name)
 	}
 
 	sort.Strings(res)
@@ -208,7 +215,7 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 
 	var res []string
 	for _, p := range mods {
-		res = append(res, p.String())
+		res = append(res, p.Name)
 	}
 
 	sort.Strings(res)

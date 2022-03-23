@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/stretchr/testify/assert"
@@ -34,55 +36,66 @@ func TestPartialRegex(t *testing.T) {
 	assert.Equal(t, res[0][2], "12345")
 }
 
-var testModules = []*manifest.Module{
+var testModules = []*pbtransform.Module{
 	{
 		Name:   "A",
-		Kind:   manifest.ModuleKindMap,
+		Kind:   &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
 		Inputs: nil,
 	},
 	{
 		Name: "B",
-		Kind: manifest.ModuleKindStore,
-		Inputs: []*manifest.Input{
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
 			{
-				Map:  "A",
-				Name: "map:A",
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "A",
+				}},
 			},
 		},
 	},
 	{
 		Name: "C",
-		Kind: manifest.ModuleKindStore,
-		Inputs: []*manifest.Input{
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
 			{
-				Map:  "A",
-				Name: "map:A",
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "A",
+				}},
 			},
 		},
 	},
 	{
 		Name: "D",
-		Kind: manifest.ModuleKindMap,
-		Inputs: []*manifest.Input{
+		Kind: &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
+		Inputs: []*pbtransform.Input{
 			{
-				Map:  "B",
-				Name: "store:B",
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "B",
+				}},
 			},
 		},
 	},
 	{
 		Name: "E",
-		Kind: manifest.ModuleKindStore,
-		Inputs: []*manifest.Input{
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
 			{
-				Map:  "C",
-				Name: "store:C",
-			},
-			{
-				Map:  "D",
-				Name: "map:D",
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "C",
+				}},
 			},
 		},
+
+		//Inputs: []*manifest.Input{
+		//	{
+		//		Map:  "C",
+		//		Name: "store:C",
+		//	},
+		//	{
+		//		Map:  "D",
+		//		Name: "map:D",
+		//	},
+		//},
 	},
 }
 
@@ -161,7 +174,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			waiter := NewFileWaiter("E", test.graph, 0, test.factory, test.targetBlock)
+			waiter := NewFileWaiter("E", test.graph, test.factory, test.targetBlock)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 			defer cancel()

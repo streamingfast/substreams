@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -94,18 +93,6 @@ inputs:
 //	sig := pairsStream.Signature(manifest.Graph)
 //	assert.Equal(t, "mJWxgtjCeH4ulmYN4fq3wVTUz8U=", base64.StdEncoding.EncodeToString(sig))
 //}
-
-func TestStreamLinks_Streams(t *testing.T) {
-	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
-	require.NoError(t, err)
-	pbManifest, err := manifest.ToProto()
-	require.NoError(t, err)
-	moduleGraph, err := NewModuleGraph(pbManifest.Modules)
-	require.NoError(t, err)
-	res, err := moduleGraph.ModulesDownTo("reserves_extractor")
-	require.NoError(t, err)
-	assert.Equal(t, `[name:"pair_extractor" kind_map:{output_type:"proto:pcs.types.v1.Pairs"} wasm_code:{entrypoint:"map_pairs"} inputs:{source:{type:"sf.ethereum.type.v1.Block"}} output:{type:"proto:pcs.types.v1.Pairs"} name:"pairs" kind_store:{value_type:"bytes"} wasm_code:{entrypoint:"build_pairs_state"} inputs:{map:{module_name:"pair_extractor"}} name:"reserves_extractor" kind_map:{output_type:"proto:pcs.types.v1.Reserves"} wasm_code:{entrypoint:"map_reserves"} inputs:{source:{type:"sf.ethereum.type.v1.Block"}} inputs:{store:{module_name:"pairs"}} output:{type:"proto:pcs.types.v1.Reserves"}]`, fmt.Sprint(res))
-}
 
 func TestManifest_ToProto(t *testing.T) {
 	manifest, err := newWithoutLoad("./test/test_manifest.yaml")

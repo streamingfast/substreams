@@ -26,7 +26,6 @@ const (
 type Manifest struct {
 	SpecVersion string    `yaml:"specVersion"`
 	Description string    `yaml:"description"`
-	CodeType    string    `yaml:"codeType"`
 	StartBlock  uint64    `yaml:"startBlock"` // TODO: This needs to go on the actual module, perhaps can be inferred from its dependencies
 	ProtoFiles  []string  `yaml:"protoFiles"`
 	Modules     []*Module `yaml:"modules"`
@@ -61,6 +60,7 @@ type Input struct {
 
 type Code struct {
 	File       string `yaml:"file"`
+	Type       string `yaml:"type"`
 	Native     string `yaml:"native"`
 	Content    []byte `yaml:"-"`
 	Entrypoint string `yaml:"entrypoint"`
@@ -103,12 +103,6 @@ func newWithoutLoad(path string) (*Manifest, error) {
 	_, m, err := DecodeYamlManifestFromFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("decoding yaml: %w", err)
-	}
-
-	switch m.CodeType {
-	case "wasm/rust-v1", "native":
-	default:
-		return nil, fmt.Errorf("invalid value %q for 'codeType'", m.CodeType)
 	}
 
 	for _, s := range m.Modules {
@@ -238,7 +232,7 @@ func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
 	//todo: load wasm code and keep a map of the index
 	for _, module := range m.Modules {
 
-		switch m.CodeType {
+		switch module.Code.Type {
 		case "native":
 			modProto, err := module.ToProtoNative()
 			if err != nil {

@@ -98,17 +98,16 @@ func (p *Pipeline) Build(ctx context.Context, forceLoadState bool) error {
 		vmType := ""
 		switch {
 		case mod.GetWasmCode() != nil:
-			p.vmType = "wasm"
+			vmType = "wasm"
 		case mod.GetNativeCode() != nil:
-			p.vmType = "native"
+			vmType = "native"
+		default:
+			return fmt.Errorf("invalid code type for modules %s ", mod.Name)
 		}
-		if p.vmType == "" {
-			p.vmType = vmType
-			continue
-		}
-		if vmType != p.vmType {
+		if p.vmType != "" && vmType != p.vmType {
 			return fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
 		}
+		p.vmType = vmType
 	}
 
 	switch p.vmType {
@@ -269,6 +268,7 @@ func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
 			p.streamFuncs = append(p.streamFuncs, func() error {
 				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, outType)
 			})
+			continue
 		}
 		if v := mod.GetKindStore(); v != nil {
 			updatePolicy := v.UpdatePolicy
@@ -286,9 +286,9 @@ func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
 			p.streamFuncs = append(p.streamFuncs, func() error {
 				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact)
 			})
-
+			continue
 		}
-		return fmt.Errorf("unknown value %q for 'kind' in module %q", mod.Kind, mod.Name)
+		return fmt.Errorf("invalid kind %q in module %q", mod.Kind, mod.Name)
 
 	}
 

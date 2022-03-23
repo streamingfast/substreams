@@ -252,7 +252,8 @@ func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
 				return nil, fmt.Errorf("converting mondule, %s: %w", module.Name, err)
 			}
 			pbManifest.Modules = append(pbManifest.Modules, pbModule)
-
+		default:
+			return nil, fmt.Errorf("invalid code type, %s for module %s", module.Code.Type, module.Name)
 		}
 
 	}

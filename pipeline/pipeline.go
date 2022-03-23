@@ -142,7 +142,7 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 		}
 		f, found := nativeStreams[nativeCode.Entrypoint]
 		if !found {
-			return fmt.Errorf("native code not found for %q", modName)
+			return fmt.Errorf("native code not found for %q entry point %s", modName, nativeCode.Entrypoint)
 		}
 
 		// debugOutput := modName == p.outputStreamName

@@ -305,7 +305,7 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 		Name: m.Name,
 		Code: &pbtransform.Module_NativeCode{
 			NativeCode: &pbtransform.NativeCode{
-				Entrypoint: m.Code.Native,
+				Entrypoint: m.Code.Entrypoint,
 			},
 		},
 	}

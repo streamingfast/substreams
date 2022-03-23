@@ -228,7 +228,7 @@ func (m ModuleGroupMarhsaler) MarshalJSON() ([]byte, error) {
 	return json.Marshal(l)
 }
 
-type ModuleMarshaler []*Module
+type ModuleMarshaler []*pbtransform.Module
 
 func (m ModuleMarshaler) MarshalJSON() ([]byte, error) {
 	l := make([]string, 0, len(m))

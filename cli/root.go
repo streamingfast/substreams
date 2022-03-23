@@ -116,17 +116,17 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	graph, err := manifest.NewModuleGraph(manifProto.Modules)
 	if err != nil {
-		return fmt.Errorf("create module graph %q: %w", err)
+		return fmt.Errorf("create module graph %w", err)
 	}
 
 	var pipelineOpts []pipeline.Option
 	if partialMode := viper.GetBool("partial"); partialMode {
 		fmt.Println("Starting pipeline in partial mode...")
-		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(ioFactory, graph, startBlockNum))
+		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(startBlockNum))
 	}
-	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, graph, outputStreamName, ProtobufBlockType, pipelineOpts...)
+	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
 
-	if err := pipe.Build(ctx, manifProto, graph, ioFactory, forceLoadState); err != nil {
+	if err := pipe.Build(ctx, forceLoadState); err != nil {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
 

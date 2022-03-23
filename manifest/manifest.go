@@ -238,21 +238,33 @@ func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
 	//todo: load wasm code and keep a map of the index
 	for _, module := range m.Modules {
 
-		codeIndex, found := moduleCodeIndexes[module.Code.File]
-		if !found {
-			var err error
-			codeIndex, err = m.loadCode(module.Code.File, pbManifest)
-			moduleCodeIndexes[module.Code.File] = codeIndex
+		switch m.CodeType {
+		case "native":
+			modProto, err := module.ToProtoNative()
 			if err != nil {
-				return nil, fmt.Errorf("loading code: %w", err)
+				return nil, err
 			}
+			pbManifest.Modules = append(pbManifest.Modules, modProto)
+
+		case "wasm":
+			codeIndex, found := moduleCodeIndexes[module.Code.File]
+			if !found {
+				var err error
+				codeIndex, err = m.loadCode(module.Code.File, pbManifest)
+				moduleCodeIndexes[module.Code.File] = codeIndex
+				if err != nil {
+					return nil, fmt.Errorf("loading code: %w", err)
+				}
+			}
+
+			pbModule, err := module.ToProtoWASM(uint32(codeIndex))
+			if err != nil {
+				return nil, fmt.Errorf("converting mondule, %s: %w", module.Name, err)
+			}
+			pbManifest.Modules = append(pbManifest.Modules, pbModule)
+
 		}
 
-		pbModule, err := module.ToProto(uint32(codeIndex))
-		if err != nil {
-			return nil, fmt.Errorf("converting mondule, %s: %w", module.Name, err)
-		}
-		pbManifest.Modules = append(pbManifest.Modules, pbModule)
 	}
 
 	return pbManifest, nil
@@ -264,23 +276,7 @@ func (m *Manifest) loadCode(codePath string, pbManifest *pbtransform.Manifest) (
 		return 0, fmt.Errorf("reading code from file, %s: %w", codePath, err)
 	}
 
-	var codeType pbtransform.ModuleCode_CodeType
-	switch m.CodeType {
-	case "wasm/rust-v1":
-		codeType = pbtransform.ModuleCode_WASM_RUST_V1
-	case "native":
-		codeType = pbtransform.ModuleCode_NATIVE
-	default:
-		return 0, fmt.Errorf("invalid code type, %s", codeType)
-	}
-
-	moduleCode := &pbtransform.ModuleCode{
-		CodeType: codeType,
-		Bytecode: byteCode,
-	}
-
-	pbManifest.ModulesCode = append(pbManifest.ModulesCode, moduleCode)
-
+	pbManifest.ModulesCode = append(pbManifest.ModulesCode, byteCode)
 	return len(pbManifest.ModulesCode) - 1, nil
 }
 
@@ -313,26 +309,44 @@ func (m *Module) String() string {
 	return m.Name
 }
 
-func (m *Module) ToProto(codeIndex uint32) (*pbtransform.Module, error) {
-	pbModule := &pbtransform.Module{
-		Name:           m.Name,
-		CodeIndex:      codeIndex,
-		CodeEntrypoint: m.Code.Entrypoint,
+func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
+	out := &pbtransform.Module{
+		Name: m.Name,
+		Code: &pbtransform.Module_NativeCode{
+			NativeCode: &pbtransform.NativeCode{
+				Entrypoint: m.Code.Native,
+			},
+		},
 	}
 
-	if m.Output.Type != "" {
-		pbModule.Output = &pbtransform.Output{
-			Type: m.Output.Type,
-		}
+	m.setOutputToProto(out)
+	m.setKindToProto(out)
+	err := m.setInputsToProto(out)
+	if err != nil {
+		return nil, fmt.Errorf("setting input for module, %s: %w", m.Name, err)
+	}
+	return out, nil
+}
+
+func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
+	out := &pbtransform.Module{
+		Name: m.Name,
+		Code: &pbtransform.Module_WasmCode{
+			WasmCode: &pbtransform.WasmCode{
+				Index:      codeIndex,
+				Entrypoint: m.Code.Entrypoint,
+			},
+		},
 	}
 
-	m.setKindToProto(pbModule)
-	err := m.setInputsToProto(pbModule)
+	m.setOutputToProto(out)
+	m.setKindToProto(out)
+	err := m.setInputsToProto(out)
 	if err != nil {
 		return nil, fmt.Errorf("setting input for module, %s: %w", m.Name, err)
 	}
 
-	return pbModule, nil
+	return out, nil
 }
 
 func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
@@ -404,6 +418,14 @@ func (m *Module) setKindToProto(pbModule *pbtransform.Module) {
 				UpdatePolicy: pbtransform.KindStore_UpdatePolicy(pbtransform.KindStore_UpdatePolicy_value[m.UpdatePolicy]),
 				ValueType:    m.ValueType,
 			},
+		}
+	}
+}
+
+func (m *Module) setOutputToProto(pbModule *pbtransform.Module) {
+	if m.Output.Type != "" {
+		pbModule.Output = &pbtransform.Output{
+			Type: m.Output.Type,
 		}
 	}
 }

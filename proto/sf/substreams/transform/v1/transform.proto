@@ -13,7 +13,7 @@ message Manifest {
   string spec_version = 1;
   string description = 2;
   repeated Module modules = 3;
-  repeated ModuleCode modules_code = 4;
+  repeated bytes modules_code = 4;
 }
 
 message Module {
@@ -23,12 +23,23 @@ message Module {
     KindStore kind_store = 3;
   };
 
-  // Refers to the `modules_code` list in the Manifest in which this module is referenced
-  uint32 code_index = 4;
-  string code_entrypoint = 5;
+  oneof code {
+    WasmCode wasm_code = 4;
+    NativeCode native_code = 5;
+  }
+
   repeated Input inputs = 6;
   Output output  = 7;
   uint64 initial_block = 8;
+}
+
+message WasmCode {
+  uint32 index = 4;
+  string entrypoint = 5;
+}
+
+message NativeCode {
+  string entrypoint = 5;
 }
 
 message KindMap {
@@ -88,14 +99,4 @@ message InputStore {
     DELTAS = 2;
   }
   Mode mode = 2;
-}
-
-message ModuleCode {
-  enum CodeType {
-    UNSET = 0;
-    NATIVE = 1;
-    WASM_RUST_V1 = 2;
-  }
-  CodeType code_type = 1;
-  bytes bytecode = 2;
 }

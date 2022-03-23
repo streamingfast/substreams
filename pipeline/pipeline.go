@@ -14,6 +14,7 @@ import (
 	imports "github.com/streamingfast/substreams/native-imports"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	"github.com/streamingfast/substreams/registry"
 	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
@@ -38,11 +39,14 @@ type Pipeline struct {
 	nativeImports *imports.Imports
 	stores        map[string]*state.Builder
 
+	ioFactory        state.FactoryInterface
+	graph            *manifest.ModuleGraph
 	manifest         *pbtransform.Manifest
 	outputStreamName string
 
-	streamFuncs []StreamFunc
-	outputs     map[string]interface{}
+	streamFuncs   []StreamFunc
+	nativeOutputs map[string]reflect.Value
+	wasmOutputs   map[string][]byte
 }
 
 type RpcProvider interface {
@@ -51,26 +55,33 @@ type RpcProvider interface {
 
 type Option func(p *Pipeline)
 
-func WithPartialMode(ioFactory state.FactoryInterface, graph *manifest.ModuleGraph, reqStartBlock uint64) Option {
+func WithPartialMode(reqStartBlock uint64) Option {
 	return func(p *Pipeline) {
 		p.partialMode = true
-		//FIXME find the right startblocks
-
-		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, graph, ioFactory, reqStartBlock)
+		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, reqStartBlock)
 	}
 }
 
-func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manif *pbtransform.Manifest, outputStreamName string, blockType string, opts ...Option) *Pipeline {
+func New(startBlockNum uint64,
+	rpcClient *rpc.Client,
+	rpcCache *ssrpc.Cache,
+	manif *pbtransform.Manifest,
+	graph *manifest.ModuleGraph,
+	outputStreamName string,
+	blockType string,
+	ioFactory state.FactoryInterface,
+	opts ...Option) *Pipeline {
 	pipe := &Pipeline{
 		startBlockNum:    startBlockNum,
 		rpcClient:        rpcClient,
 		rpcCache:         rpcCache,
 		nativeImports:    imports.NewImports(rpcClient, rpcCache, true),
 		stores:           map[string]*state.Builder{},
+		graph:            graph,
+		ioFactory:        ioFactory,
 		manifest:         manif,
 		outputStreamName: outputStreamName,
-		//vmType:           manif.CodeType,
-		blockType: blockType,
+		blockType:        blockType,
 	}
 
 	for _, opt := range opts {
@@ -80,83 +91,123 @@ func New(startBlockNum uint64, rpcClient *rpc.Client, rpcCache *ssrpc.Cache, man
 	return pipe
 }
 
-//func (p *Pipeline) BuildNative(ctx context.Context, ioFactory state.FactoryInterface, forceLoadState bool) error {
-//	modules, err := p.manifest.Graph.ModulesDownTo(p.outputStreamName)
-//	if err != nil {
-//		return fmt.Errorf("whoops: %w", err)
-//	}
-//
-//	nativeStreams := registry.Init(p.nativeImports)
-//
-//	if err := p.setupStores(ctx, p.manifest.Graph, ioFactory, forceLoadState); err != nil {
-//		return fmt.Errorf("setting up stores: %w", err)
-//	}
-//	p.nativeOutputs = map[string]reflect.Value{}
-//
-//	for _, mod := range modules {
-//		f, found := nativeStreams[mod.Code.Native]
-//		if !found {
-//			return fmt.Errorf("native code not found for %q", mod.Code)
-//		}
-//
-//		debugOutput := mod.Name == p.outputStreamName
-//		inputs := []string{}
-//		for _, in := range mod.Inputs {
-//			inputs = append(inputs, strings.Split(in.Name, ":")[1])
-//		}
-//		modName := mod.Name // to ensure it's enclosed
-//
-//		switch mod.Kind {
-//		case "map":
-//			method := f.MethodByName("Map")
-//			if method.Kind() == reflect.Invalid {
-//				return fmt.Errorf("Map() method not found on %T", f.Interface())
-//			}
-//			if method.IsZero() {
-//				return fmt.Errorf("Map() method not found on %T", f.Interface())
-//			}
-//			fmt.Printf("Adding mapper for module %q\n", mod.Name)
-//			p.streamFuncs = append(p.streamFuncs, func() error {
-//				return nativeMapCall(p.nativeOutputs, method, modName, inputs, debugOutput)
-//			})
-//		case "store":
-//			method := f.MethodByName("Store")
-//			if method.Kind() == reflect.Invalid {
-//				return fmt.Errorf("Store() method not found on %T", f.Interface())
-//			}
-//			if method.IsZero() {
-//				return fmt.Errorf("Store() method not found on %T", f.Interface())
-//			}
-//
-//			p.nativeOutputs[mod.Name] = reflect.ValueOf(p.stores[mod.Name])
-//
-//			fmt.Printf("Adding state builder for stream %q\n", mod.Name)
-//			p.streamFuncs = append(p.streamFuncs, func() error {
-//				return nativeStoreCall(p.nativeOutputs, method, modName, inputs, debugOutput)
-//			})
-//
-//		default:
-//			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
-//		}
-//
-//	}
-//
-//	p.vmType = "native"
-//
-//	return nil
-//}
+// Build will determine and run the builder that corresponds to the correct code type
+func (p *Pipeline) Build(ctx context.Context, forceLoadState bool) error {
 
-func (p *Pipeline) Build(ctx context.Context, manif *pbtransform.Manifest, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface, forceLoadState bool) error {
-	modules, err := graph.ModulesDownTo(p.outputStreamName)
+	for _, mod := range p.manifest.Modules {
+		vmType := ""
+		switch {
+		case mod.GetWasmCode() != nil:
+			p.vmType = "wasm"
+		case mod.GetNativeCode() != nil:
+			p.vmType = "native"
+		}
+		if p.vmType == "" {
+			p.vmType = vmType
+			continue
+		}
+		if vmType != p.vmType {
+			return fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
+		}
+	}
+
+	switch p.vmType {
+	case "native":
+		return p.BuildNative(ctx, forceLoadState)
+	case "wasm":
+		return p.BuildWASM(ctx, forceLoadState)
+	default:
+		return fmt.Errorf("cannot determine the code type: %s", p.vmType)
+	}
+}
+
+func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
+	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
+	if err != nil {
+		return fmt.Errorf("whoops: %w", err)
+	}
+
+	nativeStreams := registry.Init(p.nativeImports)
+
+	if err := p.setupStores(ctx, p.graph, p.ioFactory, forceLoadState); err != nil {
+		return fmt.Errorf("setting up stores: %w", err)
+	}
+	p.nativeOutputs = map[string]reflect.Value{}
+
+	for _, mod := range modules {
+		modName := mod.Name // to ensure it's enclosed
+
+		nativeCode := mod.GetNativeCode()
+		if nativeCode == nil {
+			return fmt.Errorf("build_native cannot use modules that are not of type native")
+		}
+		f, found := nativeStreams[nativeCode.Entrypoint]
+		if !found {
+			return fmt.Errorf("native code not found for %q", modName)
+		}
+
+		// debugOutput := modName == p.outputStreamName
+		inputs := []string{}
+		for _, in := range mod.Inputs {
+			if v := in.GetMap(); v != nil {
+				inputs = append(inputs, v.ModuleName)
+			} else if v := in.GetStore(); v != nil {
+				inputs = append(inputs, v.ModuleName)
+			}
+		}
+
+		if v := mod.GetKindMap(); v != nil {
+			method := f.MethodByName("Map")
+			if method.Kind() == reflect.Invalid {
+				return fmt.Errorf("Map() method not found on %T", f.Interface())
+			}
+			if method.IsZero() {
+				return fmt.Errorf("Map() method not found on %T", f.Interface())
+			}
+			fmt.Printf("Adding mapper for module %q\n", mod.Name)
+			p.streamFuncs = append(p.streamFuncs, func() error {
+				return nativeMapCall(p.nativeOutputs, method, modName, inputs, true)
+			})
+			continue
+		}
+
+		if v := mod.GetKindStore(); v != nil {
+			method := f.MethodByName("Store")
+			if method.Kind() == reflect.Invalid {
+				return fmt.Errorf("Store() method not found on %T", f.Interface())
+			}
+			if method.IsZero() {
+				return fmt.Errorf("Store() method not found on %T", f.Interface())
+			}
+
+			p.nativeOutputs[mod.Name] = reflect.ValueOf(p.stores[mod.Name])
+
+			fmt.Printf("Adding state builder for stream %q\n", mod.Name)
+			p.streamFuncs = append(p.streamFuncs, func() error {
+				return nativeStoreCall(p.nativeOutputs, method, modName, inputs, true)
+			})
+
+			continue
+		}
+
+		return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
+
+	}
+
+	return nil
+}
+
+func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
+	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(ctx, graph, ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(ctx, p.graph, p.ioFactory, forceLoadState); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
-	p.outputs = map[string]interface{}{}
+	p.wasmOutputs = map[string][]byte{}
 
 	for _, mod := range modules {
 		debugOutput := mod.Name == p.outputStreamName
@@ -195,8 +246,14 @@ func (p *Pipeline) Build(ctx context.Context, manif *pbtransform.Manifest, graph
 		}
 		modName := mod.Name // to ensure it's enclosed
 
-		code := manif.ModulesCode[mod.CodeIndex]
-		wasmModule, err := wasm.NewModule(code.Bytecode, mod.Name)
+		wasmCodeRef := mod.GetWasmCode()
+		if wasmCodeRef == nil {
+			return fmt.Errorf("build_wasm cannot use modules that are not of type wasm")
+		}
+		entrypoint := wasmCodeRef.Entrypoint
+
+		code := p.manifest.ModulesCode[wasmCodeRef.Index]
+		wasmModule, err := wasm.NewModule(code, mod.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
@@ -209,17 +266,14 @@ func (p *Pipeline) Build(ctx context.Context, manif *pbtransform.Manifest, graph
 			if strings.HasPrefix(outType, "proto:") {
 				outType = outType[6:]
 			}
-			entrypoint := mod.CodeEntrypoint
 			p.streamFuncs = append(p.streamFuncs, func() error {
 				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, debugOutput, rpcWasmFuncFact, outType)
 			})
 		}
 		if v := mod.GetKindStore(); v != nil {
-
 			updatePolicy := v.UpdatePolicy
 			valueType := v.ValueType
 
-			entrypoint := mod.CodeEntrypoint
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         modName,
@@ -290,16 +344,15 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 		}
 	}
 
-	stores, err := graph.StoresDownTo(p.outputStreamName)
+	modules, err := graph.StoresDownTo(p.outputStreamName)
 	if err != nil {
 		return err
 	}
 
 	p.stores = make(map[string]*state.Builder)
-	for _, s := range stores {
-		output := s.Output
-		store := state.NewBuilder(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.startBlockNum, p.manifest.StartBlock, p.outputStreamName),
+	for _, s := range modules {
+		store := state.NewBuilder(s.Name, s.GetKindStore().UpdatePolicy, s.GetKindStore().ValueType, ioFactory,
+			state.WithPartialMode(p.partialMode, p.startBlockNum, s.InitialBlock, p.outputStreamName),
 		)
 
 		var initializeStore bool
@@ -483,6 +536,7 @@ func wasmMapCall(vals map[string][]byte,
 		out := vm.Output()
 		vals[name] = out
 		//FIXME printoutput
+		fmt.Println(out)
 	} else {
 		vals[name] = nil
 	}

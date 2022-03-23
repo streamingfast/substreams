@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 )
 
 const (
@@ -34,17 +36,17 @@ func (b *Builder) Merge(previous *Builder) error {
 	}
 
 	switch latest.updatePolicy {
-	case UpdatePolicyReplace:
+	case pbtransform.KindStore_REPLACE:
 		for k, v := range previous.KV {
 			if _, found := latest.KV[k]; !found {
 				latest.KV[k] = v
 			}
 		}
-	case UpdatePolicyIgnore:
+	case pbtransform.KindStore_IGNORE:
 		for k, v := range previous.KV {
 			latest.KV[k] = v
 		}
-	case UpdatePolicySum:
+	case pbtransform.KindStore_SUM:
 		// check valueType to do the right thing
 		switch latest.valueType {
 		case OutputValueTypeInt64:
@@ -90,7 +92,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
 		}
-	case UpdatePolicyMax:
+	case pbtransform.KindStore_MAX:
 		switch latest.valueType {
 		case OutputValueTypeInt64:
 			max := func(a, b uint64) uint64 {
@@ -167,7 +169,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
 		}
-	case UpdatePolicyMin:
+	case pbtransform.KindStore_MIN:
 		switch latest.valueType {
 		case OutputValueTypeInt64:
 			min := func(a, b uint64) uint64 {

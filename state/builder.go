@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -28,9 +29,8 @@ type Builder struct {
 	Deltas      []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
 	DeletedKeys map[string]interface{}
 
-	updatePolicy string
+	updatePolicy pbtransform.KindStore_UpdatePolicy
 	valueType    string
-	protoType    string
 	lastOrdinal  uint64
 }
 
@@ -45,13 +45,12 @@ func WithPartialMode(partialMode bool, startBlock, moduleStartBlock uint64, outp
 	}
 }
 
-func NewBuilder(name string, updatePolicy, valueType, protoType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:         name,
 		KV:           make(map[string][]byte),
 		updatePolicy: updatePolicy,
 		valueType:    valueType,
-		protoType:    protoType,
 	}
 	if storageFactory != nil {
 		b.store = storageFactory.New(name)

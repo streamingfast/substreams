@@ -176,7 +176,7 @@ func TestModuleGraph_GroupedStoresDownTo(t *testing.T) {
 	for _, modgroup := range modgroups {
 		var mods []string
 		for _, p := range modgroup {
-			mods = append(mods, p.String())
+			mods = append(mods, p.Name)
 		}
 		sort.Strings(mods)
 		res = append(res, mods)

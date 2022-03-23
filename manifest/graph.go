@@ -3,8 +3,6 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
-
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/yourbasic/graph"
 )
@@ -32,7 +30,6 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 
 	for i, module := range modules {
 		for _, input := range module.Inputs {
-
 			var moduleName string
 			if v := input.GetMap(); v != nil {
 				moduleName = v.ModuleName
@@ -41,7 +38,6 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 			}
 			if moduleName == "" {
 				continue
-				//return nil, fmt.Errorf("module name should be set")
 			}
 
 			if j, found := g.moduleIndex[moduleName]; found {
@@ -157,75 +153,6 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbtransform.Module, e
 	}
 
 	return res, nil
-}
-
-func (g *ModuleGraph) GroupedModulesDownTo(moduleName string) ([][]*pbtransform.Module, error) {
-	return g.groupedModulesDownTo(moduleName, false)
-}
-
-func (g *ModuleGraph) GroupedStoresDownTo(moduleName string) ([][]*pbtransform.Module, error) {
-	return g.groupedModulesDownTo(moduleName, true)
-}
-
-func (g *ModuleGraph) groupedModulesDownTo(moduleName string, storesOnly bool) ([][]*pbtransform.Module, error) {
-	v, found := g.moduleIndex[moduleName]
-
-	if !found {
-		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
-	}
-
-	g.topSort()
-
-	var modsFunc func(string) ([]*pbtransform.Module, error)
-	if storesOnly {
-		modsFunc = g.StoresDownTo
-	} else {
-		modsFunc = g.ModulesDownTo
-	}
-
-	mods, err := modsFunc(moduleName)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine dependencies graph for %s: %w", moduleName, err)
-	}
-
-	_, dist := graph.ShortestPaths(g, v)
-
-	distmap := map[int][]*pbtransform.Module{}
-	distkeys := []int{}
-	for _, mod := range mods {
-		mix := g.moduleIndex[mod.Name]
-		if _, found := distmap[int(dist[mix])]; !found {
-			distkeys = append(distkeys, int(dist[mix]))
-		}
-		distmap[int(dist[mix])] = append(distmap[int(dist[mix])], mod)
-	}
-
-	//reverse sort
-	sort.Slice(distkeys, func(i, j int) bool {
-		return distkeys[j] < distkeys[i]
-	})
-
-	res := make([][]*pbtransform.Module, 0, len(distmap))
-	for _, ix := range distkeys {
-		res = append(res, distmap[ix])
-	}
-
-	return res, nil
-}
-
-type ModuleGroupMarhsaler [][]*Module
-
-func (m ModuleGroupMarhsaler) MarshalJSON() ([]byte, error) {
-	l := make([][]string, len(m), len(m))
-	for i, g := range m {
-		sg := make([]string, 0, len(g))
-		for _, mod := range g {
-			sg = append(sg, mod.Name)
-		}
-		l[i] = sg
-	}
-
-	return json.Marshal(l)
 }
 
 type ModuleMarshaler []*pbtransform.Module

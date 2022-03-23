@@ -324,6 +324,7 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 		Name: m.Name,
 		Code: &pbtransform.Module_WasmCode{
 			WasmCode: &pbtransform.WasmCode{
+				Type:       m.Code.Type,
 				Index:      codeIndex,
 				Entrypoint: m.Code.Entrypoint,
 			},

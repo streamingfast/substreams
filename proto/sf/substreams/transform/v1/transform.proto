@@ -34,8 +34,9 @@ message Module {
 }
 
 message WasmCode {
-  uint32 index = 4;
-  string entrypoint = 5;
+  string type = 4;
+  uint32 index = 5;
+  string entrypoint = 6;
 }
 
 message NativeCode {

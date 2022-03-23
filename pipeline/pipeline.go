@@ -98,7 +98,7 @@ func (p *Pipeline) Build(ctx context.Context, forceLoadState bool) error {
 		vmType := ""
 		switch {
 		case mod.GetWasmCode() != nil:
-			vmType = "wasm"
+			vmType = mod.GetWasmCode().GetType()
 		case mod.GetNativeCode() != nil:
 			vmType = "native"
 		default:
@@ -110,14 +110,11 @@ func (p *Pipeline) Build(ctx context.Context, forceLoadState bool) error {
 		p.vmType = vmType
 	}
 
-	switch p.vmType {
-	case "native":
+	if p.vmType == "native" {
 		return p.BuildNative(ctx, forceLoadState)
-	case "wasm":
-		return p.BuildWASM(ctx, forceLoadState)
-	default:
-		return fmt.Errorf("cannot determine the code type: %s", p.vmType)
 	}
+
+	return p.BuildWASM(ctx, forceLoadState)
 }
 
 func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
@@ -152,6 +149,8 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 				inputs = append(inputs, v.ModuleName)
 			} else if v := in.GetStore(); v != nil {
 				inputs = append(inputs, v.ModuleName)
+			} else if v := in.GetSource(); v != nil {
+				inputs = append(inputs, v.GetType())
 			}
 		}
 
@@ -482,7 +481,7 @@ func nativeMapCall(vals map[string]reflect.Value, method reflect.Value, name str
 	}
 	out := method.Call(inputVals)
 	if len(out) != 2 {
-		return fmt.Errorf("invalid number of outputs for Map call in code for module %q, should be 2 (data, error)", name)
+		return fmt.Errorf("invalid number of outputs for Map call in code for module %q, should be 2 (data, error), got %d", name, len(out))
 	}
 	vals[name] = out[0]
 
@@ -536,7 +535,6 @@ func wasmMapCall(vals map[string][]byte,
 		out := vm.Output()
 		vals[name] = out
 		//FIXME printoutput
-		fmt.Println(out)
 	} else {
 		vals[name] = nil
 	}

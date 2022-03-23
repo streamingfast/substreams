@@ -158,6 +158,30 @@ func TestModuleGraph_GroupedModulesDownTo(t *testing.T) {
 	assert.Equal(t, expected, res)
 }
 
+func TestModuleGraph_GroupedStoresDownTo(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	modgroups, err := g.GroupedStoresDownTo("G")
+	assert.NoError(t, err)
+
+	var res [][]string
+	for _, modgroup := range modgroups {
+		var mods []string
+		for _, p := range modgroup {
+			mods = append(mods, p.String())
+		}
+		sort.Strings(mods)
+		res = append(res, mods)
+	}
+
+	expected := [][]string{
+		{"B"}, {"E"}, {"G"},
+	}
+
+	assert.Equal(t, expected, res)
+}
+
 func TestModuleGraph_ModulesDownTo(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)

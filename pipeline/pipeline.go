@@ -299,7 +299,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 	for _, s := range stores {
 		output := s.Output
 		store := state.NewBuilder(s.Name, output.UpdatePolicy, output.ValueType, output.ProtoType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.startBlockNum, p.manifest.StartBlock),
+			state.WithPartialMode(p.partialMode, p.startBlockNum, p.manifest.StartBlock, p.outputStreamName),
 		)
 
 		var initializeStore bool
@@ -334,7 +334,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
+func (p *Pipeline) HandlerFactory(stopBlock uint64) bstream.Handler {
 
 	p.lastStatUpdate = time.Now()
 	p.blockCount = 0
@@ -348,13 +348,9 @@ func (p *Pipeline) HandlerFactory(blockCount uint64) bstream.Handler {
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
-		if block.Number >= p.startBlockNum+blockCount {
+		if block.Number >= stopBlock {
 			for _, s := range p.stores {
-				if p.partialMode && s.Name != p.outputStreamName {
-					continue
-				}
-
-				err := s.WriteState(context.Background(), block)
+				err := s.WriteState(context.Background(), block.Num())
 				if err != nil {
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)
 				}

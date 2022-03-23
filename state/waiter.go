@@ -23,14 +23,14 @@ type node struct {
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
-	ancestorStores         []*node
-	targetStartBlockNumber uint64
+	ancestorStores    []*node
+	targetBlockNumber uint64
 }
 
 func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory FactoryInterface, targetStartBlock uint64) *FileWaiter {
 	w := &FileWaiter{
-		ancestorStores:         nil,
-		targetStartBlockNumber: targetStartBlock,
+		ancestorStores:    nil,
+		targetBlockNumber: targetStartBlock,
 	}
 
 	ancestorStores, _ := moduleGraph.AncestorStoresOf(moduleName)
@@ -81,7 +81,7 @@ func (p *FileWaiter) wait(ctx context.Context, node *node) <-chan error {
 				//
 			}
 
-			exists, _, err := ContiguousFilesToTargetBlock(ctx, node.Name, node.Store, node.StartBlock, p.targetStartBlockNumber)
+			exists, _, err := ContiguousFilesToTargetBlock(ctx, node.Name, node.Store, node.StartBlock, p.targetBlockNumber)
 			if err != nil {
 				done <- &fileWaitResult{ctx.Err()}
 				return
@@ -92,7 +92,7 @@ func (p *FileWaiter) wait(ctx context.Context, node *node) <-chan error {
 			}
 
 			time.Sleep(WaiterSleepInterval)
-			fmt.Printf("waiting for store %s to complete processing to block %d\n", node.Name, p.targetStartBlockNumber)
+			fmt.Printf("waiting for store %s to complete processing to block %d\n", node.Name, p.targetBlockNumber)
 		}
 	}()
 
@@ -163,20 +163,28 @@ func ContiguousFilesToTargetBlock(ctx context.Context, storeName string, store S
 	}
 
 	//check if there is a path from any of the full snapshots (start = 0) to our target block
+	var paths [][]int
+	var dists []int64
 	var path []int
 	for t := range targets {
 		for f := range fulls {
-			p, _ := graph.ShortestPath(g, f, t)
-			if len(p) > 0 {
-				path = p
-				break
+			p, d := graph.ShortestPath(g, f, t)
+			if len(p) >= 0 && d >= 0 {
+				paths = append(paths, p)
+				dists = append(dists, d)
 			}
 		}
 	}
 
-	if len(path) == 0 {
+	if len(paths) == 0 {
 		return false, nil, nil
 	}
+
+	sort.Slice(paths, func(i, j int) bool {
+		return dists[i] < dists[j]
+	})
+
+	path = paths[0]
 
 	var pathFileNames []string
 	for _, p := range path {

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package sf.substreams.transform.v1;
 
-//import "google/protobuf/any.proto";
-
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1;pbtransform";
 
 message Transform {

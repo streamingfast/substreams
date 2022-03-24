@@ -44,22 +44,25 @@ type Pipeline struct {
 	manifest         *pbtransform.Manifest
 	outputStreamName string
 
-	streamFuncs   []StreamFunc
-	nativeOutputs map[string]reflect.Value
-	wasmOutputs   map[string][]byte
-	progress      *progress
+	streamFuncs     []StreamFunc
+	nativeOutputs   map[string]reflect.Value
+	wasmOutputs     map[string][]byte
+	progressTracker *progressTracker
 }
 
-type progress struct {
+type progressTracker struct {
 	startAt                  time.Time
-	lastLogAt                time.Time
 	processedBlockLastSecond int
 	processedBlockCount      int
 	blockSecond              int
 	lastBlock                uint64
 }
 
-func (p *progress) startTracking(ctx context.Context) {
+func newProgressTracker() *progressTracker {
+	return &progressTracker{}
+}
+
+func (p *progressTracker) startTracking(ctx context.Context) {
 	p.startAt = time.Now()
 
 	go func() {
@@ -85,12 +88,13 @@ func (p *progress) startTracking(ctx context.Context) {
 		}
 	}()
 }
-func (p *progress) blockProcessed(block *bstream.Block) {
+
+func (p *progressTracker) blockProcessed(block *bstream.Block) {
 	p.processedBlockCount += 1
 	p.lastBlock = block.Num()
 }
 
-func (p *progress) log() {
+func (p *progressTracker) log() {
 	zlog.Info("progress",
 		zap.Uint64("last_block", p.lastBlock),
 		zap.Int("total_processed_block", p.processedBlockCount),
@@ -130,7 +134,7 @@ func New(startBlockNum uint64,
 		manifest:         manif,
 		outputStreamName: outputStreamName,
 		blockType:        blockType,
-		progress:         &progress{},
+		progressTracker:  newProgressTracker(),
 	}
 
 	for _, opt := range opts {
@@ -436,7 +440,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream.Handler {
-	p.progress.startTracking(ctx)
+	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		// defer func() {
@@ -500,7 +504,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream
 			s.Flush()
 		}
 
-		p.progress.blockProcessed(block)
+		p.progressTracker.blockProcessed(block)
 
 		return nil
 	})

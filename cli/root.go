@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 	Use:          "substreams [manifest] [stream_name] [start_block] [block_count]",
 	Short:        "A substreams runner",
 	RunE:         runRoot,
-	Args:         cobra.ExactArgs(3),
+	Args:         cobra.ExactArgs(4),
 	SilenceUsage: true,
 }
 

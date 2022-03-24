@@ -26,7 +26,6 @@ const (
 type Manifest struct {
 	SpecVersion string    `yaml:"specVersion"`
 	Description string    `yaml:"description"`
-	StartBlock  uint64    `yaml:"startBlock"` // TODO: This needs to go on the actual module, perhaps can be inferred from its dependencies
 	ProtoFiles  []string  `yaml:"protoFiles"`
 	Modules     []*Module `yaml:"modules"`
 
@@ -35,8 +34,9 @@ type Manifest struct {
 }
 
 type Module struct {
-	Name string `yaml:"name"`
-	Kind string `yaml:"kind"`
+	Name          string `yaml:"name"`
+	Kind          string `yaml:"kind"`
+	InititalBlock uint64 `yaml:"InititalBlock"`
 
 	UpdatePolicy string       `yaml:"updatePolicy"`
 	ValueType    string       `yaml:"valueType"`
@@ -321,7 +321,8 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 	out := &pbtransform.Module{
-		Name: m.Name,
+		Name:         m.Name,
+		InitialBlock: m.InititalBlock,
 		Code: &pbtransform.Module_WasmCode{
 			WasmCode: &pbtransform.WasmCode{
 				Type:       m.Code.Type,

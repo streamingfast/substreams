@@ -23,7 +23,7 @@ var ProtobufBlockType string = "block"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:          "substreams [manifest] [stream_name] [block_count]",
+	Use:          "substreams [manifest] [stream_name] [start_block] [block_count]",
 	Short:        "A substreams runner",
 	RunE:         runRoot,
 	Args:         cobra.ExactArgs(3),
@@ -49,31 +49,25 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	// this is firehose stuff
 
-	modulesStartBlock := manif.StartBlock
-
-	startBlockNum := viper.GetUint64("start-block")
-	if startBlockNum == 0 {
-		startBlockNum = modulesStartBlock
+	num, err := strconv.ParseInt(args[2], 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid start block, %s", args[2])
 	}
-
+	startBlockNum := uint64(num)
 	stopBlockNum := viper.GetUint64("stop-block")
 	if stopBlockNum == 0 {
 		var blockCount uint64 = 1000
 		if len(args) > 0 {
-			val, err := strconv.ParseInt(args[2], 10, 64)
+			val, err := strconv.ParseInt(args[3], 10, 64)
 			if err != nil {
-				return fmt.Errorf("invalid block count %s", args[2])
+				return fmt.Errorf("invalid block count %s", args[3])
 			}
 			blockCount = uint64(val)
 		}
-		stopBlockNum = startBlockNum + blockCount
+		stopBlockNum = uint64(startBlockNum) + blockCount
 	}
 
-	fmt.Println("START BLOCK NUM", startBlockNum)
-	forceLoadState := false
-	if startBlockNum > modulesStartBlock {
-		forceLoadState = true
-	}
+	forceLoadState := true
 
 	localBlocksPath := viper.GetString("blocks-store-url")
 	blocksStore, err := dstore.NewDBinStore(localBlocksPath)

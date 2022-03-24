@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -124,14 +123,14 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
 
-	handler := pipe.HandlerFactory(stopBlockNum)
+	handler := pipe.HandlerFactory(ctx, stopBlockNum)
 
 	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),
 		firehose.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
 	)
 
-	if err := hose.Run(context.Background()); err != nil {
+	if err := hose.Run(ctx); err != nil {
 		return fmt.Errorf("running the firehose: %w", err)
 	}
 	time.Sleep(5 * time.Second)

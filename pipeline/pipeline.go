@@ -59,19 +59,29 @@ type progress struct {
 	lastBlock                uint64
 }
 
-func (p *progress) startTracking() {
+func (p *progress) startTracking(ctx context.Context) {
 	p.startAt = time.Now()
+
 	go func() {
 		for {
-			<-time.After(1 * time.Second)
-			p.blockSecond = p.processedBlockCount - p.processedBlockLastSecond
-			p.processedBlockLastSecond = p.processedBlockCount
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(1 * time.Second):
+				p.blockSecond = p.processedBlockCount - p.processedBlockLastSecond
+				p.processedBlockLastSecond = p.processedBlockCount
+			}
 		}
 	}()
+
 	go func() {
 		for {
-			<-time.After(5 * time.Second)
-			p.log()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				p.log()
+			}
 		}
 	}()
 }
@@ -425,9 +435,9 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(stopBlock uint64) bstream.Handler {
+func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream.Handler {
+	p.progress.startTracking(ctx)
 
-	p.progress.startTracking()
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		// defer func() {
 		// 	if r := recover(); r != nil {

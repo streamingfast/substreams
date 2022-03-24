@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/manifest"
@@ -23,10 +25,8 @@ import (
 )
 
 type Pipeline struct {
-	vmType         string // wasm, native
-	startBlockNum  uint64
-	blockCount     int
-	lastStatUpdate time.Time
+	vmType        string // wasm, native
+	startBlockNum uint64
 
 	partialMode bool
 	fileWaiter  *state.FileWaiter
@@ -47,6 +47,44 @@ type Pipeline struct {
 	streamFuncs   []StreamFunc
 	nativeOutputs map[string]reflect.Value
 	wasmOutputs   map[string][]byte
+	progress      *progress
+}
+
+type progress struct {
+	startAt                  time.Time
+	lastLogAt                time.Time
+	processedBlockLastSecond int
+	processedBlockCount      int
+	blockSecond              int
+	lastBlock                uint64
+}
+
+func (p *progress) startTracking() {
+	p.startAt = time.Now()
+	go func() {
+		for {
+			<-time.After(1 * time.Second)
+			p.blockSecond = p.processedBlockCount - p.processedBlockLastSecond
+			p.processedBlockLastSecond = p.processedBlockCount
+		}
+	}()
+	go func() {
+		for {
+			<-time.After(5 * time.Second)
+			p.log()
+		}
+	}()
+}
+func (p *progress) blockProcessed(block *bstream.Block) {
+	p.processedBlockCount += 1
+	p.lastBlock = block.Num()
+}
+
+func (p *progress) log() {
+	zlog.Info("progress",
+		zap.Uint64("last_block", p.lastBlock),
+		zap.Int("total_processed_block", p.processedBlockCount),
+		zap.Int("block_second", p.blockSecond))
 }
 
 type RpcProvider interface {
@@ -82,6 +120,7 @@ func New(startBlockNum uint64,
 		manifest:         manif,
 		outputStreamName: outputStreamName,
 		blockType:        blockType,
+		progress:         &progress{},
 	}
 
 	for _, opt := range opts {
@@ -172,10 +211,10 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 		if v := mod.GetKindStore(); v != nil {
 			method := f.MethodByName("Store")
 			if method.Kind() == reflect.Invalid {
-				return fmt.Errorf("Store() method not found on %T", f.Interface())
+				return fmt.Errorf("store() method not found on %T", f.Interface())
 			}
 			if method.IsZero() {
-				return fmt.Errorf("Store() method not found on %T", f.Interface())
+				return fmt.Errorf("store() method not found on %T", f.Interface())
 			}
 
 			p.nativeOutputs[mod.Name] = reflect.ValueOf(p.stores[mod.Name])
@@ -388,9 +427,7 @@ type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(stopBlock uint64) bstream.Handler {
 
-	p.lastStatUpdate = time.Now()
-	p.blockCount = 0
-
+	p.progress.startTracking()
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		// defer func() {
 		// 	if r := recover(); r != nil {
@@ -437,13 +474,6 @@ func (p *Pipeline) HandlerFactory(stopBlock uint64) bstream.Handler {
 		fmt.Println("-------------------------------------------------------------------")
 		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.startBlockNum, block.Num(), block.ID())
 
-		p.blockCount += 1
-		if time.Since(p.lastStatUpdate) >= time.Second {
-			fmt.Printf("\n==> Blocks processed in last second %d <==\n\n", p.blockCount)
-			p.blockCount = 0
-			p.lastStatUpdate = time.Now()
-		}
-
 		// LockOSThread is to avoid this goroutine to be MOVED by the Go runtime to another system thread,
 		// while wasmer is using some instances in a given thread. Wasmer will not be happy if the goroutine
 		// switched thread and tries to access a wasmer instance from a different one.
@@ -459,6 +489,8 @@ func (p *Pipeline) HandlerFactory(stopBlock uint64) bstream.Handler {
 		for _, s := range p.stores {
 			s.Flush()
 		}
+
+		p.progress.blockProcessed(block)
 
 		return nil
 	})

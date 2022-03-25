@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -70,6 +71,7 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pb
 		}
 	}
 
+	ctx := context.Background()
 	var delay time.Duration
 	var attemptNumber int
 	for {
@@ -78,7 +80,7 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pb
 		attemptNumber += 1
 		delay = minDuration(time.Duration(attemptNumber*500)*time.Millisecond, 10*time.Second)
 
-		out, err := rpcClient.DoRequests(reqs)
+		out, err := rpcClient.DoRequests(ctx, reqs)
 		if err != nil {
 			zlog.Warn("retrying RPCCall on RPC error", zap.Error(err), zap.Uint64("at_block", blockNum))
 			continue

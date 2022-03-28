@@ -25,8 +25,8 @@ import (
 )
 
 type Pipeline struct {
-	vmType        string // wasm, native
-	startBlockNum uint64
+	vmType                 string // wasm, native
+	requestedStartBlockNum uint64
 
 	partialMode bool
 	fileWaiter  *state.FileWaiter
@@ -114,7 +114,8 @@ func WithPartialMode(reqStartBlock uint64) Option {
 	}
 }
 
-func New(startBlockNum uint64,
+func New(
+	requestedStartBlockNum uint64,
 	rpcClient *rpc.Client,
 	rpcCache *ssrpc.Cache,
 	manifest *pbtransform.Manifest,
@@ -124,17 +125,17 @@ func New(startBlockNum uint64,
 	ioFactory state.FactoryInterface,
 	opts ...Option) *Pipeline {
 	pipe := &Pipeline{
-		startBlockNum:    startBlockNum,
-		rpcClient:        rpcClient,
-		rpcCache:         rpcCache,
-		nativeImports:    imports.NewImports(rpcClient, rpcCache, true),
-		stores:           map[string]*state.Builder{},
-		graph:            graph,
-		ioFactory:        ioFactory,
-		manifest:         manifest,
-		outputStreamName: outputStreamName,
-		blockType:        blockType,
-		progressTracker:  newProgressTracker(),
+		requestedStartBlockNum: requestedStartBlockNum,
+		rpcClient:              rpcClient,
+		rpcCache:               rpcCache,
+		nativeImports:          imports.NewImports(rpcClient, rpcCache, true),
+		stores:                 map[string]*state.Builder{},
+		graph:                  graph,
+		ioFactory:              ioFactory,
+		manifest:               manifest,
+		outputStreamName:       outputStreamName,
+		blockType:              blockType,
+		progressTracker:        newProgressTracker(),
 	}
 
 	for _, opt := range opts {
@@ -404,7 +405,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 	p.stores = make(map[string]*state.Builder)
 	for _, s := range modules {
 		store := state.NewBuilder(s.Name, s.GetKindStore().UpdatePolicy, s.GetKindStore().ValueType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.startBlockNum, s.InitialBlock, p.outputStreamName),
+			state.WithPartialMode(p.partialMode, p.requestedStartBlockNum, s.InitialBlock, p.outputStreamName),
 		)
 
 		var initializeStore bool
@@ -420,8 +421,8 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 		}
 
 		if initializeStore {
-			if err := store.Init(ctx, p.startBlockNum); err != nil {
-				return fmt.Errorf("could not load state for store %s at block num %d: %w", s.Name, p.startBlockNum, err)
+			if err := store.Init(ctx, p.requestedStartBlockNum); err != nil {
+				return fmt.Errorf("could not load state for store %s at block num %d: %w", s.Name, p.requestedStartBlockNum, err)
 			}
 		}
 
@@ -445,7 +446,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %w", block.Num(), r)
+				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
 			}
 		}()
 
@@ -486,7 +487,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream
 		}
 
 		fmt.Println("-------------------------------------------------------------------")
-		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.startBlockNum, block.Num(), block.ID())
+		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.requestedStartBlockNum, block.Num(), block.ID())
 
 		for _, streamFunc := range p.streamFuncs {
 			if err := streamFunc(); err != nil {
@@ -640,4 +641,16 @@ func wasmCall(vals map[string][]byte,
 		instance.Close()
 	}
 	return
+}
+
+func (p *Pipeline) GetStartBlocks(requestedStartBlock uint64) (uint64, map[string]uint64) {
+	startBlock := requestedStartBlock
+	out := map[string]uint64{}
+	for _, module := range p.manifest.Modules {
+		out[module.Name] = module.InitialBlock
+		if module.InitialBlock < startBlock {
+			startBlock = module.InitialBlock
+		}
+	}
+	return startBlock, out
 }

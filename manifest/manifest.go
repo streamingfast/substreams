@@ -34,9 +34,9 @@ type Manifest struct {
 }
 
 type Module struct {
-	Name          string `yaml:"name"`
-	Kind          string `yaml:"kind"`
-	InititalBlock uint64 `yaml:"InititalBlock"`
+	Name       string `yaml:"name"`
+	Kind       string `yaml:"kind"`
+	StartBlock uint64 `yaml:"startBlock"`
 
 	UpdatePolicy string       `yaml:"updatePolicy"`
 	ValueType    string       `yaml:"valueType"`
@@ -322,7 +322,7 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 	out := &pbtransform.Module{
 		Name:         m.Name,
-		InitialBlock: m.InititalBlock,
+		InitialBlock: m.StartBlock,
 		Code: &pbtransform.Module_WasmCode{
 			WasmCode: &pbtransform.WasmCode{
 				Type:       m.Code.Type,

@@ -2,6 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+	"google.golang.org/protobuf/types/known/anypb"
 	"math"
 	"net/http"
 	"strconv"
@@ -45,22 +48,6 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	manifProto, err := manif.ToProto()
 	if err != nil {
 		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
-	}
-
-	// this is firehose stuff
-
-	startBlockNum := viper.GetUint64("start-block")
-	stopBlockNum := viper.GetUint64("stop-block")
-	if stopBlockNum == 0 {
-		var blockCount uint64 = 1000
-		if len(args) > 0 {
-			val, err := strconv.ParseInt(args[3], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid block count %s", args[3])
-			}
-			blockCount = uint64(val)
-		}
-		stopBlockNum = uint64(startBlockNum) + blockCount
 	}
 
 	forceLoadState := true
@@ -109,6 +96,9 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create module graph %w", err)
 	}
 
+	startBlockNum := viper.GetUint64("start-block")
+	stopBlockNum := viper.GetUint64("stop-block")
+
 	var pipelineOpts []pipeline.Option
 	if partialMode := viper.GetBool("partial"); partialMode {
 		fmt.Println("Starting pipeline in partial mode...")
@@ -122,13 +112,28 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if stopBlockNum == 0 {
+		var blockCount uint64 = 1000
+		if len(args) > 0 {
+			val, err := strconv.ParseInt(args[2], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid block count %s", args[2])
+			}
+			blockCount = uint64(val)
+		}
+
+		stopBlockNum = startBlockNum + blockCount
+	}
+
 	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
 
 	if err := pipe.Build(ctx, forceLoadState); err != nil {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
-
-	handler := pipe.HandlerFactory(ctx, stopBlockNum)
+	returnHandler := &ReturnHandler{
+		manifest: manif,
+	}
+	handler := pipe.HandlerFactory(ctx, stopBlockNum, returnHandler.onReturn)
 
 	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),
@@ -141,4 +146,33 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	time.Sleep(5 * time.Second)
 
 	return nil
+}
+
+type ReturnHandler struct {
+	manifest *manifest.Manifest
+}
+
+func (r *ReturnHandler) onReturn(any *anypb.Any) {
+	var msgDesc *desc.MessageDescriptor
+	for _, file := range r.manifest.ProtoDescs {
+		msgDesc = file.FindMessage(any.GetTypeUrl()) //todo: make sure it works relatively-wise
+		if msgDesc != nil {
+			break
+		}
+	}
+
+	if msgDesc != nil {
+		msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+		if err := msg.Unmarshal(any.GetValue()); err != nil {
+			fmt.Printf("error unmarshalling protobuf %s to map: %s \n", any.GetTypeUrl(), err)
+		}
+
+		cnt, err := msg.MarshalJSONIndent()
+		if err != nil {
+			fmt.Printf("error encoding protobuf %s into json: %S \n", any.GetTypeUrl(), err)
+		}
+
+		fmt.Println(string(cnt))
+	}
+
 }

@@ -19,7 +19,6 @@ modules:
 
   - name: pairs
     kind: store
-    startBlock: 6809737
     updatePolicy: replace
     valueType: bytes
     code:
@@ -31,7 +30,6 @@ modules:
 
   - name: reserves_extractor
     kind: map
-    startBlock: 6809737
     code:
       type: wasm/rust-v1
       file:  ./test/code/pcs_substreams_bg.wasm
@@ -44,7 +42,6 @@ modules:
 
   - name: block_to_tokens
     kind: map
-    startBlock: 6809737
     code:
       type: wasm/rust-v1
       file: ./test/code/pcs_substreams_bg.wasm

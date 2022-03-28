@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"math"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -28,6 +30,7 @@ func init() {
 	rootCmd.PersistentFlags().String("blocks-store-url", "./localblocks", "URL of blocks store")
 	rootCmd.PersistentFlags().String("irr-indexes-url", "./localirr", "URL of blocks store")
 
+	rootCmd.PersistentFlags().Int64("start-block", math.MaxUint64, "Stop block for blockchain firehose")
 	rootCmd.PersistentFlags().Int64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	rootCmd.PersistentFlags().BoolP("partial", "p", false, "Start block for blockchain firehose")
 }

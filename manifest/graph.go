@@ -3,6 +3,8 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/yourbasic/graph"
 )
@@ -50,7 +52,42 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 		return nil, fmt.Errorf("modules graph has a cycle")
 	}
 
+	computeStartBlock(modules, g)
+
 	return g, nil
+}
+
+func computeStartBlock(modules []*pbtransform.Module, g *ModuleGraph) {
+	for _, module := range modules {
+		if module.StartBlock == nil {
+			moduleIndex := g.moduleIndex[module.Name]
+			startBlock := startBlockForModule(moduleIndex, g, math.MaxUint64)
+			module.StartBlock = &startBlock
+		}
+	}
+}
+
+func startBlockForModule(moduleIndex int, g *ModuleGraph, startBlock uint64) uint64 {
+	sb := startBlock
+	g.Visit(moduleIndex, func(w int, c int64) bool {
+		parent := g.modules[w]
+		if parent.StartBlock != nil {
+			if parent.GetStartBlock() < sb {
+				sb = parent.GetStartBlock()
+			}
+			return false
+		}
+		resolvedStartBlock := startBlockForModule(w, g, sb)
+		if resolvedStartBlock < sb {
+			sb = resolvedStartBlock
+		}
+
+		return false
+	})
+	if sb == math.MaxUint64 {
+		return 0
+	}
+	return sb
 }
 
 func (g *ModuleGraph) topSort() ([]*pbtransform.Module, bool) {
@@ -153,6 +190,13 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbtransform.Module, e
 	}
 
 	return res, nil
+}
+
+func (g *ModuleGraph) ModuleStartBlock(moduleName string) (uint64, error) {
+	if moduleIndex, found := g.moduleIndex[moduleName]; found {
+		return g.modules[moduleIndex].GetStartBlock(), nil
+	}
+	return 0, fmt.Errorf("could not find module %s in graph", moduleName)
 }
 
 type ModuleMarshaler []*pbtransform.Module

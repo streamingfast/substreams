@@ -40,7 +40,7 @@ func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory
 		partialNode := &node{
 			Name:       ancestorStore.Name,
 			Store:      factory.New(ancestorStore.Name),
-			StartBlock: ancestorStore.InitialBlock,
+			StartBlock: ancestorStore.GetStartBlock(),
 		}
 		parentNodes = append(parentNodes, partialNode)
 	}

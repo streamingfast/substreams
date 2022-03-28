@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -8,13 +9,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var ten = uint64(10)
+var twenty = uint64(20)
+
 var testModules = []*pbtransform.Module{
 	{
 		Name: "A",
 	},
 	{
-		Name: "B",
-		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Name:       "B",
+		StartBlock: &ten,
+		Kind:       &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
 		Inputs: []*pbtransform.Input{
 			{
 				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
@@ -24,8 +29,9 @@ var testModules = []*pbtransform.Module{
 		},
 	},
 	{
-		Name: "C",
-		Kind: &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
+		Name:       "C",
+		StartBlock: &twenty,
+		Kind:       &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
 		Inputs: []*pbtransform.Input{
 			{
 				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
@@ -173,4 +179,12 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 	sort.Strings(res)
 
 	assert.Equal(t, []string{"B", "E", "G"}, res)
+}
+
+func TestModuleGraph_computeStartBlocks(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+	for _, module := range g.modules {
+		fmt.Println(module.Name, "start block:", *module.StartBlock)
+	}
 }

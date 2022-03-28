@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -22,10 +23,10 @@ var ProtobufBlockType string = "sf.ethereum.type.v1.Block"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:          "substreams [manifest] [stream_name] [start_block] [block_count]",
+	Use:          "substreams [manifest] [stream_name] [block_count]",
 	Short:        "A substreams runner",
 	RunE:         runRoot,
-	Args:         cobra.ExactArgs(4),
+	Args:         cobra.ExactArgs(3),
 	SilenceUsage: true,
 }
 
@@ -48,11 +49,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	// this is firehose stuff
 
-	num, err := strconv.ParseInt(args[2], 10, 64)
-	if err != nil {
-		return fmt.Errorf("invalid start block, %s", args[2])
-	}
-	startBlockNum := uint64(num)
+	startBlockNum := viper.GetUint64("start-block")
 	stopBlockNum := viper.GetUint64("stop-block")
 	if stopBlockNum == 0 {
 		var blockCount uint64 = 1000
@@ -117,6 +114,14 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		fmt.Println("Starting pipeline in partial mode...")
 		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(startBlockNum))
 	}
+
+	if startBlockNum == math.MaxUint64 {
+		startBlockNum, err = graph.ModuleStartBlock(outputStreamName)
+		if err != nil {
+			return fmt.Errorf("getting module start block: %w", err)
+		}
+	}
+
 	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
 
 	if err := pipe.Build(ctx, forceLoadState); err != nil {

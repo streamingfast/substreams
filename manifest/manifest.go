@@ -321,8 +321,8 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 	out := &pbtransform.Module{
-		Name:         m.Name,
-		InitialBlock: m.StartBlock,
+		Name:       m.Name,
+		StartBlock: &m.StartBlock,
 		Code: &pbtransform.Module_WasmCode{
 			WasmCode: &pbtransform.WasmCode{
 				Type:       m.Code.Type,

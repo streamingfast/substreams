@@ -117,7 +117,7 @@ func WithPartialMode(reqStartBlock uint64) Option {
 func New(startBlockNum uint64,
 	rpcClient *rpc.Client,
 	rpcCache *ssrpc.Cache,
-	manif *pbtransform.Manifest,
+	manifest *pbtransform.Manifest,
 	graph *manifest.ModuleGraph,
 	outputStreamName string,
 	blockType string,
@@ -131,7 +131,7 @@ func New(startBlockNum uint64,
 		stores:           map[string]*state.Builder{},
 		graph:            graph,
 		ioFactory:        ioFactory,
-		manifest:         manif,
+		manifest:         manifest,
 		outputStreamName: outputStreamName,
 		blockType:        blockType,
 		progressTracker:  newProgressTracker(),
@@ -488,11 +488,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream
 		fmt.Println("-------------------------------------------------------------------")
 		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.startBlockNum, block.Num(), block.ID())
 
-		// LockOSThread is to avoid this goroutine to be MOVED by the Go runtime to another system thread,
-		// while wasmer is using some instances in a given thread. Wasmer will not be happy if the goroutine
-		// switched thread and tries to access a wasmer instance from a different one.
-		//runtime.LockOSThread()
-		//defer runtime.UnlockOSThread()
 		for _, streamFunc := range p.streamFuncs {
 			if err := streamFunc(); err != nil {
 				return err

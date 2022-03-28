@@ -443,11 +443,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream
 	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		// defer func() {
-		// 	if r := recover(); r != nil {
-		// 		err = fmt.Errorf("panic: %w", r)
-		// 	}
-		// }()
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic at block %d: %w", block.Num(), r)
+			}
+		}()
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.

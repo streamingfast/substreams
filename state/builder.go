@@ -201,21 +201,21 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 
 var NotFound = errors.New("state key not found")
 
-func (b *Builder) GetFirst(key string) ([]byte, bool) {
+func (b *Builder) GetFirst(key string) ([]byte, bool, error) {
 	for _, delta := range b.Deltas {
 		if delta.Key == key {
 			switch delta.Operation {
 			case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
-				return delta.OldValue, true
+				return delta.OldValue, true, nil
 			case pbsubstreams.StoreDelta_CREATE:
-				return nil, false
+				return nil, false, nil
 			default:
-				// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-				panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+				return nil, false, fmt.Errorf("get first: invalid operation %q for key %q of builder %s", delta.Operation.String(), delta.Key, b.Name)
 			}
 		}
 	}
-	return b.GetLast(key)
+	data, found := b.GetLast(key)
+	return data, found, nil
 }
 
 func (b *Builder) GetLast(key string) ([]byte, bool) {
@@ -224,7 +224,7 @@ func (b *Builder) GetLast(key string) ([]byte, bool) {
 }
 
 // GetAt returns the key for the state that includes the processing of `ord`.
-func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool) {
+func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool, err error) {
 	out, found = b.GetLast(key)
 
 	for i := len(b.Deltas) - 1; i >= 0; i-- {
@@ -241,16 +241,19 @@ func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool) {
 				out = nil
 				found = false
 			default:
-				// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-				panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
+				return nil, false, fmt.Errorf("get at: invalid operation %q for key %q of builder %s", delta.Operation.String(), delta.Key, b.Name)
+
 			}
 		}
 	}
 	return
 }
 
-func (b *Builder) Del(ord uint64, key string) {
-	b.bumpOrdinal(ord)
+func (b *Builder) Del(ord uint64, key string) error {
+	err := b.bumpOrdinal(ord)
+	if err != nil {
+		return fmt.Errorf("builder delete: %w", err)
+	}
 
 	val, found := b.GetLast(key)
 	if found {
@@ -264,10 +267,14 @@ func (b *Builder) Del(ord uint64, key string) {
 		b.applyDelta(delta)
 		b.Deltas = append(b.Deltas, delta)
 	}
+	return nil
 }
 
-func (b *Builder) DeletePrefix(ord uint64, prefix string) {
-	b.bumpOrdinal(ord)
+func (b *Builder) DeletePrefix(ord uint64, prefix string) error {
+	err := b.bumpOrdinal(ord)
+	if err != nil {
+		return fmt.Errorf("builder delete prefix: %w", err)
+	}
 
 	for key, val := range b.KV {
 		if !strings.HasPrefix(key, prefix) {
@@ -285,32 +292,37 @@ func (b *Builder) DeletePrefix(ord uint64, prefix string) {
 
 		//todo: if builder in batch mode. we need to add the deleted key to the b.DeletedKeys
 	}
+	return nil
 }
 
-func (b *Builder) bumpOrdinal(ord uint64) {
-	if b.lastOrdinal > ord {
-		panic("cannot Set or Del a value on a state.Builder with an ordinal lower than the previous")
+func (b *Builder) bumpOrdinal(ordinal uint64) error {
+	if b.lastOrdinal > ordinal {
+		return fmt.Errorf("bump ordinal: ordinal %d is lower then last ordinal %d", ordinal, b.lastOrdinal)
 	}
-	b.lastOrdinal = ord
+	b.lastOrdinal = ordinal
+	return nil
 }
 
-func (b *Builder) SetBytesIfNotExists(ord uint64, key string, value []byte) {
-	b.setIfNotExists(ord, key, value)
+func (b *Builder) SetBytesIfNotExists(ord uint64, key string, value []byte) error {
+	return b.setIfNotExists(ord, key, value)
 }
 
-func (b *Builder) SetIfNotExists(ord uint64, key string, value string) {
-	b.setIfNotExists(ord, key, []byte(value))
+func (b *Builder) SetIfNotExists(ord uint64, key string, value string) error {
+	return b.setIfNotExists(ord, key, []byte(value))
 }
 
-func (b *Builder) SetBytes(ord uint64, key string, value []byte) {
-	b.set(ord, key, value)
+func (b *Builder) SetBytes(ord uint64, key string, value []byte) error {
+	return b.set(ord, key, value)
 }
-func (b *Builder) Set(ord uint64, key string, value string) {
-	b.set(ord, key, []byte(value))
+func (b *Builder) Set(ord uint64, key string, value string) error {
+	return b.set(ord, key, []byte(value))
 }
 
-func (b *Builder) set(ord uint64, key string, value []byte) {
-	b.bumpOrdinal(ord)
+func (b *Builder) set(ord uint64, key string, value []byte) error {
+	err := b.bumpOrdinal(ord)
+	if err != nil {
+		return fmt.Errorf("builder set: %w", err)
+	}
 
 	val, found := b.GetLast(key)
 
@@ -318,7 +330,7 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 	if found {
 		//Uncomment when finished debugging:
 		if bytes.Compare(value, val) == 0 {
-			return
+			return nil
 		}
 		delta = &pbsubstreams.StoreDelta{
 			Operation: pbsubstreams.StoreDelta_UPDATE,
@@ -338,14 +350,18 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 	}
 	b.applyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)
+	return nil
 }
 
-func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
-	b.bumpOrdinal(ord)
+func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) error {
+	err := b.bumpOrdinal(ord)
+	if err != nil {
+		return fmt.Errorf("builder set if not exist: %w", err)
+	}
 
 	_, found := b.GetLast(key)
 	if found {
-		return
+		return nil
 	}
 
 	delta := &pbsubstreams.StoreDelta{
@@ -357,6 +373,7 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 	}
 	b.applyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)
+	return nil
 }
 
 func (b *Builder) applyDelta(delta *pbsubstreams.StoreDelta) {

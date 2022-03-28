@@ -6,9 +6,12 @@ import (
 	"strconv"
 )
 
-func (b *Builder) SetMaxBigInt(ord uint64, key string, value *big.Int) {
+func (b *Builder) SetMaxBigInt(ord uint64, key string, value *big.Int) error {
 	max := new(big.Int)
-	val, found := b.GetAt(ord, key)
+	val, found, err := b.GetAt(ord, key)
+	if err != nil {
+		return fmt.Errorf("set max big int: %w", err)
+	}
 	if !found {
 		max = value
 	} else {
@@ -20,11 +23,15 @@ func (b *Builder) SetMaxBigInt(ord uint64, key string, value *big.Int) {
 		}
 	}
 	b.set(ord, key, []byte(max.String()))
+	return nil
 }
 
-func (b *Builder) SetMaxInt64(ord uint64, key string, value int64) {
+func (b *Builder) SetMaxInt64(ord uint64, key string, value int64) error {
 	var max int64
-	val, found := b.GetAt(ord, key)
+	val, found, err := b.GetAt(ord, key)
+	if err != nil {
+		return fmt.Errorf("set max int 64: %w", err)
+	}
 	if !found {
 		max = value
 	} else {
@@ -36,11 +43,16 @@ func (b *Builder) SetMaxInt64(ord uint64, key string, value int64) {
 		}
 	}
 	b.set(ord, key, []byte(fmt.Sprintf("%d", max)))
+	return nil
 }
 
-func (b *Builder) SetMaxFloat64(ord uint64, key string, value float64) {
+func (b *Builder) SetMaxFloat64(ord uint64, key string, value float64) error {
 	var max float64
-	val, found := b.GetAt(ord, key)
+	val, found, err := b.GetAt(ord, key)
+	if err != nil {
+		return fmt.Errorf("set max float 64: %w", err)
+	}
+
 	if !found {
 		max = value
 	} else {
@@ -53,11 +65,16 @@ func (b *Builder) SetMaxFloat64(ord uint64, key string, value float64) {
 		}
 	}
 	b.set(ord, key, []byte(strconv.FormatFloat(max, 'g', 100, 64)))
+	return nil
 }
 
-func (b *Builder) SetMaxBigFloat(ord uint64, key string, value *big.Float) {
+func (b *Builder) SetMaxBigFloat(ord uint64, key string, value *big.Float) error {
 	max := new(big.Float)
-	val, found := b.GetAt(ord, key)
+	val, found, err := b.GetAt(ord, key)
+	if err != nil {
+		return fmt.Errorf("set max big float: %w", err)
+	}
+
 	if !found {
 		max = value
 	} else {
@@ -70,4 +87,5 @@ func (b *Builder) SetMaxBigFloat(ord uint64, key string, value *big.Float) {
 		}
 	}
 	b.set(ord, key, []byte(max.Text('g', -1)))
+	return nil
 }

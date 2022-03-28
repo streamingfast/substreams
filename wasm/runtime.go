@@ -52,7 +52,7 @@ type Module struct {
 	engine *wasmer.Engine
 	Store  *wasmer.Store
 	module *wasmer.Module
-	name   string
+	Name   string
 
 	wasmCode []byte
 }
@@ -72,7 +72,7 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 		engine:   engine,
 		Store:    store,
 		module:   module,
-		name:     name,
+		Name:     name,
 		wasmCode: wasmCode,
 	}, nil
 }
@@ -235,7 +235,7 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
+				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.Name))
 
 				fmt.Println(message)
 
@@ -668,7 +668,10 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, found := readStore.GetAt(uint64(ord), key)
+			value, found, err := readStore.GetAt(uint64(ord), key)
+			if err != nil {
+				return nil, fmt.Errorf("get at: %w", err)
+			}
 			if !found {
 				zero := wasmer.NewI32(0)
 				return []wasmer.Value{zero}, nil
@@ -700,7 +703,10 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, found := readStore.GetFirst(key)
+			value, found, err := readStore.GetFirst(key)
+			if err != nil {
+				return nil, fmt.Errorf("get first: %w", err)
+			}
 			if !found {
 				zero := wasmer.NewI32(0)
 				return []wasmer.Value{zero}, nil

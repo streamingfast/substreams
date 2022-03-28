@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/test-go/testify/require"
+
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,8 +58,10 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
-			test.builder.SetMinBigInt(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			err := test.builder.SetMinBigInt(0, test.key, test.value)
+			require.NoError(t, err)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -123,7 +127,8 @@ func TestBuilderSetMinInt64(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
 			test.builder.SetMinInt64(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -190,7 +195,8 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
 			test.builder.SetMinFloat64(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -250,7 +256,8 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
 			test.builder.SetMinBigFloat(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/test-go/testify/require"
+
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -58,7 +60,8 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
 			test.builder.SetMaxBigInt(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -124,7 +127,9 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
 			test.builder.SetMaxInt64(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
+
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -190,8 +195,12 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
-			test.builder.SetMaxFloat64(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			err := test.builder.SetMaxFloat64(0, test.key, test.value)
+			require.NoError(t, err)
+
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
+
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -251,7 +260,8 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 			initTestBuilder(test.builder, test.key, test.existingValue)
 
 			test.builder.SetMaxBigFloat(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			actual, found, err := test.builder.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}

@@ -482,7 +482,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64) bstream
 			p.wasmOutputs[p.blockType] = blkBytes
 			//p.wasmOutputs["sf.substreams.v1.Clock"] = clock //FIXME stepd implement clock
 		default:
-			panic("unsupported vmType " + p.vmType)
+			return fmt.Errorf("unsupported vmType %s", p.vmType)
 		}
 
 		fmt.Println("-------------------------------------------------------------------")
@@ -600,8 +600,9 @@ func wasmStoreCall(vals map[string][]byte,
 	return nil
 }
 
-func wasmCall(vals map[string][]byte,
-	mod *wasm.Module,
+func wasmCall(
+	vals map[string][]byte,
+	module *wasm.Module,
 	entrypoint string,
 	name string,
 	inputs []*wasm.Input,
@@ -621,7 +622,7 @@ func wasmCall(vals map[string][]byte,
 		case wasm.OutputStore:
 
 		default:
-			panic(fmt.Sprintf("Invalid input type %d", input.Type))
+			return nil, fmt.Errorf("invalid input type %d for module %s", input.Type, module.Name)
 		}
 	}
 
@@ -630,7 +631,7 @@ func wasmCall(vals map[string][]byte,
 	//  state builders will not be called if their input streams are 0 bytes length (and there's no
 	//  state store in read mode)
 	if hasInput {
-		instance, err = mod.NewInstance(entrypoint, inputs, rpcFactory)
+		instance, err = module.NewInstance(entrypoint, inputs, rpcFactory)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}

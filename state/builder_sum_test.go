@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/test-go/testify/require"
+
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -46,8 +48,10 @@ func TestBuilderSumBigInt(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := initTestBuilder(test.key, test.existingValue)
 
-			b.SumBigInt(0, test.key, test.value)
-			actual, found := b.GetAt(0, test.key)
+			err := b.SumBigInt(0, test.key, test.value)
+			require.NoError(t, err)
+			actual, found, err := b.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -87,8 +91,10 @@ func TestBuilderSumInt64(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := initTestBuilder(test.key, test.existingValue)
 
-			b.SumInt64(0, test.key, test.value)
-			actual, found := b.GetAt(0, test.key)
+			err := b.SumInt64(0, test.key, test.value)
+			require.NoError(t, err)
+			actual, found, err := b.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -129,8 +135,10 @@ func TestBuilderSumFloat64(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := initTestBuilder(test.key, test.existingValue)
 
-			b.SumFloat64(0, test.key, test.value)
-			actual, found := b.GetAt(0, test.key)
+			err := b.SumFloat64(0, test.key, test.value)
+			require.NoError(t, err)
+			actual, found, err := b.GetAt(0, test.key)
+			require.NoError(t, err)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -171,8 +179,9 @@ func TestBuilderSumBigFloat(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := initTestBuilder(test.key, test.existingValue)
 
-			b.SumBigFloat(0, test.key, test.value)
-			actual, found := b.GetAt(0, test.key)
+			err := b.SumBigFloat(0, test.key, test.value)
+			require.NoError(t, err)
+			actual, found, err := b.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
 			}

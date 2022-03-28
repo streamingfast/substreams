@@ -3,23 +3,23 @@ package state
 import "math/big"
 
 type Reader interface {
-	GetFirst(key string) ([]byte, bool)
+	GetFirst(key string) ([]byte, bool, error)
 	GetLast(key string) ([]byte, bool)
-	GetAt(ord uint64, key string) ([]byte, bool)
+	GetAt(ord uint64, key string) ([]byte, bool, error)
 }
 
 type UpdateKeySetter interface {
-	Set(ord uint64, key string, value string)
-	SetBytes(ord uint64, key string, value []byte)
+	Set(ord uint64, key string, value string) error
+	SetBytes(ord uint64, key string, value []byte) error
 }
 
 type ConditionalKeySetter interface {
-	SetIfNotExists(ord uint64, key string, value string)
-	SetBytesIfNotExists(ord uint64, key string, value []byte)
+	SetIfNotExists(ord uint64, key string, value string) error
+	SetBytesIfNotExists(ord uint64, key string, value []byte) error
 }
 
 type Deleter interface {
-	DeletePrefix(ord uint64, prefix string)
+	DeletePrefix(ord uint64, prefix string) error
 	//// Deletes a range of keys, lexicographically between `lowKey` and `highKey`
 	//DeleteRange(lowKey, highKey string)
 	//// Deletes a range of keys, first considering the _value_ of such keys as a _pointerSeparator_-separated list of keys to _also_ delete.
@@ -27,42 +27,42 @@ type Deleter interface {
 }
 
 type MaxBigIntSetter interface {
-	SetMaxBigInt(ord uint64, key string, value *big.Int)
+	SetMaxBigInt(ord uint64, key string, value *big.Int) error
 }
 type MaxInt64Setter interface {
-	SetMaxInt64(ord uint64, key string, value int64)
+	SetMaxInt64(ord uint64, key string, value int64) error
 }
 type MaxFloat64Setter interface {
-	SetMaxFloat64(ord uint64, key string, value float64)
+	SetMaxFloat64(ord uint64, key string, value float64) error
 }
 type MaxBigFloatSetter interface {
-	SetMaxBigFloat(ord uint64, key string, value *big.Float)
+	SetMaxBigFloat(ord uint64, key string, value *big.Float) error
 }
 
 type MinBigIntSetter interface {
-	SetMinBigInt(ord uint64, key string, value *big.Int)
+	SetMinBigInt(ord uint64, key string, value *big.Int) error
 }
 type MinInt64Setter interface {
-	SetMinInt64(ord uint64, key string, value int64)
+	SetMinInt64(ord uint64, key string, value int64) error
 }
 type MinFloat64Setter interface {
-	SetMinFloat64(ord uint64, key string, value float64)
+	SetMinFloat64(ord uint64, key string, value float64) error
 }
 type MinBigFloatSetter interface {
-	SetMinBigFloat(ord uint64, key string, value *big.Float)
+	SetMinBigFloat(ord uint64, key string, value *big.Float) error
 }
 
 type SumBigIntSetter interface {
-	SumBigInt(ord uint64, key string, value *big.Int)
+	SumBigInt(ord uint64, key string, value *big.Int) error
 }
 type SumInt64Setter interface {
-	SumInt64(ord uint64, key string, value int64)
+	SumInt64(ord uint64, key string, value int64) error
 }
 type SumFloat64Setter interface {
-	SumFloat64(ord uint64, key string, value float64)
+	SumFloat64(ord uint64, key string, value float64) error
 }
 type SumBigFloatSetter interface {
-	SumBigFloat(ord uint64, key string, value *big.Float)
+	SumBigFloat(ord uint64, key string, value *big.Float) error
 }
 
 type Mergeable interface {

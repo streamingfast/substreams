@@ -6,13 +6,9 @@ import (
 	"strconv"
 )
 
-func (b *Builder) SetMinBigInt(ord uint64, key string, value *big.Int) error {
+func (b *Builder) SetMinBigInt(ord uint64, key string, value *big.Int) {
 	min := new(big.Int)
-	val, found, err := b.GetAt(ord, key)
-	if err != nil {
-		return fmt.Errorf("set min big int: %w", err)
-	}
-
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -24,16 +20,11 @@ func (b *Builder) SetMinBigInt(ord uint64, key string, value *big.Int) error {
 		}
 	}
 	b.set(ord, key, []byte(min.String()))
-	return nil
 }
 
-func (b *Builder) SetMinInt64(ord uint64, key string, value int64) error {
+func (b *Builder) SetMinInt64(ord uint64, key string, value int64) {
 	var min int64
-	val, found, err := b.GetAt(ord, key)
-	if err != nil {
-		return fmt.Errorf("set min big 64: %w", err)
-	}
-
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -45,16 +36,11 @@ func (b *Builder) SetMinInt64(ord uint64, key string, value int64) error {
 		}
 	}
 	b.set(ord, key, []byte(fmt.Sprintf("%d", min)))
-	return nil
 }
 
-func (b *Builder) SetMinFloat64(ord uint64, key string, value float64) error {
+func (b *Builder) SetMinFloat64(ord uint64, key string, value float64) {
 	var min float64
-	val, found, err := b.GetAt(ord, key)
-	if err != nil {
-		return fmt.Errorf("set min float 64: %w", err)
-	}
-
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -67,16 +53,11 @@ func (b *Builder) SetMinFloat64(ord uint64, key string, value float64) error {
 		}
 	}
 	b.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
-	return nil
 }
 
-func (b *Builder) SetMinBigFloat(ord uint64, key string, value *big.Float) error {
+func (b *Builder) SetMinBigFloat(ord uint64, key string, value *big.Float) {
 	min := new(big.Float)
-	val, found, err := b.GetAt(ord, key)
-	if err != nil {
-		return fmt.Errorf("set min big float: %w", err)
-	}
-
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -89,5 +70,4 @@ func (b *Builder) SetMinBigFloat(ord uint64, key string, value *big.Float) error
 		}
 	}
 	b.set(ord, key, []byte(min.Text('g', -1)))
-	return nil
 }

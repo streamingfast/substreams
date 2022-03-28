@@ -18,7 +18,7 @@ import (
 	"github.com/streamingfast/substreams/state"
 )
 
-var ProtobufBlockType string = "block"
+var ProtobufBlockType string = "sf.ethereum.type.v1.Block"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

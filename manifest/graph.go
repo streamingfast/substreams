@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/streamingfast/bstream"
+
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/yourbasic/graph"
 )
@@ -77,15 +79,10 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph, startBlock uint64) uin
 			}
 			return false
 		}
-		resolvedStartBlock := startBlockForModule(w, g, sb)
-		if resolvedStartBlock < sb {
-			sb = resolvedStartBlock
-		}
-
 		return false
 	})
 	if sb == math.MaxUint64 {
-		return 0
+		return bstream.GetProtocolFirstStreamableBlock
 	}
 	return sb
 }

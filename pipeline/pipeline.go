@@ -405,7 +405,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 	p.stores = make(map[string]*state.Builder)
 	for _, s := range modules {
 		store := state.NewBuilder(s.Name, s.GetKindStore().UpdatePolicy, s.GetKindStore().ValueType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.requestedStartBlockNum, s.InitialBlock, p.outputStreamName),
+			state.WithPartialMode(p.partialMode, p.requestedStartBlockNum, s.GetStartBlock(), p.outputStreamName),
 		)
 
 		var initializeStore bool
@@ -647,9 +647,9 @@ func (p *Pipeline) GetStartBlocks(requestedStartBlock uint64) (uint64, map[strin
 	startBlock := requestedStartBlock
 	out := map[string]uint64{}
 	for _, module := range p.manifest.Modules {
-		out[module.Name] = module.InitialBlock
-		if module.InitialBlock < startBlock {
-			startBlock = module.InitialBlock
+		out[module.Name] = module.GetStartBlock()
+		if module.GetStartBlock() < startBlock {
+			startBlock = module.GetStartBlock()
 		}
 	}
 	return startBlock, out

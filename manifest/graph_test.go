@@ -90,6 +90,17 @@ var testModules = []*pbtransform.Module{
 		},
 	},
 	{
+		Name: "K",
+		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Inputs: []*pbtransform.Input{
+			{
+				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
+					ModuleName: "G",
+				}},
+			},
+		},
+	},
+	{
 		Name:   "H",
 		Kind:   &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
 		Inputs: nil,

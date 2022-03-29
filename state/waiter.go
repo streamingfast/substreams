@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/yourbasic/graph"
 )
 
 type node struct {
@@ -23,38 +23,44 @@ type node struct {
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
-	ancestorStores    []*node
+	ancestorStores    []*pbtransform.Module
 	targetBlockNumber uint64
+	storeFactory      FactoryInterface
 }
 
 func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory FactoryInterface, targetStartBlock uint64) *FileWaiter {
 	w := &FileWaiter{
 		ancestorStores:    nil,
 		targetBlockNumber: targetStartBlock,
+		storeFactory:      factory,
 	}
 
-	ancestorStores, _ := moduleGraph.AncestorStoresOf(moduleName)
+	ancestorStores, _ := moduleGraph.AncestorStoresOf(moduleName) //todo: new the list of parent store.
 
-	var parentNodes []*node
-	for _, ancestorStore := range ancestorStores {
-		partialNode := &node{
-			Name:       ancestorStore.Name,
-			Store:      factory.New(ancestorStore.Name),
-			StartBlock: ancestorStore.GetStartBlock(),
-		}
-		parentNodes = append(parentNodes, partialNode)
-	}
-	w.ancestorStores = parentNodes
+	//var parentNodes []*node
+	//for _, ancestorStore := range ancestorStores {
+	//	partialNode := &node{
+	//		Name:       ancestorStore.Name,
+	//		Store:      factory.New(ancestorStore.Name),
+	//		StartBlock: ancestorStore.GetStartBlock(),
+	//	}
+	//	parentNodes = append(parentNodes, partialNode)
+	//}
+	w.ancestorStores = ancestorStores
 
 	return w
 }
 
-func (p *FileWaiter) Wait(ctx context.Context) error {
+func (p *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64) error {
 	eg := llerrgroup.New(len(p.ancestorStores))
-	for _, parent := range p.ancestorStores {
-		node := parent
+	for _, ancestor := range p.ancestorStores {
+		if eg.Stop() {
+			continue // short-circuit the loop if we got an error
+		}
+
+		module := ancestor
 		eg.Go(func() error {
-			return <-p.wait(ctx, node)
+			return <-p.wait(ctx, requestStartBlock, module)
 		})
 	}
 
@@ -65,9 +71,14 @@ func (p *FileWaiter) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (p *FileWaiter) wait(ctx context.Context, node *node) <-chan error {
+func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module *pbtransform.Module) <-chan error {
 	done := make(chan error)
-
+	store := p.storeFactory.New(module.Name) //todo: need to use module signature here.
+	waitForBlockNum := requestStartBlock
+	//       END  START
+	//module_3000_2000.partial
+	//module_2000_1000.partial
+	//module_1000.kv
 	go func() {
 		defer close(done)
 
@@ -81,117 +92,107 @@ func (p *FileWaiter) wait(ctx context.Context, node *node) <-chan error {
 				//
 			}
 
-			exists, _, err := ContiguousFilesToTargetBlock(ctx, node.Name, node.Store, node.StartBlock, p.targetBlockNumber)
+			prefix := fmt.Sprintf("%s-%d", module.Name, waitForBlockNum)
+			files, err := store.ListFiles(ctx, prefix, "", 1)
 			if err != nil {
-				done <- &fileWaitResult{ctx.Err()}
+				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
 				return
 			}
 
-			if exists {
+			found := len(files) == 1
+			if !found {
+				time.Sleep(WaiterSleepInterval)
+				fmt.Printf("waiting for store %s to complete processing to block %d\n", module.Name, p.targetBlockNumber)
+				continue
+			}
+
+			ok, start, _, partial := parseFileName(files[0])
+			if !ok {
+				done <- &fileWaitResult{fmt.Errorf("could not parse filename %s", files[0])}
 				return
 			}
 
-			time.Sleep(WaiterSleepInterval)
-			fmt.Printf("waiting for store %s to complete processing to block %d\n", node.Name, p.targetBlockNumber)
+			//todo: validate that start block match configured kv block range.
+			if partial {
+				waitForBlockNum = start
+				//todo 2.1: if start block from partial is the module start block we are done waiting
+				if start == module.GetStartBlock() {
+					return
+				}
+				continue
+			}
+
+			return //we are done because we found a kv file.
 		}
 	}()
 
 	return done
 }
 
-func ContiguousFilesToTargetBlock(ctx context.Context, storeName string, store StoreInterface, startBlock, targetBlock uint64) (bool, []string, error) {
-	/// walk files and create a graph where edges link the end-block of one file to the start-block of another.
-	/// this way, we can know if a store has all the necessary files to cover all the data up to the target block by checking if there is a path in
-	///   the graph to the target
+func pathToState(ctx context.Context, store StoreInterface, requestStartBlock uint64, module *pbtransform.Module) ([]string, error) {
+	var out []string
+	nextBlockNum := requestStartBlock
+	for {
+		//check context
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			//
+		}
 
-	//get all block ranges for this store
-	var ranges blockRangeItems
-	err := store.Walk(ctx, fmt.Sprintf("%s-", storeName), ".tmp", func(filename string) error {
-		ok, start, end := parseFileName(filename)
+		prefix := fmt.Sprintf("%s-%d", module.Name, nextBlockNum)
+		files, err := store.ListFiles(ctx, prefix, "", 2)
+		if err != nil {
+			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
+		}
+
+		found := len(files) >= 1
+		if !found {
+			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, module.Name)
+		}
+
+		foundFile := files[0]
+		switch len(files) {
+		case 2:
+			_, _, _, partialLeft := parseFileName(files[0])
+			_, _, _, partialRight := parseFileName(files[1])
+			if partialLeft && partialRight {
+				return nil, fmt.Errorf("found two partial files %s and %s", files[0], files[1])
+			}
+			if !partialRight {
+				foundFile = files[1]
+			}
+		}
+
+		out = append(out, foundFile)
+
+		ok, start, _, partial := parseFileName(foundFile)
 		if !ok {
-			return fmt.Errorf("could not parse filename %s", filename)
+			return nil, fmt.Errorf("could not parse filename %s", files[0])
 		}
 
-		bri := blockRangeItem{
-			start:    start,
-			end:      end,
-			filename: filename,
-		}
-		ranges = append(ranges, bri)
-
-		return nil
-	})
-
-	if err != nil {
-		return false, nil, fmt.Errorf("error walking files: %w", err)
-	}
-
-	sort.Sort(ranges)
-
-	fulls := map[int]struct{}{}
-	targets := map[int]struct{}{}
-	for i, x := range ranges {
-		if x.start == 0 || x.start == startBlock {
-			fulls[i] = struct{}{}
-		}
-		if x.end == targetBlock {
-			targets[i] = struct{}{}
-		}
-	}
-
-	if len(fulls) == 0 {
-		return false, nil, nil // no files which start at the beginning
-	}
-
-	if len(targets) == 0 { // no files which reach the target block
-		return false, nil, nil
-	}
-
-	var ends []int
-	for _, br := range ranges {
-		ends = append(ends, int(br.end))
-	}
-
-	// construct a graph with all the paths of ranges
-	g := graph.New(len(ranges))
-	for i, e := range ends {
-		for j, br := range ranges {
-			if uint64(e) == br.start {
-				g.AddCost(i, j, 1)
+		//todo: validate that start block match configured kv block range.
+		if partial {
+			nextBlockNum = start
+			//todo 2.1: if start block from partial is the module start block we are done waiting
+			if start == module.GetStartBlock() {
+				reversePathToState(out)
+				return out, nil
 			}
+			continue
 		}
+
+		break //we are done because we found a kv file.
 	}
 
-	//check if there is a path from any of the full snapshots (start = 0) to our target block
-	var paths [][]int
-	var dists []int64
-	var path []int
-	for t := range targets {
-		for f := range fulls {
-			p, d := graph.ShortestPath(g, f, t)
-			if len(p) >= 0 && d >= 0 {
-				paths = append(paths, p)
-				dists = append(dists, d)
-			}
-		}
+	reversePathToState(out)
+	return out, nil
+}
+func reversePathToState(input []string) {
+	for i, j := 0, len(input)-1; i < j; i, j = i+1, j-1 {
+		input[i], input[j] = input[j], input[i]
 	}
-
-	if len(paths) == 0 {
-		return false, nil, nil
-	}
-
-	sort.Slice(paths, func(i, j int) bool {
-		return dists[i] < dists[j]
-	})
-
-	path = paths[0]
-
-	var pathFileNames []string
-	for _, p := range path {
-		pathFileNames = append(pathFileNames, ranges[p].filename)
-	}
-
-	return true, pathFileNames, nil
 }
 
 type fileWaitResult struct {
@@ -210,7 +211,7 @@ func init() {
 	partialKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-([\d]+)\.partial`)
 }
 
-func parseFileName(filename string) (ok bool, start, end uint64) {
+func parseFileName(filename string) (ok bool, start, end uint64, partial bool) {
 	if strings.HasSuffix(filename, ".kv") {
 		res := fullKVRegex.FindAllStringSubmatch(filename, 1)
 		if len(res) != 1 {
@@ -218,42 +219,20 @@ func parseFileName(filename string) (ok bool, start, end uint64) {
 		}
 		start = 0
 		end = uint64(mustAtoi(res[0][1]))
+		partial = false
 		ok = true
 	} else if strings.HasSuffix(filename, ".partial") {
 		res := partialKVRegex.FindAllStringSubmatch(filename, 1)
 		if len(res) != 1 {
 			return
 		}
-		start = uint64(mustAtoi(res[0][1]))
-		end = uint64(mustAtoi(res[0][2]))
+		end = uint64(mustAtoi(res[0][1]))
+		start = uint64(mustAtoi(res[0][2]))
+		partial = true
 		ok = true
 	}
 
 	return
-}
-
-type blockRangeItem struct {
-	start uint64
-	end   uint64
-
-	filename string
-}
-
-type blockRangeItems []blockRangeItem
-
-func (b blockRangeItems) Len() int {
-	return len(b)
-}
-
-func (b blockRangeItems) Less(i, j int) bool {
-	if b[i].start == b[j].start {
-		return b[i].end < b[j].end
-	}
-	return b[i].end < b[j].start
-}
-
-func (b blockRangeItems) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
 }
 
 func mustAtoi(s string) int {

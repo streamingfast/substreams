@@ -61,5 +61,5 @@ func GetStateFileName(name string, blockNum uint64) string {
 }
 
 func GetPartialFileName(name string, startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%s-%d-%d.partial", name, startBlockNum, endBlockNum)
+	return fmt.Sprintf("%s-%d-%d.partial", name, endBlockNum, startBlockNum)
 }

@@ -79,7 +79,7 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (b *Builder) Init(ctx context.Context, startBlockNum uint64) error {
-	if err := b.ReadState(ctx, startBlockNum); err != nil {
+	if err := b.ReadState(ctx, startBlockNum, nil); err != nil {
 		return err
 	}
 
@@ -96,8 +96,8 @@ func (b *Builder) clone() *Builder {
 	return o
 }
 
-func (b *Builder) ReadState(ctx context.Context, blockNumber uint64) error {
-	_, files, err := ContiguousFilesToTargetBlock(ctx, b.Name, b.store, b.moduleStartBlock, blockNumber)
+func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64, module *pbtransform.Module) error {
+	files, err := pathToState(ctx, b.store, requestedStartBlock, module)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (b *Builder) ReadState(ctx context.Context, blockNumber uint64) error {
 		builder := b.clone()
 		kv := map[string]string{}
 		if err = json.Unmarshal(data, &kv); err != nil {
-			return fmt.Errorf("unmarshalling kv file %s for %s at block %d: %w", file, b.Name, blockNumber, err)
+			return fmt.Errorf("unmarshalling kv file %s for %s at block %d: %w", file, b.Name, requestedStartBlock, err)
 		}
 
 		builder.KV = byteMap(kv)
@@ -151,7 +151,7 @@ func (b *Builder) ReadState(ctx context.Context, blockNumber uint64) error {
 		}
 		b.KV = builders[len(builders)-1].KV
 
-		err := b.writeState(ctx, blockNumber, false)
+		err := b.writeState(ctx, requestedStartBlock, false)
 		if err != nil {
 			return fmt.Errorf("writing merged kv: %w", err)
 		}

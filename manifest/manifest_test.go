@@ -80,7 +80,7 @@ inputs:
 //	require.NoError(t, err)
 //
 //	pairExtractorStream := manifest.Graph.modules[0]
-//	sig := pairExtractorStream.Signature(manifest.Graph)
+//	sig := pairExtractorStream.MonduleSignature(manifest.Graph)
 //	assert.Equal(t, "SAx2VACDM0U0cATBhdVLBEBWkhM=", base64.StdEncoding.EncodeToString(sig))
 //}
 //
@@ -89,7 +89,7 @@ inputs:
 //	require.NoError(t, err)
 //
 //	pairsStream := manifest.Graph.modules[1]
-//	sig := pairsStream.Signature(manifest.Graph)
+//	sig := pairsStream.MonduleSignature(manifest.Graph)
 //	assert.Equal(t, "mJWxgtjCeH4ulmYN4fq3wVTUz8U=", base64.StdEncoding.EncodeToString(sig))
 //}
 

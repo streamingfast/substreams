@@ -271,31 +271,6 @@ func (m *Manifest) loadCode(codePath string, pbManifest *pbtransform.Manifest) (
 	return len(pbManifest.ModulesCode) - 1, nil
 }
 
-//func (m *Module) Signature(graph *ModuleGraph) []byte {
-//	buf := bytes.NewBuffer(nil)
-//	buf.WriteString(m.Kind)
-//	buf.Write(m.Code.Content)
-//	buf.Write([]byte(m.Code.Entrypoint))
-//
-//	sort.Slice(m.Inputs, func(i, j int) bool {
-//		return m.Inputs[i].Name < m.Inputs[j].Name
-//	})
-//	for _, input := range m.Inputs {
-//		buf.WriteString(input.Name)
-//	}
-//
-//	ancestors, _ := graph.AncestorsOf(m.Name)
-//	for _, ancestor := range ancestors {
-//		sig := ancestor.Signature(graph)
-//		buf.Write(sig)
-//	}
-//
-//	h := sha1.New()
-//	h.Write(buf.Bytes())
-//
-//	return h.Sum(nil)
-//}
-
 func (m *Module) String() string {
 	return m.Name
 }
@@ -428,7 +403,7 @@ func (m *Module) setOutputToProto(pbModule *pbtransform.Module) {
 //	String() string
 //}
 //
-//func Signature(graph *ModuleGraph, m *pbtransform.Module) []byte {
+//func MonduleSignature(graph *ModuleGraph, m *pbtransform.Module) []byte {
 //	buf := bytes.NewBuffer(nil)
 //	buf.WriteString(m.Kind.(stringer).String())
 //
@@ -445,7 +420,7 @@ func (m *Module) setOutputToProto(pbModule *pbtransform.Module) {
 //
 //	ancestors, _ := graph.AncestorsOf(m.Name)
 //	for _, ancestor := range ancestors {
-//		sig := ancestor.Signature(graph)
+//		sig := ancestor.MonduleSignature(graph)
 //		buf.Write(sig)
 //	}
 //

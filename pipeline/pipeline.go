@@ -223,7 +223,9 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 			outputFunc := func(msg proto.Message) error { return nil }
 			if debugOutput {
 				outputFunc = func(msg proto.Message) (err error) {
-					p.nextReturnValue, err = anypb.New(msg)
+					if msg != nil {
+						p.nextReturnValue, err = anypb.New(msg)
+					}
 					return
 				}
 			}
@@ -249,7 +251,9 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 			outputFunc := func() error { return nil }
 			if debugOutput {
 				outputFunc = func() (err error) {
-					p.nextReturnValue, err = anypb.New(&pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas})
+					if len(outputStore.Deltas) != 0 {
+						p.nextReturnValue, err = anypb.New(&pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas})
+					}
 					return
 				}
 			}
@@ -334,15 +338,14 @@ func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
 		if v := mod.GetKindMap(); v != nil {
 			fmt.Printf("Adding mapper for module %q\n", modName)
 
-			outType := mod.Output.Type
-			if strings.HasPrefix(outType, "proto:") {
-				outType = outType[6:]
-			}
+			outType := strings.TrimPrefix(mod.Output.Type, "proto:")
 
 			outputFunc := func(out []byte) {}
 			if isOutput {
 				outputFunc = func(out []byte) {
-					p.nextReturnValue = &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: out}
+					if out != nil {
+						p.nextReturnValue = &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: out}
+					}
 				}
 			}
 
@@ -368,7 +371,9 @@ func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
 			outputFunc := func() error { return nil }
 			if isOutput {
 				outputFunc = func() (err error) {
-					p.nextReturnValue, err = anypb.New(&pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas})
+					if len(outputStore.Deltas) != 0 {
+						p.nextReturnValue, err = anypb.New(&pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas})
+					}
 					return
 				}
 			}

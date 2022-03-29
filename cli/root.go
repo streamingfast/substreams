@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jhump/protoreflect/desc"
@@ -141,6 +144,9 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	)
 
 	if err := hose.Run(ctx); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		return fmt.Errorf("running the firehose: %w", err)
 	}
 	time.Sleep(5 * time.Second)
@@ -160,6 +166,8 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 		}
 	}
 
+	msgType = strings.TrimPrefix(msgType, "proto:")
+
 	var msgDesc *desc.MessageDescriptor
 	for _, file := range manif.ProtoDescs {
 		msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
@@ -170,17 +178,23 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 
 	if msgDesc != nil {
 		return func(any *anypb.Any) error {
+			if any == nil {
+				return nil
+			}
+
+			msgType := strings.TrimPrefix(any.GetTypeUrl(), "type.googleapis.com/")
+
 			msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 			if err := msg.Unmarshal(any.GetValue()); err != nil {
-				fmt.Printf("error unmarshalling protobuf %s to map: %s \n", any.GetTypeUrl(), err)
+				fmt.Printf("error unmarshalling protobuf %s to map: %s \n", msgType, err)
 			}
 
 			cnt, err := msg.MarshalJSONIndent()
 			if err != nil {
-				fmt.Printf("error encoding protobuf %s into json: %S \n", any.GetTypeUrl(), err)
+				fmt.Printf("error encoding protobuf %s into json: %S \n", msgType, err)
 			}
 
-			fmt.Println(string(cnt))
+			fmt.Printf("Message %q: %s\n", msgType, string(cnt))
 
 			return nil
 		}
@@ -188,6 +202,9 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 	}
 
 	return func(any *anypb.Any) error {
+		if any == nil {
+			return nil
+		}
 		fmt.Println(protojson.Marshal(any))
 		return nil
 	}

@@ -14,7 +14,7 @@ type Imports struct {
 	currentBlock bstream.BlockRef
 }
 
-func NewImports(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, noArchiveMode bool) *Imports {
+func NewImports(rpcClient *rpc.Client, rpcCache *ssrpc.Cache) *Imports {
 	return &Imports{
 		rpcClient: rpcClient,
 		rpcCache:  rpcCache,

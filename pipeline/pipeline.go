@@ -36,9 +36,7 @@ type Pipeline struct {
 
 	blockType string
 
-	rpcClient *rpc.Client
-	rpcCache  *ssrpc.Cache
-
+	rpcCache      *ssrpc.Cache
 	nativeImports *imports.Imports
 	stores        map[string]*state.Builder
 
@@ -119,7 +117,6 @@ func WithPartialMode(reqStartBlock uint64) Option {
 }
 
 func New(
-	requestedStartBlockNum uint64,
 	rpcClient *rpc.Client,
 	rpcCache *ssrpc.Cache,
 	manifest *pbtransform.Manifest,
@@ -129,17 +126,15 @@ func New(
 	ioFactory state.FactoryInterface,
 	opts ...Option) *Pipeline {
 	pipe := &Pipeline{
-		requestedStartBlockNum: requestedStartBlockNum,
-		rpcClient:              rpcClient,
-		rpcCache:               rpcCache,
-		nativeImports:          imports.NewImports(rpcClient, rpcCache, true),
-		stores:                 map[string]*state.Builder{},
-		graph:                  graph,
-		ioFactory:              ioFactory,
-		manifest:               manifest,
-		outputStreamName:       outputStreamName,
-		blockType:              blockType,
-		progressTracker:        newProgressTracker(),
+		rpcCache:         rpcCache,
+		nativeImports:    imports.NewImports(rpcClient, rpcCache),
+		stores:           map[string]*state.Builder{},
+		graph:            graph,
+		ioFactory:        ioFactory,
+		manifest:         manifest,
+		outputStreamName: outputStreamName,
+		blockType:        blockType,
+		progressTracker:  newProgressTracker(),
 	}
 
 	for _, opt := range opts {
@@ -149,8 +144,8 @@ func New(
 	return pipe
 }
 
-// Build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) Build(ctx context.Context, forceLoadState bool) error {
+// build will determine and run the builder that corresponds to the correct code type
+func (p *Pipeline) build(ctx context.Context, forceLoadState bool) error {
 
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
@@ -172,7 +167,7 @@ func (p *Pipeline) Build(ctx context.Context, forceLoadState bool) error {
 		return p.BuildNative(ctx, forceLoadState)
 	}
 
-	return p.BuildWASM(ctx, forceLoadState)
+	return p.buildWASM(ctx, forceLoadState)
 }
 
 func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
@@ -273,7 +268,7 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 	return nil
 }
 
-func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
+func (p *Pipeline) buildWASM(ctx context.Context, forceLoadState bool) error {
 	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
@@ -447,7 +442,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 	p.stores = make(map[string]*state.Builder)
 	for _, s := range modules {
 		store := state.NewBuilder(s.Name, s.GetKindStore().UpdatePolicy, s.GetKindStore().ValueType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.requestedStartBlockNum, s.GetStartBlock(), p.outputStreamName),
+			state.WithPartialMode(p.partialMode, p.requestedStartBlockNum, *s.StartBlock, p.outputStreamName),
 		)
 
 		var initializeStore bool
@@ -482,7 +477,14 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64, returnFunc func(any *anypb.Any) error) bstream.Handler {
+func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlock, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
+
+	p.requestedStartBlockNum = requestedStartBlock
+	err := p.build(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+
 	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
@@ -551,7 +553,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64, returnF
 		}
 
 		return nil
-	})
+	}), nil
 }
 
 type Printer interface {

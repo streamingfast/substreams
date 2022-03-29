@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -20,10 +19,9 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/firehose"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/eth-go/rpc"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline"
-	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
 )
 
@@ -55,8 +53,6 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
 	}
 
-	forceLoadState := true
-
 	localBlocksPath := viper.GetString("blocks-store-url")
 	blocksStore, err := dstore.NewDBinStore(localBlocksPath)
 	if err != nil {
@@ -69,24 +65,10 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up irr blocks store: %w", err)
 	}
 
-	rpcCacheStore, err := dstore.NewStore("./rpc-cache", "", "", false)
+	rpcClient, rpcCache, err := substreams.GetRPCClient(viper.GetString("rpc-endpoint"), "./rpc-cache")
 	if err != nil {
-		return fmt.Errorf("setting up store for rpc-cache: %w", err)
+		return fmt.Errorf("setting up rpc client: %w", err)
 	}
-
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DisableKeepAlives: true, // don't reuse connections
-		},
-		Timeout: 3 * time.Second,
-	}
-
-	rpcEndpoint := viper.GetString("rpc-endpoint")
-	rpcClient := rpc.NewClient(rpcEndpoint, rpc.WithHttpClient(httpClient))
-	rpcCache := ssrpc.NewCache(rpcCacheStore, rpcCacheStore, 0, 999)
-	rpcCache.Load(ctx)
-
-	fmt.Println("Using RPC endpoint:", rpcEndpoint)
 
 	stateStorePath := viper.GetString("state-store-url")
 	stateStore, err := dstore.NewStore(stateStorePath, "", "", false)
@@ -130,13 +112,13 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		stopBlockNum = startBlockNum + blockCount
 	}
 
-	pipe := pipeline.New(startBlockNum, rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
-
-	if err := pipe.Build(ctx, forceLoadState); err != nil {
-		return fmt.Errorf("building pipeline: %w", err)
-	}
 	returnHandler := NewPrintReturnHandler(manif, outputStreamName)
-	handler := pipe.HandlerFactory(ctx, stopBlockNum, returnHandler)
+	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
+
+	handler, err := pipe.HandlerFactory(ctx, startBlockNum, stopBlockNum, returnHandler)
+	if err != nil {
+		return fmt.Errorf("building pipeline handler: %w", err)
+	}
 
 	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),

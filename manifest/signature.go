@@ -26,7 +26,7 @@ func SignModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 	case *pbtransform.Module_KindStore:
 		buf.WriteString("store")
 	default:
-		panic(fmt.Sprint("invalid module file %T", module.Kind))
+		panic(fmt.Sprintf("invalid module file %T", module.Kind))
 	}
 
 	buf.WriteString("code")
@@ -64,6 +64,6 @@ func inputName(input *pbtransform.Input) string {
 	case *pbtransform.Input_Map:
 		return "map"
 	default:
-		panic(fmt.Sprint("invalid input %T", input.Input))
+		panic(fmt.Sprintf("invalid input %T", input.Input))
 	}
 }

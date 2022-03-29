@@ -509,6 +509,8 @@ github.com/streamingfast/eth-go v0.0.0-20220312041930-62a1ff104ff6 h1:OXDajDt4Zz
 github.com/streamingfast/eth-go v0.0.0-20220312041930-62a1ff104ff6/go.mod h1:2NpyJ/M0rOQVxf67tnnfhYdE8DqtBSea1HtSKBNOfO4=
 github.com/streamingfast/firehose v0.1.1-0.20220328204102-02de7f7019e3 h1:ljrmOWFa6WEB0GYZhYLpJB7+4YahJ5EQXWWFI0misZ8=
 github.com/streamingfast/firehose v0.1.1-0.20220328204102-02de7f7019e3/go.mod h1:yQqMVyuEfv1iMqqSN3EMj7XojX3gW1GZYFO8leDs1lg=
+github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873 h1:8+TXT26c2p6f8JMg0w4JQ8t4fAbfMmR11zLN4KFVRC8=
+github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873/go.mod h1:M7l9klD6EPgXwPOrhzQrLLKZHZSNTt4nm+GDRFNbQdc=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=
 github.com/streamingfast/logging v0.0.0-20210908162127-bdc5856d5341/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=
 github.com/streamingfast/logging v0.0.0-20220222131651-12c3943aac2e/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=
@@ -545,8 +547,6 @@ github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9/go.mod h1:q+QjxYv
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/wasmerio/wasmer-go v1.0.4 h1:MnqHoOGfiQ8MMq2RF6wyCeebKOe84G88h5yv+vmxJgs=
 github.com/wasmerio/wasmer-go v1.0.4/go.mod h1:0gzVdSfg6pysA6QVp6iVRPTagC6Wq9pOE8J86WKb2Fk=
-github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 h1:7v7L5lsfw4w8iqBBXETukHo4IPltmD+mWoLRYUmeGN8=
-github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869/go.mod h1:Rfzr+sqaDreiCaoQbFCu3sTXxeFq/9kXRuyOoSlGQHE=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

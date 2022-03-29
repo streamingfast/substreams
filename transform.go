@@ -45,8 +45,7 @@ func GetRPCClient(endpoint string, cachePath string) (*rpc.Client, *ssrpc.Cache,
 	return rpc.NewClient(endpoint, rpc.WithHttpClient(httpClient)), cache, nil
 }
 
-func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockType string) *transform.Factory {
-	// ProtobufBlockType string = "sf.ethereum.type.v1.Block"
+func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockType string, firehoseServer *firehose.Server) *transform.Factory {
 
 	return &transform.Factory{
 		Obj: &pbtransform.Transform{},
@@ -60,6 +59,10 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 			err := proto.Unmarshal(message.Value, req)
 			if err != nil {
 				return nil, fmt.Errorf("unexpected unmarshall error: %w", err)
+			}
+
+			if req.Manifest == nil {
+				return nil, fmt.Errorf("missing manifest in request")
 			}
 
 			rpcClient, rpcCache, err := GetRPCClient(rpcEndpoint, rpcCachePath)
@@ -89,7 +92,8 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 					protobufBlockType,
 					ioFactory,
 				),
-				description: req.Manifest.Description,
+				description:    req.Manifest.Description,
+				firehoseServer: firehoseServer,
 			}
 
 			return t, nil
@@ -103,20 +107,45 @@ type ssTransform struct {
 	firehoseServer *firehose.Server
 }
 
-func (t *ssTransform) Run(ctx context.Context, req *pbfirehose.Request, output func(*bstream.Cursor, *anypb.Any) error) {
+func (t *ssTransform) Run(ctx context.Context, req *pbfirehose.Request, output func(*bstream.Cursor, *anypb.Any) error) error {
+	fmt.Println("inside Run")
 
-	// FIXME: run the subtreams engine, do the thing, transform block, output shit
-	m := &pbtransform.Manifest{
-		Description: "This is a test " + req.String(),
-	}
-	anyMsg, err := anypb.New(m)
-	if err != nil {
-		return
+	newReq := &pbfirehose.Request{
+		StartBlockNum: req.StartBlockNum,
+		StopBlockNum:  req.StopBlockNum,
+		StartCursor:   req.StartCursor,
+		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE}, //FIXME ?
+
+		// ...FIXME ?
 	}
 
-	err = output(nil, anyMsg)
+	returnHandler := func(any *anypb.Any) error {
+		return output(nil, any)
+	}
+
+	if req.StartBlockNum < 0 {
+		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", req.StartBlockNum)
+		// FIXME we want logger too
+		// FIXME start block resolving is an art, it should be handled here
+	}
+
+	handler, err := t.pipeline.HandlerFactory(ctx, uint64(req.StartBlockNum), req.StopBlockNum, returnHandler)
 	if err != nil {
-		return
+		return fmt.Errorf("error building substreams pipeline handler: %w", err)
+	}
+
+	client := t.firehoseServer.BlocksFromLocal(ctx, newReq)
+	for {
+		resp, err := client.Recv()
+		if err != nil {
+			return fmt.Errorf("error receiving block from firehose client")
+		}
+
+		if resp.Block.TypeUrl != "dfuse.bstream.v1.block" {
+			panic(resp.Block.TypeUrl)
+		}
+		_ = handler
+
 	}
 }
 

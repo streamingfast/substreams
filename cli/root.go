@@ -78,7 +78,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create module graph %w", err)
 	}
 
-	startBlockNum := viper.GetUint64("start-block")
+	startBlockNum := viper.GetInt64("start-block")
 	stopBlockNum := viper.GetUint64("stop-block")
 
 	var pipelineOpts []pipeline.Option
@@ -114,6 +114,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("building pipeline handler: %w", err)
 	}
+
+	fmt.Println("Starting firehose from block", startBlockNum)
 
 	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),

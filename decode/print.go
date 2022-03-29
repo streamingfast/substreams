@@ -74,10 +74,11 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 		if msgDesc != nil {
 			decodeValue = decodeMsgTypeWithIndent
 		} else {
-			if msgType == "string" || msgType == "float" || msgType == "int" {
-				decodeValue = decodeAsString
-			} else {
+			if msgType == "bytes" {
 				decodeValue = decodeAsHex
+			} else {
+				// bigint, bigfloat, int64, float64, string
+				decodeValue = decodeAsString
 			}
 		}
 

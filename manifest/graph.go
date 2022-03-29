@@ -3,7 +3,6 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/streamingfast/bstream"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/yourbasic/graph"
@@ -15,7 +14,6 @@ type ModuleGraph struct {
 	modules     []*pbtransform.Module
 	moduleIndex map[string]int
 	indexIndex  map[int]*pbtransform.Module
-	startBlock  map[int]bool
 }
 
 func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
@@ -60,10 +58,10 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 
 func computeStartBlock(modules []*pbtransform.Module, g *ModuleGraph) {
 	for _, module := range modules {
-		if module.StartBlock == nil { //todo: @ed
+		if module.StartBlock == UNSET {
 			moduleIndex := g.moduleIndex[module.Name]
 			startBlock := startBlockForModule(moduleIndex, g)
-			module.StartBlock = &startBlock
+			module.StartBlock = startBlock
 		}
 	}
 }
@@ -73,7 +71,7 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph) uint64 {
 	g.Visit(moduleIndex, func(w int, c int64) bool {
 		parent := g.modules[w]
 		currentStartBlock := int64(-1)
-		if parent.StartBlock == nil { //todo: @ed
+		if parent.StartBlock == UNSET {
 			currentStartBlock = int64(startBlockForModule(w, g))
 		} else {
 			currentStartBlock = int64(parent.GetStartBlock())
@@ -86,7 +84,7 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph) uint64 {
 			return false
 		}
 		if parentsStartBlock != currentStartBlock {
-			panic("un beau petit message intelligent ici")
+			panic(fmt.Sprintf("Cannot deterministically determine the start block for module %s", g.modules[moduleIndex].Name))
 		}
 		return false
 	})

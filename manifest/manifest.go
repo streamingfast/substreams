@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"regexp"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 )
+
+const UNSET = math.MaxUint64
 
 var ModuleNameRegexp *regexp.Regexp
 
@@ -34,9 +37,9 @@ type Manifest struct {
 }
 
 type Module struct {
-	Name       string `yaml:"name"`
-	Kind       string `yaml:"kind"`
-	StartBlock uint64 `yaml:"startBlock"`
+	Name       string  `yaml:"name"`
+	Kind       string  `yaml:"kind"`
+	StartBlock *uint64 `yaml:"startBlock"`
 
 	UpdatePolicy string       `yaml:"updatePolicy"`
 	ValueType    string       `yaml:"valueType"`
@@ -291,6 +294,11 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 		},
 	}
 
+	out.StartBlock = UNSET
+	if m.StartBlock != nil {
+		out.StartBlock = *m.StartBlock
+	}
+
 	m.setOutputToProto(out)
 	m.setKindToProto(out)
 	err := m.setInputsToProto(out)
@@ -302,8 +310,7 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 	out := &pbtransform.Module{
-		Name:       m.Name,
-		StartBlock: &m.StartBlock,
+		Name: m.Name,
 		Code: &pbtransform.Module_WasmCode{
 			WasmCode: &pbtransform.WasmCode{
 				Type:       m.Code.Type,
@@ -311,6 +318,11 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 				Entrypoint: m.Code.Entrypoint,
 			},
 		},
+	}
+
+	out.StartBlock = UNSET
+	if m.StartBlock != nil {
+		out.StartBlock = *m.StartBlock
 	}
 
 	m.setOutputToProto(out)

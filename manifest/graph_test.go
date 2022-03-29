@@ -2,6 +2,8 @@ package manifest
 
 import (
 	"fmt"
+	"github.com/streamingfast/bstream"
+	"github.com/test-go/testify/require"
 	"sort"
 	"testing"
 
@@ -11,6 +13,7 @@ import (
 
 var ten = uint64(10)
 var twenty = uint64(20)
+var thirty = uint64(30)
 
 var testModules = []*pbtransform.Module{
 	{
@@ -18,7 +21,7 @@ var testModules = []*pbtransform.Module{
 	},
 	{
 		Name:       "B",
-		StartBlock: &ten,
+		StartBlock: ten,
 		Kind:       &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
 		Inputs: []*pbtransform.Input{
 			{
@@ -30,7 +33,7 @@ var testModules = []*pbtransform.Module{
 	},
 	{
 		Name:       "C",
-		StartBlock: &twenty,
+		StartBlock: twenty,
 		Kind:       &pbtransform.Module_KindMap{KindMap: &pbtransform.KindMap{}},
 		Inputs: []*pbtransform.Input{
 			{
@@ -53,7 +56,7 @@ var testModules = []*pbtransform.Module{
 	},
 	{
 		Name:       "E",
-		StartBlock: &ten,
+		StartBlock: ten,
 		Kind:       &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
 		Inputs: []*pbtransform.Input{
 			{
@@ -194,10 +197,328 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 }
 
 func TestModuleGraph_computeStartBlocks(t *testing.T) {
+	var startBlockTestModule = []*pbtransform.Module{
+		{
+			Name:       "block_to_pairs",
+			StartBlock: twenty,
+		},
+		{
+			Name: "pairs",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "block_to_pairs",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "block_to_reserves",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "pairs",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "reserves",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "pairs",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "block_to_reserves",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "prices",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "pairs",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "block_to_reserves",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "reserves",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "mint_burn_swaps_extractor",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "pairs",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "prices",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "volumes",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "mint_burn_swaps_extractor",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "database_output",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "mint_burn_swaps_extractor",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "volumes",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "totals",
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "mint_burn_swaps_extractor",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "block_to_pairs",
+						},
+					},
+				},
+			},
+		},
+	}
+
 	//todo: @ed please add test here! thanks
-	g, err := NewModuleGraph(testModules)
+	g, err := NewModuleGraph(startBlockTestModule)
 	assert.NoError(t, err)
 	for _, module := range g.modules {
-		fmt.Println(module.Name, "start block:", *module.StartBlock)
+		fmt.Println(module.Name, "start block:", module.StartBlock)
 	}
+}
+
+func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingNoStartBlock(t *testing.T) {
+	var oldValue = bstream.GetProtocolFirstStreamableBlock
+	bstream.GetProtocolFirstStreamableBlock = uint64(99)
+	defer func() {
+		bstream.GetProtocolFirstStreamableBlock = oldValue
+	}()
+
+	var testModules = []*pbtransform.Module{
+		{
+			Name:       "A",
+			StartBlock: UNSET,
+		},
+		{
+			Name:       "B",
+			StartBlock: UNSET,
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "A",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+
+	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[0].StartBlock)
+	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[1].StartBlock)
+}
+
+func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingAStartBlock(t *testing.T) {
+	var testModules = []*pbtransform.Module{
+		{
+			Name:       "A",
+			StartBlock: ten,
+		},
+		{
+			Name:       "B",
+			StartBlock: UNSET,
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "A",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint64(10), testModules[0].GetStartBlock())
+	assert.Equal(t, uint64(10), testModules[1].GetStartBlock())
+}
+
+func TestModuleGraph_ComputeStartBlocks_WithTwoParentsAndAGrandParentContainingStartBlock(t *testing.T) {
+	var testModules = []*pbtransform.Module{
+		{
+			Name:       "A",
+			StartBlock: ten,
+		},
+		{
+			Name:       "B",
+			StartBlock: UNSET,
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "A",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:       "C",
+			StartBlock: UNSET,
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "A",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:       "D",
+			StartBlock: UNSET,
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "B",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "C",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint64(10), testModules[0].GetStartBlock())
+	assert.Equal(t, uint64(10), testModules[1].GetStartBlock())
+	assert.Equal(t, uint64(10), testModules[2].GetStartBlock())
+	assert.Equal(t, uint64(10), testModules[3].GetStartBlock())
+}
+
+func TestModuleGraph_ComputeStartBlocks_WithThreeParentsEachContainingAStartBlock(t *testing.T) {
+	var testModules = []*pbtransform.Module{
+		{
+			Name:       "A",
+			StartBlock: ten,
+		},
+		{
+			Name:       "B",
+			StartBlock: twenty,
+		},
+		{
+			Name:       "C",
+			StartBlock: thirty,
+		},
+		{
+			Name:       "D",
+			StartBlock: UNSET,
+			Inputs: []*pbtransform.Input{
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "A",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "B",
+						},
+					},
+				},
+				{
+					Input: &pbtransform.Input_Store{
+						Store: &pbtransform.InputStore{
+							ModuleName: "C",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	require.Panics(t, func() {
+		NewModuleGraph(testModules)
+	})
 }

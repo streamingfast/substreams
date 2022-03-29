@@ -11,7 +11,7 @@ import (
 
 type ModuleSignature []byte
 
-func SignModule(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) ModuleSignature {
+func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) ModuleSignature {
 	buf := bytes.NewBuffer(nil)
 
 	startBlockBytes := make([]byte, 8)
@@ -35,6 +35,10 @@ func SignModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 		code := manifest.ModulesCode[m.WasmCode.Index]
 		buf.Write(code)
 		buf.WriteString(m.WasmCode.Entrypoint)
+	case *pbtransform.Module_NativeCode:
+		// TODO: get some version of the native code from the registry
+		// so it can break compatibility when the native code is updated.
+		buf.WriteString(m.NativeCode.Entrypoint)
 	}
 
 	buf.WriteString("inputs")
@@ -45,7 +49,7 @@ func SignModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 	buf.WriteString("ancestors")
 	ancestors, _ := graph.AncestorsOf(module.Name)
 	for _, ancestor := range ancestors {
-		sig := SignModule(manifest, ancestor, graph)
+		sig := HashModule(manifest, ancestor, graph)
 		buf.Write(sig)
 	}
 

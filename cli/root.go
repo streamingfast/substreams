@@ -1,19 +1,12 @@
 package cli
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"strconv"
-	"strings"
 	"time"
-
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,8 +14,8 @@ import (
 	"github.com/streamingfast/bstream/firehose"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/state"
 )
@@ -114,7 +107,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		stopBlockNum = startBlockNum + blockCount
 	}
 
-	returnHandler := NewPrintReturnHandler(manif, outputStreamName)
+	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
 	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
 
 	handler, err := pipe.HandlerFactory(ctx, startBlockNum, stopBlockNum, returnHandler)
@@ -136,110 +129,4 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	time.Sleep(5 * time.Second)
 
 	return nil
-}
-
-func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) func(any *anypb.Any) error {
-	var msgType string
-	var isStore bool
-	for _, mod := range manif.Modules {
-		if mod.Name == outputStreamName {
-			if mod.Kind == "store" {
-				isStore = true
-				msgType = mod.ValueType
-			} else {
-				msgType = mod.Output.Type
-			}
-		}
-	}
-
-	msgType = strings.TrimPrefix(msgType, "proto:")
-
-	var msgDesc *desc.MessageDescriptor
-	for _, file := range manif.ProtoDescs {
-		msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
-		if msgDesc != nil {
-			break
-		}
-	}
-
-	defaultHandler := func(any *anypb.Any) error {
-		if any == nil {
-			return nil
-		}
-
-		fmt.Printf("Message %q:\n", msgType)
-		fmt.Println(protojson.Marshal(any))
-		return nil
-	}
-
-	decodeAsString := func(in []byte) string { return fmt.Sprintf("%q", string(in)) }
-	decodeAsHex := func(in []byte) string { return "(hex) " + hex.EncodeToString(in) }
-	decodeMsgType := func(in []byte) string {
-		msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-		if err := msg.Unmarshal(in); err != nil {
-			fmt.Printf("error unmarshalling protobuf %s to map: %s\n", msgType, err)
-			return decodeAsString(in)
-		}
-
-		cnt, err := msg.MarshalJSONIndent()
-		if err != nil {
-			fmt.Printf("error encoding protobuf %s into json: %s\n", msgType, err)
-			return decodeAsString(in)
-		}
-
-		return string(cnt)
-	}
-	decodeMsgTypeWithIndent := func(in []byte) string {
-		out := decodeMsgType(in)
-		return strings.Replace(out, "\n", "\n    ", -1)
-	}
-
-	if isStore {
-		var decodeValue func(in []byte) string
-		if msgDesc != nil {
-			decodeValue = decodeMsgTypeWithIndent
-		} else {
-			if msgType == "string" || msgType == "float" || msgType == "int" {
-				decodeValue = decodeAsString
-			} else {
-				decodeValue = decodeAsHex
-			}
-		}
-
-		return func(any *anypb.Any) error {
-			if any == nil {
-				return nil
-			}
-			d := &pbsubstreams.StoreDeltas{}
-			if err := any.UnmarshalTo(d); err != nil {
-				fmt.Printf("Error decoding store deltas: %w", err)
-				return nil
-			}
-
-			fmt.Printf("Store deltas for %q:\n", outputStreamName)
-			for _, delta := range d.Deltas {
-				fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
-
-				fmt.Printf("    OLD: %s\n", decodeValue(delta.OldValue))
-				fmt.Printf("    NEW: %s\n", decodeValue(delta.NewValue))
-			}
-			return nil
-		}
-	} else {
-		if msgDesc != nil {
-			return func(any *anypb.Any) error {
-				if any == nil {
-					return nil
-				}
-
-				cnt := decodeMsgType(any.GetValue())
-
-				fmt.Printf("Message %q: %s\n", msgType, string(cnt))
-
-				return nil
-			}
-		} else {
-			return defaultHandler
-		}
-	}
 }

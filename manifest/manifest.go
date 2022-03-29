@@ -188,14 +188,20 @@ func validateStoreBuilder(module *Module) error {
 		"ignore:proto",   // Exposes SetBytesIfNotExists
 	}
 	found := false
+	var lastCombination string
 	for _, comb := range combinations {
-		if fmt.Sprintf("%s:%s", module.UpdatePolicy, module.ValueType) == comb {
+		valType := module.ValueType
+		if strings.HasPrefix(valType, "proto:") {
+			valType = "proto"
+		}
+		lastCombination = fmt.Sprintf("%s:%s", module.UpdatePolicy, valType)
+		if lastCombination == comb {
 			found = true
 		}
 	}
 
 	if !found {
-		return fmt.Errorf("invalid 'output.updatePolicy' and 'output.valueType' combination, use one of: %s", combinations)
+		return fmt.Errorf("invalid 'output.updatePolicy' and 'output.valueType' combination, found %q use one of: %s", lastCombination, combinations)
 	}
 
 	return nil

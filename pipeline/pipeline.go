@@ -232,7 +232,7 @@ func (p *Pipeline) BuildNative(ctx context.Context, forceLoadState bool) error {
 		}
 
 		if v := mod.GetKindStore(); v != nil {
-			method := f.MethodByName("Store")
+			method := f.MethodByName("store")
 			if method.Kind() == reflect.Invalid {
 				return fmt.Errorf("store() method not found on %T", f.Interface())
 			}
@@ -440,15 +440,17 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 	}
 
 	p.stores = make(map[string]*state.Builder)
-	for _, s := range modules {
-		store := state.NewBuilder(s.Name, s.GetKindStore().UpdatePolicy, s.GetKindStore().ValueType, ioFactory,
-			state.WithPartialMode(p.partialMode, p.requestedStartBlockNum, *s.StartBlock, p.outputStreamName),
-		)
+	for _, m := range modules {
+		var options []state.BuilderOption
+		if p.partialMode {
+			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
+		}
+		store := state.NewBuilder(m.Name, m.GetKindStore().UpdatePolicy, m.GetKindStore().ValueType, ioFactory, options...)
 
 		var initializeStore bool
 		if p.partialMode {
 			/// initialize all parent store data
-			if p.outputStreamName != s.Name {
+			if p.outputStreamName != m.Name {
 				initializeStore = true
 			}
 		} else {
@@ -458,12 +460,12 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 		}
 
 		if initializeStore {
-			if err := store.Init(ctx, p.requestedStartBlockNum); err != nil {
-				return fmt.Errorf("could not load state for store %s at block num %d: %w", s.Name, p.requestedStartBlockNum, err)
+			if err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
+				return fmt.Errorf("could not load state for store %s at block num %d: %w", m.Name, p.requestedStartBlockNum, err)
 			}
 		}
 
-		p.stores[s.Name] = store
+		p.stores[m.Name] = store
 	}
 	return nil
 }
@@ -607,7 +609,7 @@ func nativeStoreCall(vals map[string]reflect.Value, method reflect.Value, name s
 	// TODO: we can cache the `Method` retrieved on the stream.
 	out := method.Call(inputVals)
 	if len(out) != 1 {
-		return fmt.Errorf("invalid number of outputs for 'Store' call in code for module %q, should be 1 (error)", name)
+		return fmt.Errorf("invalid number of outputs for 'store' call in code for module %q, should be 1 (error)", name)
 	}
 	if err, ok := out[0].Interface().(error); ok && err != nil {
 		return fmt.Errorf("state builder module %q: %w", name, err)

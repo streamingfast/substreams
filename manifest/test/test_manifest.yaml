@@ -7,7 +7,7 @@ protoFiles:
 modules:
   - name: pair_extractor
     kind: map
-    startBlock: 6809737
+#    startBlock: 6809737
     code:
       type: wasm/rust-v1
       file: ./test/code/pcs_substreams_bg.wasm

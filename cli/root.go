@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 	"time"
 
@@ -84,14 +83,15 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	var pipelineOpts []pipeline.Option
 	if partialMode := viper.GetBool("partial"); partialMode {
 		fmt.Println("Starting pipeline in partial mode...")
-		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(startBlockNum))
+		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(uint64(startBlockNum)))
 	}
 
-	if startBlockNum == math.MaxUint64 {
-		startBlockNum, err = graph.ModuleStartBlock(outputStreamName)
+	if startBlockNum == -1 {
+		sb, err := graph.ModuleStartBlock(outputStreamName)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
 		}
+		startBlockNum = int64(sb)
 	}
 
 	if stopBlockNum == 0 {
@@ -104,13 +104,13 @@ func runRoot(cmd *cobra.Command, args []string) error {
 			blockCount = uint64(val)
 		}
 
-		stopBlockNum = startBlockNum + blockCount
+		stopBlockNum = uint64(startBlockNum) + blockCount
 	}
 
 	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
 	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
 
-	handler, err := pipe.HandlerFactory(ctx, startBlockNum, stopBlockNum, returnHandler)
+	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)
 	if err != nil {
 		return fmt.Errorf("building pipeline handler: %w", err)
 	}

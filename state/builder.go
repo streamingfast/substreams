@@ -36,11 +36,10 @@ type Builder struct {
 
 type BuilderOption func(b *Builder)
 
-func WithPartialMode(partialMode bool, startBlock, moduleStartBlock uint64, outputStream string) BuilderOption {
+func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 	return func(b *Builder) {
-		b.partialMode = partialMode
+		b.partialMode = true
 		b.partialStartBlock = startBlock
-		b.moduleStartBlock = moduleStartBlock
 		b.disableWriteState = outputStream != b.Name
 	}
 }

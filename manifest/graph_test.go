@@ -52,8 +52,9 @@ var testModules = []*pbtransform.Module{
 		},
 	},
 	{
-		Name: "E",
-		Kind: &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
+		Name:       "E",
+		StartBlock: &ten,
+		Kind:       &pbtransform.Module_KindStore{KindStore: &pbtransform.KindStore{}},
 		Inputs: []*pbtransform.Input{
 			{
 				Input: &pbtransform.Input_Store{Store: &pbtransform.InputStore{
@@ -193,6 +194,7 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 }
 
 func TestModuleGraph_computeStartBlocks(t *testing.T) {
+	//todo: @ed please add test here! thanks
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 	for _, module := range g.modules {

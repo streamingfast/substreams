@@ -30,6 +30,7 @@ message Module {
 
   repeated Input inputs = 6;
   Output output  = 7;
+  //todo: @ed remove the optional
   optional uint64 start_block = 8;
 }
 

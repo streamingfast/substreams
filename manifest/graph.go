@@ -3,10 +3,8 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 
 	"github.com/streamingfast/bstream"
-
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/yourbasic/graph"
 )
@@ -17,6 +15,7 @@ type ModuleGraph struct {
 	modules     []*pbtransform.Module
 	moduleIndex map[string]int
 	indexIndex  map[int]*pbtransform.Module
+	startBlock  map[int]bool
 }
 
 func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
@@ -61,30 +60,40 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 
 func computeStartBlock(modules []*pbtransform.Module, g *ModuleGraph) {
 	for _, module := range modules {
-		if module.StartBlock == nil {
+		if module.StartBlock == nil { //todo: @ed
 			moduleIndex := g.moduleIndex[module.Name]
-			startBlock := startBlockForModule(moduleIndex, g, math.MaxUint64)
+			startBlock := startBlockForModule(moduleIndex, g)
 			module.StartBlock = &startBlock
 		}
 	}
 }
 
-func startBlockForModule(moduleIndex int, g *ModuleGraph, startBlock uint64) uint64 {
-	sb := startBlock
+func startBlockForModule(moduleIndex int, g *ModuleGraph) uint64 {
+	parentsStartBlock := int64(-1)
 	g.Visit(moduleIndex, func(w int, c int64) bool {
 		parent := g.modules[w]
-		if parent.StartBlock != nil {
-			if parent.GetStartBlock() < sb {
-				sb = parent.GetStartBlock()
+		currentStartBlock := int64(-1)
+		if parent.StartBlock == nil { //todo: @ed
+			currentStartBlock = int64(startBlockForModule(w, g))
+		} else {
+			currentStartBlock = int64(parent.GetStartBlock())
+		}
+
+		if parentsStartBlock == -1 {
+			if currentStartBlock != -1 {
+				parentsStartBlock = currentStartBlock
 			}
 			return false
 		}
+		if parentsStartBlock != currentStartBlock {
+			panic("un beau petit message intelligent ici")
+		}
 		return false
 	})
-	if sb == math.MaxUint64 {
+	if parentsStartBlock == -1 {
 		return bstream.GetProtocolFirstStreamableBlock
 	}
-	return sb
+	return uint64(parentsStartBlock)
 }
 
 func (g *ModuleGraph) topSort() ([]*pbtransform.Module, bool) {

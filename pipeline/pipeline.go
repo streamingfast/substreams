@@ -342,7 +342,7 @@ func (p *Pipeline) BuildWASM(ctx context.Context, forceLoadState bool) error {
 			outputFunc := func(out []byte) {}
 			if isOutput {
 				outputFunc = func(out []byte) {
-					p.nextReturnValue = &anypb.Any{TypeUrl: outType, Value: out}
+					p.nextReturnValue = &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: out}
 				}
 			}
 
@@ -477,7 +477,7 @@ func (p *Pipeline) setupStores(ctx context.Context, graph *manifest.ModuleGraph,
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64, returnFunc func(any *anypb.Any)) bstream.Handler {
+func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64, returnFunc func(any *anypb.Any) error) bstream.Handler {
 	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
@@ -534,14 +534,16 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, stopBlock uint64, returnF
 			}
 		}
 
-		returnFunc(p.nextReturnValue)
-
 		// Prep for next block, clean-up all deltas.
 		for _, s := range p.stores {
 			s.Flush()
 		}
 
 		p.progressTracker.blockProcessed(block)
+
+		if err := returnFunc(p.nextReturnValue); err != nil {
+			return err
+		}
 
 		return nil
 	})

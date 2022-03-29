@@ -2,13 +2,15 @@ package cli
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
-	"google.golang.org/protobuf/types/known/anypb"
 	"math"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -130,10 +132,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	if err := pipe.Build(ctx, forceLoadState); err != nil {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
-	returnHandler := &ReturnHandler{
-		manifest: manif,
-	}
-	handler := pipe.HandlerFactory(ctx, stopBlockNum, returnHandler.onReturn)
+	returnHandler := NewPrintReturnHandler(manif, outputStreamName)
+	handler := pipe.HandlerFactory(ctx, stopBlockNum, returnHandler)
 
 	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
 		firehose.WithForkableSteps(bstream.StepIrreversible),
@@ -148,31 +148,47 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type ReturnHandler struct {
-	manifest *manifest.Manifest
-}
+func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) func(any *anypb.Any) error {
+	var msgType string
+	for _, mod := range manif.Modules {
+		if mod.Name == outputStreamName {
+			if mod.Output.Type != "" {
+				msgType = mod.Output.Type
+			} else {
+				msgType = mod.ValueType
+			}
+		}
+	}
 
-func (r *ReturnHandler) onReturn(any *anypb.Any) {
 	var msgDesc *desc.MessageDescriptor
-	for _, file := range r.manifest.ProtoDescs {
-		msgDesc = file.FindMessage(any.GetTypeUrl()) //todo: make sure it works relatively-wise
+	for _, file := range manif.ProtoDescs {
+		msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
 		if msgDesc != nil {
 			break
 		}
 	}
 
 	if msgDesc != nil {
-		msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-		if err := msg.Unmarshal(any.GetValue()); err != nil {
-			fmt.Printf("error unmarshalling protobuf %s to map: %s \n", any.GetTypeUrl(), err)
+		return func(any *anypb.Any) error {
+			msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+			if err := msg.Unmarshal(any.GetValue()); err != nil {
+				fmt.Printf("error unmarshalling protobuf %s to map: %s \n", any.GetTypeUrl(), err)
+			}
+
+			cnt, err := msg.MarshalJSONIndent()
+			if err != nil {
+				fmt.Printf("error encoding protobuf %s into json: %S \n", any.GetTypeUrl(), err)
+			}
+
+			fmt.Println(string(cnt))
+
+			return nil
 		}
 
-		cnt, err := msg.MarshalJSONIndent()
-		if err != nil {
-			fmt.Printf("error encoding protobuf %s into json: %S \n", any.GetTypeUrl(), err)
-		}
-
-		fmt.Println(string(cnt))
 	}
 
+	return func(any *anypb.Any) error {
+		fmt.Println(protojson.Marshal(any))
+		return nil
+	}
 }

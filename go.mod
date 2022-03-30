@@ -81,6 +81,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594 // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447 // indirect
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a // indirect
+	github.com/streamingfast/firehose v0.1.1-0.20220330200655-9a92471b9be3 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect

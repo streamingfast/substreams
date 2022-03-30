@@ -169,24 +169,26 @@ func (p *Pipeline) build(ctx context.Context) error {
 		p.vmType = vmType
 	}
 
-	if p.vmType == "native" {
-		return p.BuildNative(ctx)
-	}
-
-	return p.buildWASM(ctx)
-}
-
-func (p *Pipeline) BuildNative(ctx context.Context) error {
 	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
-		return fmt.Errorf("whoops: %w", err)
+		return fmt.Errorf("building execution graph: %w", err)
 	}
-
-	nativeStreams := registry.Init(p.nativeImports)
 
 	if err := p.setupStores(ctx, p.requestedStartBlockNum, p.graph, p.ioFactory); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
+
+	if p.vmType == "native" {
+		return p.BuildNative(modules)
+	}
+
+	return p.buildWASM(modules)
+}
+
+func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
+
+	nativeStreams := registry.Init(p.nativeImports)
+
 	p.nativeOutputs = map[string]reflect.Value{}
 
 	for _, mod := range modules {
@@ -202,7 +204,7 @@ func (p *Pipeline) BuildNative(ctx context.Context) error {
 		}
 
 		debugOutput := modName == p.outputStreamName
-		inputs := []string{}
+		var inputs []string
 		for _, in := range mod.Inputs {
 			if v := in.GetMap(); v != nil {
 				inputs = append(inputs, v.ModuleName)
@@ -274,15 +276,7 @@ func (p *Pipeline) BuildNative(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pipeline) buildWASM(ctx context.Context) error {
-	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
-	if err != nil {
-		return fmt.Errorf("building execution graph: %w", err)
-	}
-
-	if err := p.setupStores(ctx, p.requestedStartBlockNum, p.graph, p.ioFactory); err != nil {
-		return fmt.Errorf("setting up stores: %w", err)
-	}
+func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 
 	p.wasmOutputs = map[string][]byte{}
 

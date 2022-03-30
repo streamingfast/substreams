@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/bstream/firehose"
+	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/decode"
@@ -116,18 +116,18 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("building pipeline handler: %w", err)
 	}
 
-	fmt.Println("Starting firehose from block", startBlockNum)
+	fmt.Println("Starting firehose stream from block", startBlockNum)
 
-	hose := firehose.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
-		firehose.WithForkableSteps(bstream.StepIrreversible),
-		firehose.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
+	hose := stream.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
+		stream.WithForkableSteps(bstream.StepIrreversible),
+		stream.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
 	)
 
 	if err := hose.Run(ctx); err != nil {
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
-		return fmt.Errorf("running the firehose: %w", err)
+		return fmt.Errorf("running the firehose stream: %w", err)
 	}
 	time.Sleep(5 * time.Second)
 

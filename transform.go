@@ -6,17 +6,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/eth-go/rpc"
-	"github.com/streamingfast/firehose"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"github.com/streamingfast/substreams/manifest"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -45,7 +44,7 @@ func GetRPCClient(endpoint string, cachePath string) (*rpc.Client, *ssrpc.Cache,
 	return rpc.NewClient(endpoint, rpc.WithHttpClient(httpClient)), cache, nil
 }
 
-func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockType string, firehoseServer *firehose.Server) *transform.Factory {
+func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockType string) *transform.Factory {
 
 	return &transform.Factory{
 		Obj: &pbtransform.Transform{},
@@ -92,8 +91,7 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 					protobufBlockType,
 					ioFactory,
 				),
-				description:    req.Manifest.Description,
-				firehoseServer: firehoseServer,
+				description: req.Manifest.Description,
 			}
 
 			return t, nil
@@ -102,13 +100,17 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 }
 
 type ssTransform struct {
-	pipeline       *pipeline.Pipeline
-	description    string
-	firehoseServer *firehose.Server
+	pipeline    *pipeline.Pipeline
+	description string
 }
 
-func (t *ssTransform) Run(ctx context.Context, req *pbfirehose.Request, output func(*bstream.Cursor, *anypb.Any) error) error {
-	fmt.Println("inside Run")
+func (t *ssTransform) Run(
+	ctx context.Context,
+	req *pbfirehose.Request,
+	getStream transform.StreamGetter,
+	output transform.StreamOutput,
+) error {
+	fmt.Println("inside run with request", req)
 
 	newReq := &pbfirehose.Request{
 		StartBlockNum: req.StartBlockNum,
@@ -120,6 +122,7 @@ func (t *ssTransform) Run(ctx context.Context, req *pbfirehose.Request, output f
 	}
 
 	returnHandler := func(any *anypb.Any) error {
+		// FIXME we need to get the block here or the step or something...
 		return output(nil, any)
 	}
 
@@ -129,24 +132,19 @@ func (t *ssTransform) Run(ctx context.Context, req *pbfirehose.Request, output f
 		// FIXME start block resolving is an art, it should be handled here
 	}
 
-	handler, err := t.pipeline.HandlerFactory(ctx, uint64(req.StartBlockNum), req.StopBlockNum, returnHandler)
+	handlerFactoryStartBlock := uint64(req.StartBlockNum) // FIXME why do we need this ?
+	handler, err := t.pipeline.HandlerFactory(ctx, handlerFactoryStartBlock, req.StopBlockNum, returnHandler)
 	if err != nil {
 		return fmt.Errorf("error building substreams pipeline handler: %w", err)
 	}
 
-	client := t.firehoseServer.BlocksFromLocal(ctx, newReq)
-	for {
-		resp, err := client.Recv()
-		if err != nil {
-			return fmt.Errorf("error receiving block from firehose client")
-		}
-
-		if resp.Block.TypeUrl != "dfuse.bstream.v1.block" {
-			panic(resp.Block.TypeUrl)
-		}
-		_ = handler
-
+	st, err := getStream(ctx, handler, newReq, zap.NewNop())
+	if err != nil {
+		return fmt.Errorf("error getting stream: %w", err)
 	}
+	fmt.Println("running stream")
+	return st.Run(ctx)
+
 }
 
 func (t *ssTransform) String() string {

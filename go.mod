@@ -4,15 +4,14 @@ go 1.17
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/golang/protobuf v1.5.2
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/streamingfast/bstream v0.0.2-0.20220328204032-dd1f19f4e885
+	github.com/streamingfast/bstream v0.0.2-0.20220330132237-248bc2d8ea7e
 	github.com/streamingfast/dstore v0.1.1-0.20220307201418-3ad32e685451
 	github.com/streamingfast/eth-go v0.0.0-20220312041930-62a1ff104ff6
-	github.com/streamingfast/firehose v0.1.1-0.20220328204102-02de7f7019e3
+	github.com/streamingfast/firehose v0.1.1-0.20220330132243-8bebec58df04
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
@@ -50,6 +49,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.7 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect

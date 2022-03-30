@@ -12,11 +12,11 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/transform"
 )
 
 var ProtobufBlockType string = "sf.ethereum.type.v1.Block"
@@ -81,7 +81,8 @@ func runLocal(cmd *cobra.Command, args []string) error {
 	}
 	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
 	fmt.Println("ENDPOINT", rpcEndpoint)
-	rpcClient, rpcCache, err := substreams.GetRPCClient(rpcEndpoint, "./rpc-cache")
+	// FIXME: obviously this doesn't belong in `transform`, it's an `eth-centric` thing.
+	rpcClient, rpcCache, err := transform.GetRPCClient(rpcEndpoint, "./rpc-cache")
 	if err != nil {
 		return fmt.Errorf("setting up rpc client: %w", err)
 	}

@@ -112,7 +112,7 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		if cursor != nil && cursor.Block != nil {
 			fmt.Println(cursor.Block.Num())
 		}
-		ret := returnHandler(resp.Block)
+		ret := returnHandler(resp.Block, stepFromProto(resp.Step), cursor)
 		if ret != nil {
 			fmt.Println(ret)
 		}
@@ -142,4 +142,16 @@ func runRemote(cmd *cobra.Command, args []string) error {
 	//	time.Sleep(5 * time.Second)
 	//
 	// return nil
+}
+
+func stepFromProto(step pbfirehose.ForkStep) bstream.StepType {
+	switch step {
+	case pbfirehose.ForkStep_STEP_NEW:
+		return bstream.StepNew
+	case pbfirehose.ForkStep_STEP_UNDO:
+		return bstream.StepUndo
+	case pbfirehose.ForkStep_STEP_IRREVERSIBLE:
+		return bstream.StepIrreversible
+	}
+	return bstream.StepType(0)
 }

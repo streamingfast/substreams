@@ -129,5 +129,4 @@ func printBlock(step bstream.StepType, cursor *bstream.Cursor) {
 		blockNum = cursor.Block.Num()
 	}
 	fmt.Printf("----------- BLOCK: %d (%s) ---------------\n", blockNum, step)
-
 }

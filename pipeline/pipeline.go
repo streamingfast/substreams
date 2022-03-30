@@ -488,6 +488,12 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			}
 		}()
 
+		cursorable := obj.(bstream.Cursorable)
+		cursor := cursorable.Cursor()
+
+		stepable := obj.(bstream.Stepable)
+		step := stepable.Step()
+
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		if block.Number >= stopBlock {
@@ -526,8 +532,8 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			panic("unsupported vmType " + p.vmType)
 		}
 
-		fmt.Println("-------------------------------------------------------------------")
-		fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.requestedStartBlockNum, block.Num(), block.ID())
+		// fmt.Println("-------------------------------------------------------------------")
+		// fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.requestedStartBlockNum, block.Num(), block.ID())
 
 		for _, streamFunc := range p.streamFuncs {
 			if err := streamFunc(); err != nil {
@@ -542,7 +548,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 
 		p.progressTracker.blockProcessed(block)
 
-		if err := returnFunc(p.nextReturnValue); err != nil {
+		if err := returnFunc(p.nextReturnValue, step, cursor); err != nil {
 			return err
 		}
 

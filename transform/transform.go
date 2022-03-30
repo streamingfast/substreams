@@ -1,4 +1,4 @@
-package substreams
+package transform
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/eth-go/rpc"
@@ -24,6 +25,7 @@ import (
 
 var MessageName = proto.MessageName(&pbtransform.Transform{})
 
+// FIXME: move that to an eth-specific location sometime!
 func GetRPCClient(endpoint string, cachePath string) (*rpc.Client, *ssrpc.Cache, error) {
 	var cache *ssrpc.Cache
 
@@ -125,9 +127,11 @@ func (t *ssTransform) Run(
 		// ...FIXME ?
 	}
 
-	returnHandler := func(any *anypb.Any) error {
+	returnHandler := func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
 		// FIXME we need to get the block here or the step or something...
-		return output(nil, any)
+		// FIXME: use the same ReturnHandler interface, why not store it in `bstream`, and replace
+		// that StreamOutput iface.
+		return output(cursor, any)
 	}
 
 	if req.StartBlockNum < 0 {

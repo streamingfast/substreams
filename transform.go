@@ -2,7 +2,9 @@ package substreams
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -145,8 +147,13 @@ func (t *ssTransform) Run(
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 	fmt.Println("running stream")
-	return st.Run(ctx)
-
+	if err := st.Run(ctx); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return fmt.Errorf("running the firehose stream: %w", err)
+	}
+	return nil
 }
 
 func (t *ssTransform) String() string {

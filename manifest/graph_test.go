@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"fmt"
 	"github.com/streamingfast/bstream"
 	"github.com/test-go/testify/require"
 	"sort"
@@ -197,13 +196,20 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 }
 
 func TestModuleGraph_computeStartBlocks(t *testing.T) {
+	var oldValue = bstream.GetProtocolFirstStreamableBlock
+	bstream.GetProtocolFirstStreamableBlock = uint64(99)
+	defer func() {
+		bstream.GetProtocolFirstStreamableBlock = oldValue
+	}()
+
 	var startBlockTestModule = []*pbtransform.Module{
 		{
 			Name:       "block_to_pairs",
 			StartBlock: twenty,
 		},
 		{
-			Name: "pairs",
+			Name:       "pairs",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -215,7 +221,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "block_to_reserves",
+			Name:       "block_to_reserves",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -227,7 +234,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "reserves",
+			Name:       "reserves",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -246,7 +254,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "prices",
+			Name:       "prices",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -272,7 +281,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "mint_burn_swaps_extractor",
+			Name:       "mint_burn_swaps_extractor",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -291,7 +301,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "volumes",
+			Name:       "volumes",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -303,7 +314,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "database_output",
+			Name:       "database_output",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -322,7 +334,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name: "totals",
+			Name:       "totals",
+			StartBlock: UNSET,
 			Inputs: []*pbtransform.Input{
 				{
 					Input: &pbtransform.Input_Store{
@@ -342,12 +355,11 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 		},
 	}
 
-	//todo: @ed please add test here! thanks
-	g, err := NewModuleGraph(startBlockTestModule)
-	assert.NoError(t, err)
-	for _, module := range g.modules {
-		fmt.Println(module.Name, "start block:", module.StartBlock)
-	}
+	_, err := NewModuleGraph(startBlockTestModule)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint64(20), startBlockTestModule[0].StartBlock)
+	assert.Equal(t, uint64(20), startBlockTestModule[1].StartBlock)
 }
 
 func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingNoStartBlock(t *testing.T) {

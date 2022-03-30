@@ -151,7 +151,7 @@ func New(
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build(ctx context.Context, requestStartBlock uint64) error {
+func (p *Pipeline) build(ctx context.Context) error {
 
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
@@ -170,13 +170,13 @@ func (p *Pipeline) build(ctx context.Context, requestStartBlock uint64) error {
 	}
 
 	if p.vmType == "native" {
-		return p.BuildNative(ctx, requestStartBlock)
+		return p.BuildNative(ctx)
 	}
 
-	return p.buildWASM(ctx, requestStartBlock)
+	return p.buildWASM(ctx)
 }
 
-func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64) error {
+func (p *Pipeline) BuildNative(ctx context.Context) error {
 	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("whoops: %w", err)
@@ -184,7 +184,7 @@ func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64) er
 
 	nativeStreams := registry.Init(p.nativeImports)
 
-	if err := p.setupStores(ctx, requestStartBlock, p.graph, p.ioFactory); err != nil {
+	if err := p.setupStores(ctx, p.requestedStartBlockNum, p.graph, p.ioFactory); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 	p.nativeOutputs = map[string]reflect.Value{}
@@ -274,13 +274,13 @@ func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64) er
 	return nil
 }
 
-func (p *Pipeline) buildWASM(ctx context.Context, requestStartBlock uint64) error {
+func (p *Pipeline) buildWASM(ctx context.Context) error {
 	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(ctx, requestStartBlock, p.graph, p.ioFactory); err != nil {
+	if err := p.setupStores(ctx, p.requestedStartBlockNum, p.graph, p.ioFactory); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
@@ -478,7 +478,7 @@ type StreamFunc func() error
 func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
 
 	p.requestedStartBlockNum = requestedStartBlockNum
-	err := p.build(ctx, requestedStartBlockNum)
+	err := p.build(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}

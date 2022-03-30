@@ -32,6 +32,8 @@ func GetRPCClient(endpoint string, cachePath string) (*rpc.Client, *ssrpc.Cache,
 		}
 		cache = ssrpc.NewCache(rpcCacheStore, rpcCacheStore, 0, 999) // FIXME: kind of a hack here...
 		cache.Load(context.Background())                             // FIXME: dont load this every request
+	} else {
+		cache = ssrpc.NewCache(nil, nil, 0, 99999999) // FIXME: kind of a hack here...
 	}
 
 	httpClient := &http.Client{

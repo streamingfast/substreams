@@ -424,10 +424,12 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 }
 
 func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface) error {
-	p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
-	err := p.fileWaiter.Wait(ctx, requestStartBlock) //block until all parent stores have completed their tasks
-	if err != nil {
-		return fmt.Errorf("fileWaiter: %w", err)
+	if p.partialMode {
+		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
+		err := p.fileWaiter.Wait(ctx, requestStartBlock) //block until all parent stores have completed their tasks
+		if err != nil {
+			return fmt.Errorf("fileWaiter: %w", err)
+		}
 	}
 
 	modules, err := graph.StoresDownTo(p.outputStreamName)

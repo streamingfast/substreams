@@ -214,14 +214,14 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 				inputs = append(inputs, v.GetType())
 			}
 		}
-
-		if v := mod.GetKindMap(); v != nil {
+		switch mod.Kind.(type) {
+		case *pbtransform.Module_KindMap:
 			method := f.MethodByName("Map")
 			if method.Kind() == reflect.Invalid {
-				return fmt.Errorf("Map() method not found on %T", f.Interface())
+				return fmt.Errorf("map() method not found on %T", f.Interface())
 			}
 			if method.IsZero() {
-				return fmt.Errorf("Map() method not found on %T", f.Interface())
+				return fmt.Errorf("map() method not found on %T", f.Interface())
 			}
 			outputFunc := func(msg proto.Message) error { return nil }
 			if debugOutput {
@@ -237,9 +237,7 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 				return nativeMapCall(p.nativeOutputs, method, modName, inputs, outputFunc)
 			})
 			continue
-		}
-
-		if v := mod.GetKindStore(); v != nil {
+		case *pbtransform.Module_KindStore:
 			method := f.MethodByName("store")
 			if method.Kind() == reflect.Invalid {
 				return fmt.Errorf("store() method not found on %T", f.Interface())
@@ -267,10 +265,9 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 			})
 
 			continue
+		default:
+			return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
 		}
-
-		return fmt.Errorf("unknown value %q for 'kind' in stream %q", mod.Kind, mod.Name)
-
 	}
 
 	return nil

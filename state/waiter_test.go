@@ -272,7 +272,7 @@ func Test_pathToState(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			files, err := pathToState(context.TODO(), test.store, test.targetBlock, &pbtransform.Module{Name: test.storeName, StartBlock: &test.moduleStartBlock})
+			files, err := pathToState(context.TODO(), test.store, test.targetBlock, &pbtransform.Module{Name: test.storeName, StartBlock: test.moduleStartBlock})
 			assert.Equal(t, test.expectedFiles, files)
 			assert.Equal(t, test.expectedError, err != nil)
 		})

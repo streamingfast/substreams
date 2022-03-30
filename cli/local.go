@@ -72,7 +72,14 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up irr blocks store: %w", err)
 	}
 
-	rpcEndpoint := viper.GetString("rpc-endpoint")
+	mustGetString := func(cmd *cobra.Command, flagName string) string {
+		val, err := cmd.Flags().GetString(flagName)
+		if err != nil {
+			panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+		}
+		return val
+	}
+	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
 	fmt.Println("ENDPOINT", rpcEndpoint)
 	rpcClient, rpcCache, err := substreams.GetRPCClient(rpcEndpoint, "./rpc-cache")
 	if err != nil {

@@ -7,8 +7,6 @@ import (
 func Main() {
 	setup()
 
-	autoBind(rootCmd, "SUBSTREAMS")
-
 	err := rootCmd.Execute()
 	if err != nil {
 		zlog.Error("running cmd", zap.Error(err))

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -8,8 +9,14 @@ import (
 	"github.com/spf13/pflag"
 )
 
+func init() {
+	cobra.OnInitialize(func() {
+		autoBind(rootCmd, "SUBSTREAMS")
+	})
+}
+
 func autoBind(root *cobra.Command, prefix string) {
-	recurseCommands(root, "SUBSTREAMS", nil) // []string{strings.ToLower(prefix)}) how does it wweeeerrkk?
+	recurseCommands(root, prefix, nil) // []string{strings.ToLower(prefix)}) how does it wweeeerrkk?
 }
 
 func recurseCommands(root *cobra.Command, prefix string, segments []string) {
@@ -21,20 +28,24 @@ func recurseCommands(root *cobra.Command, prefix string, segments []string) {
 	root.PersistentFlags().VisitAll(func(f *pflag.Flag) {
 		newName := strings.Replace(strings.ToUpper(f.Name), "-", "_", -1)
 		varName := prefix + "_" + segmentPrefix + "GLOBAL_" + newName
-		//fmt.Println("PERSISTENT FLAG:", varName)
 		if val := os.Getenv(varName); val != "" {
 			f.Usage += " [LOADED FROM ENV]" // Until we have a better template for our usage.
-			f.DefValue = val
+			fmt.Println("SET PERSISTENT FLAG:", varName, val)
+			if !f.Changed {
+				f.Value.Set(val)
+			}
 		}
 	})
 
 	root.Flags().VisitAll(func(f *pflag.Flag) {
 		newName := strings.Replace(strings.ToUpper(f.Name), "-", "_", -1)
 		varName := prefix + "_" + segmentPrefix + "CMD_" + newName
-		//fmt.Println("FLAG:", varName)
 		if val := os.Getenv(varName); val != "" {
 			f.Usage += " [LOADED FROM ENV]"
-			f.DefValue = val
+			//fmt.Println("SET FLAG:", varName, val, f.Changed)
+			if !f.Changed {
+				f.Value.Set(val)
+			}
 		}
 	})
 

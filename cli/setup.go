@@ -10,6 +10,10 @@ func setup() {
 	setupProfiler()
 }
 
+var (
+	pprofListenAddr = "localhost:6060"
+)
+
 func setupProfiler() {
 	go func() {
 		err := http.ListenAndServe(pprofListenAddr, nil)

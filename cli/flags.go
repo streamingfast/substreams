@@ -1,47 +1,44 @@
 package cli
 
 import (
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 func autoBind(root *cobra.Command, prefix string) {
-	viper.SetEnvPrefix(strings.ToUpper(prefix))
-	viper.AutomaticEnv()
-	replacer := strings.NewReplacer("-", "_")
-	viper.SetEnvKeyReplacer(replacer)
-
-	recurseCommands(root, nil) // []string{strings.ToLower(prefix)}) how does it wweeeerrkk?
+	recurseCommands(root, "SUBSTREAMS", nil) // []string{strings.ToLower(prefix)}) how does it wweeeerrkk?
 }
 
-func recurseCommands(root *cobra.Command, segments []string) {
+func recurseCommands(root *cobra.Command, prefix string, segments []string) {
 	var segmentPrefix string
 	if len(segments) > 0 {
-		segmentPrefix = strings.Join(segments, "-") + "-"
+		segmentPrefix = strings.ToUpper(strings.Join(segments, "_")) + "_"
 	}
 
-	zlog.Debug("re-binding flags", zap.String("cmd", root.Name()), zap.String("prefix", segmentPrefix))
-	defer func() {
-		zlog.Debug("rebinding flags terminated", zap.String("cmd", root.Name()))
-	}()
-
 	root.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		newVar := segmentPrefix + "global-" + f.Name
-		viper.BindPFlag(newVar, f)
-		zlog.Debug("binding persistent flag", zap.String("actual", f.Name), zap.String("rebind", newVar))
+		newName := strings.Replace(strings.ToUpper(f.Name), "-", "_", -1)
+		varName := prefix + "_" + segmentPrefix + "GLOBAL_" + newName
+		//fmt.Println("PERSISTENT FLAG:", varName)
+		if val := os.Getenv(varName); val != "" {
+			f.Usage += " [LOADED FROM ENV]" // Until we have a better template for our usage.
+			f.DefValue = val
+		}
 	})
 
 	root.Flags().VisitAll(func(f *pflag.Flag) {
-		newVar := segmentPrefix + f.Name
-		viper.BindPFlag(newVar, f)
-		zlog.Debug("binding flag", zap.String("actual", f.Name), zap.String("rebind", newVar))
+		newName := strings.Replace(strings.ToUpper(f.Name), "-", "_", -1)
+		varName := prefix + "_" + segmentPrefix + "CMD_" + newName
+		//fmt.Println("FLAG:", varName)
+		if val := os.Getenv(varName); val != "" {
+			f.Usage += " [LOADED FROM ENV]"
+			f.DefValue = val
+		}
 	})
 
 	for _, cmd := range root.Commands() {
-		recurseCommands(cmd, append(segments, cmd.Name()))
+		recurseCommands(cmd, prefix, append(segments, cmd.Name()))
 	}
 }

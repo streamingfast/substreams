@@ -151,7 +151,7 @@ func New(
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build(ctx context.Context) error {
+func (p *Pipeline) build() (modules []*pbtransform.Module, stores []*pbtransform.Module, err error) {
 
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
@@ -161,29 +161,36 @@ func (p *Pipeline) build(ctx context.Context) error {
 		case mod.GetNativeCode() != nil:
 			vmType = "native"
 		default:
-			return fmt.Errorf("invalid code type for modules %s ", mod.Name)
+			return nil, nil, fmt.Errorf("invalid code type for modules %s ", mod.Name)
 		}
 		if p.vmType != "" && vmType != p.vmType {
-			return fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
+			return nil, nil, fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
 		}
 		p.vmType = vmType
 	}
 
-	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
+	modules, err = p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
-		return fmt.Errorf("building execution graph: %w", err)
+		return nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
-	stores, err := p.graph.StoresDownTo(p.outputStreamName)
-	if err := p.setupStores(ctx, p.requestedStartBlockNum, stores, p.ioFactory); err != nil {
-		return fmt.Errorf("setting up stores: %w", err)
+	p.stores = make(map[string]*state.Builder)
+	stores, err = p.graph.StoresDownTo(p.outputStreamName)
+	for _, store := range stores {
+		var options []state.BuilderOption
+		if p.partialMode {
+			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
+		}
+		store := state.NewBuilder(store.Name, store.GetKindStore().UpdatePolicy, store.GetKindStore().ValueType, p.ioFactory, options...)
+		p.stores[store.Name] = store
 	}
 
 	if p.vmType == "native" {
-		return p.BuildNative(modules)
+		err = p.BuildNative(modules)
+		return
 	}
-
-	return p.buildWASM(modules)
+	err = p.buildWASM(modules)
+	return
 }
 
 func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
@@ -424,22 +431,17 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 	}
 }
 
-func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, modules []*pbtransform.Module, ioFactory state.FactoryInterface) error {
+func (p *Pipeline) SynchronizeStores(ctx context.Context, storeModules []*pbtransform.Module) error {
 	if p.partialMode {
 		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
-		err := p.fileWaiter.Wait(ctx, requestStartBlock) //block until all parent stores have completed their tasks
+		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}
 	}
 
-	p.stores = make(map[string]*state.Builder)
-	for _, m := range modules {
-		var options []state.BuilderOption
-		if p.partialMode {
-			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
-		}
-		store := state.NewBuilder(m.Name, m.GetKindStore().UpdatePolicy, m.GetKindStore().ValueType, ioFactory, options...)
+	for _, m := range storeModules {
+		store := p.stores[m.Name]
 		if err := store.ReadState(ctx, p.requestedStartBlockNum, m); err != nil {
 			e := fmt.Errorf("could not load state for store %s at block num %d: %w", m.Name, p.requestedStartBlockNum, err)
 			if !p.allowInvalidState {
@@ -447,8 +449,7 @@ func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, mo
 			}
 			zlog.Warn("reading state", zap.Error(e))
 		}
-
-		p.stores[m.Name] = store
+		zlog.Info("adding store", zap.String("module_name", m.Name))
 	}
 	return nil
 }
@@ -465,11 +466,17 @@ type StreamFunc func() error
 func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
 
 	p.requestedStartBlockNum = requestedStartBlockNum
-	err := p.build(ctx)
+	_, stores, err := p.build()
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
+	err = p.SynchronizeStores(ctx, stores)
+	if err != nil {
+		return nil, fmt.Errorf("synchonizing store: %w", err)
+	}
+
+	fmt.Println(p.stores)
 	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {

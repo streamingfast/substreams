@@ -7,13 +7,15 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) func(any *anypb.Any) error {
+func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) substreams.ReturnFunc {
 	var msgType string
 	var isStore bool
 	for _, mod := range manif.Modules {
@@ -37,7 +39,8 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 		}
 	}
 
-	defaultHandler := func(any *anypb.Any) error {
+	defaultHandler := func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+		printBlock(step, cursor)
 		if any == nil {
 			return nil
 		}
@@ -82,7 +85,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 			}
 		}
 
-		return func(any *anypb.Any) error {
+		return func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
 			if any == nil {
 				return nil
 			}
@@ -103,7 +106,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 		}
 	} else {
 		if msgDesc != nil {
-			return func(any *anypb.Any) error {
+			return func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
 				if any == nil {
 					return nil
 				}
@@ -118,4 +121,13 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) fu
 			return defaultHandler
 		}
 	}
+}
+
+func printBlock(step bstream.StepType, cursor *bstream.Cursor) {
+	var blockNum uint64
+	if cursor != nil && cursor.Block != nil {
+		blockNum = cursor.Block.Num()
+	}
+	fmt.Printf("----------- BLOCK: %d (%s) ---------------\n", blockNum, step)
+
 }

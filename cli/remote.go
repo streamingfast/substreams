@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/firehose/client"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"github.com/streamingfast/substreams/decode"
@@ -66,8 +66,8 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create module graph %w", err)
 	}
 
-	startBlockNum := viper.GetInt64("start-block")
-	stopBlockNum := viper.GetUint64("stop-block")
+	startBlockNum := mustGetInt64(cmd, "start-block")
+	stopBlockNum := mustGetUint64(cmd, "stop-block")
 
 	if startBlockNum == -1 {
 		sb, err := graph.ModuleStartBlock(outputStreamName)
@@ -76,12 +76,12 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		}
 		startBlockNum = int64(sb)
 	}
+	endpoint := mustGetString(cmd, "firehose-endpoint")
+	jwt := os.Getenv(mustGetString(cmd, "firehose-api-key-envvar"))
+	insecure := mustGetBool(cmd, "insecure")
+	plaintext := mustGetBool(cmd, "plaintext")
 
-	endpoint := viper.GetString("firehose-endpoint")
-	jwt := os.Getenv(viper.GetString("firehose-api-key-envvar"))
-	insecure := viper.GetBool("insecure")
-	plaintext := viper.GetBool("plaintext")
-
+	fmt.Println("CALLING ENDPOINT", endpoint)
 	fhClient, callOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 	if err != nil {
 		return fmt.Errorf("firehose client: %w", err)
@@ -108,7 +108,15 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(returnHandler(resp.Block))
+		cursor, _ := bstream.CursorFromOpaque(resp.Cursor)
+		if cursor != nil && cursor.Block != nil {
+			fmt.Println(cursor.Block.Num())
+		}
+		ret := returnHandler(resp.Block)
+		if ret != nil {
+			fmt.Println(ret)
+		}
+
 	}
 
 	//	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
@@ -133,5 +141,5 @@ func runRemote(cmd *cobra.Command, args []string) error {
 	//	}
 	//	time.Sleep(5 * time.Second)
 	//
-	return nil
+	// return nil
 }

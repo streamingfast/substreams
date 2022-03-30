@@ -146,7 +146,6 @@ func (t *ssTransform) Run(
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}
-	fmt.Println("running stream")
 	if err := st.Run(ctx); err != nil {
 		if errors.Is(err, io.EOF) {
 			return nil

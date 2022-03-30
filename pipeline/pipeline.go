@@ -12,6 +12,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
 	pbethsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
@@ -462,7 +463,7 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
+func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
 
 	p.requestedStartBlockNum = requestedStartBlockNum
 	_, _, err := p.build()

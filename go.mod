@@ -11,7 +11,6 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20220330132237-248bc2d8ea7e
 	github.com/streamingfast/dstore v0.1.1-0.20220307201418-3ad32e685451
 	github.com/streamingfast/eth-go v0.0.0-20220312041930-62a1ff104ff6
-	github.com/streamingfast/firehose v0.1.1-0.20220330132243-8bebec58df04
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942

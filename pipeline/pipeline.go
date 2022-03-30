@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"time"
-
-	"go.uber.org/zap"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
@@ -23,6 +22,7 @@ import (
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/wasmerio/wasmer-go/wasmer"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -473,11 +473,13 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		//defer func() {
-		//	if r := recover(); r != nil {
-		//		err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-		//	}
-		//}()
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+				zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
+				zlog.Error(string(debug.Stack()))
+			}
+		}()
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.

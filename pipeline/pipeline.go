@@ -174,7 +174,8 @@ func (p *Pipeline) build(ctx context.Context) error {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(ctx, p.requestedStartBlockNum, p.graph, p.ioFactory); err != nil {
+	stores, err := p.graph.StoresDownTo(p.outputStreamName)
+	if err := p.setupStores(ctx, p.requestedStartBlockNum, stores, p.ioFactory); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
@@ -423,18 +424,13 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 	}
 }
 
-func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface) error {
+func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, modules []*pbtransform.Module, ioFactory state.FactoryInterface) error {
 	if p.partialMode {
 		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
 		err := p.fileWaiter.Wait(ctx, requestStartBlock) //block until all parent stores have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}
-	}
-
-	modules, err := graph.StoresDownTo(p.outputStreamName)
-	if err != nil {
-		return err
 	}
 
 	p.stores = make(map[string]*state.Builder)
@@ -444,14 +440,12 @@ func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, gr
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
 		}
 		store := state.NewBuilder(m.Name, m.GetKindStore().UpdatePolicy, m.GetKindStore().ValueType, ioFactory, options...)
-
 		if err := store.ReadState(ctx, p.requestedStartBlockNum, m); err != nil {
 			e := fmt.Errorf("could not load state for store %s at block num %d: %w", m.Name, p.requestedStartBlockNum, err)
-			if p.allowInvalidState {
-				zlog.Warn("reading state", zap.Error(e))
-				return nil
+			if !p.allowInvalidState {
+				return e
 			}
-			return e
+			zlog.Warn("reading state", zap.Error(e))
 		}
 
 		p.stores[m.Name] = store
@@ -479,11 +473,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-			}
-		}()
+		//defer func() {
+		//	if r := recover(); r != nil {
+		//		err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+		//	}
+		//}()
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.

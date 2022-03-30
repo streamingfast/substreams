@@ -129,7 +129,7 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 	return done
 }
 
-func pathToState(ctx context.Context, store StoreInterface, requestStartBlock uint64, module *pbtransform.Module) ([]string, error) {
+func pathToState(ctx context.Context, store StoreInterface, requestStartBlock uint64, moduleName string, moduleStartBlock uint64) ([]string, error) {
 	var out []string
 	nextBlockNum := requestStartBlock
 	for {
@@ -141,7 +141,7 @@ func pathToState(ctx context.Context, store StoreInterface, requestStartBlock ui
 			//
 		}
 
-		prefix := fmt.Sprintf("%s-%d", module.Name, nextBlockNum)
+		prefix := fmt.Sprintf("%s-%d", moduleStartBlock, nextBlockNum)
 		files, err := store.ListFiles(ctx, prefix, "", 2)
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
@@ -149,7 +149,7 @@ func pathToState(ctx context.Context, store StoreInterface, requestStartBlock ui
 
 		found := len(files) >= 1
 		if !found {
-			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, module.Name)
+			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, moduleName)
 		}
 
 		foundFile := files[0]
@@ -176,7 +176,7 @@ func pathToState(ctx context.Context, store StoreInterface, requestStartBlock ui
 		if partial {
 			nextBlockNum = start
 			//todo 2.1: if start block from partial is the module start block we are done waiting
-			if start == module.GetStartBlock() {
+			if start == moduleStartBlock {
 				reversePathToState(out)
 				return out, nil
 			}

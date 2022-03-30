@@ -44,12 +44,13 @@ func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 	}
 }
 
-func NewBuilder(name string, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
 	b := &Builder{
-		Name:         name,
-		KV:           make(map[string][]byte),
-		updatePolicy: updatePolicy,
-		valueType:    valueType,
+		Name:             name,
+		moduleStartBlock: moduleStartBlock,
+		KV:               make(map[string][]byte),
+		updatePolicy:     updatePolicy,
+		valueType:        valueType,
 	}
 	if storageFactory != nil {
 		b.store = storageFactory.New(name)
@@ -79,7 +80,7 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (b *Builder) Init(ctx context.Context, startBlockNum uint64) error {
-	if err := b.ReadState(ctx, startBlockNum, nil); err != nil {
+	if err := b.ReadState(ctx, startBlockNum); err != nil {
 		return err
 	}
 
@@ -96,8 +97,8 @@ func (b *Builder) clone() *Builder {
 	return o
 }
 
-func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64, module *pbtransform.Module) error {
-	files, err := pathToState(ctx, b.store, requestedStartBlock, module)
+func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) error {
+	files, err := pathToState(ctx, b.store, requestedStartBlock, b.Name, b.moduleStartBlock)
 	if err != nil {
 		return err
 	}

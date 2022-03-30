@@ -181,7 +181,7 @@ func (p *Pipeline) build() (modules []*pbtransform.Module, stores []*pbtransform
 		if p.partialMode {
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
 		}
-		store := state.NewBuilder(store.Name, store.GetKindStore().UpdatePolicy, store.GetKindStore().ValueType, p.ioFactory, options...)
+		store := state.NewBuilder(store.Name, store.StartBlock, store.GetKindStore().UpdatePolicy, store.GetKindStore().ValueType, p.ioFactory, options...)
 		p.stores[store.Name] = store
 	}
 
@@ -431,7 +431,7 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 	}
 }
 
-func (p *Pipeline) SynchronizeStores(ctx context.Context, storeModules []*pbtransform.Module) error {
+func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
 		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
 		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum) //block until all parent storeModules have completed their tasks
@@ -440,16 +440,15 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context, storeModules []*pbtran
 		}
 	}
 
-	for _, m := range storeModules {
-		store := p.stores[m.Name]
-		if err := store.ReadState(ctx, p.requestedStartBlockNum, m); err != nil {
-			e := fmt.Errorf("could not load state for store %s at block num %d: %w", m.Name, p.requestedStartBlockNum, err)
+	for _, store := range p.stores {
+		if err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
+			e := fmt.Errorf("could not load state for store %s at block num %d: %w", store.Name, p.requestedStartBlockNum, err)
 			if !p.allowInvalidState {
 				return e
 			}
 			zlog.Warn("reading state", zap.Error(e))
 		}
-		zlog.Info("adding store", zap.String("module_name", m.Name))
+		zlog.Info("adding store", zap.String("module_name", store.Name))
 	}
 	return nil
 }
@@ -466,12 +465,12 @@ type StreamFunc func() error
 func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
 
 	p.requestedStartBlockNum = requestedStartBlockNum
-	_, stores, err := p.build()
+	_, _, err := p.build()
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
-	err = p.SynchronizeStores(ctx, stores)
+	err = p.SynchronizeStores(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("synchonizing store: %w", err)
 	}

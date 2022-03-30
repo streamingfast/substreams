@@ -83,8 +83,9 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	var pipelineOpts []pipeline.Option
 	if partialMode := viper.GetBool("partial"); partialMode {
 		fmt.Println("Starting pipeline in partial mode...")
-		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode(uint64(startBlockNum)))
+		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode())
 	}
+	pipelineOpts = append(pipelineOpts, pipeline.WithAllowInvalidState())
 
 	if startBlockNum == -1 {
 		sb, err := graph.ModuleStartBlock(outputStreamName)

@@ -45,11 +45,12 @@ type Pipeline struct {
 	manifest         *pbtransform.Manifest
 	outputStreamName string
 
-	streamFuncs     []StreamFunc
-	nativeOutputs   map[string]reflect.Value
-	wasmOutputs     map[string][]byte
-	progressTracker *progressTracker
-	nextReturnValue *anypb.Any
+	streamFuncs       []StreamFunc
+	nativeOutputs     map[string]reflect.Value
+	wasmOutputs       map[string][]byte
+	progressTracker   *progressTracker
+	nextReturnValue   *anypb.Any
+	allowInvalidState bool
 }
 
 type progressTracker struct {
@@ -109,10 +110,15 @@ type RpcProvider interface {
 
 type Option func(p *Pipeline)
 
-func WithPartialMode(reqStartBlock uint64) Option {
+func WithPartialMode() Option {
 	return func(p *Pipeline) {
 		p.partialMode = true
-		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, reqStartBlock)
+	}
+}
+
+func WithAllowInvalidState() Option {
+	return func(p *Pipeline) {
+		p.allowInvalidState = true
 	}
 }
 
@@ -145,7 +151,7 @@ func New(
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build(ctx context.Context, requestStartBlock uint64, forceLoadState bool) error {
+func (p *Pipeline) build(ctx context.Context, requestStartBlock uint64) error {
 
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
@@ -164,13 +170,13 @@ func (p *Pipeline) build(ctx context.Context, requestStartBlock uint64, forceLoa
 	}
 
 	if p.vmType == "native" {
-		return p.BuildNative(ctx, requestStartBlock, forceLoadState)
+		return p.BuildNative(ctx, requestStartBlock)
 	}
 
-	return p.buildWASM(ctx, requestStartBlock, forceLoadState)
+	return p.buildWASM(ctx, requestStartBlock)
 }
 
-func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64, forceLoadState bool) error {
+func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64) error {
 	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("whoops: %w", err)
@@ -178,7 +184,7 @@ func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64, fo
 
 	nativeStreams := registry.Init(p.nativeImports)
 
-	if err := p.setupStores(ctx, requestStartBlock, p.graph, p.ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(ctx, requestStartBlock, p.graph, p.ioFactory); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 	p.nativeOutputs = map[string]reflect.Value{}
@@ -268,13 +274,13 @@ func (p *Pipeline) BuildNative(ctx context.Context, requestStartBlock uint64, fo
 	return nil
 }
 
-func (p *Pipeline) buildWASM(ctx context.Context, requestStartBlock uint64, forceLoadState bool) error {
+func (p *Pipeline) buildWASM(ctx context.Context, requestStartBlock uint64) error {
 	modules, err := p.graph.ModulesDownTo(p.outputStreamName)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 
-	if err := p.setupStores(ctx, requestStartBlock, p.graph, p.ioFactory, forceLoadState); err != nil {
+	if err := p.setupStores(ctx, requestStartBlock, p.graph, p.ioFactory); err != nil {
 		return fmt.Errorf("setting up stores: %w", err)
 	}
 
@@ -426,12 +432,11 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 	}
 }
 
-func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface, forceLoadState bool) error {
-	if p.fileWaiter != nil {
-		err := p.fileWaiter.Wait(ctx, requestStartBlock) //block until all parent stores have completed their tasks
-		if err != nil {
-			return fmt.Errorf("fileWaiter: %w", err)
-		}
+func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, graph *manifest.ModuleGraph, ioFactory state.FactoryInterface) error {
+	p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
+	err := p.fileWaiter.Wait(ctx, requestStartBlock) //block until all parent stores have completed their tasks
+	if err != nil {
+		return fmt.Errorf("fileWaiter: %w", err)
 	}
 
 	modules, err := graph.StoresDownTo(p.outputStreamName)
@@ -447,22 +452,13 @@ func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, gr
 		}
 		store := state.NewBuilder(m.Name, m.GetKindStore().UpdatePolicy, m.GetKindStore().ValueType, ioFactory, options...)
 
-		var initializeStore bool
-		if p.partialMode {
-			/// initialize all parent store data
-			if p.outputStreamName != m.Name {
-				initializeStore = true
+		if err := store.ReadState(ctx, p.requestedStartBlockNum, m); err != nil {
+			e := fmt.Errorf("could not load state for store %s at block num %d: %w", m.Name, p.requestedStartBlockNum, err)
+			if p.allowInvalidState {
+				zlog.Warn("reading state", zap.Error(e))
+				return nil
 			}
-		} else {
-			if forceLoadState {
-				initializeStore = true
-			}
-		}
-
-		if initializeStore {
-			if err := store.ReadState(ctx, p.requestedStartBlockNum, m); err != nil {
-				return fmt.Errorf("could not load state for store %s at block num %d: %w", m.Name, p.requestedStartBlockNum, err)
-			}
+			return e
 		}
 
 		p.stores[m.Name] = store
@@ -479,12 +475,12 @@ func (p *Pipeline) setupStores(ctx context.Context, requestStartBlock uint64, gr
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlock, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
+func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc func(any *anypb.Any) error) (bstream.Handler, error) {
 
-	p.requestedStartBlockNum = requestedStartBlock
-	err := p.build(ctx, requestedStartBlock, true)
+	p.requestedStartBlockNum = requestedStartBlockNum
+	err := p.build(ctx, requestedStartBlockNum)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
 	p.progressTracker.startTracking(ctx)

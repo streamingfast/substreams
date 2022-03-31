@@ -46,6 +46,9 @@ var localCmd = &cobra.Command{
 }
 
 func runLocal(cmd *cobra.Command, args []string) error {
+	// ISSUE A BIG WARNING IF WE HAVEN'T LOADED ALL THE CHAIN CONFIG SPECIFICS.
+	// If we haven't compiled from `sf-ethereum`, we won't have the block readers, etc..
+
 	ctx := cmd.Context()
 
 	manifestPath := args[0]
@@ -75,7 +78,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 	}
 
 	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
-	fmt.Println("ENDPOINT", rpcEndpoint)
+	fmt.Println("RPC endpoint:", rpcEndpoint)
 	// FIXME: obviously this doesn't belong in `transform`, it's an `eth-centric` thing.
 	rpcClient, rpcCache, err := transform.GetRPCClient(rpcEndpoint, "./rpc-cache")
 	if err != nil {

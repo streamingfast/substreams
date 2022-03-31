@@ -506,6 +506,10 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)
 				}
 
+				if p.requestedStartBlockNum <= s.ModuleStartBlock {
+					continue
+				}
+
 				if p.partialMode {
 					wg.Add(1)
 					go func() {

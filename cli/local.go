@@ -31,7 +31,7 @@ func init() {
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	localCmd.Flags().BoolP("partial", "p", false, "Produce partial stores")
-	localCmd.Flags().BoolP("no-return-handler", "p", false, "Produce partial stores")
+	localCmd.Flags().Bool("no-return-handler", false, "Produce partial stores")
 
 	rootCmd.AddCommand(localCmd)
 }

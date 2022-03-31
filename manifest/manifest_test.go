@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -116,6 +118,7 @@ func TestManifest_ToProto(t *testing.T) {
 	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, 1, len(module.Inputs))
 	require.Equal(t, "pair_extractor", module.Inputs[0].GetMap().ModuleName)
+	require.Equal(t, pbtransform.KindStore_UPDATE_POLICY_REPLACE, module.GetKindStore().UpdatePolicy)
 	require.Nil(t, module.Output)
 
 	module = pbManifest.Modules[2]

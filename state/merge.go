@@ -9,14 +9,6 @@ import (
 )
 
 const (
-	UpdatePolicyReplace = "replace"
-	UpdatePolicyIgnore  = "ignore"
-	UpdatePolicySum     = "sum"
-	UpdatePolicyMax     = "max"
-	UpdatePolicyMin     = "min"
-)
-
-const (
 	OutputValueTypeInt64    = "int64"
 	OutputValueTypeFloat64  = "float64"
 	OutputValueTypeBigInt   = "bigInt"

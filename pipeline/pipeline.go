@@ -61,6 +61,7 @@ type progressTracker struct {
 	processedBlockCount      int
 	blockSecond              int
 	lastBlock                uint64
+	timeSpentInStreamFuncs   time.Duration
 }
 
 func newProgressTracker() *progressTracker {
@@ -87,23 +88,26 @@ func (p *progressTracker) startTracking(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(5 * time.Second):
+			case <-time.After(2 * time.Second):
 				p.log()
 			}
 		}
 	}()
 }
 
-func (p *progressTracker) blockProcessed(block *bstream.Block) {
+func (p *progressTracker) blockProcessed(block *bstream.Block, delta time.Duration) {
 	p.processedBlockCount += 1
 	p.lastBlock = block.Num()
+	p.timeSpentInStreamFuncs += delta
 }
 
 func (p *progressTracker) log() {
 	zlog.Info("progress",
 		zap.Uint64("last_block", p.lastBlock),
 		zap.Int("total_processed_block", p.processedBlockCount),
-		zap.Int("block_second", p.blockSecond))
+		zap.Int("block_second", p.blockSecond),
+		zap.Duration("stream_func_deltas", p.timeSpentInStreamFuncs))
+	p.timeSpentInStreamFuncs = 0
 }
 
 type RpcProvider interface {
@@ -482,6 +486,8 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	}
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		t0 := time.Now()
+
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -585,11 +591,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			s.Flush()
 		}
 
-		p.progressTracker.blockProcessed(block)
-
 		if err := returnFunc(p.nextReturnValue, step, cursor); err != nil {
 			return err
 		}
+
+		p.progressTracker.blockProcessed(block, time.Since(t0))
 
 		return nil
 	}), nil

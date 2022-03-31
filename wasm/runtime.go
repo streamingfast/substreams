@@ -76,6 +76,10 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 		wasmCode: wasmCode,
 	}, nil
 }
+func (m *Module) Close() {
+	m.module.Close()
+	m.Store.Close()
+}
 
 func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory WasmerFunctionFactory) (*Instance, error) {
 	// WARN: An instance needs to be created on the same thread that it is consumed.

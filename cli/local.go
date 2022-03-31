@@ -31,7 +31,7 @@ func init() {
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	localCmd.Flags().BoolP("partial", "p", false, "Produce partial stores")
-	localCmd.Flags().Bool("no-return-handler", false, "Produce partial stores")
+	localCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -46,6 +46,10 @@ var localCmd = &cobra.Command{
 }
 
 func runLocal(cmd *cobra.Command, args []string) error {
+	if bstream.GetBlockDecoder == nil {
+		return fmt.Errorf("cannot run local with a build that didn't include chain-specific decoders, compile from sf-ethereum or use the remote command")
+	}
+
 	// ISSUE A BIG WARNING IF WE HAVEN'T LOADED ALL THE CHAIN CONFIG SPECIFICS.
 	// If we haven't compiled from `sf-ethereum`, we won't have the block readers, etc..
 

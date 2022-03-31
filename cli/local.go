@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -28,7 +27,7 @@ func init() {
 	localCmd.Flags().String("irr-indexes-url", "./localirr", "URL of blocks store")
 
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
-	localCmd.Flags().Int64("stop-block", 0, "Stop block for blockchain firehose")
+	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	localCmd.Flags().BoolP("partial", "p", false, "Produce partial stores")
 
 	rootCmd.AddCommand(localCmd)
@@ -60,25 +59,18 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
 	}
 
-	localBlocksPath := viper.GetString("blocks-store-url")
+	localBlocksPath := mustGetString(cmd, "blocks-store-url")
 	blocksStore, err := dstore.NewDBinStore(localBlocksPath)
 	if err != nil {
 		return fmt.Errorf("setting up blocks store: %w", err)
 	}
 
-	irrIndexesPath := viper.GetString("irr-indexes-url")
+	irrIndexesPath := mustGetString(cmd, "irr-indexes-url")
 	irrStore, err := dstore.NewStore(irrIndexesPath, "", "", false)
 	if err != nil {
 		return fmt.Errorf("setting up irr blocks store: %w", err)
 	}
 
-	mustGetString := func(cmd *cobra.Command, flagName string) string {
-		val, err := cmd.Flags().GetString(flagName)
-		if err != nil {
-			panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-		}
-		return val
-	}
 	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
 	fmt.Println("ENDPOINT", rpcEndpoint)
 	// FIXME: obviously this doesn't belong in `transform`, it's an `eth-centric` thing.
@@ -87,7 +79,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up rpc client: %w", err)
 	}
 
-	stateStorePath := viper.GetString("state-store-url")
+	stateStorePath := mustGetString(cmd, "state-store-url")
 	stateStore, err := dstore.NewStore(stateStorePath, "", "", false)
 	if err != nil {
 		return fmt.Errorf("setting up store for data: %w", err)
@@ -100,11 +92,11 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create module graph %w", err)
 	}
 
-	startBlockNum := viper.GetInt64("start-block")
-	stopBlockNum := viper.GetUint64("stop-block")
+	startBlockNum := mustGetInt64(cmd, "start-block")
+	stopBlockNum := mustGetUint64(cmd, "stop-block")
 
 	var pipelineOpts []pipeline.Option
-	if partialMode := viper.GetBool("partial"); partialMode {
+	if partialMode := mustGetBool(cmd, "partial"); partialMode {
 		fmt.Println("Starting pipeline in partial mode...")
 		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode())
 	}

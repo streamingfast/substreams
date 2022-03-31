@@ -176,7 +176,7 @@ func pathToState(ctx context.Context, store StoreInterface, requestStartBlock ui
 			//
 		}
 
-		prefix := fmt.Sprintf("%s-%d", moduleStartBlock, nextBlockNum)
+		prefix := fmt.Sprintf("%s-%d", moduleName, nextBlockNum)
 		files, err := store.ListFiles(ctx, prefix, "", 2)
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)

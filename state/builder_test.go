@@ -9,7 +9,7 @@ import (
 )
 
 func TestStateBuilder(t *testing.T) {
-	s := NewBuilder("b", pbtransform.KindStore_UPDATE_POLICY_UNSET, "", nil)
+	s := NewBuilder("b", 0, pbtransform.KindStore_UPDATE_POLICY_UNSET, "", nil)
 
 	s.Set(0, "1", "val1")
 	s.Set(1, "1", "val2")

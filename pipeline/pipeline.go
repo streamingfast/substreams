@@ -154,7 +154,6 @@ func New(
 
 // build will determine and run the builder that corresponds to the correct code type
 func (p *Pipeline) build() (modules []*pbtransform.Module, stores []*pbtransform.Module, err error) {
-
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
 		switch {
@@ -472,13 +471,12 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
+	p.progressTracker.startTracking(ctx)
+
 	err = p.SynchronizeStores(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("synchonizing store: %w", err)
 	}
-
-	fmt.Println(p.stores)
-	p.progressTracker.startTracking(ctx)
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		defer func() {

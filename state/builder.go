@@ -445,9 +445,6 @@ func (b *Builder) applyDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (b *Builder) Flush() {
-	for _, delta := range b.Deltas {
-		b.applyDelta(delta)
-	}
 	b.Deltas = nil
 	b.lastOrdinal = 0
 }

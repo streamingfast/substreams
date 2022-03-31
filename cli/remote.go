@@ -109,9 +109,6 @@ func runRemote(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		cursor, _ := bstream.CursorFromOpaque(resp.Cursor)
-		if cursor != nil && cursor.Block != nil {
-			fmt.Println(cursor.Block.Num())
-		}
 		ret := returnHandler(resp.Block, stepFromProto(resp.Step), cursor)
 		if ret != nil {
 			fmt.Println(ret)

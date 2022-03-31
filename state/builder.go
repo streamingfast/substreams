@@ -11,6 +11,7 @@ import (
 
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 )
 
 type Builder struct {
@@ -177,9 +178,16 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	if partialMode && b.partialStartBlock == b.ModuleStartBlock {
+	if partialMode && b.partialStartBlock <= b.ModuleStartBlock {
 		partialMode = false //this starts at module start block, therefore consider it a full kv
 	}
+
+	zlog.Info("write state mode",
+		zap.Bool("partial", partialMode),
+		zap.String("store", b.Name),
+		zap.Uint64("partial_start_block", b.partialStartBlock),
+		zap.Uint64("module_start_block", b.ModuleStartBlock),
+	)
 
 	var writeFunc func() error
 	if partialMode {

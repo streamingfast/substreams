@@ -71,6 +71,41 @@ func (p *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64) error {
 	return nil
 }
 
+func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface, storeName string) <-chan error {
+	done := make(chan error)
+	store := storeFactory.New(storeName) //todo: need to use module signature here.
+
+	go func() {
+		defer close(done)
+
+		for {
+			//check context
+			select {
+			case <-ctx.Done():
+				done <- &fileWaitResult{ctx.Err()}
+				return
+			default:
+				//
+			}
+
+			fileName := fmt.Sprintf("%s-%d.kv", storeName, endBlock)
+			exists, err := store.FileExists(ctx, fileName)
+			if err != nil {
+				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
+				return
+			}
+
+			if exists {
+				return
+			}
+
+			time.Sleep(WaiterSleepInterval)
+		}
+	}()
+
+	return done
+}
+
 func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module *pbtransform.Module) <-chan error {
 	done := make(chan error)
 	store := p.storeFactory.New(module.Name) //todo: need to use module signature here.

@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -497,12 +498,40 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		if block.Number >= stopBlock {
+			wg := &sync.WaitGroup{}
 			for _, s := range p.stores {
 				err := s.WriteState(context.Background(), block.Num())
 				if err != nil {
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)
 				}
+
+				if p.partialMode {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+
+						zlog.Info("waiting for kv file",
+							zap.String("filename", fmt.Sprintf("%s-%d.kv", s.Name, requestedStartBlockNum)),
+							zap.String("store", s.Name),
+						)
+
+						<-state.WaitKV(ctx, requestedStartBlockNum, p.ioFactory, s.Name)
+
+						zlog.Info("kv file found",
+							zap.String("filename", fmt.Sprintf("%s-%d.kv", s.Name, requestedStartBlockNum)),
+							zap.String("store", s.Name),
+						)
+
+						zlog.Info("re-reading state to merge data", zap.String("store", s.Name))
+						err := s.ReadState(ctx, requestedStartBlockNum)
+						if err != nil {
+							zlog.Error("reading state", zap.Error(err))
+							panic(fmt.Errorf("reading state: %w", err))
+						}
+					}()
+				}
 			}
+			wg.Wait()
 
 			p.rpcCache.Save(context.Background())
 

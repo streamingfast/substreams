@@ -533,6 +533,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 							zlog.Error("squashing", zap.Error(err), zap.String("store", s.Name))
 							panic(fmt.Errorf("squashing: %w", err))
 						}
+
+						err = s.WriteFullState(context.Background(), block.Num())
+						if err != nil {
+							panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
+						}
 					}()
 				}
 			}

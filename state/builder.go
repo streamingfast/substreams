@@ -103,6 +103,7 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 	if err != nil {
 		return err
 	}
+	zlog.Info("squashing files found", zap.Strings("files", files), zap.String("store", b.Name))
 
 	var builders []*Builder
 	for _, file := range files {
@@ -140,6 +141,7 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 	}
 
 	builders = append(builders, b)
+	zlog.Info("number of builders", zap.Int("len", len(builders)), zap.String("store", b.Name))
 
 	for i := 0; i < len(builders)-1; i++ {
 		prev := builders[i]
@@ -218,6 +220,14 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 	}
 
 	return nil
+}
+
+func (b *Builder) WriteFullState(ctx context.Context, blockNum uint64) error {
+	if b.disableWriteState {
+		return nil
+	}
+
+	return b.writeState(ctx, blockNum, false)
 }
 
 func (b *Builder) WriteState(ctx context.Context, blockNum uint64) error {

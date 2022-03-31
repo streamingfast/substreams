@@ -20,7 +20,7 @@ type Builder struct {
 
 	partialMode       bool
 	partialStartBlock uint64
-	moduleStartBlock  uint64
+	ModuleStartBlock  uint64
 	disableWriteState bool
 
 	complete bool
@@ -47,7 +47,7 @@ func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:             name,
-		moduleStartBlock: moduleStartBlock,
+		ModuleStartBlock: moduleStartBlock,
 		KV:               make(map[string][]byte),
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
@@ -98,7 +98,7 @@ func (b *Builder) clone() *Builder {
 }
 
 func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) error {
-	files, err := pathToState(ctx, b.store, requestedStartBlock, b.Name, b.moduleStartBlock)
+	files, err := pathToState(ctx, b.store, requestedStartBlock, b.Name, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	if partialMode && b.partialStartBlock == b.moduleStartBlock {
+	if partialMode && b.partialStartBlock == b.ModuleStartBlock {
 		partialMode = false //this starts at module start block, therefore consider it a full kv
 	}
 

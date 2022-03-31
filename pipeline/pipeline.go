@@ -442,6 +442,9 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	}
 
 	for _, store := range p.stores {
+		if p.requestedStartBlockNum == store.ModuleStartBlock {
+			continue
+		}
 		if err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
 			e := fmt.Errorf("could not load state for store %s at block num %d: %w", store.Name, p.requestedStartBlockNum, err)
 			if !p.allowInvalidState {

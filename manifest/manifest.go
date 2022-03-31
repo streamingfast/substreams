@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/streamingfast/substreams/state"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
@@ -399,9 +401,24 @@ func (m *Module) setKindToProto(pbModule *pbtransform.Module) {
 			},
 		}
 	case ModuleKindStore:
+		var updatePolicy pbtransform.KindStore_UpdatePolicy
+		switch m.UpdatePolicy {
+		case state.UpdatePolicyReplace:
+			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_REPLACE
+		case state.UpdatePolicyIgnore:
+			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_IGNORE
+		case state.UpdatePolicySum:
+			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_SUM
+		case state.UpdatePolicyMax:
+			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_MAX
+		case state.UpdatePolicyMin:
+			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_MIN
+		default:
+			panic(fmt.Sprintf("invalid update policy %s", m.UpdatePolicy))
+		}
 		pbModule.Kind = &pbtransform.Module_KindStore{
 			KindStore: &pbtransform.KindStore{
-				UpdatePolicy: pbtransform.KindStore_UpdatePolicy(pbtransform.KindStore_UpdatePolicy_value[m.UpdatePolicy]),
+				UpdatePolicy: updatePolicy,
 				ValueType:    m.ValueType,
 			},
 		}

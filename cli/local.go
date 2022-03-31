@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
@@ -29,6 +31,7 @@ func init() {
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	localCmd.Flags().BoolP("partial", "p", false, "Produce partial stores")
+	localCmd.Flags().BoolP("no-return-handler", "p", false, "Produce partial stores")
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -122,8 +125,13 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 		stopBlockNum = uint64(startBlockNum) + blockCount
 	}
-
 	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
+	if mustGetBool(cmd, "no-return-handler") {
+		returnHandler = func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+			return nil
+		}
+	}
+
 	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
 
 	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)

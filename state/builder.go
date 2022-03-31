@@ -103,6 +103,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 	if err != nil {
 		return err
 	}
+	zlog.Info("read state files found", zap.Strings("files", files), zap.String("store", b.Name))
 
 	var builders []*Builder
 	for _, file := range files {
@@ -135,6 +136,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 		builders = append(builders, builder)
 	}
 
+	zlog.Info("number of builders", zap.Int("len", len(builders)), zap.String("store", b.Name))
 	switch len(builders) {
 	case 0:
 		/// nothing to do
@@ -145,7 +147,6 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 		for i := 0; i < len(builders)-1; i++ {
 			prev := builders[i]
 			next := builders[i+1]
-
 			err := next.Merge(prev)
 			if err != nil {
 				return fmt.Errorf("merging state for %s: %w", b.Name, err)
@@ -153,10 +154,12 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 		}
 		b.KV = builders[len(builders)-1].KV
 
+		zlog.Info("writing state", zap.String("store", b.Name))
 		err := b.writeState(ctx, requestedStartBlock, false)
 		if err != nil {
 			return fmt.Errorf("writing merged kv: %w", err)
 		}
+		zlog.Info("state written", zap.String("store", b.Name))
 	}
 
 	return nil

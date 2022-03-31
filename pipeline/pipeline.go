@@ -527,11 +527,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 							zap.String("store", s.Name),
 						)
 
-						zlog.Info("re-reading state to merge data", zap.String("store", s.Name))
-						err := s.ReadState(ctx, requestedStartBlockNum)
+						zlog.Info("squashing", zap.String("store", s.Name))
+						err := s.Squash(ctx, requestedStartBlockNum)
 						if err != nil {
-							zlog.Error("reading state", zap.Error(err))
-							panic(fmt.Errorf("reading state: %w", err))
+							zlog.Error("squashing", zap.Error(err), zap.String("store", s.Name))
+							panic(fmt.Errorf("squashing: %w", err))
 						}
 					}()
 				}

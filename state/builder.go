@@ -98,6 +98,61 @@ func (b *Builder) clone() *Builder {
 	return o
 }
 
+func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
+	files, err := pathToState(ctx, b.store, upToBlock, b.Name, b.ModuleStartBlock)
+	if err != nil {
+		return err
+	}
+
+	var builders []*Builder
+	for _, file := range files {
+		data, err := func() ([]byte, error) { //this is an inline func so that we can defer the close call properly
+			rc, err := b.store.OpenObject(ctx, file)
+			if err != nil {
+				return nil, err
+			}
+			defer rc.Close()
+
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				return nil, err
+			}
+
+			return data, nil
+		}()
+
+		if err != nil {
+			return fmt.Errorf("reading file %s in store %s: %w", file, b.Name, err)
+		}
+
+		builder := b.clone()
+		kv := map[string]string{}
+		if err = json.Unmarshal(data, &kv); err != nil {
+			return fmt.Errorf("unmarshalling kv file %s for %s at block %d: %w", file, b.Name, upToBlock, err)
+		}
+
+		builder.KV = byteMap(kv)
+		builders = append(builders, builder)
+	}
+
+	if len(builders) == 0 {
+		return fmt.Errorf("len of builders is 0")
+	}
+
+	builders = append(builders, b)
+
+	for i := 0; i < len(builders)-1; i++ {
+		prev := builders[i]
+		next := builders[i+1]
+		err := next.Merge(prev)
+		if err != nil {
+			return fmt.Errorf("merging state for %s: %w", b.Name, err)
+		}
+	}
+
+	return nil
+}
+
 func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) error {
 	files, err := pathToState(ctx, b.store, requestedStartBlock, b.Name, b.ModuleStartBlock)
 	if err != nil {

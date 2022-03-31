@@ -2,6 +2,7 @@ package cli
 
 import (
 	"net/http"
+	_ "net/http/pprof"
 
 	"go.uber.org/zap"
 )

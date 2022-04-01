@@ -400,7 +400,7 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 		namespace = "rpc"
 		name = "eth_call"
 		wasmerFunc = wasmer.NewFunction(
-			instance.Store(),
+			wasm.I.Store(),
 			wasmer.NewFunctionType(
 				wasm.Params(wasmer.I32, wasmer.I32, wasmer.I32), // 0(READ): proto RPCCalls offset,  1(READ): proto RPCCalls len, 2(WRITE): offset for proto RPCResponses
 				wasm.Returns()),

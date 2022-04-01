@@ -421,8 +421,7 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
 
 				t0 := time.Now()
 				responses := rpcProv.RPC(rpcCalls)
-
-				fmt.Println("time taken to call rpc: ", time.Since(t0))
+				zlog.Info("time taken to call rpc: ", zap.Duration("rpc_call_duration", time.Since(t0)))
 
 				responsesBytes, err := proto.Marshal(responses)
 				if err != nil {
@@ -581,7 +580,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */ ] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?

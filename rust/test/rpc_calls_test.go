@@ -98,7 +98,7 @@ func TestRPCCalls(t *testing.T) {
 				nextResponses: c.nextResponses,
 			}
 
-			instance, err := module.NewInstance(c.functionName, nil, pipeline.GetRPCWasmFunctionFactory(rpcProv))
+			instance, err := module.NewInstance(c.functionName, nil, pipeline.GetRPCWasmFunctionFactory(rpcProv, module))
 			require.NoError(t, err)
 			err = instance.Execute()
 			require.NoError(t, err)

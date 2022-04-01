@@ -339,7 +339,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
-		rpcWasmFuncFact := GetRPCWasmFunctionFactory(p.nativeImports)
+		rpcWasmFuncFact := GetRPCWasmFunctionFactory(p.nativeImports, wasmModule)
 		if v := mod.GetKindMap(); v != nil {
 			fmt.Printf("Adding mapper for module %q\n", modName)
 
@@ -395,12 +395,12 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 	return nil
 }
 
-func GetRPCWasmFunctionFactory(rpcProv RpcProvider) wasm.WasmerFunctionFactory {
+func GetRPCWasmFunctionFactory(rpcProv RpcProvider, module *wasm.Module) wasm.WasmerFunctionFactory {
 	return func(instance *wasm.Instance) (namespace string, name string, wasmerFunc *wasmer.Function) {
 		namespace = "rpc"
 		name = "eth_call"
 		wasmerFunc = wasmer.NewFunction(
-			wasm.I.Store(),
+			module.CurrentInstance.Store(),
 			wasmer.NewFunctionType(
 				wasm.Params(wasmer.I32, wasmer.I32, wasmer.I32), // 0(READ): proto RPCCalls offset,  1(READ): proto RPCCalls len, 2(WRITE): offset for proto RPCResponses
 				wasm.Returns()),

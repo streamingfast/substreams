@@ -54,8 +54,9 @@ type Module struct {
 	module *wasmer.Module
 	name   string
 
-	wasmCode []byte
-	imports  *wasmer.ImportObject
+	wasmCode        []byte
+	CurrentInstance *Instance
+	imports         *wasmer.ImportObject
 }
 
 type WasmerFunctionFactory func(*Instance) (namespace string, name string, wasmerFunc *wasmer.Function)
@@ -68,15 +69,16 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading wasm module: %w", err)
 	}
-	imports := newImports(store)
 
-	return &Module{
+	m := &Module{
 		engine:   engine,
 		module:   module,
 		name:     name,
 		wasmCode: wasmCode,
-		imports:  imports,
-	}, nil
+	}
+	m.imports = m.newImports(store)
+
+	return m, nil
 }
 func (m *Module) Close() {
 	m.module.Close()
@@ -86,14 +88,14 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 	// WARN: An instance needs to be created on the same thread that it is consumed.
 	store := wasmer.NewStore(m.engine)
 
-	instance := &Instance{
+	m.CurrentInstance = &Instance{
 		moduleName:   m.name,
 		store:        store,
 		functionName: functionName,
 	}
-	I = instance
+
 	if rpcFactory != nil {
-		namespace, name, f := rpcFactory(instance)
+		namespace, name, f := rpcFactory(m.CurrentInstance) // todo fix
 		m.imports.Register(namespace, map[string]wasmer.IntoExtern{name: f})
 	}
 
@@ -101,7 +103,7 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 	if err != nil {
 		return nil, fmt.Errorf("creating instance: %w", err)
 	}
-	instance.vmInstance = vmInstance
+	m.CurrentInstance.vmInstance = vmInstance
 
 	memory, err := vmInstance.Exports.GetMemory("memory")
 	if err != nil {
@@ -112,9 +114,9 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 	if err != nil {
 		return nil, fmt.Errorf("getting alloc function: %w", err)
 	}
-	instance.memory = memory
-	instance.heap = NewHeap(memory, alloc)
-	instance.entrypoint, err = vmInstance.Exports.GetRawFunction(functionName)
+	m.CurrentInstance.memory = memory
+	m.CurrentInstance.heap = NewHeap(memory, alloc)
+	m.CurrentInstance.entrypoint, err = vmInstance.Exports.GetRawFunction(functionName)
 	if err != nil {
 		return nil, fmt.Errorf("getting wasm module function %q: %w", functionName, err)
 	}
@@ -123,7 +125,7 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 	for _, input := range inputs {
 		switch input.Type {
 		case InputSource:
-			ptr, err := instance.heap.Write(input.StreamData)
+			ptr, err := m.CurrentInstance.heap.Write(input.StreamData)
 			if err != nil {
 				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
 			}
@@ -137,25 +139,25 @@ func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory Wa
 					return nil, fmt.Errorf("marshaling store deltas: %w", err)
 				}
 
-				ptr, err := instance.heap.Write(cnt)
+				ptr, err := m.CurrentInstance.heap.Write(cnt)
 				if err != nil {
 					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
 				}
 
 				args = append(args, ptr, int32(len(cnt)))
 			} else {
-				instance.inputStores = append(instance.inputStores, input.Store)
-				args = append(args, len(instance.inputStores)-1)
+				m.CurrentInstance.inputStores = append(m.CurrentInstance.inputStores, input.Store)
+				args = append(args, len(m.CurrentInstance.inputStores)-1)
 			}
 		case OutputStore:
-			instance.outputStore = input.Store
-			instance.updatePolicy = input.UpdatePolicy
-			instance.valueType = input.ValueType
+			m.CurrentInstance.outputStore = input.Store
+			m.CurrentInstance.updatePolicy = input.UpdatePolicy
+			m.CurrentInstance.valueType = input.ValueType
 		}
 	}
-	instance.args = args
+	m.CurrentInstance.args = args
 
-	return instance, nil
+	return m.CurrentInstance, nil
 }
 
 func (i *Instance) Execute() (err error) {
@@ -172,13 +174,11 @@ func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
 	return nil
 }
 
-var I *Instance
-
-func newImports(store *wasmer.Store) *wasmer.ImportObject {
+func (m *Module) newImports(store *wasmer.Store) *wasmer.ImportObject {
 	imports := wasmer.NewImportObject()
 
-	registerLoggerImports(imports, store)
-	registerStateImports(imports, store)
+	m.registerLoggerImports(imports, store)
+	m.registerStateImports(imports, store)
 
 	imports.Register("env", map[string]wasmer.IntoExtern{
 		"register_panic": wasmer.NewFunction(
@@ -188,7 +188,7 @@ func newImports(store *wasmer.Store) *wasmer.ImportObject {
 				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := I.heap.ReadString(args[0].I32(), args[1].I32())
+				message, err := m.CurrentInstance.heap.ReadString(args[0].I32(), args[1].I32())
 				if err != nil {
 					return nil, fmt.Errorf("read message argument: %w", err)
 				}
@@ -196,7 +196,7 @@ func newImports(store *wasmer.Store) *wasmer.ImportObject {
 				var filename string
 				filenamePtr := args[2].I32()
 				if filenamePtr != 0 {
-					filename, err = I.heap.ReadString(args[2].I32(), args[3].I32())
+					filename, err = m.CurrentInstance.heap.ReadString(args[2].I32(), args[3].I32())
 					if err != nil {
 						return nil, fmt.Errorf("read filename argument: %w", err)
 					}
@@ -205,9 +205,9 @@ func newImports(store *wasmer.Store) *wasmer.ImportObject {
 				lineNumber := int(args[4].I32())
 				columnNumber := int(args[5].I32())
 
-				I.panicError = &PanicError{message, filename, lineNumber, columnNumber}
+				m.CurrentInstance.panicError = &PanicError{message, filename, lineNumber, columnNumber}
 
-				return nil, I.panicError
+				return nil, m.CurrentInstance.panicError
 			},
 		),
 		"output": wasmer.NewFunction(
@@ -217,12 +217,12 @@ func newImports(store *wasmer.Store) *wasmer.ImportObject {
 				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := I.heap.ReadBytes(args[0].I32(), args[1].I32())
+				message, err := m.CurrentInstance.heap.ReadBytes(args[0].I32(), args[1].I32())
 				if err != nil {
 					return nil, fmt.Errorf("reading bytes: %w", err)
 				}
 
-				I.returnValue = message
+				m.CurrentInstance.returnValue = message
 
 				return nil, nil
 			},
@@ -231,7 +231,7 @@ func newImports(store *wasmer.Store) *wasmer.ImportObject {
 	return imports
 }
 
-func registerLoggerImports(imports *wasmer.ImportObject, store *wasmer.Store) {
+func (m *Module) registerLoggerImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 	imports.Register("logger", map[string]wasmer.IntoExtern{
 		"println": wasmer.NewFunction(
 			store,
@@ -240,18 +240,18 @@ func registerLoggerImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := I.heap.ReadString(args[0].I32(), args[1].I32())
+				message, err := m.CurrentInstance.heap.ReadString(args[0].I32(), args[1].I32())
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-				zlog.Info(message, zap.String("function_name", I.functionName), zap.String("wasm_file", I.moduleName))
+				zlog.Info(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
 
 				return nil, nil
 			},
 		),
 	})
 }
-func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
+func (m *Module) registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 	functions := map[string]wasmer.IntoExtern{}
 	functions["set"] = wasmer.NewFunction(
 		store,
@@ -260,20 +260,20 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_REPLACE {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_REPLACE {
 				return nil, fmt.Errorf("invalid store operation: 'set' only valid for stores with updatePolicy == 'replace'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadBytes(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadBytes(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
-			I.outputStore.SetBytes(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SetBytes(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -286,20 +286,20 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_IGNORE {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_IGNORE {
 				return nil, fmt.Errorf("invalid store operation: 'set_if_not_exists' only valid for stores with updatePolicy == 'ignore'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadBytes(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadBytes(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
-			I.outputStore.SetBytesIfNotExists(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SetBytesIfNotExists(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -315,12 +315,12 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			prefix, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			prefix, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading prefix: %w", err)
 			}
 			ord := args[0].I64()
-			I.outputStore.DeletePrefix(uint64(ord), prefix)
+			m.CurrentInstance.outputStore.DeletePrefix(uint64(ord), prefix)
 			return nil, nil
 		},
 	)
@@ -331,15 +331,15 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && I.valueType != "bigfloat" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && m.CurrentInstance.valueType != "bigfloat" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigfloat' only valid for stores with updatePolicy == 'sum' and valueType == 'bigfloat'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
@@ -349,7 +349,7 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 				return nil, fmt.Errorf("parsing bigfloat value %q: %w", value, err)
 			}
 
-			I.outputStore.SumBigFloat(uint64(ord), key, toAdd)
+			m.CurrentInstance.outputStore.SumBigFloat(uint64(ord), key, toAdd)
 
 			return nil, nil
 		},
@@ -362,21 +362,21 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && I.valueType != "bigint" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && m.CurrentInstance.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
 			toAdd, _ := new(big.Int).SetString(value, 10)
-			I.outputStore.SumBigInt(uint64(ord), key, toAdd)
+			m.CurrentInstance.outputStore.SumBigInt(uint64(ord), key, toAdd)
 
 			return nil, nil
 		},
@@ -389,17 +389,17 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && I.valueType != "int64" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && m.CurrentInstance.valueType != "int64" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigint' only valid for stores with updatePolicy == 'sum' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
 			value := args[3].I64()
 
-			I.outputStore.SumInt64(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SumInt64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -412,11 +412,11 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && I.valueType != "float64" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && m.CurrentInstance.valueType != "float64" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_float64' only valid for stores with updatePolicy == 'sum' and valueType == 'float64'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
@@ -425,7 +425,7 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
-			I.outputStore.SumFloat64(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SumFloat64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -438,21 +438,21 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && I.valueType != "bigfloat" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_SUM && m.CurrentInstance.valueType != "bigfloat" {
 				return nil, fmt.Errorf("invalid store operation: 'sum_bigfloat' only valid for stores with updatePolicy == 'sum' and valueType == 'bigfloat'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
 			toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
-			I.outputStore.SumBigFloat(uint64(ord), key, toAdd)
+			m.CurrentInstance.outputStore.SumBigFloat(uint64(ord), key, toAdd)
 
 			return nil, nil
 		},
@@ -465,17 +465,17 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && I.valueType != "int64" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "int64" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_int64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
 			value := args[3].I64()
 
-			I.outputStore.SetMinInt64(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SetMinInt64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -488,21 +488,21 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && I.valueType != "bigfloat" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "bigfloat" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_bigint' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
 			toSet, _ := new(big.Int).SetString(value, 10)
-			I.outputStore.SetMinBigInt(uint64(ord), key, toSet)
+			m.CurrentInstance.outputStore.SetMinBigInt(uint64(ord), key, toSet)
 
 			return nil, nil
 		},
@@ -514,16 +514,16 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && I.valueType != "float" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "float" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_float64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
 			value := args[3].F64()
-			I.outputStore.SetMinFloat64(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SetMinFloat64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -536,21 +536,21 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && I.valueType != "bigint" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'set_min_bigfloat' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
 			toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
-			I.outputStore.SetMinBigFloat(uint64(ord), key, toSet)
+			m.CurrentInstance.outputStore.SetMinBigFloat(uint64(ord), key, toSet)
 
 			return nil, nil
 		},
@@ -563,17 +563,17 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && I.valueType != "int64" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "int64" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_int64' only valid for stores with updatePolicy == 'max' and valueType == 'int64'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
 			value := args[3].I64()
 
-			I.outputStore.SetMaxInt64(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SetMaxInt64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -586,21 +586,21 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && I.valueType != "bigint" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_bigint' only valid for stores with updatePolicy == 'max' and valueType == 'bigint'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
 			toSet, _ := new(big.Int).SetString(value, 10)
-			I.outputStore.SetMaxBigInt(uint64(ord), key, toSet)
+			m.CurrentInstance.outputStore.SetMaxBigInt(uint64(ord), key, toSet)
 
 			return nil, nil
 		},
@@ -612,16 +612,16 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && I.valueType != "float" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "float" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_float64' only valid for stores with updatePolicy == 'max' and valueType == 'float64'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
 			value := args[3].F64()
-			I.outputStore.SetMaxFloat64(uint64(ord), key, value)
+			m.CurrentInstance.outputStore.SetMaxFloat64(uint64(ord), key, value)
 
 			return nil, nil
 		},
@@ -634,21 +634,21 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 			Returns(),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
-			if I.outputStore == nil && I.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && I.valueType != "bigint" {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbtransform.KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "bigint" {
 				return nil, fmt.Errorf("invalid store operation: 'set_max_bigfloat' only valid for stores with updatePolicy == 'max' and valueType == 'bigfloat'")
 			}
 			ord := args[0].I64()
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
-			value, err := I.heap.ReadString(args[3].I32(), args[4].I32())
+			value, err := m.CurrentInstance.heap.ReadString(args[3].I32(), args[4].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading bytes: %w", err)
 			}
 
 			toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
-			I.outputStore.SetMaxBigFloat(uint64(ord), key, toSet)
+			m.CurrentInstance.outputStore.SetMaxBigFloat(uint64(ord), key, toSet)
 
 			return nil, nil
 		},
@@ -666,12 +666,12 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			storeIndex := int(args[0].I32())
-			if storeIndex+1 > len(I.inputStores) {
-				return nil, fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(I.inputStores))
+			if storeIndex+1 > len(m.CurrentInstance.inputStores) {
+				return nil, fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores))
 			}
-			readStore := I.inputStores[storeIndex]
+			readStore := m.CurrentInstance.inputStores[storeIndex]
 			ord := args[1].I64()
-			key, err := I.heap.ReadString(args[2].I32(), args[3].I32())
+			key, err := m.CurrentInstance.heap.ReadString(args[2].I32(), args[3].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
@@ -681,7 +681,7 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[4].I32()
-			err = I.WriteOutputToHeap(outputPtr, value)
+			err = m.CurrentInstance.WriteOutputToHeap(outputPtr, value)
 			if err != nil {
 				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 			}
@@ -699,11 +699,11 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			storeIndex := int(args[0].I32())
-			if storeIndex+1 > len(I.inputStores) {
-				return nil, fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(I.inputStores))
+			if storeIndex+1 > len(m.CurrentInstance.inputStores) {
+				return nil, fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores))
 			}
-			readStore := I.inputStores[storeIndex]
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			readStore := m.CurrentInstance.inputStores[storeIndex]
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
@@ -713,7 +713,7 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[3].I32()
-			err = I.WriteOutputToHeap(outputPtr, value)
+			err = m.CurrentInstance.WriteOutputToHeap(outputPtr, value)
 			if err != nil {
 				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 			}
@@ -733,11 +733,11 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 
 		func(args []wasmer.Value) ([]wasmer.Value, error) {
 			storeIndex := int(args[0].I32())
-			if storeIndex+1 > len(I.inputStores) {
-				return nil, fmt.Errorf("'get__last' failed: invalid store index %d, %d stores declared", storeIndex, len(I.inputStores))
+			if storeIndex+1 > len(m.CurrentInstance.inputStores) {
+				return nil, fmt.Errorf("'get__last' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores))
 			}
-			readStore := I.inputStores[storeIndex]
-			key, err := I.heap.ReadString(args[1].I32(), args[2].I32())
+			readStore := m.CurrentInstance.inputStores[storeIndex]
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)
 			}
@@ -747,7 +747,7 @@ func registerStateImports(imports *wasmer.ImportObject, store *wasmer.Store) {
 				return []wasmer.Value{zero}, nil
 			}
 			outputPtr := args[3].I32()
-			err = I.WriteOutputToHeap(outputPtr, value)
+			err = m.CurrentInstance.WriteOutputToHeap(outputPtr, value)
 			if err != nil {
 				return nil, fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err)
 			}

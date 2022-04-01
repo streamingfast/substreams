@@ -191,7 +191,7 @@ func TestRustScript(t *testing.T) {
 			imps := &imports.Imports{}
 			imps.SetCurrentBlock(bstream.NewBlockRef("test", 42))
 
-			instance, err := module.NewInstance(c.functionName, nil, pipeline.GetRPCWasmFunctionFactory(nil))
+			instance, err := module.NewInstance(c.functionName, nil, pipeline.GetRPCWasmFunctionFactory(nil, module))
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
 			err = instance.Execute()
@@ -224,7 +224,7 @@ func Test_MakeItCrash(t *testing.T) {
 				//fmt.Print(id, "-")
 				//runtime.LockOSThread()
 
-				instance, err := module.NewInstance("test_make_it_crash", nil, pipeline.GetRPCWasmFunctionFactory(nil))
+				instance, err := module.NewInstance("test_make_it_crash", nil, pipeline.GetRPCWasmFunctionFactory(nil, module))
 				time.Sleep(10 * time.Millisecond)
 				ptr, err := instance.Heap().Write(data)
 

@@ -14,7 +14,6 @@ import (
 )
 
 type Instance struct {
-	module *Module
 	memory *wasmer.Memory
 
 	heap         *Heap
@@ -30,6 +29,8 @@ type Instance struct {
 	panicError   *PanicError
 	functionName string
 	vmInstance   *wasmer.Instance
+	moduleName   string
+	store        *wasmer.Store
 }
 
 func (i *Instance) Heap() *Heap {
@@ -37,7 +38,7 @@ func (i *Instance) Heap() *Heap {
 }
 
 func (i *Instance) Store() *wasmer.Store {
-	return i.module.Store
+	return i.store
 }
 
 func (i *Instance) PrintStats() {
@@ -50,7 +51,7 @@ func (i *Instance) Close() {
 
 type Module struct {
 	engine *wasmer.Engine
-	Store  *wasmer.Store
+	//Store  *wasmer.Store
 	module *wasmer.Module
 	name   string
 
@@ -70,7 +71,6 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 
 	return &Module{
 		engine:   engine,
-		Store:    store,
 		module:   module,
 		name:     name,
 		wasmCode: wasmCode,
@@ -78,13 +78,15 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 }
 func (m *Module) Close() {
 	m.module.Close()
-	m.Store.Close()
 }
 
 func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory WasmerFunctionFactory) (*Instance, error) {
 	// WARN: An instance needs to be created on the same thread that it is consumed.
+	store := wasmer.NewStore(m.engine)
+
 	instance := &Instance{
-		module:       m,
+		moduleName:   m.name,
+		store:        store,
 		functionName: functionName,
 	}
 	imports := instance.newImports()
@@ -177,7 +179,7 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 
 	imports.Register("env", map[string]wasmer.IntoExtern{
 		"register_panic": wasmer.NewFunction(
-			i.module.Store,
+			i.store,
 			wasmer.NewFunctionType(
 				Params(wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
 				Returns(),
@@ -206,7 +208,7 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 			},
 		),
 		"output": wasmer.NewFunction(
-			i.module.Store,
+			i.store,
 			wasmer.NewFunctionType(
 				Params(wasmer.I32, wasmer.I32),
 				Returns(),
@@ -229,7 +231,7 @@ func (i *Instance) newImports() *wasmer.ImportObject {
 func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 	imports.Register("logger", map[string]wasmer.IntoExtern{
 		"println": wasmer.NewFunction(
-			i.module.Store,
+			i.store,
 			wasmer.NewFunctionType(
 				Params(wasmer.I32, wasmer.I32),
 				Returns(),
@@ -239,7 +241,7 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
+				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.moduleName))
 
 				return nil, nil
 			},
@@ -249,7 +251,7 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	functions := map[string]wasmer.IntoExtern{}
 	functions["set"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
 			Returns(),
@@ -275,7 +277,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_if_not_exists"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
 			Returns(),
@@ -300,7 +302,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 	functions["delete_prefix"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(
 				wasmer.I64, /* ordinal */
@@ -320,7 +322,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 	functions["sum_bigfloat"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -351,7 +353,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["sum_bigint"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -378,7 +380,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["sum_int64"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
 			Returns(),
@@ -401,7 +403,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["sum_float64"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
 			Returns(),
@@ -427,7 +429,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["sum_bigfloat"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -454,7 +456,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_min_int64"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
 			Returns(),
@@ -477,7 +479,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_min_bigint"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -503,7 +505,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 	functions["set_min_float64"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
 			Returns(),
@@ -525,7 +527,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_min_bigfloat"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -552,7 +554,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_max_int64"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I64 /* value */),
 			Returns(),
@@ -575,7 +577,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_max_bigint"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -601,7 +603,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 	functions["set_max_float64"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.F64 /* value */),
 			Returns(),
@@ -623,7 +625,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["set_max_bigfloat"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I64 /* ordinal */, wasmer.I32, wasmer.I32 /* key */, wasmer.I32, wasmer.I32 /* value */),
 			Returns(),
@@ -650,7 +652,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 	)
 
 	functions["get_at"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I32, /* store index */
 				wasmer.I64, /* ordinal */
@@ -684,7 +686,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 	functions["get_first"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I32,
 				wasmer.I32,
@@ -717,7 +719,7 @@ func (i *Instance) registerStateImports(imports *wasmer.ImportObject) {
 		},
 	)
 	functions["get_last"] = wasmer.NewFunction(
-		i.module.Store,
+		i.store,
 		wasmer.NewFunctionType(
 			Params(wasmer.I32,
 				wasmer.I32,

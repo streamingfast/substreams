@@ -610,7 +610,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			return err
 		}
 
-		fmt.Println("Timning: block handling:", time.Since(handleBlockStart), "between block:", timeBetweenBlock)
+		fmt.Println("Timing: block handling:", time.Since(handleBlockStart), "between block:", timeBetweenBlock)
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
 		timeBetweenBlockStart = time.Now()
 		return nil

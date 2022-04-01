@@ -36,16 +36,6 @@ func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory
 	}
 
 	ancestorStores, _ := moduleGraph.AncestorStoresOf(moduleName) //todo: new the list of parent store.
-
-	//var parentNodes []*node
-	//for _, ancestorStore := range ancestorStores {
-	//	partialNode := &node{
-	//		Name:       ancestorStore.Name,
-	//		Store:      factory.New(ancestorStore.Name),
-	//		StartBlock: ancestorStore.GetStartBlock(),
-	//	}
-	//	parentNodes = append(parentNodes, partialNode)
-	//}
 	w.ancestorStores = ancestorStores
 
 	return w
@@ -125,6 +115,10 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 				return
 			default:
 				//
+			}
+
+			if p.targetBlockNumber <= module.StartBlock {
+				return
 			}
 
 			prefix := fmt.Sprintf("%s-%d", module.Name, waitForBlockNum)

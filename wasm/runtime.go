@@ -241,8 +241,6 @@ func (i *Instance) registerLoggerImports(imports *wasmer.ImportObject) {
 				}
 				zlog.Info(message, zap.String("function_name", i.functionName), zap.String("wasm_file", i.module.name))
 
-				fmt.Println(message)
-
 				return nil, nil
 			},
 		),

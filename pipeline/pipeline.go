@@ -88,7 +88,7 @@ func (p *progressTracker) startTracking(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(2 * time.Second):
+			case <-time.After(1 * time.Second):
 				p.log()
 			}
 		}
@@ -472,6 +472,8 @@ type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
 
+	fmt.Println("GRRRRRRRR: HandlerFactory")
+
 	p.requestedStartBlockNum = requestedStartBlockNum
 	_, _, err := p.build()
 	if err != nil {
@@ -485,9 +487,22 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		return nil, fmt.Errorf("synchonizing store: %w", err)
 	}
 
-	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		t0 := time.Now()
+	timeBetweenBlockStart := time.Now()
+	blockCount := 0
+	//blockSec := 0
 
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			//blockSec = blockCount
+			blockCount = 0
+		}
+	}()
+
+	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		blockCount++
+		handleBlockStart := time.Now()
+		timeBetweenBlock := time.Since(timeBetweenBlockStart)
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -595,8 +610,9 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			return err
 		}
 
-		p.progressTracker.blockProcessed(block, time.Since(t0))
-
+		fmt.Println("Timning: block handling:", time.Since(handleBlockStart), "between block:", timeBetweenBlock)
+		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
+		timeBetweenBlockStart = time.Now()
 		return nil
 	}), nil
 }

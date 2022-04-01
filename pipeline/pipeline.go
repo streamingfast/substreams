@@ -533,7 +533,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 
 				if p.partialMode {
 					wg.Add(1)
-					go func() {
+					go func(s *state.Builder) {
 						defer wg.Done()
 
 						zlog.Info("waiting for kv file",
@@ -559,7 +559,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 						if err != nil {
 							panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
 						}
-					}()
+					}(s)
 				}
 			}
 			wg.Wait()

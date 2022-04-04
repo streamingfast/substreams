@@ -31,7 +31,7 @@ type TestFactory struct {
 	stores map[string]*TestStore
 }
 
-func (t *TestFactory) New(name string) StoreInterface {
+func (t *TestFactory) New(name string, moduleHash string) Store {
 	if _, ok := t.stores[name]; ok {
 		return t.stores[name]
 	}

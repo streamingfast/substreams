@@ -17,11 +17,12 @@ import (
 type Builder struct {
 	Name string
 
-	store StoreInterface
+	store Store
 
 	partialMode       bool
 	partialStartBlock uint64
 	ModuleStartBlock  uint64
+	ModuleHash        string
 	disableWriteState bool
 
 	complete bool
@@ -45,7 +46,7 @@ func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 	}
 }
 
-func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:             name,
 		ModuleStartBlock: moduleStartBlock,
@@ -54,7 +55,7 @@ func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.K
 		valueType:        valueType,
 	}
 	if storageFactory != nil {
-		b.store = storageFactory.New(name)
+		b.store = storageFactory.New(name, moduleHash)
 	}
 
 	for _, opt := range opts {

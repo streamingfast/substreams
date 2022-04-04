@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 )
 
-type ModuleSignature []byte
+type ModuleHash []byte
 
-func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) ModuleSignature {
+func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) ModuleHash {
+
 	buf := bytes.NewBuffer(nil)
 
 	startBlockBytes := make([]byte, 8)
@@ -58,7 +60,9 @@ func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 
 	return h.Sum(nil)
 }
-
+func HashModuleAsString(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) string {
+	return hex.EncodeToString(HashModule(manifest, module, graph))
+}
 func inputName(input *pbtransform.Input) string {
 	switch input.Input.(type) {
 	case *pbtransform.Input_Store:

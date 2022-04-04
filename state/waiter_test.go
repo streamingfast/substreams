@@ -167,7 +167,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 			defer cancel()
 
-			err = waiter.Wait(ctx, test.targetBlock)
+			err = waiter.Wait(ctx, &pbtransform.Manifest{}, graph, test.targetBlock)
 			assert.Equal(t, test.expectedError, err != nil)
 		})
 	}
@@ -176,7 +176,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 func Test_pathToState(t *testing.T) {
 	tests := []struct {
 		name             string
-		store            StoreInterface
+		store            Store
 		storeName        string
 		moduleStartBlock uint64
 		targetBlock      uint64

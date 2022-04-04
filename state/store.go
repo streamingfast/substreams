@@ -9,7 +9,7 @@ import (
 )
 
 type FactoryInterface interface {
-	New(name string) StoreInterface
+	New(name string, moduleHash string) Store
 }
 
 type StoreFactory struct {
@@ -22,44 +22,46 @@ func NewStoreFactory(store dstore.Store) *StoreFactory {
 	}
 }
 
-func (f *StoreFactory) New(name string) StoreInterface {
-	return NewStore(name, f.store)
+func (f *StoreFactory) New(name string, moduleHash string) Store {
+	return NewStore(name, moduleHash, f.store)
 }
 
-type StoreInterface interface {
+type Store interface {
 	dstore.Store
 
 	WriteState(ctx context.Context, content []byte, blockNum uint64) error
 	WritePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) error
 }
 
-type Store struct {
+type DefaultStore struct {
 	dstore.Store
 
-	name string
+	name       string
+	moduleHash string
 }
 
-func NewStore(name string, baseStore dstore.Store) *Store {
-	s := &Store{
-		Store: baseStore,
-		name:  name,
+func NewStore(name string, moduleHash string, baseStore dstore.Store) *DefaultStore {
+	s := &DefaultStore{
+		Store:      baseStore,
+		name:       name,
+		moduleHash: moduleHash,
 	}
 
 	return s
 }
 
-func (s *Store) WriteState(ctx context.Context, content []byte, blockNum uint64) error {
-	return s.WriteObject(ctx, GetStateFileName(s.name, blockNum), bytes.NewReader(content))
+func (s *DefaultStore) WriteState(ctx context.Context, content []byte, blockNum uint64) error {
+	return s.WriteObject(ctx, s.stateFileName(blockNum), bytes.NewReader(content))
 }
 
-func (s *Store) WritePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) error {
-	return s.WriteObject(ctx, GetPartialFileName(s.name, startBlockNum, endBlockNum), bytes.NewReader(content))
+func (s *DefaultStore) WritePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) error {
+	return s.WriteObject(ctx, s.partialFileName(startBlockNum, endBlockNum), bytes.NewReader(content))
 }
 
-func GetStateFileName(name string, blockNum uint64) string {
-	return fmt.Sprintf("%s-%d.kv", name, blockNum)
+func (s *DefaultStore) stateFileName(blockNum uint64) string {
+	return fmt.Sprintf("%s-%s-%d.kv", s.moduleHash, s.name, blockNum)
 }
 
-func GetPartialFileName(name string, startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%s-%d-%d.partial", name, endBlockNum, startBlockNum)
+func (s *DefaultStore) partialFileName(startBlockNum, endBlockNum uint64) string {
+	return fmt.Sprintf("%s-%s-%d-%d.partial", s.moduleHash, s.name, endBlockNum, startBlockNum)
 }

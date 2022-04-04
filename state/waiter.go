@@ -14,12 +14,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 )
 
-type node struct {
-	Name       string
-	StartBlock uint64
-	Store      StoreInterface
-}
-
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
@@ -41,7 +35,7 @@ func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory
 	return w
 }
 
-func (p *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64) error {
+func (p *FileWaiter) Wait(ctx context.Context, manif *pbtransform.Manifest, graph *manifest.ModuleGraph, requestStartBlock uint64) error {
 	eg := llerrgroup.New(len(p.ancestorStores))
 	for _, ancestor := range p.ancestorStores {
 		if eg.Stop() {
@@ -50,7 +44,7 @@ func (p *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64) error {
 
 		module := ancestor
 		eg.Go(func() error {
-			return <-p.wait(ctx, requestStartBlock, module)
+			return <-p.wait(ctx, requestStartBlock, module, manifest.HashModuleAsString(manif, module, graph))
 		})
 	}
 
@@ -61,9 +55,9 @@ func (p *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64) error {
 	return nil
 }
 
-func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface, storeName string) <-chan error {
+func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface, storeName string, moduleHash string) <-chan error {
 	done := make(chan error)
-	store := storeFactory.New(storeName) //todo: need to use module signature here.
+	store := storeFactory.New(storeName, moduleHash) //todo: need to use module signature here.
 
 	go func() {
 		defer close(done)
@@ -96,9 +90,9 @@ func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface,
 	return done
 }
 
-func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module *pbtransform.Module) <-chan error {
+func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module *pbtransform.Module, moduleHash string) <-chan error {
 	done := make(chan error)
-	store := p.storeFactory.New(module.Name) //todo: need to use module signature here.
+	store := p.storeFactory.New(module.Name, moduleHash) //todo: need to use module signature here.
 	waitForBlockNum := requestStartBlock
 	//       END  START
 	//module_3000_2000.partial
@@ -158,7 +152,7 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 	return done
 }
 
-func pathToState(ctx context.Context, store StoreInterface, requestStartBlock uint64, moduleName string, moduleStartBlock uint64) ([]string, error) {
+func pathToState(ctx context.Context, store Store, requestStartBlock uint64, moduleName string, moduleStartBlock uint64) ([]string, error) {
 	var out []string
 	nextBlockNum := requestStartBlock
 	for {

@@ -157,7 +157,7 @@ func New(
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build() (modules []*pbtransform.Module, stores []*pbtransform.Module, err error) {
+func (p *Pipeline) build(manif *pbtransform.Manifest, graph *manifest.ModuleGraph) (modules []*pbtransform.Module, stores []*pbtransform.Module, err error) {
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
 		switch {
@@ -186,7 +186,8 @@ func (p *Pipeline) build() (modules []*pbtransform.Module, stores []*pbtransform
 		if p.partialMode {
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
 		}
-		store := state.NewBuilder(store.Name, store.StartBlock, store.GetKindStore().UpdatePolicy, store.GetKindStore().ValueType, p.ioFactory, options...)
+
+		store := state.NewBuilder(store.Name, store.StartBlock, manifest.HashModuleAsString(manif, store, graph), store.GetKindStore().UpdatePolicy, store.GetKindStore().ValueType, p.ioFactory, options...)
 		p.stores[store.Name] = store
 	}
 
@@ -442,7 +443,7 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider, module *wasm.Module) wasm.Wa
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
 		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
-		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum) //block until all parent storeModules have completed their tasks
+		err := p.fileWaiter.Wait(ctx, p.manifest, p.graph, p.requestedStartBlockNum) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}
@@ -475,10 +476,8 @@ type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
 
-	fmt.Println("GRRRRRRRR: HandlerFactory")
-
 	p.requestedStartBlockNum = requestedStartBlockNum
-	_, _, err := p.build()
+	_, _, err := p.build(p.manifest, p.graph)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
@@ -544,7 +543,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 							zap.String("store", s.Name),
 						)
 
-						<-state.WaitKV(ctx, requestedStartBlockNum, p.ioFactory, s.Name)
+						<-state.WaitKV(ctx, requestedStartBlockNum, p.ioFactory, s.Name, s.ModuleHash)
 
 						zlog.Info("kv file found",
 							zap.String("filename", fmt.Sprintf("%s-%d.kv", s.Name, requestedStartBlockNum)),

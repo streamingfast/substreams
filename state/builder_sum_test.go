@@ -11,7 +11,7 @@ import (
 )
 
 func initTestBuilder(key string, value []byte) *Builder {
-	b := NewBuilder("b", 0, pbtransform.KindStore_UPDATE_POLICY_UNSET, "", nil)
+	b := NewBuilder("b", 0, "module.hash", pbtransform.KindStore_UPDATE_POLICY_UNSET, "", nil)
 	if value != nil {
 		b.KV[key] = value
 	}

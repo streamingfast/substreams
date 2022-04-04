@@ -38,15 +38,17 @@ import (
 type Store struct {
 	dstore.Store
 
-	Name       string
-	ModuleHash string
+	Name             string
+	ModuleHash       string
+	ModuleStartBlock uint64
 }
 
-func NewStore(name string, moduleHash string, baseStore dstore.Store) *Store {
+func NewStore(name string, moduleHash string, moduleStartBlock uint64, baseStore dstore.Store) *Store {
 	s := &Store{
-		Store:      baseStore,
-		Name:       name,
-		ModuleHash: moduleHash,
+		Store:            baseStore,
+		Name:             name,
+		ModuleHash:       moduleHash,
+		ModuleStartBlock: moduleStartBlock,
 	}
 
 	return s
@@ -61,7 +63,7 @@ func (s *Store) WritePartialState(ctx context.Context, content []byte, startBloc
 }
 
 func (s *Store) StateFileName(blockNum uint64) string {
-	return fmt.Sprintf("%s-%s-%d.kv", s.ModuleHash, s.Name, blockNum)
+	return fmt.Sprintf("%s-%s-%d-%d.kv", s.ModuleHash, s.Name, blockNum, s.ModuleStartBlock)
 }
 
 func (s *Store) PartialFileName(startBlockNum, endBlockNum uint64) string {

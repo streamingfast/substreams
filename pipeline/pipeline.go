@@ -182,7 +182,7 @@ func (p *Pipeline) build() (modules []*pbtransform.Module, storeModules []*pbtra
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
 		}
 
-		store := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), p.stateStore)
+		store := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
 
 		builder := state.NewBuilder(
 			storeModule.Name,

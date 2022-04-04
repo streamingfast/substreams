@@ -191,7 +191,7 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-1000": {"A-1000.kv"},
+					"A-1000": {"A-1000-0.kv"},
 					"A-2000": {"A-2000-1000.partial"},
 					"A-3000": {"A-3000-2000.partial"},
 				}
@@ -201,7 +201,7 @@ func Test_pathToState(t *testing.T) {
 			moduleStartBlock: 0,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-1000.kv", "A-2000-1000.partial", "A-3000-2000.partial"},
+			expectedFiles:    []string{"A-1000-0.kv", "A-2000-1000.partial", "A-3000-2000.partial"},
 			expectedError:    false,
 		},
 		{
@@ -227,14 +227,14 @@ func Test_pathToState(t *testing.T) {
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000.kv", "A-3000-2000.partial"},
+					"A-3000": {"A-3000-0.kv", "A-3000-2000.partial"},
 				}
 				return files[prefix], nil
 			}),
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-3000.kv"},
+			expectedFiles:    []string{"A-3000-0.kv"},
 			expectedError:    false,
 		},
 		{
@@ -243,14 +243,14 @@ func Test_pathToState(t *testing.T) {
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000-2000.partial", "A-3000.kv"},
+					"A-3000": {"A-3000-2000.partial", "A-3000-0.kv"},
 				}
 				return files[prefix], nil
 			}),
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-3000.kv"},
+			expectedFiles:    []string{"A-3000-0.kv"},
 			expectedError:    false,
 		},
 		{
@@ -258,7 +258,7 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-1000": {"A-1000.kv"},
+					"A-1000": {"A-1000-0.kv"},
 					"A-2000": {"A-2000-1000.partial"},
 					"A-3000": {"A-3000-1000.partial", "A-3000-2000.partial"},
 				}
@@ -285,5 +285,5 @@ func getWaiterTestStore(moduleName string, moduleHash string, listFilesFunc func
 	mockDStore := &dstore.MockStore{
 		ListFilesFunc: listFilesFunc,
 	}
-	return NewStore(moduleName, moduleHash, mockDStore)
+	return NewStore(moduleName, moduleHash, 0, mockDStore)
 }

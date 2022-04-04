@@ -17,7 +17,7 @@ import (
 type Builder struct {
 	Name string
 
-	store Store
+	Store *Store
 
 	partialMode       bool
 	partialStartBlock uint64
@@ -46,16 +46,14 @@ func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 	}
 }
 
-func NewBuilder(name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, storageFactory FactoryInterface, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, store *Store, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:             name,
 		ModuleStartBlock: moduleStartBlock,
 		KV:               make(map[string][]byte),
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
-	}
-	if storageFactory != nil {
-		b.store = storageFactory.New(name, moduleHash)
+		Store:            store,
 	}
 
 	for _, opt := range opts {
@@ -100,7 +98,7 @@ func (b *Builder) clone() *Builder {
 }
 
 func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
-	files, err := pathToState(ctx, b.store, upToBlock, b.Name, b.ModuleStartBlock)
+	files, err := pathToState(ctx, b.Store, upToBlock, b.Name, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}
@@ -109,7 +107,7 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 	var builders []*Builder
 	for _, file := range files {
 		data, err := func() ([]byte, error) { //this is an inline func so that we can defer the close call properly
-			rc, err := b.store.OpenObject(ctx, file)
+			rc, err := b.Store.OpenObject(ctx, file)
 			if err != nil {
 				return nil, err
 			}
@@ -157,7 +155,7 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 }
 
 func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) error {
-	files, err := pathToState(ctx, b.store, requestedStartBlock, b.Name, b.ModuleStartBlock)
+	files, err := pathToState(ctx, b.Store, requestedStartBlock, b.Name, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}
@@ -166,7 +164,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 	var builders []*Builder
 	for _, file := range files {
 		data, err := func() ([]byte, error) { //this is an inline func so that we can defer the close call properly
-			rc, err := b.store.OpenObject(ctx, file)
+			rc, err := b.Store.OpenObject(ctx, file)
 			if err != nil {
 				return nil, err
 			}
@@ -261,11 +259,11 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 	var writeFunc func() error
 	if partialMode {
 		writeFunc = func() error {
-			return b.store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
+			return b.Store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
 		}
 	} else {
 		writeFunc = func() error {
-			return b.store.WriteState(ctx, content, blockNum)
+			return b.Store.WriteState(ctx, content, blockNum)
 		}
 	}
 

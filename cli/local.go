@@ -16,7 +16,6 @@ import (
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/transform"
 )
 
@@ -95,7 +94,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up store for data: %w", err)
 	}
 
-	ioFactory := state.NewStoreFactory(stateStore)
+	//ioFactory := state.NewStoreFactory(stateStore)
 
 	graph, err := manifest.NewModuleGraph(manifProto.Modules)
 	if err != nil {
@@ -139,7 +138,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
+	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)
 
 	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)
 	if err != nil {

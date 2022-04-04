@@ -8,43 +8,34 @@ import (
 	"strings"
 	"time"
 
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
-
 	"github.com/abourget/llerrgroup"
-	"github.com/streamingfast/substreams/manifest"
 )
 
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
-	ancestorStores    []*pbtransform.Module
+	stores            []*Store
 	targetBlockNumber uint64
-	storeFactory      FactoryInterface
 }
 
-func NewFileWaiter(moduleName string, moduleGraph *manifest.ModuleGraph, factory FactoryInterface, targetStartBlock uint64) *FileWaiter {
+func NewFileWaiter(targetStartBlock uint64, stores []*Store) *FileWaiter {
 	w := &FileWaiter{
-		ancestorStores:    nil,
+		stores:            stores,
 		targetBlockNumber: targetStartBlock,
-		storeFactory:      factory,
 	}
-
-	ancestorStores, _ := moduleGraph.AncestorStoresOf(moduleName) //todo: new the list of parent store.
-	w.ancestorStores = ancestorStores
 
 	return w
 }
 
-func (p *FileWaiter) Wait(ctx context.Context, manif *pbtransform.Manifest, graph *manifest.ModuleGraph, requestStartBlock uint64) error {
-	eg := llerrgroup.New(len(p.ancestorStores))
-	for _, ancestor := range p.ancestorStores {
+func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleStartBlock uint64) error {
+	eg := llerrgroup.New(len(w.stores))
+	for _, store := range w.stores {
 		if eg.Stop() {
 			continue // short-circuit the loop if we got an error
 		}
 
-		module := ancestor
 		eg.Go(func() error {
-			return <-p.wait(ctx, requestStartBlock, module, manifest.HashModuleAsString(manif, module, graph))
+			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, store)
 		})
 	}
 
@@ -55,9 +46,8 @@ func (p *FileWaiter) Wait(ctx context.Context, manif *pbtransform.Manifest, grap
 	return nil
 }
 
-func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface, storeName string, moduleHash string) <-chan error {
+func WaitKV(ctx context.Context, store *Store, endBlock uint64) <-chan error {
 	done := make(chan error)
-	store := storeFactory.New(storeName, moduleHash) //todo: need to use module signature here.
 
 	go func() {
 		defer close(done)
@@ -72,7 +62,7 @@ func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface,
 				//
 			}
 
-			fileName := fmt.Sprintf("%s-%d.kv", storeName, endBlock)
+			fileName := store.StateFileName(endBlock)
 			exists, err := store.FileExists(ctx, fileName)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
@@ -90,14 +80,9 @@ func WaitKV(ctx context.Context, endBlock uint64, storeFactory FactoryInterface,
 	return done
 }
 
-func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module *pbtransform.Module, moduleHash string) <-chan error {
+func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleStartBlock uint64, store *Store) <-chan error {
 	done := make(chan error)
-	store := p.storeFactory.New(module.Name, moduleHash) //todo: need to use module signature here.
 	waitForBlockNum := requestStartBlock
-	//       END  START
-	//module_3000_2000.partial
-	//module_2000_1000.partial
-	//module_1000.kv
 	go func() {
 		defer close(done)
 
@@ -111,11 +96,11 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 				//
 			}
 
-			if p.targetBlockNumber <= module.StartBlock {
+			if w.targetBlockNumber <= moduleStartBlock {
 				return
 			}
 
-			prefix := fmt.Sprintf("%s-%d", module.Name, waitForBlockNum)
+			prefix := fmt.Sprintf("%s-%d", store.Name, waitForBlockNum)
 			files, err := store.ListFiles(ctx, prefix, "", 1)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
@@ -125,7 +110,7 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 			found := len(files) == 1
 			if !found {
 				time.Sleep(WaiterSleepInterval)
-				fmt.Printf("waiting for store %s to complete processing to block %d\n", module.Name, p.targetBlockNumber)
+				fmt.Printf("waiting for store %s to complete processing to block %d\n", store.Name, w.targetBlockNumber)
 				continue
 			}
 
@@ -135,11 +120,9 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 				return
 			}
 
-			//todo: validate that start block match configured kv block range.
 			if partial {
 				waitForBlockNum = start
-				//todo 2.1: if start block from partial is the module start block we are done waiting
-				if start == module.GetStartBlock() {
+				if start == moduleStartBlock {
 					return
 				}
 				continue
@@ -152,7 +135,7 @@ func (p *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, module 
 	return done
 }
 
-func pathToState(ctx context.Context, store Store, requestStartBlock uint64, moduleName string, moduleStartBlock uint64) ([]string, error) {
+func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, moduleName string, moduleStartBlock uint64) ([]string, error) {
 	var out []string
 	nextBlockNum := requestStartBlock
 	for {

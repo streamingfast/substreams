@@ -50,7 +50,6 @@ func (i *Instance) Close() {
 
 type Module struct {
 	engine *wasmer.Engine
-	//DefaultStore  *wasmer.Store
 	module *wasmer.Module
 	name   string
 

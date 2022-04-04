@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/dstore"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams"
@@ -40,9 +42,9 @@ type Pipeline struct {
 
 	rpcCache      *ssrpc.Cache
 	nativeImports *imports.Imports
-	stores        map[string]*state.Builder
+	builders      map[string]*state.Builder
 
-	ioFactory        state.FactoryInterface
+	//ioFactory        state.FactoryInterface
 	graph            *manifest.ModuleGraph
 	manifest         *pbtransform.Manifest
 	outputStreamName string
@@ -53,6 +55,7 @@ type Pipeline struct {
 	progressTracker   *progressTracker
 	nextReturnValue   *anypb.Any
 	allowInvalidState bool
+	stateStore        dstore.Store
 }
 
 type progressTracker struct {
@@ -128,21 +131,13 @@ func WithAllowInvalidState() Option {
 	}
 }
 
-func New(
-	rpcClient *rpc.Client,
-	rpcCache *ssrpc.Cache,
-	manifest *pbtransform.Manifest,
-	graph *manifest.ModuleGraph,
-	outputStreamName string,
-	blockType string,
-	ioFactory state.FactoryInterface,
-	opts ...Option) *Pipeline {
+func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbtransform.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
 	pipe := &Pipeline{
 		rpcCache:         rpcCache,
 		nativeImports:    imports.NewImports(rpcClient, rpcCache),
-		stores:           map[string]*state.Builder{},
+		builders:         map[string]*state.Builder{},
 		graph:            graph,
-		ioFactory:        ioFactory,
+		stateStore:       stateStore,
 		manifest:         manifest,
 		outputStreamName: outputStreamName,
 		blockType:        blockType,
@@ -157,7 +152,7 @@ func New(
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build(manif *pbtransform.Manifest, graph *manifest.ModuleGraph) (modules []*pbtransform.Module, stores []*pbtransform.Module, err error) {
+func (p *Pipeline) build() (modules []*pbtransform.Module, storeModules []*pbtransform.Module, err error) {
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
 		switch {
@@ -179,16 +174,25 @@ func (p *Pipeline) build(manif *pbtransform.Manifest, graph *manifest.ModuleGrap
 		return nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
-	p.stores = make(map[string]*state.Builder)
-	stores, err = p.graph.StoresDownTo(p.outputStreamName)
-	for _, store := range stores {
+	p.builders = make(map[string]*state.Builder)
+	storeModules, err = p.graph.StoresDownTo(p.outputStreamName)
+	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
 		if p.partialMode {
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
 		}
 
-		store := state.NewBuilder(store.Name, store.StartBlock, manifest.HashModuleAsString(manif, store, graph), store.GetKindStore().UpdatePolicy, store.GetKindStore().ValueType, p.ioFactory, options...)
-		p.stores[store.Name] = store
+		store := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), p.stateStore)
+
+		builder := state.NewBuilder(
+			storeModule.Name,
+			storeModule.StartBlock,
+			storeModule.GetKindStore().UpdatePolicy,
+			storeModule.GetKindStore().ValueType,
+			store,
+			options...,
+		)
+		p.builders[builder.Name] = builder
 	}
 
 	if p.vmType == "native" {
@@ -260,7 +264,7 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 				return fmt.Errorf("store() method not found on %T", f.Interface())
 			}
 
-			outputStore := p.stores[mod.Name]
+			outputStore := p.builders[mod.Name]
 			p.nativeOutputs[mod.Name] = reflect.ValueOf(outputStore)
 
 			outputFunc := func() error { return nil }
@@ -307,14 +311,14 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 					inputs = append(inputs, &wasm.Input{
 						Type:   wasm.InputStore,
 						Name:   inputName,
-						Store:  p.stores[inputName],
+						Store:  p.builders[inputName],
 						Deltas: true,
 					})
 				} else {
 					inputs = append(inputs, &wasm.Input{
 						Type:  wasm.InputStore,
 						Name:  inputName,
-						Store: p.stores[inputName],
+						Store: p.builders[inputName],
 					})
 				}
 			} else if inputSource := in.GetSource(); inputSource != nil {
@@ -364,7 +368,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			updatePolicy := v.UpdatePolicy
 			valueType := v.ValueType
 
-			outputStore := p.stores[modName]
+			outputStore := p.builders[modName]
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         modName,
@@ -442,14 +446,26 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider, module *wasm.Module) wasm.Wa
 
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
-		p.fileWaiter = state.NewFileWaiter(p.outputStreamName, p.graph, p.ioFactory, p.requestedStartBlockNum)
-		err := p.fileWaiter.Wait(ctx, p.manifest, p.graph, p.requestedStartBlockNum) //block until all parent storeModules have completed their tasks
+		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputStreamName) //todo: new the list of parent store.
+		var outputStreamModule *pbtransform.Module
+		var stores []*state.Store
+		for _, ancestorStore := range ancestorStores {
+			builder := p.builders[ancestorStore.Name]
+			//store := state.NewStore(module.Name, module.ModuleHash, p.stateStore)
+			stores = append(stores, builder.Store)
+			if ancestorStore.Name == p.outputStreamName {
+				outputStreamModule = ancestorStore
+			}
+		}
+
+		p.fileWaiter = state.NewFileWaiter(p.requestedStartBlockNum, stores)
+		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.StartBlock) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}
 	}
 
-	for _, store := range p.stores {
+	for _, store := range p.builders {
 		if p.requestedStartBlockNum == store.ModuleStartBlock {
 			continue
 		}
@@ -477,7 +493,7 @@ type StreamFunc func() error
 func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
 
 	p.requestedStartBlockNum = requestedStartBlockNum
-	_, _, err := p.build(p.manifest, p.graph)
+	_, _, err := p.build()
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
@@ -523,13 +539,13 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		if block.Number >= stopBlock {
 			wg := &sync.WaitGroup{}
-			for _, s := range p.stores {
-				err := s.WriteState(context.Background(), block.Num())
+			for _, builder := range p.builders {
+				err := builder.WriteState(context.Background(), block.Num())
 				if err != nil {
-					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err)
+					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), builder.Name, err)
 				}
 
-				if p.requestedStartBlockNum <= s.ModuleStartBlock {
+				if p.requestedStartBlockNum <= builder.ModuleStartBlock {
 					continue
 				}
 
@@ -543,7 +559,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 							zap.String("store", s.Name),
 						)
 
-						<-state.WaitKV(ctx, requestedStartBlockNum, p.ioFactory, s.Name, s.ModuleHash)
+						<-state.WaitKV(ctx, builder.Store, requestedStartBlockNum)
 
 						zlog.Info("kv file found",
 							zap.String("filename", fmt.Sprintf("%s-%d.kv", s.Name, requestedStartBlockNum)),
@@ -561,7 +577,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 						if err != nil {
 							panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
 						}
-					}(s)
+					}(builder)
 				}
 			}
 			wg.Wait()
@@ -604,7 +620,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		}
 
 		// Prep for next block, clean-up all deltas.
-		for _, s := range p.stores {
+		for _, s := range p.builders {
 			s.Flush()
 		}
 

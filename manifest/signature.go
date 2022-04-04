@@ -60,7 +60,7 @@ func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 
 	return h.Sum(nil)
 }
-func HashModuleAsString(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) string {
+func HashModuleAsString(manifest *pbtransform.Manifest, graph *ModuleGraph, module *pbtransform.Module) string {
 	return hex.EncodeToString(HashModule(manifest, module, graph))
 }
 func inputName(input *pbtransform.Input) string {

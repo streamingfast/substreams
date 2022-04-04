@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/test-go/testify/require"
+
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 
 	"github.com/streamingfast/dstore"
@@ -99,34 +101,32 @@ func TestFileWaiter_Wait(t *testing.T) {
 	tests := []struct {
 		name          string
 		graph         *manifest.ModuleGraph
-		factory       FactoryInterface
+		stores        []*Store
 		targetBlock   uint64
 		expectedError bool
 	}{
 		{
 			name:  "files all present",
 			graph: graph,
-			factory: &TestFactory{
-				stores: map[string]*TestStore{
-					"B": getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
-						files := map[string][]string{
-							"B-1000": {"B-1000.kv"},
-							"B-2000": {"B-2000-1000.partial"},
-							"B-3000": {"B-3000-2000.partial"},
-						}
-						return files[prefix], nil
+			stores: []*Store{
+				getWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+					files := map[string][]string{
+						"B-1000": {"B-1000.kv"},
+						"B-2000": {"B-2000-1000.partial"},
+						"B-3000": {"B-3000-2000.partial"},
+					}
+					return files[prefix], nil
 
-					}),
-					"C": getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
-						files := map[string][]string{
-							"C-1000": {"C-1000.kv"},
-							"C-2000": {"C-2000-1000.partial"},
-							"C-3000": {"C-3000-2000.partial"},
-						}
-						return files[prefix], nil
+				}),
+				getWaiterTestStore("C", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+					files := map[string][]string{
+						"C-1000": {"C-1000.kv"},
+						"C-2000": {"C-2000-1000.partial"},
+						"C-3000": {"C-3000-2000.partial"},
+					}
+					return files[prefix], nil
 
-					}),
-				},
+				}),
 			},
 			targetBlock:   3000,
 			expectedError: false,
@@ -134,26 +134,24 @@ func TestFileWaiter_Wait(t *testing.T) {
 		{
 			name:  "file missing on one store",
 			graph: graph,
-			factory: &TestFactory{
-				stores: map[string]*TestStore{
-					"B": getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
-						files := map[string][]string{
-							"B-1000": {"B-1000.kv"},
-							"B-2000": {"B-2000-1000.partial"},
-							"B-3000": {"B-3000-2000.partial"},
-						}
+			stores: []*Store{
+				getWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+					files := map[string][]string{
+						"B-1000": {"B-1000.kv"},
+						"B-2000": {"B-2000-1000.partial"},
+						"B-3000": {"B-3000-2000.partial"},
+					}
 
-						return files[prefix], nil
+					return files[prefix], nil
 
-					}),
-					"C": getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
-						files := map[string][]string{
-							"C-1000": {"C-1000.kv"},
-							"C-3000": {"C-3000-2000.partial"},
-						}
-						return files[prefix], nil
-					}),
-				},
+				}),
+				getWaiterTestStore("C", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+					files := map[string][]string{
+						"C-1000": {"C-1000.kv"},
+						"C-3000": {"C-3000-2000.partial"},
+					}
+					return files[prefix], nil
+				}),
 			},
 			targetBlock:   3000,
 			expectedError: true,
@@ -162,13 +160,17 @@ func TestFileWaiter_Wait(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			waiter := NewFileWaiter("E", test.graph, test.factory, test.targetBlock)
+			waiter := NewFileWaiter(test.targetBlock, test.stores)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 			defer cancel()
 
-			err = waiter.Wait(ctx, &pbtransform.Manifest{}, graph, test.targetBlock)
-			assert.Equal(t, test.expectedError, err != nil)
+			err = waiter.Wait(ctx, test.targetBlock, 1000)
+			if test.expectedError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -176,7 +178,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 func Test_pathToState(t *testing.T) {
 	tests := []struct {
 		name             string
-		store            Store
+		store            *Store
 		storeName        string
 		moduleStartBlock uint64
 		targetBlock      uint64
@@ -187,7 +189,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path",
 			storeName: "A",
-			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-1000": {"A-1000.kv"},
 					"A-2000": {"A-2000-1000.partial"},
@@ -205,7 +207,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path all partial with start block",
 			storeName: "A",
-			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-2000": {"A-2000-1000.partial"},
 					"A-3000": {"A-3000-2000.partial"},
@@ -222,7 +224,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path take shortest path",
 			storeName: "A",
-			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-2000": {"A-2000-1000.partial"},
 					"A-3000": {"A-3000.kv", "A-3000-2000.partial"},
@@ -238,7 +240,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path take shortest path part 2",
 			storeName: "A",
-			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-2000": {"A-2000-1000.partial"},
 					"A-3000": {"A-3000-2000.partial", "A-3000.kv"},
@@ -254,7 +256,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "conflicting partial files",
 			storeName: "A",
-			store: getWaiterTestStore(func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-1000": {"A-1000.kv"},
 					"A-2000": {"A-2000-1000.partial"},
@@ -279,11 +281,9 @@ func Test_pathToState(t *testing.T) {
 	}
 }
 
-func getWaiterTestStore(listFilesFunc func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error)) *TestStore {
+func getWaiterTestStore(moduleName string, moduleHash string, listFilesFunc func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error)) *Store {
 	mockDStore := &dstore.MockStore{
 		ListFilesFunc: listFilesFunc,
 	}
-	return &TestStore{
-		MockStore: mockDStore,
-	}
+	return NewStore(moduleName, moduleHash, mockDStore)
 }

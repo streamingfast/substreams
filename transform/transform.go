@@ -17,7 +17,6 @@ import (
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	ssrpc "github.com/streamingfast/substreams/rpc"
-	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -80,23 +79,13 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 				return nil, fmt.Errorf("setting up store for data: %w", err)
 			}
 
-			ioFactory := state.NewStoreFactory(stateStore)
-
 			graph, err := manifest.NewModuleGraph(req.Manifest.Modules)
 			if err != nil {
 				return nil, fmt.Errorf("create module graph %w", err)
 			}
 
 			t := &ssTransform{
-				pipeline: pipeline.New(
-					rpcClient,
-					rpcCache,
-					req.Manifest,
-					graph,
-					req.OutputModule,
-					protobufBlockType,
-					ioFactory,
-				),
+				pipeline:    pipeline.New(rpcClient, rpcCache, req.Manifest, graph, req.OutputModule, protobufBlockType, stateStore),
 				description: req.Manifest.Description,
 			}
 

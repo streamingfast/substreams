@@ -26,14 +26,3 @@ func (io *TestStore) WriteState(ctx context.Context, content []byte, blockNum ui
 	}
 	return nil
 }
-
-type TestFactory struct {
-	stores map[string]*TestStore
-}
-
-func (t *TestFactory) New(name string, moduleHash string) Store {
-	if _, ok := t.stores[name]; ok {
-		return t.stores[name]
-	}
-	return nil
-}

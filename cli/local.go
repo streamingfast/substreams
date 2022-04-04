@@ -25,6 +25,7 @@ func init() {
 	localCmd.Flags().String("rpc-endpoint", "http://localhost:8546", "RPC endpoint of blockchain node")
 	localCmd.Flags().String("state-store-url", "./localdata", "URL of state store")
 	localCmd.Flags().String("blocks-store-url", "./localblocks", "URL of blocks store")
+	localCmd.Flags().String("rpc-cache-store-url", "./rpc-cache", "URL of blocks store")
 	localCmd.Flags().String("irr-indexes-url", "./localirr", "URL of blocks store")
 
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
@@ -82,8 +83,10 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
 	fmt.Println("RPC endpoint:", rpcEndpoint)
+	rpcCacheURL := mustGetString(cmd, "rpc-cache-store-url")
+	fmt.Println("RPC cache url:", rpcCacheURL)
 	// FIXME: obviously this doesn't belong in `transform`, it's an `eth-centric` thing.
-	rpcClient, rpcCache, err := transform.GetRPCClient(rpcEndpoint, "./rpc-cache")
+	rpcClient, rpcCache, err := transform.GetRPCClient(rpcEndpoint, rpcCacheURL)
 	if err != nil {
 		return fmt.Errorf("setting up rpc client: %w", err)
 	}

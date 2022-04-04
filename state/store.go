@@ -8,33 +8,6 @@ import (
 	"github.com/streamingfast/dstore"
 )
 
-//type FactoryInterface interface {
-//	New(name string, moduleHash string) Store
-//}
-//
-//type StoreFactory struct {
-//	store dstore.Store
-//}
-//
-//func NewStoreFactory(store dstore.Store) *StoreFactory {
-//	return &StoreFactory{
-//		store: store,
-//	}
-//}
-//
-//func (f *StoreFactory) New(name string, moduleHash string) Store {
-//	return NewDefaultStore(name, moduleHash, f.store)
-//}
-
-//type Store interface {
-//	dstore.Store
-//
-//	WriteState(ctx context.Context, content []byte, blockNum uint64) error
-//	WritePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) error
-//	StateFileName(blockNum uint64) string
-//	PartialFileName(startBlockNum, endBlockNum uint64) string
-//}
-
 type Store struct {
 	dstore.Store
 

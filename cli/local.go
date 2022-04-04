@@ -150,7 +150,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Starting firehose stream from block", startBlockNum)
 
-	hose := stream.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
+	hose := stream.New([]dstore.Store{blocksStore}, startBlockNum, handler,
 		stream.WithForkableSteps(bstream.StepIrreversible),
 		stream.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
 	)

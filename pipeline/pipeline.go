@@ -447,19 +447,15 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider, module *wasm.Module) wasm.Wa
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
 		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputStreamName) //todo: new the list of parent store.
-		var outputStreamModule *pbtransform.Module
+		outputStreamModule := p.builders[p.outputStreamName]
 		var stores []*state.Store
 		for _, ancestorStore := range ancestorStores {
 			builder := p.builders[ancestorStore.Name]
-			//store := state.NewStore(module.Name, module.ModuleHash, p.stateStore)
 			stores = append(stores, builder.Store)
-			if ancestorStore.Name == p.outputStreamName {
-				outputStreamModule = ancestorStore
-			}
 		}
 
 		p.fileWaiter = state.NewFileWaiter(p.requestedStartBlockNum, stores)
-		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.StartBlock) //block until all parent storeModules have completed their tasks
+		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}

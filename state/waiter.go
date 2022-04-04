@@ -135,7 +135,7 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 	return done
 }
 
-func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, moduleName string, moduleStartBlock uint64) ([]string, error) {
+func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, moduleStartBlock uint64) ([]string, error) {
 	var out []string
 	nextBlockNum := requestStartBlock
 	for {
@@ -147,7 +147,7 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 			//
 		}
 
-		prefix := fmt.Sprintf("%s-%d", moduleName, nextBlockNum)
+		prefix := store.StateFilePrefix(nextBlockNum)
 		files, err := store.ListFiles(ctx, prefix, "", 2)
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
@@ -155,7 +155,7 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 
 		found := len(files) >= 1
 		if !found {
-			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, moduleName)
+			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, store.Name)
 		}
 
 		foundFile := files[0]

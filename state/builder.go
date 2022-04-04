@@ -98,7 +98,7 @@ func (b *Builder) clone() *Builder {
 }
 
 func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
-	files, err := pathToState(ctx, b.Store, upToBlock, b.Name, b.ModuleStartBlock)
+	files, err := pathToState(ctx, b.Store, upToBlock, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 }
 
 func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) error {
-	files, err := pathToState(ctx, b.Store, requestedStartBlock, b.Name, b.ModuleStartBlock)
+	files, err := pathToState(ctx, b.Store, requestedStartBlock, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}

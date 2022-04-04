@@ -191,9 +191,9 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-1000": {"A-1000-0.kv"},
-					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000-2000.partial"},
+					"module.hash.1-A-1000": {"module.hash.1-A-1000-0.kv"},
+					"module.hash.1-A-2000": {"module.hash.1-A-2000-1000.partial"},
+					"module.hash.1-A-3000": {"module.hash.1-A-3000-2000.partial"},
 				}
 				return files[prefix], nil
 
@@ -201,7 +201,7 @@ func Test_pathToState(t *testing.T) {
 			moduleStartBlock: 0,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-1000-0.kv", "A-2000-1000.partial", "A-3000-2000.partial"},
+			expectedFiles:    []string{"module.hash.1-A-1000-0.kv", "module.hash.1-A-2000-1000.partial", "module.hash.1-A-3000-2000.partial"},
 			expectedError:    false,
 		},
 		{
@@ -209,8 +209,8 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000-2000.partial"},
+					"module.hash.1-A-2000": {"module.hash.1-A-2000-1000.partial"},
+					"module.hash.1-A-3000": {"module.hash.1-A-3000-2000.partial"},
 				}
 				return files[prefix], nil
 
@@ -218,7 +218,7 @@ func Test_pathToState(t *testing.T) {
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-2000-1000.partial", "A-3000-2000.partial"},
+			expectedFiles:    []string{"module.hash.1-A-2000-1000.partial", "module.hash.1-A-3000-2000.partial"},
 			expectedError:    false,
 		},
 		{
@@ -226,15 +226,15 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000-0.kv", "A-3000-2000.partial"},
+					"module.hash.1-A-2000": {"module.hash.1-A-2000-1000.partial"},
+					"module.hash.1-A-3000": {"module.hash.1-A-3000-0.kv", "module.hash.1-A-3000-2000.partial"},
 				}
 				return files[prefix], nil
 			}),
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-3000-0.kv"},
+			expectedFiles:    []string{"module.hash.1-A-3000-0.kv"},
 			expectedError:    false,
 		},
 		{
@@ -242,15 +242,15 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000-2000.partial", "A-3000-0.kv"},
+					"module.hash.1-A-2000": {"module.hash.1-A-2000-1000.partial"},
+					"module.hash.1-A-3000": {"module.hash.1-A-3000-2000.partial", "module.hash.1-A-3000-0.kv"},
 				}
 				return files[prefix], nil
 			}),
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-3000-0.kv"},
+			expectedFiles:    []string{"module.hash.1-A-3000-0.kv"},
 			expectedError:    false,
 		},
 		{
@@ -258,9 +258,9 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			store: getWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-1000": {"A-1000-0.kv"},
-					"A-2000": {"A-2000-1000.partial"},
-					"A-3000": {"A-3000-1000.partial", "A-3000-2000.partial"},
+					"module.hash.1-A-1000": {"module.hash.1-A-1000-0.kv"},
+					"module.hash.1-A-2000": {"module.hash.1-A-2000-1000.partial"},
+					"module.hash.1-A-3000": {"module.hash.1-A-3000-1000.partial", "module.hash.1-A-3000-2000.partial"},
 				}
 				return files[prefix], nil
 			}),
@@ -274,7 +274,7 @@ func Test_pathToState(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			files, err := pathToState(context.TODO(), test.store, test.targetBlock, test.storeName, test.moduleStartBlock)
+			files, err := pathToState(context.TODO(), test.store, test.targetBlock, test.moduleStartBlock)
 			assert.Equal(t, test.expectedFiles, files)
 			assert.Equal(t, test.expectedError, err != nil)
 		})

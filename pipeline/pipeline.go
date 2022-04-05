@@ -501,7 +501,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		return nil, fmt.Errorf("synchonizing store: %w", err)
 	}
 
-	timeBetweenBlockStart := time.Now()
 	blockCount := 0
 	//blockSec := 0
 
@@ -516,7 +515,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		blockCount++
 		handleBlockStart := time.Now()
-		timeBetweenBlock := time.Since(timeBetweenBlockStart)
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -625,7 +623,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		}
 
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
-		timeBetweenBlockStart = time.Now()
 		return nil
 	}), nil
 }

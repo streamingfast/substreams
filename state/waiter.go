@@ -100,8 +100,8 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 				return
 			}
 
-			prefix := fmt.Sprintf("%s-%d", store.Name, waitForBlockNum)
-			files, err := store.ListFiles(ctx, prefix, "", 1)
+			prefix := store.StateFilePrefix(waitForBlockNum)
+			files, err := store.ListFiles(ctx, store.StateFilePrefix(waitForBlockNum), "", 1)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
 				return

@@ -549,11 +549,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 						defer wg.Done()
 
 						zlog.Info("waiting for kv file",
-							zap.String("filename", fmt.Sprintf("%s-%d.kv", s.Name, requestedStartBlockNum)),
+							zap.String("filename", builder.Store.StateFileName(requestedStartBlockNum)),
 							zap.String("store", s.Name),
 						)
 
-						<-state.WaitKV(ctx, builder.Store, requestedStartBlockNum)
+						<-state.WaitKV(ctx, s.Store, requestedStartBlockNum)
 
 						zlog.Info("kv file found",
 							zap.Uint64("at_block_num", requestedStartBlockNum),

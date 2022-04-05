@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/abourget/llerrgroup"
 )
 
@@ -63,6 +65,7 @@ func WaitKV(ctx context.Context, store *Store, endBlock uint64) <-chan error {
 			}
 
 			fileName := store.StateFileName(endBlock)
+			zlog.Info("looking for kv file:", zap.String("file_name", fileName))
 			exists, err := store.FileExists(ctx, fileName)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}

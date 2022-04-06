@@ -16,7 +16,7 @@ import (
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/transform"
+	"github.com/streamingfast/substreams/rpc"
 )
 
 var ProtobufBlockType string = "sf.ethereum.type.v1.Block"
@@ -81,16 +81,6 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up irr blocks store: %w", err)
 	}
 
-	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
-	fmt.Println("RPC endpoint:", rpcEndpoint)
-	rpcCacheURL := mustGetString(cmd, "rpc-cache-store-url")
-	fmt.Println("RPC cache url:", rpcCacheURL)
-	// FIXME: obviously this doesn't belong in `transform`, it's an `eth-centric` thing.
-	rpcClient, rpcCache, err := transform.GetRPCClient(rpcEndpoint, rpcCacheURL)
-	if err != nil {
-		return fmt.Errorf("setting up rpc client: %w", err)
-	}
-
 	stateStorePath := mustGetString(cmd, "state-store-url")
 	stateStore, err := dstore.NewStore(stateStorePath, "", "", false)
 	if err != nil {
@@ -106,6 +96,19 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	startBlockNum := mustGetInt64(cmd, "start-block")
 	stopBlockNum := mustGetUint64(cmd, "stop-block")
+
+	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
+	fmt.Println("RPC endpoint:", rpcEndpoint)
+	rpcCacheURL := mustGetString(cmd, "rpc-cache-store-url")
+	fmt.Println("RPC cache url:", rpcCacheURL)
+
+	rpcCacheStore, err := dstore.NewStore(rpcCacheURL, "", "", false)
+	if err != nil {
+		return fmt.Errorf("setting up rpc client: %w", err)
+	}
+
+	rpcClient := rpc.NewClient(rpcEndpoint)
+	rpcCacheManager := rpc.NewCacheManager(ctx, rpcCacheStore, startBlockNum)
 
 	var pipelineOpts []pipeline.Option
 	if partialMode := mustGetBool(cmd, "partial"); partialMode {
@@ -141,7 +144,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)
+	pipe := pipeline.New(rpcClient, rpcCacheManager, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)
 
 	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)
 	if err != nil {

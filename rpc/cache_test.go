@@ -1,61 +1,10 @@
 package rpc
 
 import (
-	"bytes"
-	"context"
-	"fmt"
-	"io"
 	"testing"
 
-	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestRpcCacheNewLoadSave(t *testing.T) {
-	cache := map[string][]byte{}
-
-	writeStore := dstore.NewMockStore(nil)
-	writeStore.WriteObjectFunc = func(ctx context.Context, base string, f io.Reader) error {
-		data, err := io.ReadAll(f)
-		if err != nil {
-			return err
-		}
-
-		_, exists := cache[base]
-		if exists && !writeStore.Overwrite() {
-			return nil
-		}
-
-		cache[base] = data
-		return nil
-	}
-
-	ctx := context.Background()
-	wc := NewCache(nil, writeStore, 1000, 11000)
-
-	wc.kv = map[CacheKey][]byte{
-		"foo": []byte(`bar`),
-		"bar": []byte(`foo`),
-	}
-	wc.Save(ctx)
-
-	readStore := dstore.NewMockStore(nil)
-	readStore.OpenObjectFunc = func(ctx context.Context, name string) (out io.ReadCloser, err error) {
-		if _, exists := cache[name]; !exists {
-			return nil, fmt.Errorf("%s does not exist", name)
-		}
-		r := bytes.NewReader(cache[name])
-		return io.NopCloser(r), nil
-	}
-
-	rc := NewCache(readStore, nil, 1000, 11000)
-	rc.Load(ctx)
-
-	assert.Equal(t, map[CacheKey][]byte{
-		"foo": []byte(`bar`),
-		"bar": []byte(`foo`),
-	}, rc.kv)
-}
 
 func TestRpcCacheKey(t *testing.T) {
 	c := &Cache{}
@@ -86,7 +35,7 @@ func TestRpcCacheSet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cache := NewCache(nil, nil, 0, 0)
+			cache := newCache(nil, nil, cacheFileName(0, 0))
 			cache.Set("foo", c.in)
 			assert.Equal(t, c.expect, cache.kv["foo"])
 		})
@@ -134,7 +83,7 @@ func TestRpcCacheGet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cache := NewCache(nil, nil, 0, 0)
+			cache := newCache(nil, nil, cacheFileName(0, 0))
 			cache.kv = c.kv
 
 			var ok bool

@@ -40,9 +40,9 @@ type Pipeline struct {
 
 	blockType string
 
-	rpcCache      *ssrpc.Cache
-	nativeImports *imports.Imports
-	builders      map[string]*state.Builder
+	rpcCacheManager *ssrpc.CacheManager
+	nativeImports   *imports.Imports
+	builders        map[string]*state.Builder
 
 	//ioFactory        state.FactoryInterface
 	graph            *manifest.ModuleGraph
@@ -131,10 +131,10 @@ func WithAllowInvalidState() Option {
 	}
 }
 
-func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbtransform.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
+func New(rpcClient *rpc.Client, rpcCacheManager *ssrpc.CacheManager, manifest *pbtransform.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
 	pipe := &Pipeline{
-		rpcCache:         rpcCache,
-		nativeImports:    imports.NewImports(rpcClient, rpcCache),
+		rpcCacheManager:  rpcCacheManager,
+		nativeImports:    imports.NewImports(rpcClient, rpcCacheManager),
 		builders:         map[string]*state.Builder{},
 		graph:            graph,
 		stateStore:       stateStore,
@@ -344,7 +344,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
-		rpcWasmFuncFact := GetRPCWasmFunctionFactory(p.nativeImports, wasmModule)
+		rpcWasmFuncFactory := GetRPCWasmFunctionFactory(p.nativeImports, wasmModule)
 		if v := mod.GetKindMap(); v != nil {
 			fmt.Printf("Adding mapper for module %q\n", modName)
 
@@ -360,7 +360,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			}
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc, rpcWasmFuncFact)
+				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc, rpcWasmFuncFactory)
 			})
 			continue
 		}
@@ -389,7 +389,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			}
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc, rpcWasmFuncFact)
+				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc, rpcWasmFuncFactory)
 			})
 			continue
 		}
@@ -400,7 +400,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 	return nil
 }
 
-func GetRPCWasmFunctionFactory(rpcProv RpcProvider, module *wasm.Module) wasm.WasmerFunctionFactory {
+func GetRPCWasmFunctionFactory(rpcProvider RpcProvider, module *wasm.Module) wasm.WasmerFunctionFactory {
 	return func(instance *wasm.Instance) (namespace string, name string, wasmerFunc *wasmer.Function) {
 		namespace = "rpc"
 		name = "eth_call"
@@ -425,7 +425,7 @@ func GetRPCWasmFunctionFactory(rpcProv RpcProvider, module *wasm.Module) wasm.Wa
 				}
 
 				t0 := time.Now()
-				responses := rpcProv.RPC(rpcCalls)
+				responses := rpcProvider.RPC(rpcCalls)
 				zlog.Info("time taken to call rpc: ", zap.Duration("rpc_call_duration", time.Since(t0)))
 
 				responsesBytes, err := proto.Marshal(responses)
@@ -576,7 +576,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			}
 			wg.Wait()
 
-			p.rpcCache.Save(context.Background())
+			p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
 
 			return io.EOF
 		}

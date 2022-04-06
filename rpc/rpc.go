@@ -60,7 +60,7 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pb
 			rpcResp := []*rpc.RPCResponse{}
 			err := json.Unmarshal(fromCache, &rpcResp)
 			if err != nil {
-				zlog.Warn("cannot unmarshal cache response for rpc call", zap.Error(err))
+				zlog.Warn("cannot unmarshal Cache response for rpc call", zap.Error(err))
 			} else {
 				for i, resp := range rpcResp {
 					resp.CopyDecoder(reqs[i])

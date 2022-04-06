@@ -364,12 +364,14 @@ func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
 			var mode pbtransform.InputStore_Mode
 
 			switch input.Mode {
-			case "UNSET":
+			case "":
 				mode = pbtransform.InputStore_UNSET
-			case "GET":
+			case "get":
 				mode = pbtransform.InputStore_GET
-			case "Delta":
+			case "deltas":
 				mode = pbtransform.InputStore_DELTAS
+			default:
+				panic(fmt.Sprintf("invalid input mode %s", input.Mode))
 			}
 
 			pbInput := &pbtransform.Input{

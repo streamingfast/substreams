@@ -549,7 +549,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 						defer wg.Done()
 
 						zlog.Info("waiting for kv file",
-							zap.String("filename", builder.Store.StateFileName(requestedStartBlockNum)),
+							zap.String("filename", s.Store.StateFileName(requestedStartBlockNum)),
 							zap.String("store", s.Name),
 						)
 

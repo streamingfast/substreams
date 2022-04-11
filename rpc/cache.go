@@ -31,8 +31,9 @@ func (t *CachePerformanceTracker) startTracking(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
+				t.log()
 				return
-			case <-time.After(1 * time.Second):
+			case <-time.After(5 * time.Second):
 				t.log()
 			}
 		}
@@ -134,7 +135,7 @@ func (cm *CacheManager) initialize(ctx context.Context, startBlock, endBlock uin
 	}
 
 	cm.currentEndBlock = endBlock
-	cm.currentCache = newCache(cm.store, cm.store, filename)
+	cm.currentCache = newCache()
 	cm.Load(ctx)
 
 	return cm.currentCache
@@ -192,7 +193,7 @@ type Cache struct {
 	misses int
 }
 
-func newCache(readStore, writeStore dstore.Store, filename string) *Cache {
+func newCache() *Cache {
 	return &Cache{
 		kv: make(map[CacheKey][]byte),
 	}

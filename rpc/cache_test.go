@@ -35,7 +35,7 @@ func TestRpcCacheSet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cache := newCache(nil, nil, cacheFileName(0, 0))
+			cache := newCache()
 			cache.Set("foo", c.in)
 			assert.Equal(t, c.expect, cache.kv["foo"])
 		})
@@ -83,7 +83,7 @@ func TestRpcCacheGet(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cache := newCache(nil, nil, cacheFileName(0, 0))
+			cache := newCache()
 			cache.kv = c.kv
 
 			var ok bool

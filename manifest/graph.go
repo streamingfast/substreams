@@ -3,6 +3,9 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
+
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/bstream"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/yourbasic/graph"
@@ -62,6 +65,7 @@ func computeStartBlock(modules []*pbtransform.Module, g *ModuleGraph) {
 			moduleIndex := g.moduleIndex[module.Name]
 			startBlock := startBlockForModule(moduleIndex, g)
 			module.StartBlock = startBlock
+			zlog.Info("computed start block", zap.String("module_name", module.Name), zap.Uint64("start_block", startBlock))
 		}
 	}
 }

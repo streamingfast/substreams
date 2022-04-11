@@ -17,7 +17,8 @@ func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 	buf := bytes.NewBuffer(nil)
 
 	startBlockBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(startBlockBytes, module.StartBlock) //at this point start block should have been resolved
+	binary.LittleEndian.PutUint64(startBlockBytes, module.StartBlock) //at this
+	// point start block should have been resolved
 	buf.WriteString("start_block")
 	buf.Write(startBlockBytes)
 

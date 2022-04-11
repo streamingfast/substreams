@@ -132,7 +132,7 @@ func (cm *CacheManager) initialize(ctx context.Context, startBlock, endBlock uin
 
 	cm.currentEndBlock = endBlock
 	cm.currentCache = newCache()
-	cm.Load(ctx)
+	cm.currentCache.load(ctx, cm.store, cm.currentFilename)
 
 	return cm.currentCache
 }
@@ -174,10 +174,6 @@ func (cm *CacheManager) Save(ctx context.Context, startBlock uint64, endBlock ui
 
 	cm.currentStartBlock = endBlock
 	cm.currentCache = nil
-}
-
-func (cm *CacheManager) Load(ctx context.Context) {
-	cm.currentCache.load(ctx, cm.store, cm.currentFilename)
 }
 
 type Cache struct {

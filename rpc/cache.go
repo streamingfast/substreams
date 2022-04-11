@@ -62,11 +62,10 @@ type CacheKey string
 type CacheManager struct {
 	store dstore.Store
 
-	currentlyLoadedFromFile bool
-	currentCache            *Cache
-	currentFilename         string
-	currentStartBlock       uint64
-	currentEndBlock         uint64
+	currentCache      *Cache
+	currentFilename   string
+	currentStartBlock uint64
+	currentEndBlock   uint64
 
 	totalHits   int
 	totalMisses int
@@ -92,8 +91,6 @@ func NewCacheManager(ctx context.Context, store dstore.Store, startBlock int64) 
 func (cm *CacheManager) initialize(ctx context.Context, startBlock, endBlock uint64) *Cache {
 	var filename string
 	var found bool
-
-	cm.currentlyLoadedFromFile = false
 
 	prefixSearchBlock := startBlock
 	if cm.currentStartBlock > 0 {
@@ -122,7 +119,6 @@ func (cm *CacheManager) initialize(ctx context.Context, startBlock, endBlock uin
 	}
 
 	if found {
-		cm.currentlyLoadedFromFile = true
 		_, endBlock = mustParseCacheFileName(filename)
 		cm.currentFilename = filename
 	} else {
@@ -167,13 +163,11 @@ func (cm *CacheManager) Save(ctx context.Context, startBlock uint64, endBlock ui
 		return
 	}
 
-	if !cm.currentlyLoadedFromFile {
-		saveStartBlock := startBlock
-		if cm.currentStartBlock > startBlock {
-			saveStartBlock = cm.currentStartBlock
-		}
-		cm.currentCache.save(ctx, cm.store, cacheFileName(saveStartBlock, endBlock))
+	saveStartBlock := startBlock
+	if cm.currentStartBlock > startBlock {
+		saveStartBlock = cm.currentStartBlock
 	}
+	cm.currentCache.save(ctx, cm.store, cacheFileName(saveStartBlock, endBlock))
 
 	cm.totalHits += cm.currentCache.hits
 	cm.totalMisses += cm.currentCache.misses

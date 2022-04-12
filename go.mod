@@ -16,6 +16,7 @@ require (
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
 	github.com/test-go/testify v1.1.4
+	github.com/vektah/gqlparser v1.3.1
 	github.com/wasmerio/wasmer-go v1.0.4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.21.0

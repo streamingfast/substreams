@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
+	ethrpc "github.com/streamingfast/eth-go/rpc"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"github.com/streamingfast/substreams/manifest"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
@@ -46,8 +49,15 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 				return nil, fmt.Errorf("setting up rpc cache store: %w", err)
 			}
 
-			rpcClient := ssrpc.NewClient(rpcEndpoint)
-			rpcCacheManager := ssrpc.NewCacheManager(context.Background(), rpcCacheStore, 0)
+			rpcCache := ssrpc.NewCacheManager(context.Background(), rpcCacheStore, 0)
+			httpClient := &http.Client{
+				Transport: &http.Transport{
+					DisableKeepAlives: true, // don't reuse connections
+				},
+				Timeout: 3 * time.Second,
+			}
+
+			rpcClient := ethrpc.NewClient(rpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache))
 
 			stateStore, err := dstore.NewStore(stateStorePath, "", "", false)
 			if err != nil {
@@ -60,7 +70,7 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 			}
 
 			t := &ssTransform{
-				pipeline:    pipeline.New(rpcClient, rpcCacheManager, req.Manifest, graph, req.OutputModule, protobufBlockType, stateStore),
+				pipeline:    pipeline.New(rpcClient, rpcCache, req.Manifest, graph, req.OutputModule, protobufBlockType, stateStore),
 				description: req.Manifest.Description,
 			}
 

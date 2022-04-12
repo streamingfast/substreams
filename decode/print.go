@@ -46,7 +46,13 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 		}
 
 		fmt.Printf("Message %q:\n", msgType)
-		fmt.Println(protojson.Marshal(any))
+
+		marshalledBytes, err := protojson.Marshal(any)
+		if err != nil {
+			return fmt.Errorf("return handler: marshalling: %w", err)
+		}
+
+		fmt.Println(marshalledBytes)
 		return nil
 	}
 

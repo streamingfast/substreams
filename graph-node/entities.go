@@ -35,7 +35,6 @@ type Field struct {
 	Derived      bool
 	Hidden       bool
 	PostgresType string
-	//PostgresIndex string
 }
 
 func NewEntityDefinitions(postgresSchema string, graphqlSchemaDoc *ast.SchemaDocument) (*EntityDefinitions, error) {

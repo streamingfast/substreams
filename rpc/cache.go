@@ -23,7 +23,7 @@ func init() {
 }
 
 type CachePerformanceTracker struct {
-	manager *CacheManager
+	manager *Cache
 }
 
 func (t *CachePerformanceTracker) startTracking(ctx context.Context) {
@@ -59,10 +59,10 @@ func (t *CachePerformanceTracker) log() {
 
 type CacheKey string
 
-type CacheManager struct {
+type Cache struct {
 	store dstore.Store
 
-	currentCache      *Cache
+	currentCache      *cache
 	currentFilename   string
 	currentStartBlock uint64
 	currentEndBlock   uint64
@@ -70,11 +70,11 @@ type CacheManager struct {
 	totalHits   int
 	totalMisses int
 
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
-func NewCacheManager(ctx context.Context, store dstore.Store, startBlock int64) *CacheManager {
-	cf := &CacheManager{
+func NewCacheManager(ctx context.Context, store dstore.Store, startBlock int64) *Cache {
+	cf := &Cache{
 		store: store,
 	}
 
@@ -88,7 +88,7 @@ func NewCacheManager(ctx context.Context, store dstore.Store, startBlock int64) 
 	return cf
 }
 
-func (cm *CacheManager) initialize(ctx context.Context, startBlock, endBlock uint64) *Cache {
+func (cm *Cache) initialize(ctx context.Context, startBlock, endBlock uint64) *cache {
 	var filename string
 	var found bool
 
@@ -131,13 +131,12 @@ func (cm *CacheManager) initialize(ctx context.Context, startBlock, endBlock uin
 	}
 
 	cm.currentEndBlock = endBlock
-	cm.currentCache = newCache()
-	cm.currentCache.load(ctx, cm.store, cm.currentFilename)
+	cm.load(ctx)
 
 	return cm.currentCache
 }
 
-func (cm *CacheManager) Get(ctx context.Context, startBlock, endBlock uint64) *Cache {
+func (cm *Cache) UpdateCache(ctx context.Context, startBlock, endBlock uint64) {
 	var initialize bool
 
 	if cm.currentCache == nil {
@@ -154,11 +153,20 @@ func (cm *CacheManager) Get(ctx context.Context, startBlock, endBlock uint64) *C
 	if initialize {
 		cm.initialize(ctx, startBlock, endBlock)
 	}
-
-	return cm.currentCache
 }
 
-func (cm *CacheManager) Save(ctx context.Context, startBlock uint64, endBlock uint64) {
+func (cm *Cache) load(ctx context.Context) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.currentCache = newCache()
+	cm.currentCache.load(ctx, cm.store, cm.currentFilename)
+}
+
+func (cm *Cache) Save(ctx context.Context, startBlock uint64, endBlock uint64) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	if cm.currentCache == nil {
 		return
 	}
@@ -176,20 +184,34 @@ func (cm *CacheManager) Save(ctx context.Context, startBlock uint64, endBlock ui
 	cm.currentCache = nil
 }
 
-type Cache struct {
+func (cm *Cache) Get(ctx context.Context, key string) ([]byte, bool) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	return cm.currentCache.Get(CacheKey(key))
+}
+
+func (cm *Cache) Set(ctx context.Context, key string, value []byte) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.currentCache.Set(CacheKey(key), value)
+}
+
+type cache struct {
 	kv map[CacheKey][]byte
 
 	hits   int
 	misses int
 }
 
-func newCache() *Cache {
-	return &Cache{
+func newCache() *cache {
+	return &cache{
 		kv: make(map[CacheKey][]byte),
 	}
 }
 
-func (c *Cache) load(ctx context.Context, store dstore.Store, filename string) {
+func (c *cache) load(ctx context.Context, store dstore.Store, filename string) {
 	if store == nil {
 		zlog.Info("skipping rpccache load: no read store is defined")
 		return
@@ -197,26 +219,26 @@ func (c *Cache) load(ctx context.Context, store dstore.Store, filename string) {
 
 	obj, err := store.OpenObject(ctx, filename)
 	if err != nil {
-		zlog.Info("rpc Cache not found", zap.String("filename", filename), zap.String("read_store_url", store.BaseURL().Redacted()), zap.Error(err))
+		zlog.Info("rpc cache not found", zap.String("filename", filename), zap.String("read_store_url", store.BaseURL().Redacted()), zap.Error(err))
 		return
 	}
 
 	b, err := ioutil.ReadAll(obj)
 	if err != nil {
-		zlog.Info("cannot read all rpc Cache bytes", zap.String("filename", filename), zap.String("read_store_url", store.BaseURL().Redacted()), zap.Error(err))
+		zlog.Info("cannot read all rpc cache bytes", zap.String("filename", filename), zap.String("read_store_url", store.BaseURL().Redacted()), zap.Error(err))
 		return
 	}
 
 	kv := make(map[CacheKey][]byte)
 	err = json.Unmarshal(b, &kv)
 	if err != nil {
-		zlog.Info("cannot unmarshal rpc Cache", zap.String("filename", filename), zap.String("read_store_url", store.BaseURL().Redacted()), zap.Error(err))
+		zlog.Info("cannot unmarshal rpc cache", zap.String("filename", filename), zap.String("read_store_url", store.BaseURL().Redacted()), zap.Error(err))
 		return
 	}
 	c.kv = kv
 }
 
-func (c *Cache) save(ctx context.Context, store dstore.Store, filename string) {
+func (c *cache) save(ctx context.Context, store dstore.Store, filename string) {
 	if store == nil {
 		zlog.Info("skipping rpccache save: no store is defined")
 		return
@@ -224,20 +246,20 @@ func (c *Cache) save(ctx context.Context, store dstore.Store, filename string) {
 
 	b, err := json.Marshal(c.kv)
 	if err != nil {
-		zlog.Info("cannot marshal rpc Cache to bytes", zap.Error(err))
+		zlog.Info("cannot marshal rpc cache to bytes", zap.Error(err))
 		return
 	}
 	ioreader := bytes.NewReader(b)
 
 	err = store.WriteObject(ctx, filename, ioreader)
 	if err != nil {
-		zlog.Info("cannot write rpc Cache to store", zap.String("filename", filename), zap.String("write_store_url", store.BaseURL().Redacted()), zap.Error(err))
+		zlog.Info("cannot write rpc cache to store", zap.String("filename", filename), zap.String("write_store_url", store.BaseURL().Redacted()), zap.Error(err))
 	}
 
 	return
 }
 
-func (_ *Cache) Key(prefix string, items ...interface{}) CacheKey {
+func (_ *cache) Key(prefix string, items ...interface{}) CacheKey {
 	key := prefix
 	for _, it := range items {
 		key = fmt.Sprintf("%s:%v", key, it)
@@ -245,29 +267,11 @@ func (_ *Cache) Key(prefix string, items ...interface{}) CacheKey {
 	return CacheKey(key)
 }
 
-func (c *Cache) Set(k CacheKey, v interface{}) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return // skipping is OK for a Cache
-	}
-	c.kv[k] = b
+func (c *cache) Set(k CacheKey, v []byte) {
+	c.kv[k] = v
 }
 
-func (c *Cache) Get(k CacheKey, out interface{}) (found bool) {
-	v, found := c.kv[k]
-	if !found {
-		c.misses++
-		return false
-	}
-	c.hits++
-
-	if err := json.Unmarshal(v, &out); err != nil {
-		return false
-	}
-	return true
-}
-
-func (c *Cache) GetRaw(k CacheKey) (v []byte, found bool) {
+func (c *cache) Get(k CacheKey) (v []byte, found bool) {
 	v, found = c.kv[k]
 
 	if !found {
@@ -277,10 +281,6 @@ func (c *Cache) GetRaw(k CacheKey) (v []byte, found bool) {
 	}
 
 	return
-}
-
-func (c *Cache) Stats() (hits int, misses int) {
-	return c.hits, c.misses
 }
 
 func cacheFileName(start, end uint64) string {

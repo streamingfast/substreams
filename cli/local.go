@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"time"
 
+	ethrpc "github.com/streamingfast/eth-go/rpc"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/spf13/cobra"
@@ -107,8 +109,15 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("setting up rpc client: %w", err)
 	}
 
-	rpcClient := rpc.NewClient(rpcEndpoint)
-	rpcCacheManager := rpc.NewCacheManager(ctx, rpcCacheStore, startBlockNum)
+	rpcCache := rpc.NewCacheManager(ctx, rpcCacheStore, startBlockNum)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true, // don't reuse connections
+		},
+		Timeout: 3 * time.Second,
+	}
+
+	rpcClient := ethrpc.NewClient(rpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache))
 
 	var pipelineOpts []pipeline.Option
 	if partialMode := mustGetBool(cmd, "partial"); partialMode {
@@ -144,7 +153,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pipe := pipeline.New(rpcClient, rpcCacheManager, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)
+	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)
 
 	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)
 	if err != nil {

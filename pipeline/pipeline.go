@@ -40,7 +40,7 @@ type Pipeline struct {
 
 	blockType string
 
-	rpcCacheManager *ssrpc.CacheManager
+	rpcCacheManager *ssrpc.Cache
 	nativeImports   *imports.Imports
 	builders        map[string]*state.Builder
 
@@ -131,10 +131,10 @@ func WithAllowInvalidState() Option {
 	}
 }
 
-func New(rpcClient *rpc.Client, rpcCacheManager *ssrpc.CacheManager, manifest *pbtransform.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
+func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbtransform.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
 	pipe := &Pipeline{
-		rpcCacheManager:  rpcCacheManager,
-		nativeImports:    imports.NewImports(rpcClient, rpcCacheManager),
+		rpcCacheManager:  rpcCache,
+		nativeImports:    imports.NewImports(rpcClient),
 		builders:         map[string]*state.Builder{},
 		graph:            graph,
 		stateStore:       stateStore,
@@ -582,6 +582,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		}
 
 		p.nativeImports.SetCurrentBlock(block)
+		p.rpcCacheManager.UpdateCache(ctx, block.Num(), stopBlock)
 		p.nextReturnValue = nil
 
 		//clock := toClock(block)
@@ -589,7 +590,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */ ] = reflect.ValueOf(blk)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?

@@ -1,9 +1,6 @@
 package imports
 
 import (
-	"context"
-	"math"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/eth-go/rpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
@@ -11,16 +8,14 @@ import (
 )
 
 type Imports struct {
-	rpcCacheManager *ssrpc.CacheManager
-	rpcClient       *rpc.Client
+	rpcClient *rpc.Client
 
 	currentBlock bstream.BlockRef
 }
 
-func NewImports(rpcClient *rpc.Client, rpcCacheManager *ssrpc.CacheManager) *Imports {
+func NewImports(rpcClient *rpc.Client) *Imports {
 	return &Imports{
-		rpcClient:       rpcClient,
-		rpcCacheManager: rpcCacheManager,
+		rpcClient: rpcClient,
 	}
 }
 
@@ -32,7 +27,6 @@ func (i *Imports) RPC(calls *pbsubstreams.RpcCalls) *pbsubstreams.RpcResponses {
 	return ssrpc.RPCCalls(
 		i.currentBlock.Num(),
 		i.rpcClient,
-		i.rpcCacheManager.Get(context.Background(), i.currentBlock.Num(), math.MaxUint64),
 		calls,
 	)
 }

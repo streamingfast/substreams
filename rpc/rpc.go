@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -31,7 +30,7 @@ type RPCResponse struct {
 	CallError     error // always deterministic
 }
 
-func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pbsubstreams.RpcCalls) (out *pbsubstreams.RpcResponses) {
+func RPCCalls(blockNum uint64, rpcClient *rpc.Client, calls *pbsubstreams.RpcCalls) (out *pbsubstreams.RpcResponses) {
 	var reqs []*rpc.RPCRequest
 	for _, call := range calls.Calls {
 		req := &rpc.RPCRequest{
@@ -45,30 +44,6 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pb
 			Method: "eth_call",
 		}
 		reqs = append(reqs, req)
-	}
-
-	var cacheKey CacheKey
-	if rpcCache != nil {
-		var cacheKeyParts []interface{}
-		cacheKeyParts = append(cacheKeyParts, blockNum)
-		for _, call := range calls.Calls {
-			cacheKeyParts = append(cacheKeyParts, callToString(call))
-		}
-		cacheKey = rpcCache.Key("rpc", cacheKeyParts...)
-
-		if fromCache, found := rpcCache.GetRaw(cacheKey); found {
-			rpcResp := []*rpc.RPCResponse{}
-			err := json.Unmarshal(fromCache, &rpcResp)
-			if err != nil {
-				zlog.Warn("cannot unmarshal Cache response for rpc call", zap.Error(err))
-			} else {
-				for i, resp := range rpcResp {
-					resp.CopyDecoder(reqs[i])
-				}
-				resps := toProtoResponses(rpcResp)
-				return resps
-			}
-		}
 	}
 
 	ctx := context.Background()
@@ -97,9 +72,7 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, rpcCache *Cache, calls *pb
 		if nonDeterministicResp {
 			continue
 		}
-		if rpcCache != nil {
-			rpcCache.Set(cacheKey, out)
-		}
+
 		resp := toProtoResponses(out)
 		return resp
 	}

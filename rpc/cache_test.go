@@ -6,12 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRpcCacheKey(t *testing.T) {
-	c := &Cache{}
-	k := c.Key("testtype", 234, "something", "blah:\nblah")
-	assert.Equal(t, k, CacheKey("testtype:234:something:blah:\nblah"))
-}
-
 func TestRpcCacheSet(t *testing.T) {
 	var cases = []struct {
 		name   string

@@ -10,7 +10,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20220330132237-248bc2d8ea7e
 	github.com/streamingfast/dstore v0.1.1-0.20220307201418-3ad32e685451
-	github.com/streamingfast/eth-go v0.0.0-20220412135558-30a3403b6c8f  //rpc_cache feature branch
+	github.com/streamingfast/eth-go v0.0.0-20220412135558-30a3403b6c8f //rpc_cache feature branch
 	github.com/streamingfast/firehose v0.1.1-0.20220330200655-9a92471b9be3
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
@@ -57,7 +57,9 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/jmoiron/sqlx v1.3.4 // indirect
 	github.com/klauspost/compress v1.10.2 // indirect
+	github.com/lib/pq v1.10.5 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect

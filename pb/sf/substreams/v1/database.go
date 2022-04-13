@@ -18,39 +18,46 @@ func (x *DatabaseChanges) Squash() error {
 }
 
 func (x TableChanges) Merge() ([]*TableChange, error) {
-	tableMap := make(map[string][]*TableChange)
+	//group the table changes by key
+	tableMap := make(map[string]map[string][]*TableChange)
 	for _, i := range x {
-		tableMap[i.Table] = append(tableMap[i.Table], i)
+		if _, ok := tableMap[i.Table]; !ok {
+			tableMap[i.Table] = make(map[string][]*TableChange)
+		}
+		tableMap[i.Table][i.Pk] = append(tableMap[i.Table][i.Pk], i)
 	}
 
+	//merge each group
 	result := make([]*TableChange, 0)
-	for _, cs := range tableMap {
-		switch len(cs) {
-		case 0:
-			continue
-		case 1:
-			result = append(result, cs[0])
-		default:
-			sort.Slice(cs, func(i, j int) bool {
-				return cs[i].Ordinal < cs[j].Ordinal
-			})
-
-			newTableCreatedHere := cs[0].Operation == TableChange_CREATE
-
-			for i := 0; i < len(cs)-1; i++ {
-				prev := cs[0]
-				next := cs[i+1]
-				err := prev.Merge(next)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			if newTableCreatedHere && cs[0].Operation == TableChange_DELETE {
+	for _, table := range tableMap {
+		for _, cs := range table {
+			switch len(cs) {
+			case 0:
 				continue
-			}
+			case 1:
+				result = append(result, cs[0])
+			default:
+				sort.Slice(cs, func(i, j int) bool {
+					return cs[i].Ordinal < cs[j].Ordinal
+				})
 
-			result = append(result, cs[0])
+				createdHere := cs[0].Operation == TableChange_CREATE
+
+				for i := 0; i < len(cs)-1; i++ {
+					prev := cs[0]
+					next := cs[i+1]
+					err := prev.Merge(next)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				if createdHere && cs[0].Operation == TableChange_DELETE {
+					continue
+				}
+
+				result = append(result, cs[0])
+			}
 		}
 	}
 

@@ -176,8 +176,8 @@ func TestTableChanges_Merge(t *testing.T) {
 			Pk:        "four.1",
 			Operation: TableChange_UPDATE,
 			Fields: []*Field{
-				{Name: "f1", OldValue: "", NewValue: "xyz"},
-				{Name: "f2", OldValue: "", NewValue: "23"},
+				{Name: "f1", OldValue: "wut", NewValue: "xyz"},
+				{Name: "f2", OldValue: "10", NewValue: "23"},
 			},
 		},
 		&TableChange{
@@ -228,8 +228,8 @@ func TestTableChanges_Merge(t *testing.T) {
 			Pk:        "four.1",
 			Operation: TableChange_UPDATE,
 			Fields: []*Field{
-				{Name: "f1", OldValue: "", NewValue: "xyz"},
-				{Name: "f2", OldValue: "", NewValue: "17"},
+				{Name: "f1", OldValue: "wut", NewValue: "xyz"},
+				{Name: "f2", OldValue: "10", NewValue: "17"},
 			},
 		},
 	}

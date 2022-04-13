@@ -101,7 +101,7 @@ func (t *ssTransform) Run(
 		// ...FIXME ?
 	}
 
-	returnHandler := func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+	returnHandler := func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
 		// FIXME we need to get the block here or the step or something...
 		// FIXME: use the same ReturnHandler interface, why not store it in `bstream`, and replace
 		// that StreamOutput iface.

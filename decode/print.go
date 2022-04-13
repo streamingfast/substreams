@@ -39,7 +39,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 		}
 	}
 
-	defaultHandler := func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+	defaultHandler := func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
 		printBlock(step, cursor)
 		if any == nil {
 			return nil
@@ -91,7 +91,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 			}
 		}
 
-		return func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+		return func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
 			printBlock(step, cursor)
 			if any == nil {
 				return nil
@@ -113,7 +113,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 		}
 	} else {
 		if msgDesc != nil {
-			return func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+			return func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
 				printBlock(step, cursor)
 				if any == nil {
 					return nil

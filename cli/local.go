@@ -146,11 +146,27 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 		stopBlockNum = uint64(startBlockNum) + blockCount
 	}
+
 	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
 	if mustGetBool(cmd, "no-return-handler") {
-		returnHandler = func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error {
+		returnHandler = func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
 			return nil
 		}
+	} else {
+		//var registry *graphnode.Registry
+		//
+		//var db *sqlx.DB
+		//var deployment string
+		//var schema string
+		//var subgraphDef *subgraph.Definition
+		//var withTransactions bool
+		//storage, err := postgres.New(zlog, metrics.NewBlockMetrics(), db, schema, deployment, subgraphDef, map[string]bool{}, withTransactions)
+		//if err != nil {
+		//	return fmt.Errorf("creating postgres store: %w", err)
+		//}
+		//
+		//importer := graphnode.NewImporter(storage, registry)
+		//returnHandler = importer.ReturnHandler
 	}
 
 	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)

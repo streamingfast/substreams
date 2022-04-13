@@ -5,4 +5,4 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type ReturnFunc func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error
+type ReturnFunc func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error

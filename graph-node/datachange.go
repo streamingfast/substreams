@@ -9,11 +9,11 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func ApplyTableChange(changes *pbsubstreams.TableChange, entity Entity) (err error) {
+func ApplyTableChange(change *pbsubstreams.TableChange, entity Entity) (err error) {
 	rv := reflect.ValueOf(entity)
 	rt := rv.Type()
 	fieldChanges := map[string]*pbsubstreams.Field{}
-	for _, field := range changes.Fields {
+	for _, field := range change.Fields {
 		fieldChanges[field.Name] = field
 	}
 
@@ -33,7 +33,6 @@ func ApplyTableChange(changes *pbsubstreams.TableChange, entity Entity) (err err
 }
 
 func applyTableChange(rv reflect.Value, fieldChange *pbsubstreams.Field, fieldTags *FieldTags) (err error) {
-
 	if fieldTags == nil {
 		fieldTags = &FieldTags{}
 	}

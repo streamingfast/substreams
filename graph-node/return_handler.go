@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type Importer struct {
+type Loader struct {
 	store    storage.Store
 	registry *Registry
 
@@ -22,20 +22,20 @@ type Importer struct {
 	updates map[string]map[string]Entity
 }
 
-func NewImporter(store storage.Store, registry *Registry) *Importer {
-	return &Importer{
+func NewImporter(store storage.Store, registry *Registry) *Loader {
+	return &Loader{
 		store:    store,
 		registry: registry,
 	}
 }
 
-func (i *Importer) save(ent Entity) error {
+func (l *Loader) save(ent Entity) error {
 	tableName := GetTableName(ent)
 
-	updateTable, found := i.updates[tableName]
+	updateTable, found := l.updates[tableName]
 	if !found {
 		updateTable = make(map[string]Entity)
-		i.updates[tableName] = updateTable
+		l.updates[tableName] = updateTable
 	}
 
 	ent.SetExists(true)
@@ -44,24 +44,24 @@ func (i *Importer) save(ent Entity) error {
 	return nil
 }
 
-func (i *Importer) load(ent Entity, block *bstream.Block) error {
-	tableName := GetTableName(ent)
-	id := ent.GetID()
+func (l *Loader) load(entity Entity, block *bstream.Block) error {
+	tableName := GetTableName(entity)
+	id := entity.GetID()
 
 	zlog.Debug("loading entity",
 		zap.String("id", id),
 		zap.String("table", tableName),
-		zap.Uint64("vid", ent.GetVID()),
+		zap.Uint64("vid", entity.GetVID()),
 	)
 	if id == "" {
 		return fmt.Errorf("id was not set before calling load")
 	}
 
 	// First check from updates
-	updateTable, found := i.updates[tableName]
+	updateTable, found := l.updates[tableName]
 	if !found {
 		updateTable = make(map[string]Entity)
-		i.updates[tableName] = updateTable
+		l.updates[tableName] = updateTable
 	}
 
 	cachedEntity, found := updateTable[id]
@@ -69,16 +69,16 @@ func (i *Importer) load(ent Entity, block *bstream.Block) error {
 		if cachedEntity == nil {
 			return nil
 		}
-		ve := reflect.ValueOf(ent).Elem()
+		ve := reflect.ValueOf(entity).Elem()
 		ve.Set(reflect.ValueOf(cachedEntity).Elem())
 		return nil
 	}
 
 	// Load from DB otherwise
-	currentTable, found := i.current[tableName]
+	currentTable, found := l.current[tableName]
 	if !found {
 		currentTable = make(map[string]Entity)
-		i.current[tableName] = currentTable
+		l.current[tableName] = currentTable
 	}
 
 	cachedEntity, found = currentTable[id]
@@ -86,23 +86,23 @@ func (i *Importer) load(ent Entity, block *bstream.Block) error {
 		if cachedEntity == nil {
 			return nil
 		}
-		ve := reflect.ValueOf(ent).Elem()
+		ve := reflect.ValueOf(entity).Elem()
 		ve.Set(reflect.ValueOf(cachedEntity).Elem())
 		return nil
 	}
 
-	if err := i.store.Load(context.TODO(), id, ent, block.Num()); err != nil {
+	if err := l.store.Load(context.TODO(), id, entity, block.Num()); err != nil {
 		return fmt.Errorf("failed loading entity: %w", err)
 	}
 
-	if ent.Exists() {
-		reflectType, ok := i.registry.GetType(tableName) //subgraph.MainSubgraphDef.Entities.GetType(tableName)
+	if entity.Exists() {
+		reflectType, ok := l.registry.GetType(tableName) //subgraph.MainSubgraphDef.Entities.GetType(tableName)
 		if !ok {
 			return fmt.Errorf("unable to retrieve entity type")
 		}
 		clone := reflect.New(reflectType).Interface()
 		ve := reflect.ValueOf(clone).Elem()
-		ve.Set(reflect.ValueOf(ent).Elem())
+		ve.Set(reflect.ValueOf(entity).Elem())
 		currentTable[id] = clone.(Entity)
 	} else {
 		currentTable[id] = nil
@@ -111,15 +111,15 @@ func (i *Importer) load(ent Entity, block *bstream.Block) error {
 	return nil
 }
 
-func (i *Importer) Flush(cursor string, block *bstream.Block) error {
-	return i.store.BatchSave(context.TODO(), block.Num(), block.ID(), block.Time(), i.updates, cursor)
+func (l *Loader) Flush(cursor string, block *bstream.Block) error {
+	return l.store.BatchSave(context.TODO(), block.Num(), block.ID(), block.Time(), l.updates, cursor)
 }
 
-func (i *Importer) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+func (l *Loader) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
 	var databaseChanges *pbsubstreams.DatabaseChanges
 
-	i.current = make(map[string]map[string]Entity)
-	i.updates = make(map[string]map[string]Entity)
+	l.current = make(map[string]map[string]Entity)
+	l.updates = make(map[string]map[string]Entity)
 
 	data := any.GetValue()
 	err := proto.Unmarshal(data, databaseChanges)
@@ -134,12 +134,12 @@ func (i *Importer) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstr
 	}
 
 	for _, change := range databaseChanges.TableChanges {
-		ent, ok := i.registry.GetInterface(change.Table)
+		ent, ok := l.registry.GetInterface(change.Table)
 		if !ok {
 			return fmt.Errorf("unknown entity for table %s", change.Table)
 		}
 
-		err = i.load(ent, block)
+		err = l.load(ent, block)
 		if err != nil {
 			return fmt.Errorf("loading entity %w", err)
 		}
@@ -149,13 +149,13 @@ func (i *Importer) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstr
 			return fmt.Errorf("applying table change: %w", err)
 		}
 
-		err = i.save(ent)
+		err = l.save(ent)
 		if err != nil {
 			return fmt.Errorf("saving entity: %w", err)
 		}
 	}
 
-	err = i.Flush(cursor.String(), block)
+	err = l.Flush(cursor.String(), block)
 	if err != nil {
 		return fmt.Errorf("flushing block changes: %w", err)
 	}

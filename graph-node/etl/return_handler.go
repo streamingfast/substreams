@@ -1,9 +1,12 @@
-package graphnode
+package etl
 
 import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
+
+	graphnode "github.com/streamingfast/substreams/graph-node"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
@@ -15,26 +18,26 @@ import (
 
 type Loader struct {
 	store    storage.Store
-	registry *Registry
+	registry *graphnode.Registry
 
 	// cached entities
-	current map[string]map[string]Entity
-	updates map[string]map[string]Entity
+	current map[string]map[string]graphnode.Entity
+	updates map[string]map[string]graphnode.Entity
 }
 
-func NewImporter(store storage.Store, registry *Registry) *Loader {
+func NewLoader(store storage.Store, registry *graphnode.Registry) *Loader {
 	return &Loader{
 		store:    store,
 		registry: registry,
 	}
 }
 
-func (l *Loader) save(ent Entity) error {
-	tableName := GetTableName(ent)
+func (l *Loader) save(ent graphnode.Entity) error {
+	tableName := graphnode.GetTableName(ent)
 
 	updateTable, found := l.updates[tableName]
 	if !found {
-		updateTable = make(map[string]Entity)
+		updateTable = make(map[string]graphnode.Entity)
 		l.updates[tableName] = updateTable
 	}
 
@@ -44,8 +47,8 @@ func (l *Loader) save(ent Entity) error {
 	return nil
 }
 
-func (l *Loader) load(entity Entity, block *bstream.Block) error {
-	tableName := GetTableName(entity)
+func (l *Loader) load(entity graphnode.Entity, blockNum uint64) error {
+	tableName := graphnode.GetTableName(entity)
 	id := entity.GetID()
 
 	zlog.Debug("loading entity",
@@ -60,7 +63,7 @@ func (l *Loader) load(entity Entity, block *bstream.Block) error {
 	// First check from updates
 	updateTable, found := l.updates[tableName]
 	if !found {
-		updateTable = make(map[string]Entity)
+		updateTable = make(map[string]graphnode.Entity)
 		l.updates[tableName] = updateTable
 	}
 
@@ -77,7 +80,7 @@ func (l *Loader) load(entity Entity, block *bstream.Block) error {
 	// Load from DB otherwise
 	currentTable, found := l.current[tableName]
 	if !found {
-		currentTable = make(map[string]Entity)
+		currentTable = make(map[string]graphnode.Entity)
 		l.current[tableName] = currentTable
 	}
 
@@ -91,7 +94,7 @@ func (l *Loader) load(entity Entity, block *bstream.Block) error {
 		return nil
 	}
 
-	if err := l.store.Load(context.TODO(), id, entity, block.Num()); err != nil {
+	if err := l.store.Load(context.TODO(), id, entity, blockNum); err != nil {
 		return fmt.Errorf("failed loading entity: %w", err)
 	}
 
@@ -103,7 +106,7 @@ func (l *Loader) load(entity Entity, block *bstream.Block) error {
 		clone := reflect.New(reflectType).Interface()
 		ve := reflect.ValueOf(clone).Elem()
 		ve.Set(reflect.ValueOf(entity).Elem())
-		currentTable[id] = clone.(Entity)
+		currentTable[id] = clone.(graphnode.Entity)
 	} else {
 		currentTable[id] = nil
 	}
@@ -111,15 +114,15 @@ func (l *Loader) load(entity Entity, block *bstream.Block) error {
 	return nil
 }
 
-func (l *Loader) Flush(cursor string, block *bstream.Block) error {
-	return l.store.BatchSave(context.TODO(), block.Num(), block.ID(), block.Time(), l.updates, cursor)
+func (l *Loader) Flush(cursor string, blockNum uint64, blockID string, blockTime time.Time) error {
+	return l.store.BatchSave(context.TODO(), blockNum, blockID, blockTime, l.updates, cursor)
 }
 
-func (l *Loader) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+func (l *Loader) ReturnHandler(any *anypb.Any, blockNum uint64, blockID string, blockTime time.Time, step bstream.StepType, cursor *bstream.Cursor) error {
 	var databaseChanges *pbsubstreams.DatabaseChanges
 
-	l.current = make(map[string]map[string]Entity)
-	l.updates = make(map[string]map[string]Entity)
+	l.current = make(map[string]map[string]graphnode.Entity)
+	l.updates = make(map[string]map[string]graphnode.Entity)
 
 	data := any.GetValue()
 	err := proto.Unmarshal(data, databaseChanges)
@@ -139,12 +142,12 @@ func (l *Loader) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstrea
 			return fmt.Errorf("unknown entity for table %s", change.Table)
 		}
 
-		err = l.load(ent, block)
+		err = l.load(ent, blockNum)
 		if err != nil {
 			return fmt.Errorf("loading entity %w", err)
 		}
 
-		err := ApplyTableChange(change, ent)
+		err := graphnode.ApplyTableChange(change, ent)
 		if err != nil {
 			return fmt.Errorf("applying table change: %w", err)
 		}
@@ -155,7 +158,7 @@ func (l *Loader) ReturnHandler(any *anypb.Any, block *bstream.Block, step bstrea
 		}
 	}
 
-	err = l.Flush(cursor.String(), block)
+	err = l.Flush(cursor.String(), blockNum, blockID, blockTime)
 	if err != nil {
 		return fmt.Errorf("flushing block changes: %w", err)
 	}

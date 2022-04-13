@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
@@ -109,7 +110,8 @@ func runRemote(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		cursor, _ := bstream.CursorFromOpaque(resp.Cursor)
-		ret := returnHandler(resp.Block, stepFromProto(resp.Step), cursor)
+		panic("missing block info in response")
+		ret := returnHandler(resp.Block, 0, "block.id.1", time.Now(), stepFromProto(resp.Step), cursor) //todo: fixme
 		if ret != nil {
 			fmt.Println(ret)
 		}

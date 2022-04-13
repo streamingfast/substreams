@@ -619,7 +619,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			s.Flush()
 		}
 
-		if err := returnFunc(p.nextReturnValue, block, step, cursor); err != nil {
+		if err := returnFunc(p.nextReturnValue, block.Num(), block.Id, block.Time(), step, cursor); err != nil {
 			return err
 		}
 

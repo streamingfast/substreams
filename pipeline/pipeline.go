@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/streamingfast/dstore"
 
 	"github.com/streamingfast/bstream"
@@ -619,7 +621,13 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			s.Flush()
 		}
 
-		if err := returnFunc(p.nextReturnValue, block.Num(), block.Id, block.Time(), step, cursor); err != nil {
+		out := &pbsubstreams.Output{
+			BlockNum:  block.Num(),
+			BlockId:   block.Id,
+			Timestamp: timestamppb.New(block.Time()),
+			Value:     p.nextReturnValue,
+		}
+		if err := returnFunc(out, step, cursor); err != nil {
 			return err
 		}
 

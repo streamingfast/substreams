@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
@@ -101,11 +103,11 @@ func (t *ssTransform) Run(
 		// ...FIXME ?
 	}
 
-	returnHandler := func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+	returnHandler := func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 		// FIXME we need to get the block here or the step or something...
 		// FIXME: use the same ReturnHandler interface, why not store it in `bstream`, and replace
 		// that StreamOutput iface.
-		return output(cursor, any)
+		return output(cursor, out.GetValue())
 	}
 
 	if req.StartBlockNum < 0 {

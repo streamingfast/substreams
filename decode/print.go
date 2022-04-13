@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) substreams.ReturnFunc {
@@ -39,15 +38,15 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 		}
 	}
 
-	defaultHandler := func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+	defaultHandler := func(output *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 		printBlock(step, cursor)
-		if any == nil {
+		if output == nil {
 			return nil
 		}
 
 		fmt.Printf("Message %q:\n", msgType)
 
-		marshalledBytes, err := protojson.Marshal(any)
+		marshalledBytes, err := protojson.Marshal(output.GetValue())
 		if err != nil {
 			return fmt.Errorf("return handler: marshalling: %w", err)
 		}
@@ -91,15 +90,15 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 			}
 		}
 
-		return func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+		return func(output *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 			printBlock(step, cursor)
-			if any == nil {
+			if output == nil {
 				return nil
 			}
 			d := &pbsubstreams.StoreDeltas{}
-			if err := any.UnmarshalTo(d); err != nil {
+			if err := output.Value.UnmarshalTo(d); err != nil {
 				fmt.Printf("Error decoding store deltas: %s\n", err)
-				fmt.Printf("Raw StoreDeltas bytes: %s\n", decodeAsHex(any.Value))
+				fmt.Printf("Raw StoreDeltas bytes: %s\n", decodeAsHex(output.Value.Value))
 			}
 
 			fmt.Printf("Store deltas for %q:\n", outputStreamName)
@@ -113,15 +112,15 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 		}
 	} else {
 		if msgDesc != nil {
-			return func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+			return func(output *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 				printBlock(step, cursor)
-				if any == nil {
+				if output == nil {
 					return nil
 				}
 
-				cnt := decodeMsgType(any.GetValue())
+				cnt := decodeMsgType(output.Value.GetValue())
 
-				fmt.Printf("Message %q: %s\n", msgType, string(cnt))
+				fmt.Printf("Message %q: %s\n", msgType, cnt)
 
 				return nil
 			}

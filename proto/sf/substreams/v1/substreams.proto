@@ -1,8 +1,12 @@
 syntax = "proto3";
 
 package sf.substreams.v1;
-
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+
 
 message StoreDeltas {
   repeated StoreDelta deltas = 1;
@@ -44,6 +48,13 @@ message DatabaseChanges {
 
 //table.1
 // update f.1 o.10 n.400 f.2 o.abc n.xyz
+
+message Output {
+  uint64 block_num = 1;
+  string block_id = 2;
+  google.protobuf.Timestamp timestamp = 4;
+  google.protobuf.Any value = 10;
+}
 
 message TableChange {
   string table = 1;

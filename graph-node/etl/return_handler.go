@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams/graph-node/storage"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Loader struct {
@@ -118,13 +117,13 @@ func (l *Loader) Flush(cursor string, blockNum uint64, blockID string, blockTime
 	return l.store.BatchSave(context.TODO(), blockNum, blockID, blockTime, l.updates, cursor)
 }
 
-func (l *Loader) ReturnHandler(any *anypb.Any, blockNum uint64, blockID string, blockTime time.Time, step bstream.StepType, cursor *bstream.Cursor) error {
+func (l *Loader) ReturnHandler(output pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 	var databaseChanges *pbsubstreams.DatabaseChanges
 
 	l.current = make(map[string]map[string]graphnode.Entity)
 	l.updates = make(map[string]map[string]graphnode.Entity)
 
-	data := any.GetValue()
+	data := output.Value.GetValue()
 	err := proto.Unmarshal(data, databaseChanges)
 	if err != nil {
 		return fmt.Errorf("unmarshaling database changes proto: %w", err)
@@ -142,7 +141,7 @@ func (l *Loader) ReturnHandler(any *anypb.Any, blockNum uint64, blockID string, 
 			return fmt.Errorf("unknown entity for table %s", change.Table)
 		}
 
-		err = l.load(ent, blockNum)
+		err = l.load(ent, output.BlockNum)
 		if err != nil {
 			return fmt.Errorf("loading entity %w", err)
 		}
@@ -158,7 +157,7 @@ func (l *Loader) ReturnHandler(any *anypb.Any, blockNum uint64, blockID string, 
 		}
 	}
 
-	err = l.Flush(cursor.String(), blockNum, blockID, blockTime)
+	err = l.Flush(cursor.String(), output.BlockNum, output.BlockId, output.Timestamp.AsTime())
 	if err != nil {
 		return fmt.Errorf("flushing block changes: %w", err)
 	}

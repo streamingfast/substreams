@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	ethrpc "github.com/streamingfast/eth-go/rpc"
-	"google.golang.org/protobuf/types/known/anypb"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
+	ethrpc "github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline"
@@ -149,7 +149,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
 	if mustGetBool(cmd, "no-return-handler") {
-		returnHandler = func(any *anypb.Any, block *bstream.Block, step bstream.StepType, cursor *bstream.Cursor) error {
+		returnHandler = func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 			return nil
 		}
 	} else {

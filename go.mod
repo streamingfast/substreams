@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
+	github.com/drone/envsubst v1.0.2
 	github.com/golang/protobuf v1.5.2
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.3.0

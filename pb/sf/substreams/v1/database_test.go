@@ -4,13 +4,17 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func (x TableChanges) isEqual(other TableChanges) bool {
 	if len(x) != len(other) {
 		return false
 	}
+
+	sort.Slice(x, func(i, j int) bool {
+		return x[i].Table < x[j].Table
+	})
 
 	for i, tc := range x {
 		if !tc.isEqual(other[i]) {
@@ -80,7 +84,6 @@ func TestTableChanges_Merge(t *testing.T) {
 	tableChanges = append(tableChanges,
 		&TableChange{
 			Table:     "table.1",
-			BlockNum:  0,
 			Ordinal:   1,
 			Pk:        "one",
 			Operation: TableChange_CREATE,
@@ -91,7 +94,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.1",
-			BlockNum:  0,
 			Ordinal:   2,
 			Pk:        "one",
 			Operation: TableChange_UPDATE,
@@ -101,7 +103,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.1",
-			BlockNum:  0,
 			Ordinal:   3,
 			Pk:        "one",
 			Operation: TableChange_UPDATE,
@@ -112,7 +113,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.2",
-			BlockNum:  0,
 			Ordinal:   3,
 			Pk:        "two",
 			Operation: TableChange_UPDATE,
@@ -123,7 +123,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.2",
-			BlockNum:  0,
 			Ordinal:   4,
 			Pk:        "two",
 			Operation: TableChange_DELETE,
@@ -131,7 +130,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.3",
-			BlockNum:  0,
 			Ordinal:   5,
 			Pk:        "three",
 			Operation: TableChange_CREATE,
@@ -142,7 +140,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.3",
-			BlockNum:  0,
 			Ordinal:   6,
 			Pk:        "three",
 			Operation: TableChange_DELETE,
@@ -150,7 +147,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.4",
-			BlockNum:  0,
 			Ordinal:   1,
 			Pk:        "four.0",
 			Operation: TableChange_CREATE,
@@ -161,7 +157,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.4",
-			BlockNum:  0,
 			Ordinal:   2,
 			Pk:        "four.0",
 			Operation: TableChange_UPDATE,
@@ -171,7 +166,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.4",
-			BlockNum:  0,
 			Ordinal:   3,
 			Pk:        "four.1",
 			Operation: TableChange_UPDATE,
@@ -182,7 +176,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		&TableChange{
 			Table:     "table.4",
-			BlockNum:  0,
 			Ordinal:   4,
 			Pk:        "four.1",
 			Operation: TableChange_UPDATE,
@@ -195,7 +188,6 @@ func TestTableChanges_Merge(t *testing.T) {
 	expected := []*TableChange{
 		{
 			Table:     "table.1",
-			BlockNum:  0,
 			Ordinal:   3,
 			Operation: TableChange_CREATE,
 			Fields: []*Field{
@@ -205,14 +197,12 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		{
 			Table:     "table.2",
-			BlockNum:  0,
 			Ordinal:   4,
 			Operation: TableChange_DELETE,
 			Fields:    []*Field{},
 		},
 		{
 			Table:     "table.4",
-			BlockNum:  0,
 			Ordinal:   2,
 			Pk:        "four.0",
 			Operation: TableChange_CREATE,
@@ -223,7 +213,6 @@ func TestTableChanges_Merge(t *testing.T) {
 		},
 		{
 			Table:     "table.4",
-			BlockNum:  0,
 			Ordinal:   4,
 			Pk:        "four.1",
 			Operation: TableChange_UPDATE,
@@ -235,12 +224,7 @@ func TestTableChanges_Merge(t *testing.T) {
 	}
 
 	changes, err := TableChanges(tableChanges).Merge()
+	require.Nil(t, err)
 
-	sort.Slice(changes, func(i, j int) bool {
-		return changes[i].Table < changes[j].Table
-	})
-
-	assert.Nil(t, err)
-
-	assert.True(t, TableChanges(changes).isEqual(TableChanges(expected)))
+	require.True(t, TableChanges(changes).isEqual(TableChanges(expected)))
 }

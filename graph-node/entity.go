@@ -1,4 +1,4 @@
-package entity
+package graphnode
 
 type Base struct {
 	ID              string      `db:"id" csv:"id"`         // text key

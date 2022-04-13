@@ -1,4 +1,4 @@
-package entity
+package graphnode
 
 import (
 	"reflect"
@@ -8,15 +8,15 @@ import (
 )
 
 type Registry struct {
-	entities   []Interface
+	entities   []Entity
 	data       map[string]reflect.Type
-	interfaces map[reflect.Type]Interface
+	interfaces map[reflect.Type]Entity
 }
 
-func NewRegistry(entities ...Interface) *Registry {
+func NewRegistry(entities ...Entity) *Registry {
 	r := &Registry{
 		data:       map[string]reflect.Type{},
-		interfaces: map[reflect.Type]Interface{},
+		interfaces: map[reflect.Type]Entity{},
 	}
 	r.Register(entities...)
 	r.Register(&POI{})
@@ -32,12 +32,12 @@ func (r *Registry) Data() map[string]reflect.Type {
 	return r.data
 }
 
-func (r *Registry) Entities() []Interface {
+func (r *Registry) Entities() []Entity {
 	//TODO: should we rlock here?
 	return r.entities
 }
 
-func GetTableName(entity Interface) string {
+func GetTableName(entity Entity) string {
 	if v, ok := entity.(NamedEntity); ok {
 		return v.TableName()
 	}
@@ -55,7 +55,7 @@ func (r *Registry) GetType(tableName string) (reflect.Type, bool) {
 	return res, ok
 }
 
-func (r *Registry) GetInterface(tableName string) (Interface, bool) {
+func (r *Registry) GetInterface(tableName string) (Entity, bool) {
 	t, ok := r.data[tableName]
 	if !ok {
 		return nil, false
@@ -65,7 +65,7 @@ func (r *Registry) GetInterface(tableName string) (Interface, bool) {
 	return res, ok
 }
 
-func (r *Registry) Register(entities ...Interface) {
+func (r *Registry) Register(entities ...Entity) {
 	r.entities = append(r.entities, entities...)
 
 	for _, ent := range entities {

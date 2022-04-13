@@ -1,4 +1,4 @@
-package entity
+package graphnode
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ type ExportedEntities struct {
 	} `json:"-"`
 }
 
-type Map map[string]Interface
+type Map map[string]Entity
 
 func (ee *ExportedEntities) UnmarshalJSON(in []byte) error {
 	discovery := struct {
@@ -42,7 +42,7 @@ func (ee *ExportedEntities) UnmarshalJSON(in []byte) error {
 		return fmt.Errorf("no entity registered for table name %q", tblName)
 	}
 
-	var entities = make(map[string]Interface, len(discovery.Entities))
+	var entities = make(map[string]Entity, len(discovery.Entities))
 
 	for id, rawEntity := range discovery.Entities {
 		if bytes.Compare(rawEntity, []byte(`null`)) == 0 {
@@ -54,7 +54,7 @@ func (ee *ExportedEntities) UnmarshalJSON(in []byte) error {
 		if err := json.Unmarshal(rawEntity, el); err != nil {
 			return fmt.Errorf("unmarshal raw entity: %w", err)
 		}
-		entities[id] = el.(Interface)
+		entities[id] = el.(Entity)
 	}
 
 	*ee = ExportedEntities{

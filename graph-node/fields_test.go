@@ -1,4 +1,4 @@
-package entity
+package graphnode
 
 import (
 	"reflect"
@@ -17,7 +17,7 @@ type PancakeFactory struct {
 func TestFieldTags(t *testing.T) {
 	tests := []struct {
 		name   string
-		input  Interface
+		input  Entity
 		expect []*FieldTag
 	}{
 		{

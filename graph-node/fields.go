@@ -1,4 +1,4 @@
-package entity
+package graphnode
 
 import (
 	"reflect"

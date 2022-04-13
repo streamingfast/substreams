@@ -16,7 +16,6 @@ require (
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
 	github.com/test-go/testify v1.1.4
-	github.com/vektah/gqlparser v1.3.1
 	github.com/wasmerio/wasmer-go v1.0.4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.21.0
@@ -25,6 +24,13 @@ require (
 )
 
 replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
+
+require (
+	github.com/iancoleman/strcase v0.2.0
+	github.com/jmoiron/sqlx v1.3.4
+	github.com/jszwec/csvutil v1.6.0
+	github.com/lib/pq v1.10.5
+)
 
 require (
 	cloud.google.com/go v0.100.2 // indirect
@@ -57,9 +63,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/jmoiron/sqlx v1.3.4 // indirect
 	github.com/klauspost/compress v1.10.2 // indirect
-	github.com/lib/pq v1.10.5 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect

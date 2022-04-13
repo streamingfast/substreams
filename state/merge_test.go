@@ -10,13 +10,14 @@ import (
 
 func TestBuilder_Merge(t *testing.T) {
 	tests := []struct {
-		name          string
-		latest        *Builder
-		latestKV      map[string][]byte
-		prev          *Builder
-		prevKV        map[string][]byte
-		expectedError bool
-		expectedKV    map[string][]byte
+		name            string
+		latest          *Builder
+		latestKV        map[string][]byte
+		prev            *Builder
+		prevKV          map[string][]byte
+		expectedError   bool
+		expectedKV      map[string][]byte
+		deletedPrefixes []string
 	}{
 		{
 			name:          "incompatible merge strategies",
@@ -296,12 +297,31 @@ func TestBuilder_Merge(t *testing.T) {
 				"three": []byte("30.1"),
 			},
 		},
+		{
+			name:   "delete key prefixes",
+			latest: NewBuilder("b1", 0, pbtransform.KindStore_UPDATE_POLICY_REPLACE, OutputValueTypeString, nil),
+			latestKV: map[string][]byte{
+				"t:1": []byte("bar"),
+			},
+			deletedPrefixes: []string{"p:"},
+			prev:            NewBuilder("b2", 0, pbtransform.KindStore_UPDATE_POLICY_REPLACE, OutputValueTypeString, nil),
+			prevKV: map[string][]byte{
+				"t:1": []byte("baz"),
+				"p:3": []byte("lol"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"t:1": []byte("bar"),
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test.prev.partialMode = true
 			test.latest.KV = test.latestKV
 			test.prev.KV = test.prevKV
+			test.latest.DeletedPrefixes = test.deletedPrefixes
 
 			err := test.latest.Merge(test.prev)
 			if err != nil && !test.expectedError {

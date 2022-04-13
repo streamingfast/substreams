@@ -27,9 +27,9 @@ type Builder struct {
 
 	complete bool
 
-	KV          map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
-	Deltas      []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
-	DeletedKeys map[string]interface{}
+	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
+	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
+	DeletedPrefixes []string
 
 	updatePolicy pbtransform.KindStore_UpdatePolicy
 	valueType    string
@@ -89,10 +89,12 @@ func (b *Builder) Init(ctx context.Context, startBlockNum uint64) error {
 
 func (b *Builder) clone() *Builder {
 	o := &Builder{
-		Name:         b.Name,
-		KV:           make(map[string][]byte),
-		updatePolicy: b.updatePolicy,
-		valueType:    b.valueType,
+		Name:            b.Name,
+		KV:              make(map[string][]byte),
+		DeletedPrefixes: b.DeletedPrefixes,
+		updatePolicy:    b.updatePolicy,
+		valueType:       b.valueType,
+		partialMode:     b.partialMode,
 	}
 	return o
 }
@@ -358,7 +360,10 @@ func (b *Builder) DeletePrefix(ord uint64, prefix string) {
 		b.applyDelta(delta)
 		b.Deltas = append(b.Deltas, delta)
 
-		//todo: if builder in batch mode. we need to add the deleted key to the b.DeletedKeys
+	}
+
+	if b.partialMode {
+		b.DeletedPrefixes = append(b.DeletedPrefixes, prefix)
 	}
 }
 
@@ -435,6 +440,12 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 }
 
 func (b *Builder) applyDelta(delta *pbsubstreams.StoreDelta) {
+	// Keys need to have at least one character, and mustn't start with 0xFF
+	// 0xFF is reserved for internal use.
+	if delta.Key[0] == byte(255) {
+		panic(fmt.Sprintf("key %q invalid, must be at least 1 character and not start with 0xFF", delta.Key))
+	}
+
 	switch delta.Operation {
 	case pbsubstreams.StoreDelta_UPDATE, pbsubstreams.StoreDelta_CREATE:
 		b.KV[delta.Key] = delta.NewValue

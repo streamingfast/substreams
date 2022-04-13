@@ -27,6 +27,10 @@ func (b *Builder) Merge(previous *Builder) error {
 		return fmt.Errorf("incompatible value types: cannot merge %q and %q", latest.valueType, previous.valueType)
 	}
 
+	for _, p := range latest.DeletedPrefixes {
+		previous.DeletePrefix(previous.lastOrdinal, p)
+	}
+
 	switch latest.updatePolicy {
 	case pbtransform.KindStore_UPDATE_POLICY_REPLACE:
 		for k, v := range previous.KV {

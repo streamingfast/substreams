@@ -54,16 +54,39 @@ type storeEventChanges struct {
 
 var SystemTables = []string{"poi2$", "cursor"}
 
+func dbFromDSN(dsnString string) (*sqlx.DB, error) {
+	connectionInfo, err := ParseDSN(dsnString)
+	if err != nil {
+		return nil, fmt.Errorf("parsing dsn: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	db, err := sqlx.ConnectContext(ctx, "postgres", connectionInfo.DSN())
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+	}
+	db.SetMaxOpenConns(500)
+
+	return db, nil
+}
+
 func New(
 	logger *zap.Logger,
 	metrics *metrics.BlockMetrics,
-	db *sqlx.DB,
+	dsn string,
 	subgraphSchema string,
 	subgraphDeploymentID string,
 	subgraph *subgraph.Definition,
 	entitiesNeverReadFromDB map[string]bool,
 	withTransaction bool,
 ) (*store, error) {
+	db, err := dbFromDSN(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("creating database: %w", err)
+	}
+
 	return &store{
 		db:                    db,
 		metrics:               metrics,

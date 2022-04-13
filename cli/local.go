@@ -1,24 +1,16 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strconv"
-	"time"
 
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/runtime"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/bstream/stream"
-	"github.com/streamingfast/dstore"
-	ethrpc "github.com/streamingfast/eth-go/rpc"
 	"github.com/streamingfast/substreams/decode"
-	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/rpc"
 )
 
 var ProtobufBlockType string = "sf.ethereum.type.v1.Block"
@@ -34,6 +26,7 @@ func init() {
 	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	localCmd.Flags().BoolP("partial", "p", false, "Produce partial stores")
 	localCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
+	localCmd.Flags().Bool("disable-database-transactions", false, "Disable transactions in database for faster inserts.")
 
 	rootCmd.AddCommand(localCmd)
 }
@@ -54,87 +47,21 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	// ISSUE A BIG WARNING IF WE HAVEN'T LOADED ALL THE CHAIN CONFIG SPECIFICS.
 	// If we haven't compiled from `sf-ethereum`, we won't have the block readers, etc..
-
-	ctx := cmd.Context()
-
-	manifestPath := args[0]
-	outputStreamName := args[1]
-
-	manif, err := manifest.New(manifestPath)
-	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	cfg := &runtime.LocalConfig{
+		ManifestPath:     args[0],
+		OutputStreamName: args[1],
+		PrintMermaid:     true,
+		BlocksStoreUrl:   mustGetString(cmd, "blocks-store-url"),
+		IrrIndexesUrl:    mustGetString(cmd, "irr-indexes-url"),
+		StateStoreUrl:    mustGetString(cmd, "state-store-url"),
+		StartBlock:       mustGetUint64(cmd, "start-block"),
+		StopBlock:        mustGetUint64(cmd, "stop-block"),
+		RpcEndpoint:      mustGetString(cmd, "rpc-endpoint"),
+		RpcCacheUrl:      mustGetString(cmd, "rpc-cache-store-url"),
+		PartialMode:      mustGetBool(cmd, "partial"),
 	}
 
-	manif.PrintMermaid()
-	manifProto, err := manif.ToProto()
-	if err != nil {
-		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
-	}
-
-	localBlocksPath := mustGetString(cmd, "blocks-store-url")
-	blocksStore, err := dstore.NewDBinStore(localBlocksPath)
-	if err != nil {
-		return fmt.Errorf("setting up blocks store: %w", err)
-	}
-
-	irrIndexesPath := mustGetString(cmd, "irr-indexes-url")
-	irrStore, err := dstore.NewStore(irrIndexesPath, "", "", false)
-	if err != nil {
-		return fmt.Errorf("setting up irr blocks store: %w", err)
-	}
-
-	stateStorePath := mustGetString(cmd, "state-store-url")
-	stateStore, err := dstore.NewStore(stateStorePath, "", "", false)
-	if err != nil {
-		return fmt.Errorf("setting up store for data: %w", err)
-	}
-
-	//ioFactory := state.NewStoreFactory(stateStore)
-
-	graph, err := manifest.NewModuleGraph(manifProto.Modules)
-	if err != nil {
-		return fmt.Errorf("create module graph %w", err)
-	}
-
-	startBlockNum := mustGetInt64(cmd, "start-block")
-	stopBlockNum := mustGetUint64(cmd, "stop-block")
-
-	rpcEndpoint := mustGetString(cmd, "rpc-endpoint")
-	fmt.Println("RPC endpoint:", rpcEndpoint)
-	rpcCacheURL := mustGetString(cmd, "rpc-cache-store-url")
-	fmt.Println("RPC cache url:", rpcCacheURL)
-
-	rpcCacheStore, err := dstore.NewStore(rpcCacheURL, "", "", false)
-	if err != nil {
-		return fmt.Errorf("setting up rpc client: %w", err)
-	}
-
-	rpcCache := rpc.NewCacheManager(ctx, rpcCacheStore, startBlockNum)
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DisableKeepAlives: true, // don't reuse connections
-		},
-		Timeout: 3 * time.Second,
-	}
-
-	rpcClient := ethrpc.NewClient(rpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache))
-
-	var pipelineOpts []pipeline.Option
-	if partialMode := mustGetBool(cmd, "partial"); partialMode {
-		fmt.Println("Starting pipeline in partial mode...")
-		pipelineOpts = append(pipelineOpts, pipeline.WithPartialMode())
-	}
-	pipelineOpts = append(pipelineOpts, pipeline.WithAllowInvalidState())
-
-	if startBlockNum == -1 {
-		sb, err := graph.ModuleStartBlock(outputStreamName)
-		if err != nil {
-			return fmt.Errorf("getting module start block: %w", err)
-		}
-		startBlockNum = int64(sb)
-	}
-
-	if stopBlockNum == 0 {
+	if cfg.StopBlock == 0 {
 		var blockCount uint64 = 1000
 		if len(args) > 0 {
 			val, err := strconv.ParseInt(args[2], 10, 64)
@@ -144,52 +71,25 @@ func runLocal(cmd *cobra.Command, args []string) error {
 			blockCount = uint64(val)
 		}
 
-		stopBlockNum = uint64(startBlockNum) + blockCount
+		cfg.StopBlock = cfg.StartBlock + blockCount
 	}
 
-	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
-	if mustGetBool(cmd, "no-return-handler") {
-		returnHandler = func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
-			return nil
-		}
-	} else {
-		//var registry *graphnode.Registry
-		//
-		//var db *sqlx.DB
-		//var deployment string
-		//var schema string
-		//var subgraphDef *subgraph.Definition
-		//var withTransactions bool
-		//storage, err := postgres.New(zlog, metrics.NewBlockMetrics(), db, schema, deployment, subgraphDef, map[string]bool{}, withTransactions)
-		//if err != nil {
-		//	return fmt.Errorf("creating postgres store: %w", err)
-		//}
-		//
-		//importer := graphnode.NewImporter(storage, registry)
-		//returnHandler = importer.ReturnHandler
-	}
-
-	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, stateStore, pipelineOpts...)
-
-	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)
+	manif, err := manifest.New(cfg.ManifestPath)
 	if err != nil {
-		return fmt.Errorf("building pipeline handler: %w", err)
+		return fmt.Errorf("read manifest %q: %w", cfg.ManifestPath, err)
 	}
 
-	fmt.Println("Starting firehose stream from block", startBlockNum)
-
-	hose := stream.New([]dstore.Store{blocksStore}, startBlockNum, handler,
-		stream.WithForkableSteps(bstream.StepIrreversible),
-		stream.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
-	)
-
-	if err := hose.Run(ctx); err != nil {
-		if errors.Is(err, io.EOF) {
+	cfg.ReturnHandler = decode.NewPrintReturnHandler(manif, cfg.OutputStreamName)
+	if mustGetBool(cmd, "no-return-handler") {
+		cfg.ReturnHandler = func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
 			return nil
 		}
-		return fmt.Errorf("running the firehose stream: %w", err)
 	}
-	time.Sleep(5 * time.Second)
+
+	err = runtime.LocalRun(cmd.Context(), cfg)
+	if err != nil {
+		return fmt.Errorf("running local substream: %w", err)
+	}
 
 	return nil
 }

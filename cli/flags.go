@@ -82,3 +82,20 @@ func mustGetBool(cmd *cobra.Command, flagName string) bool {
 	}
 	return val
 }
+
+func maybeGetString(cmd *cobra.Command, flagName string) string {
+	val, _ := cmd.Flags().GetString(flagName)
+	return val
+}
+func maybeGetInt64(cmd *cobra.Command, flagName string) int64 {
+	val, _ := cmd.Flags().GetInt64(flagName)
+	return val
+}
+func maybeGetUint64(cmd *cobra.Command, flagName string) uint64 {
+	val, _ := cmd.Flags().GetUint64(flagName)
+	return val
+}
+func maybeGetBool(cmd *cobra.Command, flagName string) bool {
+	val, _ := cmd.Flags().GetBool(flagName)
+	return val
+}

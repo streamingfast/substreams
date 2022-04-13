@@ -31,6 +31,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
+	github.com/vektah/gqlparser v1.3.1
 )
 
 require (

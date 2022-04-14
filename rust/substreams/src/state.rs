@@ -72,6 +72,18 @@ pub fn set(ord: i64, key: String, value: &Vec<u8>) {
     }
 }
 
+pub fn set_if_not_exists(ord: i64, key: String, value: &Vec<u8>) {
+    unsafe {
+        externs::state::set_if_not_exists(
+            ord,
+            key.as_ptr(),
+            key.len() as u32,
+            value.as_ptr(),
+            value.len() as u32,
+        )
+    }
+}
+
 pub fn delete_prefix(ord: i64, prefix: &String){
     unsafe {
         externs::state::delete_prefix(

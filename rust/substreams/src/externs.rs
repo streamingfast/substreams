@@ -35,6 +35,13 @@ pub mod state {
             value_ptr: *const u8,
             value_len: u32,
         );
+        pub fn set_if_not_exists(
+            ord: i64,
+            key_ptr: *const u8,
+            key_len: u32,
+            value_ptr: *const u8,
+            value_len: u32,
+        );
         pub fn delete_prefix(ord: i64, prefix_ptr: *const u8, prefix_len: u32);
         pub fn sum_bigint(
             ord: i64,

@@ -6,7 +6,82 @@ option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbs
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
+service Stream {
+  rpc Blocks(Request) returns (stream Response);
+}
 
+message Request {
+  int64 start_block_num = 1;
+  string start_cursor = 2;
+  uint64 stop_block_num = 3;
+  repeated ForkStep fork_steps = 4;
+  string irreversibility_condition = 5;
+
+  Manifest manifest = 6;
+  repeated string output_modules = 7;
+  repeated string initial_store_snapshot_for_modules = 8;
+}
+
+message Response {
+  oneof message {
+    ModulesProgress progress = 1; // Progress of data preparation, before sending in the stream of `data` events.
+    InitialSnapshotData snapshot_data = 2;
+    InitialSnapshotComplete snapshot_complete = 3;
+    BlockScopedData data = 4;
+  }
+}
+
+message InitialSnapshotComplete {
+  string cursor = 1;
+}
+
+message InitialSnapshotData {
+  string module_name = 1;
+  StoreDeltas deltas = 2;
+  uint64 sent_keys = 4;
+  uint64 total_keys = 3;
+}
+
+message BlockScopedData {
+  repeated ModuleOutput outputs = 1;
+  Clock clock = 3;
+  ForkStep step = 6;
+  string cursor = 10;
+}
+
+message Clock {
+  string id = 1;
+  uint64 number = 2;
+  google.timestamp.Timestamp timestamp = 3;
+}
+
+message ModuleOutput {
+  string name = 1;
+  // oneof ?
+  google.protobuf.Any map_output = 2;
+  StoreDeltas store_deltas = 3;
+  repeated string logs = 4;
+}
+
+message ModulesProgress {
+  repeated ModuleProgress modules = 1;
+}
+
+message ModuleProgress {
+  string name = 1;
+  repeated BlockRange processed_ranges = 2;
+
+  uint64 total_bytes_read = 4;
+  uint64 total_bytes_written = 4;
+
+  bool failed = 3;
+  string failure_reason = 5;
+}
+
+message BlockRange {
+  uint64 start_block = 1;
+  uint64 end_block = 2;
+}
 
 message StoreDeltas {
   repeated StoreDelta deltas = 1;

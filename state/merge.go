@@ -4,8 +4,14 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+)
+
+var (
+	updatePolicyKey = strings.Join([]string{string([]byte{255}), "update-policy"}, "")
+	valueTypeKey    = strings.Join([]string{string([]byte{255}), "value-type"}, "")
 )
 
 const (
@@ -15,6 +21,29 @@ const (
 	OutputValueTypeBigFloat = "bigFloat"
 	OutputValueTypeString   = "string"
 )
+
+func (b *Builder) writeMergeValues() {
+	b.KV[updatePolicyKey] = []byte(strconv.Itoa(int(b.updatePolicy)))
+	b.KV[valueTypeKey] = []byte(b.valueType)
+}
+
+func (b *Builder) readMergeValues() error {
+	if updatePolicyBytes, ok := b.KV[updatePolicyKey]; ok {
+		updatePolicyInt, err := strconv.Atoi(string(updatePolicyBytes))
+		if err != nil {
+			return fmt.Errorf("parsing update policy value: %w", err)
+		}
+		b.updatePolicy = pbtransform.KindStore_UpdatePolicy(int32(updatePolicyInt))
+		delete(b.KV, updatePolicyKey)
+	}
+
+	if valueTypeBytes, ok := b.KV[valueTypeKey]; ok {
+		b.valueType = string(valueTypeBytes)
+		delete(b.KV, valueTypeKey)
+	}
+
+	return nil
+}
 
 func (b *Builder) Merge(previous *Builder) error {
 	latest := b

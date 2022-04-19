@@ -8,6 +8,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMergeValues(t *testing.T) {
+	b := &Builder{
+		KV:           map[string][]byte{},
+		valueType:    OutputValueTypeInt64,
+		updatePolicy: pbtransform.KindStore_UPDATE_POLICY_SUM,
+	}
+
+	b.writeMergeValues()
+	assert.Len(t, b.KV, 2)
+	_, ok := b.KV[valueTypeKey]
+	assert.True(t, ok)
+	_, ok = b.KV[updatePolicyKey]
+	assert.True(t, ok)
+
+	c := &Builder{
+		KV: b.KV,
+	}
+	err := c.readMergeValues()
+	assert.NoError(t, err)
+
+	assert.Equal(t, OutputValueTypeInt64, c.valueType)
+	assert.Equal(t, pbtransform.KindStore_UPDATE_POLICY_SUM, c.updatePolicy)
+	assert.Len(t, c.KV, 0)
+}
+
 func TestBuilder_Merge(t *testing.T) {
 	tests := []struct {
 		name            string

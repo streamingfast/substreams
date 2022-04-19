@@ -134,6 +134,10 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 		}
 
 		builder.KV = byteMap(kv)
+		if err = builder.readMergeValues(); err != nil {
+			return fmt.Errorf("getting values for merge type and value type: %w", err)
+		}
+
 		builders = append(builders, builder)
 	}
 
@@ -191,6 +195,10 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 		}
 
 		builder.KV = byteMap(kv)
+		if err = builder.readMergeValues(); err != nil {
+			return fmt.Errorf("getting values for merge type and value type: %w", err)
+		}
+
 		builders = append(builders, builder)
 	}
 
@@ -240,6 +248,8 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64) error {
 }
 
 func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode bool) error {
+	b.writeMergeValues()
+
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
 
 	content, err := json.MarshalIndent(kv, "", "  ")

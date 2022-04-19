@@ -1,8 +1,9 @@
 package substreams
 
 import (
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/streamingfast/bstream"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type ReturnFunc func(any *anypb.Any, step bstream.StepType, cursor *bstream.Cursor) error
+type ReturnFunc func(any *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error

@@ -16,15 +16,19 @@ type Store struct {
 	ModuleStartBlock uint64
 }
 
-func NewStore(name string, moduleHash string, moduleStartBlock uint64, baseStore dstore.Store) *Store {
+func NewStore(name string, moduleHash string, moduleStartBlock uint64, baseStore dstore.Store) (*Store, error) {
+	ds, err := baseStore.SubStore(moduleHash)
+	if err != nil {
+		return nil, fmt.Errorf("creating new store: %w", err)
+	}
 	s := &Store{
-		Store:            baseStore,
+		Store:            ds,
 		Name:             name,
 		ModuleHash:       moduleHash,
 		ModuleStartBlock: moduleStartBlock,
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *Store) WriteState(ctx context.Context, content []byte, blockNum uint64) error {
@@ -36,13 +40,13 @@ func (s *Store) WritePartialState(ctx context.Context, content []byte, startBloc
 }
 
 func (s *Store) StateFilePrefix(blockNum uint64) string {
-	return fmt.Sprintf("%s/%s-%d", s.ModuleHash, s.Name, blockNum)
+	return fmt.Sprintf("%s-%d", s.Name, blockNum)
 }
 
 func (s *Store) StateFileName(blockNum uint64) string {
-	return fmt.Sprintf("%s/%s-%d-%d.kv", s.ModuleHash, s.Name, blockNum, s.ModuleStartBlock)
+	return fmt.Sprintf("%s-%d-%d.kv", s.Name, blockNum, s.ModuleStartBlock)
 }
 
 func (s *Store) PartialFileName(startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%s/%s-%d-%d.partial", s.ModuleHash, s.Name, endBlockNum, startBlockNum)
+	return fmt.Sprintf("%s-%d-%d.partial", s.Name, endBlockNum, startBlockNum)
 }

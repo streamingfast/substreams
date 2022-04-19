@@ -31,6 +31,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
+	github.com/vektah/gqlparser v1.3.1
 )
 
 require (
@@ -101,4 +102,8 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf // indirect
 	google.golang.org/grpc v1.44.0 // indirect
+)
+
+replace (
+	github.com/streamingfast/dstore => /Users/cbillett/devel/sf/dstore
 )

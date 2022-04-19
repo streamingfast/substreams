@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/firehose/client"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -52,7 +54,7 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
 	}
 
-	sub := &pbsubstreams.Transform{
+	sub := &pbtransform.Transform{
 		OutputModule: outputStreamName,
 		Manifest:     manifProto,
 	}
@@ -109,11 +111,15 @@ func runRemote(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		cursor, _ := bstream.CursorFromOpaque(resp.Cursor)
-		ret := returnHandler(resp.Block, stepFromProto(resp.Step), cursor)
+		output := &pbsubstreams.Output{}
+		err = proto.Unmarshal(resp.Block.GetValue(), output)
+		if err != nil {
+			return fmt.Errorf("unmarshalling substream output: %w", err)
+		}
+		ret := returnHandler(output, stepFromProto(resp.Step), cursor)
 		if ret != nil {
 			fmt.Println(ret)
 		}
-
 	}
 
 	//	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)

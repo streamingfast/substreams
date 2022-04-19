@@ -2,6 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/decode"
+	"github.com/streamingfast/substreams/manifest"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/runtime"
@@ -31,19 +35,33 @@ var remoteCmd = &cobra.Command{
 func runRemote(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	config := &runtime.RemoteConfig{
-		ManifestPath:         args[0],
-		OutputStreamName:     args[1],
-		FirehoseEndpoint:     mustGetString(cmd, "firehose-endpoint"),
-		FirehoseApiKeyEnvVar: mustGetString(cmd, "firehose-api-key-envvar"),
-		StartBlock:           mustGetUint64(cmd, "start-block"),
-		StopBlock:            mustGetUint64(cmd, "stop-block"),
-		InsecureMode:         mustGetBool(cmd, "insecure"),
-		Plaintext:            mustGetBool(cmd, "plaintext"),
-		PrintMermaid:         true,
+	config := &runtime.Config{
+		ManifestPath:     args[0],
+		OutputStreamName: args[1],
+		StartBlock:       mustGetUint64(cmd, "start-block"),
+		StopBlock:        mustGetUint64(cmd, "stop-block"),
+		PrintMermaid:     true,
+		RemoteConfig: &runtime.RemoteConfig{
+			FirehoseEndpoint:     mustGetString(cmd, "firehose-endpoint"),
+			FirehoseApiKeyEnvVar: mustGetString(cmd, "firehose-api-key-envvar"),
+			InsecureMode:         mustGetBool(cmd, "insecure"),
+			Plaintext:            mustGetBool(cmd, "plaintext"),
+		},
 	}
 
-	err := runtime.RemoteRun(ctx, config)
+	manif, err := manifest.New(config.ManifestPath)
+	if err != nil {
+		return fmt.Errorf("read manifest %q: %w", config.ManifestPath, err)
+	}
+
+	config.ReturnHandler = decode.NewPrintReturnHandler(manif, config.OutputStreamName)
+	if mustGetBool(cmd, "no-return-handler") {
+		config.ReturnHandler = func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
+			return nil
+		}
+	}
+
+	err = runtime.RemoteRun(ctx, config)
 	if err != nil {
 		return fmt.Errorf("running remote substream: %w", err)
 	}

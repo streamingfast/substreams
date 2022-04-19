@@ -6,7 +6,6 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/firehose/client"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
-	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -15,23 +14,7 @@ import (
 	"os"
 )
 
-type RemoteConfig struct {
-	ManifestPath     string
-	OutputStreamName string
-
-	FirehoseEndpoint     string
-	FirehoseApiKeyEnvVar string
-
-	StartBlock uint64
-	StopBlock  uint64
-
-	InsecureMode bool
-	Plaintext    bool
-
-	PrintMermaid bool
-}
-
-func RemoteRun(ctx context.Context, config *RemoteConfig) error {
+func RemoteRun(ctx context.Context, config *Config) error {
 	manif, err := manifest.New(config.ManifestPath)
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", config.ManifestPath, err)
@@ -94,8 +77,6 @@ func RemoteRun(ctx context.Context, config *RemoteConfig) error {
 		return fmt.Errorf("call Blocks: %w", err)
 	}
 
-	returnHandler := decode.NewPrintReturnHandler(manif, config.OutputStreamName)
-
 	for {
 		resp, err := cli.Recv()
 		if err != nil {
@@ -107,9 +88,9 @@ func RemoteRun(ctx context.Context, config *RemoteConfig) error {
 		if err != nil {
 			return fmt.Errorf("unmarshalling substream output: %w", err)
 		}
-		ret := returnHandler(output, stepFromProto(resp.Step), cursor)
-		if ret != nil {
-			fmt.Println(ret)
+		retErr := config.ReturnHandler(output, stepFromProto(resp.Step), cursor)
+		if retErr != nil {
+			fmt.Println(retErr)
 		}
 	}
 }

@@ -12,35 +12,12 @@ import (
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	ethrpc "github.com/streamingfast/eth-go/rpc"
-	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/rpc"
 )
 
-type LocalConfig struct {
-	ManifestPath     string
-	OutputStreamName string
-
-	BlocksStoreUrl string
-	StateStoreUrl  string
-	IrrIndexesUrl  string
-
-	ProtobufBlockType string
-
-	StartBlock uint64
-	StopBlock  uint64
-
-	RpcEndpoint string
-
-	PrintMermaid bool
-	RpcCacheUrl  string
-	PartialMode  bool
-
-	ReturnHandler substreams.ReturnFunc
-}
-
-func LocalRun(ctx context.Context, config *LocalConfig) error {
+func LocalRun(ctx context.Context, config *Config) error {
 	if bstream.GetBlockDecoder == nil {
 		return fmt.Errorf("cannot run local with a build that didn't include chain-specific decoders, compile from sf-ethereum or use the remote command")
 	}

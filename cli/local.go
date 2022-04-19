@@ -47,18 +47,21 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	// ISSUE A BIG WARNING IF WE HAVEN'T LOADED ALL THE CHAIN CONFIG SPECIFICS.
 	// If we haven't compiled from `sf-ethereum`, we won't have the block readers, etc..
-	cfg := &runtime.LocalConfig{
+
+	cfg := &runtime.Config{
 		ManifestPath:     args[0],
 		OutputStreamName: args[1],
-		PrintMermaid:     true,
-		BlocksStoreUrl:   mustGetString(cmd, "blocks-store-url"),
-		IrrIndexesUrl:    mustGetString(cmd, "irr-indexes-url"),
-		StateStoreUrl:    mustGetString(cmd, "state-store-url"),
 		StartBlock:       mustGetUint64(cmd, "start-block"),
 		StopBlock:        mustGetUint64(cmd, "stop-block"),
-		RpcEndpoint:      mustGetString(cmd, "rpc-endpoint"),
-		RpcCacheUrl:      mustGetString(cmd, "rpc-cache-store-url"),
-		PartialMode:      mustGetBool(cmd, "partial"),
+		PrintMermaid:     true,
+		LocalConfig: &runtime.LocalConfig{
+			BlocksStoreUrl: mustGetString(cmd, "blocks-store-url"),
+			IrrIndexesUrl:  mustGetString(cmd, "irr-indexes-url"),
+			StateStoreUrl:  mustGetString(cmd, "state-store-url"),
+			RpcEndpoint:    mustGetString(cmd, "rpc-endpoint"),
+			RpcCacheUrl:    mustGetString(cmd, "rpc-cache-store-url"),
+			PartialMode:    mustGetBool(cmd, "partial"),
+		},
 	}
 
 	if cfg.StopBlock == 0 {

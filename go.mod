@@ -105,5 +105,5 @@ require (
 )
 
 replace (
-	github.com/streamingfast/dstore => /Users/cbillett/devel/sf/dstore
+	//github.com/streamingfast/dstore => /Users/cbillett/devel/sf/dstore
 )

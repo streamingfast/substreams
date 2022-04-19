@@ -5,6 +5,8 @@ option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbs
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
+import "sf/substreams/v1/manifest.proto";
+import "sf/substreams/v1/clock.proto";
 
 service Stream {
   rpc Blocks(Request) returns (stream Response);
@@ -31,6 +33,20 @@ message Response {
   }
 }
 
+enum ForkStep {
+  STEP_UNKNOWN = 0;
+  // Block is new head block of the chain, that is linear with the previous block
+  STEP_NEW = 1;
+  // Block is now forked and should be undone, it's not the head block of the chain anymore
+  STEP_UNDO = 2;
+  // Removed, was STEP_REDO
+  reserved 3;
+  // Block is now irreversible and can be committed to (finality is chain specific, see chain documentation for more details)
+  STEP_IRREVERSIBLE = 4;
+  // Removed, was STEP_STALLED
+  reserved 5;
+}
+
 message InitialSnapshotComplete {
   string cursor = 1;
 }
@@ -49,17 +65,12 @@ message BlockScopedData {
   string cursor = 10;
 }
 
-message Clock {
-  string id = 1;
-  uint64 number = 2;
-  google.timestamp.Timestamp timestamp = 3;
-}
-
 message ModuleOutput {
   string name = 1;
-  // oneof ?
-  google.protobuf.Any map_output = 2;
-  StoreDeltas store_deltas = 3;
+  oneof data {
+    google.protobuf.Any map_output = 2;
+    StoreDeltas store_deltas = 3;
+  }
   repeated string logs = 4;
 }
 
@@ -71,11 +82,11 @@ message ModuleProgress {
   string name = 1;
   repeated BlockRange processed_ranges = 2;
 
-  uint64 total_bytes_read = 4;
+  uint64 total_bytes_read = 3;
   uint64 total_bytes_written = 4;
 
-  bool failed = 3;
-  string failure_reason = 5;
+  bool failed = 7;
+  string failure_reason = 8;
 }
 
 message BlockRange {
@@ -99,10 +110,6 @@ message StoreDelta {
   string key = 3;
   bytes old_value = 4;
   bytes new_value = 5;
-}
-
-message DatabaseChanges {
-  repeated TableChange tableChanges = 1;
 }
 
 //table.1
@@ -129,24 +136,4 @@ message Output {
   string block_id = 2;
   google.protobuf.Timestamp timestamp = 4;
   google.protobuf.Any value = 10;
-}
-
-message TableChange {
-  string table = 1;
-  string pk = 2;
-  uint64 block_num = 3;
-  uint64 ordinal = 4;
-  enum Operation {
-    CREATE = 0;
-    UPDATE = 1;
-    DELETE = 2;
-  }
-  Operation operation = 5;
-  repeated Field fields = 6;
-}
-
-message Field {
-  string name = 1;
-  string new_value = 2;
-  string old_value = 3;
 }

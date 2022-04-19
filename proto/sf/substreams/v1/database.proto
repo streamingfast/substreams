@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package sf.substreams.v1;
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
+
+message DatabaseChanges {
+  repeated TableChange tableChanges = 1;
+}
+
+message TableChange {
+  string table = 1;
+  string pk = 2;
+  uint64 block_num = 3;
+  uint64 ordinal = 4;
+  enum Operation {
+    CREATE = 0;
+    UPDATE = 1;
+    DELETE = 2;
+  }
+  Operation operation = 5;
+  repeated Field fields = 6;
+}
+
+message Field {
+  string name = 1;
+  string new_value = 2;
+  string old_value = 3;
+}

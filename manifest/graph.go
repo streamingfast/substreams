@@ -8,24 +8,24 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/bstream"
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/yourbasic/graph"
 )
 
 type ModuleGraph struct {
 	*graph.Mutable
 
-	modules     []*pbtransform.Module
+	modules     []*pbsubstreams.Module
 	moduleIndex map[string]int
-	indexIndex  map[int]*pbtransform.Module
+	indexIndex  map[int]*pbsubstreams.Module
 }
 
-func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
+func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 	g := &ModuleGraph{
 		Mutable:     graph.New(len(modules)),
 		modules:     modules,
 		moduleIndex: make(map[string]int),
-		indexIndex:  make(map[int]*pbtransform.Module),
+		indexIndex:  make(map[int]*pbsubstreams.Module),
 	}
 
 	for i, module := range modules {
@@ -60,7 +60,7 @@ func NewModuleGraph(modules []*pbtransform.Module) (*ModuleGraph, error) {
 	return g, nil
 }
 
-func computeStartBlock(modules []*pbtransform.Module, g *ModuleGraph) {
+func computeStartBlock(modules []*pbsubstreams.Module, g *ModuleGraph) {
 	for _, module := range modules {
 		if module.StartBlock == UNSET {
 			moduleIndex := g.moduleIndex[module.Name]
@@ -99,13 +99,13 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph) uint64 {
 	return uint64(parentsStartBlock)
 }
 
-func (g *ModuleGraph) TopologicalSort() ([]*pbtransform.Module, bool) {
+func (g *ModuleGraph) TopologicalSort() ([]*pbsubstreams.Module, bool) {
 	order, ok := graph.TopSort(g)
 	if !ok {
 		return nil, ok
 	}
 
-	var res []*pbtransform.Module
+	var res []*pbsubstreams.Module
 	for _, i := range order {
 		res = append(res, g.indexIndex[i])
 	}
@@ -113,14 +113,14 @@ func (g *ModuleGraph) TopologicalSort() ([]*pbtransform.Module, bool) {
 	return res, ok
 }
 
-func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*pbtransform.Module, error) {
+func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*pbsubstreams.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
 	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-	var res []*pbtransform.Module
+	var res []*pbsubstreams.Module
 	for i, d := range distances {
 		if d >= 1 {
 			res = append(res, g.indexIndex[i])
@@ -130,13 +130,13 @@ func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*pbtransform.Module, err
 	return res, nil
 }
 
-func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbtransform.Module, error) {
+func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbsubstreams.Module, error) {
 	ancestors, err := g.AncestorsOf(moduleName)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]*pbtransform.Module, 0, len(ancestors))
+	result := make([]*pbsubstreams.Module, 0, len(ancestors))
 	for _, a := range ancestors {
 		kind := a.GetKindStore()
 		if kind != nil {
@@ -147,14 +147,14 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbtransform.Module
 	return result, nil
 }
 
-func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbtransform.Module, error) {
+func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
 
 	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-	var res []*pbtransform.Module
+	var res []*pbsubstreams.Module
 	for i, d := range distances {
 		if d == 1 {
 			res = append(res, g.indexIndex[i])
@@ -164,7 +164,7 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbtransform.Module, error
 	return res, nil
 }
 
-func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbtransform.Module, error) {
+func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbsubstreams.Module, error) {
 	alreadyAdded := map[string]bool{}
 	topologicalIndex := map[string]int{}
 
@@ -209,7 +209,7 @@ func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbtransform.Module,
 	return res, nil
 }
 
-func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbtransform.Module, error) {
+func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Module, error) {
 	alreadyAdded := map[string]bool{}
 	topologicalIndex := map[string]int{}
 
@@ -257,7 +257,7 @@ func (g *ModuleGraph) ModuleStartBlock(moduleName string) (uint64, error) {
 	return 0, fmt.Errorf("could not find module %s in graph", moduleName)
 }
 
-type ModuleMarshaler []*pbtransform.Module
+type ModuleMarshaler []*pbsubstreams.Module
 
 func (m ModuleMarshaler) MarshalJSON() ([]byte, error) {
 	l := make([]string, 0, len(m))

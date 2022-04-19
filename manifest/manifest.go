@@ -10,7 +10,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 const UNSET = math.MaxUint64
@@ -227,8 +227,8 @@ func (m *Manifest) PrintMermaid() {
 	fmt.Println("")
 }
 
-func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
-	pbManifest := &pbtransform.Manifest{
+func (m *Manifest) ToProto() (*pbsubstreams.Manifest, error) {
+	pbManifest := &pbsubstreams.Manifest{
 		SpecVersion: m.SpecVersion,
 		Description: m.Description,
 	}
@@ -270,7 +270,7 @@ func (m *Manifest) ToProto() (*pbtransform.Manifest, error) {
 	return pbManifest, nil
 }
 
-func (m *Manifest) loadCode(codePath string, pbManifest *pbtransform.Manifest) (int, error) {
+func (m *Manifest) loadCode(codePath string, pbManifest *pbsubstreams.Manifest) (int, error) {
 	byteCode, err := ioutil.ReadFile(codePath)
 	if err != nil {
 		return 0, fmt.Errorf("reading code from file, %s: %w", codePath, err)
@@ -284,11 +284,11 @@ func (m *Module) String() string {
 	return m.Name
 }
 
-func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
-	out := &pbtransform.Module{
+func (m *Module) ToProtoNative() (*pbsubstreams.Module, error) {
+	out := &pbsubstreams.Module{
 		Name: m.Name,
-		Code: &pbtransform.Module_NativeCode{
-			NativeCode: &pbtransform.NativeCode{
+		Code: &pbsubstreams.Module_NativeCode{
+			NativeCode: &pbsubstreams.NativeCode{
 				Entrypoint: m.Code.Entrypoint,
 			},
 		},
@@ -308,11 +308,11 @@ func (m *Module) ToProtoNative() (*pbtransform.Module, error) {
 	return out, nil
 }
 
-func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
-	out := &pbtransform.Module{
+func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
+	out := &pbsubstreams.Module{
 		Name: m.Name,
-		Code: &pbtransform.Module_WasmCode{
-			WasmCode: &pbtransform.WasmCode{
+		Code: &pbsubstreams.Module_WasmCode{
+			WasmCode: &pbsubstreams.WasmCode{
 				Type:       m.Code.Type,
 				Index:      codeIndex,
 				Entrypoint: m.Code.Entrypoint,
@@ -335,12 +335,12 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbtransform.Module, error) {
 	return out, nil
 }
 
-func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
+func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 	for _, input := range m.Inputs {
 		if input.Source != "" {
-			pbInput := &pbtransform.Input{
-				Input: &pbtransform.Input_Source{
-					Source: &pbtransform.InputSource{
+			pbInput := &pbsubstreams.Input{
+				Input: &pbsubstreams.Input_Source{
+					Source: &pbsubstreams.InputSource{
 						Type: input.Source,
 					},
 				},
@@ -349,9 +349,9 @@ func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
 			continue
 		}
 		if input.Map != "" {
-			pbInput := &pbtransform.Input{
-				Input: &pbtransform.Input_Map{
-					Map: &pbtransform.InputMap{
+			pbInput := &pbsubstreams.Input{
+				Input: &pbsubstreams.Input_Map{
+					Map: &pbsubstreams.InputMap{
 						ModuleName: input.Map,
 					},
 				},
@@ -361,22 +361,22 @@ func (m *Module) setInputsToProto(pbModule *pbtransform.Module) error {
 		}
 		if input.Store != "" {
 
-			var mode pbtransform.InputStore_Mode
+			var mode pbsubstreams.InputStore_Mode
 
 			switch input.Mode {
 			case "":
-				mode = pbtransform.InputStore_UNSET
+				mode = pbsubstreams.InputStore_UNSET
 			case "get":
-				mode = pbtransform.InputStore_GET
+				mode = pbsubstreams.InputStore_GET
 			case "deltas":
-				mode = pbtransform.InputStore_DELTAS
+				mode = pbsubstreams.InputStore_DELTAS
 			default:
 				panic(fmt.Sprintf("invalid input mode %s", input.Mode))
 			}
 
-			pbInput := &pbtransform.Input{
-				Input: &pbtransform.Input_Store{
-					Store: &pbtransform.InputStore{
+			pbInput := &pbsubstreams.Input{
+				Input: &pbsubstreams.Input_Store{
+					Store: &pbsubstreams.InputStore{
 						ModuleName: input.Store,
 						Mode:       mode,
 					},
@@ -400,32 +400,32 @@ const (
 	UpdatePolicyMin     = "min"
 )
 
-func (m *Module) setKindToProto(pbModule *pbtransform.Module) {
+func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 	switch m.Kind {
 	case ModuleKindMap:
-		pbModule.Kind = &pbtransform.Module_KindMap{
-			KindMap: &pbtransform.KindMap{
+		pbModule.Kind = &pbsubstreams.Module_KindMap{
+			KindMap: &pbsubstreams.KindMap{
 				OutputType: m.Output.Type,
 			},
 		}
 	case ModuleKindStore:
-		var updatePolicy pbtransform.KindStore_UpdatePolicy
+		var updatePolicy pbsubstreams.KindStore_UpdatePolicy
 		switch m.UpdatePolicy {
 		case UpdatePolicyReplace:
-			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_REPLACE
+			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_REPLACE
 		case UpdatePolicyIgnore:
-			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_IGNORE
+			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_IGNORE
 		case UpdatePolicySum:
-			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_SUM
+			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_SUM
 		case UpdatePolicyMax:
-			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_MAX
+			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_MAX
 		case UpdatePolicyMin:
-			updatePolicy = pbtransform.KindStore_UPDATE_POLICY_MIN
+			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_MIN
 		default:
 			panic(fmt.Sprintf("invalid update policy %s", m.UpdatePolicy))
 		}
-		pbModule.Kind = &pbtransform.Module_KindStore{
-			KindStore: &pbtransform.KindStore{
+		pbModule.Kind = &pbsubstreams.Module_KindStore{
+			KindStore: &pbsubstreams.KindStore{
 				UpdatePolicy: updatePolicy,
 				ValueType:    m.ValueType,
 			},
@@ -433,9 +433,9 @@ func (m *Module) setKindToProto(pbModule *pbtransform.Module) {
 	}
 }
 
-func (m *Module) setOutputToProto(pbModule *pbtransform.Module) {
+func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 	if m.Output.Type != "" {
-		pbModule.Output = &pbtransform.Output{
+		pbModule.Output = &pbsubstreams.Output{
 			Type: m.Output.Type,
 		}
 	}
@@ -446,7 +446,7 @@ func (m *Module) setOutputToProto(pbModule *pbtransform.Module) {
 //	String() string
 //}
 //
-//func MonduleSignature(graph *ModuleGraph, m *pbtransform.Module) []byte {
+//func MonduleSignature(graph *ModuleGraph, m *pbsubstreams.Module) []byte {
 //	buf := bytes.NewBuffer(nil)
 //	buf.WriteString(m.Kind.(stringer).String())
 //

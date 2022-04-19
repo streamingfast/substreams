@@ -7,12 +7,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type ModuleHash []byte
 
-func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, graph *ModuleGraph) ModuleHash {
+func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
 
 	buf := bytes.NewBuffer(nil)
 
@@ -24,9 +24,9 @@ func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 
 	buf.WriteString("kind")
 	switch module.Kind.(type) {
-	case *pbtransform.Module_KindMap:
+	case *pbsubstreams.Module_KindMap:
 		buf.WriteString("map")
-	case *pbtransform.Module_KindStore:
+	case *pbsubstreams.Module_KindStore:
 		buf.WriteString("store")
 	default:
 		panic(fmt.Sprintf("invalid module file %T", module.Kind))
@@ -34,11 +34,11 @@ func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 
 	buf.WriteString("code")
 	switch m := module.Code.(type) {
-	case *pbtransform.Module_WasmCode:
+	case *pbsubstreams.Module_WasmCode:
 		code := manifest.ModulesCode[m.WasmCode.Index]
 		buf.Write(code)
 		buf.WriteString(m.WasmCode.Entrypoint)
-	case *pbtransform.Module_NativeCode:
+	case *pbsubstreams.Module_NativeCode:
 		// TODO: get some version of the native code from the registry
 		// so it can break compatibility when the native code is updated.
 		buf.WriteString(m.NativeCode.Entrypoint)
@@ -61,16 +61,16 @@ func HashModule(manifest *pbtransform.Manifest, module *pbtransform.Module, grap
 
 	return h.Sum(nil)
 }
-func HashModuleAsString(manifest *pbtransform.Manifest, graph *ModuleGraph, module *pbtransform.Module) string {
+func HashModuleAsString(manifest *pbsubstreams.Manifest, graph *ModuleGraph, module *pbsubstreams.Module) string {
 	return hex.EncodeToString(HashModule(manifest, module, graph))
 }
-func inputName(input *pbtransform.Input) string {
+func inputName(input *pbsubstreams.Input) string {
 	switch input.Input.(type) {
-	case *pbtransform.Input_Store:
+	case *pbsubstreams.Input_Store:
 		return "store"
-	case *pbtransform.Input_Source:
+	case *pbsubstreams.Input_Source:
 		return "source"
-	case *pbtransform.Input_Map:
+	case *pbsubstreams.Input_Map:
 		return "map"
 	default:
 		panic(fmt.Sprintf("invalid input %T", input.Input))

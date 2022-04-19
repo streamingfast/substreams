@@ -70,7 +70,7 @@ message Module {
   }
 
   message Input {
-    oneof input{
+    oneof input {
       Source source = 1;
       Map map = 2;
       Store store = 3;

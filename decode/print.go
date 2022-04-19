@@ -14,32 +14,35 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) substreams.ReturnFunc {
-	var msgType string
+func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string) substreams.ReturnFunc {
+
 	var isStore bool
 	for _, mod := range manif.Modules {
-		if mod.Name == outputStreamName {
-			if mod.Kind == "store" {
-				isStore = true
-				msgType = mod.ValueType
-			} else {
-				msgType = mod.Output.Type
+		for _, outputStreamName := range outputStreamNames {
+			if mod.Name == outputStreamName {
+				var msgType string
+				if mod.Kind == "store" {
+					isStore = true
+					msgType = mod.ValueType
+				} else {
+					msgType = mod.Output.Type
+				}
+				msgType = strings.TrimPrefix(msgType, "proto:")
+
+				var msgDesc *desc.MessageDescriptor
+				for _, file := range manif.ProtoDescs {
+					msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
+					if msgDesc != nil {
+						break
+					}
+				}
+
 			}
 		}
 	}
 
-	msgType = strings.TrimPrefix(msgType, "proto:")
-
-	var msgDesc *desc.MessageDescriptor
-	for _, file := range manif.ProtoDescs {
-		msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
-		if msgDesc != nil {
-			break
-		}
-	}
-
-	defaultHandler := func(output *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
-		printBlock(step, cursor)
+	defaultHandler := func(output *pbsubstreams.BlockScopedData) error {
+		printBlock(output)
 		if output == nil {
 			return nil
 		}
@@ -90,8 +93,8 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 			}
 		}
 
-		return func(output *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
-			printBlock(step, cursor)
+		return func(output *pbsubstreams.BlockScopedData) error {
+			printBlock(output)
 			if output == nil {
 				return nil
 			}
@@ -112,8 +115,8 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 		}
 	} else {
 		if msgDesc != nil {
-			return func(output *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
-				printBlock(step, cursor)
+			return func(output *pbsubstreams.BlockScopedData) error {
+				printBlock(output)
 				if output == nil {
 					return nil
 				}
@@ -130,10 +133,18 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamName string) su
 	}
 }
 
-func printBlock(step bstream.StepType, cursor *bstream.Cursor) {
-	var blockNum uint64
-	if cursor != nil && cursor.Block != nil {
-		blockNum = cursor.Block.Num()
+func printBlock(block *pbsubstreams.BlockScopedData) {
+	fmt.Printf("----------- BLOCK: %d (%s) ---------------\n", block.Clock.Number, stepFromProto(block.Step))
+}
+
+func stepFromProto(step pbsubstreams.ForkStep) bstream.StepType {
+	switch step {
+	case pbsubstreams.ForkStep_STEP_NEW:
+		return bstream.StepNew
+	case pbsubstreams.ForkStep_STEP_UNDO:
+		return bstream.StepUndo
+	case pbsubstreams.ForkStep_STEP_IRREVERSIBLE:
+		return bstream.StepIrreversible
 	}
-	fmt.Printf("----------- BLOCK: %d (%s) ---------------\n", blockNum, step)
+	return bstream.StepType(0)
 }

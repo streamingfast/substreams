@@ -27,6 +27,8 @@ type LocalConfig struct {
 	RpcEndpoint string
 	RpcCacheUrl string
 	PartialMode bool
+
+	ProtoUrl string
 }
 
 type RemoteConfig struct {

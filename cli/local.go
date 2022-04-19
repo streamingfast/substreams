@@ -21,6 +21,7 @@ func init() {
 	localCmd.Flags().String("blocks-store-url", "./localblocks", "URL of blocks store")
 	localCmd.Flags().String("rpc-cache-store-url", "./rpc-cache", "URL of blocks store")
 	localCmd.Flags().String("irr-indexes-url", "./localirr", "URL of blocks store")
+	localCmd.Flags().String("proto-url", "./proto", "Path of proto files")
 
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
@@ -51,7 +52,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 	cfg := &runtime.Config{
 		ManifestPath:     args[0],
 		OutputStreamName: args[1],
-		StartBlock:       mustGetUint64(cmd, "start-block"),
+		StartBlock:       uint64(mustGetInt64(cmd, "start-block")),
 		StopBlock:        mustGetUint64(cmd, "stop-block"),
 		PrintMermaid:     true,
 		LocalConfig: &runtime.LocalConfig{
@@ -61,6 +62,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 			RpcEndpoint:    mustGetString(cmd, "rpc-endpoint"),
 			RpcCacheUrl:    mustGetString(cmd, "rpc-cache-store-url"),
 			PartialMode:    mustGetBool(cmd, "partial"),
+			ProtoUrl:       mustGetString(cmd, "proto-url"),
 		},
 	}
 

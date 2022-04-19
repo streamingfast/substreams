@@ -2,18 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/firehose/client"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
-	"github.com/streamingfast/substreams/decode"
-	"github.com/streamingfast/substreams/manifest"
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"google.golang.org/protobuf/types/known/anypb"
+	"github.com/streamingfast/substreams/runtime"
 )
 
 func init() {
@@ -31,7 +22,7 @@ func init() {
 // remoteCmd represents the base command when called without any subcommands
 var remoteCmd = &cobra.Command{
 	Use:          "remote [manifest] [module_name]",
-	Short:        "Run substreams locally",
+	Short:        "Run substreams remotely",
 	RunE:         runRemote,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
@@ -40,121 +31,22 @@ var remoteCmd = &cobra.Command{
 func runRemote(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	manifestPath := args[0]
-	outputStreamName := args[1]
+	config := &runtime.RemoteConfig{
+		ManifestPath:         args[0],
+		OutputStreamName:     args[1],
+		FirehoseEndpoint:     mustGetString(cmd, "firehose-endpoint"),
+		FirehoseApiKeyEnvVar: mustGetString(cmd, "firehose-api-key-envvar"),
+		StartBlock:           mustGetUint64(cmd, "start-block"),
+		StopBlock:            mustGetUint64(cmd, "stop-block"),
+		InsecureMode:         mustGetBool(cmd, "insecure"),
+		Plaintext:            mustGetBool(cmd, "plaintext"),
+		PrintMermaid:         true,
+	}
 
-	manif, err := manifest.New(manifestPath)
+	err := runtime.RemoteRun(ctx, config)
 	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+		return fmt.Errorf("running remote substream: %w", err)
 	}
 
-	manif.PrintMermaid()
-	manifProto, err := manif.ToProto()
-	if err != nil {
-		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
-	}
-
-	sub := &pbtransform.Transform{
-		OutputModule: outputStreamName,
-		Manifest:     manifProto,
-	}
-	trans, err := anypb.New(sub)
-	if err != nil {
-		return fmt.Errorf("convert transform to any: %w", err)
-	}
-
-	graph, err := manifest.NewModuleGraph(manifProto.Modules)
-	if err != nil {
-		return fmt.Errorf("create module graph %w", err)
-	}
-
-	startBlockNum := mustGetInt64(cmd, "start-block")
-	stopBlockNum := mustGetUint64(cmd, "stop-block")
-
-	if startBlockNum == -1 {
-		sb, err := graph.ModuleStartBlock(outputStreamName)
-		if err != nil {
-			return fmt.Errorf("getting module start block: %w", err)
-		}
-		startBlockNum = int64(sb)
-	}
-	endpoint := mustGetString(cmd, "firehose-endpoint")
-	jwt := os.Getenv(mustGetString(cmd, "firehose-api-key-envvar"))
-	insecure := mustGetBool(cmd, "insecure")
-	plaintext := mustGetBool(cmd, "plaintext")
-
-	fmt.Println("CALLING ENDPOINT", endpoint)
-	fhClient, callOpts, err := client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
-	if err != nil {
-		return fmt.Errorf("firehose client: %w", err)
-	}
-
-	req := &pbfirehose.Request{
-		StartBlockNum: startBlockNum,
-		StopBlockNum:  stopBlockNum,
-		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE},
-		Transforms: []*anypb.Any{
-			trans,
-		},
-	}
-
-	cli, err := fhClient.Blocks(ctx, req, callOpts...)
-	if err != nil {
-		return fmt.Errorf("call Blocks: %w", err)
-	}
-
-	returnHandler := decode.NewPrintReturnHandler(manif, outputStreamName)
-
-	for {
-		resp, err := cli.Recv()
-		if err != nil {
-			return err
-		}
-		cursor, _ := bstream.CursorFromOpaque(resp.Cursor)
-		output := &pbsubstreams.Output{}
-		err = proto.Unmarshal(resp.Block.GetValue(), output)
-		if err != nil {
-			return fmt.Errorf("unmarshalling substream output: %w", err)
-		}
-		ret := returnHandler(output, stepFromProto(resp.Step), cursor)
-		if ret != nil {
-			fmt.Println(ret)
-		}
-	}
-
-	//	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, ProtobufBlockType, ioFactory, pipelineOpts...)
-	//
-	//	handler, err := pipe.HandlerFactory(ctx, uint64(startBlockNum), stopBlockNum, returnHandler)
-	//	if err != nil {
-	//		return fmt.Errorf("building pipeline handler: %w", err)
-	//	}
-	//
-	//	fmt.Println("Starting firehose from block", startBlockNum)
-	//
-	//	hose := stream.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
-	//		stream.WithForkableSteps(bstream.StepIrreversible),
-	//		stream.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
-	//	)
-	//
-	//	if err := hose.Run(ctx); err != nil {
-	//		if errors.Is(err, io.EOF) {
-	//			return nil
-	//		}
-	//		return fmt.Errorf("running the firehose: %w", err)
-	//	}
-	//	time.Sleep(5 * time.Second)
-	//
-	// return nil
-}
-
-func stepFromProto(step pbfirehose.ForkStep) bstream.StepType {
-	switch step {
-	case pbfirehose.ForkStep_STEP_NEW:
-		return bstream.StepNew
-	case pbfirehose.ForkStep_STEP_UNDO:
-		return bstream.StepUndo
-	case pbfirehose.ForkStep_STEP_IRREVERSIBLE:
-		return bstream.StepIrreversible
-	}
-	return bstream.StepType(0)
+	return nil
 }

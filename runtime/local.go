@@ -18,10 +18,6 @@ import (
 	"github.com/streamingfast/substreams/rpc"
 )
 
-type Local struct {
-	hose *stream.Stream
-}
-
 type LocalConfig struct {
 	ManifestPath     string
 	OutputStreamName string
@@ -49,12 +45,9 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 		return fmt.Errorf("cannot run local with a build that didn't include chain-specific decoders, compile from sf-ethereum or use the remote command")
 	}
 
-	manifestPath := config.ManifestPath
-	outputStreamName := config.OutputStreamName
-
-	manif, err := manifest.New(manifestPath)
+	manif, err := manifest.New(config.ManifestPath)
 	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+		return fmt.Errorf("read manifest %q: %w", config.ManifestPath, err)
 	}
 
 	if config.PrintMermaid {
@@ -63,7 +56,7 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 
 	manifProto, err := manif.ToProto()
 	if err != nil {
-		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
+		return fmt.Errorf("parse manifest to proto%q: %w", config.ManifestPath, err)
 	}
 
 	blocksStore, err := dstore.NewDBinStore(config.BlocksStoreUrl)
@@ -86,18 +79,12 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 		return fmt.Errorf("create module graph %w", err)
 	}
 
-	startBlockNum := config.StartBlock
-	stopBlockNum := config.StopBlock
-
-	rpcEndpoint := config.RpcEndpoint
-	rpcCacheURL := config.RpcCacheUrl
-
-	rpcCacheStore, err := dstore.NewStore(rpcCacheURL, "", "", false)
+	rpcCacheStore, err := dstore.NewStore(config.RpcCacheUrl, "", "", false)
 	if err != nil {
 		return fmt.Errorf("setting up rpc client: %w", err)
 	}
 
-	rpcCache := rpc.NewCacheManager(ctx, rpcCacheStore, int64(startBlockNum))
+	rpcCache := rpc.NewCacheManager(ctx, rpcCacheStore, int64(config.StartBlock))
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DisableKeepAlives: true, // don't reuse connections
@@ -105,7 +92,7 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 		Timeout: 3 * time.Second,
 	}
 
-	rpcClient := ethrpc.NewClient(rpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache))
+	rpcClient := ethrpc.NewClient(config.RpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache))
 
 	var pipelineOpts []pipeline.Option
 	if config.PartialMode {
@@ -114,23 +101,21 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 	}
 	pipelineOpts = append(pipelineOpts, pipeline.WithAllowInvalidState())
 
-	if startBlockNum == 0 {
-		sb, err := graph.ModuleStartBlock(outputStreamName)
+	if config.StartBlock == 0 {
+		sb, err := graph.ModuleStartBlock(config.OutputStreamName)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
 		}
-		startBlockNum = sb
+		config.StartBlock = sb
 	}
 
-	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, outputStreamName, config.ProtobufBlockType, stateStore, pipelineOpts...)
-	handler, err := pipe.HandlerFactory(ctx, startBlockNum, stopBlockNum, config.ReturnHandler)
+	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, config.OutputStreamName, config.ProtobufBlockType, stateStore, pipelineOpts...)
+	handler, err := pipe.HandlerFactory(ctx, config.StartBlock, config.StopBlock, config.ReturnHandler)
 	if err != nil {
 		return fmt.Errorf("building pipeline handler: %w", err)
 	}
 
-	fmt.Println("Starting firehose stream from block", startBlockNum)
-
-	hose := stream.New([]dstore.Store{blocksStore}, int64(startBlockNum), handler,
+	hose := stream.New([]dstore.Store{blocksStore}, int64(config.StartBlock), handler,
 		stream.WithForkableSteps(bstream.StepIrreversible),
 		stream.WithIrreversibleBlocksIndex(irrStore, []uint64{10000, 1000, 100}),
 	)

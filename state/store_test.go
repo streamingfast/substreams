@@ -2,6 +2,9 @@ package state
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
+	"io"
+	"testing"
 
 	"github.com/streamingfast/dstore"
 )
@@ -25,4 +28,26 @@ func (io *TestStore) WriteState(ctx context.Context, content []byte, blockNum ui
 		return io.WriteStateFunc(ctx, content, blockNum)
 	}
 	return nil
+}
+
+func TestStateFileName(t *testing.T) {
+	s, err := NewStore(
+		"test",
+		"abc",
+		100,
+		dstore.NewMockStore(func(base string, f io.Reader) (err error) {
+			return nil
+		}),
+	)
+
+	require.NoError(t, err)
+
+	prefix := s.StateFilePrefix(10000)
+	require.Equal(t, "test-0000010000", prefix)
+
+	stateFileName := s.StateFileName(10000)
+	require.Equal(t, "test-0000010000-0000000100.kv", stateFileName)
+
+	partialFileName := s.PartialFileName(10000, 20000)
+	require.Equal(t, "test-0000020000-0000010000.partial", partialFileName)
 }

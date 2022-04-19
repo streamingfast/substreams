@@ -506,6 +506,8 @@ github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447/go.mod h1:V
 github.com/streamingfast/dstore v0.1.1-0.20220304164644-696f9c5fc231/go.mod h1:aii8QXJg+2b5CXw+Y1SkTf5QJkJOu8ujq6+rw8J1OK0=
 github.com/streamingfast/dstore v0.1.1-0.20220419122426-72c87c8ca668 h1:9N7hi1Egzv50+AKssRxrOXNzmfdESMHOLVW7nIK1yik=
 github.com/streamingfast/dstore v0.1.1-0.20220419122426-72c87c8ca668/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
+github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e h1:yXNSEK3eu2CXJvuk2RoZIbgmDJ+gaCLEzRSn+2/T6gw=
+github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a/go.mod h1:bqiYZaX6L/MoXNfFQeAdau6g9HLA3yKHkX8KzStt58Q=
 github.com/streamingfast/eth-go v0.0.0-20220419161629-0c08380c1460 h1:bdkeE4BOBxYYvFTrOEBZ1mS3xagekXwXMKI1FhdzeNE=

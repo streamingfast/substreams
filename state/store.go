@@ -40,13 +40,13 @@ func (s *Store) WritePartialState(ctx context.Context, content []byte, startBloc
 }
 
 func (s *Store) StateFilePrefix(blockNum uint64) string {
-	return fmt.Sprintf("%s-%d", s.Name, blockNum)
+	return fmt.Sprintf("%s-%010d", s.Name, blockNum)
 }
 
 func (s *Store) StateFileName(blockNum uint64) string {
-	return fmt.Sprintf("%s-%d-%d.kv", s.Name, blockNum, s.ModuleStartBlock)
+	return fmt.Sprintf("%s-%010d-%010d.kv", s.Name, blockNum, s.ModuleStartBlock)
 }
 
 func (s *Store) PartialFileName(startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%s-%d-%d.partial", s.Name, endBlockNum, startBlockNum)
+	return fmt.Sprintf("%s-%010d-%010d.partial", s.Name, endBlockNum, startBlockNum)
 }

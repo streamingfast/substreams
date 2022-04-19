@@ -103,3 +103,7 @@ require (
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf // indirect
 	google.golang.org/grpc v1.44.0 // indirect
 )
+
+replace (
+	github.com/streamingfast/dstore => /Users/cbillett/devel/sf/dstore
+)

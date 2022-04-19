@@ -46,6 +46,7 @@ type Entity interface {
 	Exists() bool
 	SetExists(exists bool)
 	SetMutated(step int)
+	Default()
 }
 
 type NamedEntity interface {

@@ -28,6 +28,8 @@ func NewPOI(causalityRegion string) *POI {
 	}
 }
 
+func (p *POI) Default() {}
+
 func (p *POI) Clear() {
 	p.md5 = md5.New()
 	p.Digest = nil

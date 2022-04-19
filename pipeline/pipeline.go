@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -184,7 +183,10 @@ func (p *Pipeline) build() (modules []*pbtransform.Module, storeModules []*pbtra
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
 		}
 
-		store := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
+		store, err := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
+		if err != nil {
+			return nil, nil, fmt.Errorf("init new store: %w", err)
+		}
 
 		builder := state.NewBuilder(
 			storeModule.Name,
@@ -468,7 +470,7 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 			continue
 		}
 		if err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
-			e := fmt.Errorf("could not load state for store %s at block num %d: %w", store.Name, p.requestedStartBlockNum, err)
+			e := fmt.Errorf("could not load state for store %s at block num %d: %s: %w", store.Name, p.requestedStartBlockNum, store.Store.BaseURL(), err)
 			if !p.allowInvalidState {
 				return e
 			}
@@ -517,13 +519,13 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		blockCount++
 		handleBlockStart := time.Now()
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-				zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
-				zlog.Error(string(debug.Stack()))
-			}
-		}()
+		//defer func() {
+		//	if r := recover(); r != nil {
+		//		err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+		//		zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
+		//		zlog.Error(string(debug.Stack()))
+		//	}
+		//}()
 
 		cursorable := obj.(bstream.Cursorable)
 		cursor := cursorable.Cursor()
@@ -621,14 +623,16 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			s.Flush()
 		}
 
-		out := &pbsubstreams.Output{
-			BlockNum:  block.Num(),
-			BlockId:   block.Id,
-			Timestamp: timestamppb.New(block.Time()),
-			Value:     p.nextReturnValue,
-		}
-		if err := returnFunc(out, step, cursor); err != nil {
-			return err
+		if p.nextReturnValue != nil {
+			out := &pbsubstreams.Output{
+				BlockNum:  block.Num(),
+				BlockId:   block.Id,
+				Timestamp: timestamppb.New(block.Time()),
+				Value:     p.nextReturnValue,
+			}
+			if err := returnFunc(out, step, cursor); err != nil {
+				return err
+			}
 		}
 
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))

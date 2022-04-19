@@ -14,42 +14,44 @@ func NewBase(id string) Base {
 	return Base{ID: id}
 }
 
-func (e *Base) GetID() string {
-	return e.ID
+func (b *Base) Default() {}
+
+func (b *Base) GetID() string {
+	return b.ID
 }
 
-func (e *Base) SetID(id string) {
-	e.ID = id
+func (b *Base) SetID(id string) {
+	b.ID = id
 }
 
-func (e *Base) GetVID() uint64 {
-	return e.VID
+func (b *Base) GetVID() uint64 {
+	return b.VID
 }
 
-func (e *Base) SetVID(vid uint64) {
-	e.VID = vid
+func (b *Base) SetVID(vid uint64) {
+	b.VID = vid
 }
 
-func (e *Base) SetBlockRange(br *BlockRange) {
-	e.BlockRange = br
+func (b *Base) SetBlockRange(br *BlockRange) {
+	b.BlockRange = br
 }
 
-func (e *Base) GetBlockRange() *BlockRange {
-	return e.BlockRange
+func (b *Base) GetBlockRange() *BlockRange {
+	return b.BlockRange
 }
 
-func (e *Base) Exists() bool {
-	return e.exists
+func (b *Base) Exists() bool {
+	return b.exists
 }
 
-func (e *Base) SetExists(exists bool) {
-	e.exists = exists
+func (b *Base) SetExists(exists bool) {
+	b.exists = exists
 }
 
-func (e *Base) SetMutated(step int) {
-	e.MutatedOnStep = step
+func (b *Base) SetMutated(step int) {
+	b.MutatedOnStep = step
 }
 
-func (e *Base) SetUpdatedBlockNum(blockNum uint64) {
-	e.UpdatedBlockNum = blockNum
+func (b *Base) SetUpdatedBlockNum(blockNum uint64) {
+	b.UpdatedBlockNum = blockNum
 }

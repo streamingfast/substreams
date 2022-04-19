@@ -657,6 +657,7 @@ func (s *store) UpdateBlockRange(ctx context.Context, dbTx *sqlx.Tx, tableName s
 }
 
 func (s *store) updateDeploymentHead(ctx context.Context, tx *sqlx.Tx, blockNumer uint64, blockHash string) error {
+	return nil //todo: fix this please
 	updateDeploymentQuery := "update subgraphs.subgraph_deployment set latest_ethereum_block_number=$1, latest_ethereum_block_hash=$2 where deployment = $3"
 	result, err := tx.ExecContext(ctx, updateDeploymentQuery, blockNumer, blockHash, s.subgraphDeploymentID)
 	if err != nil {

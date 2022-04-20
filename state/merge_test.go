@@ -10,27 +10,27 @@ import (
 
 func TestMergeValues(t *testing.T) {
 	b := &Builder{
-		KV:           map[string][]byte{},
+		KV: map[string][]byte{},
+		Store: &Store{
+			ModuleHash:       "abc123",
+			ModuleStartBlock: 1023,
+			Name:             "testStore",
+		},
 		valueType:    OutputValueTypeInt64,
 		updatePolicy: pbtransform.KindStore_UPDATE_POLICY_SUM,
 	}
 
 	b.writeMergeValues()
-	assert.Len(t, b.KV, 2)
 	_, ok := b.KV[valueTypeKey]
 	assert.True(t, ok)
 	_, ok = b.KV[updatePolicyKey]
 	assert.True(t, ok)
-
-	c := &Builder{
-		KV: b.KV,
-	}
-	err := c.readMergeValues()
-	assert.NoError(t, err)
-
-	assert.Equal(t, OutputValueTypeInt64, c.valueType)
-	assert.Equal(t, pbtransform.KindStore_UPDATE_POLICY_SUM, c.updatePolicy)
-	assert.Len(t, c.KV, 0)
+	_, ok = b.KV[moduleStartBlockKey]
+	assert.True(t, ok)
+	_, ok = b.KV[moduleHashKey]
+	assert.True(t, ok)
+	_, ok = b.KV[storeNameKey]
+	assert.True(t, ok)
 }
 
 func TestBuilder_Merge(t *testing.T) {

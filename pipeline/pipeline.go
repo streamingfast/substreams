@@ -538,7 +538,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		if block.Number >= stopBlock {
 			wg := &sync.WaitGroup{}
 			for _, builder := range p.builders {
-				err := builder.WriteState(context.Background(), block.Num())
+				_, err := builder.WriteState(context.Background(), block.Num())
 				if err != nil {
 					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), builder.Name, err)
 				}
@@ -571,7 +571,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 							panic(fmt.Errorf("squashing: %w", err))
 						}
 
-						err = s.WriteFullState(context.Background(), block.Num())
+						_, err = s.WriteFullState(context.Background(), block.Num())
 						if err != nil {
 							panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
 						}

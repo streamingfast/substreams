@@ -10,8 +10,11 @@ import (
 )
 
 var (
-	updatePolicyKey = strings.Join([]string{string([]byte{255}), "update-policy"}, "")
-	valueTypeKey    = strings.Join([]string{string([]byte{255}), "value-type"}, "")
+	updatePolicyKey     = strings.Join([]string{string([]byte{255}), "update-policy"}, "")
+	valueTypeKey        = strings.Join([]string{string([]byte{255}), "value-type"}, "")
+	storeNameKey        = strings.Join([]string{string([]byte{255}), "store-name"}, "")
+	moduleHashKey       = strings.Join([]string{string([]byte{255}), "module-hash"}, "")
+	moduleStartBlockKey = strings.Join([]string{string([]byte{255}), "module-start-block"}, "")
 )
 
 const (
@@ -25,100 +28,125 @@ const (
 func (b *Builder) writeMergeValues() {
 	b.KV[updatePolicyKey] = []byte(strconv.Itoa(int(b.updatePolicy)))
 	b.KV[valueTypeKey] = []byte(b.valueType)
+	b.KV[moduleHashKey] = []byte(b.Store.ModuleHash)
+	b.KV[moduleStartBlockKey] = intToBytes(int(b.Store.ModuleStartBlock))
+	b.KV[storeNameKey] = []byte(b.Store.Name)
 }
 
-func (b *Builder) readMergeValues() error {
-	if updatePolicyBytes, ok := b.KV[updatePolicyKey]; ok {
+func readMergeValues(kv map[string][]byte) (updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
+	if updatePolicyBytes, ok := kv[updatePolicyKey]; ok {
 		updatePolicyInt, err := strconv.Atoi(string(updatePolicyBytes))
 		if err != nil {
-			return fmt.Errorf("parsing update policy value: %w", err)
+			panic(fmt.Errorf("parsing update policy value: %w", err))
 		}
-		b.updatePolicy = pbtransform.KindStore_UpdatePolicy(int32(updatePolicyInt))
-		delete(b.KV, updatePolicyKey)
+		updatePolicy = pbtransform.KindStore_UpdatePolicy(int32(updatePolicyInt))
+		delete(kv, updatePolicyKey)
 	}
 
-	if valueTypeBytes, ok := b.KV[valueTypeKey]; ok {
-		b.valueType = string(valueTypeBytes)
-		delete(b.KV, valueTypeKey)
+	if valueTypeBytes, ok := kv[valueTypeKey]; ok {
+		valueType = string(valueTypeBytes)
+		delete(kv, valueTypeKey)
 	}
 
-	return nil
+	if moduleHashBytes, ok := kv[moduleHashKey]; ok {
+		moduleHash = string(moduleHashBytes)
+		delete(kv, moduleHashKey)
+	}
+
+	if moduleStartBlockBytes, ok := kv[moduleStartBlockKey]; ok {
+		moduleStartBlock = uint64(bytesToInt(moduleStartBlockBytes))
+		delete(kv, moduleStartBlockKey)
+	}
+
+	if storeNameBytes, ok := kv[storeNameKey]; ok {
+		storeName = string(storeNameBytes)
+		delete(kv, storeNameKey)
+	}
+
+	return
+}
+
+func (b *Builder) readMergeValues() {
+	b.updatePolicy, b.valueType, b.ModuleHash, b.ModuleStartBlock, b.Name = readMergeValues(b.KV)
+	b.Store.Name = b.Name
+	b.Store.ModuleHash = b.ModuleHash
+	b.Store.ModuleStartBlock = b.ModuleStartBlock
 }
 
 func (b *Builder) Merge(previous *Builder) error {
-	latest := b
+	next := b
 
-	if latest.updatePolicy != previous.updatePolicy {
-		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", latest.updatePolicy, previous.updatePolicy)
+	if next.updatePolicy != previous.updatePolicy {
+		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", next.updatePolicy, previous.updatePolicy)
 	}
 
-	if latest.valueType != previous.valueType {
-		return fmt.Errorf("incompatible value types: cannot merge %q and %q", latest.valueType, previous.valueType)
+	if next.valueType != previous.valueType {
+		return fmt.Errorf("incompatible value types: cannot merge %q and %q", next.valueType, previous.valueType)
 	}
 
-	for _, p := range latest.DeletedPrefixes {
+	for _, p := range next.DeletedPrefixes {
 		previous.DeletePrefix(previous.lastOrdinal, p)
 	}
 
-	switch latest.updatePolicy {
+	switch next.updatePolicy {
 	case pbtransform.KindStore_UPDATE_POLICY_REPLACE:
 		for k, v := range previous.KV {
-			if _, found := latest.KV[k]; !found {
-				latest.KV[k] = v
+			if _, found := next.KV[k]; !found {
+				next.KV[k] = v
 			}
 		}
 	case pbtransform.KindStore_UPDATE_POLICY_IGNORE:
 		for k, v := range previous.KV {
-			latest.KV[k] = v
+			next.KV[k] = v
 		}
 	case pbtransform.KindStore_UPDATE_POLICY_SUM:
 		// check valueType to do the right thing
-		switch latest.valueType {
+		switch next.valueType {
 		case OutputValueTypeInt64:
 			sum := func(a, b uint64) uint64 {
 				return a + b
 			}
 			for k, v := range previous.KV {
-				v0b, fv0 := latest.KV[k]
+				v0b, fv0 := next.KV[k]
 				v0 := foundOrZeroUint64(v0b, fv0)
 				v1 := foundOrZeroUint64(v, true)
-				latest.KV[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
+				next.KV[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
 		case OutputValueTypeFloat64:
 			sum := func(a, b float64) float64 {
 				return a + b
 			}
 			for k, v := range previous.KV {
-				v0b, fv0 := latest.KV[k]
+				v0b, fv0 := next.KV[k]
 				v0 := foundOrZeroFloat(v0b, fv0)
 				v1 := foundOrZeroFloat(v, true)
-				latest.KV[k] = []byte(floatToStr(sum(v0, v1)))
+				next.KV[k] = []byte(floatToStr(sum(v0, v1)))
 			}
 		case OutputValueTypeBigInt:
 			sum := func(a, b *big.Int) *big.Int {
 				return bi().Add(a, b)
 			}
 			for k, v := range previous.KV {
-				v0b, fv0 := latest.KV[k]
+				v0b, fv0 := next.KV[k]
 				v0 := foundOrZeroBigInt(v0b, fv0)
 				v1 := foundOrZeroBigInt(v, true)
-				latest.KV[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
+				next.KV[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
 		case OutputValueTypeBigFloat:
 			sum := func(a, b *big.Float) *big.Float {
 				return bf().Add(a, b).SetPrec(100)
 			}
 			for k, v := range previous.KV {
-				v0b, fv0 := latest.KV[k]
+				v0b, fv0 := next.KV[k]
 				v0 := foundOrZeroBigFloat(v0b, fv0)
 				v1 := foundOrZeroBigFloat(v, true)
-				latest.KV[k] = []byte(bigFloatToStr(sum(v0, v1)))
+				next.KV[k] = []byte(bigFloatToStr(sum(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
 		}
 	case pbtransform.KindStore_UPDATE_POLICY_MAX:
-		switch latest.valueType {
+		switch next.valueType {
 		case OutputValueTypeInt64:
 			max := func(a, b uint64) uint64 {
 				if a >= b {
@@ -128,14 +156,14 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroUint64(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(fmt.Sprintf("%d", v1))
+					next.KV[k] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
 				v0 := foundOrZeroUint64(v, true)
 
-				latest.KV[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
+				next.KV[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
 		case OutputValueTypeFloat64:
 			min := func(a, b float64) float64 {
@@ -146,14 +174,14 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroFloat(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(floatToStr(v1))
+					next.KV[k] = []byte(floatToStr(v1))
 					continue
 				}
 				v0 := foundOrZeroFloat(v, true)
 
-				latest.KV[k] = []byte(floatToStr(min(v0, v1)))
+				next.KV[k] = []byte(floatToStr(min(v0, v1)))
 			}
 		case OutputValueTypeBigInt:
 			max := func(a, b *big.Int) *big.Int {
@@ -164,14 +192,14 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroBigInt(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(v1.String())
+					next.KV[k] = []byte(v1.String())
 					continue
 				}
 				v0 := foundOrZeroBigInt(v, true)
 
-				latest.KV[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
+				next.KV[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
 		case OutputValueTypeBigFloat:
 			max := func(a, b *big.Float) *big.Float {
@@ -182,20 +210,20 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroBigFloat(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(bigFloatToStr(v1))
+					next.KV[k] = []byte(bigFloatToStr(v1))
 					continue
 				}
 				v0 := foundOrZeroBigFloat(v, true)
 
-				latest.KV[k] = []byte(bigFloatToStr(max(v0, v1)))
+				next.KV[k] = []byte(bigFloatToStr(max(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
 		}
 	case pbtransform.KindStore_UPDATE_POLICY_MIN:
-		switch latest.valueType {
+		switch next.valueType {
 		case OutputValueTypeInt64:
 			min := func(a, b uint64) uint64 {
 				if a <= b {
@@ -205,14 +233,14 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroUint64(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(fmt.Sprintf("%d", v1))
+					next.KV[k] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
 				v0 := foundOrZeroUint64(v, true)
 
-				latest.KV[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
+				next.KV[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
 		case OutputValueTypeFloat64:
 			min := func(a, b float64) float64 {
@@ -223,14 +251,14 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroFloat(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(floatToStr(v1))
+					next.KV[k] = []byte(floatToStr(v1))
 					continue
 				}
 				v0 := foundOrZeroFloat(v, true)
 
-				latest.KV[k] = []byte(floatToStr(min(v0, v1)))
+				next.KV[k] = []byte(floatToStr(min(v0, v1)))
 			}
 		case OutputValueTypeBigInt:
 			min := func(a, b *big.Int) *big.Int {
@@ -241,14 +269,14 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroBigInt(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(v1.String())
+					next.KV[k] = []byte(v1.String())
 					continue
 				}
 				v0 := foundOrZeroBigInt(v, true)
 
-				latest.KV[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
+				next.KV[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
 		case OutputValueTypeBigFloat:
 			min := func(a, b *big.Float) *big.Float {
@@ -259,20 +287,25 @@ func (b *Builder) Merge(previous *Builder) error {
 			}
 			for k, v := range previous.KV {
 				v1 := foundOrZeroBigFloat(v, true)
-				v, found := latest.KV[k]
+				v, found := next.KV[k]
 				if !found {
-					latest.KV[k] = []byte(bigFloatToStr(v1))
+					next.KV[k] = []byte(bigFloatToStr(v1))
 					continue
 				}
 				v0 := foundOrZeroBigFloat(v, true)
 
-				latest.KV[k] = []byte(bigFloatToStr(min(v0, v1)))
+				next.KV[k] = []byte(bigFloatToStr(min(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", latest.updatePolicy, latest.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
 		}
 	default:
-		return fmt.Errorf("update policy %q not supported", latest.updatePolicy) // should have been validated already
+		return fmt.Errorf("update policy %q not supported", next.updatePolicy) // should have been validated already
+	}
+
+	next.partialMode = previous.partialMode
+	if next.partialMode {
+		next.partialStartBlock = previous.partialStartBlock
 	}
 
 	return nil
@@ -354,6 +387,18 @@ func floatToStr(f float64) string {
 
 func floatToBytes(f float64) []byte {
 	return []byte(floatToStr(f))
+}
+
+func intToBytes(i int) []byte {
+	return []byte(strconv.Itoa(i))
+}
+
+func bytesToInt(b []byte) int {
+	i, err := strconv.Atoi(string(b))
+	if err != nil {
+		panic(fmt.Sprintf("cannot convert string %s to int: %s", string(b), err.Error()))
+	}
+	return i
 }
 
 func bigFloatToStr(f *big.Float) string {

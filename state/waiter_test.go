@@ -15,19 +15,20 @@ import (
 )
 
 func TestKVRegex(t *testing.T) {
-	filename := "test-00000012345-00000000000.kv"
+	filename := "test-0000012345-0000000000.kv"
 	res := fullKVRegex.FindAllStringSubmatch(filename, 1)
 
 	assert.Greater(t, len(res[0]), 0)
-	assert.Equal(t, "00000012345", res[0][1])
+	assert.Equal(t, "0000012345", res[0][1])
+	assert.Equal(t, "0000000000", res[0][2])
 }
 
 func TestPartialRegex(t *testing.T) {
-	filename := "test-0000001234-0000012345.partial"
+	filename := "test-0000012345-0000010345.partial"
 	res := partialKVRegex.FindAllStringSubmatch(filename, 1)
 	assert.Greater(t, len(res[0]), 0)
-	assert.Equal(t, "0000001234", res[0][1])
-	assert.Equal(t, "0000012345", res[0][2])
+	assert.Equal(t, "0000012345", res[0][1])
+	assert.Equal(t, "0000010345", res[0][2])
 }
 
 var testModules = []*pbtransform.Module{

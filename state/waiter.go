@@ -117,7 +117,7 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 				continue
 			}
 
-			ok, start, _, partial := parseFileName(files[0])
+			ok, start, _, partial := ParseFileName(files[0])
 			if !ok {
 				done <- &fileWaitResult{fmt.Errorf("could not parse filename %s", files[0])}
 				return
@@ -164,8 +164,8 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 		foundFile := files[0]
 		switch len(files) {
 		case 2:
-			_, _, _, partialLeft := parseFileName(files[0])
-			_, _, _, partialRight := parseFileName(files[1])
+			_, _, _, partialLeft := ParseFileName(files[0])
+			_, _, _, partialRight := ParseFileName(files[1])
 			if partialLeft && partialRight {
 				return nil, fmt.Errorf("found two partial files %s and %s", files[0], files[1])
 			}
@@ -176,7 +176,7 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 
 		out = append(out, foundFile)
 
-		ok, start, _, partial := parseFileName(foundFile)
+		ok, start, _, partial := ParseFileName(foundFile)
 		if !ok {
 			return nil, fmt.Errorf("could not parse filename %s", files[0])
 		}
@@ -216,18 +216,18 @@ var fullKVRegex *regexp.Regexp
 var partialKVRegex *regexp.Regexp
 
 func init() {
-	fullKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-[\d]+\.kv`)
+	fullKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-([\d]+)\.kv`)
 	partialKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-([\d]+)\.partial`)
 }
 
-func parseFileName(filename string) (ok bool, start, end uint64, partial bool) {
+func ParseFileName(filename string) (ok bool, start, end uint64, partial bool) {
 	if strings.HasSuffix(filename, ".kv") {
 		res := fullKVRegex.FindAllStringSubmatch(filename, 1)
 		if len(res) != 1 {
 			return
 		}
-		start = 0
 		end = uint64(mustAtoi(res[0][1]))
+		start = uint64(mustAtoi(res[0][2]))
 		partial = false
 		ok = true
 	} else if strings.HasSuffix(filename, ".partial") {

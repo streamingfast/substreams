@@ -31,12 +31,14 @@ func NewStore(name string, moduleHash string, moduleStartBlock uint64, baseStore
 	return s, nil
 }
 
-func (s *Store) WriteState(ctx context.Context, content []byte, blockNum uint64) error {
-	return s.WriteObject(ctx, s.StateFileName(blockNum), bytes.NewReader(content))
+func (s *Store) WriteState(ctx context.Context, content []byte, blockNum uint64) (string, error) {
+	filename := s.StateFileName(blockNum)
+	return filename, s.WriteObject(ctx, s.StateFileName(blockNum), bytes.NewReader(content))
 }
 
-func (s *Store) WritePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) error {
-	return s.WriteObject(ctx, s.PartialFileName(startBlockNum, endBlockNum), bytes.NewReader(content))
+func (s *Store) WritePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) (string, error) {
+	filename := s.PartialFileName(startBlockNum, endBlockNum)
+	return filename, s.WriteObject(ctx, s.PartialFileName(startBlockNum, endBlockNum), bytes.NewReader(content))
 }
 
 func (s *Store) StateFilePrefix(blockNum uint64) string {

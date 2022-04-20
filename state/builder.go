@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/dstore"
 	"io"
 	"strings"
 
@@ -63,6 +64,53 @@ func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.K
 	return b
 }
 
+func BuilderFromFile(ctx context.Context, filename string, baseStore dstore.Store) (*Builder, error) {
+	ok, partialFileStartBlock, _, isPartialFile := ParseFileName(filename)
+	if !ok {
+		return nil, fmt.Errorf("could not parse filename %s", filename)
+	}
+
+	rc, err := baseStore.OpenObject(ctx, filename)
+	if err != nil {
+		return nil, fmt.Errorf("opening file %s: %w", filename, err)
+	}
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("reading data: %w", err)
+	}
+	defer rc.Close()
+
+	kv := map[string]string{}
+	if err = json.Unmarshal(data, &kv); err != nil {
+		return nil, fmt.Errorf("json unmarshal of data: %w", err)
+	}
+
+	updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
+
+	store, err := NewStore(name, moduleHash, moduleStartBlock, baseStore)
+	if err != nil {
+		return nil, fmt.Errorf("creating store: %w", err)
+	}
+
+	b := &Builder{
+		KV:               byteMap(kv),
+		Store:            store,
+		Name:             name,
+		ModuleHash:       moduleHash,
+		ModuleStartBlock: moduleStartBlock,
+		updatePolicy:     updatePolicy,
+		valueType:        valueType,
+		partialMode:      isPartialFile,
+	}
+
+	if isPartialFile {
+		b.partialStartBlock = partialFileStartBlock
+	}
+
+	return b, nil
+}
+
 func (b *Builder) Print() {
 	if len(b.Deltas) == 0 {
 		return
@@ -87,18 +135,6 @@ func (b *Builder) Init(ctx context.Context, startBlockNum uint64) error {
 	return nil
 }
 
-func (b *Builder) clone() *Builder {
-	o := &Builder{
-		Name:            b.Name,
-		KV:              make(map[string][]byte),
-		DeletedPrefixes: b.DeletedPrefixes,
-		updatePolicy:    b.updatePolicy,
-		valueType:       b.valueType,
-		partialMode:     b.partialMode,
-	}
-	return o
-}
-
 func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 	files, err := pathToState(ctx, b.Store, upToBlock, b.ModuleStartBlock)
 	if err != nil {
@@ -108,34 +144,9 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 
 	var builders []*Builder
 	for _, file := range files {
-		data, err := func() ([]byte, error) { //this is an inline func so that we can defer the close call properly
-			rc, err := b.Store.OpenObject(ctx, file)
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
-
-			data, err := io.ReadAll(rc)
-			if err != nil {
-				return nil, err
-			}
-
-			return data, nil
-		}()
-
+		builder, err := BuilderFromFile(ctx, file, b.Store.Store)
 		if err != nil {
-			return fmt.Errorf("reading file %s in store %s: %w", file, b.Name, err)
-		}
-
-		builder := b.clone()
-		kv := map[string]string{}
-		if err = json.Unmarshal(data, &kv); err != nil {
-			return fmt.Errorf("unmarshalling kv file %s for %s at block %d: %w", file, b.Name, upToBlock, err)
-		}
-
-		builder.KV = byteMap(kv)
-		if err = builder.readMergeValues(); err != nil {
-			return fmt.Errorf("getting values for merge type and value type: %w", err)
+			return fmt.Errorf("creating builder from file %s: %w", file, err)
 		}
 
 		builders = append(builders, builder)
@@ -169,34 +180,9 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 
 	var builders []*Builder
 	for _, file := range files {
-		data, err := func() ([]byte, error) { //this is an inline func so that we can defer the close call properly
-			rc, err := b.Store.OpenObject(ctx, file)
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
-
-			data, err := io.ReadAll(rc)
-			if err != nil {
-				return nil, err
-			}
-
-			return data, nil
-		}()
-
+		builder, err := BuilderFromFile(ctx, file, b.Store.Store)
 		if err != nil {
-			return fmt.Errorf("reading file %s in store %s: %w", file, b.Name, err)
-		}
-
-		builder := b.clone()
-		kv := map[string]string{}
-		if err = json.Unmarshal(data, &kv); err != nil {
-			return fmt.Errorf("unmarshalling kv file %s for %s at block %d: %w", file, b.Name, requestedStartBlock, err)
-		}
-
-		builder.KV = byteMap(kv)
-		if err = builder.readMergeValues(); err != nil {
-			return fmt.Errorf("getting values for merge type and value type: %w", err)
+			return fmt.Errorf("creating builder from file %s: %w", file, err)
 		}
 
 		builders = append(builders, builder)
@@ -221,40 +207,40 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 		b.KV = builders[len(builders)-1].KV
 
 		zlog.Info("writing state", zap.String("store", b.Name))
-		err := b.writeState(ctx, requestedStartBlock, false)
+		f, err := b.writeState(ctx, requestedStartBlock, false)
 		if err != nil {
 			return fmt.Errorf("writing merged kv: %w", err)
 		}
-		zlog.Info("state written", zap.String("store", b.Name))
+		zlog.Info("state written", zap.String("filename", f), zap.String("store", b.Name))
 	}
 
 	return nil
 }
 
-func (b *Builder) WriteFullState(ctx context.Context, blockNum uint64) error {
+func (b *Builder) WriteFullState(ctx context.Context, blockNum uint64) (string, error) {
 	if b.disableWriteState {
-		return nil
+		return "", nil
 	}
 
 	return b.writeState(ctx, blockNum, false)
 }
 
-func (b *Builder) WriteState(ctx context.Context, blockNum uint64) error {
+func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (string, error) {
 	if b.disableWriteState {
-		return nil
+		return "", nil
 	}
 
 	return b.writeState(ctx, blockNum, b.partialMode)
 }
 
-func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode bool) error {
+func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode bool) (string, error) {
 	b.writeMergeValues()
 
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
 
 	content, err := json.MarshalIndent(kv, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal kv state: %w", err)
+		return "", fmt.Errorf("marshal kv state: %w", err)
 	}
 
 	if partialMode && b.partialStartBlock <= b.ModuleStartBlock {
@@ -268,22 +254,23 @@ func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode b
 		zap.Uint64("module_start_block", b.ModuleStartBlock),
 	)
 
-	var writeFunc func() error
+	var writeFunc func() (string, error)
 	if partialMode {
-		writeFunc = func() error {
+		writeFunc = func() (string, error) {
 			return b.Store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
 		}
 	} else {
-		writeFunc = func() error {
+		writeFunc = func() (string, error) {
 			return b.Store.WriteState(ctx, content, blockNum)
 		}
 	}
 
-	if err = writeFunc(); err != nil {
-		return fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
+	filename, err := writeFunc()
+	if err != nil {
+		return "", fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
 	}
 
-	return nil
+	return filename, nil
 }
 
 var NotFound = errors.New("state key not found")

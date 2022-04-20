@@ -216,7 +216,7 @@ var fullKVRegex *regexp.Regexp
 var partialKVRegex *regexp.Regexp
 
 func init() {
-	fullKVRegex = regexp.MustCompile(`[\w]+-([\d]+)\.kv`)
+	fullKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-[\d]+\.kv`)
 	partialKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-([\d]+)\.partial`)
 }
 

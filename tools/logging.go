@@ -5,10 +5,4 @@ import (
 	"go.uber.org/zap"
 )
 
-var zlog *zap.Logger
-
-func init() {
-	zlog, _ = logging.ApplicationLogger("substreams", "github.com/streamingfast/substreams/tools",
-		logging.WithSwitcherServerAutoStart(),
-	)
-}
+var zlog, tracer = logging.PackageLogger("tools", "github.com/streamingfast/substreams/tools", logging.LoggerDefaultLevel(zap.InfoLevel))

@@ -13,7 +13,7 @@ import (
 
 var mergeCmd = &cobra.Command{
 	Use:   "merge {store_url}",
-	Short: "finds the largest contiguous block range possible and merges it",
+	Short: "Finds the largest contiguous block range possible and merges the relevant files",
 	Args:  cobra.ExactArgs(1),
 	RunE:  mergePartialFilesE,
 }

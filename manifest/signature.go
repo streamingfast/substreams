@@ -24,9 +24,9 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 
 	buf.WriteString("kind")
 	switch module.Kind.(type) {
-	case *pbsubstreams.Module_KindMap:
+	case *pbsubstreams.Module_KindMap_:
 		buf.WriteString("map")
-	case *pbsubstreams.Module_KindStore:
+	case *pbsubstreams.Module_KindStore_:
 		buf.WriteString("store")
 	default:
 		panic(fmt.Sprintf("invalid module file %T", module.Kind))
@@ -34,11 +34,11 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 
 	buf.WriteString("code")
 	switch m := module.Code.(type) {
-	case *pbsubstreams.Module_WasmCode:
+	case *pbsubstreams.Module_WasmCode_:
 		code := manifest.ModulesCode[m.WasmCode.Index]
 		buf.Write(code)
 		buf.WriteString(m.WasmCode.Entrypoint)
-	case *pbsubstreams.Module_NativeCode:
+	case *pbsubstreams.Module_NativeCode_:
 		// TODO: get some version of the native code from the registry
 		// so it can break compatibility when the native code is updated.
 		buf.WriteString(m.NativeCode.Entrypoint)
@@ -64,13 +64,13 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 func HashModuleAsString(manifest *pbsubstreams.Manifest, graph *ModuleGraph, module *pbsubstreams.Module) string {
 	return hex.EncodeToString(HashModule(manifest, module, graph))
 }
-func inputName(input *pbsubstreams.Input) string {
+func inputName(input *pbsubstreams.Module_Input) string {
 	switch input.Input.(type) {
-	case *pbsubstreams.Input_Store:
+	case *pbsubstreams.Module_Input_Store_:
 		return "store"
-	case *pbsubstreams.Input_Source:
+	case *pbsubstreams.Module_Input_Source_:
 		return "source"
-	case *pbsubstreams.Input_Map:
+	case *pbsubstreams.Module_Input_Map_:
 		return "map"
 	default:
 		panic(fmt.Sprintf("invalid input %T", input.Input))

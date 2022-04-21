@@ -19,7 +19,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
 	pbethsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/registry"
 	ssrpc "github.com/streamingfast/substreams/rpc"
@@ -46,17 +45,19 @@ type Pipeline struct {
 
 	//ioFactory        state.FactoryInterface
 	graph            *manifest.ModuleGraph
-	manifest         *pbtransform.Manifest
+	manifest         *pbsubstreams.Manifest
 	outputStreamName string
 
-	streamFuncs        []StreamFunc
-	nativeOutputs      map[string]reflect.Value
-	wasmOutputs        map[string][]byte
+	streamFuncs   []StreamFunc
+	nativeOutputs map[string]reflect.Value
+	wasmOutputs   map[string][]byte
+
 	progressTracker    *progressTracker
-	nextReturnValue    *anypb.Any
 	allowInvalidState  bool
 	stateStore         dstore.Store
-	statesSaveInterval uint64
+
+	nextReturnValue *pbsubstreams.ModuleOutput
+	logs            []string
 }
 
 type progressTracker struct {
@@ -132,9 +133,9 @@ func WithAllowInvalidState() Option {
 	}
 }
 
-func New(rpcClient *rpc.Client,
+func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbsubstreams.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
 	rpcCache *ssrpc.Cache,
-	manifest *pbtransform.Manifest,
+	manifest *pbsubstreams.Manifest,
 	graph *manifest.ModuleGraph,
 	outputStreamName string,
 	blockType string,
@@ -163,7 +164,7 @@ func New(rpcClient *rpc.Client,
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build() (modules []*pbtransform.Module, storeModules []*pbtransform.Module, err error) {
+func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
 		switch {
@@ -217,7 +218,7 @@ func (p *Pipeline) build() (modules []*pbtransform.Module, storeModules []*pbtra
 	return
 }
 
-func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
+func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 
 	nativeStreams := registry.Init(p.nativeImports)
 
@@ -247,7 +248,7 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 			}
 		}
 		switch mod.Kind.(type) {
-		case *pbtransform.Module_KindMap:
+		case *pbsubstreams.Module_KindMap_:
 			method := f.MethodByName("Map")
 			if method.Kind() == reflect.Invalid {
 				return fmt.Errorf("map() method not found on %T", f.Interface())
@@ -259,7 +260,18 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 			if debugOutput {
 				outputFunc = func(msg proto.Message) (err error) {
 					if msg != nil {
-						p.nextReturnValue, err = anypb.New(msg)
+						anyMsg, err := anypb.New(msg)
+						if err != nil {
+							return err
+						}
+
+						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+							Name: modName,
+							Data: &pbsubstreams.ModuleOutput_MapOutput{
+								MapOutput: anyMsg,
+							},
+							Logs: p.logs,
+						}
 					}
 					return
 				}
@@ -269,7 +281,7 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 				return nativeMapCall(p.nativeOutputs, method, modName, inputs, outputFunc)
 			})
 			continue
-		case *pbtransform.Module_KindStore:
+		case *pbsubstreams.Module_KindStore_:
 			method := f.MethodByName("store")
 			if method.Kind() == reflect.Invalid {
 				return fmt.Errorf("store() method not found on %T", f.Interface())
@@ -285,7 +297,13 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 			if debugOutput {
 				outputFunc = func() (err error) {
 					if len(outputStore.Deltas) != 0 {
-						p.nextReturnValue, err = anypb.New(&pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas})
+						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+							Name: modName,
+							Data: &pbsubstreams.ModuleOutput_StoreDeltas{
+								StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas},
+							},
+							Logs: p.logs,
+						}
 					}
 					return
 				}
@@ -305,7 +323,7 @@ func (p *Pipeline) BuildNative(modules []*pbtransform.Module) error {
 	return nil
 }
 
-func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
+func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 
 	p.wasmOutputs = map[string][]byte{}
 
@@ -321,7 +339,7 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 				})
 			} else if inputStore := in.GetStore(); inputStore != nil {
 				inputName := inputStore.ModuleName
-				if inputStore.Mode == pbtransform.InputStore_DELTAS {
+				if inputStore.Mode == pbsubstreams.Module_Input_Store_DELTAS {
 					inputs = append(inputs, &wasm.Input{
 						Type:   wasm.InputStore,
 						Name:   inputName,
@@ -368,7 +386,13 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			if isOutput {
 				outputFunc = func(out []byte) {
 					if out != nil {
-						p.nextReturnValue = &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: out}
+						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+							Name: modName,
+							Data: &pbsubstreams.ModuleOutput_MapOutput{
+								MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: out},
+							},
+							Logs: p.logs,
+						}
 					}
 				}
 			}
@@ -396,7 +420,13 @@ func (p *Pipeline) buildWASM(modules []*pbtransform.Module) error {
 			if isOutput {
 				outputFunc = func() (err error) {
 					if len(outputStore.Deltas) != 0 {
-						p.nextReturnValue, err = anypb.New(&pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas})
+						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+							Name: modName,
+							Data: &pbsubstreams.ModuleOutput_StoreDeltas{
+								StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas},
+							},
+							Logs: p.logs,
+						}
 					}
 					return
 				}
@@ -567,10 +597,17 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 
 		//clock := toClock(block)
 
+		clock := &pbsubstreams.Clock{
+			Number:    block.Num(),
+			Id:        block.Id,
+			Timestamp: timestamppb.New(block.Time()),
+		}
+
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
 			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
+			p.nativeOutputs["sf.substreams.v1.Clock"] = reflect.ValueOf(clock)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
 			// CORRECTIONS of the block, that the BlockDecoder does?
@@ -579,7 +616,10 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 				return fmt.Errorf("packing block: %w", err)
 			}
 
+			clockBytes, err := proto.Marshal(clock)
+
 			p.wasmOutputs[p.blockType] = blkBytes
+			p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
 			//p.wasmOutputs["sf.substreams.v1.Clock"] = clock //FIXME stepd implement clock
 		default:
 			panic("unsupported vmType " + p.vmType)
@@ -596,13 +636,23 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		}
 
 		if p.nextReturnValue != nil {
-			out := &pbsubstreams.Output{
-				BlockNum:  block.Num(),
-				BlockId:   block.Id,
-				Timestamp: timestamppb.New(block.Time()),
-				Value:     p.nextReturnValue,
+			// out := &pbsubstreams.Output{
+			// 	BlockNum:  block.Num(),
+			// 	BlockId:   block.Id,
+			// 	Timestamp: timestamppb.New(block.Time()),
+			// 	Value:     p.nextReturnValue,
+			// }
+			// TODO: package, after each execution, all of the internal changes of each module, along with
+			// logs
+			out := &pbsubstreams.BlockScopedData{
+				Outputs: []*pbsubstreams.ModuleOutput{
+					p.nextReturnValue,
+				},
+				Clock:  clock,
+				Step:   stepToProto(step),
+				Cursor: cursor.ToOpaque(),
 			}
-			if err := returnFunc(out, step, cursor); err != nil {
+			if err := returnFunc(out); err != nil {
 				return err
 			}
 		}
@@ -610,6 +660,18 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
 		return nil
 	}), nil
+}
+
+func stepToProto(step bstream.StepType) pbsubstreams.ForkStep {
+	switch step {
+	case bstream.StepNew:
+		return pbsubstreams.ForkStep_STEP_NEW
+	case bstream.StepUndo:
+		return pbsubstreams.ForkStep_STEP_UNDO
+	case bstream.StepIrreversible:
+		return pbsubstreams.ForkStep_STEP_IRREVERSIBLE
+	}
+	return pbsubstreams.ForkStep_STEP_UNKNOWN
 }
 
 //func (p *Pipeline) commit(ctx context.Context, block *bstream.Block) {

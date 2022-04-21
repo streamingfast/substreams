@@ -3,13 +3,13 @@ package state
 import (
 	"testing"
 
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestStateBuilder(t *testing.T) {
-	s := NewBuilder("b", 0, pbtransform.KindStore_UPDATE_POLICY_UNSET, "", nil)
+	s := NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 
 	s.Set(0, "1", "val1")
 	s.Set(1, "1", "val2")

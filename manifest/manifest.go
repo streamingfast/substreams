@@ -287,8 +287,8 @@ func (m *Module) String() string {
 func (m *Module) ToProtoNative() (*pbsubstreams.Module, error) {
 	out := &pbsubstreams.Module{
 		Name: m.Name,
-		Code: &pbsubstreams.Module_NativeCode{
-			NativeCode: &pbsubstreams.NativeCode{
+		Code: &pbsubstreams.Module_NativeCode_{
+			NativeCode: &pbsubstreams.Module_NativeCode{
 				Entrypoint: m.Code.Entrypoint,
 			},
 		},
@@ -311,8 +311,8 @@ func (m *Module) ToProtoNative() (*pbsubstreams.Module, error) {
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 	out := &pbsubstreams.Module{
 		Name: m.Name,
-		Code: &pbsubstreams.Module_WasmCode{
-			WasmCode: &pbsubstreams.WasmCode{
+		Code: &pbsubstreams.Module_WasmCode_{
+			WasmCode: &pbsubstreams.Module_WasmCode{
 				Type:       m.Code.Type,
 				Index:      codeIndex,
 				Entrypoint: m.Code.Entrypoint,
@@ -338,9 +338,9 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 	for _, input := range m.Inputs {
 		if input.Source != "" {
-			pbInput := &pbsubstreams.Input{
-				Input: &pbsubstreams.Input_Source{
-					Source: &pbsubstreams.InputSource{
+			pbInput := &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_Source_{
+					Source: &pbsubstreams.Module_Input_Source{
 						Type: input.Source,
 					},
 				},
@@ -349,9 +349,9 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 			continue
 		}
 		if input.Map != "" {
-			pbInput := &pbsubstreams.Input{
-				Input: &pbsubstreams.Input_Map{
-					Map: &pbsubstreams.InputMap{
+			pbInput := &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_Map_{
+					Map: &pbsubstreams.Module_Input_Map{
 						ModuleName: input.Map,
 					},
 				},
@@ -361,22 +361,22 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 		}
 		if input.Store != "" {
 
-			var mode pbsubstreams.InputStore_Mode
+			var mode pbsubstreams.Module_Input_Store_Mode
 
 			switch input.Mode {
 			case "":
-				mode = pbsubstreams.InputStore_UNSET
+				mode = pbsubstreams.Module_Input_Store_UNSET
 			case "get":
-				mode = pbsubstreams.InputStore_GET
+				mode = pbsubstreams.Module_Input_Store_GET
 			case "deltas":
-				mode = pbsubstreams.InputStore_DELTAS
+				mode = pbsubstreams.Module_Input_Store_DELTAS
 			default:
 				panic(fmt.Sprintf("invalid input mode %s", input.Mode))
 			}
 
-			pbInput := &pbsubstreams.Input{
-				Input: &pbsubstreams.Input_Store{
-					Store: &pbsubstreams.InputStore{
+			pbInput := &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_Store_{
+					Store: &pbsubstreams.Module_Input_Store{
 						ModuleName: input.Store,
 						Mode:       mode,
 					},
@@ -403,29 +403,29 @@ const (
 func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 	switch m.Kind {
 	case ModuleKindMap:
-		pbModule.Kind = &pbsubstreams.Module_KindMap{
-			KindMap: &pbsubstreams.KindMap{
+		pbModule.Kind = &pbsubstreams.Module_KindMap_{
+			KindMap: &pbsubstreams.Module_KindMap{
 				OutputType: m.Output.Type,
 			},
 		}
 	case ModuleKindStore:
-		var updatePolicy pbsubstreams.KindStore_UpdatePolicy
+		var updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 		switch m.UpdatePolicy {
 		case UpdatePolicyReplace:
-			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_REPLACE
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE
 		case UpdatePolicyIgnore:
-			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_IGNORE
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE
 		case UpdatePolicySum:
-			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_SUM
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM
 		case UpdatePolicyMax:
-			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_MAX
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX
 		case UpdatePolicyMin:
-			updatePolicy = pbsubstreams.KindStore_UPDATE_POLICY_MIN
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN
 		default:
 			panic(fmt.Sprintf("invalid update policy %s", m.UpdatePolicy))
 		}
-		pbModule.Kind = &pbsubstreams.Module_KindStore{
-			KindStore: &pbsubstreams.KindStore{
+		pbModule.Kind = &pbsubstreams.Module_KindStore_{
+			KindStore: &pbsubstreams.Module_KindStore{
 				UpdatePolicy: updatePolicy,
 				ValueType:    m.ValueType,
 			},
@@ -435,7 +435,7 @@ func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 
 func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 	if m.Output.Type != "" {
-		pbModule.Output = &pbsubstreams.Output{
+		pbModule.Output = &pbsubstreams.Module_Output{
 			Type: m.Output.Type,
 		}
 	}

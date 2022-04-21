@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 var (
@@ -52,7 +52,7 @@ func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updateP
 		if err != nil {
 			panic(fmt.Errorf("parsing update policy value: %w", err))
 		}
-		updatePolicy = pbtransform.KindStore_UpdatePolicy(int32(updatePolicyInt))
+		updatePolicy = pbsubstreams.Module_KindStore_UpdatePolicy(int32(updatePolicyInt))
 		delete(kv, updatePolicyKey)
 	}
 
@@ -104,17 +104,17 @@ func (b *Builder) Merge(previous *Builder) error {
 	}
 
 	switch next.updatePolicy {
-	case pbtransform.KindStore_UPDATE_POLICY_REPLACE:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE:
 		for k, v := range previous.KV {
 			if _, found := next.KV[k]; !found {
 				next.KV[k] = v
 			}
 		}
-	case pbtransform.KindStore_UPDATE_POLICY_IGNORE:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE:
 		for k, v := range previous.KV {
 			next.KV[k] = v
 		}
-	case pbtransform.KindStore_UPDATE_POLICY_SUM:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM:
 		// check valueType to do the right thing
 		switch next.valueType {
 		case OutputValueTypeInt64:
@@ -160,7 +160,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
 		}
-	case pbtransform.KindStore_UPDATE_POLICY_MAX:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch next.valueType {
 		case OutputValueTypeInt64:
 			max := func(a, b uint64) uint64 {
@@ -237,7 +237,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
 		}
-	case pbtransform.KindStore_UPDATE_POLICY_MIN:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch next.valueType {
 		case OutputValueTypeInt64:
 			min := func(a, b uint64) uint64 {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/streamingfast/dstore"
 
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -31,7 +30,7 @@ type Builder struct {
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
 	DeletedPrefixes []string
 
-	updatePolicy pbtransform.KindStore_UpdatePolicy
+	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType    string
 	lastOrdinal  uint64
 }
@@ -45,7 +44,7 @@ func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 	}
 }
 
-func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, store *Store, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store *Store, opts ...BuilderOption) *Builder {
 	b := &Builder{
 		Name:             name,
 		ModuleStartBlock: moduleStartBlock,

@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/dstore"
 	"io"
 	"strings"
+
+	"github.com/streamingfast/dstore"
 
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -86,7 +87,7 @@ func BuilderFromFile(ctx context.Context, filename string, baseStore dstore.Stor
 		return nil, fmt.Errorf("json unmarshal of data: %w", err)
 	}
 
-	updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
+	updatedkv, updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
 
 	store, err := NewStore(name, moduleHash, moduleStartBlock, baseStore)
 	if err != nil {
@@ -94,7 +95,7 @@ func BuilderFromFile(ctx context.Context, filename string, baseStore dstore.Stor
 	}
 
 	b := &Builder{
-		KV:               byteMap(kv),
+		KV:               updatedkv,
 		Store:            store,
 		Name:             name,
 		ModuleHash:       moduleHash,

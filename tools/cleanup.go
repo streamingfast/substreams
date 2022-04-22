@@ -53,6 +53,11 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 		return nil
 	})
 
+	if len(partialFiles) == 0 {
+		zlog.Info("no partial files found")
+		return nil
+	}
+
 	for endBlock, filename := range partialFiles {
 		if endBlock > highestKVBlock {
 			continue

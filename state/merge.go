@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -33,7 +34,19 @@ func (b *Builder) writeMergeValues() {
 	b.KV[storeNameKey] = []byte(b.Store.Name)
 }
 
-func readMergeValues(kv map[string][]byte) (updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
+func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
+	//mega-hack because json marshalling converts invalid UTF-8 (in our case byte 255) to Unicode replacement character U+FFFD (byte 239-191-189)  (see json package documentation)
+	//here, we convert that back to byte 255
+	//todo: do this in json.Unmarshal implementation of a new KV type.
+	for k, v := range kv {
+		bk := []byte(k)
+		if bytes.HasPrefix([]byte(k), []byte{239, 191, 189}) {
+			bk := bytes.Replace(bk, []byte{239, 191, 189}, []byte{255}, 1)
+			delete(kv, k)
+			kv[string(bk)] = v
+		}
+	}
+
 	if updatePolicyBytes, ok := kv[updatePolicyKey]; ok {
 		updatePolicyInt, err := strconv.Atoi(string(updatePolicyBytes))
 		if err != nil {
@@ -63,11 +76,13 @@ func readMergeValues(kv map[string][]byte) (updatePolicy pbtransform.KindStore_U
 		delete(kv, storeNameKey)
 	}
 
+	updatedKV = kv
+
 	return
 }
 
 func (b *Builder) readMergeValues() {
-	b.updatePolicy, b.valueType, b.ModuleHash, b.ModuleStartBlock, b.Name = readMergeValues(b.KV)
+	b.KV, b.updatePolicy, b.valueType, b.ModuleHash, b.ModuleStartBlock, b.Name = readMergeValues(b.KV)
 	b.Store.Name = b.Name
 	b.Store.ModuleHash = b.ModuleHash
 	b.Store.ModuleStartBlock = b.ModuleStartBlock

@@ -56,13 +56,14 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		StopBlock:        mustGetUint64(cmd, "stop-block"),
 		PrintMermaid:     true,
 		LocalConfig: &runtime.LocalConfig{
-			BlocksStoreUrl: mustGetString(cmd, "blocks-store-url"),
-			IrrIndexesUrl:  mustGetString(cmd, "irr-indexes-url"),
-			StateStoreUrl:  mustGetString(cmd, "state-store-url"),
-			RpcEndpoint:    mustGetString(cmd, "rpc-endpoint"),
-			RpcCacheUrl:    mustGetString(cmd, "rpc-cache-store-url"),
-			PartialMode:    mustGetBool(cmd, "partial"),
-			ProtoUrl:       mustGetString(cmd, "proto-url"),
+			BlocksStoreUrl:    mustGetString(cmd, "blocks-store-url"),
+			IrrIndexesUrl:     mustGetString(cmd, "irr-indexes-url"),
+			StateStoreUrl:     mustGetString(cmd, "state-store-url"),
+			RpcEndpoint:       mustGetString(cmd, "rpc-endpoint"),
+			RpcCacheUrl:       mustGetString(cmd, "rpc-cache-store-url"),
+			PartialMode:       mustGetBool(cmd, "partial"),
+			ProtoUrl:          mustGetString(cmd, "proto-url"),
+			ProtobufBlockType: ProtobufBlockType,
 		},
 	}
 

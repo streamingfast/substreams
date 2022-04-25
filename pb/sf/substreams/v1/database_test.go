@@ -7,76 +7,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (x TableChanges) isEqual(other TableChanges) bool {
-	if len(x) != len(other) {
-		return false
-	}
+func (x TableChanges) isEqual(t *testing.T, expected TableChanges) {
+	//require.Equal(t, len(x), len(expected))
 
 	sort.Slice(x, func(i, j int) bool {
 		return x[i].Table < x[j].Table
 	})
 
 	for i, tc := range x {
-		if !tc.isEqual(other[i]) {
-			return false
-		}
+		tc.isEqual(t, expected[i])
 	}
-
-	return true
 }
 
-func (x *TableChange) isEqual(other *TableChange) bool {
-	if x.Table != other.Table {
-		return false
-	}
-
-	if x.BlockNum != other.BlockNum {
-		return false
-	}
-
-	if x.Ordinal != other.Ordinal {
-		return false
-	}
-
-	if x.Operation != other.Operation {
-		return false
-	}
-
-	if len(x.Fields) != len(other.Fields) {
-		return false
-	}
-
+func (x *TableChange) isEqual(t *testing.T, expected *TableChange) {
 	sort.Slice(x.Fields, func(i, j int) bool {
 		return x.Fields[i].Name < x.Fields[j].Name
 	})
 
-	sort.Slice(other.Fields, func(i, j int) bool {
+	sort.Slice(expected.Fields, func(i, j int) bool {
 		return x.Fields[i].Name < x.Fields[j].Name
 	})
 
-	for i, f := range x.Fields {
-		if !f.isEqual(other.Fields[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (x *Field) isEqual(other *Field) bool {
-	if x.Name != other.Name {
-		return false
-	}
-
-	if x.OldValue != other.OldValue {
-		return false
-	}
-
-	if x.NewValue != other.NewValue {
-		return false
-	}
-
-	return true
+	require.Equal(t, expected, x)
 }
 
 func TestTableChanges_Merge(t *testing.T) {
@@ -190,6 +142,7 @@ func TestTableChanges_Merge(t *testing.T) {
 			Table:     "table.1",
 			Ordinal:   3,
 			Operation: TableChange_CREATE,
+			Pk:        "one",
 			Fields: []*Field{
 				{Name: "f1", OldValue: "", NewValue: "xyz"},
 				{Name: "f2", OldValue: "", NewValue: "23"},
@@ -198,6 +151,7 @@ func TestTableChanges_Merge(t *testing.T) {
 		{
 			Table:     "table.2",
 			Ordinal:   4,
+			Pk:        "two",
 			Operation: TableChange_DELETE,
 			Fields:    []*Field{},
 		},
@@ -226,5 +180,5 @@ func TestTableChanges_Merge(t *testing.T) {
 	changes, err := TableChanges(tableChanges).Merge()
 	require.Nil(t, err)
 
-	require.True(t, TableChanges(changes).isEqual(TableChanges(expected)))
+	TableChanges(changes).isEqual(t, expected)
 }

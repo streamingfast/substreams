@@ -2,6 +2,7 @@ package pbsubstreams
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"sort"
 )
 
@@ -29,34 +30,35 @@ func (x TableChanges) Merge() ([]*TableChange, error) {
 
 	//merge each group
 	result := make([]*TableChange, 0)
-	for _, table := range tableMap {
-		for _, cs := range table {
-			switch len(cs) {
+	for _, tableChanges := range tableMap {
+		for _, tableChange := range tableChanges {
+			switch len(tableChange) {
 			case 0:
 				continue
 			case 1:
-				result = append(result, cs[0])
+				result = append(result, tableChange[0])
 			default:
-				sort.Slice(cs, func(i, j int) bool {
-					return cs[i].Ordinal < cs[j].Ordinal
+				sort.Slice(tableChange, func(i, j int) bool {
+					return tableChange[i].Ordinal < tableChange[j].Ordinal
 				})
 
-				createdHere := cs[0].Operation == TableChange_CREATE
+				currentTableChange := tableChange[0]
+				createdHere := currentTableChange.Operation == TableChange_CREATE
 
-				for i := 0; i < len(cs)-1; i++ {
-					prev := cs[0]
-					next := cs[i+1]
-					err := prev.Merge(next)
+				for i := 1; i <= len(tableChange)-1; i++ {
+					next := tableChange[i]
+					err := currentTableChange.Merge(next)
 					if err != nil {
 						return nil, err
 					}
 				}
 
-				if createdHere && cs[0].Operation == TableChange_DELETE {
+				// row created and deleted in the same table change... we do nothing
+				if createdHere && tableChange[0].Operation == TableChange_DELETE {
 					continue
 				}
 
-				result = append(result, cs[0])
+				result = append(result, currentTableChange)
 			}
 		}
 	}
@@ -75,11 +77,16 @@ func (x *TableChange) Merge(next *TableChange) error {
 
 	switch next.Operation {
 	case TableChange_DELETE:
-		x.Operation = TableChange_DELETE
+		x.Operation = next.Operation
 		x.Fields = next.Fields
 	case TableChange_CREATE:
 		if x.Operation != TableChange_DELETE {
-			return fmt.Errorf("trying to create table when previous operation was not delete")
+			zlog.Error("trying to create row when current operation is not delete, row already exists",
+				zap.String("table", x.Table),
+				zap.String("key", x.Pk),
+				zap.String("last_operation", x.Operation.String()),
+				zap.Reflect("fields", next.Fields))
+			return fmt.Errorf("trying to create row when current operation is not delete, row already exists")
 		}
 		x.Operation = next.Operation
 		x.Fields = next.Fields

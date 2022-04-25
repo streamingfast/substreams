@@ -25,7 +25,7 @@ func ApplyTableChange(change *pbsubstreams.TableChange, entity Entity) (err erro
 
 		if field, found := fieldChanges[fieldTag.dbFieldName]; found {
 			if err = applyTableChange(v, field, fieldTag); err != nil {
-				return
+				return fmt.Errorf("applying table %s change :%w", change.Table, err)
 			}
 		}
 	}
@@ -36,6 +36,8 @@ func applyTableChange(rv reflect.Value, fieldChange *pbsubstreams.Field, fieldTa
 	if fieldTags == nil {
 		fieldTags = &FieldTags{}
 	}
+
+	rv = indirect(rv, false)
 
 	rt := rv.Type()
 
@@ -117,14 +119,14 @@ func applyTableChange(rv reflect.Value, fieldChange *pbsubstreams.Field, fieldTa
 			rv.Set(reflect.ValueOf(NewFloatFromLiteral(n)))
 		default:
 
-			panic(fmt.Sprintf("nested structure not supported %q", rt))
+			return fmt.Errorf("nested structure not supported %q", rt)
 		}
 		//if err = applyTableChangeStruct(rt, rv, changes); err != nil {
 		//	return
 		//}
 
 	default:
-		return fmt.Errorf("decode: unsupported type %q", rt)
+		return fmt.Errorf("decode: unsupported type %q for field %s", rt, fieldChange.GetName())
 	}
 
 	return

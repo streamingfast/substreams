@@ -34,7 +34,7 @@ func (b *Builder) writeMergeValues() {
 	b.KV[storeNameKey] = []byte(b.Store.Name)
 }
 
-func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updatePolicy pbtransform.KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
+func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
 	//mega-hack because json marshalling converts invalid UTF-8 (in our case byte 255) to Unicode replacement character U+FFFD (byte 239-191-189)  (see json package documentation)
 	//here, we convert that back to byte 255
 	//todo: do this in json.Unmarshal implementation of a new KV type.

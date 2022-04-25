@@ -2,7 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"github.com/streamingfast/bstream"
+	"strings"
+
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -35,7 +36,7 @@ var remoteCmd = &cobra.Command{
 func runRemote(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	config := &runtime.RemoteConfig{
+	cfg := &runtime.Config{
 		FirehoseEndpoint:     mustGetString(cmd, "firehose-endpoint"),
 		FirehoseApiKeyEnvVar: mustGetString(cmd, "firehose-api-key-envvar"),
 		InsecureMode:         mustGetBool(cmd, "insecure"),
@@ -50,19 +51,20 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		},
 	}
 
-	manif, err := manifest.New(config.ManifestPath)
+	manif, err := manifest.New(cfg.ManifestPath)
 	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", config.ManifestPath, err)
+		return fmt.Errorf("read manifest %q: %w", cfg.ManifestPath, err)
 	}
 
-	config.ReturnHandler = decode.NewPrintReturnHandler(manif, config.OutputStreamName)
 	if mustGetBool(cmd, "no-return-handler") {
-		config.ReturnHandler = func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
+		cfg.ReturnHandler = func(any *pbsubstreams.BlockScopedData) error {
 			return nil
 		}
+	} else {
+		cfg.ReturnHandler = decode.NewPrintReturnHandler(manif, strings.Split(cfg.OutputStreamName, ","))
 	}
 
-	err = runtime.RemoteRun(ctx, config)
+	err = runtime.RemoteRun(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("running remote substream: %w", err)
 	}

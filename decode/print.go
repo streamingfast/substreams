@@ -16,11 +16,14 @@ import (
 
 func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string) substreams.ReturnFunc {
 
-	var isStore bool
+	decodeMsgTypes := map[string]func(in []byte) string{}
+	msgTypes := map[string]string{}
+
 	for _, mod := range manif.Modules {
 		for _, outputStreamName := range outputStreamNames {
 			if mod.Name == outputStreamName {
 				var msgType string
+				var isStore bool
 				if mod.Kind == "store" {
 					isStore = true
 					msgType = mod.ValueType
@@ -28,6 +31,8 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string)
 					msgType = mod.Output.Type
 				}
 				msgType = strings.TrimPrefix(msgType, "proto:")
+
+				msgTypes[mod.Name] = msgType
 
 				var msgDesc *desc.MessageDescriptor
 				for _, file := range manif.ProtoDescs {
@@ -37,103 +42,98 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string)
 					}
 				}
 
+				decodeMsgType := func(in []byte) string {
+					msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+					if err := msg.Unmarshal(in); err != nil {
+						fmt.Printf("error unmarshalling protobuf %s to map: %s\n", msgType, err)
+						return decodeAsString(in)
+					}
+
+					cnt, err := msg.MarshalJSONIndent()
+					if err != nil {
+						fmt.Printf("error encoding protobuf %s into json: %s\n", msgType, err)
+						return decodeAsString(in)
+					}
+
+					return string(cnt)
+				}
+
+				if isStore {
+					if msgDesc != nil {
+						decodeMsgTypeWithIndent := func(in []byte) string {
+							out := decodeMsgType(in)
+							return strings.Replace(out, "\n", "\n    ", -1)
+						}
+						decodeMsgTypes[mod.Name] = decodeMsgTypeWithIndent
+					} else {
+						if msgType == "bytes" {
+							decodeMsgTypes[mod.Name] = decodeAsHex
+						} else {
+							// bigint, bigfloat, int64, float64, string
+							decodeMsgTypes[mod.Name] = decodeAsString
+						}
+					}
+
+				} else {
+					decodeMsgTypes[mod.Name] = decodeMsgType
+				}
+
 			}
 		}
 	}
 
-	defaultHandler := func(output *pbsubstreams.BlockScopedData) error {
-		printBlock(output)
+	return func(output *pbsubstreams.BlockScopedData) error {
+		printClock(output)
 		if output == nil {
 			return nil
 		}
-
-		fmt.Printf("Message %q:\n", msgType)
-
-		marshalledBytes, err := protojson.Marshal(output.GetValue())
-		if err != nil {
-			return fmt.Errorf("return handler: marshalling: %w", err)
-		}
-
-		fmt.Println(marshalledBytes)
-		return nil
-	}
-
-	decodeAsString := func(in []byte) string { return fmt.Sprintf("%q", string(in)) }
-	decodeAsHex := func(in []byte) string { return "(hex) " + hex.EncodeToString(in) }
-	decodeMsgType := func(in []byte) string {
-		msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-		if err := msg.Unmarshal(in); err != nil {
-			fmt.Printf("error unmarshalling protobuf %s to map: %s\n", msgType, err)
-			return decodeAsString(in)
-		}
-
-		cnt, err := msg.MarshalJSONIndent()
-		if err != nil {
-			fmt.Printf("error encoding protobuf %s into json: %s\n", msgType, err)
-			return decodeAsString(in)
-		}
-
-		return string(cnt)
-	}
-	decodeMsgTypeWithIndent := func(in []byte) string {
-		out := decodeMsgType(in)
-		return strings.Replace(out, "\n", "\n    ", -1)
-	}
-
-	if isStore {
-		var decodeValue func(in []byte) string
-		if msgDesc != nil {
-			decodeValue = decodeMsgTypeWithIndent
-		} else {
-			if msgType == "bytes" {
-				decodeValue = decodeAsHex
-			} else {
-				// bigint, bigfloat, int64, float64, string
-				decodeValue = decodeAsString
-			}
-		}
-
-		return func(output *pbsubstreams.BlockScopedData) error {
-			printBlock(output)
-			if output == nil {
-				return nil
-			}
-			d := &pbsubstreams.StoreDeltas{}
-			if err := output.Value.UnmarshalTo(d); err != nil {
-				fmt.Printf("Error decoding store deltas: %s\n", err)
-				fmt.Printf("Raw StoreDeltas bytes: %s\n", decodeAsHex(output.Value.Value))
-			}
-
-			fmt.Printf("Store deltas for %q:\n", outputStreamName)
-			for _, delta := range d.Deltas {
-				fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
-
-				fmt.Printf("    OLD: %s\n", decodeValue(delta.OldValue))
-				fmt.Printf("    NEW: %s\n", decodeValue(delta.NewValue))
-			}
+		if len(output.Outputs) == 0 {
 			return nil
 		}
-	} else {
-		if msgDesc != nil {
-			return func(output *pbsubstreams.BlockScopedData) error {
-				printBlock(output)
-				if output == nil {
-					return nil
+
+		for _, out := range output.Outputs {
+			switch data := out.Data.(type) {
+			case *pbsubstreams.ModuleOutput_MapOutput:
+
+				decodeValue := decodeMsgTypes[out.Name]
+				msgType := msgTypes[out.Name]
+				if decodeValue != nil {
+					cnt := decodeValue(data.MapOutput.GetValue())
+
+					fmt.Printf("Message %q: %s\n", msgType, cnt)
+				} else {
+					fmt.Printf("Message %q: ", msgType)
+
+					marshalledBytes, err := protojson.Marshal(data.MapOutput)
+					if err != nil {
+						return fmt.Errorf("return handler: marshalling: %w", err)
+					}
+
+					fmt.Println(marshalledBytes)
 				}
 
-				cnt := decodeMsgType(output.Value.GetValue())
+			case *pbsubstreams.ModuleOutput_StoreDeltas:
+				fmt.Printf("Store deltas for %q:\n", out.Name)
+				decodeValue := decodeMsgTypes[out.Name]
+				for _, delta := range data.StoreDeltas.Deltas {
+					fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
 
-				fmt.Printf("Message %q: %s\n", msgType, cnt)
+					fmt.Printf("    OLD: %s\n", decodeValue(delta.OldValue))
+					fmt.Printf("    NEW: %s\n", decodeValue(delta.NewValue))
+				}
 
-				return nil
+			default:
+				panic("unsupported module output data type")
 			}
-		} else {
-			return defaultHandler
 		}
+		return nil
 	}
 }
 
-func printBlock(block *pbsubstreams.BlockScopedData) {
+func decodeAsString(in []byte) string { return fmt.Sprintf("%q", string(in)) }
+func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
+
+func printClock(block *pbsubstreams.BlockScopedData) {
 	fmt.Printf("----------- BLOCK: %d (%s) ---------------\n", block.Clock.Number, stepFromProto(block.Step))
 }
 

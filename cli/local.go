@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -88,11 +89,12 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", cfg.ManifestPath, err)
 	}
 
-	cfg.ReturnHandler = decode.NewPrintReturnHandler(manif, cfg.OutputStreamName)
 	if mustGetBool(cmd, "no-return-handler") {
-		cfg.ReturnHandler = func(out *pbsubstreams.Output, step bstream.StepType, cursor *bstream.Cursor) error {
+		cfg.ReturnHandler = func(any *pbsubstreams.BlockScopedData) error {
 			return nil
 		}
+	} else {
+		cfg.ReturnHandler = decode.NewPrintReturnHandler(manif, strings.Split(cfg.OutputStreamName, ","))
 	}
 
 	err = runtime.LocalRun(cmd.Context(), cfg)

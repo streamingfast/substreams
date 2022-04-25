@@ -9,13 +9,13 @@ import (
 
 type Registry struct {
 	entities   []Entity
-	data       map[string]reflect.Type
+	types      map[string]reflect.Type
 	interfaces map[reflect.Type]Entity
 }
 
 func NewRegistry(entities ...Entity) *Registry {
 	r := &Registry{
-		data:       map[string]reflect.Type{},
+		types:      map[string]reflect.Type{},
 		interfaces: map[reflect.Type]Entity{},
 	}
 	r.Register(entities...)
@@ -24,12 +24,12 @@ func NewRegistry(entities ...Entity) *Registry {
 }
 
 func (r *Registry) Len() int {
-	return len(r.data)
+	return len(r.types)
 }
 
 func (r *Registry) Data() map[string]reflect.Type {
 	//TODO: should we rlock here?
-	return r.data
+	return r.types
 }
 
 func (r *Registry) Entities() []Entity {
@@ -51,25 +51,25 @@ func GetTableNameFromType(entity reflect.Type) string {
 }
 
 func (r *Registry) GetType(tableName string) (reflect.Type, bool) {
-	res, ok := r.data[tableName]
+	res, ok := r.types[tableName]
 	return res, ok
 }
 
 func (r *Registry) GetInterface(tableName string) (Entity, bool) {
-	t, ok := r.data[tableName]
+	t, ok := r.types[tableName]
 	if !ok {
 		return nil, false
 	}
+	instance := reflect.New(t)
 
-	res, ok := r.interfaces[t]
-	return res, ok
+	return instance.Interface().(Entity), ok
 }
 
 func (r *Registry) Register(entities ...Entity) {
 	r.entities = append(r.entities, entities...)
 
 	for _, ent := range entities {
-		r.data[GetTableName(ent)] = reflect.TypeOf(ent).Elem()
+		r.types[GetTableName(ent)] = reflect.TypeOf(ent).Elem()
 		r.interfaces[reflect.TypeOf(ent).Elem()] = ent
 	}
 }

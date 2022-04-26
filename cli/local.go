@@ -23,6 +23,7 @@ func init() {
 	localCmd.Flags().String("rpc-cache-store-url", "./rpc-cache", "URL of blocks store")
 	localCmd.Flags().String("irr-indexes-url", "./localirr", "URL of blocks store")
 	localCmd.Flags().String("proto-url", "./proto", "Path of proto files")
+	localCmd.Flags().Uint64("states-save-interval", uint64(10000), "State size")
 
 	localCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	localCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
@@ -51,20 +52,21 @@ func runLocal(cmd *cobra.Command, args []string) error {
 	// If we haven't compiled from `sf-ethereum`, we won't have the block readers, etc..
 
 	cfg := &runtime.LocalConfig{
-		BlocksStoreUrl:    mustGetString(cmd, "blocks-store-url"),
-		IrrIndexesUrl:     mustGetString(cmd, "irr-indexes-url"),
-		StateStoreUrl:     mustGetString(cmd, "state-store-url"),
-		RpcEndpoint:       mustGetString(cmd, "rpc-endpoint"),
-		SecondaryRpcEndpoints: mustGetStringArray(cmd, "secondary-rpc-endpoints"),RpcCacheUrl:       mustGetString(cmd, "rpc-cache-store-url"),
+		BlocksStoreUrl:        mustGetString(cmd, "blocks-store-url"),
+		IrrIndexesUrl:         mustGetString(cmd, "irr-indexes-url"),
+		StateStoreUrl:         mustGetString(cmd, "state-store-url"),
+		RpcEndpoint:           mustGetString(cmd, "rpc-endpoint"),
+		SecondaryRpcEndpoints: mustGetStringArray(cmd, "secondary-rpc-endpoints"), RpcCacheUrl: mustGetString(cmd, "rpc-cache-store-url"),
 		PartialMode:       mustGetBool(cmd, "partial"),
 		ProtoUrl:          mustGetString(cmd, "proto-url"),
 		ProtobufBlockType: ProtobufBlockType,
 		Config: &runtime.Config{
-			ManifestPath:     args[0],
-			OutputStreamName: args[1],
-			StartBlock:       uint64(mustGetInt64(cmd, "start-block")),
-			StopBlock:        mustGetUint64(cmd, "stop-block"),
-			PrintMermaid:     true,
+			ManifestPath:       args[0],
+			OutputStreamName:   args[1],
+			StartBlock:         uint64(mustGetInt64(cmd, "start-block")),
+			StopBlock:          mustGetUint64(cmd, "stop-block"),
+			PrintMermaid:       true,
+			StatesSaveInterval: mustGetUint64(cmd, "states-save-interval"),
 		},
 	}
 

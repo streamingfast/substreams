@@ -41,11 +41,12 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		InsecureMode:         mustGetBool(cmd, "insecure"),
 		Plaintext:            mustGetBool(cmd, "plaintext"),
 		Config: &runtime.Config{
-			ManifestPath:     args[0],
-			OutputStreamName: args[1],
-			StartBlock:       mustGetUint64(cmd, "start-block"),
-			StopBlock:        mustGetUint64(cmd, "stop-block"),
-			PrintMermaid:     true,
+			ManifestPath:       args[0],
+			OutputStreamName:   args[1],
+			StartBlock:         mustGetUint64(cmd, "start-block"),
+			StopBlock:          mustGetUint64(cmd, "stop-block"),
+			PrintMermaid:       true,
+			StatesSaveInterval: mustGetUint64(cmd, "states-save-interval"),
 		},
 	}
 

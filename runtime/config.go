@@ -11,6 +11,8 @@ type Config struct {
 
 	PrintMermaid bool
 
+	StatesSaveInterval uint64
+
 	ReturnHandler substreams.ReturnFunc
 }
 

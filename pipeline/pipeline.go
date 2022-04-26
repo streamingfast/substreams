@@ -49,13 +49,14 @@ type Pipeline struct {
 	manifest         *pbtransform.Manifest
 	outputStreamName string
 
-	streamFuncs       []StreamFunc
-	nativeOutputs     map[string]reflect.Value
-	wasmOutputs       map[string][]byte
-	progressTracker   *progressTracker
-	nextReturnValue   *anypb.Any
-	allowInvalidState bool
-	stateStore        dstore.Store
+	streamFuncs        []StreamFunc
+	nativeOutputs      map[string]reflect.Value
+	wasmOutputs        map[string][]byte
+	progressTracker    *progressTracker
+	nextReturnValue    *anypb.Any
+	allowInvalidState  bool
+	stateStore         dstore.Store
+	statesSaveInterval uint64
 }
 
 type progressTracker struct {
@@ -131,17 +132,27 @@ func WithAllowInvalidState() Option {
 	}
 }
 
-func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbtransform.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
+func New(rpcClient *rpc.Client,
+	rpcCache *ssrpc.Cache,
+	manifest *pbtransform.Manifest,
+	graph *manifest.ModuleGraph,
+	outputStreamName string,
+	blockType string,
+	stateStore dstore.Store,
+	statesSaveInterval uint64,
+	opts ...Option) *Pipeline {
+
 	pipe := &Pipeline{
-		rpcCacheManager:  rpcCache,
-		nativeImports:    imports.NewImports(rpcClient),
-		builders:         map[string]*state.Builder{},
-		graph:            graph,
-		stateStore:       stateStore,
-		manifest:         manifest,
-		outputStreamName: outputStreamName,
-		blockType:        blockType,
-		progressTracker:  newProgressTracker(),
+		rpcCacheManager:    rpcCache,
+		nativeImports:      imports.NewImports(rpcClient),
+		builders:           map[string]*state.Builder{},
+		graph:              graph,
+		stateStore:         stateStore,
+		manifest:           manifest,
+		outputStreamName:   outputStreamName,
+		blockType:          blockType,
+		progressTracker:    newProgressTracker(),
+		statesSaveInterval: statesSaveInterval,
 	}
 
 	for _, opt := range opts {
@@ -535,7 +546,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 
-		if block.Num()%10000 == 0 {
+		if block.Num()%p.statesSaveInterval == 0 {
 			//p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
 			for _, s := range p.builders {
 				fileName, err := s.WriteState(ctx, block.Num(), p.partialMode)

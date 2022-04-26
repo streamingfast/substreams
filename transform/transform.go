@@ -26,7 +26,7 @@ import (
 
 var MessageName = proto.MessageName(&pbtransform.Transform{})
 
-func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockType string) *transform.Factory {
+func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockType string, statesSaveInterval uint64) *transform.Factory {
 
 	return &transform.Factory{
 		Obj: &pbtransform.Transform{},
@@ -72,7 +72,7 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 			}
 
 			t := &ssTransform{
-				pipeline:    pipeline.New(rpcClient, rpcCache, req.Manifest, graph, req.OutputModule, protobufBlockType, stateStore),
+				pipeline:    pipeline.New(rpcClient, rpcCache, req.Manifest, graph, req.OutputModule, protobufBlockType, stateStore, statesSaveInterval),
 				description: req.Manifest.Description,
 			}
 

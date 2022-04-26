@@ -86,7 +86,7 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 		config.StartBlock = sb
 	}
 
-	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, config.OutputStreamName, config.ProtobufBlockType, stateStore, pipelineOpts...)
+	pipe := pipeline.New(rpcClient, rpcCache, manifProto, graph, config.OutputStreamName, config.ProtobufBlockType, stateStore, config.StatesSaveInterval, pipelineOpts...)
 	handler, err := pipe.HandlerFactory(ctx, config.StartBlock, config.StopBlock, config.ReturnHandler)
 	if err != nil {
 		return fmt.Errorf("building pipeline handler: %w", err)

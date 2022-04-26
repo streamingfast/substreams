@@ -107,6 +107,7 @@ func (t *ssTransform) Run(
 		// FIXME we need to get the block here or the step or something...
 		// FIXME: use the same ReturnHandler interface, why not store it in `bstream`, and replace
 		// that StreamOutput iface.
+		fmt.Println("Grrr: return handler with value len: ", len(out.GetValue().Value))
 		return output(cursor, out.GetValue())
 	}
 

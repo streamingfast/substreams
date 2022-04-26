@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/streamingfast/eth-go"
+	"github.com/streamingfast/eth-go/rpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
-
-	rpc "github.com/streamingfast/eth-go/rpc"
 	"go.uber.org/zap"
 )
 
@@ -70,6 +69,7 @@ func RPCCalls(blockNum uint64, rpcClient *rpc.Client, calls *pbsubstreams.RpcCal
 			}
 		}
 		if nonDeterministicResp {
+			rpcClient.RollEndpointIndex()
 			continue
 		}
 

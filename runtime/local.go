@@ -69,7 +69,7 @@ func LocalRun(ctx context.Context, config *Config) error {
 		Timeout: 3 * time.Second,
 	}
 
-	rpcClient := ethrpc.NewClient(config.RpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache))
+	rpcClient := ethrpc.NewClient(config.RpcEndpoint, ethrpc.WithHttpClient(httpClient), ethrpc.WithCache(rpcCache), ethrpc.WithSecondaryEndpoints(config.SecondaryRpcEndpoints))
 
 	var pipelineOpts []pipeline.Option
 	if config.PartialMode {

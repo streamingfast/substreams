@@ -24,9 +24,10 @@ type LocalConfig struct {
 
 	ProtobufBlockType string
 
-	RpcEndpoint string
-	RpcCacheUrl string
-	PartialMode bool
+	RpcEndpoint           string
+	SecondaryRpcEndpoints []string
+	RpcCacheUrl           string
+	PartialMode           bool
 
 	ProtoUrl string
 }

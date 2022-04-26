@@ -3,6 +3,7 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"go.uber.org/zap"
 
@@ -98,7 +99,7 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph) uint64 {
 	return uint64(parentsStartBlock)
 }
 
-func (g *ModuleGraph) topSort() ([]*pbtransform.Module, bool) {
+func (g *ModuleGraph) TopologicalSort() ([]*pbtransform.Module, bool) {
 	order, ok := graph.TopSort(g)
 	if !ok {
 		return nil, ok
@@ -163,39 +164,88 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbtransform.Module, error
 	return res, nil
 }
 
-func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*pbtransform.Module, error) {
-	if _, found := g.moduleIndex[moduleName]; !found {
-		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbtransform.Module, error) {
+	alreadyAdded := map[string]bool{}
+	topologicalIndex := map[string]int{}
+
+	sortedModules, ok := g.TopologicalSort()
+	if !ok {
+		return nil, fmt.Errorf("could not get topological sort of module graph")
 	}
 
-	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+	for i, node := range sortedModules {
+		topologicalIndex[node.Name] = i
+	}
 
 	var res []*pbtransform.Module
-	for i, d := range distances {
-		if d >= 0 { // connected node or myself
-			module := g.indexIndex[i]
-			if module.GetKindStore() != nil {
-				res = append(res, g.indexIndex[i])
+	for _, moduleName := range moduleNames {
+		if _, found := g.moduleIndex[moduleName]; !found {
+			return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+		}
+
+		_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+
+		for i, d := range distances {
+			if d >= 0 { // connected node or myself
+				module := g.indexIndex[i]
+				if module.GetKindStore() == nil {
+					continue
+				}
+
+				if _, ok := alreadyAdded[module.Name]; ok {
+					continue
+				}
+
+				res = append(res, module)
+				alreadyAdded[module.Name] = true
 			}
 		}
 	}
 
+	sort.Slice(res, func(i, j int) bool {
+		return topologicalIndex[res[i].Name] < topologicalIndex[res[j].Name]
+	})
+
 	return res, nil
 }
 
-func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbtransform.Module, error) {
-	if _, found := g.moduleIndex[moduleName]; !found {
-		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbtransform.Module, error) {
+	alreadyAdded := map[string]bool{}
+	topologicalIndex := map[string]int{}
+
+	sortedModules, ok := g.TopologicalSort()
+	if !ok {
+		return nil, fmt.Errorf("could not get topological sort of module graph")
 	}
 
-	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+	for i, node := range sortedModules {
+		topologicalIndex[node.Name] = i
+	}
 
 	var res []*pbtransform.Module
-	for i, d := range distances {
-		if d >= 0 { // connected node or myself
-			res = append(res, g.indexIndex[i])
+	for _, moduleName := range moduleNames {
+		if _, found := g.moduleIndex[moduleName]; !found {
+			return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+		}
+
+		_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+
+		for i, d := range distances {
+			if d >= 0 { // connected node or myself
+				module := g.indexIndex[i]
+				if _, ok := alreadyAdded[module.Name]; ok {
+					continue
+				}
+
+				res = append(res, module)
+				alreadyAdded[module.Name] = true
+			}
 		}
 	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return topologicalIndex[res[i].Name] < topologicalIndex[res[j].Name]
+	})
 
 	return res, nil
 }

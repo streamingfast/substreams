@@ -180,13 +180,13 @@ func (p *Pipeline) build() (modules []*pbtransform.Module, storeModules []*pbtra
 		p.vmType = vmType
 	}
 
-	modules, err = p.graph.ModulesDownTo(p.outputStreamName)
+	modules, err = p.graph.ModulesDownTo([]string{p.outputStreamName})
 	if err != nil {
 		return nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
 	p.builders = make(map[string]*state.Builder)
-	storeModules, err = p.graph.StoresDownTo(p.outputStreamName)
+	storeModules, err = p.graph.StoresDownTo([]string{p.outputStreamName})
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
 		if p.partialMode {

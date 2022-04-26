@@ -1,10 +1,11 @@
 package manifest
 
 import (
-	"github.com/streamingfast/bstream"
-	"github.com/test-go/testify/require"
 	"sort"
 	"testing"
+
+	"github.com/streamingfast/bstream"
+	"github.com/test-go/testify/require"
 
 	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
 	"github.com/stretchr/testify/assert"
@@ -165,7 +166,7 @@ func TestModuleGraph_ModulesDownTo(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	mods, err := g.ModulesDownTo("G")
+	mods, err := g.ModulesDownTo([]string{"G"})
 	assert.NoError(t, err)
 
 	var res []string
@@ -182,7 +183,7 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	mods, err := g.StoresDownTo("G")
+	mods, err := g.StoresDownTo([]string{"G"})
 	assert.NoError(t, err)
 
 	var res []string

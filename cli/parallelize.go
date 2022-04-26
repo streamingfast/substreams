@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
 )
@@ -26,7 +27,7 @@ func runParallelizeE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	stores, err := manif.Graph.StoresDownTo(streamName)
+	stores, err := manif.Graph.StoresDownTo([]string{streamName})
 	res, err := json.Marshal(manifest.ModuleMarshaler(stores))
 	if err != nil {
 		return err

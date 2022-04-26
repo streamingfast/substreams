@@ -17,6 +17,7 @@ var ProtobufBlockType string = "sf.ethereum.type.v1.Block"
 
 func init() {
 	localCmd.Flags().String("rpc-endpoint", "http://localhost:8546", "RPC endpoint of blockchain node")
+	localCmd.Flags().StringArray("secondary-rpc-endpoints", nil, "RPC endpoints that will replace the primary in case of errors")
 	localCmd.Flags().String("state-store-url", "./localdata", "URL of state store")
 	localCmd.Flags().String("blocks-store-url", "./localblocks", "URL of blocks store")
 	localCmd.Flags().String("rpc-cache-store-url", "./rpc-cache", "URL of blocks store")
@@ -54,7 +55,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		IrrIndexesUrl:     mustGetString(cmd, "irr-indexes-url"),
 		StateStoreUrl:     mustGetString(cmd, "state-store-url"),
 		RpcEndpoint:       mustGetString(cmd, "rpc-endpoint"),
-		RpcCacheUrl:       mustGetString(cmd, "rpc-cache-store-url"),
+		SecondaryRpcEndpoints: mustGetStringArray(cmd, "secondary-rpc-endpoints"),RpcCacheUrl:       mustGetString(cmd, "rpc-cache-store-url"),
 		PartialMode:       mustGetBool(cmd, "partial"),
 		ProtoUrl:          mustGetString(cmd, "proto-url"),
 		ProtobufBlockType: ProtobufBlockType,

@@ -11,7 +11,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20220330132237-248bc2d8ea7e
 	github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e
-	github.com/streamingfast/eth-go v0.0.0-20220419161629-0c08380c1460
+	github.com/streamingfast/eth-go v0.0.0-20220426130813-8ceed63c0fd5
 	github.com/streamingfast/firehose v0.1.1-0.20220330200655-9a92471b9be3
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a

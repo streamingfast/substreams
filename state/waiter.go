@@ -35,9 +35,9 @@ func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleS
 		if eg.Stop() {
 			continue // short-circuit the loop if we got an error
 		}
-
+		s := store
 		eg.Go(func() error {
-			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, store)
+			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, s)
 		})
 	}
 

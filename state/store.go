@@ -52,3 +52,15 @@ func (s *Store) StateFileName(blockNum uint64) string {
 func (s *Store) PartialFileName(startBlockNum, endBlockNum uint64) string {
 	return fmt.Sprintf("%s-%010d-%010d.partial", s.Name, endBlockNum, startBlockNum)
 }
+
+func PartialFileName(storeName string, startBlockNum, endBlockNum uint64) string {
+	return fmt.Sprintf("%s-%010d-%010d.partial", storeName, endBlockNum, startBlockNum)
+}
+
+func StateFileName(storeName string, endBlockNum, moduleStartBlock uint64) string {
+	return fmt.Sprintf("%s-%010d-%010d.kv", storeName, endBlockNum, moduleStartBlock)
+}
+
+func FilePrefix(storeName string, endBlockNum uint64) string {
+	return fmt.Sprintf("%s-%010d-", storeName, endBlockNum)
+}

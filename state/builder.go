@@ -123,15 +123,7 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-func (b *Builder) Init(ctx context.Context, startBlockNum uint64) error {
-	if err := b.ReadState(ctx, startBlockNum); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
+func (b *Builder) Squash(ctx context.Context, baseStore dstore.Store, upToBlock uint64) error {
 	files, err := pathToState(ctx, b.Store, upToBlock, b.ModuleStartBlock)
 	if err != nil {
 		return err
@@ -140,7 +132,7 @@ func (b *Builder) Squash(ctx context.Context, upToBlock uint64) error {
 
 	var builders []*Builder
 	for _, file := range files {
-		builder, err := BuilderFromFile(ctx, file, b.Store.Store)
+		builder, err := BuilderFromFile(ctx, file, baseStore)
 		if err != nil {
 			return fmt.Errorf("creating builder from file %s: %w", file, err)
 		}

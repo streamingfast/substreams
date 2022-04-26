@@ -2,11 +2,6 @@ package graphnode
 
 import (
 	"github.com/streamingfast/logging"
-	"go.uber.org/zap"
 )
 
-var zlog *zap.Logger
-
-func init() {
-	logging.Register("github.com/streamingfast/sparkle/entity", &zlog)
-}
+var zlog, _ = logging.PackageLogger("substreams.graph-node", "github.com/streamingfast/substreams/graph-node")

@@ -44,10 +44,6 @@ func (i *Instance) PrintStats() {
 	fmt.Printf("Memory size: %d\n", i.memory.DataSize())
 }
 
-func (i *Instance) Close() {
-	i.vmInstance.Close()
-}
-
 type Module struct {
 	engine *wasmer.Engine
 	module *wasmer.Module
@@ -78,9 +74,6 @@ func NewModule(wasmCode []byte, name string) (*Module, error) {
 	m.imports = m.newImports(store)
 
 	return m, nil
-}
-func (m *Module) Close() {
-	m.module.Close()
 }
 
 func (m *Module) NewInstance(functionName string, inputs []*Input, rpcFactory WasmerFunctionFactory) (*Instance, error) {

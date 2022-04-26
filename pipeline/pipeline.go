@@ -796,7 +796,6 @@ func wasmCall(vals map[string][]byte,
 		if err = instance.Execute(); err != nil {
 			return nil, fmt.Errorf("module %q: wasm execution failed: %w", name, err)
 		}
-		instance.Close()
 	}
 	return
 }

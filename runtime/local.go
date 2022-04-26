@@ -61,7 +61,7 @@ func LocalRun(ctx context.Context, config *LocalConfig) error {
 		return fmt.Errorf("setting up rpc client: %w", err)
 	}
 
-	rpcCache := rpc.NewCacheManager(ctx, rpcCacheStore, int64(config.StartBlock))
+	rpcCache := rpc.NewCache(ctx, rpcCacheStore, int64(config.StartBlock))
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DisableKeepAlives: true, // don't reuse connections

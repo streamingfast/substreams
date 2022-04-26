@@ -51,7 +51,7 @@ func TransformFactory(rpcEndpoint, rpcCachePath, stateStorePath, protobufBlockTy
 				return nil, fmt.Errorf("setting up rpc cache store: %w", err)
 			}
 
-			rpcCache := ssrpc.NewCacheManager(context.Background(), rpcCacheStore, 0)
+			rpcCache := ssrpc.NewCache(context.Background(), rpcCacheStore, 0)
 			httpClient := &http.Client{
 				Transport: &http.Transport{
 					DisableKeepAlives: true, // don't reuse connections

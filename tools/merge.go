@@ -126,7 +126,7 @@ func mergePartialFilesE(cmd *cobra.Command, args []string) error {
 			_, _, end, _ := state.ParseFileName(files[len(files)-1])
 			lastMergedBuilder := builders[len(builders)-1]
 
-			fileWritten, err := lastMergedBuilder.WriteState(ctx, end)
+			fileWritten, err := lastMergedBuilder.WriteState(ctx, end, true)
 			if err != nil {
 				return fmt.Errorf("writing file: %w", err)
 			}

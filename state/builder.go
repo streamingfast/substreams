@@ -17,10 +17,8 @@ import (
 )
 
 type Builder struct {
-	Name string
-
-	Store *Store
-
+	Name              string
+	Store             *Store
 	partialMode       bool
 	partialStartBlock uint64
 	ModuleStartBlock  uint64
@@ -44,7 +42,6 @@ func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
 	return func(b *Builder) {
 		b.partialMode = true
 		b.partialStartBlock = startBlock
-		b.disableWriteState = outputStream != b.Name
 	}
 }
 
@@ -208,7 +205,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 		b.KV = builders[len(builders)-1].KV
 
 		zlog.Info("writing state", zap.String("store", b.Name))
-		f, err := b.writeState(ctx, requestedStartBlock, false)
+		f, err := b.WriteState(ctx, requestedStartBlock, false)
 		if err != nil {
 			return fmt.Errorf("writing merged kv: %w", err)
 		}
@@ -218,23 +215,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 	return nil
 }
 
-func (b *Builder) WriteFullState(ctx context.Context, blockNum uint64) (string, error) {
-	if b.disableWriteState {
-		return "", nil
-	}
-
-	return b.writeState(ctx, blockNum, false)
-}
-
-func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (string, error) {
-	if b.disableWriteState {
-		return "", nil
-	}
-
-	return b.writeState(ctx, blockNum, b.partialMode)
-}
-
-func (b *Builder) writeState(ctx context.Context, blockNum uint64, partialMode bool) (string, error) {
+func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode bool) (string, error) {
 	b.writeMergeValues()
 
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK

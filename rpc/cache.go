@@ -73,7 +73,7 @@ type Cache struct {
 	mu sync.RWMutex
 }
 
-func NewCacheManager(ctx context.Context, store dstore.Store, startBlock int64) *Cache {
+func NewCache(ctx context.Context, store dstore.Store, startBlock int64) *Cache {
 	cf := &Cache{
 		store: store,
 	}
@@ -88,17 +88,17 @@ func NewCacheManager(ctx context.Context, store dstore.Store, startBlock int64) 
 	return cf
 }
 
-func (cm *Cache) initialize(ctx context.Context, startBlock, endBlock uint64) *cache {
+func (c *Cache) initialize(ctx context.Context, startBlock, endBlock uint64) *cache {
 	var filename string
 	var found bool
 
 	prefixSearchBlock := startBlock
-	if cm.currentStartBlock > 0 {
-		prefixSearchBlock = cm.currentStartBlock
+	if c.currentStartBlock > 0 {
+		prefixSearchBlock = c.currentStartBlock
 	}
 
 	///search by prefix first...
-	cm.store.Walk(ctx, cacheFileStartBlockPrefix(prefixSearchBlock), ".tmp", func(fn string) (err error) {
+	c.store.Walk(ctx, cacheFileStartBlockPrefix(prefixSearchBlock), ".tmp", func(fn string) (err error) {
 		filename = fn
 		found = true
 		return nil
@@ -107,7 +107,7 @@ func (cm *Cache) initialize(ctx context.Context, startBlock, endBlock uint64) *c
 	///if not found walk the store, look for closest start block
 	if !found {
 		closestDiff := uint64(math.MaxUint64)
-		cm.store.Walk(ctx, cacheFilePrefix(), ".tmp", func(fn string) (err error) {
+		c.store.Walk(ctx, cacheFilePrefix(), ".tmp", func(fn string) (err error) {
 			fileStart, fileEnd := mustParseCacheFileName(fn)
 			if (startBlock < fileEnd) && (startBlock > fileStart) && (startBlock-fileStart) < closestDiff {
 				filename = fn
@@ -120,82 +120,82 @@ func (cm *Cache) initialize(ctx context.Context, startBlock, endBlock uint64) *c
 
 	if found {
 		_, endBlock = mustParseCacheFileName(filename)
-		cm.currentFilename = filename
+		c.currentFilename = filename
 	} else {
 		fileStartBlock := startBlock
-		if cm.currentStartBlock > 0 {
-			fileStartBlock = cm.currentStartBlock
+		if c.currentStartBlock > 0 {
+			fileStartBlock = c.currentStartBlock
 		}
 		filename = cacheFileName(fileStartBlock, endBlock)
-		cm.currentFilename = filename
+		c.currentFilename = filename
 	}
 
-	cm.currentEndBlock = endBlock
-	cm.load(ctx)
+	c.currentEndBlock = endBlock
+	c.load(ctx)
 
-	return cm.currentCache
+	return c.currentCache
 }
 
-func (cm *Cache) UpdateCache(ctx context.Context, startBlock, endBlock uint64) {
+func (c *Cache) UpdateCache(ctx context.Context, startBlock, endBlock uint64) {
 	var initialize bool
 
-	if cm.currentCache == nil {
+	if c.currentCache == nil {
 		initialize = true
-	} else if cm.currentEndBlock <= math.MaxUint64 && startBlock >= cm.currentEndBlock {
+	} else if c.currentEndBlock <= math.MaxUint64 && startBlock >= c.currentEndBlock {
 		saveStartBlock := startBlock
-		if cm.currentStartBlock > 0 {
-			saveStartBlock = cm.currentStartBlock
+		if c.currentStartBlock > 0 {
+			saveStartBlock = c.currentStartBlock
 		}
-		cm.Save(ctx, saveStartBlock, cm.currentEndBlock)
+		c.Save(ctx, saveStartBlock, c.currentEndBlock)
 		initialize = true
 	}
 
 	if initialize {
-		cm.initialize(ctx, startBlock, endBlock)
+		c.initialize(ctx, startBlock, endBlock)
 	}
 }
 
-func (cm *Cache) load(ctx context.Context) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+func (c *Cache) load(ctx context.Context) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	cm.currentCache = newCache()
-	cm.currentCache.load(ctx, cm.store, cm.currentFilename)
+	c.currentCache = newCache()
+	c.currentCache.load(ctx, c.store, c.currentFilename)
 }
 
-func (cm *Cache) Save(ctx context.Context, startBlock uint64, endBlock uint64) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+func (c *Cache) Save(ctx context.Context, startBlock uint64, endBlock uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if cm.currentCache == nil {
+	if c.currentCache == nil {
 		return
 	}
 
 	saveStartBlock := startBlock
-	if cm.currentStartBlock > startBlock {
-		saveStartBlock = cm.currentStartBlock
+	if c.currentStartBlock > startBlock {
+		saveStartBlock = c.currentStartBlock
 	}
-	cm.currentCache.save(ctx, cm.store, cacheFileName(saveStartBlock, endBlock))
+	c.currentCache.save(ctx, c.store, cacheFileName(saveStartBlock, endBlock))
 
-	cm.totalHits += cm.currentCache.hits
-	cm.totalMisses += cm.currentCache.misses
+	c.totalHits += c.currentCache.hits
+	c.totalMisses += c.currentCache.misses
 
-	cm.currentStartBlock = endBlock
-	cm.currentCache = nil
+	c.currentStartBlock = endBlock
+	c.currentCache = nil
 }
 
-func (cm *Cache) Get(ctx context.Context, key string) ([]byte, bool) {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
+func (c *Cache) Get(ctx context.Context, key string) ([]byte, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	return cm.currentCache.Get(CacheKey(key))
+	return c.currentCache.Get(CacheKey(key))
 }
 
-func (cm *Cache) Set(ctx context.Context, key string, value []byte) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+func (c *Cache) Set(ctx context.Context, key string, value []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	cm.currentCache.Set(CacheKey(key), value)
+	c.currentCache.Set(CacheKey(key), value)
 }
 
 type cache struct {

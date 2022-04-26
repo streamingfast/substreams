@@ -7,7 +7,6 @@ import (
 	"io"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -535,53 +534,19 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
-		if block.Number >= stopBlock {
-			wg := &sync.WaitGroup{}
-			for _, builder := range p.builders {
-				_, err := builder.WriteState(context.Background(), block.Num())
+
+		if block.Num()%10000 == 0 {
+			//p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
+			for _, s := range p.builders {
+				fileName, err := s.WriteState(ctx, block.Num(), p.partialMode)
 				if err != nil {
-					return fmt.Errorf("error writing block %d to store %s: %w", block.Num(), builder.Name, err)
+					return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
 				}
-
-				if p.requestedStartBlockNum <= builder.ModuleStartBlock {
-					continue
-				}
-
-				if p.partialMode {
-					wg.Add(1)
-					go func(s *state.Builder) {
-						defer wg.Done()
-
-						zlog.Info("waiting for kv file",
-							zap.String("filename", s.Store.StateFileName(requestedStartBlockNum)),
-							zap.String("store", s.Name),
-						)
-
-						<-state.WaitKV(ctx, s.Store, requestedStartBlockNum)
-
-						zlog.Info("kv file found",
-							zap.Uint64("at_block_num", requestedStartBlockNum),
-							zap.String("store", s.Name),
-						)
-
-						zlog.Info("squashing", zap.String("store", s.Name))
-						err := s.Squash(ctx, requestedStartBlockNum)
-						if err != nil {
-							zlog.Error("squashing", zap.Error(err), zap.String("store", s.Name))
-							panic(fmt.Errorf("squashing: %w", err))
-						}
-
-						_, err = s.WriteFullState(context.Background(), block.Num())
-						if err != nil {
-							panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
-						}
-					}(builder)
-				}
+				zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
 			}
-			wg.Wait()
+		}
 
-			p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
-
+		if block.Number >= stopBlock {
 			return io.EOF
 		}
 
@@ -609,16 +574,12 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			panic("unsupported vmType " + p.vmType)
 		}
 
-		// fmt.Println("-------------------------------------------------------------------")
-		// fmt.Printf("BLOCK +%d %d %s\n", block.Num()-p.requestedStartBlockNum, block.Num(), block.ID())
-
 		for _, streamFunc := range p.streamFuncs {
 			if err := streamFunc(); err != nil {
 				return err
 			}
 		}
 
-		// Prep for next block, clean-up all deltas.
 		for _, s := range p.builders {
 			s.Flush()
 		}
@@ -639,6 +600,52 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		return nil
 	}), nil
 }
+
+//func (p *Pipeline) commit(ctx context.Context, block *bstream.Block) {
+//
+//	wg := &sync.WaitGroup{}
+//	for _, builder := range p.builders {
+//
+//		if p.requestedStartBlockNum <= builder.ModuleStartBlock {
+//			continue
+//		}
+//
+//		if p.partialMode {
+//			wg.Add(1)
+//			go func(s *state.Builder) {
+//				defer wg.Done()
+//
+//				zlog.Info("waiting for kv file",
+//					zap.String("filename", s.Store.StateFileName(p.requestedStartBlockNum)),
+//					zap.String("store", s.Name),
+//				)
+//
+//				<-state.WaitKV(ctx, s.Store, requestedStartBlockNum)
+//
+//				zlog.Info("kv file found",
+//					zap.Uint64("at_block_num", requestedStartBlockNum),
+//					zap.String("store", s.Name),
+//				)
+//
+//				zlog.Info("squashing", zap.String("store", s.Name))
+//				err := s.Squash(ctx, requestedStartBlockNum)
+//				if err != nil {
+//					zlog.Error("squashing", zap.Error(err), zap.String("store", s.Name))
+//					panic(fmt.Errorf("squashing: %w", err))
+//				}
+//
+//				_, err = s.WriteFullState(context.Background(), block.Num())
+//				if err != nil {
+//					panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
+//				}
+//			}(builder)
+//		}
+//	}
+//	wg.Wait()
+//
+//	p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
+//
+//}
 
 type Printer interface {
 	Print()

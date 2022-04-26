@@ -14,7 +14,7 @@ import (
 	"os"
 )
 
-func RemoteRun(ctx context.Context, config *Config) error {
+func RemoteRun(ctx context.Context, config *RemoteConfig) error {
 	manif, err := manifest.New(config.ManifestPath)
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", config.ManifestPath, err)

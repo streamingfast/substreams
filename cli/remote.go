@@ -35,17 +35,17 @@ var remoteCmd = &cobra.Command{
 func runRemote(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	config := &runtime.Config{
-		ManifestPath:     args[0],
-		OutputStreamName: args[1],
-		StartBlock:       mustGetUint64(cmd, "start-block"),
-		StopBlock:        mustGetUint64(cmd, "stop-block"),
-		PrintMermaid:     true,
-		RemoteConfig: &runtime.RemoteConfig{
-			FirehoseEndpoint:     mustGetString(cmd, "firehose-endpoint"),
-			FirehoseApiKeyEnvVar: mustGetString(cmd, "firehose-api-key-envvar"),
-			InsecureMode:         mustGetBool(cmd, "insecure"),
-			Plaintext:            mustGetBool(cmd, "plaintext"),
+	config := &runtime.RemoteConfig{
+		FirehoseEndpoint:     mustGetString(cmd, "firehose-endpoint"),
+		FirehoseApiKeyEnvVar: mustGetString(cmd, "firehose-api-key-envvar"),
+		InsecureMode:         mustGetBool(cmd, "insecure"),
+		Plaintext:            mustGetBool(cmd, "plaintext"),
+		Config: &runtime.Config{
+			ManifestPath:     args[0],
+			OutputStreamName: args[1],
+			StartBlock:       mustGetUint64(cmd, "start-block"),
+			StopBlock:        mustGetUint64(cmd, "stop-block"),
+			PrintMermaid:     true,
 		},
 	}
 

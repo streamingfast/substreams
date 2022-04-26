@@ -12,9 +12,6 @@ type Config struct {
 	PrintMermaid bool
 
 	ReturnHandler substreams.ReturnFunc
-
-	*LocalConfig
-	*RemoteConfig
 }
 
 type LocalConfig struct {
@@ -29,6 +26,8 @@ type LocalConfig struct {
 	PartialMode bool
 
 	ProtoUrl string
+
+	*Config
 }
 
 type RemoteConfig struct {
@@ -37,4 +36,6 @@ type RemoteConfig struct {
 
 	InsecureMode bool
 	Plaintext    bool
+
+	*Config
 }

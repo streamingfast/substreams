@@ -49,21 +49,21 @@ func runLocal(cmd *cobra.Command, args []string) error {
 	// ISSUE A BIG WARNING IF WE HAVEN'T LOADED ALL THE CHAIN CONFIG SPECIFICS.
 	// If we haven't compiled from `sf-ethereum`, we won't have the block readers, etc..
 
-	cfg := &runtime.Config{
-		ManifestPath:     args[0],
-		OutputStreamName: args[1],
-		StartBlock:       uint64(mustGetInt64(cmd, "start-block")),
-		StopBlock:        mustGetUint64(cmd, "stop-block"),
-		PrintMermaid:     true,
-		LocalConfig: &runtime.LocalConfig{
-			BlocksStoreUrl:    mustGetString(cmd, "blocks-store-url"),
-			IrrIndexesUrl:     mustGetString(cmd, "irr-indexes-url"),
-			StateStoreUrl:     mustGetString(cmd, "state-store-url"),
-			RpcEndpoint:       mustGetString(cmd, "rpc-endpoint"),
-			RpcCacheUrl:       mustGetString(cmd, "rpc-cache-store-url"),
-			PartialMode:       mustGetBool(cmd, "partial"),
-			ProtoUrl:          mustGetString(cmd, "proto-url"),
-			ProtobufBlockType: ProtobufBlockType,
+	cfg := &runtime.LocalConfig{
+		BlocksStoreUrl:    mustGetString(cmd, "blocks-store-url"),
+		IrrIndexesUrl:     mustGetString(cmd, "irr-indexes-url"),
+		StateStoreUrl:     mustGetString(cmd, "state-store-url"),
+		RpcEndpoint:       mustGetString(cmd, "rpc-endpoint"),
+		RpcCacheUrl:       mustGetString(cmd, "rpc-cache-store-url"),
+		PartialMode:       mustGetBool(cmd, "partial"),
+		ProtoUrl:          mustGetString(cmd, "proto-url"),
+		ProtobufBlockType: ProtobufBlockType,
+		Config: &runtime.Config{
+			ManifestPath:     args[0],
+			OutputStreamName: args[1],
+			StartBlock:       uint64(mustGetInt64(cmd, "start-block")),
+			StopBlock:        mustGetUint64(cmd, "stop-block"),
+			PrintMermaid:     true,
 		},
 	}
 

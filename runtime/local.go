@@ -17,7 +17,7 @@ import (
 	"github.com/streamingfast/substreams/rpc"
 )
 
-func LocalRun(ctx context.Context, config *Config) error {
+func LocalRun(ctx context.Context, config *LocalConfig) error {
 	if bstream.GetBlockDecoder == nil {
 		return fmt.Errorf("cannot run local with a build that didn't include chain-specific decoders, compile from sf-ethereum or use the remote command")
 	}

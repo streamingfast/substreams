@@ -524,6 +524,9 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		//	}
 		//}()
 
+		p.moduleOutputs = nil
+		zlog.Info("reset module outputs")
+
 		cursorable := obj.(bstream.Cursorable)
 		cursor := cursorable.Cursor()
 
@@ -535,6 +538,9 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			Id:        block.Id,
 			Timestamp: timestamppb.New(block.Time()),
 		}
+
+		p.currentClock = clock
+		p.nativeImports.SetCurrentBlock(block)
 
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
@@ -555,16 +561,11 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			return io.EOF
 		}
 
-		p.currentClock = clock
-		p.nativeImports.SetCurrentBlock(block)
-
 		for _, hook := range p.preBlockHooks {
 			if err := hook(ctx, clock); err != nil {
 				return fmt.Errorf("pre block hook: %w", err)
 			}
 		}
-		p.moduleOutputs = nil
-		zlog.Info("reset module outputs")
 
 		blk := block.ToProtocol()
 		switch p.vmType {
@@ -593,10 +594,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			}
 		}
 
-		for _, s := range p.builders {
-			s.Flush()
-		}
-
 		if p.moduleOutputs != nil {
 			// TODO: package, after each execution, ALL of the modules we want changes for,
 			// and add LOGS
@@ -610,6 +607,10 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			if err := returnFunc(out); err != nil {
 				return err
 			}
+		}
+
+		for _, s := range p.builders {
+			s.Flush()
 		}
 
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))

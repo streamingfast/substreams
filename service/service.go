@@ -107,8 +107,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	var opts []pipeline.Option
 	for _, pipeOpts := range s.pipelineOptions {
-		// FIXME: this should use the resolved start block num, no?
-		for _, opt := range pipeOpts.PipelineOptions(uint64(request.StartBlockNum), request.StopBlockNum) {
+		for _, opt := range pipeOpts.PipelineOptions(ctx, request) {
 			opts = append(opts, opt)
 		}
 	}
@@ -129,7 +128,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	pipeline := pipeline.New(request.Manifest, graph, request.OutputModules, s.blockType, s.stateStore, s.wasmExtensions, opts...)
+	pipeline := pipeline.New(ctx, request, graph, s.blockType, s.stateStore, s.wasmExtensions, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,
@@ -150,8 +149,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	handlerFactoryStartBlock := uint64(request.StartBlockNum) // FIXME why do we need this ?
-	handler, err := pipeline.HandlerFactory(ctx, handlerFactoryStartBlock, request.StopBlockNum, returnHandler)
+	handler, err := pipeline.HandlerFactory(returnHandler)
 	if err != nil {
 		return fmt.Errorf("error building substreams pipeline handler: %w", err)
 	}

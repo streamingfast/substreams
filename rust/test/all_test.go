@@ -3,6 +3,7 @@ package test
 //go:generate ./build.sh
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -186,7 +187,7 @@ func TestRustScript(t *testing.T) {
 			rpcProv := &testWasmExtension{}
 			runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
 
-			module, err := runtime.NewModule(byteCode, c.functionName)
+			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
 			require.NoError(t, err)
 
 			imps := &imports.Imports{}
@@ -215,7 +216,7 @@ func Test_MakeItCrash(t *testing.T) {
 	wg := sync.WaitGroup{}
 	data := make([]byte, (1024*1024)*1)
 	runtime := wasm.NewRuntime(nil)
-	module, err := runtime.NewModule(byteCode, "test_make_it_crash")
+	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "test_make_it_crash")
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
 		fmt.Println("iteration:", i)

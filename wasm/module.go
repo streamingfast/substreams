@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -21,7 +22,7 @@ type Module struct {
 	imports         *wasmer.ImportObject
 }
 
-func (r *Runtime) NewModule(wasmCode []byte, name string) (*Module, error) {
+func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string) (*Module, error) {
 	engine := wasmer.NewUniversalEngine()
 	store := wasmer.NewStore(engine)
 
@@ -42,7 +43,7 @@ func (r *Runtime) NewModule(wasmCode []byte, name string) (*Module, error) {
 	for namespace, imports := range r.extensions {
 		externs := map[string]wasmer.IntoExtern{}
 		for importName, f := range imports {
-			externs[importName] = m.newExtensionFunction(store, namespace, importName, f)
+			externs[importName] = m.newExtensionFunction(ctx, request, store, namespace, importName, f)
 		}
 		//
 		m.imports.Register(namespace, externs)
@@ -55,7 +56,7 @@ func (m *Module) Close() {
 	m.module.Close()
 }
 
-func (m *Module) newExtensionFunction(store *wasmer.Store, namespace, name string, f WASMExtension) *wasmer.Function {
+func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams.Request, store *wasmer.Store, namespace, name string, f WASMExtension) *wasmer.Function {
 	return wasmer.NewFunction(
 		store,
 		wasmer.NewFunctionType(
@@ -70,7 +71,7 @@ func (m *Module) newExtensionFunction(store *wasmer.Store, namespace, name strin
 				return nil, fmt.Errorf("read message argument: %w", err)
 			}
 
-			out, err := f(m.CurrentInstance.clock, message)
+			out, err := f(ctx, request, m.CurrentInstance.clock, message)
 			if err != nil {
 				return nil, fmt.Errorf(`failed running wasm extension "%s::%s": %w`, namespace, name, err)
 			}

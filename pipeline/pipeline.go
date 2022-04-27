@@ -42,11 +42,12 @@ type Pipeline struct {
 	nativeImports  *imports.Imports
 	builders       map[string]*state.Builder
 
-	//ioFactory        state.FactoryInterface
+	context           context.Context
+	request           *pbsubstreams.Request
 	graph             *manifest.ModuleGraph
 	manifest          *pbsubstreams.Manifest
-	outputStreamNames []string
-	outputStreamsMap  map[string]bool
+	outputModuleNames []string
+	outputModuleMap   map[string]bool
 
 	streamFuncs   []StreamFunc
 	nativeOutputs map[string]reflect.Value
@@ -118,29 +119,31 @@ func (p *progressTracker) log() {
 }
 
 func New(
-	manifest *pbsubstreams.Manifest,
+	ctx context.Context,
+	request *pbsubstreams.Request,
 	graph *manifest.ModuleGraph,
-	outputStreamNames []string,
 	blockType string,
 	stateStore dstore.Store,
 	wasmExtensions []wasm.WASMExtensioner,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
+		context:           ctx,
+		request:           request,
 		nativeImports:     imports.NewImports(),
 		builders:          map[string]*state.Builder{},
 		graph:             graph,
 		stateStore:        stateStore,
-		manifest:          manifest,
-		outputStreamNames: outputStreamNames,
-		outputStreamsMap:  map[string]bool{},
+		manifest:          request.Manifest,
+		outputModuleNames: request.OutputModules,
+		outputModuleMap:   map[string]bool{},
 		blockType:         blockType,
 		progressTracker:   newProgressTracker(),
 		wasmExtensions:    wasmExtensions,
 	}
 
-	for _, name := range outputStreamNames {
-		pipe.outputStreamsMap[name] = true
+	for _, name := range request.OutputModules {
+		pipe.outputModuleMap[name] = true
 	}
 
 	for _, opt := range opts {
@@ -151,7 +154,7 @@ func New(
 }
 
 // build will determine and run the builder that corresponds to the correct code type
-func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
+func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
 	for _, mod := range p.manifest.Modules {
 		vmType := ""
 		switch {
@@ -168,13 +171,13 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 		p.vmType = vmType
 	}
 
-	modules, err = p.graph.ModulesDownTo(p.outputStreamNames)
+	modules, err = p.graph.ModulesDownTo(p.outputModuleNames)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
 	p.builders = make(map[string]*state.Builder)
-	storeModules, err = p.graph.StoresDownTo(p.outputStreamNames)
+	storeModules, err = p.graph.StoresDownTo(p.outputModuleNames)
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
 		if p.partialMode {
@@ -201,7 +204,7 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 		err = p.BuildNative(modules)
 		return
 	}
-	err = p.buildWASM(modules)
+	err = p.buildWASM(ctx, request, modules)
 	return
 }
 
@@ -229,7 +232,7 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 			return fmt.Errorf("native code not found for %q entry point %s", modName, nativeCode.Entrypoint)
 		}
 
-		debugOutput := p.outputStreamsMap[modName]
+		debugOutput := p.outputModuleMap[modName]
 		var inputs []string
 		for _, in := range mod.Inputs {
 			if v := in.GetMap(); v != nil {
@@ -316,13 +319,13 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 	return nil
 }
 
-func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
+func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request, modules []*pbsubstreams.Module) error {
 
 	p.wasmOutputs = map[string][]byte{}
 	p.wasmRuntime = wasm.NewRuntime(p.wasmExtensions)
 
 	for _, mod := range modules {
-		isOutput := p.outputStreamsMap[mod.Name]
+		isOutput := p.outputModuleMap[mod.Name]
 		var inputs []*wasm.Input
 
 		for _, in := range mod.Inputs {
@@ -365,7 +368,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 		entrypoint := wasmCodeRef.Entrypoint
 
 		code := p.manifest.ModulesCode[wasmCodeRef.Index]
-		wasmModule, err := p.wasmRuntime.NewModule(code, mod.Name)
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code, mod.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
@@ -451,8 +454,8 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
-		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputStreamNames[0]) //todo: new the list of parent store.
-		outputStreamModule := p.builders[p.outputStreamNames[0]]
+		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputModuleNames[0]) //todo: new the list of parent store.
+		outputStreamModule := p.builders[p.outputModuleNames[0]]
 		var stores []*state.Store
 		for _, ancestorStore := range ancestorStores {
 			builder := p.builders[ancestorStore.Name]
@@ -491,13 +494,15 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 
 type StreamFunc func() error
 
-func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum uint64, stopBlock uint64, returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
-
-	p.requestedStartBlockNum = requestedStartBlockNum
-	_, _, err := p.build()
+func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
+	ctx := p.context
+	// WARN: we don't support < 0 StartBlock for now
+	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
+	_, _, err := p.build(ctx, p.request)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
+	stopBlock := p.request.StopBlockNum
 
 	p.progressTracker.startTracking(ctx)
 
@@ -516,6 +521,21 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	}()
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		clock := &pbsubstreams.Clock{
+			Number:    block.Num(),
+			Id:        block.Id,
+			Timestamp: timestamppb.New(block.Time()),
+		}
+
+		defer func() {
+			if err != nil {
+				for _, hook := range p.postJobHooks {
+					if err := hook(ctx, clock); err != nil {
+						zlog.Warn("post job hook failed", zap.Error(err))
+					}
+				}
+			}
+		}()
 		zlog.Info("processing block", zap.Uint64("block_num", block.Number))
 		blockCount++
 		handleBlockStart := time.Now()
@@ -537,12 +557,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		stepable := obj.(bstream.Stepable)
 		step := stepable.Step()
 
-		clock := &pbsubstreams.Clock{
-			Number:    block.Num(),
-			Id:        block.Id,
-			Timestamp: timestamppb.New(block.Time()),
-		}
-
 		p.currentClock = clock
 		p.nativeImports.SetCurrentBlock(block)
 
@@ -556,12 +570,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		}
 
 		if block.Number >= stopBlock {
-			for _, hook := range p.postJobHooks {
-				if err := hook(ctx, clock); err != nil {
-					return fmt.Errorf("post job hook: %w", err)
-				}
-			}
-
 			return io.EOF
 		}
 

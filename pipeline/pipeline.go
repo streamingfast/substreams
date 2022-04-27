@@ -818,6 +818,8 @@ func wasmCall(clock *pbsubstreams.Clock,
 			if len(val) != 0 {
 				input.StreamData = val
 				hasInput = true
+			} else {
+				input.StreamData = nil
 			}
 		case wasm.InputStore:
 			hasInput = true

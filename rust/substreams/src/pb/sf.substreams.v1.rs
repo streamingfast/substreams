@@ -351,9 +351,10 @@ pub mod table_change {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Operation {
-        Create = 0,
-        Update = 1,
-        Delete = 2,
+        Unset = 0,
+        Create = 1,
+        Update = 2,
+        Delete = 3,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

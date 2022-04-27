@@ -1,2 +1,2 @@
-generate.sh - Tue 19 Apr 2022 12:54:57 EDT - abourget
-streamingfast/proto revision: 19533872e29a1d36678703a80fcc8c6d55a9664a
+generate.sh - Wed Apr 27 12:33:20 EDT 2022 - cbillett
+streamingfast/proto revision: dc7e41550f8a194fe3ceab0c947c520c7b4742dc

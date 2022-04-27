@@ -13,9 +13,10 @@ message TableChange {
   uint64 block_num = 3;
   uint64 ordinal = 4;
   enum Operation {
-    CREATE = 0;
-    UPDATE = 1;
-    DELETE = 2;
+    UNSET = 0;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
   }
   Operation operation = 5;
   repeated Field fields = 6;

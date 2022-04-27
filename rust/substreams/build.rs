@@ -6,6 +6,7 @@ fn main() -> Result<()> {
         &[
             "../../proto/sf/ethereum/substreams/v1/rpc.proto",
             "../../proto/sf/substreams/v1/substreams.proto",
+            "../../proto/sf/substreams/v1/database.proto",
         ],
         &["../../proto"],
     )

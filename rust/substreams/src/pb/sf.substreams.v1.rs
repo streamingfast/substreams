@@ -327,3 +327,41 @@ pub enum ForkStep {
     /// Block is now irreversible and can be committed to (finality is chain specific, see chain documentation for more details)
     StepIrreversible = 4,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DatabaseChanges {
+    #[prost(message, repeated, tag="1")]
+    pub table_changes: ::std::vec::Vec<TableChange>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TableChange {
+    #[prost(string, tag="1")]
+    pub table: std::string::String,
+    #[prost(string, tag="2")]
+    pub pk: std::string::String,
+    #[prost(uint64, tag="3")]
+    pub block_num: u64,
+    #[prost(uint64, tag="4")]
+    pub ordinal: u64,
+    #[prost(enumeration="table_change::Operation", tag="5")]
+    pub operation: i32,
+    #[prost(message, repeated, tag="6")]
+    pub fields: ::std::vec::Vec<Field>,
+}
+pub mod table_change {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Operation {
+        Create = 0,
+        Update = 1,
+        Delete = 2,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Field {
+    #[prost(string, tag="1")]
+    pub name: std::string::String,
+    #[prost(string, tag="2")]
+    pub new_value: std::string::String,
+    #[prost(string, tag="3")]
+    pub old_value: std::string::String,
+}

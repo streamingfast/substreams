@@ -133,7 +133,6 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, functionName string, inp
 				if err != nil {
 					return nil, fmt.Errorf("marshaling store deltas: %w", err)
 				}
-
 				ptr, err := m.CurrentInstance.heap.Write(cnt)
 				if err != nil {
 					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)

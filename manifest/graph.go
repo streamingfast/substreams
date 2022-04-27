@@ -203,7 +203,7 @@ func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbsubstreams.Module
 	}
 
 	sort.Slice(res, func(i, j int) bool {
-		return topologicalIndex[res[i].Name] < topologicalIndex[res[j].Name]
+		return topologicalIndex[res[i].Name] > topologicalIndex[res[j].Name]
 	})
 
 	return res, nil
@@ -244,7 +244,7 @@ func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Modul
 	}
 
 	sort.Slice(res, func(i, j int) bool {
-		return topologicalIndex[res[i].Name] < topologicalIndex[res[j].Name]
+		return topologicalIndex[res[i].Name] > topologicalIndex[res[j].Name]
 	})
 
 	return res, nil

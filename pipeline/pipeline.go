@@ -396,6 +396,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			}
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
+				zlog.Debug("wasm map call", zap.String("module_name", modName))
 				return wasmMapCall(p.currentClock, p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc)
 			})
 			continue
@@ -436,6 +437,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			}
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
+				zlog.Debug("wasm store call", zap.String("module_name", modName))
 				return wasmStoreCall(p.currentClock, p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc)
 			})
 			continue
@@ -514,6 +516,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	}()
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		zlog.Info("processing block", zap.Uint64("block_num", block.Number))
 		blockCount++
 		handleBlockStart := time.Now()
 		//defer func() {
@@ -594,10 +597,10 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			}
 		}
 
-		if p.moduleOutputs != nil {
+		if len(p.moduleOutputs) > 0 {
 			// TODO: package, after each execution, ALL of the modules we want changes for,
 			// and add LOGS
-			zlog.Info("output module outputs", zap.Int("len", len(p.moduleOutputs)))
+			zlog.Info("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
 			out := &pbsubstreams.BlockScopedData{
 				Outputs: p.moduleOutputs,
 				Clock:   clock,
@@ -612,7 +615,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		for _, s := range p.builders {
 			s.Flush()
 		}
-
+		zlog.Info("block processed", zap.Uint64("block_num", block.Number))
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
 		return nil
 	}), nil

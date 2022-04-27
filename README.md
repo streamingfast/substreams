@@ -66,6 +66,8 @@ You can run the substreams service locally this way:
 
 Get a recent release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), and install `sfeth`.
 
+Alternatively, you can use this Docker image: `ghcr.io/streamingfast/sf-ethereum:6aa70ca`, known to work with version v0.0.5-beta of the `substreams` release herein.
+
 Get some data (merged blocks) to play with locally (here on BSC mainnet):
 
 ```bash

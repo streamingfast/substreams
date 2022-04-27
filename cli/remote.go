@@ -18,7 +18,7 @@ import (
 
 func init() {
 	remoteCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
-	remoteCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "name of variable containing Substreams Authentication token (JWT)")
+	remoteCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
 	remoteCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	remoteCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	remoteCmd.Flags().StringP("proto-path", "I", "./proto", "Path of proto files")
@@ -70,7 +70,7 @@ func runRemote(cmd *cobra.Command, args []string) error {
 
 	manifProto, err := manif.ToProto()
 	if err != nil {
-		return fmt.Errorf("parse manifest to proto%q: %w", manifestPath, err)
+		return fmt.Errorf("parse manifest to proto %q: %w", manifestPath, err)
 	}
 
 	graph, err := manifest.NewModuleGraph(manifProto.Modules)
@@ -89,7 +89,7 @@ func runRemote(cmd *cobra.Command, args []string) error {
 
 	ssClient, callOpts, err := client.NewSubstreamsClient(
 		mustGetString(cmd, "substreams-endpoint"),
-		os.Getenv(mustGetString(cmd, "substreams-api-key-envvar")),
+		os.Getenv(mustGetString(cmd, "substreams-api-token-envvar")),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)

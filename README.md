@@ -56,7 +56,6 @@ Then, try to run the [https://github.com/streamingfast/substreams-playground](Pa
 ```
 cd substreams-playground
 substreams run -e bsc-dev.streamingfast.io:443 wasm_substreams_manifest.yaml pairs,block_to_pairs,volumes,totals,db_out -s 6810706 -t 6810711
-
 ```
 
 
@@ -70,7 +69,9 @@ Get a recent release of [https://github.com/streamingfast/sf-ethereum](the Ether
 Get some data (merged blocks) to play with locally (here on BSC mainnet):
 
 ```bash
-sfeth tools download-from-firehose bsc-dev.streamingfast.io:443 6810000 6820000 ./localdata
+# Downloads 2.6GB of data
+sfeth tools download-from-firehose bsc-dev.streamingfast.io:443 6810000 6820000 ./localblocks
+sfeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
 
 Then run the `firehose` service locally in a terminal, reading blocks from your disk:
@@ -82,7 +83,7 @@ sfeth start firehose  --config-file=  --log-to-file=false  --common-blockstream-
 And then run the `substreams` command against your local deployment (checkout `substreams-playground` in the _Run remotely_ section above):
 
 ```bash
-substreams remote wasm_substreams_manifest.yaml pairs,block_to_pairs,db_out,volumes,totals -e localhost:9000 -k -s 6810706 -t 6810711
+substreams run -k -e localhost:9000 wasm_substreams_manifest.yaml pairs,block_to_pairs,db_out,volumes,totals -s 6810706 -t 6810711
 ```
 
 Examples

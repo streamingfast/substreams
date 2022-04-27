@@ -4,3 +4,4 @@
 target
 /rust/substreams/Cargo.lock
 .goreleaser.SOURCE_ME.sh
+/dist

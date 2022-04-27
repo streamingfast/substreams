@@ -1,7 +1,7 @@
 Streaming Data Engine based on SF Firehose Tech
 -----------------------------------------------
 
-THIS IS AT THE DESIGN/CREATION STAGE. IT IS ONLY FOR DEVELOPER PREVIEW.
+DEVELOPER PREVIEW OF SUBSTREAMS
 
 Think Fluvio for deterministic blockchain data.
 
@@ -12,7 +12,7 @@ The successor of https://github.com/streamingfast/sparkle, enabling greater comp
 Install
 -------
 
-Get a [/streamingfast/substreams/releases](release).
+Get a [release](/streamingfast/substreams/releases) (soon).
 
 From source:
 
@@ -51,7 +51,7 @@ Then in your shell, load a key in an env var with:
 sftoken
 ```
 
-Then, try to run the [https://github.com/streamingfast/substreams-playground](PancakeSwap Substreams) (under `pcs-rust/`, we build instructions over there)
+Then, try to run the [PancakeSwap Substreams](https://github.com/streamingfast/substreams-playground) (under `pcs-rust/`, we build instructions over there)
 
 ```
 cd substreams-playground
@@ -64,7 +64,7 @@ Run locally
 
 You can run the substreams service locally this way:
 
-Get a recent release of [https://github.com/streamingfast/sf-ethereum](the Ethereum Firehose), and install `sfeth`.
+Get a recent release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), and install `sfeth`.
 
 Get some data (merged blocks) to play with locally (here on BSC mainnet):
 
@@ -85,8 +85,3 @@ And then run the `substreams` command against your local deployment (checkout `s
 ```bash
 substreams run -k -e localhost:9000 wasm_substreams_manifest.yaml pairs,block_to_pairs,db_out,volumes,totals -s 6810706 -t 6810711
 ```
-
-Examples
---------
-
-https://github.com/streamingfast/substreams-playground

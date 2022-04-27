@@ -26,7 +26,7 @@ pub unsafe fn dealloc(ptr: *mut u8, size: usize) {
     std::mem::drop(data);
 }
 
-pub(crate) fn read_u32_from_heap(output_ptr: *mut u8, len: usize) -> u32 {
+pub fn read_u32_from_heap(output_ptr: *mut u8, len: usize) -> u32 {
     unsafe {
         let value_bytes = slice::from_raw_parts(output_ptr, len);
         let value_raw_bytes: [u8; 4] = value_bytes.try_into().expect("error reading raw bytes");
@@ -34,7 +34,7 @@ pub(crate) fn read_u32_from_heap(output_ptr: *mut u8, len: usize) -> u32 {
     }
 }
 
-pub(crate) fn get_output_data(output_ptr: *mut u8) -> Vec<u8> {
+pub fn get_output_data(output_ptr: *mut u8) -> Vec<u8> {
     unsafe {
         let value_ptr: u32 = read_u32_from_heap(output_ptr, 4);
         let value_len: u32 = read_u32_from_heap(output_ptr.add(4), 4);

@@ -9,25 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"github.com/streamingfast/dstore"
-
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/eth-go/rpc"
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	imports "github.com/streamingfast/substreams/native-imports"
-	pbethsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/registry"
-	ssrpc "github.com/streamingfast/substreams/rpc"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
-	"github.com/wasmerio/wasmer-go/wasmer"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Pipeline struct {
@@ -39,14 +33,20 @@ type Pipeline struct {
 
 	blockType string
 
-	rpcCacheManager *ssrpc.Cache
-	nativeImports   *imports.Imports
-	builders        map[string]*state.Builder
+	preBlockHooks  []substreams.BlockHook
+	postBlockHooks []substreams.BlockHook
+	postJobHooks   []substreams.PostJobHook
+
+	wasmRuntime    *wasm.Runtime
+	wasmExtensions []wasm.WASMExtensioner
+	nativeImports  *imports.Imports
+	builders       map[string]*state.Builder
 
 	//ioFactory        state.FactoryInterface
-	graph            *manifest.ModuleGraph
-	manifest         *pbsubstreams.Manifest
-	outputStreamName string
+	graph             *manifest.ModuleGraph
+	manifest          *pbsubstreams.Manifest
+	outputStreamNames []string
+	outputStreamsMap  map[string]bool
 
 	streamFuncs   []StreamFunc
 	nativeOutputs map[string]reflect.Value
@@ -56,8 +56,9 @@ type Pipeline struct {
 	allowInvalidState  bool
 	stateStore         dstore.Store
 
-	nextReturnValue *pbsubstreams.ModuleOutput
-	logs            []string
+	currentClock  *pbsubstreams.Clock
+	moduleOutputs []*pbsubstreams.ModuleOutput
+	logs          []string
 }
 
 type progressTracker struct {
@@ -115,25 +116,7 @@ func (p *progressTracker) log() {
 	p.timeSpentInStreamFuncs = 0
 }
 
-type RpcProvider interface {
-	RPC(calls *pbethsubstreams.RpcCalls) *pbethsubstreams.RpcResponses
-}
-
-type Option func(p *Pipeline)
-
-func WithPartialMode() Option {
-	return func(p *Pipeline) {
-		p.partialMode = true
-	}
-}
-
-func WithAllowInvalidState() Option {
-	return func(p *Pipeline) {
-		p.allowInvalidState = true
-	}
-}
-
-func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbsubstreams.Manifest, graph *manifest.ModuleGraph, outputStreamName string, blockType string, stateStore dstore.Store, opts ...Option) *Pipeline {
+func New(manifest *pbsubstreams.Manifest, graph *manifest.ModuleGraph, outputStreamNames []string, blockType string, stateStore dstore.Store, wasmExtensions []wasm.WASMExtensioner, opts ...Option) *Pipeline {
 	rpcCache *ssrpc.Cache,
 	manifest *pbsubstreams.Manifest,
 	graph *manifest.ModuleGraph,
@@ -144,16 +127,20 @@ func New(rpcClient *rpc.Client, rpcCache *ssrpc.Cache, manifest *pbsubstreams.Ma
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
-		rpcCacheManager:    rpcCache,
-		nativeImports:      imports.NewImports(rpcClient),
-		builders:           map[string]*state.Builder{},
-		graph:              graph,
-		stateStore:         stateStore,
-		manifest:           manifest,
-		outputStreamName:   outputStreamName,
-		blockType:          blockType,
-		progressTracker:    newProgressTracker(),
-		statesSaveInterval: statesSaveInterval,
+		nativeImports:     imports.NewImports(),
+		builders:          map[string]*state.Builder{},
+		graph:             graph,
+		stateStore:        stateStore,
+		manifest:          manifest,
+		outputStreamNames: outputStreamNames,
+		outputStreamsMap:  map[string]bool{},
+		blockType:         blockType,
+		progressTracker:   newProgressTracker(),
+		wasmExtensions:    wasmExtensions,
+	}
+
+	for _, name := range outputStreamNames {
+		pipe.outputStreamsMap[name] = true
 	}
 
 	for _, opt := range opts {
@@ -191,7 +178,7 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
 		if p.partialMode {
-			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamName))
+			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamsMap[storeModule.Name]))
 		}
 
 		store, err := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
@@ -219,7 +206,13 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 }
 
 func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
-
+	// TODO: this would need to become on the same level as the WASM
+	// modules, so using bytes as input and output and being there
+	// only to avoid the overhead of the WASM VM.
+	//
+	// Perhaps it just disappears at some point. It already doesn't
+	// support RPC anymore for Eth, and we're not going to build a
+	// native abstraction for chain-specific things (yet?).
 	nativeStreams := registry.Init(p.nativeImports)
 
 	p.nativeOutputs = map[string]reflect.Value{}
@@ -236,7 +229,7 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 			return fmt.Errorf("native code not found for %q entry point %s", modName, nativeCode.Entrypoint)
 		}
 
-		debugOutput := modName == p.outputStreamName
+		debugOutput := p.outputStreamsMap[modName]
 		var inputs []string
 		for _, in := range mod.Inputs {
 			if v := in.GetMap(); v != nil {
@@ -265,13 +258,13 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 							return err
 						}
 
-						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_MapOutput{
 								MapOutput: anyMsg,
 							},
-							Logs: p.logs,
-						}
+							// FIXME: handle Logs when we need them.
+						})
 					}
 					return
 				}
@@ -297,13 +290,13 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 			if debugOutput {
 				outputFunc = func() (err error) {
 					if len(outputStore.Deltas) != 0 {
-						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_StoreDeltas{
 								StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas},
 							},
-							Logs: p.logs,
-						}
+							// FIXME: handle Logs when we need them.
+						})
 					}
 					return
 				}
@@ -326,9 +319,10 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 
 	p.wasmOutputs = map[string][]byte{}
+	p.wasmRuntime = wasm.NewRuntime(p.wasmExtensions)
 
 	for _, mod := range modules {
-		isOutput := mod.Name == p.outputStreamName
+		isOutput := p.outputStreamsMap[mod.Name]
 		var inputs []*wasm.Input
 
 		for _, in := range mod.Inputs {
@@ -371,12 +365,11 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 		entrypoint := wasmCodeRef.Entrypoint
 
 		code := p.manifest.ModulesCode[wasmCodeRef.Index]
-		wasmModule, err := wasm.NewModule(code, mod.Name)
+		wasmModule, err := p.wasmRuntime.NewModule(code, mod.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
-		rpcWasmFuncFactory := GetRPCWasmFunctionFactory(p.nativeImports, wasmModule)
 		if v := mod.GetKindMap(); v != nil {
 			fmt.Printf("Adding mapper for module %q\n", modName)
 
@@ -385,20 +378,21 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			outputFunc := func(out []byte) {}
 			if isOutput {
 				outputFunc = func(out []byte) {
-					if out != nil {
-						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+					logs := wasmModule.CurrentInstance.Logs
+					if out != nil || len(logs) != 0 {
+						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_MapOutput{
 								MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: out},
 							},
-							Logs: p.logs,
-						}
+							Logs: logs,
+						})
 					}
 				}
 			}
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmMapCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc, rpcWasmFuncFactory)
+				return wasmMapCall(p.currentClock, p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc)
 			})
 			continue
 		}
@@ -419,21 +413,22 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			outputFunc := func() error { return nil }
 			if isOutput {
 				outputFunc = func() (err error) {
-					if len(outputStore.Deltas) != 0 {
-						p.nextReturnValue = &pbsubstreams.ModuleOutput{
+					logs := wasmModule.CurrentInstance.Logs
+					if len(outputStore.Deltas) != 0 || len(logs) != 0 {
+						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_StoreDeltas{
 								StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: outputStore.Deltas},
 							},
-							Logs: p.logs,
-						}
+							Logs: logs,
+						})
 					}
 					return
 				}
 			}
 
 			p.streamFuncs = append(p.streamFuncs, func() error {
-				return wasmStoreCall(p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc, rpcWasmFuncFactory)
+				return wasmStoreCall(p.currentClock, p.wasmOutputs, wasmModule, entrypoint, modName, inputs, outputFunc)
 			})
 			continue
 		}
@@ -444,54 +439,10 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 	return nil
 }
 
-func GetRPCWasmFunctionFactory(rpcProvider RpcProvider, module *wasm.Module) wasm.WasmerFunctionFactory {
-	return func(instance *wasm.Instance) (namespace string, name string, wasmerFunc *wasmer.Function) {
-		namespace = "rpc"
-		name = "eth_call"
-		wasmerFunc = wasmer.NewFunction(
-			module.CurrentInstance.Store(),
-			wasmer.NewFunctionType(
-				wasm.Params(wasmer.I32, wasmer.I32, wasmer.I32), // 0(READ): proto RPCCalls offset,  1(READ): proto RPCCalls len, 2(WRITE): offset for proto RPCResponses
-				wasm.Returns()),
-			func(args []wasmer.Value) ([]wasmer.Value, error) {
-
-				heap := instance.Heap()
-
-				message, err := heap.ReadBytes(args[0].I32(), args[1].I32())
-				if err != nil {
-					return nil, fmt.Errorf("read message argument: %w", err)
-				}
-
-				rpcCalls := &pbethsubstreams.RpcCalls{}
-				err = proto.Unmarshal(message, rpcCalls)
-				if err != nil {
-					return nil, fmt.Errorf("unmarshal message %w", err)
-				}
-
-				t0 := time.Now()
-				responses := rpcProvider.RPC(rpcCalls)
-				zlog.Info("time taken to call rpc: ", zap.Duration("rpc_call_duration", time.Since(t0)))
-
-				responsesBytes, err := proto.Marshal(responses)
-				if err != nil {
-					return nil, fmt.Errorf("marshall message: %w", err)
-				}
-
-				err = instance.WriteOutputToHeap(args[2].I32(), responsesBytes)
-				if err != nil {
-					return nil, fmt.Errorf("write output to heap %w", err)
-				}
-				return nil, nil
-			},
-		)
-		return
-	}
-}
-
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
-		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputStreamName) //todo: new the list of parent store.
-		outputStreamModule := p.builders[p.outputStreamName]
+		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputStreamNames[0]) //todo: new the list of parent store.
+		outputStreamModule := p.builders[p.outputStreamNames[0]]
 		var stores []*state.Store
 		for _, ancestorStore := range ancestorStores {
 			builder := p.builders[ancestorStore.Name]
@@ -546,12 +497,10 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 	}
 
 	blockCount := 0
-	//blockSec := 0
 
 	go func() {
 		for {
 			time.Sleep(time.Second)
-			//blockSec = blockCount
 			blockCount = 0
 		}
 	}()
@@ -573,6 +522,12 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		stepable := obj.(bstream.Stepable)
 		step := stepable.Step()
 
+		clock := &pbsubstreams.Clock{
+			Number:    block.Num(),
+			Id:        block.Id,
+			Timestamp: timestamppb.New(block.Time()),
+		}
+
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 
@@ -586,27 +541,31 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 				zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
 			}
 		}
+			for _, hook := range p.postJobHooks {
+				if err := hook(ctx, clock); err != nil {
+					return fmt.Errorf("post job hook: %w", err)
+				}
+			}
+			//p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
 
 		if block.Number >= stopBlock {
 			return io.EOF
 		}
 
+		p.currentClock = clock
 		p.nativeImports.SetCurrentBlock(block)
-		p.rpcCacheManager.UpdateCache(ctx, block.Num(), stopBlock)
-		p.nextReturnValue = nil
 
-		//clock := toClock(block)
-
-		clock := &pbsubstreams.Clock{
-			Number:    block.Num(),
-			Id:        block.Id,
-			Timestamp: timestamppb.New(block.Time()),
+		for _, hook := range p.preBlockHooks {
+			if err := hook(ctx, clock); err != nil {
+				return fmt.Errorf("pre block hook: %w", err)
+			}
 		}
+		p.moduleOutputs = nil
 
 		blk := block.ToProtocol()
 		switch p.vmType {
 		case "native":
-			p.nativeOutputs[p.blockType /*"sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
+			p.nativeOutputs[p.blockType /* "sf.ethereum.type.v1.Block" */] = reflect.ValueOf(blk)
 			p.nativeOutputs["sf.substreams.v1.Clock"] = reflect.ValueOf(clock)
 		case "wasm/rust-v1":
 			// block.Payload.Get() could do the same, but does it go through the same
@@ -620,7 +579,6 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 
 			p.wasmOutputs[p.blockType] = blkBytes
 			p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
-			//p.wasmOutputs["sf.substreams.v1.Clock"] = clock //FIXME stepd implement clock
 		default:
 			panic("unsupported vmType " + p.vmType)
 		}
@@ -635,22 +593,14 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			s.Flush()
 		}
 
-		if p.nextReturnValue != nil {
-			// out := &pbsubstreams.Output{
-			// 	BlockNum:  block.Num(),
-			// 	BlockId:   block.Id,
-			// 	Timestamp: timestamppb.New(block.Time()),
-			// 	Value:     p.nextReturnValue,
-			// }
-			// TODO: package, after each execution, all of the internal changes of each module, along with
-			// logs
+		if p.moduleOutputs != nil {
+			// TODO: package, after each execution, ALL of the modules we want changes for,
+			// and add LOGS
 			out := &pbsubstreams.BlockScopedData{
-				Outputs: []*pbsubstreams.ModuleOutput{
-					p.nextReturnValue,
-				},
-				Clock:  clock,
-				Step:   stepToProto(step),
-				Cursor: cursor.ToOpaque(),
+				Outputs: p.moduleOutputs,
+				Clock:   clock,
+				Step:    stepToProto(step),
+				Cursor:  cursor.ToOpaque(),
 			}
 			if err := returnFunc(out); err != nil {
 				return err
@@ -788,16 +738,16 @@ func nativeStoreCall(vals map[string]reflect.Value, method reflect.Value, name s
 	return nil
 }
 
-func wasmMapCall(vals map[string][]byte,
+func wasmMapCall(clock *pbsubstreams.Clock,
+	vals map[string][]byte,
 	mod *wasm.Module,
 	entrypoint string,
 	name string,
 	inputs []*wasm.Input,
 	output func(out []byte),
-	rpcFactory wasm.WasmerFunctionFactory,
 ) (err error) {
 	var vm *wasm.Instance
-	if vm, err = wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
+	if vm, err = wasmCall(clock, vals, mod, entrypoint, name, inputs); err != nil {
 		return err
 	}
 
@@ -813,15 +763,15 @@ func wasmMapCall(vals map[string][]byte,
 	return nil
 }
 
-func wasmStoreCall(vals map[string][]byte,
+func wasmStoreCall(clock *pbsubstreams.Clock,
+	vals map[string][]byte,
 	mod *wasm.Module,
 	entrypoint string,
 	name string,
 	inputs []*wasm.Input,
 	output func() error,
-	rpcFactory wasm.WasmerFunctionFactory,
 ) (err error) {
-	if _, err := wasmCall(vals, mod, entrypoint, name, inputs, rpcFactory); err != nil {
+	if _, err := wasmCall(clock, vals, mod, entrypoint, name, inputs); err != nil {
 		return err
 	}
 
@@ -832,12 +782,12 @@ func wasmStoreCall(vals map[string][]byte,
 	return nil
 }
 
-func wasmCall(vals map[string][]byte,
+func wasmCall(clock *pbsubstreams.Clock,
+	vals map[string][]byte,
 	mod *wasm.Module,
 	entrypoint string,
 	name string,
-	inputs []*wasm.Input,
-	rpcFactory wasm.WasmerFunctionFactory) (instance *wasm.Instance, err error) {
+	inputs []*wasm.Input) (instance *wasm.Instance, err error) {
 
 	hasInput := false
 	for _, input := range inputs {
@@ -862,7 +812,7 @@ func wasmCall(vals map[string][]byte,
 	//  state builders will not be called if their input streams are 0 bytes length (and there's no
 	//  state store in read mode)
 	if hasInput {
-		instance, err = mod.NewInstance(entrypoint, inputs, rpcFactory)
+		instance, err = mod.NewInstance(clock, entrypoint, inputs)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}

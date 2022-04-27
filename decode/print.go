@@ -92,34 +92,41 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string)
 		}
 
 		for _, out := range output.Outputs {
+			for _, log := range out.Logs {
+				fmt.Printf("%s: log: %s\n", out.Name, log)
+			}
+
 			switch data := out.Data.(type) {
 			case *pbsubstreams.ModuleOutput_MapOutput:
+				if len(data.MapOutput.Value) != 0 {
+					decodeValue := decodeMsgTypes[out.Name]
+					msgType := msgTypes[out.Name]
+					if decodeValue != nil {
+						cnt := decodeValue(data.MapOutput.GetValue())
 
-				decodeValue := decodeMsgTypes[out.Name]
-				msgType := msgTypes[out.Name]
-				if decodeValue != nil {
-					cnt := decodeValue(data.MapOutput.GetValue())
+						fmt.Printf("%s: message %q: %s\n", out.Name, msgType, cnt)
+					} else {
+						fmt.Printf("%s: message %q: ", out.Name, msgType)
 
-					fmt.Printf("Message %q: %s\n", msgType, cnt)
-				} else {
-					fmt.Printf("Message %q: ", msgType)
+						marshalledBytes, err := protojson.Marshal(data.MapOutput)
+						if err != nil {
+							return fmt.Errorf("return handler: marshalling: %w", err)
+						}
 
-					marshalledBytes, err := protojson.Marshal(data.MapOutput)
-					if err != nil {
-						return fmt.Errorf("return handler: marshalling: %w", err)
+						fmt.Println(marshalledBytes)
 					}
-
-					fmt.Println(marshalledBytes)
 				}
 
 			case *pbsubstreams.ModuleOutput_StoreDeltas:
-				fmt.Printf("Store deltas for %q:\n", out.Name)
-				decodeValue := decodeMsgTypes[out.Name]
-				for _, delta := range data.StoreDeltas.Deltas {
-					fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
+				if len(data.StoreDeltas.Deltas) != 0 {
+					fmt.Printf("%s: store deltas:\n", out.Name)
+					decodeValue := decodeMsgTypes[out.Name]
+					for _, delta := range data.StoreDeltas.Deltas {
+						fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
 
-					fmt.Printf("    OLD: %s\n", decodeValue(delta.OldValue))
-					fmt.Printf("    NEW: %s\n", decodeValue(delta.NewValue))
+						fmt.Printf("    OLD: %s\n", decodeValue(delta.OldValue))
+						fmt.Printf("    NEW: %s\n", decodeValue(delta.NewValue))
+					}
 				}
 
 			default:

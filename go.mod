@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20220330132237-248bc2d8ea7e
 	github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e
 	github.com/streamingfast/eth-go v0.0.0-20220426130813-8ceed63c0fd5
-	github.com/streamingfast/firehose v0.1.1-0.20220330200655-9a92471b9be3
+	github.com/streamingfast/firehose v0.1.1-0.20220427051727-9b108461d3a6
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
 	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
@@ -86,8 +86,10 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 // indirect
+	github.com/streamingfast/dauth v0.0.0-20220404140613-a40f4cd81626 // indirect
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5 // indirect
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594 // indirect
+	github.com/streamingfast/dmetering v0.0.0-20220307162406-37261b4b3de9 // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447 // indirect
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect

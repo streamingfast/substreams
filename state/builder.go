@@ -22,7 +22,7 @@ type Builder struct {
 	partialStartBlock uint64
 	ModuleStartBlock  uint64
 	ModuleHash        string
-	disableWriteState bool
+	enableStateWriting bool
 
 	complete bool
 
@@ -37,10 +37,11 @@ type Builder struct {
 
 type BuilderOption func(b *Builder)
 
-func WithPartialMode(startBlock uint64, outputStream string) BuilderOption {
+func WithPartialMode(startBlock uint64, enableStateWriting bool) BuilderOption {
 	return func(b *Builder) {
 		b.partialMode = true
 		b.partialStartBlock = startBlock
+		b.enableStateWriting = enableStateWriting
 	}
 }
 
@@ -215,6 +216,10 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 }
 
 func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode bool) (string, error) {
+	if !b.enableStateWriting {
+		return "", nil
+	}
+
 	b.writeMergeValues()
 
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK

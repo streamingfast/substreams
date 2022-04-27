@@ -1,6 +1,5 @@
 mod pb;
 
-use crate::pb::substreams::RpcCall;
 use bigdecimal::BigDecimal;
 use num_bigint::BigUint;
 
@@ -138,79 +137,43 @@ extern "C" fn test_set_max_bigfloat() {
     );
 }
 
-#[no_mangle]
-extern "C" fn test_eth_call() {
-    let deadbeef = hex::decode("deadbeef").unwrap();
-    let addr = hex::decode("ea674fdde714fd979de3edf0f56aa9716b898ec8").unwrap();
+// wasm extension tests
 
-    let rpc_calls = pb::substreams::RpcCalls {
-        calls: vec![RpcCall {
-            to_addr: addr,
-            method_signature: deadbeef,
-        }],
-    };
+#[link(wasm_import_module = "myext")]
+extern "C" {
+    pub fn myimport(rpc_call_offset: *const u8, rpc_call_len: u32, rpc_response_ptr: *const u8);
+}
 
-    substreams::rpc::eth_call(substreams::proto::encode(&rpc_calls).unwrap());
+pub fn do_myimport(input: Vec<u8>) -> Vec<u8> {
+    unsafe {
+        let response_ptr = substreams::memory::alloc(8);
+        myimport(input.as_ptr(), input.len() as u32, response_ptr);
+        return substreams::memory::get_output_data(response_ptr);
+    }
 }
 
 #[no_mangle]
-extern "C" fn test_eth_call_2() {
-    let method_signature_1 = hex::decode("deadbeef").unwrap();
-    let addr = hex::decode("ea674fdde714fd979de3edf0f56aa9716b898ec8").unwrap();
+extern "C" fn test_wasm_extension_hello() {
+    substreams::log::println("first".to_string());
 
-    let method_signature2 = hex::decode("beefdead").unwrap();
-    let addr2 = hex::decode("0e09fabb73bd3ade0a17ecc321fd13a19e81ce82").unwrap();
-
-    let calls = vec![
-        RpcCall {
-            to_addr: addr,
-            method_signature: method_signature_1,
-        },
-        RpcCall {
-            to_addr: addr2,
-            method_signature: method_signature2,
-        }
-    ];
-
-    let rpc_calls = pb::substreams::RpcCalls {
-        calls,
-    };
-
-    substreams::rpc::eth_call(substreams::proto::encode(&rpc_calls).unwrap());
+    let val = do_myimport(Vec::from("hello"));
+    // Print a certain log statement if val == "world"
+    // Print a different one if `do_myimport` failed, or will it even come back?
+    substreams::log::println("second".to_string());
 }
 
 #[no_mangle]
-extern "C" fn test_eth_call_3() {
-    let method_signature1 = hex::decode("deadbeef").unwrap();
-    let addr = hex::decode("ea674fdde714fd979de3edf0f56aa9716b898ec8").unwrap();
+extern "C" fn test_wasm_extension_fail() {
+    substreams::log::println("first".to_string());
 
-    let method_signature2 = hex::decode("beefdead").unwrap();
-    let addr2 = hex::decode("0e09fabb73bd3ade0a17ecc321fd13a19e81ce82").unwrap();
+    let val = do_myimport(Vec::from("failfast"));
+    // Print a certain log statement if val == "world"
+    // Print a different one if `do_myimport` failed, or will it even come back?
 
-    let method_signature3 = hex::decode("feebdead").unwrap();
-    let addr3 = hex::decode("d006a7431be66fec522503db41f54692b85447c1").unwrap();
-
-    let calls = vec![
-        RpcCall {
-            to_addr: addr,
-            method_signature: method_signature1,
-        },
-        RpcCall {
-            to_addr: addr2,
-            method_signature: method_signature2,
-        },
-        RpcCall {
-            to_addr: addr3,
-            method_signature: method_signature3,
-        }
-    ];
-
-    let rpc_calls = pb::substreams::RpcCalls {
-        calls,
-    };
-
-    substreams::rpc::eth_call(substreams::proto::encode(&rpc_calls).unwrap());
+    substreams::log::println("second".to_string());
 }
+
+/// delete prefix tests
 
 #[no_mangle]
 extern "C" fn test_set_delete_prefix() {
@@ -219,10 +182,9 @@ extern "C" fn test_set_delete_prefix() {
     substreams::state::delete_prefix(3, &"2:".to_string());
 }
 
-
 #[no_mangle]
 extern "C" fn test_make_it_crash(data_ptr: *mut u8, data_len: usize) {
-     unsafe {
+    unsafe {
         let input_data = Vec::from_raw_parts(data_ptr, data_len, data_len);
         let cloned_data = input_data.clone();
         substreams::output_raw(cloned_data);

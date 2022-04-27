@@ -2,21 +2,15 @@ package imports
 
 import (
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/eth-go/rpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/ethereum/substreams/v1"
-	ssrpc "github.com/streamingfast/substreams/rpc"
 )
 
 type Imports struct {
-	rpcClient *rpc.Client
-
 	currentBlock bstream.BlockRef
 }
 
-func NewImports(rpcClient *rpc.Client) *Imports {
-	return &Imports{
-		rpcClient: rpcClient,
-	}
+func NewImports() *Imports {
+	return &Imports{}
 }
 
 func (i *Imports) SetCurrentBlock(ref bstream.BlockRef) {
@@ -24,9 +18,9 @@ func (i *Imports) SetCurrentBlock(ref bstream.BlockRef) {
 }
 
 func (i *Imports) RPC(calls *pbsubstreams.RpcCalls) *pbsubstreams.RpcResponses {
-	return ssrpc.RPCCalls(
-		i.currentBlock.Num(),
-		i.rpcClient,
-		calls,
-	)
+	// We NOW have only WASM extensions, so when we'll want to have
+	// native code support for some stuff, it won't be for extensions,
+	// but only for high speed in-memory manipulations of data
+	// structures.
+	return nil
 }

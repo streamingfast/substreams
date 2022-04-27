@@ -13,8 +13,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	imports "github.com/streamingfast/substreams/native-imports"
-	pbtransform "github.com/streamingfast/substreams/pb/sf/substreams/transform/v1"
-	"github.com/streamingfast/substreams/pipeline"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/test-go/testify/require"
@@ -31,7 +30,7 @@ func TestRustScript(t *testing.T) {
 		{
 			functionName: "test_sum_big_int",
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_SUM, "bigint", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "bigint", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("test.key.1")
 				require.True(t, found)
@@ -41,7 +40,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_int64",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_SUM, "int64", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "int64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.int.64")
 				require.True(t, found)
@@ -52,7 +51,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_float64",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_SUM, "float64", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "float64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.float.64")
 				require.True(t, found)
@@ -63,7 +62,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_big_float_small_number",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_SUM, "bigFloat", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "bigFloat", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)
@@ -73,7 +72,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_sum_big_float_big_number",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_SUM, "bigFloat", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "bigFloat", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)
@@ -83,7 +82,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_min_int64",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MIN, "int64", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "int64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_min_int64")
 				require.True(t, found)
@@ -93,7 +92,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_min_bigint",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MIN, "bigInt", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigInt", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_min_bigint")
 				require.True(t, found)
@@ -103,7 +102,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_min_float64",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MIN, "float64", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "float64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_min_float64")
 				require.True(t, found)
@@ -115,7 +114,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_min_bigfloat",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MIN, "bigFloat", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigFloat", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_min_bigfloat")
 				require.True(t, found)
@@ -125,7 +124,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_max_int64",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MAX, "int64", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "int64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_max_int64")
 				require.True(t, found)
@@ -135,7 +134,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_max_bigint",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MAX, "bigInt", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigInt", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_max_bigint")
 				require.True(t, found)
@@ -145,7 +144,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_max_float64",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MAX, "float64", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "float64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_max_float64")
 				require.True(t, found)
@@ -157,7 +156,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_max_bigfloat",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_MAX, "bigFloat", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigFloat", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("set_max_bigfloat")
 				require.True(t, found)
@@ -167,7 +166,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "./target/wasm32-unknown-unknown/release/testing_substreams.wasm",
 			functionName: "test_set_delete_prefix",
-			builder:      state.NewBuilder("builder.name.1", 0, pbtransform.KindStore_UPDATE_POLICY_IGNORE, "some object", nil),
+			builder:      state.NewBuilder("builder.name.1", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE, "some object", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				_, found := builder.GetLast("1:key_to_keep")
 				require.True(t, found, "key_to_keep")
@@ -183,13 +182,17 @@ func TestRustScript(t *testing.T) {
 			require.NoError(t, err)
 			byteCode, err := ioutil.ReadAll(file)
 			require.NoError(t, err)
-			module, err := wasm.NewModule(byteCode, c.functionName)
+
+			rpcProv := &testWasmExtension{}
+			runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
+
+			module, err := runtime.NewModule(byteCode, c.functionName)
 			require.NoError(t, err)
 
 			imps := &imports.Imports{}
 			imps.SetCurrentBlock(bstream.NewBlockRef("test", 42))
 
-			instance, err := module.NewInstance(c.functionName, nil, pipeline.GetRPCWasmFunctionFactory(nil, module))
+			instance, err := module.NewInstance(c.functionName, nil)
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
 			err = instance.Execute()
@@ -201,7 +204,7 @@ func TestRustScript(t *testing.T) {
 
 func Test_MakeItCrash(t *testing.T) {
 	t.Skip()
-	file, err := os.Open("./target/wasm32-unknown-unknown/release/testing_substreams.wasm")
+	file, err := os.Open("./pkg/testing_substreams_bg.wasm")
 	require.NoError(t, err)
 	byteCode, err := ioutil.ReadAll(file)
 	require.NoError(t, err)
@@ -211,7 +214,8 @@ func Test_MakeItCrash(t *testing.T) {
 	//mutex := sync.Mutex{}
 	wg := sync.WaitGroup{}
 	data := make([]byte, (1024*1024)*1)
-	module, err := wasm.NewModule(byteCode, "test_make_it_crash")
+	runtime := wasm.NewRuntime(nil)
+	module, err := runtime.NewModule(byteCode, "test_make_it_crash")
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
 		fmt.Println("iteration:", i)
@@ -222,7 +226,7 @@ func Test_MakeItCrash(t *testing.T) {
 				//fmt.Print(id, "-")
 				//runtime.LockOSThread()
 
-				instance, err := module.NewInstance("test_make_it_crash", nil, pipeline.GetRPCWasmFunctionFactory(nil, module))
+				instance, err := module.NewInstance("test_make_it_crash", nil)
 				time.Sleep(10 * time.Millisecond)
 				ptr, err := instance.Heap().Write(data)
 

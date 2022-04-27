@@ -14,6 +14,7 @@ bigdecimal = "0.3"
 prost = { version = "0.6" }
 prost-types = "0.6"
 hex = "0.4"
+wasm-bindgen = "0.2"
 
 [build-dependencies]
 prost-build = "0.6"

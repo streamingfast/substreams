@@ -104,7 +104,11 @@ func newWithoutLoad(path string) (*Manifest, error) {
 		return nil, fmt.Errorf("decoding yaml: %w", err)
 	}
 
+	// TODO: put some limits on the NUMBER of modules (max 50 ?)
+	// TODO: put a limit on the SIZE of the WASM payload (max 10MB per binary?)
+
 	for _, s := range m.Modules {
+		// TODO: let's make sure this is also checked when received in Protobuf in a remote request.
 		if !ModuleNameRegexp.MatchString(s.Name) {
 			return nil, fmt.Errorf("module name %s does not match regex %s", s.Name, ModuleNameRegexp.String())
 		}
@@ -114,6 +118,7 @@ func newWithoutLoad(path string) (*Manifest, error) {
 			if s.Output.Type == "" {
 				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
+			// TODO: check protobuf
 			if s.Code.Entrypoint == "" {
 				s.Code.Entrypoint = "map"
 			}
@@ -123,6 +128,8 @@ func newWithoutLoad(path string) (*Manifest, error) {
 			}
 
 			if s.Code.Entrypoint == "" {
+				// TODO: let's make sure this is validated also when analyzing some incoming protobuf version
+				// of this.
 				s.Code.Entrypoint = "build_state"
 			}
 

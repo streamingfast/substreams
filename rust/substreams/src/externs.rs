@@ -124,6 +124,7 @@ pub mod state {
     }
 }
 
+// MOVE TO a Ethereum-specific Rust crate
 pub mod rpc {
     #[link(wasm_import_module = "rpc")]
     extern "C" {

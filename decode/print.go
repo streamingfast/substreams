@@ -42,6 +42,9 @@ func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescr
 				}
 
 				decodeMsgType := func(in []byte) string {
+					if msgDesc == nil {
+						return "(unknown proto schema) " + decodeAsString(in)
+					}
 					msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 					if err := msg.Unmarshal(in); err != nil {
 						fmt.Printf("error unmarshalling protobuf %s to map: %s\n", msgType, err)

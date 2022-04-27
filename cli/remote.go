@@ -109,11 +109,13 @@ func runRemote(cmd *cobra.Command, args []string) error {
 		ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 	}
 
+	zlog.Info("connecting...")
 	cli, err := ssClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
 	}
 
+	zlog.Info("connected")
 	for {
 		resp, err := cli.Recv()
 		if err != nil {

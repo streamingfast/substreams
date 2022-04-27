@@ -14,6 +14,12 @@ func WithPartialMode() Option {
 	}
 }
 
+func WithStoresSaveInterval(seconds uint64) Option {
+	return func(p *Pipeline) {
+		p.storesSaveInterval = seconds
+	}
+}
+
 func WithAllowInvalidState() Option {
 	return func(p *Pipeline) {
 		p.allowInvalidState = true

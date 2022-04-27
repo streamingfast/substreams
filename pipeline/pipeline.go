@@ -55,6 +55,7 @@ type Pipeline struct {
 	progressTracker    *progressTracker
 	allowInvalidState  bool
 	stateStore         dstore.Store
+	storesSaveInterval uint64
 
 	currentClock  *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
@@ -116,14 +117,13 @@ func (p *progressTracker) log() {
 	p.timeSpentInStreamFuncs = 0
 }
 
-func New(manifest *pbsubstreams.Manifest, graph *manifest.ModuleGraph, outputStreamNames []string, blockType string, stateStore dstore.Store, wasmExtensions []wasm.WASMExtensioner, opts ...Option) *Pipeline {
-	rpcCache *ssrpc.Cache,
+func New(
 	manifest *pbsubstreams.Manifest,
 	graph *manifest.ModuleGraph,
-	outputStreamName string,
+	outputStreamNames []string,
 	blockType string,
 	stateStore dstore.Store,
-	statesSaveInterval uint64,
+	wasmExtensions []wasm.WASMExtensioner,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -168,17 +168,17 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 		p.vmType = vmType
 	}
 
-	modules, err = p.graph.ModulesDownTo([]string{p.outputStreamName})
+	modules, err = p.graph.ModulesDownTo(p.outputStreamNames)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
 	p.builders = make(map[string]*state.Builder)
-	storeModules, err = p.graph.StoresDownTo([]string{p.outputStreamName})
+	storeModules, err = p.graph.StoresDownTo(p.outputStreamNames)
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
 		if p.partialMode {
-			options = append(options, state.WithPartialMode(p.requestedStartBlockNum, p.outputStreamsMap[storeModule.Name]))
+			options = append(options, state.WithPartialMode(p.requestedStartBlockNum))
 		}
 
 		store, err := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
@@ -378,7 +378,10 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			outputFunc := func(out []byte) {}
 			if isOutput {
 				outputFunc = func(out []byte) {
-					logs := wasmModule.CurrentInstance.Logs
+					var logs []string
+					if wasmModule.CurrentInstance != nil {
+						logs = wasmModule.CurrentInstance.Logs
+					}
 					if out != nil || len(logs) != 0 {
 						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
@@ -413,7 +416,10 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			outputFunc := func() error { return nil }
 			if isOutput {
 				outputFunc = func() (err error) {
-					logs := wasmModule.CurrentInstance.Logs
+					var logs []string
+					if wasmModule.CurrentInstance != nil {
+						logs = wasmModule.CurrentInstance.Logs
+					}
 					if len(outputStore.Deltas) != 0 || len(logs) != 0 {
 						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
@@ -531,24 +537,19 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 
-		if block.Num()%p.statesSaveInterval == 0 {
-			//p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
-			for _, s := range p.builders {
-				fileName, err := s.WriteState(ctx, block.Num(), p.partialMode)
-				if err != nil {
-					return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
-				}
-				zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
+		if (p.storesSaveInterval != 0 && block.Num()%p.storesSaveInterval == 0) || block.Number >= stopBlock {
+			if err := p.saveStoresSnapshots(ctx, clock.Number); err != nil {
+				return err
 			}
 		}
+
+		if block.Number >= stopBlock {
 			for _, hook := range p.postJobHooks {
 				if err := hook(ctx, clock); err != nil {
 					return fmt.Errorf("post job hook: %w", err)
 				}
 			}
-			//p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
 
-		if block.Number >= stopBlock {
 			return io.EOF
 		}
 
@@ -610,6 +611,17 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
 		return nil
 	}), nil
+}
+
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context, blockNum uint64) error {
+	for _, s := range p.builders {
+		fileName, err := s.WriteState(ctx, blockNum, p.partialMode)
+		if err != nil {
+			return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
+		}
+		zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
+	}
+	return nil
 }
 
 func stepToProto(step bstream.StepType) pbsubstreams.ForkStep {

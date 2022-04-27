@@ -28,8 +28,9 @@ type Service struct {
 	blockType          string // NOTE: can't that be extracted from the actual block messages? with some proto machinery? Was probably useful when `sf.ethereum.codec.v1.Block` didn't correspond to the `sf.ethereum.type.v1.Block` target type.. but that's not true anymore.
 	partialModeEnabled bool
 
-	wasmExtensions  []wasm.WASMExtensioner
-	pipelineOptions []pipeline.PipelineOptioner
+	wasmExtensions     []wasm.WASMExtensioner
+	pipelineOptions    []pipeline.PipelineOptioner
+	storesSaveInterval uint64
 
 	firehoseServer *firehoseServer.Server
 	streamFactory  *firehose.StreamFactory
@@ -53,6 +54,12 @@ func WithPipelineOptions(f pipeline.PipelineOptioner) Option {
 func WithPartialMode() Option {
 	return func(s *Service) {
 		s.partialModeEnabled = true
+	}
+}
+
+func WithStoresSaveInterval(seconds uint64) Option {
+	return func(s *Service) {
+		s.storesSaveInterval = seconds
 	}
 }
 
@@ -105,6 +112,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			opts = append(opts, opt)
 		}
 	}
+
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
 		if len(partialMode) == 1 && partialMode[0] == "true" {
@@ -115,6 +123,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			}
 			opts = append(opts, pipeline.WithPartialMode())
 		}
+	}
+
+	if s.storesSaveInterval != 0 {
+		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
 	pipeline := pipeline.New(request.Manifest, graph, request.OutputModules, s.blockType, s.stateStore, s.wasmExtensions, opts...)

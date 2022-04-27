@@ -177,7 +177,7 @@ func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbsubstreams.Module
 		topologicalIndex[node.Name] = i
 	}
 
-	var res []*pbtransform.Module
+	var res []*pbsubstreams.Module
 	for _, moduleName := range moduleNames {
 		if _, found := g.moduleIndex[moduleName]; !found {
 			return nil, fmt.Errorf("could not find module %s in graph", moduleName)
@@ -222,7 +222,7 @@ func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Modul
 		topologicalIndex[node.Name] = i
 	}
 
-	var res []*pbtransform.Module
+	var res []*pbsubstreams.Module
 	for _, moduleName := range moduleNames {
 		if _, found := g.moduleIndex[moduleName]; !found {
 			return nil, fmt.Errorf("could not find module %s in graph", moduleName)

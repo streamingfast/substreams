@@ -22,7 +22,6 @@ type Builder struct {
 	partialStartBlock uint64
 	ModuleStartBlock  uint64
 	ModuleHash        string
-	enableStateWriting bool
 
 	complete bool
 
@@ -37,11 +36,10 @@ type Builder struct {
 
 type BuilderOption func(b *Builder)
 
-func WithPartialMode(startBlock uint64, enableStateWriting bool) BuilderOption {
+func WithPartialMode(startBlock uint64) BuilderOption {
 	return func(b *Builder) {
 		b.partialMode = true
 		b.partialStartBlock = startBlock
-		b.enableStateWriting = enableStateWriting
 	}
 }
 
@@ -215,11 +213,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 	return nil
 }
 
-func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode bool) (string, error) {
-	if !b.enableStateWriting {
-		return "", nil
-	}
-
+func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode bool) (filename string, err error) {
 	b.writeMergeValues()
 
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
@@ -240,18 +234,11 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode b
 		zap.Uint64("module_start_block", b.ModuleStartBlock),
 	)
 
-	var writeFunc func() (string, error)
 	if partialMode {
-		writeFunc = func() (string, error) {
-			return b.Store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
-		}
+		filename, err = b.Store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
 	} else {
-		writeFunc = func() (string, error) {
-			return b.Store.WriteState(ctx, content, blockNum)
-		}
+		filename, err = b.Store.WriteState(ctx, content, blockNum)
 	}
-
-	filename, err := writeFunc()
 	if err != nil {
 		return "", fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
 	}

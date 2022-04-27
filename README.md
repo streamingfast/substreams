@@ -12,7 +12,7 @@ The successor of https://github.com/streamingfast/sparkle, enabling greater comp
 Install
 -------
 
-Get a [release](/streamingfast/substreams/releases) (soon).
+Get a [release](https://github.com/streamingfast/substreams/releases).
 
 From source:
 

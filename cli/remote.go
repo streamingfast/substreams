@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/decode"
@@ -49,13 +51,20 @@ func runRemote(cmd *cobra.Command, args []string) error {
 	}
 
 	outputStreamNames := strings.Split(args[1], ",")
-	returnHandler := func(any *pbsubstreams.BlockScopedData) error { return nil }
-	if !mustGetBool(cmd, "no-return-handler") {
-		returnHandler = decode.NewPrintReturnHandler(manif, outputStreamNames)
-	}
 
 	protoIncludePath := mustGetString(cmd, "proto-path")
-	_ = protoIncludePath
+	protoFiles, err := filepath.Glob(filepath.Join(protoIncludePath, "*.proto"))
+	parser := protoparse.Parser{}
+	fileDescs, err := parser.ParseFiles(protoFiles...)
+	if err != nil {
+		return fmt.Errorf("error parsing proto files %q: %w", protoFiles, err)
+	}
+
+	returnHandler := func(any *pbsubstreams.BlockScopedData) error { return nil }
+	if !mustGetBool(cmd, "no-return-handler") {
+
+		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames)
+	}
 
 	manif.PrintMermaid()
 

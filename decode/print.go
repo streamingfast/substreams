@@ -14,8 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string) substreams.ReturnFunc {
-
+func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescriptor, outputStreamNames []string) substreams.ReturnFunc {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
@@ -35,7 +34,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, outputStreamNames []string)
 				msgTypes[mod.Name] = msgType
 
 				var msgDesc *desc.MessageDescriptor
-				for _, file := range manif.ProtoDescs {
+				for _, file := range fileDescs {
 					msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
 					if msgDesc != nil {
 						break

@@ -383,6 +383,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 						logs = wasmModule.CurrentInstance.Logs
 					}
 					if out != nil || len(logs) != 0 {
+						zlog.Info("append to output, map")
 						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_MapOutput{
@@ -421,6 +422,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 						logs = wasmModule.CurrentInstance.Logs
 					}
 					if len(outputStore.Deltas) != 0 || len(logs) != 0 {
+						zlog.Info("append to output, store")
 						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_StoreDeltas{
@@ -562,6 +564,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 			}
 		}
 		p.moduleOutputs = nil
+		zlog.Info("reset module outputs")
 
 		blk := block.ToProtocol()
 		switch p.vmType {
@@ -597,6 +600,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		if p.moduleOutputs != nil {
 			// TODO: package, after each execution, ALL of the modules we want changes for,
 			// and add LOGS
+			zlog.Info("output module outputs", zap.Int("len", len(p.moduleOutputs)))
 			out := &pbsubstreams.BlockScopedData{
 				Outputs: p.moduleOutputs,
 				Clock:   clock,

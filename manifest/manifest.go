@@ -8,8 +8,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/protoparse"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -32,8 +30,7 @@ type Manifest struct {
 	ProtoFiles  []string  `yaml:"protoFiles"`
 	Modules     []*Module `yaml:"modules"`
 
-	Graph      *ModuleGraph           `yaml:"-"`
-	ProtoDescs []*desc.FileDescriptor `yaml:"-"`
+	Graph *ModuleGraph `yaml:"-"`
 }
 
 type Module struct {
@@ -75,13 +72,6 @@ func New(path string) (m *Manifest, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	parser := protoparse.Parser{}
-	fileDescs, err := parser.ParseFiles(m.ProtoFiles...)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing proto files %q: %w", m.ProtoFiles, err)
-	}
-	m.ProtoDescs = fileDescs
 
 	for _, s := range m.Modules {
 		if s.Code.File != "" {

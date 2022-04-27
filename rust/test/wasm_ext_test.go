@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/test-go/testify/assert"
 	"github.com/test-go/testify/require"
@@ -40,7 +41,7 @@ func TestExtensionCalls(t *testing.T) {
 			module, err := runtime.NewModule(byteCode, c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(c.functionName, nil)
+			instance, err := module.NewInstance(&pbsubstreams.Clock{}, c.functionName, nil)
 			require.NoError(t, err)
 
 			err = instance.Execute()
@@ -64,7 +65,7 @@ type testWasmExtension struct {
 func (i *testWasmExtension) WASMExtensions() map[string]map[string]wasm.WASMExtension {
 	return map[string]map[string]wasm.WASMExtension{
 		"myext": map[string]wasm.WASMExtension{
-			"myimport": func(in []byte) (out []byte, err error) {
+			"myimport": func(clock *pbsubstreams.Clock, in []byte) (out []byte, err error) {
 				i.called = true
 				if string(in) == "hello" {
 					return []byte("world"), nil

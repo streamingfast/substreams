@@ -17,24 +17,24 @@ import (
 )
 
 func init() {
-	remoteCmd.Flags().String("substreams-endpoint", "api.streamingfast.io:443", "Substreams gRPC endpoint")
+	remoteCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
 	remoteCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "name of variable containing Substreams Authentication token (JWT)")
 	remoteCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	remoteCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
 	remoteCmd.Flags().StringP("proto-path", "I", "./proto", "Path of proto files")
 
-	remoteCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
-
 	remoteCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	remoteCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+
 	remoteCmd.Flags().Bool("partial-mode", false, "Request partial processing mode (internal deployments only)")
+	remoteCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
 
 	rootCmd.AddCommand(remoteCmd)
 }
 
 // remoteCmd represents the base command when called without any subcommands
 var remoteCmd = &cobra.Command{
-	Use:          "remote [manifest] [module_name]",
+	Use:          "run [manifest] [module_name]",
 	Short:        "Run substreams remotely",
 	RunE:         runRemote,
 	Args:         cobra.ExactArgs(2),

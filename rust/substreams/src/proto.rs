@@ -1,8 +1,7 @@
 use prost::{DecodeError, EncodeError};
-use std::io::Cursor;
 
 pub fn decode<T: std::default::Default + prost::Message>(buf: &Vec<u8>) -> Result<T, DecodeError> {
-    ::prost::Message::decode(&mut Cursor::new(buf))
+    ::prost::Message::decode(&buf[..])
 }
 
 pub fn decode_ptr<T: std::default::Default + prost::Message>(
@@ -11,9 +10,9 @@ pub fn decode_ptr<T: std::default::Default + prost::Message>(
 ) -> Result<T, DecodeError> {
     unsafe {
         let input_data = Vec::from_raw_parts(ptr, size, size);
-	let obj = ::prost::Message::decode(&mut Cursor::new(&input_data));
+        let obj = ::prost::Message::decode(&input_data[..]);
         std::mem::forget(input_data); // otherwise tries to free that memory at the end and crashes
-	obj
+        obj
     }
 }
 
@@ -29,7 +28,9 @@ pub fn encode<M: prost::Message>(msg: &M) -> Result<Vec<u8>, EncodeError> {
     }
 }
 
-pub fn encode_to_ptr<M: prost::Message>(msg: &M) -> Result<(*const u8, usize, Vec<u8>), EncodeError> {
+pub fn encode_to_ptr<M: prost::Message>(
+    msg: &M,
+) -> Result<(*const u8, usize, Vec<u8>), EncodeError> {
     match encode(msg) {
         Ok(buffer) => Ok((buffer.as_ptr(), buffer.len(), buffer)),
         Err(e) => Err(e),

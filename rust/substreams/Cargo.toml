@@ -5,11 +5,11 @@ description = "Substreams base library"
 edition = "2018"
 
 [dependencies]
-prost = { version = "0.6" }
-prost-types = "0.6"
+prost = { version = "0.10.1" }
+prost-types = "0.10.1"
 hex = "0.4.3"
 num-bigint = "0.4"
 bigdecimal = "0.3"
 
 [build-dependencies]
-prost-build = "0.6"
+prost-build = "0.10.1"

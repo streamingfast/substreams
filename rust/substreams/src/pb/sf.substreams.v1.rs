@@ -1,48 +1,49 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Manifest {
     #[prost(string, tag="1")]
-    pub spec_version: std::string::String,
+    pub spec_version: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
-    pub description: std::string::String,
+    pub description: ::prost::alloc::string::String,
     #[prost(message, repeated, tag="3")]
-    pub modules: ::std::vec::Vec<Module>,
-    #[prost(bytes, repeated, tag="4")]
-    pub modules_code: ::std::vec::Vec<std::vec::Vec<u8>>,
+    pub modules: ::prost::alloc::vec::Vec<Module>,
+    #[prost(bytes="vec", repeated, tag="4")]
+    pub modules_code: ::prost::alloc::vec::Vec<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Module {
     #[prost(string, tag="1")]
-    pub name: std::string::String,
+    pub name: ::prost::alloc::string::String,
     #[prost(message, repeated, tag="6")]
-    pub inputs: ::std::vec::Vec<module::Input>,
+    pub inputs: ::prost::alloc::vec::Vec<module::Input>,
     #[prost(message, optional, tag="7")]
-    pub output: ::std::option::Option<module::Output>,
+    pub output: ::core::option::Option<module::Output>,
     #[prost(uint64, tag="8")]
     pub start_block: u64,
     #[prost(oneof="module::Kind", tags="2, 3")]
-    pub kind: ::std::option::Option<module::Kind>,
+    pub kind: ::core::option::Option<module::Kind>,
     #[prost(oneof="module::Code", tags="4, 5")]
-    pub code: ::std::option::Option<module::Code>,
+    pub code: ::core::option::Option<module::Code>,
 }
+/// Nested message and enum types in `Module`.
 pub mod module {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct WasmCode {
         #[prost(string, tag="4")]
-        pub r#type: std::string::String,
+        pub r#type: ::prost::alloc::string::String,
         #[prost(uint32, tag="5")]
         pub index: u32,
         #[prost(string, tag="6")]
-        pub entrypoint: std::string::String,
+        pub entrypoint: ::prost::alloc::string::String,
     }
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct NativeCode {
         #[prost(string, tag="5")]
-        pub entrypoint: std::string::String,
+        pub entrypoint: ::prost::alloc::string::String,
     }
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct KindMap {
         #[prost(string, tag="1")]
-        pub output_type: std::string::String,
+        pub output_type: ::prost::alloc::string::String,
     }
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct KindStore {
@@ -57,8 +58,9 @@ pub mod module {
         #[prost(enumeration="kind_store::UpdatePolicy", tag="1")]
         pub update_policy: i32,
         #[prost(string, tag="2")]
-        pub value_type: std::string::String,
+        pub value_type: ::prost::alloc::string::String,
     }
+    /// Nested message and enum types in `KindStore`.
     pub mod kind_store {
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
         #[repr(i32)]
@@ -79,28 +81,30 @@ pub mod module {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Input {
         #[prost(oneof="input::Input", tags="1, 2, 3")]
-        pub input: ::std::option::Option<input::Input>,
+        pub input: ::core::option::Option<input::Input>,
     }
+    /// Nested message and enum types in `Input`.
     pub mod input {
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct Source {
             /// ex: "sf.ethereum.type.v1.Block"
             #[prost(string, tag="1")]
-            pub r#type: std::string::String,
+            pub r#type: ::prost::alloc::string::String,
         }
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct Map {
             /// ex: "block_to_pairs"
             #[prost(string, tag="1")]
-            pub module_name: std::string::String,
+            pub module_name: ::prost::alloc::string::String,
         }
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct Store {
             #[prost(string, tag="1")]
-            pub module_name: std::string::String,
+            pub module_name: ::prost::alloc::string::String,
             #[prost(enumeration="store::Mode", tag="2")]
             pub mode: i32,
         }
+        /// Nested message and enum types in `Store`.
         pub mod store {
             #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
             #[repr(i32)]
@@ -123,7 +127,7 @@ pub mod module {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Output {
         #[prost(string, tag="1")]
-        pub r#type: std::string::String,
+        pub r#type: ::prost::alloc::string::String,
     }
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Kind {
@@ -143,36 +147,37 @@ pub mod module {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Clock {
     #[prost(string, tag="1")]
-    pub id: std::string::String,
+    pub id: ::prost::alloc::string::String,
     #[prost(uint64, tag="2")]
     pub number: u64,
     #[prost(message, optional, tag="3")]
-    pub timestamp: ::std::option::Option<::prost_types::Timestamp>,
+    pub timestamp: ::core::option::Option<::prost_types::Timestamp>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Request {
     #[prost(int64, tag="1")]
     pub start_block_num: i64,
     #[prost(string, tag="2")]
-    pub start_cursor: std::string::String,
+    pub start_cursor: ::prost::alloc::string::String,
     #[prost(uint64, tag="3")]
     pub stop_block_num: u64,
     #[prost(enumeration="ForkStep", repeated, tag="4")]
-    pub fork_steps: ::std::vec::Vec<i32>,
+    pub fork_steps: ::prost::alloc::vec::Vec<i32>,
     #[prost(string, tag="5")]
-    pub irreversibility_condition: std::string::String,
+    pub irreversibility_condition: ::prost::alloc::string::String,
     #[prost(message, optional, tag="6")]
-    pub manifest: ::std::option::Option<Manifest>,
+    pub manifest: ::core::option::Option<Manifest>,
     #[prost(string, repeated, tag="7")]
-    pub output_modules: ::std::vec::Vec<std::string::String>,
+    pub output_modules: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="8")]
-    pub initial_store_snapshot_for_modules: ::std::vec::Vec<std::string::String>,
+    pub initial_store_snapshot_for_modules: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Response {
     #[prost(oneof="response::Message", tags="1, 2, 3, 4")]
-    pub message: ::std::option::Option<response::Message>,
+    pub message: ::core::option::Option<response::Message>,
 }
+/// Nested message and enum types in `Response`.
 pub mod response {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Message {
@@ -190,14 +195,14 @@ pub mod response {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitialSnapshotComplete {
     #[prost(string, tag="1")]
-    pub cursor: std::string::String,
+    pub cursor: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitialSnapshotData {
     #[prost(string, tag="1")]
-    pub module_name: std::string::String,
+    pub module_name: ::prost::alloc::string::String,
     #[prost(message, optional, tag="2")]
-    pub deltas: ::std::option::Option<StoreDeltas>,
+    pub deltas: ::core::option::Option<StoreDeltas>,
     #[prost(uint64, tag="4")]
     pub sent_keys: u64,
     #[prost(uint64, tag="3")]
@@ -206,23 +211,24 @@ pub struct InitialSnapshotData {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockScopedData {
     #[prost(message, repeated, tag="1")]
-    pub outputs: ::std::vec::Vec<ModuleOutput>,
+    pub outputs: ::prost::alloc::vec::Vec<ModuleOutput>,
     #[prost(message, optional, tag="3")]
-    pub clock: ::std::option::Option<Clock>,
+    pub clock: ::core::option::Option<Clock>,
     #[prost(enumeration="ForkStep", tag="6")]
     pub step: i32,
     #[prost(string, tag="10")]
-    pub cursor: std::string::String,
+    pub cursor: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModuleOutput {
     #[prost(string, tag="1")]
-    pub name: std::string::String,
+    pub name: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="4")]
-    pub logs: ::std::vec::Vec<std::string::String>,
+    pub logs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(oneof="module_output::Data", tags="2, 3")]
-    pub data: ::std::option::Option<module_output::Data>,
+    pub data: ::core::option::Option<module_output::Data>,
 }
+/// Nested message and enum types in `ModuleOutput`.
 pub mod module_output {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Data {
@@ -235,14 +241,14 @@ pub mod module_output {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModulesProgress {
     #[prost(message, repeated, tag="1")]
-    pub modules: ::std::vec::Vec<ModuleProgress>,
+    pub modules: ::prost::alloc::vec::Vec<ModuleProgress>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ModuleProgress {
     #[prost(string, tag="1")]
-    pub name: std::string::String,
+    pub name: ::prost::alloc::string::String,
     #[prost(message, repeated, tag="2")]
-    pub processed_ranges: ::std::vec::Vec<BlockRange>,
+    pub processed_ranges: ::prost::alloc::vec::Vec<BlockRange>,
     #[prost(uint64, tag="3")]
     pub total_bytes_read: u64,
     #[prost(uint64, tag="4")]
@@ -250,7 +256,7 @@ pub struct ModuleProgress {
     #[prost(bool, tag="7")]
     pub failed: bool,
     #[prost(string, tag="8")]
-    pub failure_reason: std::string::String,
+    pub failure_reason: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockRange {
@@ -262,7 +268,7 @@ pub struct BlockRange {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StoreDeltas {
     #[prost(message, repeated, tag="1")]
-    pub deltas: ::std::vec::Vec<StoreDelta>,
+    pub deltas: ::prost::alloc::vec::Vec<StoreDelta>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StoreDelta {
@@ -271,12 +277,13 @@ pub struct StoreDelta {
     #[prost(uint64, tag="2")]
     pub ordinal: u64,
     #[prost(string, tag="3")]
-    pub key: std::string::String,
-    #[prost(bytes, tag="4")]
-    pub old_value: std::vec::Vec<u8>,
-    #[prost(bytes, tag="5")]
-    pub new_value: std::vec::Vec<u8>,
+    pub key: ::prost::alloc::string::String,
+    #[prost(bytes="vec", tag="4")]
+    pub old_value: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes="vec", tag="5")]
+    pub new_value: ::prost::alloc::vec::Vec<u8>,
 }
+/// Nested message and enum types in `StoreDelta`.
 pub mod store_delta {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
@@ -310,11 +317,11 @@ pub struct Output {
     #[prost(uint64, tag="1")]
     pub block_num: u64,
     #[prost(string, tag="2")]
-    pub block_id: std::string::String,
+    pub block_id: ::prost::alloc::string::String,
     #[prost(message, optional, tag="4")]
-    pub timestamp: ::std::option::Option<::prost_types::Timestamp>,
+    pub timestamp: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(message, optional, tag="10")]
-    pub value: ::std::option::Option<::prost_types::Any>,
+    pub value: ::core::option::Option<::prost_types::Any>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -330,14 +337,14 @@ pub enum ForkStep {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DatabaseChanges {
     #[prost(message, repeated, tag="1")]
-    pub table_changes: ::std::vec::Vec<TableChange>,
+    pub table_changes: ::prost::alloc::vec::Vec<TableChange>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TableChange {
     #[prost(string, tag="1")]
-    pub table: std::string::String,
+    pub table: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
-    pub pk: std::string::String,
+    pub pk: ::prost::alloc::string::String,
     #[prost(uint64, tag="3")]
     pub block_num: u64,
     #[prost(uint64, tag="4")]
@@ -345,8 +352,9 @@ pub struct TableChange {
     #[prost(enumeration="table_change::Operation", tag="5")]
     pub operation: i32,
     #[prost(message, repeated, tag="6")]
-    pub fields: ::std::vec::Vec<Field>,
+    pub fields: ::prost::alloc::vec::Vec<Field>,
 }
+/// Nested message and enum types in `TableChange`.
 pub mod table_change {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
@@ -360,9 +368,9 @@ pub mod table_change {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Field {
     #[prost(string, tag="1")]
-    pub name: std::string::String,
+    pub name: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
-    pub new_value: std::string::String,
+    pub new_value: ::prost::alloc::string::String,
     #[prost(string, tag="3")]
-    pub old_value: std::string::String,
+    pub old_value: ::prost::alloc::string::String,
 }

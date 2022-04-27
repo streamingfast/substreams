@@ -4,4 +4,4 @@ import (
 	"github.com/streamingfast/logging"
 )
 
-var zlog, tracer = logging.PackageLogger("bstream", "github.com/streamingfast/substreams/pipeline")
+var zlog, tracer = logging.PackageLogger("pipeline", "github.com/streamingfast/substreams/pipeline")

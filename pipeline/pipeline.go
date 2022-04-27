@@ -528,6 +528,7 @@ func (p *Pipeline) HandlerFactory(ctx context.Context, requestedStartBlockNum ui
 		//}()
 
 		p.moduleOutputs = nil
+		p.wasmOutputs = map[string][]byte{}
 		zlog.Info("reset module outputs")
 
 		cursorable := obj.(bstream.Cursorable)

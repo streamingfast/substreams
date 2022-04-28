@@ -1,5 +1,5 @@
-Streaming Data Engine based on SF Firehose Tech
------------------------------------------------
+Substreams - A streaming data engine for The Graph - by StreamingFast
+=====================================================================
 
 DEVELOPER PREVIEW OF SUBSTREAMS
 
@@ -9,8 +9,8 @@ The successor of https://github.com/streamingfast/sparkle, enabling greater comp
 
 
 
-Install
--------
+Install client
+--------------
 
 Get a [release](https://github.com/streamingfast/substreams/releases).
 
@@ -26,6 +26,41 @@ From source without checkout:
 
 ```
 go install github.com/streamingfast/substreams/cmd/substreams@latest
+```
+
+
+Install dependencies to build Substreams
+----------------------------------------
+
+### Install rust
+
+We're going to be using the [Rust programming language](https://www.rust-lang.org/), to develop some custom logic.
+
+There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+### Install wasmer
+
+We are going to need [wasmer](https://wasmer.io/), which is a runtime for WebAssembly code.
+
+The [Getting Started can be found here](https://docs.wasmer.io/ecosystem/wasmer/getting-started), but succinctly:
+
+```bash
+curl https://get.wasmer.io -sSfL | sh
+```
+
+### Install wasm-pack
+
+Finally, [wasm-pack](https://rustwasm.github.io/wasm-pack/book/introduction.html) is a tool which allows us to work wi
+th Rust-generated WASM code.
+
+Their [quicktart docs can be found here](https://rustwasm.github.io/wasm-pack/book/quickstart.html), but again:
+
+```bash
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 ```
 
 

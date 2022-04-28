@@ -60,6 +60,18 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 	return g, nil
 }
 
+func (g *ModuleGraph) GetSources() []string {
+	var sources []string
+	for _, module := range g.modules {
+		for _, input := range module.Inputs {
+			if s := input.GetSource(); s != nil {
+				sources = append(sources, s.GetType())
+			}
+		}
+	}
+	return sources
+}
+
 func computeStartBlock(modules []*pbsubstreams.Module, g *ModuleGraph) {
 	for _, module := range modules {
 		if module.StartBlock == UNSET {

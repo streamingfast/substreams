@@ -101,6 +101,13 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return fmt.Errorf("creating module graph %w", err)
 	}
 
+	sources := graph.GetSources()
+	for _, source := range sources {
+		if source != s.blockType {
+			return fmt.Errorf("input source not supported. Only %s is accepted", s.blockType)
+		}
+	}
+
 	// TODO: missing dmetering hook that was present for each output
 	// payload, we'd send the increment in EgressBytes sent.  We'll
 	// want to review that anyway.

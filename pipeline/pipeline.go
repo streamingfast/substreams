@@ -373,7 +373,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		}
 
 		if v := mod.GetKindMap(); v != nil {
-			fmt.Printf("Adding mapper for module %q\n", modName)
 
 			outType := strings.TrimPrefix(mod.Output.Type, "proto:")
 
@@ -598,7 +597,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		for _, streamFunc := range p.streamFuncs {
 			if err := streamFunc(); err != nil {
-				fmt.Println("GRRRRRRR!::", err)
 				return err
 			}
 		}

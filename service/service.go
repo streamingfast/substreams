@@ -188,7 +188,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 
 		logger.Info("unexpected stream of blocks termination", zap.Error(err))
-		return status.Errorf(codes.Internal, "unexpected substreams termination")
+		return status.Errorf(codes.Internal, "unexpected substreams termination: %s", err)
 	}
 	return nil
 }

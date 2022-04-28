@@ -273,7 +273,6 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 					return
 				}
 			}
-			fmt.Printf("Adding mapper for module %q\n", mod.Name)
 			p.streamFuncs = append(p.streamFuncs, func() error {
 				return nativeMapCall(p.nativeOutputs, method, modName, inputs, outputFunc)
 			})
@@ -306,7 +305,6 @@ func (p *Pipeline) BuildNative(modules []*pbsubstreams.Module) error {
 				}
 			}
 
-			fmt.Printf("Adding state builder for stream %q\n", mod.Name)
 			p.streamFuncs = append(p.streamFuncs, func() error {
 				return nativeStoreCall(p.nativeOutputs, method, modName, inputs, outputFunc)
 			})
@@ -600,6 +598,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		for _, streamFunc := range p.streamFuncs {
 			if err := streamFunc(); err != nil {
+				fmt.Println("GRRRRRRR!::", err)
 				return err
 			}
 		}

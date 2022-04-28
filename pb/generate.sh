@@ -28,7 +28,6 @@ function main() {
   generate "sf/substreams/v1/substreams.proto"
   generate "sf/substreams/v1/clock.proto"
   generate "sf/substreams/v1/manifest.proto"
-  generate "sf/substreams/v1/database.proto"
 
   echo "generate.sh - `date` - `whoami`" > $ROOT/pb/last_generate.txt
   echo "streamingfast/proto revision: `GIT_DIR=$ROOT/.git git rev-parse HEAD`" >> $ROOT/pb/last_generate.txt

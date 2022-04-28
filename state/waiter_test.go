@@ -3,7 +3,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"github.com/test-go/testify/require"
 	"testing"
 	"time"
 

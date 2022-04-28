@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -38,7 +39,7 @@ func TestExtensionCalls(t *testing.T) {
 
 			rpcProv := &testWasmExtension{}
 			runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
-			module, err := runtime.NewModule(byteCode, c.functionName)
+			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
 			require.NoError(t, err)
 
 			instance, err := module.NewInstance(&pbsubstreams.Clock{}, c.functionName, nil)
@@ -64,8 +65,8 @@ type testWasmExtension struct {
 
 func (i *testWasmExtension) WASMExtensions() map[string]map[string]wasm.WASMExtension {
 	return map[string]map[string]wasm.WASMExtension{
-		"myext": map[string]wasm.WASMExtension{
-			"myimport": func(clock *pbsubstreams.Clock, in []byte) (out []byte, err error) {
+		"myext": {
+			"myimport": func(context context.Context, req *pbsubstreams.Request, clock *pbsubstreams.Clock, in []byte) (out []byte, err error) {
 				i.called = true
 				if string(in) == "hello" {
 					return []byte("world"), nil

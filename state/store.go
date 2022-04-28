@@ -17,7 +17,7 @@ type Store struct {
 }
 
 func NewStore(name string, moduleHash string, moduleStartBlock uint64, baseStore dstore.Store) (*Store, error) {
-	ds, err := baseStore.SubStore(moduleHash)
+	ds, err := baseStore.SubStore(fmt.Sprintf("%s-%s", name, moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating new store: %w", err)
 	}

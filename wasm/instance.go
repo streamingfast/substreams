@@ -46,13 +46,22 @@ func (i *Instance) PrintStats() {
 
 func (i *Instance) Execute() (err error) {
 	if _, err = i.entrypoint.Call(i.args...); err != nil {
+		if i.panicError != nil {
+			fmt.Println("Grrr:", i.panicError)
+			return i.panicError
+		}
 		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)
 	}
+
 	return nil
 }
 
 func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
 	if _, err = i.entrypoint.Call(args...); err != nil {
+		if i.panicError != nil {
+			fmt.Println("Grrr:", i.panicError)
+			return i.panicError
+		}
 		return fmt.Errorf("executing with args entrypoint %q: %w", i.functionName, err)
 	}
 	return nil

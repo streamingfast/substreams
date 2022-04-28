@@ -521,14 +521,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	}()
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-				zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
-				zlog.Error(string(debug.Stack()))
-			}
-		}()
-
 		clock := &pbsubstreams.Clock{
 			Number:    block.Num(),
 			Id:        block.Id,
@@ -536,6 +528,11 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		}
 
 		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+				zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
+				zlog.Error(string(debug.Stack()))
+			}
 			if err != nil {
 				for _, hook := range p.postJobHooks {
 					if err := hook(ctx, clock); err != nil {

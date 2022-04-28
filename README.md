@@ -12,6 +12,8 @@ The successor of https://github.com/streamingfast/sparkle, enabling greater comp
 Install client
 --------------
 
+This client will allow you to interact with Substreams endpoints, and stream data in real-time.
+
 Get a [release](https://github.com/streamingfast/substreams/releases).
 
 From source:
@@ -31,6 +33,9 @@ go install github.com/streamingfast/substreams/cmd/substreams@latest
 
 Install dependencies to build Substreams
 ----------------------------------------
+
+This will allow you to develop Substreams modules locally, and run them remotely.
+
 
 ### Install rust
 

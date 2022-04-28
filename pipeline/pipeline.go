@@ -386,7 +386,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 						logs = wasmModule.CurrentInstance.Logs
 					}
 					if out != nil || len(logs) != 0 {
-						zlog.Info("append to output, map")
+						zlog.Debug("append to output, map")
 						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_MapOutput{
@@ -416,7 +416,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				UpdatePolicy: updatePolicy,
 				ValueType:    valueType,
 			})
-			fmt.Printf("Adding state builder for module %q\n", modName)
 
 			outputFunc := func() error { return nil }
 			if isOutput {
@@ -426,7 +425,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 						logs = wasmModule.CurrentInstance.Logs
 					}
 					if len(outputStore.Deltas) != 0 || len(logs) != 0 {
-						zlog.Info("append to output, store")
+						zlog.Debug("append to output, store")
 						p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
 							Name: modName,
 							Data: &pbsubstreams.ModuleOutput_StoreDeltas{
@@ -549,7 +548,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		p.moduleOutputs = nil
 		p.wasmOutputs = map[string][]byte{}
-		zlog.Info("reset module outputs")
+		zlog.Debug("reset module outputs")
 
 		cursorable := obj.(bstream.Cursorable)
 		cursor := cursorable.Cursor()
@@ -609,7 +608,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		if len(p.moduleOutputs) > 0 {
 			// TODO: package, after each execution, ALL of the modules we want changes for,
 			// and add LOGS
-			zlog.Info("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+			zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
 			out := &pbsubstreams.BlockScopedData{
 				Outputs: p.moduleOutputs,
 				Clock:   clock,

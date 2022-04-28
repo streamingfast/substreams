@@ -417,7 +417,7 @@ func (b *Builder) applyDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (b *Builder) Flush() {
-	zlog.Info("flushing store", zap.String("name", b.Name), zap.Int("delta_count", len(b.Deltas)), zap.Int("entry_count", len(b.KV)))
+	zlog.Debug("flushing store", zap.String("name", b.Name), zap.Int("delta_count", len(b.Deltas)), zap.Int("entry_count", len(b.KV)))
 	b.Deltas = nil
 	b.lastOrdinal = 0
 }

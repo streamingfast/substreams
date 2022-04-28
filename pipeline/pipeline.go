@@ -535,7 +535,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 				}
 			}
 		}()
-		zlog.Info("processing block", zap.Uint64("block_num", block.Number))
+		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
 		blockCount++
 		handleBlockStart := time.Now()
 		//defer func() {
@@ -623,7 +623,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		for _, s := range p.builders {
 			s.Flush()
 		}
-		zlog.Info("block processed", zap.Uint64("block_num", block.Number))
+		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
 		return nil
 	}), nil

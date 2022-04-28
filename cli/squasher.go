@@ -16,8 +16,8 @@ import (
 )
 
 var squasherCmd = &cobra.Command{
-	Use:  "squasher [block_range_file]",
-	Args: cobra.ExactArgs(1),
+	Use:  "squasher [block_range_file] [base_store_dsn]",
+	Args: cobra.ExactArgs(2),
 	RunE: runSquashE,
 }
 

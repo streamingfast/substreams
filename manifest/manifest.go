@@ -24,8 +24,6 @@ const (
 	ModuleKindMap   = "map"
 )
 
-const ProtoBufBlock = "sf.ethereum.type.v1.Block"
-
 type Manifest struct {
 	SpecVersion string    `yaml:"specVersion"`
 	Description string    `yaml:"description"`
@@ -337,9 +335,11 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 	for _, input := range m.Inputs {
 		if input.Source != "" {
-			if input.Source != ProtoBufBlock {
-				return fmt.Errorf("input source not supported. Only %s is accepted", ProtoBufBlock)
-			}
+			// TODO: do this checking on the serverr side, the client doesn't know to which backend it's
+			// going to talk.. and it could be a new chain.
+			// if input.Source != ProtoBufBlock {
+			// 	return fmt.Errorf("input source not supported. Only %s is accepted", ProtoBufBlock)
+			// }
 			pbInput := &pbsubstreams.Module_Input{
 				Input: &pbsubstreams.Module_Input_Source_{
 					Source: &pbsubstreams.Module_Input_Source{

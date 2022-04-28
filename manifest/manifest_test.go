@@ -135,3 +135,17 @@ func TestManifest_ToProto(t *testing.T) {
 	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, "proto:sf.substreams.tokens.v1.Tokens", module.Output.Type)
 }
+
+func TestSetInputsToProto_InvalidInputSource(t *testing.T) {
+	out := &pbsubstreams.Module{}
+	module := &Module{
+		Name: "invalid-input-source",
+		Inputs: []*Input{
+			{
+				Source: "sf.ethereum.v1.type.block",
+			},
+		},
+	}
+
+	require.Error(t, module.setInputsToProto(out))
+}

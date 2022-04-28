@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -520,6 +521,14 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	}()
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+				zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
+				zlog.Error(string(debug.Stack()))
+			}
+		}()
+
 		clock := &pbsubstreams.Clock{
 			Number:    block.Num(),
 			Id:        block.Id,
@@ -538,13 +547,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
 		blockCount++
 		handleBlockStart := time.Now()
-		//defer func() {
-		//	if r := recover(); r != nil {
-		//		err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-		//		zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
-		//		zlog.Error(string(debug.Stack()))
-		//	}
-		//}()
 
 		p.moduleOutputs = nil
 		p.wasmOutputs = map[string][]byte{}
@@ -651,52 +653,6 @@ func stepToProto(step bstream.StepType) pbsubstreams.ForkStep {
 	}
 	return pbsubstreams.ForkStep_STEP_UNKNOWN
 }
-
-//func (p *Pipeline) commit(ctx context.Context, block *bstream.Block) {
-//
-//	wg := &sync.WaitGroup{}
-//	for _, builder := range p.builders {
-//
-//		if p.requestedStartBlockNum <= builder.ModuleStartBlock {
-//			continue
-//		}
-//
-//		if p.partialMode {
-//			wg.Add(1)
-//			go func(s *state.Builder) {
-//				defer wg.Done()
-//
-//				zlog.Info("waiting for kv file",
-//					zap.String("filename", s.Store.StateFileName(p.requestedStartBlockNum)),
-//					zap.String("store", s.Name),
-//				)
-//
-//				<-state.WaitKV(ctx, s.Store, requestedStartBlockNum)
-//
-//				zlog.Info("kv file found",
-//					zap.Uint64("at_block_num", requestedStartBlockNum),
-//					zap.String("store", s.Name),
-//				)
-//
-//				zlog.Info("squashing", zap.String("store", s.Name))
-//				err := s.Squash(ctx, requestedStartBlockNum)
-//				if err != nil {
-//					zlog.Error("squashing", zap.Error(err), zap.String("store", s.Name))
-//					panic(fmt.Errorf("squashing: %w", err))
-//				}
-//
-//				_, err = s.WriteFullState(context.Background(), block.Num())
-//				if err != nil {
-//					panic(fmt.Errorf("error writing block %d to store %s: %w", block.Num(), s.Name, err))
-//				}
-//			}(builder)
-//		}
-//	}
-//	wg.Wait()
-//
-//	p.rpcCacheManager.Save(ctx, requestedStartBlockNum, stopBlock)
-//
-//}
 
 type Printer interface {
 	Print()

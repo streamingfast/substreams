@@ -52,10 +52,6 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 	return m, nil
 }
 
-func (m *Module) Close() {
-	m.module.Close()
-}
-
 func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams.Request, store *wasmer.Store, namespace, name string, f WASMExtension) *wasmer.Function {
 	return wasmer.NewFunction(
 		store,

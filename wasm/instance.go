@@ -44,10 +44,6 @@ func (i *Instance) PrintStats() {
 	fmt.Printf("Memory size: %d\n", i.memory.DataSize())
 }
 
-func (i *Instance) Close() {
-	i.vmInstance.Close()
-}
-
 func (i *Instance) Execute() (err error) {
 	if _, err = i.entrypoint.Call(i.args...); err != nil {
 		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)

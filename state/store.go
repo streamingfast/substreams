@@ -16,6 +16,17 @@ type Store struct {
 	ModuleStartBlock uint64
 }
 
+func newStoreWithStore(name string, moduleHash string, moduleStartBlock uint64, store dstore.Store) (*Store, error) {
+	s := &Store{
+		Store:            store,
+		Name:             name,
+		ModuleHash:       moduleHash,
+		ModuleStartBlock: moduleStartBlock,
+	}
+
+	return s, nil
+}
+
 func NewStore(name string, moduleHash string, moduleStartBlock uint64, baseStore dstore.Store) (*Store, error) {
 	ds, err := baseStore.SubStore(fmt.Sprintf("%s-%s", name, moduleHash))
 	if err != nil {

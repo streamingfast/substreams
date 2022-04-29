@@ -60,13 +60,13 @@ func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbsubstreams.
 	return b
 }
 
-func BuilderFromFile(ctx context.Context, filename string, baseStore dstore.Store) (*Builder, error) {
+func BuilderFromFile(ctx context.Context, filename string, store dstore.Store) (*Builder, error) {
 	ok, partialFileStartBlock, _, isPartialFile := ParseFileName(filename)
 	if !ok {
 		return nil, fmt.Errorf("could not parse filename %s", filename)
 	}
 
-	rc, err := baseStore.OpenObject(ctx, filename)
+	rc, err := store.OpenObject(ctx, filename)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %s: %w", filename, err)
 	}
@@ -84,14 +84,14 @@ func BuilderFromFile(ctx context.Context, filename string, baseStore dstore.Stor
 
 	updatedkv, updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
 
-	store, err := NewStore(name, moduleHash, moduleStartBlock, baseStore)
+	stateStore, err := newStoreWithStore(name, moduleHash, moduleStartBlock, store)
 	if err != nil {
 		return nil, fmt.Errorf("creating store: %w", err)
 	}
 
 	b := &Builder{
 		KV:               updatedkv,
-		Store:            store,
+		Store:            stateStore,
 		Name:             name,
 		ModuleHash:       moduleHash,
 		ModuleStartBlock: moduleStartBlock,

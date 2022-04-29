@@ -544,7 +544,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		p.moduleOutputs = nil
 		p.wasmOutputs = map[string][]byte{}
-		zlog.Debug("reset module outputs")
 
 		cursorable := obj.(bstream.Cursorable)
 		cursor := cursorable.Cursor()

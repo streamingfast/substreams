@@ -437,35 +437,3 @@ func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 		}
 	}
 }
-
-// TODO FIXME good luck have fun
-//type stringer interface {
-//	String() string
-//}
-//
-//func MonduleSignature(graph *ModuleGraph, m *pbsubstreams.Module) []byte {
-//	buf := bytes.NewBuffer(nil)
-//	buf.WriteString(m.Kind.(stringer).String())
-//
-//
-//	buf.Write(m.Code.Content)
-//	buf.Write([]byte(m.Code.Entrypoint))
-//
-//	sort.Slice(m.Inputs, func(i, j int) bool {
-//		return m.Inputs[i].Name < m.Inputs[j].Name
-//	})
-//	for _, input := range m.Inputs {
-//		buf.WriteString(input.Name)
-//	}
-//
-//	ancestors, _ := graph.AncestorsOf(m.Name)
-//	for _, ancestor := range ancestors {
-//		sig := ancestor.MonduleSignature(graph)
-//		buf.Write(sig)
-//	}
-//
-//	h := sha1.New()
-//	h.Write(buf.Bytes())
-//
-//	return h.Sum(nil)
-//}

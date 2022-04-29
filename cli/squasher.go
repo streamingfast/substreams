@@ -131,7 +131,7 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 					return fmt.Errorf("squashing: %w", err)
 				}
 
-				_, err = builder.WriteState(ctx, blockRange.EndBlock, true)
+				_, err = builder.WriteState(ctx, blockRange.EndBlock, false)
 				if err != nil {
 					return fmt.Errorf("writing state to store: %w", err)
 				}

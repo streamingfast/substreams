@@ -127,7 +127,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			if !s.partialModeEnabled {
 				return status.Error(codes.InvalidArgument, "substreams-partial-mode not enabled on this instance")
 			}
-			opts = append(opts, pipeline.WithPartialMode())
+
+			opts = append(opts, pipeline.WithPartialMode(), pipeline.WithAllowInvalidState())
 		}
 	}
 

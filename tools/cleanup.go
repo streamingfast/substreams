@@ -3,6 +3,7 @@ package tools
 import (
 	"fmt"
 
+	"github.com/abourget/llerrgroup"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/state"
@@ -58,15 +59,33 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	eg := llerrgroup.New(len(partialFiles))
+
 	for endBlock, filename := range partialFiles {
-		if endBlock > highestKVBlock {
+		if eg.Stop() {
 			continue
 		}
 
-		err := store.DeleteObject(ctx, filename)
-		if err != nil {
-			zlog.Warn("error deleting file", zap.String("filename", filename), zap.String("store", dsn))
-		}
+		eb := endBlock
+		fn := filename
+
+		eg.Go(func() error {
+			if eb > highestKVBlock {
+				return nil
+			}
+
+			err := store.DeleteObject(ctx, fn)
+			if err != nil {
+				zlog.Warn("error deleting file", zap.String("filename", fn), zap.String("store", dsn))
+			}
+
+			return nil
+		})
+	}
+
+	err = eg.Wait()
+	if err != nil {
+		return fmt.Errorf("running deletes: %w", err)
 	}
 
 	return nil

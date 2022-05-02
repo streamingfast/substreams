@@ -2,9 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
+	"google.golang.org/protobuf/proto"
 )
 
 var manifestCmd = &cobra.Command{
@@ -18,8 +21,16 @@ var manifestInfoCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var manifestPackageCmd = &cobra.Command{
+	Use:          "package [manifest_yaml] {manifest_pkg_pb}",
+	RunE:         runManifestPackage,
+	Args:         cobra.RangeArgs(1, 2),
+	SilenceUsage: true,
+}
+
 func init() {
 	manifestCmd.AddCommand(manifestInfoCmd)
+	manifestCmd.AddCommand(manifestPackageCmd)
 
 	rootCmd.AddCommand(manifestCmd)
 }
@@ -52,6 +63,47 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("Kind:", module.GetKind())
 		fmt.Println("Hash:", manifest.HashModuleAsString(manifProto, graph, module))
 	}
+
+	return nil
+}
+
+func runManifestPackage(cmd *cobra.Command, args []string) error {
+	manifestPath := args[0]
+	manif, err := manifest.New(manifestPath)
+	if err != nil {
+		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
+	}
+
+	manifProto, err := manif.ToProto()
+	if err != nil {
+		return fmt.Errorf("parsing manifest %q into protobuf: %w", manifestPath, err)
+	}
+
+	// TODO: do all the validation on the proto too
+
+	if _, err = manifest.NewModuleGraph(manifProto.Modules); err != nil {
+		return fmt.Errorf("processing module graph %w", err)
+	}
+
+	var outputFile string
+	if len(args) == 2 {
+		outputFile = args[1]
+	} else {
+		outputFile = filepath.Base(manifestPath) + ".pb"
+	}
+
+	cnt, err := proto.Marshal(manifProto)
+	if err != nil {
+		return fmt.Errorf("marshalling manifest proto: %w", err)
+	}
+
+	fmt.Printf("Writing %q... ", outputFile)
+	if err := ioutil.WriteFile(outputFile, cnt, 0644); err != nil {
+		fmt.Println("")
+		return fmt.Errorf("writing %q: %w", outputFile, err)
+	}
+
+	fmt.Println("done")
 
 	return nil
 }

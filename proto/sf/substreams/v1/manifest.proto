@@ -27,7 +27,6 @@ message Module {
   Output output  = 7;
   uint64 start_block = 8;
 
-
   message WasmCode {
     string type = 4;
     uint32 index = 5;

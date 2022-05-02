@@ -224,6 +224,9 @@ func (m *Manifest) PrintMermaid() {
 	fmt.Println("")
 }
 
+// TODO: there needs to be some safety checks done directly on the _pbsubstreams.Manifest_ object,
+// as we'll receive it packaged like that.
+
 func (m *Manifest) ToProto() (*pbsubstreams.Manifest, error) {
 	pbManifest := &pbsubstreams.Manifest{
 		SpecVersion: m.SpecVersion,

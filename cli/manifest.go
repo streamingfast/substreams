@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
@@ -89,7 +88,7 @@ func runManifestPackage(cmd *cobra.Command, args []string) error {
 	if len(args) == 2 {
 		outputFile = args[1]
 	} else {
-		outputFile = filepath.Base(manifestPath) + ".pb"
+		outputFile = manifestPath + ".pb"
 	}
 
 	cnt, err := proto.Marshal(manifProto)

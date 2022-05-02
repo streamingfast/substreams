@@ -28,8 +28,9 @@ type Service struct {
 	blockType          string // NOTE: can't that be extracted from the actual block messages? with some proto machinery? Was probably useful when `sf.ethereum.codec.v1.Block` didn't correspond to the `sf.ethereum.type.v1.Block` target type.. but that's not true anymore.
 	partialModeEnabled bool
 
-	wasmExtensions     []wasm.WASMExtensioner
-	pipelineOptions    []pipeline.PipelineOptioner
+	wasmExtensions  []wasm.WASMExtensioner
+	pipelineOptions []pipeline.PipelineOptioner
+
 	storesSaveInterval uint64
 
 	firehoseServer *firehoseServer.Server
@@ -57,9 +58,9 @@ func WithPartialMode() Option {
 	}
 }
 
-func WithStoresSaveInterval(seconds uint64) Option {
+func WithStoresSaveInterval(block uint64) Option {
 	return func(s *Service) {
-		s.storesSaveInterval = seconds
+		s.storesSaveInterval = block
 	}
 }
 

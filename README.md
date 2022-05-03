@@ -81,7 +81,7 @@ Then in your shell, load a key in an env var with:
 sftoken
 ```
 
-Then, try to run the [PancakeSwap Substreams](https://github.com/streamingfast/substreams-playground)
+Then, try to run the **PancakeSwap Substreams** from our [Substreams Playground](https://github.com/streamingfast/substreams-playground) project
 
 > The below commands will be run from `substreams-playground`
 

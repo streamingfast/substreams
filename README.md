@@ -81,13 +81,16 @@ Then in your shell, load a key in an env var with:
 sftoken
 ```
 
-Then, try to run the [PancakeSwap Substreams](https://github.com/streamingfast/substreams-playground) (under `pcs-rust/`, we build instructions over there)
+Then, try to run the [PancakeSwap Substreams](https://github.com/streamingfast/substreams-playground)
+
+> The below commands will be run from `substreams-playground`
 
 ```
-cd substreams-playground
-substreams run -e bsc-dev.streamingfast.io:443 wasm_substreams_manifest.yaml pairs,block_to_pairs,volumes,totals,db_out -s 6810706 -t 6810711
+cd ./pcs-rust/ && ./build.sh
+cd ../eth-token/ && ./build.sh
+cd ..
+substreams run -e bsc-dev.streamingfast.io:443 ./pcs-rust/substreams.yaml pairs,block_to_pairs,volumes,totals,db_out -s 6810706 -t 6810711
 ```
-
 
 Run locally
 -----------

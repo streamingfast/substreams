@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -67,14 +69,22 @@ type StreamOutput struct {
 	Type string `yaml:"type"`
 }
 
-func New(path string) (m *Manifest, err error) {
-	m, err = newWithoutLoad(path)
+func New(manifestFile string) (m *Manifest, err error) {
+	m, err = newWithoutLoad(manifestFile)
 	if err != nil {
 		return nil, err
 	}
 
+	absoluteManifestPath, err := filepath.Abs(manifestFile)
+	if err != nil {
+		return nil, fmt.Errorf("getting absolute path: %w", err)
+	}
+
+	workingDir := path.Dir(absoluteManifestPath)
+
 	for _, s := range m.Modules {
 		if s.Code.File != "" {
+			s.Code.File = path.Join(workingDir, s.Code.File)
 			cnt, err := ioutil.ReadFile(s.Code.File)
 			if err != nil {
 				return nil, fmt.Errorf("reading file %q: %w", s.Code.File, err)

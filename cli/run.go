@@ -21,7 +21,7 @@ func init() {
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
 	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	runCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
-	runCmd.Flags().StringP("proto-path", "I", "./proto", "Path of proto files")
+	runCmd.Flags().StringP("proto-path", "I", "./", "Path of proto files")
 
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -53,7 +53,10 @@ func run(cmd *cobra.Command, args []string) error {
 	outputStreamNames := strings.Split(args[1], ",")
 
 	protoIncludePath := mustGetString(cmd, "proto-path")
-	protoFiles, err := filepath.Glob(filepath.Join(protoIncludePath, "*.proto"))
+	protoFiles, err := findProtoFiles(protoIncludePath)
+	if err != nil {
+		return fmt.Errorf("finding proto files int %s: %w", protoIncludePath, err)
+	}
 	parser := protoparse.Parser{}
 	fileDescs, err := parser.ParseFiles(protoFiles...)
 	if err != nil {
@@ -62,7 +65,6 @@ func run(cmd *cobra.Command, args []string) error {
 
 	returnHandler := func(any *pbsubstreams.BlockScopedData) error { return nil }
 	if !mustGetBool(cmd, "no-return-handler") {
-
 		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames)
 	}
 
@@ -139,4 +141,15 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+}
+
+func findProtoFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if strings.HasSuffix(info.Name(), ".proto") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
 }

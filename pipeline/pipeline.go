@@ -450,6 +450,12 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 }
 
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
+	//todo: compute modules start block. use module magic on the p.requestedStartBlockNum assume 10_000 block per file.
+	// get last saved state block num for each modules
+	// if last saved more the x * 10_000 behind computed start block we create a new substreams request for that module to process data upto computed start block
+	// ex: token@100_000 computedStart@300_0000. we create a request for "tokens" with start block@100_000 and stop_block@300_000
+	// we wait for that request to complete that we do the same with next modules.
+
 	if p.partialMode {
 		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputModuleNames[0]) //todo: new the list of parent store.
 		outputStreamModule := p.builders[p.outputModuleNames[0]]

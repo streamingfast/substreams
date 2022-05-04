@@ -43,22 +43,22 @@ func mergePartialFilesE(cmd *cobra.Command, args []string) error {
 
 	//get all partial files
 	err = store.Walk(ctx, "", "", func(filename string) error {
-		ok, start, end, partial := state.ParseFileName(filename)
+		fileinfo, ok := state.ParseFileName(filename)
 		if !ok {
 			return fmt.Errorf("could not parse filename %s", filename)
 		}
 
-		if partial {
+		if fileinfo.Partial {
 			partialFiles = append(partialFiles, partialFile{
 				filename: filename,
-				endBlock: end,
+				endBlock: fileinfo.EndBlock,
 			})
 		}
 
 		bri := blockRangeItem{
-			partial:  partial,
-			start:    start,
-			end:      end,
+			partial:  fileinfo.Partial,
+			start:    fileinfo.StartBlock,
+			end:      fileinfo.EndBlock,
 			filename: filename,
 		}
 		ranges = append(ranges, bri)
@@ -123,7 +123,8 @@ func mergePartialFilesE(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			_, _, end, _ := state.ParseFileName(files[len(files)-1])
+			fi, _ := state.ParseFileName(files[len(files)-1])
+			end := fi.EndBlock
 			lastMergedBuilder := builders[len(builders)-1]
 
 			fileWritten, err := lastMergedBuilder.WriteState(ctx, end, true)

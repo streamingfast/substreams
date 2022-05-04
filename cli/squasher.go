@@ -1,22 +1,24 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"sort"
-	"time"
-
 	"github.com/abourget/llerrgroup"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/state"
-	"go.uber.org/zap"
+	"io"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
+const DEFAULT_BLOCK_RANGE = 10_000
+
 var squasherCmd = &cobra.Command{
-	Use:  "squasher [block_range_file] [base_store_dsn]",
+	Use:  "squasher [base_store_dsn] [modules_list]",
 	Args: cobra.ExactArgs(2),
 	RunE: runSquashE,
 }
@@ -25,116 +27,152 @@ func init() {
 	rootCmd.AddCommand(squasherCmd)
 }
 
-type blockRange struct {
-	StartBlock uint64 `json:"start_block"`
-	EndBlock   uint64 `json:"end_block"`
+type SquasherConfig struct {
+	Modules []string `json:"modules"`
 }
 
-type storeRange struct {
-	StoreName   string       `json:"store_name"`
-	BlockRanges []blockRange `json:"block_ranges"`
+func NewSquasherConfig(modules ...string) *SquasherConfig {
+	return &SquasherConfig{Modules: modules}
+}
+
+type SquasherMetadata struct {
+	LastKVFile string `json:"last_kv_file"`
+	RangeSize  int    `json:"range_size"`
 }
 
 type Squasher struct {
-	storeRanges []storeRange
+	config *SquasherConfig
 }
 
-func NewSquasher(scheduleFile string) (*Squasher, error) {
-	schedulerBytes, err := os.ReadFile(scheduleFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading schedule file %s: %w", scheduleFile, err)
-	}
-
-	var ranges []storeRange
-	err = json.Unmarshal(schedulerBytes, &ranges)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling json: %w", err)
-	}
-
-	return &Squasher{storeRanges: ranges}, nil
+func NewSquasher(config *SquasherConfig) *Squasher {
+	return &Squasher{config: config}
 }
 
 func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
-	eg := llerrgroup.New(len(s.storeRanges))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	for _, sr := range s.storeRanges {
+	eg := llerrgroup.New(len(s.config.Modules))
+
+	for _, store := range s.config.Modules {
 		if eg.Stop() {
 			continue
 		}
 
-		sr := sr
-		eg.Go(func() error {
-			sort.Slice(sr.BlockRanges, func(i, j int) bool {
-				return sr.BlockRanges[i].EndBlock < sr.BlockRanges[j].EndBlock
-			})
+		storeName := store
+		eg.Go(func() (perr error) {
+			defer func() {
+				if perr != nil {
+					cancel()
+				}
+			}()
 
-			for _, blockRange := range sr.BlockRanges {
-				zlog.Info("looking for file", zap.String("prefix", state.FilePrefix(sr.StoreName, blockRange.EndBlock)))
+			//get metadata file
+			metadataFileName := fmt.Sprintf("%s-squasher-metadata.json", storeName)
+			exists, basePath, err := findUniqueFile(ctx, baseStore, metadataFileName)
+			if err != nil {
+				perr = fmt.Errorf("finding file %s: %w", metadataFileName, err)
+				return
+			}
+			fmt.Println(basePath)
 
-				var filename string
-				var fullKVFound bool
+			if !exists {
+				perr = fmt.Errorf("metadata file %s does not exist", metadataFileName)
+				return
+			}
 
-			FileFound: //loop waiting for file with our given end block to exist
-				for {
-					files, err := baseStore.ListFiles(ctx, state.FilePrefix(sr.StoreName, blockRange.EndBlock), "", 2) // max=2 because we might have a partial AND a full kv for this prefix
-					if err != nil {
-						return fmt.Errorf("listing files: %w", err)
-					}
+		Loop:
+			for {
+				select {
+				case <-ctx.Done():
+					break Loop
+				default:
 
-					switch len(files) {
-					case 0:
-						zlog.Info("file not found. sleeping", zap.String("file prefix", state.FilePrefix(sr.StoreName, blockRange.EndBlock)))
-						time.Sleep(5 * time.Second)
-						continue
-					case 1:
-						filename = files[0]
-						_, _, _, partial := state.ParseFileName(filename)
-						if !partial {
-							fullKVFound = true
-							zlog.Info("found full kv file for this range already", zap.String("filename", filename))
-						}
-						break FileFound
-					case 2:
-						var fullFound bool
-						for _, f := range files {
-							_, _, _, partial := state.ParseFileName(f)
-							filename = f
-							if !partial {
-								fullFound = true
-								break
-							}
-						}
-						if fullFound {
-							fullKVFound = true
-							zlog.Info("found full kv file for this range already", zap.String("filename", filename))
-						}
-						break FileFound
-					}
 				}
 
-				if fullKVFound {
-					continue
-				}
-
-				builder, err := state.BuilderFromFile(ctx, filename, baseStore)
+				metadataFileBytes, err := readObject(ctx, baseStore, basePath, metadataFileName)
 				if err != nil {
-					return fmt.Errorf("loading builder from file %s: %w", filename, err)
+					perr = fmt.Errorf("reading object %s: %w", metadataFileName, err)
+					return
 				}
 
-				zlog.Info("squashing",
-					zap.String("store", sr.StoreName),
-					zap.Uint64("up_to_block", blockRange.EndBlock),
-				)
-
-				err = builder.Squash(ctx, baseStore, blockRange.EndBlock)
+				var metadata *SquasherMetadata
+				err = json.Unmarshal(metadataFileBytes, &metadata)
 				if err != nil {
-					return fmt.Errorf("squashing: %w", err)
+					perr = fmt.Errorf("unmarshalling metadata %s: %w", metadataFileName, err)
+					return
 				}
 
-				_, err = builder.WriteState(ctx, blockRange.EndBlock, false)
-				if err != nil {
-					return fmt.Errorf("writing state to store: %w", err)
+				fileinfo, ok := state.ParseFileName(metadata.LastKVFile)
+				if !ok {
+					perr = fmt.Errorf("could not parse filename %s", metadata.LastKVFile)
+					return
 				}
+				kvFileEndBlock := fileinfo.EndBlock
+
+				partialFileStartBlock := kvFileEndBlock
+				partialFileEndBlock := kvFileEndBlock + uint64(metadata.RangeSize)
+
+				//wait for next partial file to appear
+				partialSubstore, err := baseStore.SubStore(basePath)
+				if err != nil {
+					perr = fmt.Errorf("getting substore: %w", err)
+					return
+				}
+
+				<-state.WaitPartial(ctx, storeName, partialSubstore, partialFileStartBlock, partialFileEndBlock)
+				partialFileName := state.PartialFileName(storeName, partialFileStartBlock, partialFileEndBlock)
+
+				//open the files
+				partial, err := state.BuilderFromFile(ctx, strings.Join([]string{basePath, partialFileName}, string(filepath.Separator)), baseStore)
+				if err != nil {
+					perr = fmt.Errorf("creating partial state: %w", err)
+					return
+				}
+
+				kv, err := state.BuilderFromFile(ctx, strings.Join([]string{basePath, metadata.LastKVFile}, string(filepath.Separator)), baseStore)
+				if err != nil {
+					perr = fmt.Errorf("creating kv state: %w", err)
+					return
+				}
+
+				//squash them
+				err = partial.Merge(kv)
+				if err != nil {
+					perr = fmt.Errorf("merging: %w", err)
+					return
+				}
+
+				//save the result
+				mergedFilename, err := partial.WriteState(ctx, partialFileEndBlock, false)
+				if err != nil {
+					perr = fmt.Errorf("writing new kv state: %w", err)
+					return
+				}
+
+				//delete the partial
+				err = deleteObject(ctx, baseStore, basePath, partialFileName)
+				if err != nil {
+					perr = fmt.Errorf("deleting partial file %s: %w", partialFileName, err)
+					return
+				}
+
+				//update and save metadata
+				metadata.LastKVFile = mergedFilename
+
+				newMetadataBytes, err := json.Marshal(metadata)
+				if err != nil {
+					perr = fmt.Errorf("json marshaling metadata: %w", err)
+					return
+				}
+
+				err = writeObject(ctx, baseStore, basePath, metadataFileName, newMetadataBytes)
+				if err != nil {
+					perr = fmt.Errorf("writing metadata file %s: %w", metadataFileName, err)
+					return
+				}
+
+				time.Sleep(10 * time.Second)
 			}
 
 			return nil
@@ -149,18 +187,71 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 	return nil
 }
 
-func runSquashE(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	blockRangesFile := args[0]
+func findUniqueFile(ctx context.Context, baseStore dstore.Store, filename string) (exists bool, basePath string, err error) {
+	exists = false
+	var files []string
 
-	squasher, err := NewSquasher(blockRangesFile)
-	if err != nil {
-		return err
+	_ = baseStore.Walk(ctx, "", "", func(storeFile string) (err error) {
+		if !strings.HasSuffix(storeFile, fmt.Sprintf("%s%s", string(filepath.Separator), filename)) {
+			return
+		}
+		files = append(files, storeFile)
+		exists = true
+		return
+	})
+
+	if len(files) != 1 {
+		return false, "", fmt.Errorf("invalid result. length should be 1, got %d", len(files))
 	}
 
-	store, err := dstore.NewStore(args[1], "", "", false)
+	file := files[0]
+	return true, getBasePath(filename, file), nil
+}
+
+func getBasePath(filename, objectPath string) string {
+	path := strings.TrimSuffix(objectPath, filename)
+	return strings.Trim(path, string(filepath.Separator))
+}
+
+func deleteObject(ctx context.Context, store dstore.Store, basePath, objectName string) error {
+	return store.DeleteObject(ctx, strings.Join([]string{basePath, objectName}, string(filepath.Separator)))
+}
+
+func readObject(ctx context.Context, store dstore.Store, basePath, objectName string) ([]byte, error) {
+	rc, err := store.OpenObject(ctx, strings.Join([]string{basePath, objectName}, string(filepath.Separator)))
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("opening object")
+	}
+	defer rc.Close()
+
+	return io.ReadAll(rc)
+}
+
+func writeObject(ctx context.Context, store dstore.Store, basePath, objectName string, objectData []byte) error {
+	br := bytes.NewReader(objectData)
+
+	err := store.WriteObject(ctx, strings.Join([]string{basePath, objectName}, string(filepath.Separator)), br)
+	if err != nil {
+		return fmt.Errorf("writing object")
+	}
+
+	return nil
+}
+
+func runSquashE(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	modulesList := strings.Split(args[1], ",")
+	if len(modulesList) == 0 {
+		return fmt.Errorf("modules list is empty")
+	}
+
+	config := NewSquasherConfig(modulesList...)
+	squasher := NewSquasher(config)
+
+	store, err := dstore.NewStore(args[0], "", "", false)
+	if err != nil {
+		return fmt.Errorf("creating store: %w", err)
 	}
 
 	err = squasher.run(ctx, store)

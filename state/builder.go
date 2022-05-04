@@ -61,7 +61,7 @@ func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbsubstreams.
 }
 
 func BuilderFromFile(ctx context.Context, filename string, store dstore.Store) (*Builder, error) {
-	ok, partialFileStartBlock, _, isPartialFile := ParseFileName(filename)
+	fileinfo, ok := ParseFileName(filename)
 	if !ok {
 		return nil, fmt.Errorf("could not parse filename %s", filename)
 	}
@@ -97,11 +97,11 @@ func BuilderFromFile(ctx context.Context, filename string, store dstore.Store) (
 		ModuleStartBlock: moduleStartBlock,
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
-		partialMode:      isPartialFile,
+		partialMode:      fileinfo.Partial,
 	}
 
-	if isPartialFile {
-		b.partialStartBlock = partialFileStartBlock
+	if fileinfo.Partial {
+		b.partialStartBlock = fileinfo.StartBlock
 	}
 
 	return b, nil

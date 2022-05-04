@@ -3,9 +3,9 @@ package state
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/dstore"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -37,7 +37,7 @@ func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleS
 		}
 		s := store
 		eg.Go(func() error {
-			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, s)
+			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, s.Name, s)
 		})
 	}
 
@@ -48,7 +48,7 @@ func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleS
 	return nil
 }
 
-func WaitKV(ctx context.Context, store *Store, endBlock uint64) <-chan error {
+func WaitPartial(ctx context.Context, storeName string, store dstore.Store, startBlock, endBlock uint64) <-chan error {
 	done := make(chan error)
 
 	go func() {
@@ -64,7 +64,42 @@ func WaitKV(ctx context.Context, store *Store, endBlock uint64) <-chan error {
 				//
 			}
 
-			fileName := store.StateFileName(endBlock)
+			fileName := PartialFileName(storeName, startBlock, endBlock)
+			zlog.Info("looking for partial file:", zap.String("file_name", fileName))
+			exists, err := store.FileExists(ctx, fileName)
+			if err != nil {
+				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
+				return
+			}
+
+			if exists {
+				return
+			}
+
+			time.Sleep(WaiterSleepInterval)
+		}
+	}()
+
+	return done
+}
+
+func WaitKV(ctx context.Context, storeName string, store dstore.Store, moduleStartBlock, endBlock uint64) <-chan error {
+	done := make(chan error)
+
+	go func() {
+		defer close(done)
+
+		for {
+			//check context
+			select {
+			case <-ctx.Done():
+				done <- &fileWaitResult{ctx.Err()}
+				return
+			default:
+				//
+			}
+
+			fileName := StateFileName(storeName, endBlock, moduleStartBlock)
 			zlog.Info("looking for kv file:", zap.String("file_name", fileName))
 			exists, err := store.FileExists(ctx, fileName)
 			if err != nil {
@@ -83,7 +118,7 @@ func WaitKV(ctx context.Context, store *Store, endBlock uint64) <-chan error {
 	return done
 }
 
-func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleStartBlock uint64, store *Store) <-chan error {
+func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleStartBlock uint64, storeName string, store dstore.Store) <-chan error {
 	done := make(chan error)
 	waitForBlockNum := requestStartBlock
 	go func() {
@@ -103,8 +138,8 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 				return
 			}
 
-			prefix := store.StateFilePrefix(waitForBlockNum)
-			files, err := store.ListFiles(ctx, store.StateFilePrefix(waitForBlockNum), "", 1)
+			prefix := StateFilePrefix(storeName, waitForBlockNum)
+			files, err := store.ListFiles(ctx, prefix, "", 1)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
 				return
@@ -113,19 +148,19 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 			found := len(files) == 1
 			if !found {
 				time.Sleep(WaiterSleepInterval)
-				fmt.Printf("waiting for store %s to complete processing to block %d\n", store.Name, w.targetBlockNumber)
+				fmt.Printf("waiting for store %s to complete processing to block %d\n", store, w.targetBlockNumber)
 				continue
 			}
 
-			ok, start, _, partial := ParseFileName(files[0])
+			fileinfo, ok := ParseFileName(files[0])
 			if !ok {
 				done <- &fileWaitResult{fmt.Errorf("could not parse filename %s", files[0])}
 				return
 			}
 
-			if partial {
-				waitForBlockNum = start
-				if start == moduleStartBlock {
+			if fileinfo.Partial {
+				waitForBlockNum = fileinfo.StartBlock
+				if fileinfo.StartBlock == moduleStartBlock {
 					return
 				}
 				continue
@@ -164,8 +199,12 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 		foundFile := files[0]
 		switch len(files) {
 		case 2:
-			_, _, _, partialLeft := ParseFileName(files[0])
-			_, _, _, partialRight := ParseFileName(files[1])
+			leftFileInfo, _ := ParseFileName(files[0])
+			partialLeft := leftFileInfo.Partial
+
+			rightFileInfo, _ := ParseFileName(files[1])
+			partialRight := rightFileInfo.Partial
+
 			if partialLeft && partialRight {
 				return nil, fmt.Errorf("found two partial files %s and %s", files[0], files[1])
 			}
@@ -176,7 +215,8 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 
 		out = append(out, foundFile)
 
-		ok, start, _, partial := ParseFileName(foundFile)
+		fileinfo, ok := ParseFileName(foundFile)
+		start, partial := fileinfo.StartBlock, fileinfo.Partial
 		if !ok {
 			return nil, fmt.Errorf("could not parse filename %s", files[0])
 		}
@@ -214,34 +254,36 @@ func (f fileWaitResult) Error() string {
 
 var fullKVRegex *regexp.Regexp
 var partialKVRegex *regexp.Regexp
+var stateFileRegex *regexp.Regexp
 
 func init() {
-	fullKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-([\d]+)\.kv`)
-	partialKVRegex = regexp.MustCompile(`[\w]+-([\d]+)-([\d]+)\.partial`)
+	stateFileRegex = regexp.MustCompile(`([\w]+)-([\d]+)-([\d]+)\.(kv|partial)`)
 }
 
-func ParseFileName(filename string) (ok bool, start, end uint64, partial bool) {
-	if strings.HasSuffix(filename, ".kv") {
-		res := fullKVRegex.FindAllStringSubmatch(filename, 1)
-		if len(res) != 1 {
-			return
-		}
-		end = uint64(mustAtoi(res[0][1]))
-		start = uint64(mustAtoi(res[0][2]))
-		partial = false
-		ok = true
-	} else if strings.HasSuffix(filename, ".partial") {
-		res := partialKVRegex.FindAllStringSubmatch(filename, 1)
-		if len(res) != 1 {
-			return
-		}
-		end = uint64(mustAtoi(res[0][1]))
-		start = uint64(mustAtoi(res[0][2]))
-		partial = true
-		ok = true
+type FileInfo struct {
+	ModuleName string
+	StartBlock uint64
+	EndBlock   uint64
+	Partial    bool
+}
+
+func ParseFileName(filename string) (*FileInfo, bool) {
+	res := stateFileRegex.FindAllStringSubmatch(filename, 1)
+	if len(res) != 1 {
+		return nil, false
 	}
 
-	return
+	module := res[0][1]
+	end := uint64(mustAtoi(res[0][2]))
+	start := uint64(mustAtoi(res[0][3]))
+	partial := res[0][4] == "partial"
+
+	return &FileInfo{
+		ModuleName: module,
+		StartBlock: start,
+		EndBlock:   end,
+		Partial:    partial,
+	}, true
 }
 
 func mustAtoi(s string) int {

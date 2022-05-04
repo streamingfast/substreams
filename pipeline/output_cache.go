@@ -28,7 +28,7 @@ type outputCache struct {
 
 type ModulesOutputCache struct {
 	outputCaches map[string]*outputCache
-	mu           sync.RWMutex
+	lock         sync.RWMutex
 }
 
 type blockRange struct {
@@ -80,8 +80,8 @@ func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockR
 }
 
 func (c *ModulesOutputCache) set(moduleName string, block *bstream.Block, data []byte) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	cache := c.outputCaches[moduleName]
 
@@ -111,8 +111,8 @@ func (c *ModulesOutputCache) set(moduleName string, block *bstream.Block, data [
 }
 
 func (c *ModulesOutputCache) get(moduleName string, block *bstream.Block) ([]byte, bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	cache := c.outputCaches[moduleName]
 
@@ -135,6 +135,7 @@ func (r *blockRange) contains(blockRef bstream.BlockRef) bool {
 func (o *outputCache) loadBlocks(ctx context.Context, startBlock uint64) (err error) {
 	var found bool
 
+	o.new = false
 	o.kv = make(map[string]*bstream.Block)
 	o.currentBlockRange = nil
 
@@ -144,6 +145,7 @@ func (o *outputCache) loadBlocks(ctx context.Context, startBlock uint64) (err er
 	}
 
 	if !found {
+		o.new = true
 		return nil
 	}
 

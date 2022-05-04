@@ -155,7 +155,7 @@ func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string
 			fmt.Println("GLOB", importPath, importFile)
 			matches, err := doublestar.Glob(importPathFS, importFile)
 			if err != nil {
-				return nil, fmt.Errorf("glob through %q, matching %q: %w", importPath, importFile)
+				return nil, fmt.Errorf("glob through %q, matching %q: %w", importPath, importFile, err)
 			}
 			files = append(files, matches...)
 		}

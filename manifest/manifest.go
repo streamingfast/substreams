@@ -222,11 +222,18 @@ func (m *Manifest) PrintMermaid() {
 
 	for _, s := range m.Modules {
 		for _, in := range s.Inputs {
-			dataPassed := in.Name
-			if in.Mode != "" {
-				dataPassed = dataPassed + ":" + in.Mode
+			if in.Mode != "" && in.Mode == "deltas" {
+				fmt.Printf("  %s[%s] -- %q --> %s\n",
+					strings.Split(in.Name, ":")[1],
+					strings.Replace(in.Name, ":", ": ", 1),
+					in.Mode,
+					s.Name)
+			} else {
+				fmt.Printf("  %s[%s] --> %s\n",
+					strings.Split(in.Name, ":")[1],
+					strings.Replace(in.Name, ":", ": ", 1),
+					s.Name)
 			}
-			fmt.Printf("  %s -- %q --> %s\n", strings.Split(in.Name, ":")[1], dataPassed, s.Name)
 		}
 	}
 

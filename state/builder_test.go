@@ -9,7 +9,7 @@ import (
 )
 
 func TestStateBuilder(t *testing.T) {
-	s := NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	s := mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 
 	s.Set(0, "1", "val1")
 	s.Set(1, "1", "val2")

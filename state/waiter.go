@@ -16,13 +16,13 @@ import (
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
-	stores            []*Store
+	builders          []*Builder
 	targetBlockNumber uint64
 }
 
-func NewFileWaiter(targetStartBlock uint64, stores []*Store) *FileWaiter {
+func NewFileWaiter(targetStartBlock uint64, builders []*Builder) *FileWaiter {
 	w := &FileWaiter{
-		stores:            stores,
+		builders:          builders,
 		targetBlockNumber: targetStartBlock,
 	}
 
@@ -30,14 +30,14 @@ func NewFileWaiter(targetStartBlock uint64, stores []*Store) *FileWaiter {
 }
 
 func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleStartBlock uint64) error {
-	eg := llerrgroup.New(len(w.stores))
-	for _, store := range w.stores {
+	eg := llerrgroup.New(len(w.builders))
+	for _, builder := range w.builders {
 		if eg.Stop() {
 			continue // short-circuit the loop if we got an error
 		}
-		s := store
+		b := builder
 		eg.Go(func() error {
-			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, s.Name, s)
+			return <-w.wait(ctx, requestStartBlock, moduleStartBlock, b.Name, b.Store)
 		})
 	}
 
@@ -173,7 +173,7 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 	return done
 }
 
-func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, moduleStartBlock uint64) ([]string, error) {
+func pathToState(ctx context.Context, storeName string, store dstore.Store, requestStartBlock uint64, moduleStartBlock uint64) ([]string, error) {
 	var out []string
 	nextBlockNum := requestStartBlock
 	for {
@@ -185,7 +185,7 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 			//
 		}
 
-		prefix := store.StateFilePrefix(nextBlockNum)
+		prefix := StateFilePrefix(storeName, nextBlockNum)
 		files, err := store.ListFiles(ctx, prefix, "", 2)
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
@@ -193,7 +193,7 @@ func pathToState(ctx context.Context, store *Store, requestStartBlock uint64, mo
 
 		found := len(files) >= 1
 		if !found {
-			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, store.Name)
+			return nil, fmt.Errorf("file not found to prefix %s for module %s", prefix, storeName)
 		}
 
 		foundFile := files[0]

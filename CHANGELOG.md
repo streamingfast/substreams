@@ -7,6 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.0.5-beta2]
+
+### Client
+
+* Improved defaults for `--proto-path` and `--proto`, using globs.
+* WASM file paths in substreams.yaml manifests now resolve relative to the location of the yaml file.
+* Added `substreams manifest package` to create .pb packages to simplify querying using other languages. See the python example.
+* Added `substreams manifest graph` to show the Mermaid graph alone.
+* Improved mermaid graph layout.
+* Removed native Go code support for now.
+
+### Server
+
+* Always writes store snapshots, each 10,000 blocks.
+* A few tools to manage partial snapshots under `substreams tools`
+
 
 ## [v0.0.5-beta]
 

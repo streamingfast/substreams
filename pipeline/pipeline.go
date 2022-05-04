@@ -17,18 +17,15 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Pipeline struct {
-	vmType                 string // wasm/rust-v1, native
-	requestedStartBlockNum uint64
-
-	partialMode bool
-	fileWaiter  *state.FileWaiter
-
+	vmType    string // wasm/rust-v1, native
 	blockType string
+
+	requestedStartBlockNum uint64
+	partialMode            bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -180,19 +177,19 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum))
 		}
 
-		store, err := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
-		if err != nil {
-			return nil, nil, fmt.Errorf("init new store: %w", err)
-		}
-
-		builder := state.NewBuilder(
+		builder, err := state.NewBuilder(
 			storeModule.Name,
 			storeModule.StartBlock,
+			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
-			store,
+			p.stateStore,
 			options...,
 		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
+		}
+
 		p.builders[builder.Name] = builder
 	}
 
@@ -201,21 +198,6 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 	}
 	err = p.buildWASM(ctx, request, modules)
 	return
-}
-
-type ModuleExecutor struct {
-	moduleName string
-	wasmModule *wasm.Module
-	wasmInputs []*wasm.Input
-	pipeline   *Pipeline
-	isStore    bool
-	isOutput   bool // whether output is enabled for this module
-
-	outputStore *state.Builder
-
-	mapperOutput []byte
-	outputType   string
-	entrypoint   string
 }
 
 func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request, modules []*pbsubstreams.Module) error {
@@ -332,14 +314,14 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
 		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputModuleNames[0]) //todo: new the list of parent store.
 		outputStreamModule := p.builders[p.outputModuleNames[0]]
-		var stores []*state.Store
+		var builders []*state.Builder
 		for _, ancestorStore := range ancestorStores {
 			builder := p.builders[ancestorStore.Name]
-			stores = append(stores, builder.Store)
+			builders = append(builders, builder)
 		}
 
-		p.fileWaiter = state.NewFileWaiter(p.requestedStartBlockNum, stores)
-		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
+		fileWaiter := state.NewFileWaiter(p.requestedStartBlockNum, builders)
+		err := fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}
@@ -367,8 +349,6 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 //   * connect to a remote firehose (I can cut the upstream dependencies
 //   * if resources are available, SCHEDULE on BACKING NODES a parallel processing for that segment
 //   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
-
-type StreamFunc func() error
 
 func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
 	ctx := p.context
@@ -543,119 +523,5 @@ type Printer interface {
 func printer(in interface{}) {
 	if p, ok := in.(Printer); ok {
 		p.Print()
-	}
-}
-
-func (e *ModuleExecutor) run() (err error) {
-	if e.isStore {
-		err = e.wasmStoreCall()
-	} else {
-		err = e.wasmMapCall()
-	}
-	if err != nil {
-		return err
-	}
-
-	if e.isOutput {
-		e.appendOutput()
-	}
-
-	return nil
-}
-func (e *ModuleExecutor) wasmMapCall() (err error) {
-	var vm *wasm.Instance
-	if vm, err = e.wasmCall(); err != nil {
-		return err
-	}
-
-	vals := e.pipeline.wasmOutputs
-	name := e.moduleName
-	if vm != nil {
-		out := vm.Output()
-		vals[name] = out
-		e.mapperOutput = out
-
-	} else {
-		// This means wasm execution was skipped because all inputs were empty.
-		vals[name] = nil
-		e.mapperOutput = nil
-	}
-	return nil
-}
-
-func (e *ModuleExecutor) wasmStoreCall() (err error) {
-	if _, err := e.wasmCall(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (e *ModuleExecutor) wasmCall() (instance *wasm.Instance, err error) {
-	hasInput := false
-	vals := e.pipeline.wasmOutputs
-	for _, input := range e.wasmInputs {
-		switch input.Type {
-		case wasm.InputSource:
-			val := vals[input.Name]
-			if len(val) != 0 {
-				input.StreamData = val
-				hasInput = true
-			} else {
-				input.StreamData = nil
-			}
-		case wasm.InputStore:
-			hasInput = true
-		case wasm.OutputStore:
-
-		default:
-			panic(fmt.Sprintf("Invalid input type %d", input.Type))
-		}
-	}
-
-	// This allows us to skip the execution of the VM if there are no inputs.
-	// This assumption should either be configurable by the manifest, or clearly documented:
-	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
-	//  state store in read mode)
-	if hasInput {
-		instance, err = e.wasmModule.NewInstance(e.pipeline.currentClock, e.entrypoint, e.wasmInputs)
-		if err != nil {
-			return nil, fmt.Errorf("new wasm instance: %w", err)
-		}
-		if err = instance.Execute(); err != nil {
-			return nil, fmt.Errorf("module %q: wasm execution failed: %w", e.moduleName, err)
-		}
-	}
-	return
-}
-
-func (e *ModuleExecutor) appendOutput() {
-	var logs []string
-	if e.wasmModule.CurrentInstance != nil {
-		logs = e.wasmModule.CurrentInstance.Logs
-	}
-
-	if e.isStore {
-		if len(e.outputStore.Deltas) != 0 || len(logs) != 0 {
-			zlog.Debug("append to output, store")
-			e.pipeline.moduleOutputs = append(e.pipeline.moduleOutputs, &pbsubstreams.ModuleOutput{
-				Name: e.moduleName,
-				Data: &pbsubstreams.ModuleOutput_StoreDeltas{
-					StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
-				},
-				Logs: logs,
-			})
-		}
-	} else {
-		if e.mapperOutput != nil || len(logs) != 0 {
-			zlog.Debug("append to output, map")
-			e.pipeline.moduleOutputs = append(e.pipeline.moduleOutputs, &pbsubstreams.ModuleOutput{
-				Name: e.moduleName,
-				Data: &pbsubstreams.ModuleOutput_MapOutput{
-					MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
-				},
-				Logs: logs,
-			})
-		}
 	}
 }

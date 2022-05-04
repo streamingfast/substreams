@@ -20,6 +20,13 @@ var manifestInfoCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var manifestGraphCmd = &cobra.Command{
+	Use:          "graph [manifest_file]",
+	RunE:         runManifestGraph,
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
+}
+
 var manifestPackageCmd = &cobra.Command{
 	Use:          "package [manifest_yaml] {manifest_pkg_pb}",
 	RunE:         runManifestPackage,
@@ -29,6 +36,7 @@ var manifestPackageCmd = &cobra.Command{
 
 func init() {
 	manifestCmd.AddCommand(manifestInfoCmd)
+	manifestCmd.AddCommand(manifestGraphCmd)
 	manifestCmd.AddCommand(manifestPackageCmd)
 
 	rootCmd.AddCommand(manifestCmd)
@@ -62,6 +70,18 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("Kind:", module.GetKind())
 		fmt.Println("Hash:", manifest.HashModuleAsString(manifProto, graph, module))
 	}
+
+	return nil
+}
+
+func runManifestGraph(cmd *cobra.Command, args []string) error {
+	manifestPath := args[0]
+	manif, err := manifest.New(manifestPath)
+	if err != nil {
+		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	manif.PrintMermaid()
 
 	return nil
 }

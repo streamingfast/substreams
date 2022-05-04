@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
+	doublestar "github.com/bmatcuk/doublestar/v4"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
@@ -21,7 +21,8 @@ func init() {
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
 	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	runCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
-	runCmd.Flags().StringP("proto-path", "I", "./", "Path of proto files")
+	runCmd.Flags().StringArrayP("proto-path", "I", []string{"./proto"}, "Import paths for protobuf schemas")
+	runCmd.Flags().StringArray("proto", []string{"**/*.proto"}, "Path to explicit proto files (within proto-paths)")
 
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -52,12 +53,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 	outputStreamNames := strings.Split(args[1], ",")
 
-	protoIncludePath := mustGetString(cmd, "proto-path")
-	protoFiles, err := findProtoFiles(protoIncludePath)
+	protoImportPaths := mustGetStringArray(cmd, "proto-path")
+	protoFilesPatterns := mustGetStringArray(cmd, "proto")
+	protoFiles, err := findProtoFiles(protoImportPaths, protoFilesPatterns)
 	if err != nil {
-		return fmt.Errorf("finding proto files int %s: %w", protoIncludePath, err)
+		return fmt.Errorf("finding proto files: %w", err)
 	}
-	parser := protoparse.Parser{}
+	parser := protoparse.Parser{
+		ImportPaths: protoImportPaths,
+	}
 	fileDescs, err := parser.ParseFiles(protoFiles...)
 	if err != nil {
 		return fmt.Errorf("error parsing proto files %q: %w", protoFiles, err)
@@ -143,13 +147,20 @@ func run(cmd *cobra.Command, args []string) error {
 
 }
 
-func findProtoFiles(root string) ([]string, error) {
+func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string, error) {
 	var files []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if strings.HasSuffix(info.Name(), ".proto") {
-			files = append(files, path)
+	for _, importPath := range importPaths {
+		importPathFS := os.DirFS(importPath)
+		for _, importFile := range importFilePatterns {
+			fmt.Println("GLOB", importPath, importFile)
+			matches, err := doublestar.Glob(importPathFS, importFile)
+			if err != nil {
+				return nil, fmt.Errorf("glob through %q, matching %q: %w", importPath, importFile)
+			}
+			files = append(files, matches...)
 		}
-		return nil
-	})
-	return files, err
+	}
+
+	fmt.Println("DONE", files)
+	return files, nil
 }

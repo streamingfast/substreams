@@ -61,6 +61,7 @@ func mustGetString(cmd *cobra.Command, flagName string) string {
 	}
 	return val
 }
+
 func mustGetStringArray(cmd *cobra.Command, flagName string) []string {
 	val, err := cmd.Flags().GetStringArray(flagName)
 	if err != nil {

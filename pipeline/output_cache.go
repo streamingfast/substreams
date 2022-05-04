@@ -4,6 +4,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"sync"
 )
 
 type blockID string
@@ -17,20 +18,31 @@ type outputCache struct {
 
 type ModuleOutputCache struct {
 	moduleCaches map[moduleName]*outputCache
+	mu           sync.RWMutex
 }
 
+// NewModuleOutputCache will initialize an ModuleOutputCache struct
 func NewModuleOutputCache(modules []*pbsubstreams.Module) *ModuleOutputCache {
 	//todo: init cache with module list
-	return &ModuleOutputCache{}
+	moduleOutputCache := &ModuleOutputCache{}
+
+	for _, module := range modules {
+		moduleOutputCache.moduleCaches[moduleName(module.Name)] = &outputCache{}
+		// todo: load blocks cache if they are there
+		moduleOutputCache.loadBlocks(module.StartBlock)
+	}
+
+	return moduleOutputCache
 }
 
+// update will modify the moduleOutputCache with the given blockRef
 func (c *ModuleOutputCache) update(blockRef bstream.BlockRef) {
 
 	for _, cache := range c.moduleCaches {
 		if cache.currentBlockRange == nil {
 			//todo: find the closest start block relative to blockRef
 			// maybe we should save a state file in each folder with the cache block size
-			// for now we consider that all cache blocks file wild contains 100 block.
+			// for now we consider that all cache blocks file will contain 100 blocks
 			sb := uint64(0) //todo ^^
 			c.loadBlocks(sb)
 			return
@@ -59,6 +71,8 @@ func (c *ModuleOutputCache) saveBlocks() {
 }
 
 func (c *ModuleOutputCache) loadBlocks(inclusiveStartBlockNum uint64) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	//todo: to find the file...
 	// pad the inclusiveStartBlockNum and use it has prefix in a dstore walk func.
@@ -85,7 +99,11 @@ type blockRange struct {
 	exclusiveEndBlock uint64
 }
 
+// contains check if the blockRef is contained between blockRange startBlock and exclusiveEndBlock
 func (r *blockRange) contains(blockRef bstream.BlockRef) bool {
-	//todo: end block are always exclusive.
-	panic("todo")
+	return blockRef.Num() >= r.startBlock && blockRef.Num() < r.exclusiveEndBlock
+}
+
+func computeStartBlock(startBlock uint64) uint64 {
+	return startBlock
 }

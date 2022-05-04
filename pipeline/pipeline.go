@@ -470,6 +470,8 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		}
 
 		//todo: update module output cache with current block ref
+		moduleOutputCache := NewModuleOutputCache(p.manifest.Modules)
+		_ = moduleOutputCache
 
 		for _, executor := range p.moduleExecutors {
 			//todo: get module output from cache

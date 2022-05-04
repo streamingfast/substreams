@@ -56,6 +56,8 @@ type Pipeline struct {
 	currentClock  *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	logs          []string
+
+	moduleOutputCache *ModulesOutputCache
 }
 
 type progressTracker struct {
@@ -372,7 +374,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	_, _, err := p.build(ctx, p.request)
+	modules, _, err := p.build(ctx, p.request)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
@@ -393,6 +395,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			blockCount = 0
 		}
 	}()
+
+	_ = modules
+	//p.moduleOutputCache = NewModuleOutputCache(ctx, modules, p.manifest, p.graph, )
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
 		clock := &pbsubstreams.Clock{
@@ -469,16 +474,14 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			panic("unsupported vmType " + p.vmType)
 		}
 
-		//todo: update module output cache with current block ref
-		moduleOutputCache := NewModuleOutputCache(p.manifest.Modules)
-		_ = moduleOutputCache
+		//todo: update module output kv with current block ref
 
 		for _, executor := range p.moduleExecutors {
-			//todo: get module output from cache
-			// skip execution if output found in cache
+			//todo: get module output from kv
+			// skip execution if output found in kv
 			// add output data directly into pipeline
 
-			//todo: only cache irr stchuff
+			//todo: only kv irr stchuff
 			//todo: store execution output to store
 			//todo: maybe the executor should be aware of caching ...
 			if err := executor.run(); err != nil {

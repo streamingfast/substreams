@@ -5,12 +5,17 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/streamingfast/dstore"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func initTestBuilder(key string, value []byte) *Builder {
-	b := NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	b, err := NewBuilder("b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil))
+	if err != nil {
+		panic(err)
+	}
 	if value != nil {
 		b.KV[key] = value
 	}

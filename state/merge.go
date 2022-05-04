@@ -29,9 +29,9 @@ const (
 func (b *Builder) writeMergeValues() {
 	b.KV[updatePolicyKey] = []byte(strconv.Itoa(int(b.updatePolicy)))
 	b.KV[valueTypeKey] = []byte(b.valueType)
-	b.KV[moduleHashKey] = []byte(b.Store.ModuleHash)
-	b.KV[moduleStartBlockKey] = intToBytes(int(b.Store.ModuleStartBlock))
-	b.KV[storeNameKey] = []byte(b.Store.Name)
+	b.KV[moduleHashKey] = []byte(b.ModuleHash)
+	b.KV[moduleStartBlockKey] = intToBytes(int(b.ModuleStartBlock))
+	b.KV[storeNameKey] = []byte(b.Name)
 }
 
 func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
@@ -46,6 +46,8 @@ func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updateP
 			kv[string(bk)] = v
 		}
 	}
+
+	///TODO(colin): do not delete the special keys.
 
 	if updatePolicyBytes, ok := kv[updatePolicyKey]; ok {
 		updatePolicyInt, err := strconv.Atoi(string(updatePolicyBytes))
@@ -83,9 +85,6 @@ func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updateP
 
 func (b *Builder) readMergeValues() {
 	b.KV, b.updatePolicy, b.valueType, b.ModuleHash, b.ModuleStartBlock, b.Name = readMergeValues(b.KV)
-	b.Store.Name = b.Name
-	b.Store.ModuleHash = b.ModuleHash
-	b.Store.ModuleStartBlock = b.ModuleStartBlock
 }
 
 func (b *Builder) Merge(previous *Builder) error {

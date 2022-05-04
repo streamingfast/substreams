@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -84,14 +83,14 @@ func TestFileWaiter_Wait(t *testing.T) {
 	tests := []struct {
 		name          string
 		graph         *manifest.ModuleGraph
-		stores        []*Store
+		builders      []*Builder
 		targetBlock   uint64
 		expectedError bool
 	}{
 		{
 			name:  "files all present",
 			graph: graph,
-			stores: []*Store{
+			builders: []*Builder{
 				mustGetWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
 						"B-0000001000": {"B-0000001000-0000000000.kv"},
@@ -117,7 +116,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 		{
 			name:  "file missing on one store",
 			graph: graph,
-			stores: []*Store{
+			builders: []*Builder{
 				mustGetWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
 						"B-0000001000": {"B-0000001000-0000000000.kv"},
@@ -143,7 +142,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			waiter := NewFileWaiter(test.targetBlock, test.stores)
+			waiter := NewFileWaiter(test.targetBlock, test.builders)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 			defer cancel()
@@ -161,7 +160,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 func Test_pathToState(t *testing.T) {
 	tests := []struct {
 		name             string
-		store            *Store
+		builder          *Builder
 		storeName        string
 		moduleStartBlock uint64
 		targetBlock      uint64
@@ -172,7 +171,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path",
 			storeName: "A",
-			store: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-0000001000": {"A-0000001000-0000000000.kv"},
 					"A-0000002000": {"A-0000002000-0000001000.partial"},
@@ -190,7 +189,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path all partial with start block",
 			storeName: "A",
-			store: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-0000002000": {"A-0000002000-0000001000.partial"},
 					"A-0000003000": {"A-0000003000-0000002000.partial"},
@@ -207,7 +206,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path take shortest path",
 			storeName: "A",
-			store: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-0000002000": {"A-0000002000-0000001000.partial"},
 					"A-0000003000": {"A-0000003000-0000000000.kv", "module.hash.1-A-0000003000-0000002000.partial"},
@@ -223,7 +222,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "happy path take shortest path part 2",
 			storeName: "A",
-			store: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-0000002000": {"A-0000002000-0000001000.partial"},
 					"A-0000003000": {"A-0000003000-0000002000.partial", "A-0000003000-0000000000.kv"},
@@ -239,7 +238,7 @@ func Test_pathToState(t *testing.T) {
 		{
 			name:      "conflicting partial files",
 			storeName: "A",
-			store: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
+			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
 					"A-0000001000": {"A-0000001000-0000000000.kv"},
 					"A-0000002000": {"A-0000002000-1000.partial"},
@@ -257,20 +256,16 @@ func Test_pathToState(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			files, err := pathToState(context.TODO(), test.store, test.targetBlock, test.moduleStartBlock)
+			files, err := pathToState(context.TODO(), test.storeName, test.builder.Store, test.targetBlock, test.moduleStartBlock)
 			assert.Equal(t, test.expectedFiles, files)
 			assert.Equal(t, test.expectedError, err != nil)
 		})
 	}
 }
 
-func mustGetWaiterTestStore(moduleName string, moduleHash string, listFilesFunc func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error)) *Store {
+func mustGetWaiterTestStore(moduleName string, moduleHash string, listFilesFunc func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error)) *Builder {
 	mockDStore := &dstore.MockStore{
 		ListFilesFunc: listFilesFunc,
 	}
-	s, err := NewStore(moduleName, moduleHash, 0, mockDStore)
-	if err != nil {
-		panic(fmt.Sprintf("faild to create mock store: %s", err))
-	}
-	return s
+	return &Builder{Name: moduleName, ModuleHash: moduleHash, Store: mockDStore}
 }

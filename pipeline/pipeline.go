@@ -463,23 +463,16 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			panic("unsupported vmType " + p.vmType)
 		}
 
-		//cachedOutputs = modulesCacheEngine.outputsForBlock(blk.ID)
-		//// do I have cached files for a given BLOCK ID,
-		//// for modules X, Y, Z, and Y
-		//// if I had but I don't anymore I recall build(), and prep a new stack
-		//// otherwise I know I'm ready to use the cached X, Y, Z for block ID.
-		//p.wasmOutputs.Merge(cachedOutputs)
-		//
-		//// upon build(), I'll check what I *realllly* need as immediate dependencies
-		//// and I'll check if they are cached.
-		//// I then need to constantly check if those dependencies are met, otherwise I need
-		//// to RECHECK the true dependencies that *are* met, until I fallback completely
-		//// on reexecution from scratch.
-		//
-		//if modulesCacheEngine.HitBoundaryForOneOfTheModules() {
-		//	p.build()
-		//}
+		//todo: update module output cache with current block ref
+
 		for _, executor := range p.moduleExecutors {
+			//todo: get module output from cache
+			// skip execution if output found in cache
+			// add output data directly into pipeline
+
+			//todo: only cache irr stchuff
+			//todo: store execution output to store
+			//todo: maybe the executor should be aware of caching ...
 			if err := executor.run(); err != nil {
 				return err
 			}

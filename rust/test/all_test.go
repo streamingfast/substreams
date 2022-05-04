@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/bstream"
-	imports "github.com/streamingfast/substreams/native-imports"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
@@ -189,9 +187,6 @@ func TestRustScript(t *testing.T) {
 
 			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
 			require.NoError(t, err)
-
-			imps := &imports.Imports{}
-			imps.SetCurrentBlock(bstream.NewBlockRef("test", 42))
 
 			instance, err := module.NewInstance(&pbsubstreams.Clock{}, c.functionName, nil)
 			require.NoError(t, err)

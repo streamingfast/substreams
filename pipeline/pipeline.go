@@ -2,10 +2,8 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"reflect"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -15,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/registry"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
@@ -48,8 +45,8 @@ type Pipeline struct {
 	outputModuleNames []string
 	outputModuleMap   map[string]bool
 
-	moduleExecutors   []*ModuleExec
-	wasmOutputs   map[string][]byte
+	moduleExecutors []*ModuleExecutor
+	wasmOutputs     map[string][]byte
 
 	progressTracker    *progressTracker
 	allowInvalidState  bool
@@ -198,25 +195,25 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 	}
 
 	if p.vmType == "native" {
-		return fmt.Errorf("native schtuff not supported yet")
+		return nil, nil, fmt.Errorf("native schtuff not supported yet")
 	}
 	err = p.buildWASM(ctx, request, modules)
 	return
 }
 
-type ModuleExec struct {
-	run func() error
+type ModuleExecutor struct {
 	moduleName string
 	wasmModule *wasm.Module
 	wasmInputs []*wasm.Input
-	pipeline *Pipeline
-	isStore bool
-	isOutput bool // whether output is enabled for this module
+	pipeline   *Pipeline
+	isStore    bool
+	isOutput   bool // whether output is enabled for this module
 
 	outputStore *state.Builder
 
 	mapperOutput []byte
-	outputType string
+	outputType   string
+	entrypoint   string
 }
 
 func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request, modules []*pbsubstreams.Module) error {
@@ -277,14 +274,14 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 
 			outType := strings.TrimPrefix(mod.Output.Type, "proto:")
 
-			s := &ModuleExec{
+			s := &ModuleExecutor{
 				moduleName: mod.Name,
-				isStore: false,
-				pipeline: p, // for currentClock, and wasmOutputs
+				isStore:    false,
+				pipeline:   p, // for currentClock, and wasmOutputs
 				wasmModule: wasmModule,
 				entrypoint: entrypoint,
 				wasmInputs: inputs,
-				isOutput: isOutput,
+				isOutput:   isOutput,
 				outputType: outType,
 			}
 			p.moduleExecutors = append(p.moduleExecutors, s)
@@ -303,15 +300,15 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				ValueType:    valueType,
 			})
 
-			p.moduleExecutors = append(p.moduleExecutors, &ModuleExec{
-				moduleName: modName,
-				isStore: true,
+			p.moduleExecutors = append(p.moduleExecutors, &ModuleExecutor{
+				moduleName:  modName,
+				isStore:     true,
 				outputStore: outputStore,
-				pipeline: p,  // for currentClock, and wasmOutputs
-				isOutput: isOutput,
-				wasmModule: wasmModule,
-				entrypoint: entrypoint,
-				wasmInputs: inputs,
+				pipeline:    p, // for currentClock, and wasmOutputs
+				isOutput:    isOutput,
+				wasmModule:  wasmModule,
+				entrypoint:  entrypoint,
+				wasmInputs:  inputs,
 			})
 
 			continue
@@ -466,22 +463,22 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			panic("unsupported vmType " + p.vmType)
 		}
 
-		cachedOutputs = modulesCacheEngine.outputsForBlock(blk.ID)
-		// do I have cached files for a given BLOCK ID,
-		// for modules X, Y, Z, and Y
-		// if I had but I don't anymore I recall build(), and prep a new stack
-		// otherwise I know I'm ready to use the cached X, Y, Z for block ID.
-		p.wasmOutputs.Merge(cachedOutputs)
-
-		// upon build(), I'll check what I *realllly* need as immediate dependencies
-		// and I'll check if they are cached.
-		// I then need to constantly check if those dependencies are met, otherwise I need
-		// to RECHECK the true dependencies that *are* met, until I fallback completely
-		// on reexecution from scratch.
-
-		if modulesCacheEngine.HitBoundaryForOneOfTheModules() {
-			p.build()
-		}
+		//cachedOutputs = modulesCacheEngine.outputsForBlock(blk.ID)
+		//// do I have cached files for a given BLOCK ID,
+		//// for modules X, Y, Z, and Y
+		//// if I had but I don't anymore I recall build(), and prep a new stack
+		//// otherwise I know I'm ready to use the cached X, Y, Z for block ID.
+		//p.wasmOutputs.Merge(cachedOutputs)
+		//
+		//// upon build(), I'll check what I *realllly* need as immediate dependencies
+		//// and I'll check if they are cached.
+		//// I then need to constantly check if those dependencies are met, otherwise I need
+		//// to RECHECK the true dependencies that *are* met, until I fallback completely
+		//// on reexecution from scratch.
+		//
+		//if modulesCacheEngine.HitBoundaryForOneOfTheModules() {
+		//	p.build()
+		//}
 		for _, executor := range p.moduleExecutors {
 			if err := executor.run(); err != nil {
 				return err
@@ -545,60 +542,55 @@ func printer(in interface{}) {
 	}
 }
 
-func (s *ModuleExec) run() (err error) {
-	if s.isStore {
-		err = s.wasmStoreCall()
+func (e *ModuleExecutor) run() (err error) {
+	if e.isStore {
+		err = e.wasmStoreCall()
 	} else {
-		err = s.wasmMapCall()
+		err = e.wasmMapCall()
 	}
 	if err != nil {
 		return err
 	}
 
-	if s.isOutput {
-		s.appendOutput()
+	if e.isOutput {
+		e.appendOutput()
 	}
 
 	return nil
 }
-func (s *ModuleExec) wasmMapCall() (err error) {
+func (e *ModuleExecutor) wasmMapCall() (err error) {
 	var vm *wasm.Instance
-	if vm, err = s.wasmCall() {
+	if vm, err = e.wasmCall(); err != nil {
 		return err
 	}
 
-	vals := s.Pipeline.wasmOutputs
-	name := s.ModuleName
+	vals := e.pipeline.wasmOutputs
+	name := e.moduleName
 	if vm != nil {
 		out := vm.Output()
 		vals[name] = out
-		s.output = out
+		e.mapperOutput = out
 
 	} else {
 		// This means wasm execution was skipped because all inputs were empty.
 		vals[name] = nil
-		s.output = nil
+		e.mapperOutput = nil
 	}
 	return nil
 }
 
-func (s *ModuleExec) wasmStoreCall(
-) (err error) {
-	if _, err := s.wasmCall(); err != nil {
+func (e *ModuleExecutor) wasmStoreCall() (err error) {
+	if _, err := e.wasmCall(); err != nil {
 		return err
 	}
 
-	if err := output(); err != nil {
-		return fmt.Errorf("output wasm store call: %w", err)
-	}
-
 	return nil
 }
 
-func (s *ModuleExec) wasmCall() (instance *wasm.Instance, err error) {
+func (e *ModuleExecutor) wasmCall() (instance *wasm.Instance, err error) {
 	hasInput := false
-	vals := s.Pipeline.wasmOutputs
-	for _, input := range s.Inputs {
+	vals := e.pipeline.wasmOutputs
+	for _, input := range e.wasmInputs {
 		switch input.Type {
 		case wasm.InputSource:
 			val := vals[input.Name]
@@ -619,44 +611,44 @@ func (s *ModuleExec) wasmCall() (instance *wasm.Instance, err error) {
 
 	// This allows us to skip the execution of the VM if there are no inputs.
 	// This assumption should either be configurable by the manifest, or clearly documented:
-	//  state builders will not be called if their input streams are 0 bytes length (and there's no
+	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
 	//  state store in read mode)
 	if hasInput {
-		instance, err = s.Module.NewInstance(s.Pipeline.currentClock, s.Entrypoint, s.Inputs)
+		instance, err = e.wasmModule.NewInstance(e.pipeline.currentClock, e.entrypoint, e.wasmInputs)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
 		if err = instance.Execute(); err != nil {
-			return nil, fmt.Errorf("module %q: wasm execution failed: %w", s.ModuleName, err)
+			return nil, fmt.Errorf("module %q: wasm execution failed: %w", e.moduleName, err)
 		}
 	}
 	return
 }
 
-func (s *ModuleExec) appendOutput() {
+func (e *ModuleExecutor) appendOutput() {
 	var logs []string
-	if s.wasmModule.CurrentInstance != nil {
-		logs = s.wasmModule.CurrentInstance.Logs
+	if e.wasmModule.CurrentInstance != nil {
+		logs = e.wasmModule.CurrentInstance.Logs
 	}
 
-	if s.isStore {
-		if len(s.outputStore.Deltas) != 0 || len(logs) != 0 {
+	if e.isStore {
+		if len(e.outputStore.Deltas) != 0 || len(logs) != 0 {
 			zlog.Debug("append to output, store")
-			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-				Name: modName,
+			e.pipeline.moduleOutputs = append(e.pipeline.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name: e.moduleName,
 				Data: &pbsubstreams.ModuleOutput_StoreDeltas{
-					StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: p.outputStore.Deltas},
+					StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
 				},
 				Logs: logs,
 			})
 		}
 	} else {
-		if out != nil || len(logs) != 0 {
+		if e.mapperOutput != nil || len(logs) != 0 {
 			zlog.Debug("append to output, map")
-			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-				Name: modName,
+			e.pipeline.moduleOutputs = append(e.pipeline.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name: e.moduleName,
 				Data: &pbsubstreams.ModuleOutput_MapOutput{
-					MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + outType, Value: s.mapperOutput},
+					MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
 				},
 				Logs: logs,
 			})

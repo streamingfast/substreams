@@ -175,19 +175,19 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 			options = append(options, state.WithPartialMode(p.requestedStartBlockNum))
 		}
 
-		store, err := state.NewStore(storeModule.Name, manifest.HashModuleAsString(p.manifest, p.graph, storeModule), storeModule.StartBlock, p.stateStore)
-		if err != nil {
-			return nil, nil, fmt.Errorf("init new store: %w", err)
-		}
-
-		builder := state.NewBuilder(
+		builder, err := state.NewBuilder(
 			storeModule.Name,
 			storeModule.StartBlock,
+			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
-			store,
+			p.stateStore,
 			options...,
 		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
+		}
+
 		p.builders[builder.Name] = builder
 	}
 
@@ -312,13 +312,13 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	if p.partialMode {
 		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputModuleNames[0]) //todo: new the list of parent store.
 		outputStreamModule := p.builders[p.outputModuleNames[0]]
-		var stores []*state.Store
+		var builders []*state.Builder
 		for _, ancestorStore := range ancestorStores {
 			builder := p.builders[ancestorStore.Name]
-			stores = append(stores, builder.Store)
+			builders = append(builders, builder)
 		}
 
-		fileWaiter := state.NewFileWaiter(p.requestedStartBlockNum, stores)
+		fileWaiter := state.NewFileWaiter(p.requestedStartBlockNum, builders)
 		err := fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)

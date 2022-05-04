@@ -10,7 +10,10 @@ import (
 )
 
 func initTestBuilder(key string, value []byte) *Builder {
-	b := NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	b, err := NewBuilder("b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	if err != nil {
+		panic(err)
+	}
 	if value != nil {
 		b.KV[key] = value
 	}

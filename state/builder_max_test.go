@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"github.com/streamingfast/dstore"
 	"math/big"
 	"strconv"
 	"testing"
@@ -22,7 +23,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(3),
 			value:         big.NewInt(4),
@@ -30,7 +31,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(5),
 			value:         big.NewInt(4),
@@ -38,7 +39,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewInt(4),
@@ -88,7 +89,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(3),
 			value:         4,
@@ -96,7 +97,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(5),
 			value:         4,
@@ -104,7 +105,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4,
@@ -155,7 +156,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(3.0),
 			value:         4.0,
@@ -163,7 +164,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(5.0),
 			value:         4.0,
@@ -171,7 +172,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4.0,
@@ -215,7 +216,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(3),
 			value:         big.NewFloat(4),
@@ -223,7 +224,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(5),
 			value:         big.NewFloat(4),
@@ -231,7 +232,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       NewBuilder("b", 0, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			builder:       mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewFloat(4),
@@ -262,4 +263,14 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 			assert.Equal(t, 0, actualInt.Cmp(test.expectedValue))
 		})
 	}
+}
+
+func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) *Builder {
+	t.Helper()
+	builder, err := NewBuilder(name, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return builder
 }

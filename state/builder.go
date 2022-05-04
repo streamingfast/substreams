@@ -17,7 +17,7 @@ import (
 
 type Builder struct {
 	Name              string
-	Store             *Store
+	Store             dstore.Store
 	partialMode       bool
 	partialStartBlock uint64
 	ModuleStartBlock  uint64
@@ -43,21 +43,26 @@ func WithPartialMode(startBlock uint64) BuilderOption {
 	}
 }
 
-func NewBuilder(name string, moduleStartBlock uint64, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store *Store, opts ...BuilderOption) *Builder {
+func NewBuilder(name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
+	subStore, err := store.SubStore(fmt.Sprintf("%s-%s", name, moduleHash))
+	if err != nil {
+		return nil, fmt.Errorf("creating sub store: %w", err)
+	}
+
 	b := &Builder{
 		Name:             name,
 		ModuleStartBlock: moduleStartBlock,
 		KV:               make(map[string][]byte),
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
-		Store:            store,
+		Store:            subStore,
 	}
 
 	for _, opt := range opts {
 		opt(b)
 	}
 
-	return b
+	return b, nil
 }
 
 func BuilderFromFile(ctx context.Context, filename string, store dstore.Store) (*Builder, error) {
@@ -84,21 +89,13 @@ func BuilderFromFile(ctx context.Context, filename string, store dstore.Store) (
 
 	updatedkv, updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
 
-	stateStore, err := newStoreWithStore(name, moduleHash, moduleStartBlock, store)
+	b, err := NewBuilder(name, moduleStartBlock, moduleHash, updatePolicy, valueType, store)
 	if err != nil {
-		return nil, fmt.Errorf("creating store: %w", err)
+		return nil, fmt.Errorf("creating builder %s: %w", name, err)
 	}
 
-	b := &Builder{
-		KV:               updatedkv,
-		Store:            stateStore,
-		Name:             name,
-		ModuleHash:       moduleHash,
-		ModuleStartBlock: moduleStartBlock,
-		updatePolicy:     updatePolicy,
-		valueType:        valueType,
-		partialMode:      fileinfo.Partial,
-	}
+	b.KV = updatedkv
+	b.partialMode = fileinfo.Partial
 
 	if fileinfo.Partial {
 		b.partialStartBlock = fileinfo.StartBlock
@@ -124,7 +121,7 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (b *Builder) Squash(ctx context.Context, baseStore dstore.Store, upToBlock uint64) error {
-	files, err := pathToState(ctx, b.Store, upToBlock, b.ModuleStartBlock)
+	files, err := pathToState(ctx, b.Name, b.Store, upToBlock, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}
@@ -160,7 +157,7 @@ func (b *Builder) Squash(ctx context.Context, baseStore dstore.Store, upToBlock 
 }
 
 func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) error {
-	files, err := pathToState(ctx, b.Store, requestedStartBlock, b.ModuleStartBlock)
+	files, err := pathToState(ctx, b.Name, b.Store, requestedStartBlock, b.ModuleStartBlock)
 	if err != nil {
 		return err
 	}
@@ -168,7 +165,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) err
 
 	var builders []*Builder
 	for _, file := range files {
-		builder, err := BuilderFromFile(ctx, file, b.Store.Store)
+		builder, err := BuilderFromFile(ctx, file, b.Store)
 		if err != nil {
 			return fmt.Errorf("creating builder from file %s: %w", file, err)
 		}
@@ -227,15 +224,25 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode b
 	)
 
 	if partialMode {
-		filename, err = b.Store.WritePartialState(ctx, content, b.partialStartBlock, blockNum)
+		filename, err = b.writePartialState(ctx, content, b.partialStartBlock, blockNum)
 	} else {
-		filename, err = b.Store.WriteState(ctx, content, blockNum)
+		filename, err = b.writeState(ctx, content, blockNum)
 	}
 	if err != nil {
 		return "", fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
 	}
 
 	return filename, nil
+}
+
+func (b *Builder) writeState(ctx context.Context, content []byte, blockNum uint64) (string, error) {
+	filename := StateFileName(b.Name, blockNum, b.ModuleStartBlock)
+	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
+}
+
+func (b *Builder) writePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) (string, error) {
+	filename := PartialFileName(b.Name, startBlockNum, endBlockNum)
+	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 
 var NotFound = errors.New("state key not found")
@@ -436,4 +443,20 @@ func byteMap(in map[string]string) map[string][]byte {
 		out[k] = []byte(v)
 	}
 	return out
+}
+
+func StateFilePrefix(storeName string, blockNum uint64) string {
+	return fmt.Sprintf("%s-%010d", storeName, blockNum)
+}
+
+func PartialFileName(storeName string, startBlockNum, endBlockNum uint64) string {
+	return fmt.Sprintf("%s-%010d-%010d.partial", storeName, endBlockNum, startBlockNum)
+}
+
+func StateFileName(storeName string, startBlockNum, endBlockNum uint64) string {
+	return fmt.Sprintf("%s-%010d-%010d.kv", storeName, endBlockNum, startBlockNum)
+}
+
+func FilePrefix(storeName string, endBlockNum uint64) string {
+	return fmt.Sprintf("%s-%010d-", storeName, endBlockNum)
 }

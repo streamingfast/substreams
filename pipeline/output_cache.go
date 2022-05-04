@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"math"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"io"
-	"math"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 type outputCache struct {
@@ -65,20 +66,6 @@ func NewModuleOutputCache(ctx context.Context, modules []*pbsubstreams.Module, m
 
 func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockRef) error {
 	for _, moduleCache := range c.outputCaches {
-		if moduleCache.currentBlockRange == nil {
-			//todo: find the closest start block relative to blockRef
-			// maybe we should save a state file in each folder with the kv block size
-			// for now we consider that all kv blocks file will contain 100 blocks
-			sb := uint64(0) //todo ^^
-			_ = sb
-
-			if err := moduleCache.loadBlocks(ctx, moduleCache.currentBlockRange.exclusiveEndBlock); err != nil {
-				return fmt.Errorf("loading blocks for module kv %s: %w", moduleCache.moduleName, err)
-			}
-
-			return nil
-		}
-
 		if !moduleCache.currentBlockRange.contains(blockRef) {
 			if err := moduleCache.saveBlocks(ctx); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.moduleName, err)
@@ -87,7 +74,6 @@ func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockR
 				return fmt.Errorf("loading blocks for module kv %s: %w", moduleCache.moduleName, err)
 			}
 		}
-
 	}
 
 	return nil

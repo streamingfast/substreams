@@ -128,6 +128,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, functionName string, inp
 			args = append(args, ptr, len)
 		case InputStore:
 			if input.Deltas {
+				//todo: this maybe sub optimal when deltas are extrated from module output cache
 				cnt, err := proto.Marshal(&pbsubstreams.StoreDeltas{Deltas: input.Store.Deltas})
 				if err != nil {
 					return nil, fmt.Errorf("marshaling store deltas: %w", err)

@@ -24,9 +24,10 @@ import (
 )
 
 type Service struct {
-	stateStore         dstore.Store
-	blockType          string // NOTE: can't that be extracted from the actual block messages? with some proto machinery? Was probably useful when `sf.ethereum.codec.v1.Block` didn't correspond to the `sf.ethereum.type.v1.Block` target type.. but that's not true anymore.
-	partialModeEnabled bool
+	baseStateStore       dstore.Store
+	baseOutputCacheStore dstore.Store
+	blockType            string // NOTE: can't that be extracted from the actual block messages? with some proto machinery? Was probably useful when `sf.ethereum.codec.v1.Block` didn't correspond to the `sf.ethereum.type.v1.Block` target type.. but that's not true anymore.
+	partialModeEnabled   bool
 
 	wasmExtensions  []wasm.WASMExtensioner
 	pipelineOptions []pipeline.PipelineOptioner
@@ -64,10 +65,11 @@ func WithStoresSaveInterval(block uint64) Option {
 	}
 }
 
-func New(stateStore dstore.Store, blockType string, opts ...Option) *Service {
+func New(stateStore dstore.Store, baseModuleOutputCacheStore dstore.Store, blockType string, opts ...Option) *Service {
 	s := &Service{
-		stateStore: stateStore,
-		blockType:  blockType,
+		baseStateStore:       stateStore,
+		blockType:            blockType,
+		baseOutputCacheStore: baseModuleOutputCacheStore,
 	}
 
 	for _, opt := range opts {
@@ -137,7 +139,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	pipeline := pipeline.New(ctx, request, graph, s.blockType, s.stateStore, s.wasmExtensions, opts...)
+	pipeline := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,

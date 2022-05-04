@@ -2,10 +2,11 @@ package state
 
 import (
 	"fmt"
-	"github.com/streamingfast/dstore"
 	"math/big"
 	"strconv"
 	"testing"
+
+	"github.com/streamingfast/dstore"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
@@ -267,6 +268,9 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 
 func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) *Builder {
 	t.Helper()
+	if store == nil {
+		store = dstore.NewMockStore(nil)
+	}
 	builder, err := NewBuilder(name, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)

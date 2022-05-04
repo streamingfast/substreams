@@ -5,13 +5,14 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/dstore"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/dstore"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -246,6 +247,9 @@ func Test_MakeItCrash(t *testing.T) {
 
 func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...state.BuilderOption) *state.Builder {
 	t.Helper()
+	if store == nil {
+		store = dstore.NewMockStore(nil)
+	}
 	builder, err := state.NewBuilder(name, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)

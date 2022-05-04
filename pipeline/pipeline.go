@@ -22,13 +22,11 @@ import (
 )
 
 type Pipeline struct {
-	vmType                 string // wasm/rust-v1, native
-	requestedStartBlockNum uint64
-
-	partialMode bool
-	fileWaiter  *state.FileWaiter
-
+	vmType    string // wasm/rust-v1, native
 	blockType string
+
+	requestedStartBlockNum uint64
+	partialMode            bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -336,8 +334,8 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 			stores = append(stores, builder.Store)
 		}
 
-		p.fileWaiter = state.NewFileWaiter(p.requestedStartBlockNum, stores)
-		err := p.fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
+		fileWaiter := state.NewFileWaiter(p.requestedStartBlockNum, stores)
+		err := fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
 		if err != nil {
 			return fmt.Errorf("fileWaiter: %w", err)
 		}

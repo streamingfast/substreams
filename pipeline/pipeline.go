@@ -3,12 +3,12 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/bstream"
 	"io"
 	"runtime/debug"
 	"strings"
 	"time"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
@@ -426,6 +426,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 						return fmt.Errorf("unmarshalling output deltas: %w", err)
 					}
 					executor.outputStore.Deltas = deltas.Deltas //todo: unmarshall cached data as delta
+					for _, delta := range deltas.Deltas {
+						executor.outputStore.ApplyDelta(delta)
+					}
 				} else {
 					executor.mapperOutput = output
 				}

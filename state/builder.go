@@ -307,7 +307,7 @@ func (b *Builder) Del(ord uint64, key string) {
 			OldValue:  val,
 			NewValue:  nil,
 		}
-		b.applyDelta(delta)
+		b.ApplyDelta(delta)
 		b.Deltas = append(b.Deltas, delta)
 	}
 }
@@ -326,7 +326,7 @@ func (b *Builder) DeletePrefix(ord uint64, prefix string) {
 			OldValue:  val,
 			NewValue:  nil,
 		}
-		b.applyDelta(delta)
+		b.ApplyDelta(delta)
 		b.Deltas = append(b.Deltas, delta)
 
 	}
@@ -385,7 +385,7 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 			NewValue:  value,
 		}
 	}
-	b.applyDelta(delta)
+	b.ApplyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)
 }
 
@@ -404,11 +404,11 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 		OldValue:  nil,
 		NewValue:  value,
 	}
-	b.applyDelta(delta)
+	b.ApplyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)
 }
 
-func (b *Builder) applyDelta(delta *pbsubstreams.StoreDelta) {
+func (b *Builder) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF
 	// 0xFF is reserved for internal use.
 	if delta.Key[0] == byte(255) {

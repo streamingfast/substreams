@@ -9,11 +9,11 @@ require (
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20220330132237-248bc2d8ea7e
+	github.com/streamingfast/bstream v0.0.2-0.20220505155906-a0834b9c5258
 	github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e
 	github.com/streamingfast/firehose v0.1.1-0.20220427051727-9b108461d3a6
 	github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424
-	github.com/streamingfast/pbgo v0.0.6-0.20220228185940-1bbaafec7d8a
+	github.com/streamingfast/pbgo v0.0.6-0.20220428192744-f80aee7d4688
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
 	github.com/test-go/testify v1.1.4
 	github.com/wasmerio/wasmer-go v1.0.4

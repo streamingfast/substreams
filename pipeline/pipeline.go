@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/abourget/llerrgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -57,6 +58,8 @@ type Pipeline struct {
 
 	moduleOutputCache    *ModulesOutputCache
 	baseOutputCacheStore dstore.Store
+
+	blocksFunc func(r *pbsubstreams.Request) error
 }
 
 func New(
@@ -67,6 +70,7 @@ func New(
 	baseStateStore dstore.Store,
 	baseOutputCacheStore dstore.Store,
 	wasmExtensions []wasm.WASMExtensioner,
+	blocksFunc func(r *pbsubstreams.Request) error,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -82,6 +86,7 @@ func New(
 		blockType:            blockType,
 		progressTracker:      newProgressTracker(),
 		wasmExtensions:       wasmExtensions,
+		blocksFunc:           blocksFunc,
 	}
 
 	for _, name := range request.OutputModules {
@@ -280,6 +285,7 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 		}
 
 		builder, err := state.NewBuilder(
+			ctx,
 			storeModule.Name,
 			storeModule.StartBlock,
 			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
@@ -407,12 +413,69 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
+func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
+	var catchUpBlocksForModules []*state.Builder
+	computedStartBlock := p.requestedStartBlockNum - (p.requestedStartBlockNum % 10_000)
+	for _, store := range p.builders {
+		if computedStartBlock <= store.ModuleStartBlock {
+			continue
+		}
+
+		info := store.Info()
+		if info.LastKVSavedBlock < computedStartBlock {
+			catchUpBlocksForModules = append(catchUpBlocksForModules, store)
+		}
+	}
+
+	eg := llerrgroup.New(len(catchUpBlocksForModules))
+	for _, store := range catchUpBlocksForModules {
+		if eg.Stop() {
+			continue
+		}
+
+		store := store
+		eg.Go(func() error {
+			info := store.Info()
+			startBlock := info.LastKVSavedBlock
+			endBlock := computedStartBlock
+
+			zlog.Info("waiting for request for store to finish",
+				zap.String("store", store.Name),
+				zap.Uint64("start_block", startBlock),
+				zap.Uint64("end_block", endBlock),
+			)
+
+			request := &pbsubstreams.Request{
+				StartBlockNum:                  int64(startBlock),
+				StopBlockNum:                   endBlock,
+				ForkSteps:                      p.request.ForkSteps,
+				IrreversibilityCondition:       p.request.IrreversibilityCondition,
+				Manifest:                       p.manifest,
+				OutputModules:                  []string{store.Name},
+				InitialStoreSnapshotForModules: p.request.InitialStoreSnapshotForModules,
+			}
+
+			err := p.blocksFunc(request)
+			if err != nil {
+				return fmt.Errorf("getting blocks for store %s (%d, %d): %w", store.Name, startBlock, endBlock, err)
+			}
+			return nil
+		})
+	}
+
+	err := eg.Wait()
+	if err != nil {
+		return fmt.Errorf("catching up blocks for stores: %w", err)
+	}
+
+	return nil
+}
+
 func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
-	//todo: compute modules start block. use module magic on the p.requestedStartBlockNum assume 10_000 block per file.
-	// get last saved state block num for each modules
-	// if last saved more the x * 10_000 behind computed start block we create a new substreams request for that module to process data upto computed start block
-	// ex: token@100_000 computedStart@300_0000. we create a request for "tokens" with start block@100_000 and stop_block@300_000
-	// we wait for that request to complete that we do the same with next modules.
+	err := p.synchronizeBlocks(ctx)
+	if err != nil {
+		return fmt.Errorf("synchronizing blocks: %w", err)
+	}
 
 	if p.partialMode {
 		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputModuleNames[0]) //todo: new the list of parent store.
@@ -434,7 +497,7 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 		if p.requestedStartBlockNum == store.ModuleStartBlock {
 			continue
 		}
-		if err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
+		if _, err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
 			e := fmt.Errorf("could not load state for store %s at block num %d: %s: %w", store.Name, p.requestedStartBlockNum, store.Store.BaseURL(), err)
 			if !p.allowInvalidState {
 				return e

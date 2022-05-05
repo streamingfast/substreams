@@ -39,6 +39,22 @@ type Service struct {
 	logger         *zap.Logger
 }
 
+func (s *Service) BaseStateStore() dstore.Store {
+	return s.baseStateStore
+}
+
+func (s *Service) BaseOutputCacheStore() dstore.Store {
+	return s.baseOutputCacheStore
+}
+
+func (s *Service) BlockType() string {
+	return s.blockType
+}
+
+func (s *Service) WasmExtensions() []wasm.WASMExtensioner {
+	return s.wasmExtensions
+}
+
 type Option func(*Service)
 
 func WithWASMExtension(ext wasm.WASMExtensioner) Option {
@@ -139,7 +155,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	pipeline := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, opts...)
+	blocksFunc := func(r *pbsubstreams.Request) error {
+		return s.Blocks(r, streamSrv)
+	}
+
+	pipeline := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, blocksFunc, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,

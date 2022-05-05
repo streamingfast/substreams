@@ -79,7 +79,7 @@ func mergePartialFilesE(cmd *cobra.Command, args []string) error {
 
 	filesListToBuildersList := func(in []string) (out []*state.Builder, err error) {
 		for _, filename := range in {
-			b, err := state.BuilderFromFile(ctx, filename, store)
+			b, err := state.NewBuilderFromFile(ctx, filename, store)
 			if err != nil {
 				return nil, fmt.Errorf("parsing file %s: %w", filename, err)
 			}

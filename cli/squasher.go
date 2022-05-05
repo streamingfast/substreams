@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-const DEFAULT_BLOCK_RANGE = 10_000
-
 var squasherCmd = &cobra.Command{
 	Use:  "squasher [base_store_dsn] [modules_list]",
 	Args: cobra.ExactArgs(2),
@@ -33,11 +31,6 @@ type SquasherConfig struct {
 
 func NewSquasherConfig(modules ...string) *SquasherConfig {
 	return &SquasherConfig{Modules: modules}
-}
-
-type SquasherMetadata struct {
-	LastKVFile string `json:"last_kv_file"`
-	RangeSize  int    `json:"range_size"`
 }
 
 type Squasher struct {
@@ -68,7 +61,7 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 			}()
 
 			//get metadata file
-			metadataFileName := fmt.Sprintf("%s-squasher-metadata.json", storeName)
+			metadataFileName := state.StateInfoFileName(storeName)
 			exists, basePath, err := findUniqueFile(ctx, baseStore, metadataFileName)
 			if err != nil {
 				perr = fmt.Errorf("finding file %s: %w", metadataFileName, err)
@@ -96,7 +89,7 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 					return
 				}
 
-				var metadata *SquasherMetadata
+				var metadata *state.Info
 				err = json.Unmarshal(metadataFileBytes, &metadata)
 				if err != nil {
 					perr = fmt.Errorf("unmarshalling metadata %s: %w", metadataFileName, err)
@@ -111,7 +104,7 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 				kvFileEndBlock := fileinfo.EndBlock
 
 				partialFileStartBlock := kvFileEndBlock
-				partialFileEndBlock := kvFileEndBlock + uint64(metadata.RangeSize)
+				partialFileEndBlock := kvFileEndBlock + uint64(metadata.RangeIntervalSize)
 
 				//wait for next partial file to appear
 				partialSubstore, err := baseStore.SubStore(basePath)
@@ -124,13 +117,13 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 				partialFileName := state.PartialFileName(storeName, partialFileStartBlock, partialFileEndBlock)
 
 				//open the files
-				partial, err := state.BuilderFromFile(ctx, strings.Join([]string{basePath, partialFileName}, string(filepath.Separator)), baseStore)
+				partial, err := state.NewBuilderFromFile(ctx, strings.Join([]string{basePath, partialFileName}, string(filepath.Separator)), baseStore)
 				if err != nil {
 					perr = fmt.Errorf("creating partial state: %w", err)
 					return
 				}
 
-				kv, err := state.BuilderFromFile(ctx, strings.Join([]string{basePath, metadata.LastKVFile}, string(filepath.Separator)), baseStore)
+				kv, err := state.NewBuilderFromFile(ctx, strings.Join([]string{basePath, metadata.LastKVFile}, string(filepath.Separator)), baseStore)
 				if err != nil {
 					perr = fmt.Errorf("creating kv state: %w", err)
 					return

@@ -30,6 +30,7 @@ func createSquahserMetaE(cmd *cobra.Command, args []string) error {
 
 	var highestKVFileInfo *state.FileInfo
 	var highestKVFileName string
+	var highestKVSavedBlock uint64
 
 	err = store.Walk(ctx, "", "", func(filename string) (err error) {
 		if !strings.HasSuffix(filename, ".kv") {
@@ -43,6 +44,7 @@ func createSquahserMetaE(cmd *cobra.Command, args []string) error {
 
 		if highestKVFileInfo == nil || fileinfo.EndBlock > highestKVFileInfo.EndBlock {
 			highestKVFileInfo = fileinfo
+			highestKVSavedBlock = fileinfo.EndBlock
 			highestKVFileName = filename
 		}
 
@@ -53,9 +55,10 @@ func createSquahserMetaE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error walking files: %w", err)
 	}
 
-	meta := SquasherMetadata{
-		LastKVFile: highestKVFileName,
-		RangeSize:  10_000, //TODO: parameterize this
+	meta := state.Info{
+		LastKVFile:        highestKVFileName,
+		LastKVSavedBlock:  highestKVSavedBlock,
+		RangeIntervalSize: 10_000,
 	}
 
 	metaBytes, err := json.Marshal(meta)

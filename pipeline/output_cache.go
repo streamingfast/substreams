@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"io"
 	"math"
 	"strconv"
@@ -12,13 +13,13 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
 type outputCache struct {
+	lock sync.RWMutex
+
 	moduleName        string
 	currentBlockRange *blockRange
 	kv                map[string]*bstream.Block
@@ -28,37 +29,37 @@ type outputCache struct {
 
 type ModulesOutputCache struct {
 	outputCaches map[string]*outputCache
-	lock         sync.RWMutex
 }
 
-func NewModuleOutputCache(ctx context.Context, modules []*pbsubstreams.Module, manif *pbsubstreams.Manifest, graph *manifest.ModuleGraph, baseOutputCacheStore dstore.Store, requestedStartBlock uint64) (*ModulesOutputCache, error) {
-	zlog.Debug("creating cache with modules", zap.Int("modules", len(modules)))
+func NewModuleOutputCache() *ModulesOutputCache {
+	zlog.Debug("creating cache with modules")
 	moduleOutputCache := &ModulesOutputCache{
 		outputCaches: make(map[string]*outputCache),
 	}
 
-	for _, module := range modules {
-		zlog.Debug("modules", zap.String("module_name", module.Name))
-		hash := manifest.HashModuleAsString(manif, graph, module)
+	return moduleOutputCache
+}
 
-		moduleStore, err := baseOutputCacheStore.SubStore(fmt.Sprintf("%s-%s/outputs", module.Name, hash))
-		if err != nil {
-			return nil, fmt.Errorf("creating substore for module %q: %w", module.Name, err)
-		}
+func (c *ModulesOutputCache) registerModule(ctx context.Context, module *pbsubstreams.Module, hash string, baseOutputCacheStore dstore.Store, requestedStartBlock uint64) (*outputCache, error) {
+	zlog.Debug("modules", zap.String("module_name", module.Name))
 
-		cache := &outputCache{
-			moduleName: module.Name,
-			store:      moduleStore,
-		}
-
-		moduleOutputCache.outputCaches[module.Name] = cache
-
-		if err = cache.loadBlocks(ctx, computeStartBlock(requestedStartBlock)); err != nil {
-			return nil, fmt.Errorf("loading blocks for module %q: %w", module.Name, err)
-		}
+	moduleStore, err := baseOutputCacheStore.SubStore(fmt.Sprintf("%s-%s/outputs", module.Name, hash))
+	if err != nil {
+		return nil, fmt.Errorf("creating substore for module %q: %w", module.Name, err)
 	}
 
-	return moduleOutputCache, nil
+	cache := &outputCache{
+		moduleName: module.Name,
+		store:      moduleStore,
+	}
+
+	c.outputCaches[module.Name] = cache
+
+	if err = cache.loadBlocks(ctx, computeStartBlock(requestedStartBlock)); err != nil {
+		return nil, fmt.Errorf("loading blocks for module %q: %w", module.Name, err)
+	}
+
+	return cache, nil
 }
 
 func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockRef) error {
@@ -77,14 +78,16 @@ func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockR
 	return nil
 }
 
-func (c *ModulesOutputCache) set(moduleName string, block *bstream.Block, data []byte) error {
+func (r *blockRange) contains(blockRef bstream.BlockRef) bool {
+	return blockRef.Num() >= r.startBlock && blockRef.Num() < r.exclusiveEndBlock
+}
+
+func (c *outputCache) set(block *bstream.Block, data []byte) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	cache := c.outputCaches[moduleName]
-
-	if !cache.new {
-		zlog.Warn("trying to add output to an already existing module kv", zap.String("module_name", moduleName))
+	if !c.new {
+		zlog.Warn("trying to add output to an already existing module kv", zap.String("module_name", c.moduleName))
 		return nil
 	}
 
@@ -103,18 +106,16 @@ func (c *ModulesOutputCache) set(moduleName string, block *bstream.Block, data [
 		return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
 	}
 
-	cache.kv[block.Id] = pbBlock
+	c.kv[block.Id] = pbBlock
 
 	return nil
 }
 
-func (c *ModulesOutputCache) get(moduleName string, block *bstream.Block) ([]byte, bool, error) {
+func (c *outputCache) get(block *bstream.Block) ([]byte, bool, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	cache := c.outputCaches[moduleName]
-
-	b, found := cache.kv[block.Id]
+	b, found := c.kv[block.Id]
 
 	if !found {
 		return nil, false, nil
@@ -126,34 +127,30 @@ func (c *ModulesOutputCache) get(moduleName string, block *bstream.Block) ([]byt
 
 }
 
-func (r *blockRange) contains(blockRef bstream.BlockRef) bool {
-	return blockRef.Num() >= r.startBlock && blockRef.Num() < r.exclusiveEndBlock
-}
-
-func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error) {
+func (c *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error) {
 	var found bool
 
-	o.new = false
-	o.kv = make(map[string]*bstream.Block)
+	c.new = false
+	c.kv = make(map[string]*bstream.Block)
 
-	o.currentBlockRange, found, err = findBlockRange(ctx, o.store, atBlock)
-	zlog.Info("loading blocks", zap.Stringer("block_range", o.currentBlockRange))
+	c.currentBlockRange, found, err = findBlockRange(ctx, c.store, atBlock)
+	zlog.Info("loading blocks", zap.Stringer("block_range", c.currentBlockRange))
 	if err != nil {
-		return fmt.Errorf("computing block range for module %q: %w", o.moduleName, err)
+		return fmt.Errorf("computing block range for module %q: %w", c.moduleName, err)
 	}
 
 	if !found {
-		o.currentBlockRange = &blockRange{
+		c.currentBlockRange = &blockRange{
 			startBlock:        atBlock,
 			exclusiveEndBlock: atBlock + 100,
 		}
 
-		o.new = true
+		c.new = true
 		return nil
 	}
 
-	filename := computeDBinFilename(pad(o.currentBlockRange.startBlock), pad(o.currentBlockRange.exclusiveEndBlock))
-	objectReader, err := o.store.OpenObject(ctx, filename)
+	filename := computeDBinFilename(pad(c.currentBlockRange.startBlock), pad(c.currentBlockRange.exclusiveEndBlock))
+	objectReader, err := c.store.OpenObject(ctx, filename)
 	if err != nil {
 		return fmt.Errorf("loading block reader %s: %w", filename, err)
 	}
@@ -174,7 +171,7 @@ func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 			return nil
 		}
 
-		o.kv[block.Id] = block
+		c.kv[block.Id] = block
 
 		if err == io.EOF {
 			return nil
@@ -182,9 +179,9 @@ func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 	}
 }
 
-func (o *outputCache) saveBlocks(ctx context.Context) error {
-	zlog.Info("saving cache", zap.String("module_name", o.moduleName), zap.Stringer("block_range", o.currentBlockRange))
-	filename := computeDBinFilename(pad(o.currentBlockRange.startBlock), pad(o.currentBlockRange.exclusiveEndBlock))
+func (c *outputCache) saveBlocks(ctx context.Context) error {
+	zlog.Info("saving cache", zap.String("module_name", c.moduleName), zap.Stringer("block_range", c.currentBlockRange))
+	filename := computeDBinFilename(pad(c.currentBlockRange.startBlock), pad(c.currentBlockRange.exclusiveEndBlock))
 
 	buffer := bytes.NewBuffer(nil)
 	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
@@ -192,13 +189,13 @@ func (o *outputCache) saveBlocks(ctx context.Context) error {
 		return fmt.Errorf("write block factory: %w", err)
 	}
 
-	for _, block := range o.kv {
+	for _, block := range c.kv {
 		if err := blockWriter.Write(block); err != nil {
 			return fmt.Errorf("write block: %w", err)
 		}
 	}
 
-	err = o.store.WriteObject(ctx, filename, buffer)
+	err = c.store.WriteObject(ctx, filename, buffer)
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)
 	}

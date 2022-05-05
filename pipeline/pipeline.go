@@ -42,7 +42,7 @@ type Pipeline struct {
 	outputModuleNames []string
 	outputModuleMap   map[string]bool
 
-	moduleExecutors []*ModuleExecutor
+	moduleExecutors []ModuleExecutor
 	wasmOutputs     map[string][]byte
 
 	progressTracker    *progressTracker
@@ -201,22 +201,30 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
+		hash := manifest.HashModuleAsString(p.manifest, p.graph, mod)
+		cache, err := p.moduleOutputCache.registerModule(ctx, mod, hash, p.baseOutputCacheStore, p.requestedStartBlockNum)
+
 		// TODO: turn into switch
 		if v := mod.GetKindMap(); v != nil {
-
 			outType := strings.TrimPrefix(mod.Output.Type, "proto:")
 
-			s := &ModuleExecutor{
-				moduleName: mod.Name,
-				isStore:    false,
-				pipeline:   p, // for currentClock, and wasmOutputs
-				wasmModule: wasmModule,
-				entrypoint: entrypoint,
-				wasmInputs: inputs,
-				isOutput:   isOutput,
+			if err != nil {
+				return fmt.Errorf("registering output cache for module %q: %w", mod.Name, err)
+			}
+
+			m := &MapperModuleExecutor{
+				BaseExecutor: &BaseExecutor{
+					moduleName: mod.Name,
+					wasmModule: wasmModule,
+					entrypoint: entrypoint,
+					wasmInputs: inputs,
+					isOutput:   isOutput,
+					cache:      cache,
+				},
 				outputType: outType,
 			}
-			p.moduleExecutors = append(p.moduleExecutors, s)
+
+			p.moduleExecutors = append(p.moduleExecutors, m)
 			continue
 		}
 		if v := mod.GetKindStore(); v != nil {
@@ -232,17 +240,23 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				ValueType:    valueType,
 			})
 
-			p.moduleExecutors = append(p.moduleExecutors, &ModuleExecutor{
-				moduleName:  modName,
-				isStore:     true,
-				outputStore: outputStore,
-				pipeline:    p, // for currentClock, and wasmOutputs
-				isOutput:    isOutput,
-				wasmModule:  wasmModule,
-				entrypoint:  entrypoint,
-				wasmInputs:  inputs,
-			})
+			if err != nil {
+				return fmt.Errorf("registering output cache for module %q: %w", mod.Name, err)
+			}
 
+			s := &StoreModuleExecutor{
+				BaseExecutor: &BaseExecutor{
+					moduleName: modName,
+					isOutput:   isOutput,
+					wasmModule: wasmModule,
+					entrypoint: entrypoint,
+					wasmInputs: inputs,
+					cache:      cache,
+				},
+				outputStore: outputStore,
+			}
+
+			p.moduleExecutors = append(p.moduleExecutors, s)
 			continue
 		}
 		return fmt.Errorf("invalid kind %q in module %q", mod.Kind, mod.Name)
@@ -302,7 +316,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	modules, _, err := p.build(ctx, p.request)
+	p.moduleOutputCache = NewModuleOutputCache()
+
+	_, _, err := p.build(ctx, p.request)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
@@ -324,9 +340,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		}
 	}()
 
-	fmt.Println("Alfi")
-	zlog.Warn("Alfi")
-	p.moduleOutputCache, err = NewModuleOutputCache(ctx, modules, p.manifest, p.graph, p.baseOutputCacheStore, p.requestedStartBlockNum)
 	if err != nil {
 		return nil, fmt.Errorf("initiatin module output caches: %w", err)
 	}
@@ -341,7 +354,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-				zlog.Error("panic while process block", zap.Uint64("block_nub", block.Num()), zap.Error(err))
+				zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
 				zlog.Error(string(debug.Stack()))
 			}
 			if err != nil {
@@ -414,52 +427,10 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		//todo: update module output kv with current block ref ????
 
 		for _, executor := range p.moduleExecutors {
-			output, found, err := p.moduleOutputCache.get(executor.moduleName, block)
-			if err != nil {
-				zlog.Warn("failed to get output from cache", zap.Error(err))
-			}
-			if found {
-				if executor.isStore {
-					deltas := &pbsubstreams.StoreDeltas{}
-					err := proto.Unmarshal(output, deltas)
-					if err != nil {
-						return fmt.Errorf("unmarshalling output deltas: %w", err)
-					}
-					executor.outputStore.Deltas = deltas.Deltas //todo: unmarshall cached data as delta
-					for _, delta := range deltas.Deltas {
-						executor.outputStore.ApplyDelta(delta)
-					}
-				} else {
-					executor.mapperOutput = output
-				}
-				executor.appendOutput()
-				continue
-			}
-
-			//todo: maybe the executor should be aware of caching ...
-			if err := executor.run(); err != nil {
+			if err := executor.run(p.wasmOutputs, clock, block); err != nil {
 				return err
 			}
-
-			if executor.isStore {
-				deltas := &pbsubstreams.StoreDeltas{
-					Deltas: executor.outputStore.Deltas,
-				}
-				data, err := proto.Marshal(deltas)
-				if err != nil {
-					return fmt.Errorf("caching: marshalling delta: %w", err)
-				}
-				err = p.moduleOutputCache.set(executor.moduleName, block, data)
-				if err != nil {
-					return fmt.Errorf("setting delta to cache at block %d: %w", block.Num(), err)
-				}
-			} else {
-				err = p.moduleOutputCache.set(executor.moduleName, block, executor.mapperOutput)
-				if err != nil {
-					return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
-				}
-			}
-			executor.appendOutput()
+			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
 		}
 
 		if len(p.moduleOutputs) > 0 {

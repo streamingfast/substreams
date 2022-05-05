@@ -135,7 +135,6 @@ func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 
 	o.new = false
 	o.kv = make(map[string]*bstream.Block)
-	o.currentBlockRange = nil
 
 	o.currentBlockRange, found, err = findBlockRange(ctx, o.store, atBlock)
 	zlog.Info("loading blocks", zap.Stringer("block_range", o.currentBlockRange))
@@ -144,7 +143,11 @@ func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 	}
 
 	if !found {
-		fmt.Println("")
+		o.currentBlockRange = &blockRange{
+			startBlock:        atBlock,
+			exclusiveEndBlock: atBlock + 100,
+		}
+
 		o.new = true
 		return nil
 	}
@@ -163,7 +166,7 @@ func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 	for {
 		block, err := blockReader.Read()
 
-		if err != io.EOF {
+		if err != nil && err != io.EOF {
 			return fmt.Errorf("reading block: %w", err)
 		}
 

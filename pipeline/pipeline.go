@@ -427,8 +427,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 					}
 					executor.outputStore.Deltas = deltas.Deltas //todo: unmarshall cached data as delta
 				} else {
-					p.wasmOutputs[executor.moduleName] = output
+					executor.mapperOutput = output
 				}
+				executor.appendOutput()
 				continue
 			}
 
@@ -436,6 +437,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			if err := executor.run(); err != nil {
 				return err
 			}
+
 			if executor.isStore {
 				deltas := &pbsubstreams.StoreDeltas{
 					Deltas: executor.outputStore.Deltas,
@@ -454,6 +456,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 					return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
 				}
 			}
+			executor.appendOutput()
 		}
 
 		if len(p.moduleOutputs) > 0 {

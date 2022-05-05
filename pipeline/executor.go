@@ -34,10 +34,6 @@ func (e *ModuleExecutor) run() (err error) {
 		return err
 	}
 
-	if e.isOutput {
-		e.appendOutput()
-	}
-
 	return nil
 }
 func (e *ModuleExecutor) wasmMapCall() (err error) {
@@ -108,6 +104,10 @@ func (e *ModuleExecutor) wasmCall() (instance *wasm.Instance, err error) {
 }
 
 func (e *ModuleExecutor) appendOutput() {
+	if !e.isOutput {
+		return
+	}
+
 	var logs []string
 	if e.wasmModule.CurrentInstance != nil {
 		logs = e.wasmModule.CurrentInstance.Logs

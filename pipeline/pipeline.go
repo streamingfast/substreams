@@ -413,9 +413,12 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			}
 			if found {
 				if executor.isStore {
-					//todo: what are we doing with store cache data?
-					//set module store delta with data from cache
-					executor.outputStore.Deltas = []*pbsubstreams.StoreDelta{} //todo: unmarshall cached data as delta
+					deltas := &pbsubstreams.StoreDeltas{}
+					err := proto.Unmarshal(output, deltas)
+					if err != nil {
+						return fmt.Errorf("unmarshalling output deltas: %w", err)
+					}
+					executor.outputStore.Deltas = deltas.Deltas //todo: unmarshall cached data as delta
 				} else {
 					p.wasmOutputs[executor.moduleName] = output
 				}
@@ -427,11 +430,22 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 				return err
 			}
 			if executor.isStore {
-				//todo:
-				// marshall module store delta and cache in
-
+				deltas := &pbsubstreams.StoreDeltas{
+					Deltas: executor.outputStore.Deltas,
+				}
+				data, err := proto.Marshal(deltas)
+				if err != nil {
+					return fmt.Errorf("caching: marshalling delta: %w", err)
+				}
+				err = p.moduleOutputCache.set(executor.moduleName, block, data)
+				if err != nil {
+					return fmt.Errorf("setting delta to cache at block %d: %w", block.Num(), err)
+				}
 			} else {
-				p.moduleOutputCache.set(executor.moduleName, block, executor.mapperOutput)
+				err = p.moduleOutputCache.set(executor.moduleName, block, executor.mapperOutput)
+				if err != nil {
+					return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
+				}
 			}
 		}
 

@@ -324,7 +324,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		}
 	}()
 
-	p.moduleOutputCache, err = NewModuleOutputCache(ctx, modules, p.manifest, p.graph, p.baseOutputCacheStore)
+	fmt.Println("Alfi")
+	zlog.Warn("Alfi")
+	p.moduleOutputCache, err = NewModuleOutputCache(ctx, modules, p.manifest, p.graph, p.baseOutputCacheStore, p.requestedStartBlockNum)
 	if err != nil {
 		return nil, fmt.Errorf("initiatin module output caches: %w", err)
 	}
@@ -376,6 +378,11 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		if block.Number >= stopBlock {
 			return io.EOF
+		}
+
+		err = p.moduleOutputCache.update(ctx, block.AsRef())
+		if err != nil {
+			return fmt.Errorf("updating module output cache: %w", err)
 		}
 
 		for _, hook := range p.preBlockHooks {

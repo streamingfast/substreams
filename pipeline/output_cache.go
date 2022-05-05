@@ -31,17 +31,14 @@ type ModulesOutputCache struct {
 	lock         sync.RWMutex
 }
 
-type blockRange struct {
-	startBlock        uint64
-	exclusiveEndBlock uint64
-}
-
-func NewModuleOutputCache(ctx context.Context, modules []*pbsubstreams.Module, manif *pbsubstreams.Manifest, graph *manifest.ModuleGraph, baseOutputCacheStore dstore.Store) (*ModulesOutputCache, error) {
+func NewModuleOutputCache(ctx context.Context, modules []*pbsubstreams.Module, manif *pbsubstreams.Manifest, graph *manifest.ModuleGraph, baseOutputCacheStore dstore.Store, requestedStartBlock uint64) (*ModulesOutputCache, error) {
+	zlog.Debug("creating cache with modules", zap.Int("modules", len(modules)))
 	moduleOutputCache := &ModulesOutputCache{
 		outputCaches: make(map[string]*outputCache),
 	}
 
 	for _, module := range modules {
+		zlog.Debug("modules", zap.String("module_name", module.Name))
 		hash := manifest.HashModuleAsString(manif, graph, module)
 
 		moduleStore, err := baseOutputCacheStore.SubStore(fmt.Sprintf("%s-%s/outputs", module.Name, hash))
@@ -56,7 +53,7 @@ func NewModuleOutputCache(ctx context.Context, modules []*pbsubstreams.Module, m
 
 		moduleOutputCache.outputCaches[module.Name] = cache
 
-		if err = cache.loadBlocks(ctx, module.StartBlock); err != nil {
+		if err = cache.loadBlocks(ctx, computeStartBlock(requestedStartBlock)); err != nil {
 			return nil, fmt.Errorf("loading blocks for module %q: %w", module.Name, err)
 		}
 	}
@@ -67,6 +64,7 @@ func NewModuleOutputCache(ctx context.Context, modules []*pbsubstreams.Module, m
 func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockRef) error {
 	for _, moduleCache := range c.outputCaches {
 		if !moduleCache.currentBlockRange.contains(blockRef) {
+			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 			if err := moduleCache.saveBlocks(ctx); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.moduleName, err)
 			}
@@ -132,19 +130,21 @@ func (r *blockRange) contains(blockRef bstream.BlockRef) bool {
 	return blockRef.Num() >= r.startBlock && blockRef.Num() < r.exclusiveEndBlock
 }
 
-func (o *outputCache) loadBlocks(ctx context.Context, startBlock uint64) (err error) {
+func (o *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error) {
 	var found bool
 
 	o.new = false
 	o.kv = make(map[string]*bstream.Block)
 	o.currentBlockRange = nil
 
-	o.currentBlockRange, found, err = findBlockRange(ctx, o.store, startBlock)
+	o.currentBlockRange, found, err = findBlockRange(ctx, o.store, atBlock)
+	zlog.Info("loading blocks", zap.Stringer("block_range", o.currentBlockRange))
 	if err != nil {
 		return fmt.Errorf("computing block range for module %q: %w", o.moduleName, err)
 	}
 
 	if !found {
+		fmt.Println("")
 		o.new = true
 		return nil
 	}
@@ -180,6 +180,7 @@ func (o *outputCache) loadBlocks(ctx context.Context, startBlock uint64) (err er
 }
 
 func (o *outputCache) saveBlocks(ctx context.Context) error {
+	zlog.Info("saving cache", zap.String("module_name", o.moduleName), zap.Stringer("block_range", o.currentBlockRange))
 	filename := computeDBinFilename(pad(o.currentBlockRange.startBlock), pad(o.currentBlockRange.exclusiveEndBlock))
 
 	buffer := bytes.NewBuffer(nil)
@@ -258,4 +259,13 @@ func getExclusiveEndBlock(filename string) (uint64, error) {
 	}
 
 	return uint64(parsedInt), nil
+}
+
+type blockRange struct {
+	startBlock        uint64
+	exclusiveEndBlock uint64
+}
+
+func (r *blockRange) String() string {
+	return fmt.Sprintf("start: %d exclusiveEndBlock: %d", r.startBlock, r.exclusiveEndBlock)
 }

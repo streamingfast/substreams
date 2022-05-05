@@ -17,7 +17,10 @@ message Module {
     KindMap kind_map = 2;
     KindStore kind_store = 3;
   };
-  WasmCode wasm_code = 4;
+  oneof code {
+    WasmCode wasm_code = 4;
+    NativeCode native_code = 5;
+  }
 
   repeated Input inputs = 6;
   Output output  = 7;
@@ -27,6 +30,10 @@ message Module {
     string type = 4;
     uint32 index = 5;
     string entrypoint = 6;
+  }
+
+  message NativeCode {
+    string entrypoint = 5;
   }
 
   message KindMap {

@@ -34,6 +34,14 @@ func (b *Builder) writeMergeValues() {
 	b.KV[storeNameKey] = []byte(b.Name)
 }
 
+func (b *Builder) clearMergeValues() {
+	delete(b.KV, updatePolicyKey)
+	delete(b.KV, valueTypeKey)
+	delete(b.KV, moduleHashKey)
+	delete(b.KV, moduleStartBlockKey)
+	delete(b.KV, storeNameKey)
+}
+
 func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
 	//mega-hack because json marshalling converts invalid UTF-8 (in our case byte 255) to Unicode replacement character U+FFFD (byte 239-191-189)  (see json package documentation)
 	//here, we convert that back to byte 255
@@ -47,35 +55,28 @@ func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updateP
 		}
 	}
 
-	///TODO(colin): do not delete the special keys.
-
 	if updatePolicyBytes, ok := kv[updatePolicyKey]; ok {
 		updatePolicyInt, err := strconv.Atoi(string(updatePolicyBytes))
 		if err != nil {
 			panic(fmt.Errorf("parsing update policy value: %w", err))
 		}
 		updatePolicy = pbsubstreams.Module_KindStore_UpdatePolicy(int32(updatePolicyInt))
-		delete(kv, updatePolicyKey)
 	}
 
 	if valueTypeBytes, ok := kv[valueTypeKey]; ok {
 		valueType = string(valueTypeBytes)
-		delete(kv, valueTypeKey)
 	}
 
 	if moduleHashBytes, ok := kv[moduleHashKey]; ok {
 		moduleHash = string(moduleHashBytes)
-		delete(kv, moduleHashKey)
 	}
 
 	if moduleStartBlockBytes, ok := kv[moduleStartBlockKey]; ok {
 		moduleStartBlock = uint64(bytesToInt(moduleStartBlockBytes))
-		delete(kv, moduleStartBlockKey)
 	}
 
 	if storeNameBytes, ok := kv[storeNameKey]; ok {
 		storeName = string(storeNameBytes)
-		delete(kv, storeNameKey)
 	}
 
 	updatedKV = kv
@@ -83,12 +84,12 @@ func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updateP
 	return
 }
 
-func (b *Builder) readMergeValues() {
-	b.KV, b.updatePolicy, b.valueType, b.ModuleHash, b.ModuleStartBlock, b.Name = readMergeValues(b.KV)
-}
-
 func (b *Builder) Merge(previous *Builder) error {
 	next := b
+
+	//special key values are not of the correct type for the KV, so we delete them and set them back afterwards.
+	b.clearMergeValues()
+	defer b.writeMergeValues()
 
 	if next.updatePolicy != previous.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", next.updatePolicy, previous.updatePolicy)

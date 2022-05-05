@@ -41,13 +41,17 @@ func TestBuilder_Merge(t *testing.T) {
 		{
 			name:          "incompatible merge strategies",
 			latest:        mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE, OutputValueTypeString, nil),
+			latestKV:      map[string][]byte{},
 			prev:          mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE, OutputValueTypeString, nil),
+			prevKV:        map[string][]byte{},
 			expectedError: true,
 		},
 		{
 			name:          "incompatible value types",
 			latest:        mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE, OutputValueTypeString, nil),
+			latestKV:      map[string][]byte{},
 			prev:          mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE, OutputValueTypeBigFloat, nil),
+			prevKV:        map[string][]byte{},
 			expectedError: true,
 		},
 		{
@@ -349,6 +353,10 @@ func TestBuilder_Merge(t *testing.T) {
 				}
 				return
 			}
+
+			//ignore comparing these values
+			test.prev.clearMergeValues()
+			test.latest.clearMergeValues()
 
 			// check result both ways
 

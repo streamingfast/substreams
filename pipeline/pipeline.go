@@ -151,6 +151,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			Timestamp: timestamppb.New(block.Time()),
 		}
 
+		blk := block.ToProtocol()
+		p.currentBlockRef = block.AsRef()
+
 		for _, hook := range p.preBlockHooks {
 			if err := hook(ctx, p.clock); err != nil {
 				return fmt.Errorf("pre block hook: %w", err)
@@ -162,6 +165,8 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		//todo? should we only save store if in partial mode or in catchup?
 		// no need to save store if loaded from cache?
+		// TODO: eventually, handle the `undo` signals.
+		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		if err := p.saveStoresSnapshots(ctx); err != nil {
 			return fmt.Errorf("saving stores: %w", err)
 		}
@@ -176,12 +181,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
 
 		cursor := obj.(bstream.Cursorable).Cursor()
-		// TODO: eventually, handle the `undo` signals.
-		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		step := obj.(bstream.Stepable).Step()
-
-		blk := block.ToProtocol()
-		p.currentBlockRef = block.AsRef()
 
 		if err = p.setupSource(blk); err != nil {
 			return fmt.Errorf("setting up sources: %w", err)
@@ -315,13 +315,21 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 					Name: in.Map.ModuleName,
 				})
 			case *pbsubstreams.Module_Input_Store_:
-				name := in.Store.ModuleName
-				inputs = append(inputs, &wasm.Input{
-					Type:   wasm.InputStore,
-					Name:   name,
-					Store:  p.builders[name],
-					Deltas: true,
-				})
+				inputName := input.GetStore().ModuleName
+				if input.GetStore().Mode == pbsubstreams.Module_Input_Store_DELTAS {
+					inputs = append(inputs, &wasm.Input{
+						Type:   wasm.InputStore,
+						Name:   inputName,
+						Store:  p.builders[inputName],
+						Deltas: true,
+					})
+				} else {
+					inputs = append(inputs, &wasm.Input{
+						Type:  wasm.InputStore,
+						Name:  inputName,
+						Store: p.builders[inputName],
+					})
+				}
 			case *pbsubstreams.Module_Input_Source_:
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputSource,

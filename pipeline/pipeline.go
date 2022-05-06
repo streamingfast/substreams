@@ -160,8 +160,10 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		p.moduleOutputs = nil
 		p.wasmOutputs = map[string][]byte{}
 
+		//todo? should we only save store if in partial mode or in catchup?
+		// no need to save store if loaded from cache?
 		if err := p.saveStoresSnapshots(ctx); err != nil {
-			return err
+			return fmt.Errorf("saving stores: %w", err)
 		}
 		if err = p.moduleOutputCache.update(ctx, p.currentBlockRef); err != nil {
 			return fmt.Errorf("updating module output cache: %w", err)
@@ -514,7 +516,10 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
-	if (p.requestedStartBlockNum != p.clock.Number && p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0) || p.clock.Number >= p.request.StopBlockNum {
+	isFirstRequestBlock := p.requestedStartBlockNum != p.clock.Number
+	reachInterval := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
+
+	if isFirstRequestBlock && reachInterval {
 		for _, s := range p.builders {
 			fileName, err := s.WriteState(ctx, p.clock.Number, p.partialMode)
 			if err != nil {

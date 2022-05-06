@@ -58,7 +58,8 @@ type Pipeline struct {
 	moduleOutputCache    *ModulesOutputCache
 	baseOutputCacheStore dstore.Store
 
-	blocksFunc func(r *pbsubstreams.Request) error
+	blocksFunc      func(r *pbsubstreams.Request) error
+	currentBlockRef bstream.BlockRef
 }
 
 func New(
@@ -116,7 +117,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
-	stopBlock := p.request.StopBlockNum
 
 	p.progressTracker.startTracking(ctx)
 
@@ -130,12 +130,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	}
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		p.clock = &pbsubstreams.Clock{
-			Number:    block.Num(),
-			Id:        block.Id,
-			Timestamp: timestamppb.New(block.Time()),
-		}
-
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -150,33 +144,11 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 				}
 			}
 		}()
-		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
 
-		p.moduleOutputs = nil
-		p.wasmOutputs = map[string][]byte{}
-
-		cursorable := obj.(bstream.Cursorable)
-		cursor := cursorable.Cursor()
-
-		stepable := obj.(bstream.Stepable)
-		step := stepable.Step()
-
-		// TODO: eventually, handle the `undo` signals.
-		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
-
-		if (p.requestedStartBlockNum != block.Number && p.storesSaveInterval != 0 && block.Num()%p.storesSaveInterval == 0) || block.Number >= stopBlock {
-			if err := p.saveStoresSnapshots(ctx); err != nil {
-				return err
-			}
-		}
-
-		if block.Number >= stopBlock {
-			return io.EOF
-		}
-
-		err = p.moduleOutputCache.update(ctx, block.AsRef())
-		if err != nil {
-			return fmt.Errorf("updating module output cache: %w", err)
+		p.clock = &pbsubstreams.Clock{
+			Number:    block.Num(),
+			Id:        block.Id,
+			Timestamp: timestamppb.New(block.Time()),
 		}
 
 		for _, hook := range p.preBlockHooks {
@@ -185,27 +157,33 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			}
 		}
 
-		blk := block.ToProtocol()
-		switch p.vmType {
-		case "native":
-			panic("not implemented")
-		case "wasm/rust-v1":
-			// block.Payload.Get() could do the same, but does it go through the same
-			// CORRECTIONS of the block, that the BlockDecoder does?
-			blkBytes, err := proto.Marshal(blk.(proto.Message))
-			if err != nil {
-				return fmt.Errorf("packing block: %w", err)
-			}
+		p.moduleOutputs = nil
+		p.wasmOutputs = map[string][]byte{}
 
-			clockBytes, err := proto.Marshal(p.clock)
-
-			p.wasmOutputs[p.blockType] = blkBytes
-			p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
-		default:
-			panic("unsupported vmType " + p.vmType)
+		if err := p.saveStoresSnapshots(ctx); err != nil {
+			return err
+		}
+		if err = p.moduleOutputCache.update(ctx, p.currentBlockRef); err != nil {
+			return fmt.Errorf("updating module output cache: %w", err)
 		}
 
-		//todo: update module output kv with current block ref ????
+		if p.clock.Number >= p.request.StopBlockNum {
+			return io.EOF
+		}
+
+		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
+
+		cursor := obj.(bstream.Cursorable).Cursor()
+		// TODO: eventually, handle the `undo` signals.
+		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
+		step := obj.(bstream.Stepable).Step()
+
+		blk := block.ToProtocol()
+		p.currentBlockRef = block.AsRef()
+
+		if err = p.setupSource(blk); err != nil {
+			return fmt.Errorf("setting up sources: %w", err)
+		}
 
 		for _, executor := range p.moduleExecutors {
 			if err := executor.run(p.wasmOutputs, p.clock, block); err != nil {
@@ -214,19 +192,8 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
 		}
 
-		if len(p.moduleOutputs) > 0 {
-			// TODO: package, after each execution, ALL of the modules we want changes for,
-			// and add LOGS
-			zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-			out := &pbsubstreams.BlockScopedData{
-				Outputs: p.moduleOutputs,
-				Clock:   p.clock,
-				Step:    pbsubstreams.StepToProto(step),
-				Cursor:  cursor.ToOpaque(),
-			}
-			if err := returnFunc(out); err != nil {
-				return err
-			}
+		if err := p.returnOutputs(step, cursor, returnFunc); err != nil {
+			return err
 		}
 
 		for _, s := range p.builders {
@@ -235,6 +202,44 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 		return nil
 	}), nil
+}
+
+func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, returnFunc substreams.ReturnFunc) error {
+	if len(p.moduleOutputs) > 0 {
+		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+		out := &pbsubstreams.BlockScopedData{
+			Outputs: p.moduleOutputs,
+			Clock:   p.clock,
+			Step:    pbsubstreams.StepToProto(step),
+			Cursor:  cursor.ToOpaque(),
+		}
+		if err := returnFunc(out); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
+	}
+	return nil
+}
+
+func (p *Pipeline) setupSource(blk interface{}) error {
+	switch p.vmType {
+	case "native":
+		panic("not implemented")
+	case "wasm/rust-v1":
+		// block.Payload.Get() could do the same, but does it go through the same
+		// CORRECTIONS of the block, that the BlockDecoder does?
+		blkBytes, err := proto.Marshal(blk.(proto.Message))
+		if err != nil {
+			return fmt.Errorf("packing block: %w", err)
+		}
+
+		clockBytes, err := proto.Marshal(p.clock)
+
+		p.wasmOutputs[p.blockType] = blkBytes
+		p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
+	default:
+		panic("unsupported vmType " + p.vmType)
+	}
+	return nil
 }
 
 func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
@@ -494,12 +499,14 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
-	for _, s := range p.builders {
-		fileName, err := s.WriteState(ctx, p.clock.Number, p.partialMode)
-		if err != nil {
-			return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
+	if (p.requestedStartBlockNum != p.clock.Number && p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0) || p.clock.Number >= p.request.StopBlockNum {
+		for _, s := range p.builders {
+			fileName, err := s.WriteState(ctx, p.clock.Number, p.partialMode)
+			if err != nil {
+				return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
+			}
+			zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
 		}
-		zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
 	}
 	return nil
 }

@@ -3,11 +3,12 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/bstream"
 	"io"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/bstream"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"

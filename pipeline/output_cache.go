@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"io"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
+
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -42,6 +43,10 @@ func NewModuleOutputCache() *ModulesOutputCache {
 
 func (c *ModulesOutputCache) registerModule(ctx context.Context, module *pbsubstreams.Module, hash string, baseOutputCacheStore dstore.Store, requestedStartBlock uint64) (*outputCache, error) {
 	zlog.Debug("modules", zap.String("module_name", module.Name))
+
+	if cache, found := c.outputCaches[module.Name]; found {
+		return cache, nil
+	}
 
 	moduleStore, err := baseOutputCacheStore.SubStore(fmt.Sprintf("%s-%s/outputs", module.Name, hash))
 	if err != nil {

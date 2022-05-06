@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
@@ -16,8 +19,6 @@ import (
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Pipeline struct {
@@ -92,6 +93,158 @@ func New(
 	}
 
 	return pipe
+}
+
+// `store` aura 4 modes d'opération:
+//   * fetch an absolute snapshot from disk at EXACTLY the point we're starting
+//   * fetch a partial snapshot, and fuse with previous snapshots, in which I need local "pairExtractor" building.
+//   * connect to a remote firehose (I can cut the upstream dependencies
+//   * if resources are available, SCHEDULE on BACKING NODES a parallel processing for that segment
+//   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
+
+func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
+	ctx := p.context
+	// WARN: we don't support < 0 StartBlock for now
+	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
+	p.moduleOutputCache = NewModuleOutputCache()
+
+	_, _, err := p.build(ctx, p.request)
+	if err != nil {
+		return nil, fmt.Errorf("building pipeline: %w", err)
+	}
+	stopBlock := p.request.StopBlockNum
+
+	p.progressTracker.startTracking(ctx)
+
+	err = p.SynchronizeStores(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("synchonizing store: %w", err)
+	}
+
+	blockCount := 0
+
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			blockCount = 0
+		}
+	}()
+
+	if err != nil {
+		return nil, fmt.Errorf("initiatin module output caches: %w", err)
+	}
+
+	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		clock := &pbsubstreams.Clock{
+			Number:    block.Num(),
+			Id:        block.Id,
+			Timestamp: timestamppb.New(block.Time()),
+		}
+
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+				zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
+				zlog.Error(string(debug.Stack()))
+			}
+			if err != nil {
+				for _, hook := range p.postJobHooks {
+					if err := hook(ctx, clock); err != nil {
+						zlog.Warn("post job hook failed", zap.Error(err))
+					}
+				}
+			}
+		}()
+		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
+		blockCount++
+		handleBlockStart := time.Now()
+
+		p.moduleOutputs = nil
+		p.wasmOutputs = map[string][]byte{}
+
+		cursorable := obj.(bstream.Cursorable)
+		cursor := cursorable.Cursor()
+
+		stepable := obj.(bstream.Stepable)
+		step := stepable.Step()
+
+		p.currentClock = clock
+
+		// TODO: eventually, handle the `undo` signals.
+		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
+
+		if (p.requestedStartBlockNum != block.Number && p.storesSaveInterval != 0 && block.Num()%p.storesSaveInterval == 0) || block.Number >= stopBlock {
+			if err := p.saveStoresSnapshots(ctx, clock.Number); err != nil {
+				return err
+			}
+		}
+
+		if block.Number >= stopBlock {
+			return io.EOF
+		}
+
+		err = p.moduleOutputCache.update(ctx, block.AsRef())
+		if err != nil {
+			return fmt.Errorf("updating module output cache: %w", err)
+		}
+
+		for _, hook := range p.preBlockHooks {
+			if err := hook(ctx, clock); err != nil {
+				return fmt.Errorf("pre block hook: %w", err)
+			}
+		}
+
+		blk := block.ToProtocol()
+		switch p.vmType {
+		case "native":
+			panic("not implemented")
+		case "wasm/rust-v1":
+			// block.Payload.Get() could do the same, but does it go through the same
+			// CORRECTIONS of the block, that the BlockDecoder does?
+			blkBytes, err := proto.Marshal(blk.(proto.Message))
+			if err != nil {
+				return fmt.Errorf("packing block: %w", err)
+			}
+
+			clockBytes, err := proto.Marshal(clock)
+
+			p.wasmOutputs[p.blockType] = blkBytes
+			p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
+		default:
+			panic("unsupported vmType " + p.vmType)
+		}
+
+		//todo: update module output kv with current block ref ????
+
+		for _, executor := range p.moduleExecutors {
+			if err := executor.run(p.wasmOutputs, clock, block); err != nil {
+				return err
+			}
+			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
+		}
+
+		if len(p.moduleOutputs) > 0 {
+			// TODO: package, after each execution, ALL of the modules we want changes for,
+			// and add LOGS
+			zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+			out := &pbsubstreams.BlockScopedData{
+				Outputs: p.moduleOutputs,
+				Clock:   clock,
+				Step:    stepToProto(step),
+				Cursor:  cursor.ToOpaque(),
+			}
+			if err := returnFunc(out); err != nil {
+				return err
+			}
+		}
+
+		for _, s := range p.builders {
+			s.Flush()
+		}
+		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
+		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
+		return nil
+	}), nil
 }
 
 // build will determine and run the builder that corresponds to the correct code type
@@ -291,158 +444,6 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 		zlog.Info("adding store", zap.String("module_name", store.Name))
 	}
 	return nil
-}
-
-// `store` aura 4 modes d'opération:
-//   * fetch an absolute snapshot from disk at EXACTLY the point we're starting
-//   * fetch a partial snapshot, and fuse with previous snapshots, in which I need local "pairExtractor" building.
-//   * connect to a remote firehose (I can cut the upstream dependencies
-//   * if resources are available, SCHEDULE on BACKING NODES a parallel processing for that segment
-//   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
-
-func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
-	ctx := p.context
-	// WARN: we don't support < 0 StartBlock for now
-	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	p.moduleOutputCache = NewModuleOutputCache()
-
-	_, _, err := p.build(ctx, p.request)
-	if err != nil {
-		return nil, fmt.Errorf("building pipeline: %w", err)
-	}
-	stopBlock := p.request.StopBlockNum
-
-	p.progressTracker.startTracking(ctx)
-
-	err = p.SynchronizeStores(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("synchonizing store: %w", err)
-	}
-
-	blockCount := 0
-
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			blockCount = 0
-		}
-	}()
-
-	if err != nil {
-		return nil, fmt.Errorf("initiatin module output caches: %w", err)
-	}
-
-	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		clock := &pbsubstreams.Clock{
-			Number:    block.Num(),
-			Id:        block.Id,
-			Timestamp: timestamppb.New(block.Time()),
-		}
-
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-				zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
-				zlog.Error(string(debug.Stack()))
-			}
-			if err != nil {
-				for _, hook := range p.postJobHooks {
-					if err := hook(ctx, clock); err != nil {
-						zlog.Warn("post job hook failed", zap.Error(err))
-					}
-				}
-			}
-		}()
-		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
-		blockCount++
-		handleBlockStart := time.Now()
-
-		p.moduleOutputs = nil
-		p.wasmOutputs = map[string][]byte{}
-
-		cursorable := obj.(bstream.Cursorable)
-		cursor := cursorable.Cursor()
-
-		stepable := obj.(bstream.Stepable)
-		step := stepable.Step()
-
-		p.currentClock = clock
-
-		// TODO: eventually, handle the `undo` signals.
-		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
-
-		if (p.requestedStartBlockNum != block.Number && p.storesSaveInterval != 0 && block.Num()%p.storesSaveInterval == 0) || block.Number >= stopBlock {
-			if err := p.saveStoresSnapshots(ctx, clock.Number); err != nil {
-				return err
-			}
-		}
-
-		if block.Number >= stopBlock {
-			return io.EOF
-		}
-
-		err = p.moduleOutputCache.update(ctx, block.AsRef())
-		if err != nil {
-			return fmt.Errorf("updating module output cache: %w", err)
-		}
-
-		for _, hook := range p.preBlockHooks {
-			if err := hook(ctx, clock); err != nil {
-				return fmt.Errorf("pre block hook: %w", err)
-			}
-		}
-
-		blk := block.ToProtocol()
-		switch p.vmType {
-		case "native":
-			panic("not implemented")
-		case "wasm/rust-v1":
-			// block.Payload.Get() could do the same, but does it go through the same
-			// CORRECTIONS of the block, that the BlockDecoder does?
-			blkBytes, err := proto.Marshal(blk.(proto.Message))
-			if err != nil {
-				return fmt.Errorf("packing block: %w", err)
-			}
-
-			clockBytes, err := proto.Marshal(clock)
-
-			p.wasmOutputs[p.blockType] = blkBytes
-			p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
-		default:
-			panic("unsupported vmType " + p.vmType)
-		}
-
-		//todo: update module output kv with current block ref ????
-
-		for _, executor := range p.moduleExecutors {
-			if err := executor.run(p.wasmOutputs, clock, block); err != nil {
-				return err
-			}
-			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
-		}
-
-		if len(p.moduleOutputs) > 0 {
-			// TODO: package, after each execution, ALL of the modules we want changes for,
-			// and add LOGS
-			zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-			out := &pbsubstreams.BlockScopedData{
-				Outputs: p.moduleOutputs,
-				Clock:   clock,
-				Step:    stepToProto(step),
-				Cursor:  cursor.ToOpaque(),
-			}
-			if err := returnFunc(out); err != nil {
-				return err
-			}
-		}
-
-		for _, s := range p.builders {
-			s.Flush()
-		}
-		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
-		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
-		return nil
-	}), nil
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, blockNum uint64) error {

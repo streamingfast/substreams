@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
-
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
@@ -97,16 +96,17 @@ func New(
 
 // build will determine and run the builder that corresponds to the correct code type
 func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
-	for _, mod := range p.manifest.Modules {
+	for _, module := range p.manifest.Modules {
 		vmType := ""
-		switch {
-		case mod.GetWasmCode() != nil:
-			vmType = mod.GetWasmCode().GetType()
-		case mod.GetNativeCode() != nil:
+		switch module.Code.(type) {
+		case *pbsubstreams.Module_WasmCode_:
+			vmType = module.GetWasmCode().GetType()
+		case *pbsubstreams.Module_NativeCode_:
 			vmType = "native"
 		default:
-			return nil, nil, fmt.Errorf("invalid code type for modules %s ", mod.Name)
+			return nil, nil, fmt.Errorf("invalid code type for modules %s ", module.Name)
 		}
+
 		if p.vmType != "" && vmType != p.vmType {
 			return nil, nil, fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
 		}
@@ -153,69 +153,61 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	p.wasmOutputs = map[string][]byte{}
 	p.wasmRuntime = wasm.NewRuntime(p.wasmExtensions)
 
-	for _, mod := range modules {
-		isOutput := p.outputModuleMap[mod.Name]
+	for _, module := range modules {
+		isOutput := p.outputModuleMap[module.Name]
 		var inputs []*wasm.Input
 
-		for _, in := range mod.Inputs {
-			if inputMap := in.GetMap(); inputMap != nil {
+		for _, input := range module.Inputs {
+			switch in := input.Input.(type) {
+			case *pbsubstreams.Module_Input_Map_:
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputSource,
-					Name: inputMap.ModuleName,
+					Name: in.Map.ModuleName,
 				})
-			} else if inputStore := in.GetStore(); inputStore != nil {
-				inputName := inputStore.ModuleName
-				if inputStore.Mode == pbsubstreams.Module_Input_Store_DELTAS {
-					inputs = append(inputs, &wasm.Input{
-						Type:   wasm.InputStore,
-						Name:   inputName,
-						Store:  p.builders[inputName],
-						Deltas: true,
-					})
-				} else {
-					inputs = append(inputs, &wasm.Input{
-						Type:  wasm.InputStore,
-						Name:  inputName,
-						Store: p.builders[inputName],
-					})
-				}
-			} else if inputSource := in.GetSource(); inputSource != nil {
+			case *pbsubstreams.Module_Input_Store_:
+				name := in.Store.ModuleName
+				inputs = append(inputs, &wasm.Input{
+					Type:   wasm.InputStore,
+					Name:   name,
+					Store:  p.builders[name],
+					Deltas: true,
+				})
+			case *pbsubstreams.Module_Input_Source_:
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputSource,
-					Name: inputSource.Type,
+					Name: in.Source.Type,
 				})
-			} else {
-				return fmt.Errorf("invalid input struct for module %q", mod.Name)
+			default:
+				return fmt.Errorf("invalid input struct for module %q", module.Name)
 			}
 		}
-		modName := mod.Name // to ensure it's enclosed
 
-		wasmCodeRef := mod.GetWasmCode()
+		modName := module.Name // to ensure it's enclosed
+		wasmCodeRef := module.GetWasmCode()
 		if wasmCodeRef == nil {
 			return fmt.Errorf("build_wasm cannot use modules that are not of type wasm")
 		}
 		entrypoint := wasmCodeRef.Entrypoint
 
 		code := p.manifest.ModulesCode[wasmCodeRef.Index]
-		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code, mod.Name)
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code, module.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
-		hash := manifest.HashModuleAsString(p.manifest, p.graph, mod)
-		cache, err := p.moduleOutputCache.registerModule(ctx, mod, hash, p.baseOutputCacheStore, p.requestedStartBlockNum)
+		hash := manifest.HashModuleAsString(p.manifest, p.graph, module)
+		cache, err := p.moduleOutputCache.registerModule(ctx, module, hash, p.baseOutputCacheStore, p.requestedStartBlockNum)
+		if err != nil {
+			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+		}
 
-		// TODO: turn into switch
-		if v := mod.GetKindMap(); v != nil {
-			outType := strings.TrimPrefix(mod.Output.Type, "proto:")
+		switch kind := module.Kind.(type) {
+		case *pbsubstreams.Module_KindMap_:
+			outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
-			if err != nil {
-				return fmt.Errorf("registering output cache for module %q: %w", mod.Name, err)
-			}
-
-			m := &MapperModuleExecutor{
+			executor := &MapperModuleExecutor{
 				BaseExecutor: &BaseExecutor{
-					moduleName: mod.Name,
+					moduleName: module.Name,
 					wasmModule: wasmModule,
 					entrypoint: entrypoint,
 					wasmInputs: inputs,
@@ -225,12 +217,11 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				outputType: outType,
 			}
 
-			p.moduleExecutors = append(p.moduleExecutors, m)
+			p.moduleExecutors = append(p.moduleExecutors, executor)
 			continue
-		}
-		if v := mod.GetKindStore(); v != nil {
-			updatePolicy := v.UpdatePolicy
-			valueType := v.ValueType
+		case *pbsubstreams.Module_KindStore_:
+			updatePolicy := kind.KindStore.UpdatePolicy
+			valueType := kind.KindStore.ValueType
 
 			outputStore := p.builders[modName]
 			inputs = append(inputs, &wasm.Input{
@@ -240,10 +231,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				UpdatePolicy: updatePolicy,
 				ValueType:    valueType,
 			})
-
-			if err != nil {
-				return fmt.Errorf("registering output cache for module %q: %w", mod.Name, err)
-			}
 
 			s := &StoreModuleExecutor{
 				BaseExecutor: &BaseExecutor{
@@ -259,9 +246,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 
 			p.moduleExecutors = append(p.moduleExecutors, s)
 			continue
+		default:
+			return fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name)
 		}
-		return fmt.Errorf("invalid kind %q in module %q", mod.Kind, mod.Name)
-
 	}
 
 	return nil
@@ -479,16 +466,6 @@ func stepToProto(step bstream.StepType) pbsubstreams.ForkStep {
 		return pbsubstreams.ForkStep_STEP_IRREVERSIBLE
 	}
 	return pbsubstreams.ForkStep_STEP_UNKNOWN
-}
-
-type Printer interface {
-	Print()
-}
-
-func printer(in interface{}) {
-	if p, ok := in.(Printer); ok {
-		p.Print()
-	}
 }
 
 type progressTracker struct {

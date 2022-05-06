@@ -6,7 +6,6 @@ import (
 	"io"
 	"runtime/debug"
 	"strings"
-	"time"
 
 	"github.com/abourget/llerrgroup"
 	"google.golang.org/protobuf/proto"
@@ -52,7 +51,7 @@ type Pipeline struct {
 	baseStateStore     dstore.Store
 	storesSaveInterval uint64
 
-	currentClock  *pbsubstreams.Clock
+	clock         *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	logs          []string
 
@@ -126,21 +125,12 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		return nil, fmt.Errorf("synchonizing store: %w", err)
 	}
 
-	blockCount := 0
-
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			blockCount = 0
-		}
-	}()
-
 	if err != nil {
 		return nil, fmt.Errorf("initiatin module output caches: %w", err)
 	}
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		clock := &pbsubstreams.Clock{
+		p.clock = &pbsubstreams.Clock{
 			Number:    block.Num(),
 			Id:        block.Id,
 			Timestamp: timestamppb.New(block.Time()),
@@ -154,15 +144,13 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			}
 			if err != nil {
 				for _, hook := range p.postJobHooks {
-					if err := hook(ctx, clock); err != nil {
+					if err := hook(ctx, p.clock); err != nil {
 						zlog.Warn("post job hook failed", zap.Error(err))
 					}
 				}
 			}
 		}()
 		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
-		blockCount++
-		handleBlockStart := time.Now()
 
 		p.moduleOutputs = nil
 		p.wasmOutputs = map[string][]byte{}
@@ -173,13 +161,11 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		stepable := obj.(bstream.Stepable)
 		step := stepable.Step()
 
-		p.currentClock = clock
-
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 
 		if (p.requestedStartBlockNum != block.Number && p.storesSaveInterval != 0 && block.Num()%p.storesSaveInterval == 0) || block.Number >= stopBlock {
-			if err := p.saveStoresSnapshots(ctx, clock.Number); err != nil {
+			if err := p.saveStoresSnapshots(ctx); err != nil {
 				return err
 			}
 		}
@@ -194,7 +180,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		}
 
 		for _, hook := range p.preBlockHooks {
-			if err := hook(ctx, clock); err != nil {
+			if err := hook(ctx, p.clock); err != nil {
 				return fmt.Errorf("pre block hook: %w", err)
 			}
 		}
@@ -211,7 +197,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 				return fmt.Errorf("packing block: %w", err)
 			}
 
-			clockBytes, err := proto.Marshal(clock)
+			clockBytes, err := proto.Marshal(p.clock)
 
 			p.wasmOutputs[p.blockType] = blkBytes
 			p.wasmOutputs["sf.substreams.v1.Clock"] = clockBytes
@@ -222,7 +208,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		//todo: update module output kv with current block ref ????
 
 		for _, executor := range p.moduleExecutors {
-			if err := executor.run(p.wasmOutputs, clock, block); err != nil {
+			if err := executor.run(p.wasmOutputs, p.clock, block); err != nil {
 				return err
 			}
 			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
@@ -234,8 +220,8 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
 			out := &pbsubstreams.BlockScopedData{
 				Outputs: p.moduleOutputs,
-				Clock:   clock,
-				Step:    stepToProto(step),
+				Clock:   p.clock,
+				Step:    pbsubstreams.StepToProto(step),
 				Cursor:  cursor.ToOpaque(),
 			}
 			if err := returnFunc(out); err != nil {
@@ -247,12 +233,10 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			s.Flush()
 		}
 		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
-		p.progressTracker.blockProcessed(block, time.Since(handleBlockStart))
 		return nil
 	}), nil
 }
 
-// build will determine and run the builder that corresponds to the correct code type
 func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
 	for _, module := range p.manifest.Modules {
 		vmType := ""
@@ -509,80 +493,13 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pipeline) saveStoresSnapshots(ctx context.Context, blockNum uint64) error {
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 	for _, s := range p.builders {
-		fileName, err := s.WriteState(ctx, blockNum, p.partialMode)
+		fileName, err := s.WriteState(ctx, p.clock.Number, p.partialMode)
 		if err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
 		}
 		zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
 	}
 	return nil
-}
-
-func stepToProto(step bstream.StepType) pbsubstreams.ForkStep {
-	switch step {
-	case bstream.StepNew:
-		return pbsubstreams.ForkStep_STEP_NEW
-	case bstream.StepUndo:
-		return pbsubstreams.ForkStep_STEP_UNDO
-	case bstream.StepIrreversible:
-		return pbsubstreams.ForkStep_STEP_IRREVERSIBLE
-	}
-	return pbsubstreams.ForkStep_STEP_UNKNOWN
-}
-
-type progressTracker struct {
-	startAt                  time.Time
-	processedBlockLastSecond int
-	processedBlockCount      int
-	blockSecond              int
-	lastBlock                uint64
-	timeSpentInStreamFuncs   time.Duration
-}
-
-func newProgressTracker() *progressTracker {
-	return &progressTracker{}
-}
-
-func (p *progressTracker) startTracking(ctx context.Context) {
-	p.startAt = time.Now()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(1 * time.Second):
-				p.blockSecond = p.processedBlockCount - p.processedBlockLastSecond
-				p.processedBlockLastSecond = p.processedBlockCount
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(1 * time.Second):
-				p.log()
-			}
-		}
-	}()
-}
-
-func (p *progressTracker) blockProcessed(block *bstream.Block, delta time.Duration) {
-	p.processedBlockCount += 1
-	p.lastBlock = block.Num()
-	p.timeSpentInStreamFuncs += delta
-}
-
-func (p *progressTracker) log() {
-	zlog.Info("progress",
-		zap.Uint64("last_block", p.lastBlock),
-		zap.Int("total_processed_block", p.processedBlockCount),
-		zap.Int("block_second", p.blockSecond),
-		zap.Duration("stream_func_deltas", p.timeSpentInStreamFuncs))
-	p.timeSpentInStreamFuncs = 0
 }

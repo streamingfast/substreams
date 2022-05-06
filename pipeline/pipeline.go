@@ -404,14 +404,29 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 
 func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
 	var catchUpBlocksForModules []*state.Builder
+
+	alreadyAdded := map[string]bool{}
 	computedStartBlock := p.requestedStartBlockNum - (p.requestedStartBlockNum % 10_000)
 	for _, store := range p.builders {
 		if computedStartBlock <= store.ModuleStartBlock {
 			continue
 		}
 
+		if _, ok := alreadyAdded[store.Name]; ok {
+			continue
+		}
+
 		info := store.Info()
 		if info.LastKVSavedBlock < computedStartBlock {
+			storesInTree, err := p.graph.AncestorStoresOf(store.Name)
+			if err != nil {
+				return fmt.Errorf("getting stores down to %s: %w", store.Name, err)
+			}
+
+			for _, s := range storesInTree {
+				alreadyAdded[s.Name] = true
+			}
+
 			catchUpBlocksForModules = append(catchUpBlocksForModules, store)
 		}
 	}

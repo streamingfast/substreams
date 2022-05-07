@@ -62,8 +62,10 @@ func checkE(cmd *cobra.Command, args []string) error {
 		}
 
 		if info.EndBlock-prevFileInfo.EndBlock > intervalSize {
-			return fmt.Errorf("**hole found** between %d and %d", prevFileInfo.EndBlock, info.StartBlock)
+			return fmt.Errorf("**hole found** between %d and %d", prevFileInfo.EndBlock, info.EndBlock)
 		}
+
+		prevFileInfo = info
 	}
 
 	return err

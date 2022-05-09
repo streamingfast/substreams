@@ -155,11 +155,24 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	blocksFunc := func(r *pbsubstreams.Request) error {
+	blocksFunc := func(ctx context.Context, r *pbsubstreams.Request) error {
+		ctx, cancel := context.WithCancel(ctx)
+
+		go func() {
+			defer cancel()
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-streamSrv.Context().Done():
+				return
+			}
+		}()
+
 		return s.Blocks(r, streamSrv)
 	}
 
-	pipeline := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, blocksFunc, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, blocksFunc, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,
@@ -180,7 +193,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	handler, err := pipeline.HandlerFactory(returnHandler)
+	handler, err := pipe.HandlerFactory(returnHandler)
 	if err != nil {
 		return fmt.Errorf("error building substreams pipeline handler: %w", err)
 	}

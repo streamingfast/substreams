@@ -1,6 +1,8 @@
 package cli
 
-func Main() {
+func Main(version string) {
+	rootCmd.Version = version
+
 	setup()
 
 	err := rootCmd.Execute()

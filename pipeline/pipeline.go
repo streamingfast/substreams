@@ -58,7 +58,7 @@ type Pipeline struct {
 	moduleOutputCache    *ModulesOutputCache
 	baseOutputCacheStore dstore.Store
 
-	blocksFunc      func(r *pbsubstreams.Request) error
+	blocksFunc      func(ctx context.Context, r *pbsubstreams.Request) error
 	currentBlockRef bstream.BlockRef
 }
 
@@ -70,7 +70,7 @@ func New(
 	baseStateStore dstore.Store,
 	baseOutputCacheStore dstore.Store,
 	wasmExtensions []wasm.WASMExtensioner,
-	blocksFunc func(r *pbsubstreams.Request) error,
+	blocksFunc func(ctx context.Context, r *pbsubstreams.Request) error,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -423,6 +423,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
 	var catchUpBlocksForModules []*state.Builder
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	alreadyAdded := map[string]bool{}
 	computedStartBlock := p.requestedStartBlockNum - (p.requestedStartBlockNum % 10_000)
 	for _, store := range p.builders {
@@ -477,8 +480,9 @@ func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
 				InitialStoreSnapshotForModules: p.request.InitialStoreSnapshotForModules,
 			}
 
-			err := p.blocksFunc(request)
+			err := p.blocksFunc(ctx, request)
 			if err != nil {
+				cancel()
 				return fmt.Errorf("getting blocks for store %s (%d, %d): %w", store.Name, startBlock, endBlock, err)
 			}
 			return nil

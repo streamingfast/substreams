@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"io"
 
 	"github.com/streamingfast/bstream/stream"
@@ -16,6 +17,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/streamingfast/substreams/worker"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -37,6 +39,8 @@ type Service struct {
 	firehoseServer *firehoseServer.Server
 	streamFactory  *firehose.StreamFactory
 	logger         *zap.Logger
+
+	parallelBlocksRequests int
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -81,11 +85,18 @@ func WithStoresSaveInterval(block uint64) Option {
 	}
 }
 
+func WithParallelBlocksLimit(limit int) Option {
+	return func(service *Service) {
+		service.parallelBlocksRequests = limit
+	}
+}
+
 func New(stateStore dstore.Store, baseModuleOutputCacheStore dstore.Store, blockType string, opts ...Option) *Service {
 	s := &Service{
-		baseStateStore:       stateStore,
-		blockType:            blockType,
-		baseOutputCacheStore: baseModuleOutputCacheStore,
+		baseStateStore:         stateStore,
+		blockType:              blockType,
+		baseOutputCacheStore:   baseModuleOutputCacheStore,
+		parallelBlocksRequests: 1,
 	}
 
 	for _, opt := range opts {
@@ -155,7 +166,17 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
+	pool := worker.NewPool(s.parallelBlocksRequests)
+
 	blocksFunc := func(ctx context.Context, r *pbsubstreams.Request) error {
+		///todo(colin): make it possible to call different endpoints? currently this executes all the calls to this current server
+
+		err := pool.Wait(ctx)
+		if err != nil {
+			return fmt.Errorf("waiting for worker pool: %w", err)
+		}
+		defer pool.Done()
+
 		ctx, cancel := context.WithCancel(ctx)
 
 		go func() {

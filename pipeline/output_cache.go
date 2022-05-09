@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/block"
 	"io"
 	"math"
 	"strconv"
@@ -21,7 +22,7 @@ type outputCache struct {
 	lock sync.RWMutex
 
 	moduleName        string
-	currentBlockRange *blockRange
+	currentBlockRange *block.Range
 	kv                map[string]*bstream.Block
 	store             dstore.Store
 	new               bool
@@ -68,22 +69,18 @@ func (c *ModulesOutputCache) registerModule(ctx context.Context, module *pbsubst
 
 func (c *ModulesOutputCache) update(ctx context.Context, blockRef bstream.BlockRef) error {
 	for _, moduleCache := range c.outputCaches {
-		if !moduleCache.currentBlockRange.contains(blockRef) {
+		if !moduleCache.currentBlockRange.Contains(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 			if err := moduleCache.saveBlocks(ctx); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.moduleName, err)
 			}
-			if err := moduleCache.loadBlocks(ctx, moduleCache.currentBlockRange.exclusiveEndBlock); err != nil {
+			if err := moduleCache.loadBlocks(ctx, moduleCache.currentBlockRange.ExclusiveEndBlock); err != nil {
 				return fmt.Errorf("loading blocks for module kv %s: %w", moduleCache.moduleName, err)
 			}
 		}
 	}
 
 	return nil
-}
-
-func (r *blockRange) contains(blockRef bstream.BlockRef) bool {
-	return blockRef.Num() >= r.startBlock && blockRef.Num() < r.exclusiveEndBlock
 }
 
 func (c *outputCache) set(block *bstream.Block, data []byte) error {
@@ -144,16 +141,16 @@ func (c *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 	}
 
 	if !found {
-		c.currentBlockRange = &blockRange{
-			startBlock:        atBlock,
-			exclusiveEndBlock: atBlock + 100,
+		c.currentBlockRange = &block.Range{
+			StartBlock:        atBlock,
+			ExclusiveEndBlock: atBlock + 100,
 		}
 
 		c.new = true
 		return nil
 	}
 
-	filename := computeDBinFilename(pad(c.currentBlockRange.startBlock), pad(c.currentBlockRange.exclusiveEndBlock))
+	filename := computeDBinFilename(pad(c.currentBlockRange.StartBlock), pad(c.currentBlockRange.ExclusiveEndBlock))
 	objectReader, err := c.store.OpenObject(ctx, filename)
 	if err != nil {
 		return fmt.Errorf("loading block reader %s: %w", filename, err)
@@ -185,7 +182,7 @@ func (c *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 
 func (c *outputCache) saveBlocks(ctx context.Context) error {
 	zlog.Info("saving cache", zap.String("module_name", c.moduleName), zap.Stringer("block_range", c.currentBlockRange))
-	filename := computeDBinFilename(pad(c.currentBlockRange.startBlock), pad(c.currentBlockRange.exclusiveEndBlock))
+	filename := computeDBinFilename(pad(c.currentBlockRange.StartBlock), pad(c.currentBlockRange.ExclusiveEndBlock))
 
 	buffer := bytes.NewBuffer(nil)
 	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
@@ -207,7 +204,7 @@ func (c *outputCache) saveBlocks(ctx context.Context) error {
 	return nil
 }
 
-func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*blockRange, bool, error) {
+func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {
 	var exclusiveEndBlock uint64
 
 	paddedBlock := pad(prefixStartBlock)
@@ -235,9 +232,9 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 
 	exclusiveEndBlock = biggestEndBlock
 
-	return &blockRange{
-		startBlock:        prefixStartBlock,
-		exclusiveEndBlock: exclusiveEndBlock,
+	return &block.Range{
+		StartBlock:        prefixStartBlock,
+		ExclusiveEndBlock: exclusiveEndBlock,
 	}, true, nil
 }
 
@@ -263,13 +260,4 @@ func getExclusiveEndBlock(filename string) (uint64, error) {
 	}
 
 	return uint64(parsedInt), nil
-}
-
-type blockRange struct {
-	startBlock        uint64
-	exclusiveEndBlock uint64
-}
-
-func (r *blockRange) String() string {
-	return fmt.Sprintf("start: %d exclusiveEndBlock: %d", r.startBlock, r.exclusiveEndBlock)
 }

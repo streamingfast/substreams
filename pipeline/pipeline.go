@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -422,7 +423,11 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 }
 
 func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
-	var catchUpBlocksForModules []*state.Builder
+	type syncItem struct {
+		Builder *state.Builder
+		Range   *block.Range
+	}
+	var syncItems []*syncItem
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -449,21 +454,33 @@ func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
 				alreadyAdded[s.Name] = true
 			}
 
-			catchUpBlocksForModules = append(catchUpBlocksForModules, store)
+			info := store.Info()
+			brs := (&block.Range{
+				StartBlock:        info.LastKVSavedBlock,
+				ExclusiveEndBlock: computedStartBlock,
+			}).Split(10_000)
+
+			for _, br := range brs {
+				syncItems = append(syncItems, &syncItem{
+					Builder: store,
+					Range:   br,
+				})
+			}
+
 		}
 	}
 
-	eg := llerrgroup.New(len(catchUpBlocksForModules))
-	for _, store := range catchUpBlocksForModules {
+	eg := llerrgroup.New(len(syncItems))
+	for _, item := range syncItems {
 		if eg.Stop() {
 			continue
 		}
 
-		store := store
+		store := item.Builder
+		blockRange := item.Range
 		eg.Go(func() error {
-			info := store.Info()
-			startBlock := info.LastKVSavedBlock
-			endBlock := computedStartBlock
+			startBlock := blockRange.StartBlock
+			endBlock := blockRange.ExclusiveEndBlock
 
 			zlog.Info("waiting for request for store to finish",
 				zap.String("store", store.Name),

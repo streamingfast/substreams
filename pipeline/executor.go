@@ -15,6 +15,7 @@ import (
 type ModuleExecutor interface {
 	run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error
 	appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput
+	String() string
 }
 
 type BaseExecutor struct {
@@ -208,4 +209,30 @@ func (e *MapperModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.Module
 	}
 
 	return moduleOutputs
+}
+
+func (e *StoreModuleExecutor) String() string {
+	return e.moduleName
+}
+
+func (e *MapperModuleExecutor) String() string {
+	return e.moduleName
+}
+
+func OptimizeExecutors(moduleOutputCache map[string]*outputCache, moduleExecutors []ModuleExecutor, requestedOutputStores []string) (optimizedModuleExecutors []ModuleExecutor, skipBlockSource bool) {
+	optimizedModuleExecutors = []ModuleExecutor{}
+	skipBlockSource = false
+
+	for _, outputStore := range requestedOutputStores {
+		if moduleOutputCache[outputStore] != nil && !moduleOutputCache[outputStore].new {
+			for _, executor := range moduleExecutors {
+				if executor.String() == outputStore {
+					optimizedModuleExecutors = append(optimizedModuleExecutors, executor)
+					skipBlockSource = true
+				}
+			}
+		}
+	}
+
+	return optimizedModuleExecutors, skipBlockSource
 }

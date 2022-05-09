@@ -151,8 +151,14 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			Timestamp: timestamppb.New(block.Time()),
 		}
 
-		blk := block.ToProtocol()
 		p.currentBlockRef = block.AsRef()
+
+		if err = p.moduleOutputCache.update(ctx, p.currentBlockRef); err != nil {
+			return fmt.Errorf("updating module output cache: %w", err)
+		}
+
+		requestedOutputStores := p.request.GetOutputModules()
+		optimizedModuleExecutors, skipBlockSource := OptimizeExecutors(p.moduleOutputCache.outputCaches, p.moduleExecutors, requestedOutputStores)
 
 		for _, hook := range p.preBlockHooks {
 			if err := hook(ctx, p.clock); err != nil {
@@ -170,9 +176,6 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		if err := p.saveStoresSnapshots(ctx); err != nil {
 			return fmt.Errorf("saving stores: %w", err)
 		}
-		if err = p.moduleOutputCache.update(ctx, p.currentBlockRef); err != nil {
-			return fmt.Errorf("updating module output cache: %w", err)
-		}
 
 		if p.clock.Number >= p.request.StopBlockNum {
 			return io.EOF
@@ -183,11 +186,14 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		cursor := obj.(bstream.Cursorable).Cursor()
 		step := obj.(bstream.Stepable).Step()
 
-		if err = p.setupSource(blk); err != nil {
-			return fmt.Errorf("setting up sources: %w", err)
+		if !skipBlockSource {
+			if err = p.setupSource(block); err != nil {
+				return fmt.Errorf("setting up sources: %w", err)
+			}
 		}
 
-		for _, executor := range p.moduleExecutors {
+		for _, executor := range optimizedModuleExecutors {
+			zlog.Debug("executing", zap.Stringer("module_name", executor))
 			if err := executor.run(p.wasmOutputs, p.clock, block); err != nil {
 				return err
 			}
@@ -222,7 +228,9 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 	return nil
 }
 
-func (p *Pipeline) setupSource(blk interface{}) error {
+func (p *Pipeline) setupSource(block *bstream.Block) error {
+	blk := block.ToProtocol()
+
 	switch p.vmType {
 	case "native":
 		panic("not implemented")

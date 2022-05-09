@@ -157,8 +157,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			return fmt.Errorf("updating module output cache: %w", err)
 		}
 
-		requestedOutputStores := p.request.GetOutputModules()
-		optimizedModuleExecutors, skipBlockSource := OptimizeExecutors(p.moduleOutputCache.outputCaches, p.moduleExecutors, requestedOutputStores)
+		//requestedOutputStores := p.request.GetOutputModules()
+		//optimizedModuleExecutors, skipBlockSource := OptimizeExecutors(p.moduleOutputCache.outputCaches, p.moduleExecutors, requestedOutputStores)
+		//optimizedModuleExecutors, skipBlockSource := OptimizeExecutors(p.moduleOutputCache.outputCaches, p.moduleExecutors, requestedOutputStores)
 
 		for _, hook := range p.preBlockHooks {
 			if err := hook(ctx, p.clock); err != nil {
@@ -186,13 +187,13 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		cursor := obj.(bstream.Cursorable).Cursor()
 		step := obj.(bstream.Stepable).Step()
 
-		if !skipBlockSource {
-			if err = p.setupSource(block); err != nil {
-				return fmt.Errorf("setting up sources: %w", err)
-			}
+		//if !skipBlockSource {
+		if err = p.setupSource(block); err != nil {
+			return fmt.Errorf("setting up sources: %w", err)
 		}
+		//}
 
-		for _, executor := range optimizedModuleExecutors {
+		for _, executor := range p.moduleExecutors {
 			zlog.Debug("executing", zap.Stringer("module_name", executor))
 			if err := executor.run(p.wasmOutputs, p.clock, block); err != nil {
 				return err

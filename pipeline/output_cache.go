@@ -10,10 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )

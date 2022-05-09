@@ -47,8 +47,9 @@ func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescr
 					}
 					msg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 					if err := msg.Unmarshal(in); err != nil {
-						fmt.Printf("error unmarshalling protobuf %s to map: %s\n", msgType, err)
-						return decodeAsString(in)
+						fmt.Printf("error unmarshalling protobuf %s to map: %s\n", msgType, err.Error())
+						//return decodeAsString(in)
+						return ""
 					}
 
 					cnt, err := msg.MarshalJSONIndent()

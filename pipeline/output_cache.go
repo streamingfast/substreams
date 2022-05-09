@@ -102,7 +102,7 @@ func (c *outputCache) set(block *bstream.Block, data []byte) error {
 		PayloadVersion: int32(1),
 	}
 
-	_, err := bstream.GetBlockPayloadSetter(pbBlock, data)
+	_, err := bstream.MemoryBlockPayloadSetter(pbBlock, data)
 	if err != nil {
 		return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
 	}

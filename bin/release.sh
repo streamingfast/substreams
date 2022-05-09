@@ -44,6 +44,9 @@ main() {
   echo "About to release version tagged $version ($mode)"
   sleep 3
 
+  # Fails when externally called script error out
+  set -e
+
   if [[ "$force" == "true" ]]; then
     echo "Pushing to ensure GitHub knowns about the latest commit(s)"
     git push
@@ -54,8 +57,9 @@ main() {
     args="--skip-publish --skip-validate $args"
   fi
 
-  set -e
   git tag "$version"
+
+  # Remove auto-failure as we handle the errors ourself
   set +e
 
   goreleaser release $args

@@ -40,6 +40,7 @@ type Service struct {
 	streamFactory  *firehose.StreamFactory
 	logger         *zap.Logger
 
+	pool                   *worker.Pool
 	parallelBlocksRequests int
 }
 
@@ -102,6 +103,7 @@ func New(stateStore dstore.Store, baseModuleOutputCacheStore dstore.Store, block
 	for _, opt := range opts {
 		opt(s)
 	}
+	s.pool = worker.NewPool(s.parallelBlocksRequests)
 
 	return s
 }
@@ -166,31 +168,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	pool := worker.NewPool(s.parallelBlocksRequests)
-
 	blocksFunc := func(ctx context.Context, r *pbsubstreams.Request) error {
-		///todo(colin): make it possible to call different endpoints? currently this executes all the calls to this current server
-
-		err := pool.Wait(ctx)
-		if err != nil {
-			return fmt.Errorf("waiting for worker pool: %w", err)
-		}
-		defer pool.Done()
-
-		ctx, cancel := context.WithCancel(ctx)
-
-		go func() {
-			defer cancel()
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-streamSrv.Context().Done():
-				return
-			}
-		}()
-
-		return s.Blocks(r, streamSrv)
+		return s.blocksSubCall(ctx, r, streamSrv)
 	}
 
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, blocksFunc, opts...)
@@ -256,4 +235,16 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return status.Errorf(codes.Internal, "unexpected substreams termination: %s", err)
 	}
 	return nil
+}
+
+func (s *Service) blocksSubCall(ctx context.Context, r *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
+	///todo(colin): make it possible to call external endpoints? currently this executes all the calls to this current server
+
+	err := s.pool.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("waiting for worker pool: %w", err)
+	}
+	defer s.pool.Done()
+
+	return s.Blocks(r, streamSrv)
 }

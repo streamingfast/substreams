@@ -179,7 +179,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			return fmt.Errorf("saving stores: %w", err)
 		}
 
-		if p.clock.Number >= p.request.StopBlockNum {
+		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
 			return io.EOF
 		}
 

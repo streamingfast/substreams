@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	doublestar "github.com/bmatcuk/doublestar/v4"
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
@@ -83,7 +83,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	startBlock := mustGetInt64(cmd, "start-block")
-	if startBlock == 0 {
+	if startBlock == -1 {
 		sb, err := graph.ModuleStartBlock(outputStreamNames[0])
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)

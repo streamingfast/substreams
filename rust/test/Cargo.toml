@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-substreams={ path = "../substreams" }
+substreams= { path = "../substreams" }
 num-bigint = "0.4"
 bigdecimal = "0.3"
 prost = { version = "0.10.1" }
@@ -18,3 +18,8 @@ wasm-bindgen = "0.2"
 
 [build-dependencies]
 prost-build = "0.10.1"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

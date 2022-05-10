@@ -1,4 +1,3 @@
 #!/bin/bash
 
-PROTOC_INCLUDE=. wasm-pack build --target nodejs
-
+cargo build --target wasm32-unknown-unknown --release

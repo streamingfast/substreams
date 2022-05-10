@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/block"
 	"io"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/streamingfast/substreams/block"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -122,6 +123,7 @@ func (c *outputCache) get(block *bstream.Block) ([]byte, bool, error) {
 		return nil, false, nil
 	}
 
+	fmt.Println("Grrrr: payload type: %T", b.Payload)
 	data, err := b.Payload.Get()
 
 	return data, found, err

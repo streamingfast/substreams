@@ -33,14 +33,17 @@ type Service struct {
 	wasmExtensions  []wasm.WASMExtensioner
 	pipelineOptions []pipeline.PipelineOptioner
 
-	storesSaveInterval uint64
+	storesSaveInterval           uint64
+	outputCacheSaveBlockInterval uint64
 
 	firehoseServer *firehoseServer.Server
 	streamFactory  *firehose.StreamFactory
-	logger         *zap.Logger
 
+	logger                 *zap.Logger
 	pool                   *worker.Pool
 	parallelBlocksRequests int
+
+	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -81,16 +84,23 @@ func WithStoresSaveInterval(block uint64) Option {
 	}
 }
 
-func WithParallelBlocksLimit(limit int) Option {
+func WithOutCacheSaveInterval(block uint64) Option {
+	return func(s *Service) {
+		s.outputCacheSaveBlockInterval = block
+	}
+}
+
+func WithParallelBlocksRequestsLimit(limit int) Option {
 	return func(service *Service) {
 		service.parallelBlocksRequests = limit
 	}
 }
 
-func New(stateStore dstore.Store, blockType string, opts ...Option) *Service {
+func New(stateStore dstore.Store, blockType string, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), opts ...Option) *Service {
 	s := &Service{
 		baseStateStore:         stateStore,
 		blockType:              blockType,
+		grpcClientFactory:      grpcClientFactory,
 		parallelBlocksRequests: 1,
 	}
 
@@ -162,11 +172,12 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	blocksFunc := func(ctx context.Context, r *pbsubstreams.Request) error {
-		return s.blocksSubCall(ctx, r, streamSrv)
+	grpcClient, grpcCallOpts, err := s.grpcClientFactory()
+	if err != nil {
+		return fmt.Errorf("getting grpc client: %w", err)
 	}
 
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.wasmExtensions, blocksFunc, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, grpcClient, grpcCallOpts, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,
@@ -177,13 +188,25 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// ...FIXME ?
 	}
 
-	returnHandler := func(out *pbsubstreams.BlockScopedData) error {
-		err := streamSrv.Send(&pbsubstreams.Response{
-			Message: &pbsubstreams.Response_Data{Data: out},
-		})
-		if err != nil {
-			return NewErrSendBlock(err)
+	returnHandler := func(out *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error {
+		if out != nil {
+			err := streamSrv.Send(&pbsubstreams.Response{
+				Message: &pbsubstreams.Response_Data{Data: out},
+			})
+			if err != nil {
+				return NewErrSendBlock(err)
+			}
 		}
+
+		if progress != nil {
+			err := streamSrv.Send(&pbsubstreams.Response{
+				Message: &pbsubstreams.Response_Progress{Progress: progress},
+			})
+			if err != nil {
+				return NewErrSendBlock(err)
+			}
+		}
+
 		return nil
 	}
 
@@ -229,16 +252,4 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return status.Errorf(codes.Internal, "unexpected substreams termination: %s", err)
 	}
 	return nil
-}
-
-func (s *Service) blocksSubCall(ctx context.Context, r *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
-	///todo(colin): make it possible to call external endpoints? currently this executes all the calls to this current server
-
-	err := s.pool.Wait(ctx)
-	if err != nil {
-		return fmt.Errorf("waiting for worker pool: %w", err)
-	}
-	defer s.pool.Done()
-
-	return s.Blocks(r, streamSrv)
 }

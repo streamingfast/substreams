@@ -68,7 +68,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error parsing proto files %q: %w", protoFiles, err)
 	}
 
-	returnHandler := func(any *pbsubstreams.BlockScopedData) error { return nil }
+	returnHandler := func(any *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error { return nil }
 	if !mustGetBool(cmd, "no-return-handler") {
 		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames)
 	}
@@ -143,7 +143,7 @@ func run(cmd *cobra.Command, args []string) error {
 		case *pbsubstreams.Response_SnapshotComplete:
 			_ = r.SnapshotComplete
 		case *pbsubstreams.Response_Data:
-			if err := returnHandler(r.Data); err != nil {
+			if err := returnHandler(r.Data, nil); err != nil {
 				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 			}
 		}

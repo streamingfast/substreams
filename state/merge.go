@@ -320,7 +320,7 @@ func (b *Builder) Merge(previous *Builder) error {
 
 	next.partialMode = previous.partialMode
 	if next.partialMode {
-		next.partialStartBlock = previous.partialStartBlock
+		next.startBlock = previous.startBlock
 	}
 
 	return nil

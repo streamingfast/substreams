@@ -85,7 +85,7 @@ func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescr
 		}
 	}
 
-	return func(output *pbsubstreams.BlockScopedData) error {
+	return func(output *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error {
 		printClock(output)
 		if output == nil {
 			return nil

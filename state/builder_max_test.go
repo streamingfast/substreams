@@ -1,7 +1,6 @@
 package state
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -273,8 +272,7 @@ func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHa
 		store = dstore.NewMockStore(nil)
 	}
 
-	opts = append(opts, WithSkipLoadInfo())
-	builder, err := NewBuilder(context.Background(), name, moduleStartBlock, 10_000, moduleHash, updatePolicy, valueType, store, opts...)
+	builder, err := NewBuilder(name, false, moduleStartBlock, 10_000, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)
 	}

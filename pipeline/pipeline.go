@@ -6,17 +6,18 @@ import (
 	"io"
 	"runtime/debug"
 	"strings"
+	"time"
 
-	"github.com/abourget/llerrgroup"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
@@ -44,6 +45,7 @@ type Pipeline struct {
 	outputModuleNames []string
 	outputModuleMap   map[string]bool
 
+	modules         []*pbsubstreams.Module
 	moduleExecutors []ModuleExecutor
 	wasmOutputs     map[string][]byte
 
@@ -56,10 +58,13 @@ type Pipeline struct {
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	logs          []string
 
-	moduleOutputCache *ModulesOutputCache
+	moduleOutputCache *outputs.ModulesOutputCache
 
-	blocksFunc      func(ctx context.Context, r *pbsubstreams.Request) error
 	currentBlockRef bstream.BlockRef
+
+	grpcClient                   pbsubstreams.StreamClient
+	grpcCallOpts                 []grpc.CallOption
+	outputCacheSaveBlockInterval uint64
 }
 
 func New(
@@ -68,23 +73,27 @@ func New(
 	graph *manifest.ModuleGraph,
 	blockType string,
 	baseStateStore dstore.Store,
+	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
-	blocksFunc func(ctx context.Context, r *pbsubstreams.Request) error,
+	grpcClient pbsubstreams.StreamClient,
+	grpcCallOpts []grpc.CallOption,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
-		context:           ctx,
-		request:           request,
-		builders:          map[string]*state.Builder{},
-		graph:             graph,
-		baseStateStore:    baseStateStore,
-		manifest:          request.Manifest,
-		outputModuleNames: request.OutputModules,
-		outputModuleMap:   map[string]bool{},
-		blockType:         blockType,
-		progressTracker:   newProgressTracker(),
-		wasmExtensions:    wasmExtensions,
-		blocksFunc:        blocksFunc,
+		context:                      ctx,
+		request:                      request,
+		builders:                     map[string]*state.Builder{},
+		graph:                        graph,
+		baseStateStore:               baseStateStore,
+		manifest:                     request.Manifest,
+		outputModuleNames:            request.OutputModules,
+		outputModuleMap:              map[string]bool{},
+		blockType:                    blockType,
+		progressTracker:              newProgressTracker(),
+		wasmExtensions:               wasmExtensions,
+		grpcClient:                   grpcClient,
+		grpcCallOpts:                 grpcCallOpts,
+		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
 	}
 
 	for _, name := range request.OutputModules {
@@ -106,35 +115,59 @@ func New(
 //   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
 
 func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum))
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
-	requestedStartBlockNum := uint64(p.request.StartBlockNum)
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	p.moduleOutputCache = NewModuleOutputCache()
-	modules, _, err := p.build(ctx, p.request)
+	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
+
+	var err error
+	zlog.Info("building store and executor")
+	p.modules, _, err = p.build(ctx, p.request)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
-	for _, module := range modules {
+	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
-		if isOutput && requestedStartBlockNum < module.StartBlock {
-			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", requestedStartBlockNum, module.Name, module.StartBlock)
+		if isOutput && p.requestedStartBlockNum < module.StartBlock {
+			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.StartBlock)
 		}
+
+		hash := manifest.HashModuleAsString(p.manifest, p.graph, module)
+		_, err := p.moduleOutputCache.RegisterModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
+		if err != nil {
+			return nil, fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+		}
+
 	}
 
 	p.progressTracker.startTracking(ctx)
 
-	err = p.SynchronizeStores(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("synchonizing store: %w", err)
+	if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, p.builders, p.requestedStartBlockNum, returnFunc); err != nil {
+		return nil, fmt.Errorf("synchonizing stores: %w", err)
 	}
 
+	zlog.Info("initializing stores")
+	if err = p.InitializeStores(ctx, p.builders, p.requestedStartBlockNum); err != nil {
+		return nil, fmt.Errorf("synchonizing stores: %w", err)
+	}
+
+	err = p.buildWASM(ctx, p.request, p.modules)
 	if err != nil {
-		return nil, fmt.Errorf("initiatin module output caches: %w", err)
+		return nil, fmt.Errorf("initiating module output caches: %w", err)
+	}
+
+	for _, cache := range p.moduleOutputCache.OutputCaches {
+		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
+		if err := cache.Load(ctx, atBlock); err != nil {
+			return nil, fmt.Errorf("loading outputs caches")
+		}
 	}
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
+		handleStart := time.Now()
+
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -158,7 +191,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		p.currentBlockRef = block.AsRef()
 
-		if err = p.moduleOutputCache.update(ctx, p.currentBlockRef); err != nil {
+		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 			return fmt.Errorf("updating module output cache: %w", err)
 		}
 
@@ -184,6 +217,9 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
+			if err := p.moduleOutputCache.Save(ctx); err != nil {
+				zlog.Error("saving mode")
+			}
 			return io.EOF
 		}
 
@@ -206,6 +242,8 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
 		}
 
+		p.progressTracker.blockProcessed(block, time.Since(handleStart))
+
 		if p.clock.Number >= p.requestedStartBlockNum {
 			if err := p.returnOutputs(step, cursor, returnFunc); err != nil {
 				return err
@@ -221,17 +259,29 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 }
 
 func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, returnFunc substreams.ReturnFunc) error {
+	var out *pbsubstreams.BlockScopedData
 	if len(p.moduleOutputs) > 0 {
 		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-		out := &pbsubstreams.BlockScopedData{
+		out = &pbsubstreams.BlockScopedData{
 			Outputs: p.moduleOutputs,
 			Clock:   p.clock,
 			Step:    pbsubstreams.StepToProto(step),
 			Cursor:  cursor.ToOpaque(),
 		}
-		if err := returnFunc(out); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
+
+	}
+
+	var modules []*pbsubstreams.ModuleProgress
+	for _, mod := range p.modules {
+		modules = append(modules, &pbsubstreams.ModuleProgress{
+			Name:            mod.Name,
+			ProcessedRanges: []*pbsubstreams.BlockRange{{StartBlock: p.requestedStartBlockNum, EndBlock: p.progressTracker.lastBlock}},
+		})
+	}
+	progress := &pbsubstreams.ModulesProgress{Modules: modules}
+
+	if err := returnFunc(out, progress); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
 	}
 	return nil
 }
@@ -287,13 +337,10 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 	storeModules, err = p.graph.StoresDownTo(p.outputModuleNames)
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
-		if p.partialMode {
-			options = append(options, state.WithPartialMode(p.requestedStartBlockNum))
-		}
 
 		builder, err := state.NewBuilder(
-			ctx,
 			storeModule.Name,
+			p.partialMode,
 			storeModule.StartBlock,
 			p.storesSaveInterval,
 			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
@@ -309,10 +356,6 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 		p.builders[builder.Name] = builder
 	}
 
-	if p.vmType == "native" {
-		return nil, nil, fmt.Errorf("native schtuff not supported yet")
-	}
-	err = p.buildWASM(ctx, request, modules)
 	return
 }
 
@@ -370,12 +413,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			return fmt.Errorf("new wasm module: %w", err)
 		}
 
-		hash := manifest.HashModuleAsString(p.manifest, p.graph, module)
-		cache, err := p.moduleOutputCache.registerModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
-		if err != nil {
-			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
-		}
-
 		switch kind := module.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
@@ -387,7 +424,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 					entrypoint: entrypoint,
 					wasmInputs: inputs,
 					isOutput:   isOutput,
-					cache:      cache,
+					cache:      p.moduleOutputCache.OutputCaches[module.Name],
 				},
 				outputType: outType,
 			}
@@ -414,7 +451,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 					wasmModule: wasmModule,
 					entrypoint: entrypoint,
 					wasmInputs: inputs,
-					cache:      cache,
+					cache:      p.moduleOutputCache.OutputCaches[module.Name],
 				},
 				outputStore: outputStore,
 			}
@@ -429,152 +466,141 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
-	type syncItem struct {
-		Builder *state.Builder
-		Range   *block.Range
-	}
-	var syncItems []*syncItem
+func SynchronizeStores(
+	ctx context.Context,
+	grpcClient pbsubstreams.StreamClient,
+	grpcCallOpts []grpc.CallOption,
+	request *pbsubstreams.Request,
+	builders map[string]*state.Builder,
+	upToBlockNum uint64,
+	returnFunc substreams.ReturnFunc,
+) error {
+	zlog.Info("synchronizing stores")
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	for _, builder := range builders {
+		zlog.Debug("synchronizing store", zap.String("module_nane", builder.Name))
+		req, err := createSynchronizeStoreReq(ctx, builder, upToBlockNum, request)
+		if err != nil {
+			return fmt.Errorf("synchronize stores: %w", err)
+		}
+		zlog.Debug("request created")
 
-	alreadyAdded := map[string]bool{}
-	computedStartBlock := p.requestedStartBlockNum - (p.requestedStartBlockNum % p.storesSaveInterval)
-	for _, store := range p.builders {
-		if computedStartBlock <= store.ModuleStartBlock {
+		if req == nil {
+			zlog.Debug("synchronize store request is nil. skipping", zap.String("store", builder.Name))
 			continue
 		}
 
-		if _, ok := alreadyAdded[store.Name]; ok {
-			continue
+		zlog.Debug("request", zap.Int64("start_block", req.StartBlockNum), zap.Uint64("stop_block", req.StopBlockNum), zap.Strings("stores", req.OutputModules))
+		zlog.Info("calling blocks request to synchronize store", zap.String("store", builder.Name), zap.Uint64("up to block", upToBlockNum))
+
+		stream, err := grpcClient.Blocks(ctx, req, grpcCallOpts...)
+		if err != nil {
+			return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
 		}
 
-		info := store.Info()
-		if info.LastKVSavedBlock < computedStartBlock {
-			storesInTree, err := p.graph.AncestorStoresOf(store.Name)
+		for {
+			zlog.Debug("waiting for stream response...")
+			resp, err := stream.Recv()
+
 			if err != nil {
-				return fmt.Errorf("getting stores down to %s: %w", store.Name, err)
+				if err == io.EOF {
+					return nil
+				}
+				return err
 			}
 
-			for _, s := range storesInTree {
-				alreadyAdded[s.Name] = true
+			switch r := resp.Message.(type) {
+			case *pbsubstreams.Response_Progress:
+				zlog.Debug("resp received", zap.String("type", "progress"))
+				//todo: forward progress to end user
+				err := returnFunc(nil, r.Progress)
+				if err != nil {
+					return err
+				}
+			case *pbsubstreams.Response_SnapshotData:
+				_ = r.SnapshotData
+			case *pbsubstreams.Response_SnapshotComplete:
+				_ = r.SnapshotComplete
+			case *pbsubstreams.Response_Data:
+				zlog.Debug("resp received", zap.String("type", "data"))
+				for _, output := range r.Data.Outputs {
+					for _, log := range output.Logs {
+						fmt.Println("LOG: ", log)
+						//todo: maybe return log ...
+					}
+				}
 			}
-
-			info := store.Info()
-			brs := (&block.Range{
-				StartBlock:        info.LastKVSavedBlock,
-				ExclusiveEndBlock: computedStartBlock,
-			}).Split(p.storesSaveInterval)
-
-			for _, br := range brs {
-				syncItems = append(syncItems, &syncItem{
-					Builder: store,
-					Range:   br,
-				})
-			}
-
 		}
-	}
-
-	eg := llerrgroup.New(len(syncItems))
-	for _, item := range syncItems {
-		if eg.Stop() {
-			continue
-		}
-
-		store := item.Builder
-		blockRange := item.Range
-		eg.Go(func() error {
-			startBlock := blockRange.StartBlock
-			endBlock := blockRange.ExclusiveEndBlock
-
-			zlog.Info("waiting for request for store to finish",
-				zap.String("store", store.Name),
-				zap.Uint64("start_block", startBlock),
-				zap.Uint64("end_block", endBlock),
-			)
-
-			request := &pbsubstreams.Request{
-				StartBlockNum:                  int64(startBlock),
-				StopBlockNum:                   endBlock,
-				ForkSteps:                      p.request.ForkSteps,
-				IrreversibilityCondition:       p.request.IrreversibilityCondition,
-				Manifest:                       p.manifest,
-				OutputModules:                  []string{store.Name},
-				InitialStoreSnapshotForModules: p.request.InitialStoreSnapshotForModules,
-			}
-
-			err := p.blocksFunc(ctx, request)
-			if err != nil {
-				cancel()
-				return fmt.Errorf("getting blocks for store %s (%d, %d): %w", store.Name, startBlock, endBlock, err)
-			}
-			return nil
-		})
-	}
-
-	err := eg.Wait()
-	if err != nil {
-		return fmt.Errorf("catching up blocks for stores: %w", err)
 	}
 
 	return nil
 }
 
-func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
-	err := p.synchronizeBlocks(ctx)
+func createSynchronizeStoreReq(ctx context.Context, builder *state.Builder, upToBlockNum uint64, originalReq *pbsubstreams.Request) (*pbsubstreams.Request, error) {
+	if upToBlockNum == builder.ModuleStartBlock {
+		return nil, nil
+	}
+	endBlock := upToBlockNum
+
+	info, err := builder.Info(ctx)
 	if err != nil {
-		return fmt.Errorf("synchronizing blocks: %w", err)
+		return nil, fmt.Errorf("getting builder info: %w", err)
+	}
+	lastExclusiveEndBlock := info.LastKVSavedBlock
+
+	if upToBlockNum <= lastExclusiveEndBlock {
+		zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
+		return nil, nil
 	}
 
-	if p.partialMode {
-		ancestorStores, _ := p.graph.AncestorStoresOf(p.outputModuleNames[0]) //todo: new the list of parent store.
-		outputStreamModule := p.builders[p.outputModuleNames[0]]
-		var builders []*state.Builder
-		for _, ancestorStore := range ancestorStores {
-			builder := p.builders[ancestorStore.Name]
-			builders = append(builders, builder)
-		}
-
-		fileWaiter := state.NewFileWaiter(p.requestedStartBlockNum, builders)
-		err := fileWaiter.Wait(ctx, p.requestedStartBlockNum, outputStreamModule.ModuleStartBlock) //block until all parent storeModules have completed their tasks
-		if err != nil {
-			return fmt.Errorf("fileWaiter: %w", err)
-		}
+	if lastExclusiveEndBlock == 0 {
+		return createRequest(builder.ModuleStartBlock, endBlock, builder.Name, originalReq), nil
 	}
 
-	for _, store := range p.builders {
-		if p.requestedStartBlockNum <= store.ModuleStartBlock+p.storesSaveInterval {
-			continue
-		}
-		//if p.effectiveStartBlockNum < store.ModuleStartBlock {
-		//	stateAtBlockNum = store.ModuleStartBlock
-		//	continue
-		//}
-		if _, err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
-			e := fmt.Errorf("could not load state for store %s at block num %d: %s: %w", store.Name, p.requestedStartBlockNum, store.Store.BaseURL(), err)
-			if !p.allowInvalidState {
-				return e
-			}
-			zlog.Warn("reading state", zap.Error(e))
-		}
-		zlog.Info("adding store", zap.String("module_name", store.Name))
+	return createRequest(lastExclusiveEndBlock, endBlock, builder.Name, originalReq), nil
+}
+
+func createRequest(startBlock, stopBlock uint64, outputModuleName string, originalReq *pbsubstreams.Request) *pbsubstreams.Request {
+	return &pbsubstreams.Request{
+		StartBlockNum:            int64(startBlock),
+		StopBlockNum:             stopBlock,
+		ForkSteps:                originalReq.ForkSteps,
+		IrreversibilityCondition: originalReq.IrreversibilityCondition,
+		Manifest:                 originalReq.Manifest,
+		OutputModules:            []string{outputModuleName},
 	}
-	return nil
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 	reachInterval := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
 
+	zlog.Debug("maybe saving stores snapshots",
+		zap.Uint64("req_start_block", p.requestedStartBlockNum),
+		zap.Uint64("block_num", p.clock.Number),
+		zap.Bool("is_first_request_block", isFirstRequestBlock),
+		zap.Bool("reach_save_interval", reachInterval),
+	)
 	if !isFirstRequestBlock && reachInterval {
+
 		for _, s := range p.builders {
-			fileName, err := s.WriteState(ctx, p.clock.Number, p.partialMode)
+			fileName, err := s.WriteState(ctx, p.clock.Number)
 			if err != nil {
 				return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
 			}
+			s.ExclusiveEndBlock += p.storesSaveInterval
 			zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
+		}
+	}
+	return nil
+}
+
+func (p *Pipeline) InitializeStores(ctx context.Context, builders map[string]*state.Builder, requestedStartBlockNum uint64) error {
+	for _, builder := range builders {
+		outputCache := p.moduleOutputCache.OutputCaches[builder.Name]
+		err := builder.Initialize(ctx, requestedStartBlockNum, p.moduleOutputCache.SaveBlockInterval, outputCache.Store)
+		if err != nil {
+			return fmt.Errorf("reading state for builder %q: %w", builder.Name, err)
 		}
 	}
 	return nil

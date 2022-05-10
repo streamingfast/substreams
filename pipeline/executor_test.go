@@ -1,29 +1,31 @@
 package pipeline
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/streamingfast/substreams/pipeline/outputs"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOptimizeExecutors(t *testing.T) {
 	tests := []struct {
 		name                                string
 		requestedOutputStores               []string
-		outputCache                         map[string]*outputCache
+		outputCache                         map[string]*outputs.OutputCache
 		moduleExecutors                     []ModuleExecutor
 		expectedModuleExecutorsOutputStores []ModuleExecutor
 	}{
 		{
 			name:                  "tests_2_stores",
 			requestedOutputStores: []string{"store1", "store4"},
-			outputCache: map[string]*outputCache{
+			outputCache: map[string]*outputs.OutputCache{
 				"store1": {
-					moduleName: "store1",
-					new:        false,
+					ModuleName: "store1",
+					New:        false,
 				},
 				"store4": {
-					moduleName: "store4",
-					new:        false,
+					ModuleName: "store4",
+					New:        false,
 				},
 			},
 			moduleExecutors: []ModuleExecutor{
@@ -70,10 +72,10 @@ func TestOptimizeExecutors(t *testing.T) {
 		{
 			name:                  "tests-1-store",
 			requestedOutputStores: []string{"store1"},
-			outputCache: map[string]*outputCache{
+			outputCache: map[string]*outputs.OutputCache{
 				"store1": {
-					moduleName: "store1",
-					new:        false,
+					ModuleName: "store1",
+					New:        false,
 				},
 			},
 			moduleExecutors: []ModuleExecutor{

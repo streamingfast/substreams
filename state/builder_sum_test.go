@@ -1,19 +1,17 @@
 package state
 
 import (
-	"context"
 	"math/big"
 	"strconv"
 	"testing"
 
 	"github.com/streamingfast/dstore"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func initTestBuilder(key string, value []byte) *Builder {
-	b, err := NewBuilder(context.Background(), "b", 0, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil), WithSkipLoadInfo())
+	b, err := NewBuilder("b", false, 0, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil))
 	if err != nil {
 		panic(err)
 	}

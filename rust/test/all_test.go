@@ -251,7 +251,7 @@ func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHa
 		store = dstore.NewMockStore(nil)
 	}
 	opts = append(opts, state.WithSkipLoadInfo())
-	builder, err := state.NewBuilder(context.Background(), name, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	builder, err := state.NewBuilder(context.Background(), name, moduleStartBlock, 100, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)
 	}

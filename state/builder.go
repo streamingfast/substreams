@@ -38,6 +38,7 @@ type Builder struct {
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType    string
 	lastOrdinal  uint64
+	saveInterval uint64
 }
 
 type BuilderOption func(b *Builder)
@@ -56,8 +57,8 @@ func WithSkipLoadInfo() BuilderOption {
 	}
 }
 
-func NewBuilder(ctx context.Context, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
-	subStore, err := store.SubStore(fmt.Sprintf("%s-%s", name, moduleHash))
+func NewBuilder(ctx context.Context, name string, moduleStartBlock uint64, saveInterval uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
+	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
@@ -69,6 +70,7 @@ func NewBuilder(ctx context.Context, name string, moduleStartBlock uint64, modul
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
 		Store:            subStore,
+		saveInterval:     saveInterval,
 	}
 
 	for _, opt := range opts {
@@ -106,8 +108,8 @@ func NewBuilderFromFile(ctx context.Context, filename string, store dstore.Store
 	}
 
 	updatedkv, updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
-
-	b, err := NewBuilder(context.Background(), name, moduleStartBlock, moduleHash, updatePolicy, valueType, store)
+	saveInterval := fileinfo.EndBlock - fileinfo.StartBlock
+	b, err := NewBuilder(context.Background(), name, moduleStartBlock, saveInterval, moduleHash, updatePolicy, valueType, store)
 	if err != nil {
 		return nil, fmt.Errorf("creating builder %s: %w", name, err)
 	}
@@ -142,6 +144,21 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    OLD: %s\n", string(delta.OldValue))
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
+
+//func (b *Builder) update(ctx context.Context, clock *pbsubstreams.Clock) error {
+//	if clock.Number < b.ModuleStartBlock {
+//		return nil
+//	}
+//	if clock.Number > b.ModuleStartBlock+b.saveInterval {
+//		zlog.Info("load build kv because we just saw the first viable block", zap.Uint64("block_num", clock.Number))
+//		return nil
+//	}
+//	if clock.Number > b.endBlock {
+//		zlog.Info("rolling kv file", zap.Uint64("block_num", clock.Number))
+//	}
+//
+//	return nil
+//}
 
 //func (b *Builder) Squash(ctx context.Context, baseStore dstore.Store, upToBlock uint64) error {
 //	files, err := pathToState(ctx, b.Name, b.Store, upToBlock, b.ModuleStartBlock)
@@ -182,7 +199,7 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 type Info struct {
 	LastKVFile        string `json:"last_kv_file"`
 	LastKVSavedBlock  uint64 `json:"last_saved_block"`
-	RangeIntervalSize int    `json:"range_interval_size"`
+	RangeIntervalSize uint64 `json:"range_interval_size"`
 }
 
 func (b *Builder) writeStateInfo(ctx context.Context, info *Info) error {
@@ -194,9 +211,9 @@ func (b *Builder) writeStateInfo(ctx context.Context, info *Info) error {
 		return fmt.Errorf("marshaling state info: %w", err)
 	}
 
-	err = b.Store.WriteObject(ctx, StateInfoFileName(b.Name), bytes.NewReader(data))
+	err = b.Store.WriteObject(ctx, StateInfoFileName(), bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("writing file %s: %w", StateInfoFileName(b.Name), err)
+		return fmt.Errorf("writing file %s: %w", StateInfoFileName(), err)
 	}
 
 	b.info = info
@@ -212,25 +229,25 @@ func (b *Builder) loadStateInfo(ctx context.Context) error {
 		return nil
 	}
 
-	rc, err := b.Store.OpenObject(ctx, StateInfoFileName(b.Name))
+	rc, err := b.Store.OpenObject(ctx, StateInfoFileName())
 	if err != nil {
 		if err == dstore.ErrNotFound {
 			b.info = &Info{}
 			return nil
 		}
-		return fmt.Errorf("opening object %s: %w", StateInfoFileName(b.Name), err)
+		return fmt.Errorf("opening object %s: %w", StateInfoFileName(), err)
 	}
 
 	defer func(rc io.ReadCloser) {
 		err := rc.Close()
 		if err != nil {
-			zlog.Error("closing object", zap.String("object_name", StateInfoFileName(b.Name)), zap.Error(err))
+			zlog.Error("closing object", zap.String("object_name", StateInfoFileName()), zap.Error(err))
 		}
 	}(rc)
 
 	data, err := io.ReadAll(rc)
 	if err != nil {
-		return fmt.Errorf("reading data for %s: %w", StateInfoFileName(b.Name), err)
+		return fmt.Errorf("reading data for %s: %w", StateInfoFileName(), err)
 	}
 
 	var info *Info
@@ -298,6 +315,7 @@ func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) (ui
 }
 
 func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode bool) (filename string, err error) {
+	zlog.Debug("writing state", zap.String("module", b.Name))
 	b.writeMergeValues()
 
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
@@ -331,19 +349,18 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode b
 }
 
 func (b *Builder) writeState(ctx context.Context, content []byte, blockNum uint64) (string, error) {
-	filename := StateFileName(b.Name, blockNum, b.ModuleStartBlock)
+	filename := StateFileName(blockNum, b.ModuleStartBlock)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
 		return filename, fmt.Errorf("writing state %s at block num %d: %w", b.Name, blockNum, err)
 	}
 
 	if blockNum > b.info.LastKVSavedBlock {
-		info := &Info{
+		var info = &Info{
 			LastKVFile:        filename,
 			LastKVSavedBlock:  blockNum,
-			RangeIntervalSize: 10_000,
+			RangeIntervalSize: b.saveInterval,
 		}
-
 		err = b.writeStateInfo(ctx, info)
 		if err != nil {
 			b.info = info
@@ -354,7 +371,7 @@ func (b *Builder) writeState(ctx context.Context, content []byte, blockNum uint6
 }
 
 func (b *Builder) writePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) (string, error) {
-	filename := PartialFileName(b.Name, startBlockNum, endBlockNum)
+	filename := PartialFileName(startBlockNum, endBlockNum)
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 
@@ -558,22 +575,22 @@ func byteMap(in map[string]string) map[string][]byte {
 	return out
 }
 
-func StateFilePrefix(storeName string, blockNum uint64) string {
-	return fmt.Sprintf("%s-%010d", storeName, blockNum)
+func StateFilePrefix(blockNum uint64) string {
+	return fmt.Sprintf("%010d", blockNum)
 }
 
-func PartialFileName(storeName string, startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%s-%010d-%010d.partial", storeName, endBlockNum, startBlockNum)
+func PartialFileName(startBlockNum, endBlockNum uint64) string {
+	return fmt.Sprintf("%010d-%010d.partial", endBlockNum, startBlockNum)
 }
 
-func StateFileName(storeName string, startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%s-%010d-%010d.kv", storeName, endBlockNum, startBlockNum)
+func StateFileName(startBlockNum, endBlockNum uint64) string {
+	return fmt.Sprintf("%010d-%010d.kv", endBlockNum, startBlockNum)
 }
 
-func StateInfoFileName(storeName string) string {
-	return fmt.Sprintf("___%s-store-metadata.json", storeName)
+func StateInfoFileName() string {
+	return "___store-metadata.json"
 }
 
-func FilePrefix(storeName string, endBlockNum uint64) string {
-	return fmt.Sprintf("%s-%010d-", storeName, endBlockNum)
+func FilePrefix(endBlockNum uint64) string {
+	return fmt.Sprintf("%010d-", endBlockNum)
 }

@@ -43,14 +43,14 @@ func NewModuleOutputCache() *ModulesOutputCache {
 	return moduleOutputCache
 }
 
-func (c *ModulesOutputCache) registerModule(ctx context.Context, module *pbsubstreams.Module, hash string, baseOutputCacheStore dstore.Store, requestedStartBlock uint64) (*outputCache, error) {
+func (c *ModulesOutputCache) registerModule(ctx context.Context, module *pbsubstreams.Module, hash string, baseCacheStore dstore.Store, requestedStartBlock uint64) (*outputCache, error) {
 	zlog.Debug("modules", zap.String("module_name", module.Name))
 
 	if cache, found := c.outputCaches[module.Name]; found {
 		return cache, nil
 	}
 
-	moduleStore, err := baseOutputCacheStore.SubStore(fmt.Sprintf("%s-%s/outputs", module.Name, hash))
+	moduleStore, err := baseCacheStore.SubStore(fmt.Sprintf("%s/outputs", hash))
 	if err != nil {
 		return nil, fmt.Errorf("creating substore for module %q: %w", module.Name, err)
 	}
@@ -298,7 +298,7 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 }
 
 func computeDBinFilename(startBlock, stopBlock string) string {
-	return fmt.Sprintf("%s-%s", startBlock, stopBlock)
+	return fmt.Sprintf("%s-%s.output", startBlock, stopBlock)
 }
 
 func pad(blockNumber uint64) string {

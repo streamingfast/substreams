@@ -56,11 +56,11 @@ type Pipeline struct {
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	logs          []string
 
-	moduleOutputCache    *ModulesOutputCache
-	baseOutputCacheStore dstore.Store
+	moduleOutputCache *ModulesOutputCache
 
 	blocksFunc      func(ctx context.Context, r *pbsubstreams.Request) error
 	currentBlockRef bstream.BlockRef
+	//effectiveStartBlockNum uint64
 }
 
 func New(
@@ -69,25 +69,23 @@ func New(
 	graph *manifest.ModuleGraph,
 	blockType string,
 	baseStateStore dstore.Store,
-	baseOutputCacheStore dstore.Store,
 	wasmExtensions []wasm.WASMExtensioner,
 	blocksFunc func(ctx context.Context, r *pbsubstreams.Request) error,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
-		context:              ctx,
-		request:              request,
-		builders:             map[string]*state.Builder{},
-		graph:                graph,
-		baseStateStore:       baseStateStore,
-		baseOutputCacheStore: baseOutputCacheStore,
-		manifest:             request.Manifest,
-		outputModuleNames:    request.OutputModules,
-		outputModuleMap:      map[string]bool{},
-		blockType:            blockType,
-		progressTracker:      newProgressTracker(),
-		wasmExtensions:       wasmExtensions,
-		blocksFunc:           blocksFunc,
+		context:           ctx,
+		request:           request,
+		builders:          map[string]*state.Builder{},
+		graph:             graph,
+		baseStateStore:    baseStateStore,
+		manifest:          request.Manifest,
+		outputModuleNames: request.OutputModules,
+		outputModuleMap:   map[string]bool{},
+		blockType:         blockType,
+		progressTracker:   newProgressTracker(),
+		wasmExtensions:    wasmExtensions,
+		blocksFunc:        blocksFunc,
 	}
 
 	for _, name := range request.OutputModules {
@@ -112,6 +110,11 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
+	//if p.requestedStartBlockNum < p.storesSaveInterval*2 {
+	//	p.effectiveStartBlockNum = p.requestedStartBlockNum
+	//} else {
+	//	p.effectiveStartBlockNum = (uint64(p.request.StartBlockNum) - p.requestedStartBlockNum%p.storesSaveInterval) - p.storesSaveInterval
+	//}
 	p.moduleOutputCache = NewModuleOutputCache()
 
 	_, _, err := p.build(ctx, p.request)
@@ -202,8 +205,10 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
 		}
 
-		if err := p.returnOutputs(step, cursor, returnFunc); err != nil {
-			return err
+		if p.clock.Number >= p.requestedStartBlockNum {
+			if err := p.returnOutputs(step, cursor, returnFunc); err != nil {
+				return err
+			}
 		}
 
 		for _, s := range p.builders {
@@ -289,6 +294,7 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 			ctx,
 			storeModule.Name,
 			storeModule.StartBlock,
+			p.storesSaveInterval,
 			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
@@ -364,7 +370,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		}
 
 		hash := manifest.HashModuleAsString(p.manifest, p.graph, module)
-		cache, err := p.moduleOutputCache.registerModule(ctx, module, hash, p.baseOutputCacheStore, p.requestedStartBlockNum)
+		cache, err := p.moduleOutputCache.registerModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
 		if err != nil {
 			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
@@ -433,7 +439,7 @@ func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
 	defer cancel()
 
 	alreadyAdded := map[string]bool{}
-	computedStartBlock := p.requestedStartBlockNum - (p.requestedStartBlockNum % 10_000)
+	computedStartBlock := p.requestedStartBlockNum - (p.requestedStartBlockNum % p.storesSaveInterval)
 	for _, store := range p.builders {
 		if computedStartBlock <= store.ModuleStartBlock {
 			continue
@@ -458,7 +464,7 @@ func (p *Pipeline) synchronizeBlocks(ctx context.Context) error {
 			brs := (&block.Range{
 				StartBlock:        info.LastKVSavedBlock,
 				ExclusiveEndBlock: computedStartBlock,
-			}).Split(10_000)
+			}).Split(p.storesSaveInterval)
 
 			for _, br := range brs {
 				syncItems = append(syncItems, &syncItem{
@@ -538,9 +544,14 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	}
 
 	for _, store := range p.builders {
+		//stateAtBlockNum := store.ModuleStartBlock
 		if p.requestedStartBlockNum == store.ModuleStartBlock {
 			continue
 		}
+		//if p.effectiveStartBlockNum < store.ModuleStartBlock {
+		//	stateAtBlockNum = store.ModuleStartBlock
+		//	continue
+		//}
 		if _, err := store.ReadState(ctx, p.requestedStartBlockNum); err != nil {
 			e := fmt.Errorf("could not load state for store %s at block num %d: %s: %w", store.Name, p.requestedStartBlockNum, store.Store.BaseURL(), err)
 			if !p.allowInvalidState {
@@ -554,10 +565,12 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
-	isFirstRequestBlock := p.requestedStartBlockNum != p.clock.Number
+	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 	reachInterval := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
 
-	if isFirstRequestBlock && reachInterval {
+	fmt.Println("Grrrr:saveStoresSnapshots", p.storesSaveInterval, p.clock.Number, reachInterval, isFirstRequestBlock, !isFirstRequestBlock && reachInterval, len(p.builders))
+
+	if !isFirstRequestBlock && reachInterval {
 		for _, s := range p.builders {
 			fileName, err := s.WriteState(ctx, p.clock.Number, p.partialMode)
 			if err != nil {

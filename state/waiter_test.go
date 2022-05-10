@@ -93,18 +93,18 @@ func TestFileWaiter_Wait(t *testing.T) {
 			builders: []*Builder{
 				mustGetWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
-						"B-0000001000": {"B-0000001000-0000000000.kv"},
-						"B-0000002000": {"B-0000002000-0000001000.partial"},
-						"B-0000003000": {"B-0000003000-0000002000.partial"},
+						"0000001000": {"0000001000-0000000000.kv"},
+						"0000002000": {"0000002000-0000001000.partial"},
+						"0000003000": {"0000003000-0000002000.partial"},
 					}
 					return files[prefix], nil
 
 				}),
 				mustGetWaiterTestStore("C", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
-						"C-0000001000": {"C-0000001000-0000000000.kv"},
-						"C-0000002000": {"C-0000002000-0000001000.partial"},
-						"C-0000003000": {"C-0000003000-0000002000.partial"},
+						"0000001000": {"0000001000-0000000000.kv"},
+						"0000002000": {"0000002000-0000001000.partial"},
+						"0000003000": {"0000003000-0000002000.partial"},
 					}
 					return files[prefix], nil
 
@@ -119,9 +119,9 @@ func TestFileWaiter_Wait(t *testing.T) {
 			builders: []*Builder{
 				mustGetWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
-						"B-0000001000": {"B-0000001000-0000000000.kv"},
-						"B-0000002000": {"B-0000002000-0000001000.partial"},
-						"B-0000003000": {"B-0000003000-0000002000.partial"},
+						"0000001000": {"0000001000-0000000000.kv"},
+						"0000002000": {"0000002000-0000001000.partial"},
+						"0000003000": {"0000003000-0000002000.partial"},
 					}
 
 					return files[prefix], nil
@@ -129,8 +129,8 @@ func TestFileWaiter_Wait(t *testing.T) {
 				}),
 				mustGetWaiterTestStore("C", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
-						"C-0000001000": {"C-0000001000-0000000000.kv"},
-						"C-0000003000": {"C-0000003000-0000002000.partial"},
+						"0000001000": {"0000001000-0000000000.kv"},
+						"0000003000": {"0000003000-0000002000.partial"},
 					}
 					return files[prefix], nil
 				}),
@@ -173,9 +173,9 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-0000001000": {"A-0000001000-0000000000.kv"},
-					"A-0000002000": {"A-0000002000-0000001000.partial"},
-					"A-0000003000": {"A-0000003000-0000002000.partial"},
+					"0000001000": {"0000001000-0000000000.kv"},
+					"0000002000": {"0000002000-0000001000.partial"},
+					"0000003000": {"0000003000-0000002000.partial"},
 				}
 				return files[prefix], nil
 
@@ -183,7 +183,7 @@ func Test_pathToState(t *testing.T) {
 			moduleStartBlock: 0,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-0000001000-0000000000.kv", "A-0000002000-0000001000.partial", "A-0000003000-0000002000.partial"},
+			expectedFiles:    []string{"0000001000-0000000000.kv", "0000002000-0000001000.partial", "0000003000-0000002000.partial"},
 			expectedError:    false,
 		},
 		{
@@ -191,8 +191,8 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-0000002000": {"A-0000002000-0000001000.partial"},
-					"A-0000003000": {"A-0000003000-0000002000.partial"},
+					"0000002000": {"0000002000-0000001000.partial"},
+					"0000003000": {"0000003000-0000002000.partial"},
 				}
 				return files[prefix], nil
 
@@ -200,7 +200,7 @@ func Test_pathToState(t *testing.T) {
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-0000002000-0000001000.partial", "A-0000003000-0000002000.partial"},
+			expectedFiles:    []string{"0000002000-0000001000.partial", "0000003000-0000002000.partial"},
 			expectedError:    false,
 		},
 		{
@@ -208,15 +208,15 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-0000002000": {"A-0000002000-0000001000.partial"},
-					"A-0000003000": {"A-0000003000-0000000000.kv", "module.hash.1-A-0000003000-0000002000.partial"},
+					"0000002000": {"0000002000-0000001000.partial"},
+					"0000003000": {"0000003000-0000000000.kv", "module.hash.1-0000003000-0000002000.partial"},
 				}
 				return files[prefix], nil
 			}),
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-0000003000-0000000000.kv"},
+			expectedFiles:    []string{"0000003000-0000000000.kv"},
 			expectedError:    false,
 		},
 		{
@@ -224,15 +224,15 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-0000002000": {"A-0000002000-0000001000.partial"},
-					"A-0000003000": {"A-0000003000-0000002000.partial", "A-0000003000-0000000000.kv"},
+					"0000002000": {"0000002000-0000001000.partial"},
+					"0000003000": {"0000003000-0000002000.partial", "0000003000-0000000000.kv"},
 				}
 				return files[prefix], nil
 			}),
 			moduleStartBlock: 1000,
 			targetBlock:      3000,
 			expectedOk:       true,
-			expectedFiles:    []string{"A-0000003000-0000000000.kv"},
+			expectedFiles:    []string{"0000003000-0000000000.kv"},
 			expectedError:    false,
 		},
 		{
@@ -240,9 +240,9 @@ func Test_pathToState(t *testing.T) {
 			storeName: "A",
 			builder: mustGetWaiterTestStore("A", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 				files := map[string][]string{
-					"A-0000001000": {"A-0000001000-0000000000.kv"},
-					"A-0000002000": {"A-0000002000-1000.partial"},
-					"A-0000003000": {"A-0000003000-1000.partial", "module.hash.1-A-0000003000-0000002000.partial"},
+					"0000001000": {"0000001000-0000000000.kv"},
+					"0000002000": {"0000002000-1000.partial"},
+					"0000003000": {"0000003000-1000.partial", "module.hash.1-0000003000-0000002000.partial"},
 				}
 				return files[prefix], nil
 			}),

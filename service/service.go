@@ -26,10 +26,9 @@ import (
 )
 
 type Service struct {
-	baseStateStore       dstore.Store
-	baseOutputCacheStore dstore.Store
-	blockType            string // NOTE: can't that be extracted from the actual block messages? with some proto machinery? Was probably useful when `sf.ethereum.codec.v1.Block` didn't correspond to the `sf.ethereum.type.v1.Block` target type.. but that's not true anymore.
-	partialModeEnabled   bool
+	baseStateStore     dstore.Store
+	blockType          string // NOTE: can't that be extracted from the actual block messages? with some proto machinery? Was probably useful when `sf.ethereum.codec.v1.Block` didn't correspond to the `sf.ethereum.type.v1.Block` target type.. but that's not true anymore.
+	partialModeEnabled bool
 
 	wasmExtensions  []wasm.WASMExtensioner
 	pipelineOptions []pipeline.PipelineOptioner
@@ -46,10 +45,6 @@ type Service struct {
 
 func (s *Service) BaseStateStore() dstore.Store {
 	return s.baseStateStore
-}
-
-func (s *Service) BaseOutputCacheStore() dstore.Store {
-	return s.baseOutputCacheStore
 }
 
 func (s *Service) BlockType() string {
@@ -92,11 +87,10 @@ func WithParallelBlocksLimit(limit int) Option {
 	}
 }
 
-func New(stateStore dstore.Store, baseModuleOutputCacheStore dstore.Store, blockType string, opts ...Option) *Service {
+func New(stateStore dstore.Store, blockType string, opts ...Option) *Service {
 	s := &Service{
 		baseStateStore:         stateStore,
 		blockType:              blockType,
-		baseOutputCacheStore:   baseModuleOutputCacheStore,
 		parallelBlocksRequests: 1,
 	}
 
@@ -172,7 +166,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return s.blocksSubCall(ctx, r, streamSrv)
 	}
 
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.baseOutputCacheStore, s.wasmExtensions, blocksFunc, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.wasmExtensions, blocksFunc, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,

@@ -13,7 +13,7 @@ import (
 )
 
 func initTestBuilder(key string, value []byte) *Builder {
-	b, err := NewBuilder(context.Background(), "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil), WithSkipLoadInfo())
+	b, err := NewBuilder(context.Background(), "b", 0, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil), WithSkipLoadInfo())
 	if err != nil {
 		panic(err)
 	}

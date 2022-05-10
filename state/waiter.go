@@ -3,10 +3,11 @@ package state
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/dstore"
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/streamingfast/dstore"
 
 	"go.uber.org/zap"
 
@@ -64,7 +65,7 @@ func WaitPartial(ctx context.Context, storeName string, store dstore.Store, star
 				//
 			}
 
-			fileName := PartialFileName(storeName, startBlock, endBlock)
+			fileName := PartialFileName(startBlock, endBlock)
 			zlog.Info("looking for partial file:", zap.String("file_name", fileName))
 			exists, err := store.FileExists(ctx, fileName)
 			if err != nil {
@@ -99,7 +100,7 @@ func WaitKV(ctx context.Context, storeName string, store dstore.Store, moduleSta
 				//
 			}
 
-			fileName := StateFileName(storeName, endBlock, moduleStartBlock)
+			fileName := StateFileName(endBlock, moduleStartBlock)
 			zlog.Info("looking for kv file:", zap.String("file_name", fileName))
 			exists, err := store.FileExists(ctx, fileName)
 			if err != nil {
@@ -138,7 +139,7 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 				return
 			}
 
-			prefix := StateFilePrefix(storeName, waitForBlockNum)
+			prefix := StateFilePrefix(waitForBlockNum)
 			files, err := store.ListFiles(ctx, prefix, "", 1)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
@@ -185,7 +186,7 @@ func pathToState(ctx context.Context, storeName string, store dstore.Store, requ
 			//
 		}
 
-		prefix := StateFilePrefix(storeName, nextBlockNum)
+		prefix := StateFilePrefix(nextBlockNum)
 		files, err := store.ListFiles(ctx, prefix, "", 2)
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
@@ -257,11 +258,10 @@ var partialKVRegex *regexp.Regexp
 var stateFileRegex *regexp.Regexp
 
 func init() {
-	stateFileRegex = regexp.MustCompile(`([\w]+)-([\d]+)-([\d]+)\.(kv|partial)`)
+	stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.(kv|partial)`)
 }
 
 type FileInfo struct {
-	ModuleName string
 	StartBlock uint64
 	EndBlock   uint64
 	Partial    bool
@@ -273,13 +273,11 @@ func ParseFileName(filename string) (*FileInfo, bool) {
 		return nil, false
 	}
 
-	module := res[0][1]
-	end := uint64(mustAtoi(res[0][2]))
-	start := uint64(mustAtoi(res[0][3]))
-	partial := res[0][4] == "partial"
+	end := uint64(mustAtoi(res[0][1]))
+	start := uint64(mustAtoi(res[0][2]))
+	partial := res[0][3] == "partial"
 
 	return &FileInfo{
-		ModuleName: module,
 		StartBlock: start,
 		EndBlock:   end,
 		Partial:    partial,

@@ -29,6 +29,7 @@ func checkE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not create store from %s: %w", args[0], err)
 	}
 
+	panic("remove hardcode value:10_000")
 	var intervalSize uint64 = 10_000 //todo: parameterize this
 
 	var fileInfos []*state.FileInfo

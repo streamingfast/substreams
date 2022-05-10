@@ -1,17 +1,18 @@
 package state
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFileName(t *testing.T) {
-	prefix := StateFilePrefix("test", 10000)
-	require.Equal(t, "test-0000010000", prefix)
+	prefix := StateFilePrefix(10000)
+	require.Equal(t, "0000010000", prefix)
 
-	stateFileName := StateFileName("test", 100, 10000)
-	require.Equal(t, "test-0000010000-0000000100.kv", stateFileName)
+	stateFileName := StateFileName(100, 10000)
+	require.Equal(t, "0000010000-0000000100.kv", stateFileName)
 
-	partialFileName := PartialFileName("test", 10000, 20000)
-	require.Equal(t, "test-0000020000-0000010000.partial", partialFileName)
+	partialFileName := PartialFileName(10000, 20000)
+	require.Equal(t, "0000020000-0000010000.partial", partialFileName)
 }

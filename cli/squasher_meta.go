@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/state"
-	"strings"
 )
 
 var squasherCreateCmd = &cobra.Command{
@@ -55,6 +56,7 @@ func createSquahserMetaE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error walking files: %w", err)
 	}
 
+	panic("fix this: remove hard coded value: 10_000")
 	meta := state.Info{
 		LastKVFile:        highestKVFileName,
 		LastKVSavedBlock:  highestKVSavedBlock,
@@ -66,7 +68,7 @@ func createSquahserMetaE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not marshal json: %w", err)
 	}
 
-	metaFilename := fmt.Sprintf("%s-squasher-metadata.json", highestKVFileInfo.ModuleName)
+	metaFilename := "squasher-metadata.json"
 	err = store.WriteObject(ctx, metaFilename, bytes.NewReader(metaBytes))
 	if err != nil {
 		return fmt.Errorf("writing metadata file %s: %w", metaFilename, err)

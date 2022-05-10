@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/abourget/llerrgroup"
-	"github.com/spf13/cobra"
-	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/state"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/abourget/llerrgroup"
+	"github.com/spf13/cobra"
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/state"
 )
 
 var squasherCmd = &cobra.Command{
@@ -61,7 +62,7 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 			}()
 
 			//get metadata file
-			metadataFileName := state.StateInfoFileName(storeName)
+			metadataFileName := state.StateInfoFileName()
 			exists, basePath, err := findUniqueFile(ctx, baseStore, metadataFileName)
 			if err != nil {
 				perr = fmt.Errorf("finding file %s: %w", metadataFileName, err)
@@ -114,7 +115,7 @@ func (s *Squasher) run(ctx context.Context, baseStore dstore.Store) error {
 				}
 
 				<-state.WaitPartial(ctx, storeName, partialSubstore, partialFileStartBlock, partialFileEndBlock)
-				partialFileName := state.PartialFileName(storeName, partialFileStartBlock, partialFileEndBlock)
+				partialFileName := state.PartialFileName(partialFileStartBlock, partialFileEndBlock)
 
 				//open the files
 				partial, err := state.NewBuilderFromFile(ctx, strings.Join([]string{basePath, partialFileName}, string(filepath.Separator)), baseStore)

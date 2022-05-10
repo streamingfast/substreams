@@ -7,6 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+* The `--stop-block` flag on `substream run` can be defined as `+1000` to stream from start block + 1000.
+
+## [v0.0.5-beta3]
+
+* Added Dockerfile support.
+
 ## [v0.0.5-beta2]
 
 ### Client

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -20,7 +21,7 @@ func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
 	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
-	runCmd.Flags().Uint64P("stop-block", "t", 0, "Stop block for blockchain firehose")
+	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block for blockchain firehose")
 	runCmd.Flags().StringArrayP("proto-path", "I", []string{"./proto"}, "Import paths for protobuf schemas")
 	runCmd.Flags().StringArray("proto", []string{"**/*.proto"}, "Path to explicit proto files (within proto-paths)")
 
@@ -101,9 +102,14 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}
 
+	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block")
+	if err != nil {
+		return fmt.Errorf("stop block: %w", err)
+	}
+
 	req := &pbsubstreams.Request{
 		StartBlockNum: startBlock,
-		StopBlockNum:  mustGetUint64(cmd, "stop-block"),
+		StopBlockNum:  stopBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Manifest:      manifProto,
 		OutputModules: outputStreamNames,
@@ -161,4 +167,31 @@ func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string
 
 	fmt.Println("DONE", files)
 	return files, nil
+}
+
+func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (uint64, error) {
+	val, err := cmd.Flags().GetString(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+
+	isRelative := strings.HasPrefix(val, "+")
+	if isRelative {
+		if startBlock == -1 {
+			return 0, fmt.Errorf("relative end block is supported only with an absolute start block")
+		}
+
+		val = strings.TrimPrefix(val, "+")
+	}
+
+	endBlock, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("end block is invalid: %w", err)
+	}
+
+	if isRelative {
+		return uint64(startBlock) + endBlock, nil
+	}
+
+	return endBlock, nil
 }

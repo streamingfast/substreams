@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"

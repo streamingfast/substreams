@@ -60,7 +60,6 @@ type Pipeline struct {
 
 	blocksFunc      func(ctx context.Context, r *pbsubstreams.Request) error
 	currentBlockRef bstream.BlockRef
-	//effectiveStartBlockNum uint64
 }
 
 func New(
@@ -109,17 +108,19 @@ func New(
 func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
+	requestedStartBlockNum := uint64(p.request.StartBlockNum)
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	//if p.requestedStartBlockNum < p.storesSaveInterval*2 {
-	//	p.effectiveStartBlockNum = p.requestedStartBlockNum
-	//} else {
-	//	p.effectiveStartBlockNum = (uint64(p.request.StartBlockNum) - p.requestedStartBlockNum%p.storesSaveInterval) - p.storesSaveInterval
-	//}
 	p.moduleOutputCache = NewModuleOutputCache()
-
-	_, _, err := p.build(ctx, p.request)
+	modules, _, err := p.build(ctx, p.request)
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
+	}
+
+	for _, module := range modules {
+		isOutput := p.outputModuleMap[module.Name]
+		if isOutput && requestedStartBlockNum < module.StartBlock {
+			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", requestedStartBlockNum, module.Name, module.StartBlock)
+		}
 	}
 
 	p.progressTracker.startTracking(ctx)
@@ -544,8 +545,7 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 	}
 
 	for _, store := range p.builders {
-		//stateAtBlockNum := store.ModuleStartBlock
-		if p.requestedStartBlockNum == store.ModuleStartBlock {
+		if p.requestedStartBlockNum <= store.ModuleStartBlock+p.storesSaveInterval {
 			continue
 		}
 		//if p.effectiveStartBlockNum < store.ModuleStartBlock {
@@ -567,8 +567,6 @@ func (p *Pipeline) SynchronizeStores(ctx context.Context) error {
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 	reachInterval := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-
-	fmt.Println("Grrrr:saveStoresSnapshots", p.storesSaveInterval, p.clock.Number, reachInterval, isFirstRequestBlock, !isFirstRequestBlock && reachInterval, len(p.builders))
 
 	if !isFirstRequestBlock && reachInterval {
 		for _, s := range p.builders {

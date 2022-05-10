@@ -88,8 +88,8 @@ Then, try to run the **PancakeSwap Substreams** from our [Substreams Playground]
 ```
 cd ./pcs-rust/ && ./build.sh
 cd ../eth-token/ && ./build.sh
-cd ..
-substreams run -e bsc-dev.streamingfast.io:443 ./pcs-rust/substreams.yaml pairs,block_to_pairs,volumes,totals,db_out -s 6810706 -t 6810711
+cd ../pcs-rust
+substreams run -e bsc-dev.streamingfast.io:443 ./substreams.yaml pairs,block_to_pairs,volumes,totals,db_out -s 6810706 -t 6810711
 ```
 
 Run locally

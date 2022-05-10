@@ -12,7 +12,7 @@ The successor of https://github.com/streamingfast/sparkle, enabling greater comp
 Install client
 --------------
 
-This client will allow you to interact with Substreams endpoints, and stream data in real-time.x
+This client will allow you to interact with Substreams endpoints, and stream data in real-time.
 
 Get a [release](https://github.com/streamingfast/substreams/releases).
 
@@ -46,18 +46,6 @@ There are [several ways to install Rust](https://www.rust-lang.org/tools/install
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
-
-### Install wasm-pack
-
-Finally, [wasm-pack](https://rustwasm.github.io/wasm-pack/book/introduction.html) is a tool which allows us to work wi
-th Rust-generated WASM code.
-
-Their [quicktart docs can be found here](https://rustwasm.github.io/wasm-pack/book/quickstart.html), but again:
-
-```bash
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-```
-
 
 Run remotely
 ------------

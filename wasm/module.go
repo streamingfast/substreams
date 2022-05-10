@@ -72,6 +72,12 @@ func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams
 				return nil, fmt.Errorf(`failed running wasm extension "%s::%s": %w`, namespace, name, err)
 			}
 
+			// It's unclear if WASMExtension implementor will correctly handle the context canceled case, as a safety
+			// measure, we check if the context was canceled without being handled correctly and stop here.
+			if ctx.Err() == context.Canceled {
+				return nil, fmt.Errorf("running wasm extension has been stop upstream in the call stack: %w", ctx.Err())
+			}
+
 			err = m.CurrentInstance.WriteOutputToHeap(args[2].I32(), out)
 			if err != nil {
 				return nil, fmt.Errorf("write output to heap %w", err)

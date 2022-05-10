@@ -3,8 +3,8 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -14,19 +14,20 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
+type outputKV map[string][]byte
 type outputCache struct {
 	lock sync.RWMutex
 
 	moduleName        string
 	currentBlockRange *block.Range
-	kv                map[string]*bstream.Block
-	store             dstore.Store
-	new               bool
+	//kv                map[string]*bstream.Block
+	kv    outputKV
+	store dstore.Store
+	new   bool
 }
 
 type ModulesOutputCache struct {
@@ -93,40 +94,75 @@ func (c *outputCache) set(block *bstream.Block, data []byte) error {
 		return nil
 	}
 
-	pbBlock := &bstream.Block{
-		Id:             block.ID(),
-		Number:         block.Num(),
-		PreviousId:     block.PreviousID(),
-		Timestamp:      block.Time(),
-		LibNum:         block.LIBNum(),
-		PayloadKind:    pbbstream.Protocol_UNKNOWN,
-		PayloadVersion: int32(1),
-	}
+	//pbBlock := &bstream.Block{
+	//	Id:             block.ID(),
+	//	Number:         block.Num(),
+	//	PreviousId:     block.PreviousID(),
+	//	Timestamp:      block.Time(),
+	//	LibNum:         block.LIBNum(),
+	//	PayloadKind:    pbbstream.Protocol_UNKNOWN,
+	//	PayloadVersion: int32(1),
+	//}
+	//
+	//_, err := bstream.MemoryBlockPayloadSetter(pbBlock, data)
+	//if err != nil {
+	//	return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
+	//}
 
-	_, err := bstream.MemoryBlockPayloadSetter(pbBlock, data)
-	if err != nil {
-		return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
-	}
-
-	c.kv[block.Id] = pbBlock
+	c.kv[block.Id] = data
 
 	return nil
+	//c.lock.Lock()
+	//defer c.lock.Unlock()
+	//
+	//if !c.new {
+	//	zlog.Warn("trying to add output to an already existing module kv", zap.String("module_name", c.moduleName))
+	//	return nil
+	//}
+	//
+	//pbBlock := &bstream.Block{
+	//	Id:             block.ID(),
+	//	Number:         block.Num(),
+	//	PreviousId:     block.PreviousID(),
+	//	Timestamp:      block.Time(),
+	//	LibNum:         block.LIBNum(),
+	//	PayloadKind:    pbbstream.Protocol_UNKNOWN,
+	//	PayloadVersion: int32(1),
+	//}
+	//
+	//_, err := bstream.MemoryBlockPayloadSetter(pbBlock, data)
+	//if err != nil {
+	//	return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
+	//}
+	//
+	//c.kv[block.Id] = pbBlock
+	//
+	//return nil
 }
 
 func (c *outputCache) get(block *bstream.Block) ([]byte, bool, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	b, found := c.kv[block.Id]
+	data, found := c.kv[block.Id]
 
 	if !found {
 		return nil, false, nil
 	}
 
-	fmt.Println("Grrrr: payload type: %T", b.Payload)
-	data, err := b.Payload.Get()
-
-	return data, found, err
+	return data, found, nil
+	//c.lock.Lock()
+	//defer c.lock.Unlock()
+	//
+	//b, found := c.kv[block.Id]
+	//
+	//if !found {
+	//	return nil, false, nil
+	//}
+	//
+	//data, err := b.Payload.Get()
+	//
+	//return data, found, err
 
 }
 
@@ -134,7 +170,7 @@ func (c *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 	var found bool
 
 	c.new = false
-	c.kv = make(map[string]*bstream.Block)
+	c.kv = make(outputKV)
 
 	c.currentBlockRange, found, err = findBlockRange(ctx, c.store, atBlock)
 	zlog.Info("loading blocks", zap.Stringer("block_range", c.currentBlockRange))
@@ -158,28 +194,35 @@ func (c *outputCache) loadBlocks(ctx context.Context, atBlock uint64) (err error
 		return fmt.Errorf("loading block reader %s: %w", filename, err)
 	}
 
-	blockReader, err := bstream.GetBlockReaderFactory.New(objectReader)
+	err = json.NewDecoder(objectReader).Decode(&c.kv)
 	if err != nil {
-		return fmt.Errorf("getting block reader %s: %w", filename, err)
+		return fmt.Errorf("json decoding file %s: %w", filename, err)
 	}
 
-	for {
-		block, err := blockReader.Read()
+	return nil
 
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("reading block: %w", err)
-		}
-
-		if block == nil {
-			return nil
-		}
-
-		c.kv[block.Id] = block
-
-		if err == io.EOF {
-			return nil
-		}
-	}
+	//blockReader, err := bstream.GetBlockReaderFactory.New(objectReader)
+	//if err != nil {
+	//	return fmt.Errorf("getting block reader %s: %w", filename, err)
+	//}
+	//
+	//for {
+	//	block, err := blockReader.Read()
+	//
+	//	if err != nil && err != io.EOF {
+	//		return fmt.Errorf("reading block: %w", err)
+	//	}
+	//
+	//	if block == nil {
+	//		return nil
+	//	}
+	//
+	//	c.kv[block.Id] = block
+	//
+	//	if err == io.EOF {
+	//		return nil
+	//	}
+	//}
 }
 
 func (c *outputCache) saveBlocks(ctx context.Context) error {
@@ -187,23 +230,37 @@ func (c *outputCache) saveBlocks(ctx context.Context) error {
 	filename := computeDBinFilename(pad(c.currentBlockRange.StartBlock), pad(c.currentBlockRange.ExclusiveEndBlock))
 
 	buffer := bytes.NewBuffer(nil)
-	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
+	err := json.NewEncoder(buffer).Encode(c.kv)
 	if err != nil {
-		return fmt.Errorf("write block factory: %w", err)
-	}
-
-	for _, block := range c.kv {
-		if err := blockWriter.Write(block); err != nil {
-			return fmt.Errorf("write block: %w", err)
-		}
+		return fmt.Errorf("json encoding outputs: %w", err)
 	}
 
 	err = c.store.WriteObject(ctx, filename, buffer)
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)
 	}
-
 	return nil
+	//zlog.Info("saving cache", zap.String("module_name", c.moduleName), zap.Stringer("block_range", c.currentBlockRange))
+	//filename := computeDBinFilename(pad(c.currentBlockRange.StartBlock), pad(c.currentBlockRange.ExclusiveEndBlock))
+	//
+	//buffer := bytes.NewBuffer(nil)
+	//blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
+	//if err != nil {
+	//	return fmt.Errorf("write block factory: %w", err)
+	//}
+	//
+	//for _, block := range c.kv {
+	//	if err := blockWriter.Write(block); err != nil {
+	//		return fmt.Errorf("write block: %w", err)
+	//	}
+	//}
+	//
+	//err = c.store.WriteObject(ctx, filename, buffer)
+	//if err != nil {
+	//	return fmt.Errorf("writing block buffer to store: %w", err)
+	//}
+	//
+	//return nil
 }
 
 func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {

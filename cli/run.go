@@ -72,8 +72,6 @@ func run(cmd *cobra.Command, args []string) error {
 		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames)
 	}
 
-	manif.PrintMermaid()
-
 	manifProto, err := manif.ToProto()
 	if err != nil {
 		return fmt.Errorf("parse manifest to proto %q: %w", manifestPath, err)

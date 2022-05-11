@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescriptor, outputStreamNames []string) substreams.ReturnFunc {
+func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescriptor, outputStreamNames []string, prettyPrint bool) substreams.ReturnFunc {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
@@ -52,7 +52,14 @@ func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescr
 						return ""
 					}
 
-					cnt, err := msg.MarshalJSONIndent()
+					var cnt []byte
+					var err error
+					if prettyPrint {
+						cnt, err = msg.MarshalJSONIndent()
+					} else {
+						cnt, err = msg.MarshalJSON()
+					}
+
 					if err != nil {
 						fmt.Printf("error encoding protobuf %s into json: %s\n", msgType, err)
 						return decodeAsString(in)

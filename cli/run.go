@@ -28,6 +28,7 @@ func init() {
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
+	runCmd.Flags().BoolP("compact-output", "c", false, "Avoid pretty printing output for module and make it a single compact line")
 	runCmd.Flags().Bool("partial-mode", false, "Request partial processing mode (internal deployments only)")
 	runCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
 
@@ -70,7 +71,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	returnHandler := func(any *pbsubstreams.BlockScopedData) error { return nil }
 	if !mustGetBool(cmd, "no-return-handler") {
-		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames)
+		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames, !mustGetBool(cmd, "compact-output"))
 	}
 
 	manifProto, err := manif.ToProto()
@@ -148,7 +149,6 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-
 }
 
 func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string, error) {

@@ -7,6 +7,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+* The `-c` (or `--compact-output`) can be used to print JSON as a single compact line.
 * The `--stop-block` flag on `substream run` can be defined as `+1000` to stream from start block + 1000.
 
 ## [v0.0.5-beta3]

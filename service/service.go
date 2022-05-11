@@ -187,7 +187,19 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	handler, err := pipe.HandlerFactory(returnHandler)
+	progressHandler := func(modulesProgress *pbsubstreams.ModulesProgress) error {
+		err := streamSrv.Send(&pbsubstreams.Response{
+			Message: &pbsubstreams.Response_Progress{
+				Progress: modulesProgress,
+			},
+		})
+		if err != nil {
+			return NewErrSendBlock(err)
+		}
+		return nil
+	}
+
+	handler, err := pipe.HandlerFactory(returnHandler, progressHandler)
 	if err != nil {
 		return fmt.Errorf("error building substreams pipeline handler: %w", err)
 	}

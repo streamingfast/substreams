@@ -14,9 +14,16 @@ import (
 )
 
 type ModuleExecutor interface {
-	run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error
-	appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput
+	// Name returns the name of the module as defined in the manifest.
+	Name() string
+
+	// String returns the module executor representation, usually its name directly.
 	String() string
+
+	run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error
+
+	moduleLogs() (logs []string, truncated bool)
+	moduleOutputData() pbsubstreams.ModuleOutputData
 }
 
 type BaseExecutor struct {
@@ -28,15 +35,37 @@ type BaseExecutor struct {
 	entrypoint string
 }
 
+var _ ModuleExecutor = (*MapperModuleExecutor)(nil)
+
 type MapperModuleExecutor struct {
-	*BaseExecutor
+	BaseExecutor
 	outputType   string
 	mapperOutput []byte
 }
 
+var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
+
+// Name implements ModuleExecutor
+func (e *MapperModuleExecutor) Name() string {
+	return e.moduleName
+}
+
+func (e *MapperModuleExecutor) String() string {
+	return e.moduleName
+}
+
 type StoreModuleExecutor struct {
-	*BaseExecutor
+	BaseExecutor
 	outputStore *state.Builder
+}
+
+// Name implements ModuleExecutor
+func (e *StoreModuleExecutor) Name() string {
+	return e.moduleName
+}
+
+func (e *StoreModuleExecutor) String() string {
+	return e.moduleName
 }
 
 func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error {
@@ -164,61 +193,111 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 	return
 }
 
-func (e *StoreModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
+func (e *StoreModuleExecutor) moduleLogs() (logs []string, truncated bool) {
 	if !e.isOutput {
-		return moduleOutputs
+		return
 	}
 
-	var logs []string
-	if e.wasmModule.CurrentInstance != nil {
-		logs = e.wasmModule.CurrentInstance.Logs
+	if instance := e.wasmModule.CurrentInstance; instance != nil {
+		return instance.Logs, instance.ReachedLogsMaxByteCount()
 	}
 
-	if len(e.outputStore.Deltas) != 0 || len(logs) != 0 {
-		zlog.Debug("append to output, store")
-		moduleOutputs = append(moduleOutputs, &pbsubstreams.ModuleOutput{
-			Name: e.moduleName,
-			Data: &pbsubstreams.ModuleOutput_StoreDeltas{
-				StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
-			},
-			Logs: logs,
-		})
-	}
-
-	return moduleOutputs
+	return
 }
 
-func (e *MapperModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
+func (e *StoreModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
 	if !e.isOutput {
-		return moduleOutputs
+		return nil
 	}
 
-	var logs []string
-	if e.wasmModule.CurrentInstance != nil {
-		logs = e.wasmModule.CurrentInstance.Logs
+	if len(e.outputStore.Deltas) != 0 {
+		return &pbsubstreams.ModuleOutput_StoreDeltas{
+			StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
+		}
 	}
 
-	if e.mapperOutput != nil || len(logs) != 0 {
-		zlog.Debug("append to output, map")
-		moduleOutputs = append(moduleOutputs, &pbsubstreams.ModuleOutput{
-			Name: e.moduleName,
-			Data: &pbsubstreams.ModuleOutput_MapOutput{
-				MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
-			},
-			Logs: logs,
-		})
+	return nil
+}
+
+// func (e *StoreModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
+// 	if !e.isOutput {
+// 		return moduleOutputs
+// 	}
+
+// 	var logs []string
+// 	logsTruncated := false
+// 	if instance := e.wasmModule.CurrentInstance; instance != nil {
+// 		logs = instance.Logs
+// 		logsTruncated = instance.ReachedLogsMaxByteCount()
+// 	}
+
+// 	if len(e.outputStore.Deltas) != 0 || len(logs) != 0 {
+// 		zlog.Debug("append to output, store")
+// 		moduleOutputs = append(moduleOutputs, &pbsubstreams.ModuleOutput{
+// 			Name: e.moduleName,
+// 			Data: &pbsubstreams.ModuleOutput_StoreDeltas{
+// 				StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
+// 			},
+// 			Logs:            logs,
+// 			IsLogsTruncated: logsTruncated,
+// 		})
+// 	}
+
+// 	return moduleOutputs
+// }
+
+func (e *MapperModuleExecutor) moduleLogs() (logs []string, truncated bool) {
+	if !e.isOutput {
+		return
 	}
 
-	return moduleOutputs
+	if instance := e.wasmModule.CurrentInstance; instance != nil {
+		return instance.Logs, instance.ReachedLogsMaxByteCount()
+	}
+
+	return
 }
 
-func (e *StoreModuleExecutor) String() string {
-	return e.moduleName
+func (e *MapperModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
+	if !e.isOutput {
+		return nil
+	}
+
+	if e.mapperOutput != nil {
+		return &pbsubstreams.ModuleOutput_MapOutput{
+			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
+		}
+	}
+
+	return nil
 }
 
-func (e *MapperModuleExecutor) String() string {
-	return e.moduleName
-}
+// func (e *MapperModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
+// 	if !e.isOutput {
+// 		return moduleOutputs
+// 	}
+
+// 	var logs []string
+// 	logsTruncated := false
+// 	if instance := e.wasmModule.CurrentInstance; instance != nil {
+// 		logs = instance.Logs
+// 		logsTruncated = instance.ReachedLogsMaxByteCount()
+// 	}
+
+// 	if e.mapperOutput != nil || len(logs) != 0 {
+// 		zlog.Debug("append to output, map")
+// 		moduleOutputs = append(moduleOutputs, &pbsubstreams.ModuleOutput{
+// 			Name: e.moduleName,
+// 			Data: &pbsubstreams.ModuleOutput_MapOutput{
+// 				MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
+// 			},
+// 			Logs:            logs,
+// 			IsLogsTruncated: logsTruncated,
+// 		})
+// 	}
+
+// 	return moduleOutputs
+// }
 
 func OptimizeExecutors(moduleOutputCache map[string]*outputCache, moduleExecutors []ModuleExecutor, requestedOutputStores []string) (optimizedModuleExecutors []ModuleExecutor, skipBlockSource bool) {
 	optimizedModuleExecutors = []ModuleExecutor{}

@@ -7,6 +7,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+* Added new field `logs_truncated` that can be used to determined if logs were truncated.
+* Augmented logs truncation limit to 128 KiB per module per block.
+* Updated `substreams run` to properly report module progress error.
+* When a module WASM execution error out, progress with failure logs is now returned before closing the substreams connection.
+* The API token is not passed anymore if the connection is using plain text option `--plaintext`.
 * The `-c` (or `--compact-output`) can be used to print JSON as a single compact line.
 * The `--stop-block` flag on `substream run` can be defined as `+1000` to stream from start block + 1000.
 

@@ -8,9 +8,6 @@ import (
 	"strings"
 
 	"github.com/abourget/llerrgroup"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
@@ -20,6 +17,8 @@ import (
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Pipeline struct {
@@ -105,7 +104,7 @@ func New(
 //   * if resources are available, SCHEDULE on BACKING NODES a parallel processing for that segment
 //   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
 
-func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Handler, error) {
+func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc substreams.ProgressFunc) (bstream.Handler, error) {
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	requestedStartBlockNum := uint64(p.request.StartBlockNum)
@@ -200,10 +199,23 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc) (bstream.Han
 
 		for _, executor := range p.moduleExecutors {
 			zlog.Debug("executing", zap.Stringer("module_name", executor))
-			if err := executor.run(p.wasmOutputs, p.clock, block); err != nil {
+			err := executor.run(p.wasmOutputs, p.clock, block)
+			if err != nil {
+				if returnErr := p.returnFailureProgress(err, executor, progressFunc); returnErr != nil {
+					return returnErr
+				}
+
 				return err
 			}
-			p.moduleOutputs = executor.appendOutput(p.moduleOutputs)
+
+			logs, truncated := executor.moduleLogs()
+
+			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name:          executor.Name(),
+				Data:          executor.moduleOutputData(),
+				Logs:          logs,
+				LogsTruncated: truncated,
+			})
 		}
 
 		if p.clock.Number >= p.requestedStartBlockNum {
@@ -234,6 +246,46 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 		}
 	}
 	return nil
+}
+
+func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor, progressFunc substreams.ProgressFunc) error {
+	modules := make([]*pbsubstreams.ModuleProgress, len(p.moduleOutputs)+1)
+
+	for i, moduleOutput := range p.moduleOutputs {
+		modules[i] = &pbsubstreams.ModuleProgress{
+			Name: moduleOutput.Name,
+
+			Failed: false,
+			// It's a bit weird that for successful module, there is still FailureLogs, maybe we should revisit the semantic and
+			// maybe change back to `Logs`.
+			FailureLogs:          moduleOutput.Logs,
+			FailureLogsTruncated: moduleOutput.LogsTruncated,
+
+			// Where those comes from, should we have them populate on failure?
+			ProcessedRanges:   nil,
+			TotalBytesRead:    0,
+			TotalBytesWritten: 0,
+		}
+	}
+
+	logs, truncated := failedExecutor.moduleLogs()
+
+	modules[len(p.moduleOutputs)] = &pbsubstreams.ModuleProgress{
+		Name: failedExecutor.Name(),
+
+		Failed: true,
+		// Should we maybe extract specific WASM error and improved the "printing" here?
+		FailureReason:        err.Error(),
+		FailureLogs:          logs,
+		FailureLogsTruncated: truncated,
+
+		// Where those comes from, should we have them populate on failure?
+		ProcessedRanges:   nil,
+		TotalBytesRead:    0,
+		TotalBytesWritten: 0,
+	}
+
+	return progressFunc(&pbsubstreams.ModulesProgress{Modules: modules})
 }
 
 func (p *Pipeline) setupSource(block *bstream.Block) error {
@@ -381,7 +433,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
 			executor := &MapperModuleExecutor{
-				BaseExecutor: &BaseExecutor{
+				BaseExecutor: BaseExecutor{
 					moduleName: module.Name,
 					wasmModule: wasmModule,
 					entrypoint: entrypoint,
@@ -408,7 +460,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			})
 
 			s := &StoreModuleExecutor{
-				BaseExecutor: &BaseExecutor{
+				BaseExecutor: BaseExecutor{
 					moduleName: modName,
 					isOutput:   isOutput,
 					wasmModule: wasmModule,

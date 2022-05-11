@@ -13,3 +13,7 @@ func StepToProto(step bstream.StepType) ForkStep {
 	}
 	return ForkStep_STEP_UNKNOWN
 }
+
+type ModuleOutputData interface {
+	isModuleOutput_Data()
+}

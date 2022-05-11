@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/dustin/go-humanize"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/wasmerio/wasmer-go/wasmer"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -226,14 +228,31 @@ func (m *Module) registerLoggerImports(imports *wasmer.ImportObject, store *wasm
 				Returns(),
 			),
 			func(args []wasmer.Value) ([]wasmer.Value, error) {
-				message, err := m.CurrentInstance.heap.ReadString(args[0].I32(), args[1].I32())
+				if m.CurrentInstance.ReachedLogsMaxByteCount() {
+					// Early exit, we don't even need to collect the message as we would not store it anyway
+					return nil, nil
+				}
+
+				length := args[1].I32()
+				if length > maxLogByteCount {
+					return nil, fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length)))
+				}
+
+				message, err := m.CurrentInstance.heap.ReadString(args[0].I32(), length)
 				if err != nil {
 					return nil, fmt.Errorf("reading string: %w", err)
 				}
-				if len(m.CurrentInstance.Logs) < 50 {
+
+				if tracer.Enabled() {
+					zlog.Debug(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
+				}
+
+				// len(<string>) in Go count number of bytes and not characters, so we are good here
+				m.CurrentInstance.LogsByteCount += uint64(len(message))
+
+				if !m.CurrentInstance.ReachedLogsMaxByteCount() {
 					m.CurrentInstance.Logs = append(m.CurrentInstance.Logs, message)
 				}
-				//zlog.Info(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
 
 				return nil, nil
 			},

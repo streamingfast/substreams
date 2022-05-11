@@ -1,8 +1,9 @@
 package pipeline
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestOptimizeExecutors(t *testing.T) {
@@ -28,25 +29,25 @@ func TestOptimizeExecutors(t *testing.T) {
 			},
 			moduleExecutors: []ModuleExecutor{
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store1",
 					},
 					outputStore: nil,
 				},
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store2",
 					},
 					outputStore: nil,
 				},
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store3",
 					},
 					outputStore: nil,
 				},
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store4",
 					},
 					outputStore: nil,
@@ -54,13 +55,13 @@ func TestOptimizeExecutors(t *testing.T) {
 			},
 			expectedModuleExecutorsOutputStores: []ModuleExecutor{
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store1",
 					},
 					outputStore: nil,
 				},
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store4",
 					},
 					outputStore: nil,
@@ -78,23 +79,23 @@ func TestOptimizeExecutors(t *testing.T) {
 			},
 			moduleExecutors: []ModuleExecutor{
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store1",
 					},
 					outputStore: nil,
 				},
 				&MapperModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "map1",
 					},
 				},
 				&MapperModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "map2",
 					},
 				},
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store2",
 					},
 					outputStore: nil,
@@ -102,7 +103,7 @@ func TestOptimizeExecutors(t *testing.T) {
 			},
 			expectedModuleExecutorsOutputStores: []ModuleExecutor{
 				&StoreModuleExecutor{
-					BaseExecutor: &BaseExecutor{
+					BaseExecutor: BaseExecutor{
 						moduleName: "store1",
 					},
 					outputStore: nil,

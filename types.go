@@ -7,6 +7,7 @@ import (
 )
 
 type ReturnFunc func(any *pbsubstreams.BlockScopedData) error
+type ProgressFunc func(modulesProgress *pbsubstreams.ModulesProgress) error
 
 type BlockHook func(ctx context.Context, clock *pbsubstreams.Clock) error
 type PostJobHook func(ctx context.Context, clock *pbsubstreams.Clock) error

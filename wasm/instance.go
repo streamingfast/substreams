@@ -29,7 +29,8 @@ type Instance struct {
 	vmInstance   *wasmer.Instance
 	moduleName   string
 
-	Logs []string
+	Logs          []string
+	LogsByteCount uint64
 }
 
 func (i *Instance) Heap() *Heap {
@@ -95,4 +96,10 @@ func (i *Instance) Output() []byte {
 
 func (i *Instance) SetOutputStore(store *state.Builder) {
 	i.outputStore = store
+}
+
+const maxLogByteCount = 128 * 1024 // 128 KiB
+
+func (i *Instance) ReachedLogsMaxByteCount() bool {
+	return i.LogsByteCount >= maxLogByteCount
 }

@@ -75,6 +75,27 @@ func run(cmd *cobra.Command, args []string) error {
 		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames, !mustGetBool(cmd, "compact-output"))
 	}
 
+	failureProgressHandler := func(progress *pbsubstreams.ModulesProgress) error {
+		failedModule := firstFailedModuleProgress(progress)
+		if failedModule == nil {
+			return nil
+		}
+
+		fmt.Printf("---------------------- Module %s failed ---------------------\n", failedModule.Name)
+		for _, module := range progress.Modules {
+			for _, log := range module.FailureLogs {
+				fmt.Printf("%s: %s\n", module.Name, log)
+			}
+
+			if module.FailureLogsTruncated {
+				fmt.Println("<Logs Truncated>")
+			}
+		}
+
+		fmt.Printf("Error:\n%s", failedModule.FailureReason)
+		return nil
+	}
+
 	manifProto, err := manif.ToProto()
 	if err != nil {
 		return fmt.Errorf("parse manifest to proto %q: %w", manifestPath, err)
@@ -128,18 +149,24 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	zlog.Info("connected")
+
 	for {
 		resp, err := cli.Recv()
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
+
 			return err
 		}
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreams.Response_Progress:
-			_ = r.Progress
+			if failedModule := firstFailedModuleProgress(r.Progress); failedModule != nil {
+				if err := failureProgressHandler(r.Progress); err != nil {
+					fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
+				}
+			}
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData
 		case *pbsubstreams.Response_SnapshotComplete:
@@ -150,6 +177,16 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+}
+
+func firstFailedModuleProgress(modulesProgress *pbsubstreams.ModulesProgress) *pbsubstreams.ModuleProgress {
+	for _, module := range modulesProgress.Modules {
+		if module.Failed == true {
+			return module
+		}
+	}
+
+	return nil
 }
 
 func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string, error) {

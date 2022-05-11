@@ -14,7 +14,7 @@ import (
 )
 
 func NewSubstreamsClient(endpoint, jwt string, useInsecureTSLConnection, usePlainTextConnection bool) (pbsubstreams.StreamClient, []grpc.CallOption, error) {
-	skipAuth := jwt == ""
+	skipAuth := jwt == "" || usePlainTextConnection
 
 	if useInsecureTSLConnection && usePlainTextConnection {
 		return nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")

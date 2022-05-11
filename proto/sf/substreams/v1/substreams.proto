@@ -72,6 +72,10 @@ message ModuleOutput {
     StoreDeltas store_deltas = 3;
   }
   repeated string logs = 4;
+
+  // LogsTruncated is a flag that tells you if you received all the logs or if they
+  // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+  bool logs_truncated = 5;
 }
 
 message ModulesProgress {
@@ -87,6 +91,12 @@ message ModuleProgress {
 
   bool failed = 7;
   string failure_reason = 8;
+  repeated string failure_logs = 9;
+
+  // FailureLogsTruncated is a flag that tells you if you received all the logs or if they
+  // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+  bool failure_logs_truncated = 10;
+
 }
 
 message BlockRange {

@@ -18,7 +18,7 @@ func init() {
 
 // localCmd represents the base command when called without any subcommands
 var stateCmd = &cobra.Command{
-	Use:          "state [state_file_name]",
+	Use:          "state <state_file_name>",
 	RunE:         runState,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

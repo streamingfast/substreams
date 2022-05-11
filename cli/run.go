@@ -37,7 +37,7 @@ func init() {
 
 // runCmd represents the command to run substreams remotely
 var runCmd = &cobra.Command{
-	Use:          "run [manifest] [module_name]",
+	Use:          "run <manifest> <module_name>",
 	Short:        "Run substreams remotely",
 	RunE:         run,
 	Args:         cobra.ExactArgs(2),

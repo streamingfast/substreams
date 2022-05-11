@@ -11,7 +11,7 @@ import (
 )
 
 var cleanUpCmd = &cobra.Command{
-	Use:   "cleanup {store_url}",
+	Use:   "cleanup <store_url>",
 	Short: "Checks for partial files which have already merged into a full KV store and purges them",
 	Args:  cobra.ExactArgs(1),
 	RunE:  cleanUpE,

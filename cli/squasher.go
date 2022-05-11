@@ -17,7 +17,7 @@ import (
 )
 
 var squasherCmd = &cobra.Command{
-	Use:  "squasher [base_store_dsn] [modules_list]",
+	Use:  "squasher <base_store_dsn> <modules_list>",
 	Args: cobra.ExactArgs(2),
 	RunE: runSquashE,
 }

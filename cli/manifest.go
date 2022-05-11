@@ -14,21 +14,21 @@ var manifestCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 var manifestInfoCmd = &cobra.Command{
-	Use:          "info [manifest_file]",
+	Use:          "info <manifest_file>",
 	RunE:         runManifestInfo,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 }
 
 var manifestGraphCmd = &cobra.Command{
-	Use:          "graph [manifest_file]",
+	Use:          "graph <manifest_file>",
 	RunE:         runManifestGraph,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 }
 
 var manifestPackageCmd = &cobra.Command{
-	Use:          "package [manifest_yaml] {manifest_pkg_pb}",
+	Use:          "package <manifest_yaml> [manifest_pkg_pb]",
 	RunE:         runManifestPackage,
 	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,

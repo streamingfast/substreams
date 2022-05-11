@@ -9,7 +9,7 @@ import (
 )
 
 var parallelizeCmd = &cobra.Command{
-	Use:  "parallelize [manifest] [stream_name]",
+	Use:  "parallelize <manifest> <stream_name>",
 	Args: cobra.ExactArgs(2),
 	RunE: runParallelizeE,
 }

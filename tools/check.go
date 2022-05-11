@@ -11,7 +11,7 @@ import (
 )
 
 var checkCmd = &cobra.Command{
-	Use:   "check {store_url}",
+	Use:   "check <store_url>",
 	Short: "checks the integrity of the kv files in a given store",
 	Args:  cobra.ExactArgs(1),
 	RunE:  checkE,

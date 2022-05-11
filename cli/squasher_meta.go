@@ -12,7 +12,7 @@ import (
 )
 
 var squasherCreateCmd = &cobra.Command{
-	Use:  "create [module_store_dsn]",
+	Use:  "create <module_store_dsn>",
 	Args: cobra.ExactArgs(1),
 	RunE: createSquahserMetaE,
 }

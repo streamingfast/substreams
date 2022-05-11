@@ -94,7 +94,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	ssClient, callOpts, err := client.NewSubstreamsClient(
 		mustGetString(cmd, "substreams-endpoint"),
-		os.Getenv(mustGetString(cmd, "substreams-api-token-envvar")),
+		readAPIToken(cmd, "substreams-api-token-envvar"),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
@@ -167,6 +167,16 @@ func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string
 
 	fmt.Println("DONE", files)
 	return files, nil
+}
+
+func readAPIToken(cmd *cobra.Command, envFlagName string) string {
+	envVar := mustGetString(cmd, envFlagName)
+	value := os.Getenv(envVar)
+	if value != "" {
+		return value
+	}
+
+	return os.Getenv("SF_API_TOKEN")
 }
 
 func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (uint64, error) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
@@ -151,7 +152,9 @@ func decodeAsString(in []byte) string { return fmt.Sprintf("%q", string(in)) }
 func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
 
 func printClock(block *pbsubstreams.BlockScopedData) {
-	fmt.Printf("----------- BLOCK: %d (%s) ---------------\n", block.Clock.Number, stepFromProto(block.Step))
+	humanizedNum := strings.ReplaceAll(humanize.Comma(int64(block.Clock.Number)), ",", " ")
+
+	fmt.Printf("----------- Block #%s (%s) ---------------\n", humanizedNum, stepFromProto(block.Step))
 }
 
 func stepFromProto(step pbsubstreams.ForkStep) bstream.StepType {

@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -156,7 +157,7 @@ func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string
 	for _, importPath := range importPaths {
 		importPathFS := os.DirFS(importPath)
 		for _, importFile := range importFilePatterns {
-			fmt.Println("GLOB", importPath, importFile)
+			zlog.Debug("globbing proto files", zap.String("import_path", importPath), zap.String("import_file", importFile))
 			matches, err := doublestar.Glob(importPathFS, importFile)
 			if err != nil {
 				return nil, fmt.Errorf("glob through %q, matching %q: %w", importPath, importFile, err)
@@ -165,7 +166,7 @@ func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string
 		}
 	}
 
-	fmt.Println("DONE", files)
+	zlog.Debug("proto files found", zap.Strings("files", files))
 	return files, nil
 }
 

@@ -35,10 +35,12 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 	buf.WriteString("code")
 	switch m := module.Code.(type) {
 	case *pbsubstreams.Module_WasmCode_:
+		buf.WriteString("wasm")
 		code := manifest.ModulesCode[m.WasmCode.Index]
 		buf.Write(code)
 		buf.WriteString(m.WasmCode.Entrypoint)
 	case *pbsubstreams.Module_NativeCode_:
+		buf.WriteString("native")
 		// TODO: get some version of the native code from the registry
 		// so it can break compatibility when the native code is updated.
 		buf.WriteString(m.NativeCode.Entrypoint)

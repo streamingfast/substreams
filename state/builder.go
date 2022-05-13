@@ -90,27 +90,6 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-func (b *Builder) Squash(ctx context.Context, others []*Builder) error {
-	if len(others) == 0 {
-		return nil
-	}
-	builders := others
-
-	builders = append(builders, b)
-	zlog.Info("number of builders", zap.Int("len", len(builders)), zap.String("store", b.Name))
-
-	for i := 0; i < len(builders)-1; i++ {
-		prev := builders[i]
-		next := builders[i+1]
-		err := next.Merge(prev)
-		if err != nil {
-			return fmt.Errorf("merging state for %s: %w", b.Name, err)
-		}
-	}
-
-	return nil
-}
-
 func (b *Builder) writeStateInfo(ctx context.Context, info *Info) error {
 	b.infoLock.Lock()
 	defer b.infoLock.Unlock()

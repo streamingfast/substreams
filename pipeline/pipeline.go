@@ -648,10 +648,21 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pipeline) InitializeStores(ctx context.Context, builders map[string]*state.Builder, requestedStartBlockNum uint64) error {
-	for _, builder := range builders {
-		outputCache := p.moduleOutputCache.OutputCaches[builder.Name]
-		err := builder.Initialize(ctx, requestedStartBlockNum, p.moduleOutputCache.SaveBlockInterval, outputCache.Store)
+func (p *Pipeline) InitializeStores(ctx context.Context) error {
+	var initFunc func(builder *state.Builder) error
+	if p.partialMode {
+		initFunc = func(builder *state.Builder) error {
+			return builder.InitializePartial(ctx, p.requestedStartBlockNum)
+		}
+	} else {
+		initFunc = func(builder *state.Builder) error {
+			outputCache := p.moduleOutputCache.OutputCaches[builder.Name]
+			return builder.Initialize(ctx, p.requestedStartBlockNum, p.moduleOutputCache.SaveBlockInterval, outputCache.Store)
+		}
+	}
+
+	for _, builder := range p.builders {
+		err := initFunc(builder)
 		if err != nil {
 			return fmt.Errorf("reading state for builder %q: %w", builder.Name, err)
 		}

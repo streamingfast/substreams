@@ -1,21 +1,12 @@
 package state
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strconv"
-	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-)
-
-//todo: @colin replace all these keys by a struct
-var (
-	updatePolicyKey     = strings.Join([]string{string([]byte{255}), "update-policy"}, "")
-	valueTypeKey        = strings.Join([]string{string([]byte{255}), "value-type"}, "")
-	storeNameKey        = strings.Join([]string{string([]byte{255}), "store-name"}, "")
-	moduleHashKey       = strings.Join([]string{string([]byte{255}), "module-hash"}, "")
-	moduleStartBlockKey = strings.Join([]string{string([]byte{255}), "module-start-block"}, "")
 )
 
 const (
@@ -24,32 +15,51 @@ const (
 	OutputValueTypeBigInt   = "bigInt"
 	OutputValueTypeBigFloat = "bigFloat"
 	OutputValueTypeString   = "string"
+
+	mergeValuesKey = "__!__metadata" ///NEVER EVER CHANGE THIS
 )
 
-func (b *Builder) writeMergeValues() {
-	b.KV[updatePolicyKey] = []byte(strconv.Itoa(int(b.updatePolicy)))
-	b.KV[valueTypeKey] = []byte(b.valueType)
-	b.KV[moduleHashKey] = []byte(b.ModuleHash)
-	b.KV[moduleStartBlockKey] = intToBytes(int(b.ModuleStartBlock))
-	b.KV[storeNameKey] = []byte(b.Name)
+func (b *Builder) writeMergeValues() error {
+	mergeInfo := &mergeInfo{
+		StoreName:        b.Name,
+		UpdatePolicy:     b.updatePolicy,
+		ValueType:        b.valueType,
+		ModuleHash:       b.ModuleHash,
+		ModuleStartBlock: b.ModuleStartBlock,
+	}
+
+	data, err := json.Marshal(mergeInfo)
+	if err != nil {
+		return err
+	}
+
+	b.KV[mergeValuesKey] = data
+
+	return nil
 }
 
 func (b *Builder) clearMergeValues() {
-	delete(b.KV, updatePolicyKey)
-	delete(b.KV, valueTypeKey)
-	delete(b.KV, moduleHashKey)
-	delete(b.KV, moduleStartBlockKey)
-	delete(b.KV, storeNameKey)
+	delete(b.KV, mergeValuesKey)
+}
+
+type mergeInfo struct {
+	StoreName        string                                     `json:"store_name,omitempty"`
+	UpdatePolicy     pbsubstreams.Module_KindStore_UpdatePolicy `json:"update_policy,omitempty"`
+	ValueType        string                                     `json:"value_type,omitempty"`
+	ModuleHash       string                                     `json:"module_hash,omitempty"`
+	ModuleStartBlock uint64                                     `json:"module_start_block,omitempty"`
 }
 
 func (b *Builder) Merge(previous *Builder) error {
-	//todo: @colin replace next to line by ... delete key of meta data struct here and bring it back in a defer
+	//merge values are not of the correct type for the KV, so we delete them and set them back afterwards.
 	b.clearMergeValues()
-	defer b.writeMergeValues()
+	defer func() {
+		if err := b.writeMergeValues(); err != nil {
+			panic(err)
+		}
+	}()
 
 	next := b
-
-	//special key values are not of the correct type for the KV, so we delete them and set them back afterwards.
 
 	if next.updatePolicy != previous.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", next.updatePolicy, previous.updatePolicy)

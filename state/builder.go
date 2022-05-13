@@ -471,6 +471,10 @@ func (b *Builder) Set(ord uint64, key string, value string) {
 }
 
 func (b *Builder) set(ord uint64, key string, value []byte) {
+	if strings.HasPrefix(key, "__!__") {
+		panic("key prefix __!__ is reserved for internal system use.")
+	}
+
 	b.bumpOrdinal(ord)
 
 	val, found := b.GetLast(key)

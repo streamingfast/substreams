@@ -44,8 +44,8 @@ func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlai
 	var callOpts []grpc.CallOption
 	if !skipAuth {
 		zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
-		credentials := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
-		callOpts = append(callOpts, grpc.PerRPCCredentials(credentials))
+		creds := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
+		callOpts = append(callOpts, grpc.PerRPCCredentials(creds))
 	}
 
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint))

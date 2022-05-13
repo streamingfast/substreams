@@ -3,6 +3,8 @@ package pipeline
 import (
 	"fmt"
 
+	"github.com/streamingfast/substreams/pipeline/outputs"
+
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -30,7 +32,7 @@ type BaseExecutor struct {
 	moduleName string
 	wasmModule *wasm.Module
 	wasmInputs []*wasm.Input
-	cache      *outputCache
+	cache      *outputs.OutputCache
 	isOutput   bool // whether output is enabled for this module
 	entrypoint string
 }
@@ -69,7 +71,7 @@ func (e *StoreModuleExecutor) String() string {
 }
 
 func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error {
-	output, found, err := e.cache.get(block)
+	output, found, err := e.cache.Get(block)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
 	}
@@ -83,7 +85,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 		return err
 	}
 
-	if err = e.cache.set(block, e.mapperOutput); err != nil {
+	if err = e.cache.Set(block, e.mapperOutput); err != nil {
 		return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
 	}
 
@@ -91,7 +93,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 }
 
 func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error {
-	output, found, err := e.cache.get(block)
+	output, found, err := e.cache.Get(block)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
 	}
@@ -121,7 +123,7 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 		return fmt.Errorf("caching: marshalling delta: %w", err)
 	}
 
-	if err = e.cache.set(block, data); err != nil {
+	if err = e.cache.Set(block, data); err != nil {
 		return fmt.Errorf("setting delta to cache at block %d: %w", block.Num(), err)
 	}
 
@@ -299,12 +301,12 @@ func (e *MapperModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData 
 // 	return moduleOutputs
 // }
 
-func OptimizeExecutors(moduleOutputCache map[string]*outputCache, moduleExecutors []ModuleExecutor, requestedOutputStores []string) (optimizedModuleExecutors []ModuleExecutor, skipBlockSource bool) {
+func OptimizeExecutors(moduleOutputCache map[string]*outputs.OutputCache, moduleExecutors []ModuleExecutor, requestedOutputStores []string) (optimizedModuleExecutors []ModuleExecutor, skipBlockSource bool) {
 	optimizedModuleExecutors = []ModuleExecutor{}
 	skipBlockSource = false
 
 	for _, outputStore := range requestedOutputStores {
-		if moduleOutputCache[outputStore] != nil && !moduleOutputCache[outputStore].new {
+		if moduleOutputCache[outputStore] != nil && !moduleOutputCache[outputStore].New {
 			for _, executor := range moduleExecutors {
 				if executor.String() == outputStore {
 					optimizedModuleExecutors = append(optimizedModuleExecutors, executor)

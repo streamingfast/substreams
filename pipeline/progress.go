@@ -41,7 +41,7 @@ func (p *progressTracker) startTracking(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(1 * time.Second):
+			case <-time.After(10 * time.Second):
 				p.log()
 			}
 		}

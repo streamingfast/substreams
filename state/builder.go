@@ -10,24 +10,32 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/pipeline/outputs"
 
+	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
+type Info struct {
+	LastKVFile        string `json:"last_kv_file"`
+	LastKVSavedBlock  uint64 `json:"last_saved_block"`
+	RangeIntervalSize uint64 `json:"range_interval_size"`
+}
+
 type Builder struct {
-	Name              string
-	Store             dstore.Store
-	partialMode       bool
-	partialStartBlock uint64
-	endBlock          uint64
+	Name         string
+	Store        dstore.Store
+	saveInterval uint64
+
+	startBlock        uint64
+	ExclusiveEndBlock uint64
 	ModuleStartBlock  uint64
 	ModuleHash        string
 
-	info         *Info
-	infoLock     sync.RWMutex
-	skipLoadInfo bool //for tests
+	info     *Info
+	infoLock sync.RWMutex
 
 	complete bool
 
@@ -38,26 +46,12 @@ type Builder struct {
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType    string
 	lastOrdinal  uint64
-	saveInterval uint64
+	partialMode  bool
 }
 
 type BuilderOption func(b *Builder)
 
-func WithPartialMode(startBlock uint64) BuilderOption {
-	return func(b *Builder) {
-		b.partialMode = true
-		b.partialStartBlock = startBlock
-	}
-}
-
-// deprecated: for testing purposes only!
-func WithSkipLoadInfo() BuilderOption {
-	return func(b *Builder) {
-		b.skipLoadInfo = true
-	}
-}
-
-func NewBuilder(ctx context.Context, name string, moduleStartBlock uint64, saveInterval uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
+func NewBuilder(name string, partialMode bool, moduleStartBlock uint64, saveInterval uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -71,59 +65,11 @@ func NewBuilder(ctx context.Context, name string, moduleStartBlock uint64, saveI
 		valueType:        valueType,
 		Store:            subStore,
 		saveInterval:     saveInterval,
+		partialMode:      partialMode,
 	}
 
 	for _, opt := range opts {
 		opt(b)
-	}
-
-	err = b.loadStateInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading state info: %w", err)
-	}
-
-	return b, nil
-}
-
-func NewBuilderFromFile(ctx context.Context, filename string, store dstore.Store) (*Builder, error) {
-	fileinfo, ok := ParseFileName(filename)
-	if !ok {
-		return nil, fmt.Errorf("could not parse filename %s", filename)
-	}
-
-	rc, err := store.OpenObject(ctx, filename)
-	if err != nil {
-		return nil, fmt.Errorf("opening file %s: %w", filename, err)
-	}
-
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return nil, fmt.Errorf("reading data: %w", err)
-	}
-	defer rc.Close()
-
-	kv := map[string]string{}
-	if err = json.Unmarshal(data, &kv); err != nil {
-		return nil, fmt.Errorf("json unmarshal of data: %w", err)
-	}
-
-	updatedkv, updatePolicy, valueType, moduleHash, moduleStartBlock, name := readMergeValues(byteMap(kv))
-	saveInterval := fileinfo.EndBlock - fileinfo.StartBlock
-	b, err := NewBuilder(context.Background(), name, moduleStartBlock, saveInterval, moduleHash, updatePolicy, valueType, store)
-	if err != nil {
-		return nil, fmt.Errorf("creating builder %s: %w", name, err)
-	}
-
-	b.KV = updatedkv
-	b.partialMode = fileinfo.Partial
-
-	if fileinfo.Partial {
-		b.partialStartBlock = fileinfo.StartBlock
-	}
-
-	err = b.loadStateInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading state info: %w", err)
 	}
 
 	return b, nil
@@ -145,61 +91,25 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-//func (b *Builder) update(ctx context.Context, clock *pbsubstreams.Clock) error {
-//	if clock.Number < b.ModuleStartBlock {
-//		return nil
-//	}
-//	if clock.Number > b.ModuleStartBlock+b.saveInterval {
-//		zlog.Info("load build kv because we just saw the first viable block", zap.Uint64("block_num", clock.Number))
-//		return nil
-//	}
-//	if clock.Number > b.endBlock {
-//		zlog.Info("rolling kv file", zap.Uint64("block_num", clock.Number))
-//	}
-//
-//	return nil
-//}
+func (b *Builder) Squash(ctx context.Context, others []*Builder) error {
+	if len(others) == 0 {
+		return nil
+	}
+	builders := others
 
-//func (b *Builder) Squash(ctx context.Context, baseStore dstore.Store, upToBlock uint64) error {
-//	files, err := pathToState(ctx, b.Name, b.Store, upToBlock, b.ModuleStartBlock)
-//	if err != nil {
-//		return err
-//	}
-//	zlog.Info("squashing files found", zap.Strings("files", files), zap.String("store", b.Name))
-//
-//	var builders []*Builder
-//	for _, file := range files {
-//		builder, err := NewBuilderFromFile(ctx, file, baseStore)
-//		if err != nil {
-//			return fmt.Errorf("creating builder from file %s: %w", file, err)
-//		}
-//
-//		builders = append(builders, builder)
-//	}
-//
-//	if len(builders) == 0 {
-//		return fmt.Errorf("len of builders is 0")
-//	}
-//
-//	builders = append(builders, b)
-//	zlog.Info("number of builders", zap.Int("len", len(builders)), zap.String("store", b.Name))
-//
-//	for i := 0; i < len(builders)-1; i++ {
-//		prev := builders[i]
-//		next := builders[i+1]
-//		err := next.Merge(prev)
-//		if err != nil {
-//			return fmt.Errorf("merging state for %s: %w", b.Name, err)
-//		}
-//	}
-//
-//	return nil
-//}
+	builders = append(builders, b)
+	zlog.Info("number of builders", zap.Int("len", len(builders)), zap.String("store", b.Name))
 
-type Info struct {
-	LastKVFile        string `json:"last_kv_file"`
-	LastKVSavedBlock  uint64 `json:"last_saved_block"`
-	RangeIntervalSize uint64 `json:"range_interval_size"`
+	for i := 0; i < len(builders)-1; i++ {
+		prev := builders[i]
+		next := builders[i+1]
+		err := next.Merge(prev)
+		if err != nil {
+			return fmt.Errorf("merging state for %s: %w", b.Name, err)
+		}
+	}
+
+	return nil
 }
 
 func (b *Builder) writeStateInfo(ctx context.Context, info *Info) error {
@@ -221,21 +131,13 @@ func (b *Builder) writeStateInfo(ctx context.Context, info *Info) error {
 	return nil
 }
 
-func (b *Builder) loadStateInfo(ctx context.Context) error {
-	b.infoLock.Lock()
-	defer b.infoLock.Unlock()
-
-	if b.skipLoadInfo {
-		return nil
-	}
-
-	rc, err := b.Store.OpenObject(ctx, StateInfoFileName())
+func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
+	rc, err := store.OpenObject(ctx, StateInfoFileName())
 	if err != nil {
 		if err == dstore.ErrNotFound {
-			b.info = &Info{}
-			return nil
+			return &Info{}, nil
 		}
-		return fmt.Errorf("opening object %s: %w", StateInfoFileName(), err)
+		return nil, fmt.Errorf("opening object %s: %w", StateInfoFileName(), err)
 	}
 
 	defer func(rc io.ReadCloser) {
@@ -247,74 +149,151 @@ func (b *Builder) loadStateInfo(ctx context.Context) error {
 
 	data, err := io.ReadAll(rc)
 	if err != nil {
-		return fmt.Errorf("reading data for %s: %w", StateInfoFileName(), err)
+		return nil, fmt.Errorf("reading data for %s: %w", StateInfoFileName(), err)
 	}
 
 	var info *Info
 	err = json.Unmarshal(data, &info)
 	if err != nil {
-		return fmt.Errorf("unmarshaling state info data: %w", err)
+		return nil, fmt.Errorf("unmarshaling state info data: %w", err)
 	}
 
-	b.info = info
+	return info, nil
+}
+
+func (b *Builder) Info(ctx context.Context) (*Info, error) {
+	if b.info == nil {
+		b.infoLock.Lock()
+		defer b.infoLock.Unlock()
+
+		if info, err := readStateInfo(ctx, b.Store); err != nil {
+			return nil, fmt.Errorf("reading state info for builder %q: %w", b.Name, err)
+		} else {
+			return info, nil
+		}
+
+	}
+
+	return b.info, nil
+}
+
+func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+
+	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
+	if requestedStartBlock == b.ModuleStartBlock {
+		b.startBlock = requestedStartBlock
+		floor := requestedStartBlock - requestedStartBlock%b.saveInterval
+		b.ExclusiveEndBlock = floor + b.saveInterval
+		b.KV = map[string][]byte{}
+		return nil
+	}
+
+	startBlockNum := requestedStartBlock - requestedStartBlock%b.saveInterval
+	deltasStartBlock := uint64(0)
+
+	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", startBlockNum))
+
+	deltasNeeded := false
+	if startBlockNum >= b.saveInterval && startBlockNum > b.ModuleStartBlock {
+		deltasStartBlock = requestedStartBlock - startBlockNum
+		deltasNeeded = deltasStartBlock > 0
+
+		atBlock := startBlockNum - b.saveInterval // get the previous saved range
+		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
+		err := b.loadState(ctx, atBlock)
+		if err != nil {
+			return fmt.Errorf("reading state file for module %q: %w", b.Name, err)
+		}
+	} else {
+		deltasNeeded = true
+		deltasStartBlock = b.ModuleStartBlock
+	}
+
+	if deltasNeeded {
+		err := b.loadDelta(ctx, deltasStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
+		if err != nil {
+			return fmt.Errorf("loading delta for builder %q: %w", b.Name, err)
+		}
+	}
 
 	return nil
 }
 
-func (b *Builder) Info() *Info {
-	b.infoLock.RLock()
-	defer b.infoLock.RUnlock()
+func (b *Builder) loadState(ctx context.Context, startBlockNum uint64) error {
+	zlog.Debug("initializing state", zap.String("module_name", b.Name), zap.Uint64("start_block", startBlockNum))
+	stateFileName := StateFileName(b.ModuleStartBlock, startBlockNum+b.saveInterval)
 
-	return b.info
-}
-
-func (b *Builder) ReadState(ctx context.Context, requestedStartBlock uint64) (uint64, error) {
-	files, err := pathToState(ctx, b.Name, b.Store, requestedStartBlock, b.ModuleStartBlock)
+	r, err := b.Store.OpenObject(ctx, stateFileName)
 	if err != nil {
-		return 0, err
-	}
-	zlog.Info("read state files found", zap.Strings("files", files), zap.String("store", b.Name))
-
-	var builders []*Builder
-	for _, file := range files {
-		builder, err := NewBuilderFromFile(ctx, file, b.Store)
-		if err != nil {
-			return 0, fmt.Errorf("creating builder from file %s: %w", file, err)
-		}
-
-		builders = append(builders, builder)
+		return fmt.Errorf("opening file state file %s: %w", stateFileName, err)
 	}
 
-	zlog.Info("number of builders", zap.Int("len", len(builders)), zap.String("store", b.Name))
-	switch len(builders) {
-	case 0:
-		/// nothing to do
-	case 1:
-		b.KV = builders[0].KV
-	default:
-		// merge all builders, sequentially from the start.
-		for i := 0; i < len(builders)-1; i++ {
-			prev := builders[i]
-			next := builders[i+1]
-			err := next.Merge(prev)
-			if err != nil {
-				return 0, fmt.Errorf("merging state for %s: %w", b.Name, err)
-			}
-		}
-		b.KV = builders[len(builders)-1].KV
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("reading data: %w", err)
+	}
+	defer r.Close()
 
-		zlog.Info("writing state", zap.String("store", b.Name))
-		f, err := b.WriteState(ctx, requestedStartBlock, false)
-		if err != nil {
-			return 0, fmt.Errorf("writing merged kv: %w", err)
-		}
-		zlog.Info("state written", zap.String("filename", f), zap.String("store", b.Name))
+	kv := map[string]string{}
+	if err = json.Unmarshal(data, &kv); err != nil {
+		return fmt.Errorf("json unmarshal of state file %s data: %w", stateFileName, err)
 	}
 
-	return b.endBlock, nil
+	b.KV = byteMap(kv)
+	b.startBlock = startBlockNum
+	b.ExclusiveEndBlock = startBlockNum + b.saveInterval
+	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.Uint64("start_block_num", startBlockNum), zap.Uint64("stop_block_num", b.ExclusiveEndBlock))
+	return nil
 }
 
-func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode bool) (filename string, err error) {
+func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+	zlog.Debug("loading delta",
+		zap.String("builder_name", b.Name),
+		zap.Uint64("from_block", fromBlock),
+		zap.Uint64("stop_block", exclusiveStopBlock),
+	)
+	startBlockNum := outputs.ComputeStartBlock(fromBlock, outputCacheSaveInterval)
+	outputCache := outputs.NewOutputCache(b.Name, outputCacheStore, 0)
+	err := outputCache.Load(ctx, startBlockNum)
+	if err != nil {
+		return fmt.Errorf("loading init cache for builder %q with start block %d: %w", b.Name, startBlockNum, err)
+	}
+	for {
+		deltas := outputCache.SortedCacheItem()
+		if len(deltas) == 0 {
+			panic("missing deltas")
+		}
+		firstSeenBlockNum := uint64(0)
+		lastSeenBlockNum := uint64(0)
+		for _, delta := range deltas {
+			//todo: we should check the from block?
+			if delta.BlockNum >= exclusiveStopBlock {
+				return nil //all good we reach the end
+			}
+			if firstSeenBlockNum == uint64(0) {
+				firstSeenBlockNum = delta.BlockNum
+			}
+			lastSeenBlockNum = delta.BlockNum
+			pbDelta := &pbsubstreams.StoreDelta{}
+			err := proto.Unmarshal(delta.Payload, pbDelta)
+			if err != nil {
+				return fmt.Errorf("unmarshalling builder %q delta at block %d: %w", b.Name, delta.BlockNum, err)
+			}
+			b.Deltas = append(b.Deltas, pbDelta)
+		}
+		zlog.Debug("loaded deltas", zap.String("builder_name", b.Name), zap.Uint64("from_block_num", firstSeenBlockNum), zap.Uint64("to_block_num", lastSeenBlockNum))
+
+		if exclusiveStopBlock <= outputCache.CurrentBlockRange.ExclusiveEndBlock {
+			return nil
+		}
+		err := outputCache.Load(ctx, outputCache.CurrentBlockRange.ExclusiveEndBlock)
+		if err != nil {
+			return fmt.Errorf("loading more deltas: %w", err)
+		}
+	}
+}
+
+func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (filename string, err error) {
 	zlog.Debug("writing state", zap.String("module", b.Name))
 	b.writeMergeValues()
 
@@ -325,21 +304,16 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode b
 		return "", fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	if partialMode && b.partialStartBlock <= b.ModuleStartBlock {
-		partialMode = false //this starts at module start block, therefore consider it a full kv
-	}
-
 	zlog.Info("write state mode",
-		zap.Bool("partial", partialMode),
 		zap.String("store", b.Name),
-		zap.Uint64("partial_start_block", b.partialStartBlock),
-		zap.Uint64("module_start_block", b.ModuleStartBlock),
+		zap.Bool("partial", b.partialMode),
+		zap.Uint64("end_block", b.ExclusiveEndBlock),
 	)
 
-	if partialMode {
-		filename, err = b.writePartialState(ctx, content, b.partialStartBlock, blockNum)
+	if b.partialMode {
+		filename, err = b.writePartialState(ctx, content)
 	} else {
-		filename, err = b.writeState(ctx, content, blockNum)
+		filename, err = b.writeState(ctx, content)
 	}
 	if err != nil {
 		return "", fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
@@ -348,30 +322,30 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64, partialMode b
 	return filename, nil
 }
 
-func (b *Builder) writeState(ctx context.Context, content []byte, blockNum uint64) (string, error) {
-	filename := StateFileName(blockNum, b.ModuleStartBlock)
+func (b *Builder) writeState(ctx context.Context, content []byte) (string, error) {
+	filename := StateFileName(b.ModuleStartBlock, b.ExclusiveEndBlock)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
-		return filename, fmt.Errorf("writing state %s at block num %d: %w", b.Name, blockNum, err)
+		return filename, fmt.Errorf("writing state %s at block num %d: %w", b.Name, b.ExclusiveEndBlock, err)
 	}
 
-	if blockNum > b.info.LastKVSavedBlock {
-		var info = &Info{
-			LastKVFile:        filename,
-			LastKVSavedBlock:  blockNum,
-			RangeIntervalSize: b.saveInterval,
-		}
-		err = b.writeStateInfo(ctx, info)
-		if err != nil {
-			b.info = info
-		}
+	var info = &Info{
+		LastKVFile:        filename,
+		LastKVSavedBlock:  b.ExclusiveEndBlock,
+		RangeIntervalSize: b.saveInterval,
 	}
+	err = b.writeStateInfo(ctx, info)
+	if err != nil {
+		return "", fmt.Errorf("writing state info for builder %q: %w", b.Name, err)
+	}
+	b.info = info
+	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("block_num", b.ModuleStartBlock), zap.String("file_name", filename))
 
 	return filename, err
 }
 
-func (b *Builder) writePartialState(ctx context.Context, content []byte, startBlockNum, endBlockNum uint64) (string, error) {
-	filename := PartialFileName(startBlockNum, endBlockNum)
+func (b *Builder) writePartialState(ctx context.Context, content []byte) (string, error) {
+	filename := PartialFileName(b.startBlock, b.ExclusiveEndBlock)
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 

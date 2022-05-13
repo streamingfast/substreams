@@ -624,25 +624,28 @@ func createRequest(startBlock, stopBlock uint64, outputModuleName string, origin
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
-	reachInterval := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
+	intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
 
 	zlog.Debug("maybe saving stores snapshots",
 		zap.Uint64("req_start_block", p.requestedStartBlockNum),
 		zap.Uint64("block_num", p.clock.Number),
 		zap.Bool("is_first_request_block", isFirstRequestBlock),
-		zap.Bool("reach_save_interval", reachInterval),
+		zap.Bool("reach_save_interval", intervalReached),
 	)
-	if !isFirstRequestBlock && reachInterval {
 
-		for _, s := range p.builders {
-			fileName, err := s.WriteState(ctx, p.clock.Number)
+	if !isFirstRequestBlock && intervalReached {
+		for _, builder := range p.builders {
+			fileName, err := builder.WriteState(ctx, p.clock.Number)
 			if err != nil {
-				return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
+				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 			}
-			//todo: @colin create a func roll(storesSaveInterval, isPartial) in builder
-			// if isPartial we need to move both the start block and ExclusiveEndBlock of the builder if not only ExclusiveEndBlock
-			s.ExclusiveEndBlock += p.storesSaveInterval
-			zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
+
+			if p.partialMode {
+				builder.BlockRange.StartBlock = builder.BlockRange.ExclusiveEndBlock
+			}
+			builder.BlockRange.ExclusiveEndBlock += p.storesSaveInterval
+
+			zlog.Info("state written", zap.String("store_name", builder.Name), zap.String("file_name", fileName))
 		}
 	}
 	return nil

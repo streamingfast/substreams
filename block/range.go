@@ -13,7 +13,7 @@ type Range struct {
 }
 
 func (r *Range) String() string {
-	return fmt.Sprintf("start: %d exclusiveEndBlock: %d", r.StartBlock, r.ExclusiveEndBlock)
+	return fmt.Sprintf("[%d, %d)", r.StartBlock, r.ExclusiveEndBlock)
 }
 
 func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {

@@ -10,12 +10,12 @@ import (
 	"strings"
 	"sync"
 
-	"go.uber.org/zap/zapcore"
-
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,10 +30,11 @@ type Builder struct {
 	Store        dstore.Store
 	saveInterval uint64
 
-	StartBlock        uint64
-	ModuleStartBlock  uint64
-	ExclusiveEndBlock uint64
-	ModuleHash        string
+	ModuleStartBlock uint64
+
+	BlockRange block.Range
+
+	ModuleHash string
 
 	info     *Info
 	infoLock sync.RWMutex
@@ -52,8 +53,7 @@ type Builder struct {
 
 func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("builder_name", b.Name)
-	enc.AddUint64("start_block", b.StartBlock)
-	enc.AddUint64("end_block", b.ExclusiveEndBlock)
+	enc.AddObject("block_range", &b.BlockRange)
 	enc.AddBool("partial", b.partialMode)
 
 	return nil
@@ -167,22 +167,23 @@ func (b *Builder) Info(ctx context.Context) (*Info, error) {
 
 func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) error {
 	b.partialMode = true
-	b.StartBlock = startBlock
-	b.ExclusiveEndBlock = startBlock + b.saveInterval
+	b.BlockRange = block.Range{
+		StartBlock:        startBlock,
+		ExclusiveEndBlock: startBlock + b.saveInterval,
+	}
 
-	fileName := PartialFileName(b.StartBlock, b.ExclusiveEndBlock)
-
+	fileName := PartialFileName(b.BlockRange)
 	return b.loadState(ctx, fileName)
 }
 
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
-	b.StartBlock = b.ModuleStartBlock
+	b.BlockRange.StartBlock = b.ModuleStartBlock
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
-	if requestedStartBlock == b.StartBlock {
-		b.StartBlock = requestedStartBlock
+	if requestedStartBlock == b.BlockRange.StartBlock {
+		b.BlockRange.StartBlock = requestedStartBlock
 		floor := requestedStartBlock - requestedStartBlock%b.saveInterval
-		b.ExclusiveEndBlock = floor + b.saveInterval
+		b.BlockRange.ExclusiveEndBlock = floor + b.saveInterval
 		b.KV = map[string][]byte{}
 		return nil
 	}
@@ -193,13 +194,16 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", startBlockNum))
 
 	deltasNeeded := false
-	if startBlockNum >= b.saveInterval && startBlockNum > b.StartBlock {
+	if startBlockNum >= b.saveInterval && startBlockNum > b.BlockRange.StartBlock {
 		deltasStartBlock = requestedStartBlock - startBlockNum
 		deltasNeeded = deltasStartBlock > 0
 
 		atBlock := startBlockNum - b.saveInterval // get the previous saved range
-		b.ExclusiveEndBlock = startBlockNum
-		fileName := StateFileName(b.ModuleStartBlock, b.ExclusiveEndBlock)
+		b.BlockRange.ExclusiveEndBlock = startBlockNum
+		fileName := StateFileName(block.Range{
+			StartBlock:        b.ModuleStartBlock,
+			ExclusiveEndBlock: b.BlockRange.ExclusiveEndBlock,
+		})
 
 		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
 		err := b.loadState(ctx, fileName)
@@ -208,7 +212,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		}
 	} else {
 		deltasNeeded = true
-		deltasStartBlock = b.StartBlock
+		deltasStartBlock = b.BlockRange.StartBlock
 	}
 
 	if deltasNeeded {
@@ -311,7 +315,7 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (filename str
 	zlog.Info("write state mode",
 		zap.String("store", b.Name),
 		zap.Bool("partial", b.partialMode),
-		zap.Uint64("end_block", b.ExclusiveEndBlock),
+		zap.Object("block_range", &b.BlockRange),
 	)
 
 	if b.partialMode {
@@ -327,15 +331,15 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (filename str
 }
 
 func (b *Builder) writeState(ctx context.Context, content []byte) (string, error) {
-	filename := StateFileName(b.StartBlock, b.ExclusiveEndBlock)
+	filename := StateFileName(b.BlockRange)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
-		return filename, fmt.Errorf("writing state %s at block num %d: %w", b.Name, b.ExclusiveEndBlock, err)
+		return filename, fmt.Errorf("writing state %s for range %s: %w", b.Name, b.BlockRange.String(), err)
 	}
 
 	var info = &Info{
 		LastKVFile:        filename,
-		LastKVSavedBlock:  b.ExclusiveEndBlock,
+		LastKVSavedBlock:  b.BlockRange.ExclusiveEndBlock,
 		RangeIntervalSize: b.saveInterval,
 	}
 	err = b.writeStateInfo(ctx, info)
@@ -343,13 +347,13 @@ func (b *Builder) writeState(ctx context.Context, content []byte) (string, error
 		return "", fmt.Errorf("writing state info for builder %q: %w", b.Name, err)
 	}
 	b.info = info
-	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("block_num", b.StartBlock), zap.String("file_name", filename))
+	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Object("block_range", &b.BlockRange), zap.String("file_name", filename))
 
 	return filename, err
 }
 
 func (b *Builder) writePartialState(ctx context.Context, content []byte) (string, error) {
-	filename := PartialFileName(b.StartBlock, b.ExclusiveEndBlock)
+	filename := PartialFileName(b.BlockRange)
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 
@@ -557,12 +561,12 @@ func StateFilePrefix(blockNum uint64) string {
 	return fmt.Sprintf("%010d", blockNum)
 }
 
-func PartialFileName(startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%010d-%010d.partial", endBlockNum, startBlockNum)
+func PartialFileName(r block.Range) string {
+	return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
 }
 
-func StateFileName(startBlockNum, endBlockNum uint64) string {
-	return fmt.Sprintf("%010d-%010d.kv", endBlockNum, startBlockNum)
+func StateFileName(r block.Range) string {
+	return fmt.Sprintf("%010d-%010d.kv", r.ExclusiveEndBlock, r.StartBlock)
 }
 
 func StateInfoFileName() string {

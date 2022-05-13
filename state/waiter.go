@@ -9,8 +9,6 @@ import (
 
 	"github.com/streamingfast/dstore"
 
-	"go.uber.org/zap"
-
 	"github.com/abourget/llerrgroup"
 )
 
@@ -49,75 +47,75 @@ func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleS
 	return nil
 }
 
-func WaitPartial(ctx context.Context, storeName string, store dstore.Store, startBlock, endBlock uint64) <-chan error {
-	done := make(chan error)
-
-	go func() {
-		defer close(done)
-
-		for {
-			//check context
-			select {
-			case <-ctx.Done():
-				done <- &fileWaitResult{ctx.Err()}
-				return
-			default:
-				//
-			}
-
-			fileName := PartialFileName(startBlock, endBlock)
-			zlog.Info("looking for partial file:", zap.String("file_name", fileName))
-			exists, err := store.FileExists(ctx, fileName)
-			if err != nil {
-				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
-				return
-			}
-
-			if exists {
-				return
-			}
-
-			time.Sleep(WaiterSleepInterval)
-		}
-	}()
-
-	return done
-}
-
-func WaitKV(ctx context.Context, storeName string, store dstore.Store, moduleStartBlock, endBlock uint64) <-chan error {
-	done := make(chan error)
-
-	go func() {
-		defer close(done)
-
-		for {
-			//check context
-			select {
-			case <-ctx.Done():
-				done <- &fileWaitResult{ctx.Err()}
-				return
-			default:
-				//
-			}
-
-			fileName := StateFileName(endBlock, moduleStartBlock)
-			zlog.Info("looking for kv file:", zap.String("file_name", fileName))
-			exists, err := store.FileExists(ctx, fileName)
-			if err != nil {
-				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
-				return
-			}
-
-			if exists {
-				return
-			}
-
-			time.Sleep(WaiterSleepInterval)
-		}
-	}()
-
-	return done
-}
+//func WaitPartial(ctx context.Context, storeName string, store dstore.Store, startBlock, endBlock uint64) <-chan error {
+//	done := make(chan error)
+//
+//	go func() {
+//		defer close(done)
+//
+//		for {
+//			//check context
+//			select {
+//			case <-ctx.Done():
+//				done <- &fileWaitResult{ctx.Err()}
+//				return
+//			default:
+//				//
+//			}
+//
+//			fileName := PartialFileName(startBlock, endBlock)
+//			zlog.Info("looking for partial file:", zap.String("file_name", fileName))
+//			exists, err := store.FileExists(ctx, fileName)
+//			if err != nil {
+//				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
+//				return
+//			}
+//
+//			if exists {
+//				return
+//			}
+//
+//			time.Sleep(WaiterSleepInterval)
+//		}
+//	}()
+//
+//	return done
+//}
+//
+//func WaitKV(ctx context.Context, storeName string, store dstore.Store, moduleStartBlock, endBlock uint64) <-chan error {
+//	done := make(chan error)
+//
+//	go func() {
+//		defer close(done)
+//
+//		for {
+//			//check context
+//			select {
+//			case <-ctx.Done():
+//				done <- &fileWaitResult{ctx.Err()}
+//				return
+//			default:
+//				//
+//			}
+//
+//			fileName := StateFileName(endBlock, moduleStartBlock)
+//			zlog.Info("looking for kv file:", zap.String("file_name", fileName))
+//			exists, err := store.FileExists(ctx, fileName)
+//			if err != nil {
+//				done <- &fileWaitResult{fmt.Errorf("checking if file %s exists, : %w", fileName, err)}
+//				return
+//			}
+//
+//			if exists {
+//				return
+//			}
+//
+//			time.Sleep(WaiterSleepInterval)
+//		}
+//	}()
+//
+//	return done
+//}
 
 func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleStartBlock uint64, storeName string, store dstore.Store) <-chan error {
 	done := make(chan error)

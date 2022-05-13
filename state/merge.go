@@ -30,7 +30,7 @@ func (b *Builder) writeMergeValues() {
 	b.KV[updatePolicyKey] = []byte(strconv.Itoa(int(b.updatePolicy)))
 	b.KV[valueTypeKey] = []byte(b.valueType)
 	b.KV[moduleHashKey] = []byte(b.ModuleHash)
-	b.KV[moduleStartBlockKey] = intToBytes(int(b.StartBlock))
+	b.KV[moduleStartBlockKey] = intToBytes(int(b.ModuleStartBlock))
 	b.KV[storeNameKey] = []byte(b.Name)
 }
 
@@ -280,7 +280,7 @@ func (b *Builder) Merge(previous *Builder) error {
 
 	next.partialMode = previous.partialMode
 	if next.partialMode {
-		next.StartBlock = previous.StartBlock
+		next.BlockRange.StartBlock = previous.BlockRange.StartBlock
 	}
 
 	return nil

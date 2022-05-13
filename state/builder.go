@@ -10,10 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/streamingfast/substreams/pipeline/outputs"
-
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputs"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )

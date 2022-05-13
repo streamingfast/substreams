@@ -148,7 +148,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 	}
 
 	zlog.Info("initializing stores")
-	if err = p.InitializeStores(ctx, p.builders, p.requestedStartBlockNum); err != nil {
+	if err = p.InitializeStores(ctx); err != nil {
 		return nil, fmt.Errorf("synchonizing stores: %w", err)
 	}
 

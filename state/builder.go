@@ -40,8 +40,11 @@ type Builder struct {
 
 func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("builder_name", b.Name)
-	enc.AddObject("block_range", b.BlockRange)
 	enc.AddBool("partial", b.partialMode)
+	err := enc.AddObject("block_range", b.BlockRange)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -166,9 +166,6 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 }
 
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
-	if b.partialMode {
-		panic("cannot initialize a state in partial mode")
-	}
 	b.StartBlock = b.ModuleStartBlock
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))

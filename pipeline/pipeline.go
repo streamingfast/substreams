@@ -122,7 +122,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 
 	var err error
 	zlog.Info("building store and executor")
-	p.modules, _, err = p.build(ctx, p.request)
+	p.modules, _, err = p.build()
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
@@ -362,7 +362,7 @@ func (p *Pipeline) setupSource(block *bstream.Block) error {
 	return nil
 }
 
-func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
+func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
 	for _, module := range p.manifest.Modules {
 		vmType := ""
 		switch module.Code.(type) {

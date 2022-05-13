@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "rust/substreams",
+    "rust/test"
+]
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

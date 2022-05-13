@@ -156,7 +156,7 @@ pub fn do_myimport(input: Vec<u8>) -> Vec<u8> {
 extern "C" fn test_wasm_extension_hello() {
     substreams::log::println("first".to_string());
 
-    let val = do_myimport(Vec::from("hello"));
+    do_myimport(Vec::from("hello"));
     // Print a certain log statement if val == "world"
     // Print a different one if `do_myimport` failed, or will it even come back?
     substreams::log::println("second".to_string());
@@ -166,7 +166,7 @@ extern "C" fn test_wasm_extension_hello() {
 extern "C" fn test_wasm_extension_fail() {
     substreams::log::println("first".to_string());
 
-    let val = do_myimport(Vec::from("failfast"));
+    do_myimport(Vec::from("failfast"));
     // Print a certain log statement if val == "world"
     // Print a different one if `do_myimport` failed, or will it even come back?
 

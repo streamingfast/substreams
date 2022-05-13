@@ -225,6 +225,10 @@ pub struct ModuleOutput {
     pub name: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="4")]
     pub logs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// LogsTruncated is a flag that tells you if you received all the logs or if they
+    /// were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+    #[prost(bool, tag="5")]
+    pub logs_truncated: bool,
     #[prost(oneof="module_output::Data", tags="2, 3")]
     pub data: ::core::option::Option<module_output::Data>,
 }
@@ -257,6 +261,12 @@ pub struct ModuleProgress {
     pub failed: bool,
     #[prost(string, tag="8")]
     pub failure_reason: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="9")]
+    pub failure_logs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// FailureLogsTruncated is a flag that tells you if you received all the logs or if they
+    /// were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+    #[prost(bool, tag="10")]
+    pub failure_logs_truncated: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockRange {

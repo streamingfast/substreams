@@ -1,12 +1,14 @@
 mod externs;
 pub mod log;
 pub mod memory;
-pub mod proto;
-pub mod state;
-pub mod rpc;
 pub mod pb;
+pub mod proto;
+pub mod rpc;
+pub mod state;
 
 pub fn output<M: prost::Message>(msg: M) {
+    log::debug!("value");
+
     // Need to return the buffer and forget about it issue occured when trying to write large data
     // wasm was "dropping" the data before we could write to it, which causes us to have garbage
     // value. By forgetting the data we can properly call external output function to write the
@@ -43,7 +45,7 @@ pub fn hook(info: &std::panic::PanicInfo<'_>) {
                     file.len() as u32,
                     line,
                     column,
-                )   
+                )
             }
             None => externs::register_panic(
                 error_msg.as_ptr(),

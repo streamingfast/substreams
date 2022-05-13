@@ -392,9 +392,8 @@ func (p *Pipeline) build(ctx context.Context, request *pbsubstreams.Request) (mo
 
 		builder, err := state.NewBuilder(
 			storeModule.Name,
-			p.partialMode,
-			storeModule.StartBlock,
 			p.storesSaveInterval,
+			storeModule.StartBlock,
 			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
@@ -640,6 +639,8 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("writing store '%s' state: %w", s.Name, err)
 			}
+			//todo: @colin create a func roll(storesSaveInterval, isPartial) in builder
+			// if isPartial we need to move both the start block and ExclusiveEndBlock of the builder if not only ExclusiveEndBlock
 			s.ExclusiveEndBlock += p.storesSaveInterval
 			zlog.Info("state written", zap.String("store_name", s.Name), zap.String("file_name", fileName))
 		}

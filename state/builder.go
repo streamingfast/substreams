@@ -29,9 +29,9 @@ type Builder struct {
 	Store        dstore.Store
 	saveInterval uint64
 
-	startBlock        uint64
-	ExclusiveEndBlock uint64
+	StartBlock        uint64
 	ModuleStartBlock  uint64
+	ExclusiveEndBlock uint64
 	ModuleHash        string
 
 	info     *Info
@@ -51,7 +51,7 @@ type Builder struct {
 
 type BuilderOption func(b *Builder)
 
-func NewBuilder(name string, partialMode bool, moduleStartBlock uint64, saveInterval uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
+func NewBuilder(name string, saveInterval uint64, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -59,13 +59,12 @@ func NewBuilder(name string, partialMode bool, moduleStartBlock uint64, saveInte
 
 	b := &Builder{
 		Name:             name,
-		ModuleStartBlock: moduleStartBlock,
 		KV:               make(map[string][]byte),
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
 		Store:            subStore,
 		saveInterval:     saveInterval,
-		partialMode:      partialMode,
+		ModuleStartBlock: moduleStartBlock,
 	}
 
 	for _, opt := range opts {
@@ -177,11 +176,25 @@ func (b *Builder) Info(ctx context.Context) (*Info, error) {
 	return b.info, nil
 }
 
+func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) error {
+	b.partialMode = true
+	b.StartBlock = startBlock
+	b.ExclusiveEndBlock = startBlock + b.saveInterval
+
+	fileName := PartialFileName(b.StartBlock, b.ExclusiveEndBlock)
+
+	return b.loadState(ctx, fileName)
+}
+
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+	if b.partialMode {
+		panic("cannot initialize a state in partial mode")
+	}
+	b.StartBlock = b.ModuleStartBlock
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
-	if requestedStartBlock == b.ModuleStartBlock {
-		b.startBlock = requestedStartBlock
+	if requestedStartBlock == b.StartBlock {
+		b.StartBlock = requestedStartBlock
 		floor := requestedStartBlock - requestedStartBlock%b.saveInterval
 		b.ExclusiveEndBlock = floor + b.saveInterval
 		b.KV = map[string][]byte{}
@@ -194,19 +207,22 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", startBlockNum))
 
 	deltasNeeded := false
-	if startBlockNum >= b.saveInterval && startBlockNum > b.ModuleStartBlock {
+	if startBlockNum >= b.saveInterval && startBlockNum > b.StartBlock {
 		deltasStartBlock = requestedStartBlock - startBlockNum
 		deltasNeeded = deltasStartBlock > 0
 
 		atBlock := startBlockNum - b.saveInterval // get the previous saved range
+		b.ExclusiveEndBlock = startBlockNum
+		fileName := StateFileName(b.ModuleStartBlock, b.ExclusiveEndBlock)
+
 		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
-		err := b.loadState(ctx, atBlock)
+		err := b.loadState(ctx, fileName)
 		if err != nil {
 			return fmt.Errorf("reading state file for module %q: %w", b.Name, err)
 		}
 	} else {
 		deltasNeeded = true
-		deltasStartBlock = b.ModuleStartBlock
+		deltasStartBlock = b.StartBlock
 	}
 
 	if deltasNeeded {
@@ -219,9 +235,8 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	return nil
 }
 
-func (b *Builder) loadState(ctx context.Context, startBlockNum uint64) error {
-	zlog.Debug("initializing state", zap.String("module_name", b.Name), zap.Uint64("start_block", startBlockNum))
-	stateFileName := StateFileName(b.ModuleStartBlock, startBlockNum+b.saveInterval)
+func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
+	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
 
 	r, err := b.Store.OpenObject(ctx, stateFileName)
 	if err != nil {
@@ -240,13 +255,16 @@ func (b *Builder) loadState(ctx context.Context, startBlockNum uint64) error {
 	}
 
 	b.KV = byteMap(kv)
-	b.startBlock = startBlockNum
-	b.ExclusiveEndBlock = startBlockNum + b.saveInterval
-	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.Uint64("start_block_num", startBlockNum), zap.Uint64("stop_block_num", b.ExclusiveEndBlock))
+
+	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.String("file_name", stateFileName))
 	return nil
 }
 
 func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+	if b.partialMode {
+		panic("cannot load a state in partial mode")
+	}
+
 	zlog.Debug("loading delta",
 		zap.String("builder_name", b.Name),
 		zap.Uint64("from_block", fromBlock),
@@ -323,7 +341,7 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (filename str
 }
 
 func (b *Builder) writeState(ctx context.Context, content []byte) (string, error) {
-	filename := StateFileName(b.ModuleStartBlock, b.ExclusiveEndBlock)
+	filename := StateFileName(b.StartBlock, b.ExclusiveEndBlock)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
 		return filename, fmt.Errorf("writing state %s at block num %d: %w", b.Name, b.ExclusiveEndBlock, err)
@@ -339,13 +357,13 @@ func (b *Builder) writeState(ctx context.Context, content []byte) (string, error
 		return "", fmt.Errorf("writing state info for builder %q: %w", b.Name, err)
 	}
 	b.info = info
-	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("block_num", b.ModuleStartBlock), zap.String("file_name", filename))
+	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("block_num", b.StartBlock), zap.String("file_name", filename))
 
 	return filename, err
 }
 
 func (b *Builder) writePartialState(ctx context.Context, content []byte) (string, error) {
-	filename := PartialFileName(b.startBlock, b.ExclusiveEndBlock)
+	filename := PartialFileName(b.StartBlock, b.ExclusiveEndBlock)
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 

@@ -1,7 +1,6 @@
 package state
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+//todo: @colin replace all these keys by a struct
 var (
 	updatePolicyKey     = strings.Join([]string{string([]byte{255}), "update-policy"}, "")
 	valueTypeKey        = strings.Join([]string{string([]byte{255}), "value-type"}, "")
@@ -30,7 +30,7 @@ func (b *Builder) writeMergeValues() {
 	b.KV[updatePolicyKey] = []byte(strconv.Itoa(int(b.updatePolicy)))
 	b.KV[valueTypeKey] = []byte(b.valueType)
 	b.KV[moduleHashKey] = []byte(b.ModuleHash)
-	b.KV[moduleStartBlockKey] = intToBytes(int(b.ModuleStartBlock))
+	b.KV[moduleStartBlockKey] = intToBytes(int(b.StartBlock))
 	b.KV[storeNameKey] = []byte(b.Name)
 }
 
@@ -42,54 +42,14 @@ func (b *Builder) clearMergeValues() {
 	delete(b.KV, storeNameKey)
 }
 
-func readMergeValues(kv map[string][]byte) (updatedKV map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, moduleHash string, moduleStartBlock uint64, storeName string) {
-	//mega-hack because json marshalling converts invalid UTF-8 (in our case byte 255) to Unicode replacement character U+FFFD (byte 239-191-189)  (see json package documentation)
-	//here, we convert that back to byte 255
-	//todo: do this in json.Unmarshal implementation of a new KV type.
-	for k, v := range kv {
-		bk := []byte(k)
-		if bytes.HasPrefix([]byte(k), []byte{239, 191, 189}) {
-			bk := bytes.Replace(bk, []byte{239, 191, 189}, []byte{255}, 1)
-			delete(kv, k)
-			kv[string(bk)] = v
-		}
-	}
-
-	if updatePolicyBytes, ok := kv[updatePolicyKey]; ok {
-		updatePolicyInt, err := strconv.Atoi(string(updatePolicyBytes))
-		if err != nil {
-			panic(fmt.Errorf("parsing update policy value: %w", err))
-		}
-		updatePolicy = pbsubstreams.Module_KindStore_UpdatePolicy(int32(updatePolicyInt))
-	}
-
-	if valueTypeBytes, ok := kv[valueTypeKey]; ok {
-		valueType = string(valueTypeBytes)
-	}
-
-	if moduleHashBytes, ok := kv[moduleHashKey]; ok {
-		moduleHash = string(moduleHashBytes)
-	}
-
-	if moduleStartBlockBytes, ok := kv[moduleStartBlockKey]; ok {
-		moduleStartBlock = uint64(bytesToInt(moduleStartBlockBytes))
-	}
-
-	if storeNameBytes, ok := kv[storeNameKey]; ok {
-		storeName = string(storeNameBytes)
-	}
-
-	updatedKV = kv
-
-	return
-}
-
 func (b *Builder) Merge(previous *Builder) error {
+	//todo: @colin replace next to line by ... delete key of meta data struct here and bring it back in a defer
+	b.clearMergeValues()
+	defer b.writeMergeValues()
+
 	next := b
 
 	//special key values are not of the correct type for the KV, so we delete them and set them back afterwards.
-	b.clearMergeValues()
-	defer b.writeMergeValues()
 
 	if next.updatePolicy != previous.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", next.updatePolicy, previous.updatePolicy)
@@ -320,7 +280,7 @@ func (b *Builder) Merge(previous *Builder) error {
 
 	next.partialMode = previous.partialMode
 	if next.partialMode {
-		next.startBlock = previous.startBlock
+		next.StartBlock = previous.StartBlock
 	}
 
 	return nil

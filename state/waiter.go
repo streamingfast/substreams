@@ -3,8 +3,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -98,7 +96,7 @@ func (w *FileWaiter) Wait(ctx context.Context, requestStartBlock uint64, moduleS
 //				//
 //			}
 //
-//			fileName := StateFileName(endBlock, moduleStartBlock)
+//			fileName := FullStateFileName(endBlock, moduleStartBlock)
 //			zlog.Info("looking for kv file:", zap.String("file_name", fileName))
 //			exists, err := store.FileExists(ctx, fileName)
 //			if err != nil {
@@ -137,7 +135,7 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 				return
 			}
 
-			prefix := StateFilePrefix(waitForBlockNum)
+			prefix := FullStateFilePrefix(waitForBlockNum)
 			files, err := store.ListFiles(ctx, prefix, "", 1)
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
@@ -184,7 +182,7 @@ func pathToState(ctx context.Context, storeName string, store dstore.Store, requ
 			//
 		}
 
-		prefix := StateFilePrefix(nextBlockNum)
+		prefix := FullStateFilePrefix(nextBlockNum)
 		files, err := store.ListFiles(ctx, prefix, "", 2)
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
@@ -249,43 +247,4 @@ type fileWaitResult struct {
 
 func (f fileWaitResult) Error() string {
 	return f.Err.Error()
-}
-
-var fullKVRegex *regexp.Regexp
-var partialKVRegex *regexp.Regexp
-var stateFileRegex *regexp.Regexp
-
-func init() {
-	stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.(kv|partial)`)
-}
-
-type FileInfo struct {
-	StartBlock uint64
-	EndBlock   uint64
-	Partial    bool
-}
-
-func ParseFileName(filename string) (*FileInfo, bool) {
-	res := stateFileRegex.FindAllStringSubmatch(filename, 1)
-	if len(res) != 1 {
-		return nil, false
-	}
-
-	end := uint64(mustAtoi(res[0][1]))
-	start := uint64(mustAtoi(res[0][2]))
-	partial := res[0][3] == "partial"
-
-	return &FileInfo{
-		StartBlock: start,
-		EndBlock:   end,
-		Partial:    partial,
-	}, true
-}
-
-func mustAtoi(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
-	}
-	return i
 }

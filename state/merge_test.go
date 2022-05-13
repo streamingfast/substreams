@@ -7,26 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMergeValues(t *testing.T) {
-	b := &Builder{
-		KV:           map[string][]byte{},
-		valueType:    OutputValueTypeInt64,
-		updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM,
-	}
-
-	b.writeMergeValues()
-	_, ok := b.KV[valueTypeKey]
-	assert.True(t, ok)
-	_, ok = b.KV[updatePolicyKey]
-	assert.True(t, ok)
-	_, ok = b.KV[moduleStartBlockKey]
-	assert.True(t, ok)
-	_, ok = b.KV[moduleHashKey]
-	assert.True(t, ok)
-	_, ok = b.KV[storeNameKey]
-	assert.True(t, ok)
-}
-
 func TestBuilder_Merge(t *testing.T) {
 	tests := []struct {
 		name            string

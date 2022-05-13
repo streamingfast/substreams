@@ -640,10 +640,13 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 			}
 
+			var nextBlockRangeStart *uint64
 			if p.partialMode {
-				builder.BlockRange.StartBlock = builder.BlockRange.ExclusiveEndBlock
+				nextBlockRangeStart = uint64Pointer(builder.BlockRange.ExclusiveEndBlock)
 			}
-			builder.BlockRange.ExclusiveEndBlock += p.storesSaveInterval
+			nextBlockRangeEnd := uint64Pointer(builder.BlockRange.ExclusiveEndBlock + p.storesSaveInterval)
+
+			builder.UpdateBlockRange(nextBlockRangeStart, nextBlockRangeEnd)
 
 			zlog.Info("state written", zap.String("store_name", builder.Name), zap.String("file_name", fileName))
 		}
@@ -671,4 +674,10 @@ func (p *Pipeline) InitializeStores(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func uint64Pointer(val uint64) *uint64 {
+	p := new(uint64)
+	*p = val
+	return p
 }

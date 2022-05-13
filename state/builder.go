@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
@@ -46,6 +48,15 @@ type Builder struct {
 	valueType    string
 	lastOrdinal  uint64
 	partialMode  bool
+}
+
+func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("builder_name", b.Name)
+	enc.AddUint64("start_block", b.StartBlock)
+	enc.AddUint64("end_block", b.ExclusiveEndBlock)
+	enc.AddBool("partial", b.partialMode)
+
+	return nil
 }
 
 type BuilderOption func(b *Builder)

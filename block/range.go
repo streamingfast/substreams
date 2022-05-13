@@ -2,7 +2,9 @@ package block
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
+	"go.uber.org/zap/zapcore"
 )
 
 type Range struct {
@@ -12,6 +14,13 @@ type Range struct {
 
 func (r *Range) String() string {
 	return fmt.Sprintf("start: %d exclusiveEndBlock: %d", r.StartBlock, r.ExclusiveEndBlock)
+}
+
+func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddUint64("start_block", r.StartBlock)
+	enc.AddUint64("end_block", r.ExclusiveEndBlock)
+
+	return nil
 }
 
 func (r *Range) Contains(blockRef bstream.BlockRef) bool {

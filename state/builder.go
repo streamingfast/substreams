@@ -111,14 +111,13 @@ func (b *Builder) Flush() {
 	b.lastOrdinal = 0
 }
 
-func (b *Builder) UpdateBlockRange(startBlock *uint64, endblock *uint64) {
-	if startBlock != nil {
-		b.BlockRange.StartBlock = *startBlock
-	}
-
-	if endblock != nil {
-		b.BlockRange.ExclusiveEndBlock = *endblock
-	}
+func (b *Builder) Roll() {
+	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.saveInterval
+}
+func (b *Builder) RollPartial() {
+	b.KV = map[string][]byte{}
+	b.BlockRange.StartBlock = b.BlockRange.ExclusiveEndBlock
+	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.saveInterval
 }
 
 func (b *Builder) bumpOrdinal(ord uint64) {

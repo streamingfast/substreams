@@ -637,18 +637,21 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 
 	if !isFirstRequestBlock && intervalReached {
 		for _, builder := range p.builders {
-			fileName, err := builder.WriteState(ctx, p.clock.Number)
+			fileName, err := builder.WriteState(ctx)
 			if err != nil {
 				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 			}
 
-			var nextBlockRangeStart *uint64
+			//var nextBlockRangeStart *uint64
 			if p.partialMode {
-				nextBlockRangeStart = uint64Pointer(builder.BlockRange.ExclusiveEndBlock)
+				//nextBlockRangeStart = uint64Pointer(builder.BlockRange.ExclusiveEndBlock)
+				builder.RollPartial()
+				continue
 			}
-			nextBlockRangeEnd := uint64Pointer(builder.BlockRange.ExclusiveEndBlock + p.storesSaveInterval)
-
-			builder.UpdateBlockRange(nextBlockRangeStart, nextBlockRangeEnd)
+			builder.Roll()
+			//nextBlockRangeEnd := uint64Pointer(builder.BlockRange.ExclusiveEndBlock + p.storesSaveInterval)
+			//
+			//builder.UpdateBlockRange(nextBlockRangeStart, nextBlockRangeEnd)
 
 			zlog.Info("state written", zap.String("store_name", builder.Name), zap.String("file_name", fileName))
 		}

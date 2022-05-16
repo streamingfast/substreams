@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (filename string, err error) {
+func (b *Builder) WriteState(ctx context.Context) (filename string, err error) {
 	zlog.Debug("writing state", zap.String("module", b.Name))
 
 	err = b.writeMergeValues()
@@ -37,7 +37,7 @@ func (b *Builder) WriteState(ctx context.Context, blockNum uint64) (filename str
 	}
 
 	if err != nil {
-		return "", fmt.Errorf("writing %s kv at block %d: %w", b.Name, blockNum, err)
+		return "", fmt.Errorf("writing %s kv for range %s: %w", b.Name, b.BlockRange, err)
 	}
 
 	return filename, nil

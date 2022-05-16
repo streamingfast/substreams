@@ -90,14 +90,17 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/sethvargo/go-retry v0.1.0 // indirect
 	github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 // indirect
 	github.com/streamingfast/dauth v0.0.0-20220404140613-a40f4cd81626 // indirect
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5 // indirect
+	github.com/streamingfast/derr v0.0.0-20220307162255-f277e08753fa // indirect
 	github.com/streamingfast/dmetering v0.0.0-20220307162406-37261b4b3de9 // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447 // indirect
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
+	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect

@@ -180,25 +180,24 @@ func (b *Builder) Info(ctx context.Context) (*Info, error) {
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
+	floor := requestedStartBlock - requestedStartBlock%b.saveInterval
 	if requestedStartBlock == b.ModuleStartBlock {
 		b.startBlock = requestedStartBlock
-		floor := requestedStartBlock - requestedStartBlock%b.saveInterval
 		b.ExclusiveEndBlock = floor + b.saveInterval
 		b.KV = map[string][]byte{}
 		return nil
 	}
 
-	startBlockNum := requestedStartBlock - requestedStartBlock%b.saveInterval
 	deltasStartBlock := uint64(0)
 
-	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", startBlockNum))
+	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", floor))
 
 	deltasNeeded := false
-	if startBlockNum >= b.saveInterval && startBlockNum > b.ModuleStartBlock {
-		deltasStartBlock = requestedStartBlock - startBlockNum
+	if floor >= b.saveInterval && floor > b.ModuleStartBlock {
+		deltasStartBlock = requestedStartBlock - floor
 		deltasNeeded = deltasStartBlock > 0
 
-		atBlock := startBlockNum - b.saveInterval // get the previous saved range
+		atBlock := floor - b.saveInterval // get the previous saved range
 		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
 		err := b.loadState(ctx, atBlock)
 		if err != nil {
@@ -207,6 +206,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	} else {
 		deltasNeeded = true
 		deltasStartBlock = b.ModuleStartBlock
+		b.ExclusiveEndBlock = floor + b.saveInterval
 	}
 
 	if deltasNeeded {

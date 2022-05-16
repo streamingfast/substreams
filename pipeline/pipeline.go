@@ -598,7 +598,7 @@ func createSynchronizeStoreReq(ctx context.Context, builder *state.Builder, upTo
 		return nil, fmt.Errorf("getting builder info: %w", err)
 	}
 	lastExclusiveEndBlock := info.LastKVSavedBlock
-
+	zlog.Debug("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
 	if upToBlockNum <= lastExclusiveEndBlock {
 		zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
 		return nil, nil

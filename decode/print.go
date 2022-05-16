@@ -10,37 +10,43 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func NewPrintReturnHandler(manif *manifest.Manifest, fileDescs []*desc.FileDescriptor, outputStreamNames []string, prettyPrint bool) substreams.ReturnFunc {
+func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ReturnFunc {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
-	for _, mod := range manif.Modules {
+	fileDescs, err := desc.CreateFileDescriptorFromSet(&descriptorpb.FileDescriptorSet{File: pkg.ProtoFiles})
+	if err != nil {
+		panic("couldn't convert, should do this check much earlier")
+	}
+
+	for _, mod := range pkg.Modules.Modules {
 		for _, outputStreamName := range outputStreamNames {
 			if mod.Name == outputStreamName {
 				var msgType string
 				var isStore bool
-				if mod.Kind == "store" {
+				switch modKind := mod.Kind.(type) {
+				case *pbsubstreams.Module_KindStore_:
 					isStore = true
-					msgType = mod.ValueType
-				} else {
-					msgType = mod.Output.Type
+					msgType = modKind.KindStore.ValueType
+				case *pbsubstreams.Module_KindMap_:
+					msgType = modKind.KindMap.OutputType
 				}
 				msgType = strings.TrimPrefix(msgType, "proto:")
 
 				msgTypes[mod.Name] = msgType
 
 				var msgDesc *desc.MessageDescriptor
-				for _, file := range fileDescs {
-					msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
-					if msgDesc != nil {
-						break
-					}
+				// for _, file := range fileDescs {
+				msgDesc = fileDescs.FindMessage(msgType) //todo: make sure it works relatively-wise
+				if msgDesc != nil {
+					break
 				}
+				// }
 
 				decodeMsgType := func(in []byte) string {
 					if msgDesc == nil {

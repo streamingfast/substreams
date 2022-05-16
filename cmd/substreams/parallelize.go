@@ -22,12 +22,17 @@ func runParallelizeE(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 	streamName := args[1]
 
-	manif, err := manifest.New(manifestPath)
+	pkg, err := manifest.New(manifestPath)
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	stores, err := manif.Graph.StoresDownTo([]string{streamName})
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return fmt.Errorf("computing module graph: %w", err)
+	}
+
+	stores, err := graph.StoresDownTo([]string{streamName})
 	res, err := json.Marshal(manifest.ModuleMarshaler(stores))
 	if err != nil {
 		return err

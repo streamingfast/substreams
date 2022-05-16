@@ -3,11 +3,11 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/scheduler"
+	"github.com/streamingfast/substreams/squasher"
 	"io"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -530,114 +530,61 @@ func SynchronizeStores(
 ) error {
 	zlog.Info("synchronizing stores")
 
-	for _, builder := range builders {
-		zlog.Debug("synchronizing store", zap.String("module_nane", builder.Name))
-		req, err := createSynchronizeStoreReq(ctx, builder, upToBlockNum, request.ForkSteps, request.IrreversibilityCondition, request.Manifest)
-		if err != nil {
-			return fmt.Errorf("synchronize stores: %w", err)
-		}
-		//todo: instead of ranging over builders to send requests, loop over ranges.
-		// for each range, create a waitgroup to wait for range to be complete and then squash <-squasher code to be done separately
-	}
+	var sq *squasher.Squasher
+	s := scheduler.NewScheduler(context.TODO(), request, builders, sq)
+	for {
+		err := s.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
+			zlog.Debug("request", zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum), zap.Strings("stores", req.OutputModules))
 
-	var ranges []*block.Range
-
-	for _, r := range ranges {
-
-		wg := sync.WaitGroup{}
-		wg.Add(len(builders))
-
-		for _, builder := range builders {
-			go func(b *state.Builder) {
-
-			}(builder)
-		}
-
-		zlog.Debug("request created")
-
-		if req == nil {
-			zlog.Debug("synchronize store request is nil. skipping", zap.String("store", builder.Name))
-			continue
-		}
-
-		zlog.Debug("request", zap.Int64("start_block", req.StartBlockNum), zap.Uint64("stop_block", req.StopBlockNum), zap.Strings("stores", req.OutputModules))
-		zlog.Info("calling blocks request to synchronize store", zap.String("store", builder.Name), zap.Uint64("up to block", upToBlockNum))
-
-		stream, err := grpcClient.Blocks(ctx, req, grpcCallOpts...)
-		if err != nil {
-			return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
-		}
-
-		for {
-			zlog.Debug("waiting for stream response...")
-			resp, err := stream.Recv()
-
+			stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 			if err != nil {
-				if err == io.EOF {
-					return nil
-				}
-				return err
+				callback(request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
 			}
 
-			switch r := resp.Message.(type) {
-			case *pbsubstreams.Response_Progress:
-				zlog.Debug("resp received", zap.String("type", "progress"))
-				//todo: forward progress to end user
-				err := returnFunc(nil, r.Progress)
+			for {
+				zlog.Debug("waiting for stream response...")
+				resp, err := stream.Recv()
+
 				if err != nil {
-					return err
+					if err == io.EOF {
+						callback(request, nil)
+					}
+					callback(request, err)
 				}
-			case *pbsubstreams.Response_SnapshotData:
-				_ = r.SnapshotData
-			case *pbsubstreams.Response_SnapshotComplete:
-				_ = r.SnapshotComplete
-			case *pbsubstreams.Response_Data:
-				zlog.Debug("resp received", zap.String("type", "data"))
-				for _, output := range r.Data.Outputs {
-					for _, log := range output.Logs {
-						fmt.Println("LOG: ", log)
-						//todo: maybe return log ...
+
+				switch r := resp.Message.(type) {
+				case *pbsubstreams.Response_Progress:
+					zlog.Debug("resp received", zap.String("type", "progress"))
+					//todo: forward progress to end user
+					err := returnFunc(nil, r.Progress)
+					if err != nil {
+						callback(request, err)
+					}
+				case *pbsubstreams.Response_SnapshotData:
+					_ = r.SnapshotData
+				case *pbsubstreams.Response_SnapshotComplete:
+					_ = r.SnapshotComplete
+				case *pbsubstreams.Response_Data:
+					zlog.Debug("resp received", zap.String("type", "data"))
+					for _, output := range r.Data.Outputs {
+						for _, log := range output.Logs {
+							fmt.Println("LOG: ", log)
+							//todo: maybe return log ...
+						}
 					}
 				}
 			}
-		}
+		})
 
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
-}
-
-func createSynchronizeStoreReq(ctx context.Context,
-	builder *state.Builder,
-	upToBlockNum uint64,
-	forkSteps []pbsubstreams.ForkStep,
-	irreversibilityCondition string,
-	manifest *pbsubstreams.Manifest,
-) (*pbsubstreams.Request, error) {
-	if upToBlockNum == builder.ModuleStartBlock {
-		return nil, nil
-	}
-	endBlock := upToBlockNum
-
-	info, err := builder.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting builder info: %w", err)
-	}
-	lastExclusiveEndBlock := info.LastKVSavedBlock
-	zlog.Debug("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
-	if upToBlockNum <= lastExclusiveEndBlock {
-		zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
-		return nil, nil
-	}
-
-	reqStartBlock := lastExclusiveEndBlock
-	if reqStartBlock == 0 {
-		reqStartBlock = builder.ModuleStartBlock
-	}
-
-	//TODO: split up into chunks and return array of requests.
-	req := createRequest(reqStartBlock, endBlock, builder.Name, forkSteps, irreversibilityCondition, manifest)
-	return req, nil
 }
 
 func createRequest(
@@ -712,10 +659,4 @@ func (p *Pipeline) InitializeStores(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func uint64Pointer(val uint64) *uint64 {
-	p := new(uint64)
-	*p = val
-	return p
 }

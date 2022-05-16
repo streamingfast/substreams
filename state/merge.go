@@ -16,10 +16,10 @@ const (
 	OutputValueTypeBigFloat = "bigFloat"
 	OutputValueTypeString   = "string"
 
-	mergeValuesKey = "__!__metadata" ///NEVER EVER CHANGE THIS
+	mergeDataKey = "__!__metadata" ///NEVER EVER CHANGE THIS
 )
 
-func (b *Builder) writeMergeValues() error {
+func (b *Builder) writeMergeData() error {
 	mergeInfo := &mergeInfo{
 		StoreName:        b.Name,
 		UpdatePolicy:     b.updatePolicy,
@@ -33,13 +33,13 @@ func (b *Builder) writeMergeValues() error {
 		return err
 	}
 
-	b.KV[mergeValuesKey] = data
+	b.KV[mergeDataKey] = data
 
 	return nil
 }
 
-func (b *Builder) clearMergeValues() {
-	delete(b.KV, mergeValuesKey)
+func (b *Builder) clearMergeData() {
+	delete(b.KV, mergeDataKey)
 }
 
 type mergeInfo struct {
@@ -51,10 +51,14 @@ type mergeInfo struct {
 }
 
 func (b *Builder) Merge(previous *Builder) error {
-	//merge values are not of the correct type for the KV, so we delete them and set them back afterwards.
-	b.clearMergeValues()
+	if previous == nil {
+		return nil //nothing to merge
+	}
+
+	//merge data is not of the correct type for the KV, so we delete it and set it back afterwards.
+	b.clearMergeData()
 	defer func() {
-		if err := b.writeMergeValues(); err != nil {
+		if err := b.writeMergeData(); err != nil {
 			panic(err)
 		}
 	}()

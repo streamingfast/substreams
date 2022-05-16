@@ -12,7 +12,7 @@ import (
 func (b *Builder) WriteState(ctx context.Context) (filename string, err error) {
 	zlog.Debug("writing state", zap.String("module", b.Name))
 
-	err = b.writeMergeValues()
+	err = b.writeMergeData()
 	if err != nil {
 		return "", fmt.Errorf("writing merge values: %w", err)
 	}

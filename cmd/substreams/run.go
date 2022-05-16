@@ -104,12 +104,11 @@ func pack(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	_ = b
-	//	err = proto.Unmarshal(b, fds)
-	//	if err != nil {
-	//		return err
-	//	}
-	//
+	err = proto.Unmarshal(b, fds)
+	if err != nil {
+		return err
+	}
+
 	for _, fd := range fileDescs {
 		fds.File = append(fds.File, fd.AsFileDescriptorProto())
 	}

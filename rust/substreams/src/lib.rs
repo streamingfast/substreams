@@ -7,8 +7,6 @@ pub mod rpc;
 pub mod state;
 
 pub fn output<M: prost::Message>(msg: M) {
-    log::debug!("value");
-
     // Need to return the buffer and forget about it issue occured when trying to write large data
     // wasm was "dropping" the data before we could write to it, which causes us to have garbage
     // value. By forgetting the data we can properly call external output function to write the

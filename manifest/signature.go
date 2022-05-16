@@ -12,8 +12,7 @@ import (
 
 type ModuleHash []byte
 
-func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
-
+func HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
 	buf := bytes.NewBuffer(nil)
 
 	startBlockBytes := make([]byte, 8)
@@ -35,7 +34,7 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 	buf.WriteString("code")
 	switch m := module.Code.(type) {
 	case *pbsubstreams.Module_WasmCode_:
-		code := manifest.ModulesCode[m.WasmCode.Index]
+		code := modules.ModulesCode[m.WasmCode.Index]
 		buf.Write(code)
 		buf.WriteString(m.WasmCode.Entrypoint)
 	case *pbsubstreams.Module_NativeCode_:
@@ -52,7 +51,7 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 	buf.WriteString("ancestors")
 	ancestors, _ := graph.AncestorsOf(module.Name)
 	for _, ancestor := range ancestors {
-		sig := HashModule(manifest, ancestor, graph)
+		sig := HashModule(modules, ancestor, graph)
 		buf.Write(sig)
 	}
 
@@ -61,8 +60,8 @@ func HashModule(manifest *pbsubstreams.Manifest, module *pbsubstreams.Module, gr
 
 	return h.Sum(nil)
 }
-func HashModuleAsString(manifest *pbsubstreams.Manifest, graph *ModuleGraph, module *pbsubstreams.Module) string {
-	return hex.EncodeToString(HashModule(manifest, module, graph))
+func HashModuleAsString(modules *pbsubstreams.Modules, graph *ModuleGraph, module *pbsubstreams.Module) string {
+	return hex.EncodeToString(HashModule(modules, module, graph))
 }
 func inputName(input *pbsubstreams.Module_Input) string {
 	switch input.Input.(type) {

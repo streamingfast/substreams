@@ -33,10 +33,10 @@ function main() {
 
   pushd "$ROOT/pb" > /dev/null
 
-  generate "sf/ethereum/substreams/v1/rpc.proto"
   generate "sf/substreams/v1/substreams.proto"
   generate "sf/substreams/v1/clock.proto"
-  generate "sf/substreams/v1/manifest.proto"
+  generate "sf/substreams/v1/modules.proto"
+  generate "sf/substreams/v1/package.proto"
 
   popd >/dev/null
   popd >/dev/null

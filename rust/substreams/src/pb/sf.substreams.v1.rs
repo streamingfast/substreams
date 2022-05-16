@@ -1,9 +1,5 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Manifest {
-    #[prost(string, tag="1")]
-    pub spec_version: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub description: ::prost::alloc::string::String,
+pub struct Modules {
     #[prost(message, repeated, tag="3")]
     pub modules: ::prost::alloc::vec::Vec<Module>,
     #[prost(bytes="vec", repeated, tag="4")]
@@ -166,7 +162,7 @@ pub struct Request {
     #[prost(string, tag="5")]
     pub irreversibility_condition: ::prost::alloc::string::String,
     #[prost(message, optional, tag="6")]
-    pub manifest: ::core::option::Option<Manifest>,
+    pub modules: ::core::option::Option<Modules>,
     #[prost(string, repeated, tag="7")]
     pub output_modules: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="8")]

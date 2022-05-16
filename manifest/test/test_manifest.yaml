@@ -1,4 +1,4 @@
-specVersion: 0.1.0
+specVersion: v0.1.0
 description: Test WASM substream
 
 protoFiles:

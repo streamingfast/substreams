@@ -605,10 +605,12 @@ func createSynchronizeStoreReq(ctx context.Context, builder *state.Builder, upTo
 	}
 
 	if lastExclusiveEndBlock == 0 {
-		return createRequest(builder.ModuleStartBlock, endBlock, builder.Name, originalReq), nil
+		req := createRequest(builder.ModuleStartBlock, endBlock, builder.Name, originalReq)
+		return req, nil
 	}
 
-	return createRequest(lastExclusiveEndBlock, endBlock, builder.Name, originalReq), nil
+	req := createRequest(lastExclusiveEndBlock, endBlock, builder.Name, originalReq)
+	return req, nil
 }
 
 func createRequest(startBlock, stopBlock uint64, outputModuleName string, originalReq *pbsubstreams.Request) *pbsubstreams.Request {

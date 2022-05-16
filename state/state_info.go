@@ -18,7 +18,6 @@ type Info struct {
 }
 
 func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
-
 	data, err := json.Marshal(info)
 	if err != nil {
 		return fmt.Errorf("marshaling state info: %w", err)

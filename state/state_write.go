@@ -50,6 +50,16 @@ func (b *Builder) writeState(ctx context.Context, content []byte) (string, error
 		return filename, fmt.Errorf("writing state %s for range %s: %w", b.Name, b.BlockRange.String(), err)
 	}
 
+	currentInfo, err := b.Info(ctx)
+	if err != nil {
+		return "", fmt.Errorf("getting builder info: %w", err)
+	}
+
+	if currentInfo != nil && currentInfo.LastKVSavedBlock >= b.BlockRange.ExclusiveEndBlock {
+		zlog.Debug("skipping info save.")
+		return filename, nil
+	}
+
 	var info = &Info{
 		LastKVFile:        filename,
 		LastKVSavedBlock:  b.BlockRange.ExclusiveEndBlock,

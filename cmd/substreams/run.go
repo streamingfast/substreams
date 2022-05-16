@@ -3,17 +3,24 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	statikfs "github.com/rakyll/statik/fs"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	_ "github.com/streamingfast/substreams/pb/statik"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
+
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
@@ -34,6 +41,10 @@ func init() {
 	runCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
 
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(packCmd)
+
+	packCmd.Flags().StringArrayP("proto-path", "I", []string{"./proto"}, "Import paths for protobuf schemas")
+	packCmd.Flags().StringArray("proto", []string{"**/*.proto"}, "Path to explicit proto files (within proto-paths)")
 }
 
 // runCmd represents the command to run substreams remotely
@@ -43,6 +54,100 @@ var runCmd = &cobra.Command{
 	RunE:         run,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
+}
+
+var packCmd = &cobra.Command{
+	Use:   "pack <manifest>",
+	Short: "create a package from a manifest",
+	RunE:  pack,
+	Args:  cobra.ExactArgs(1),
+}
+
+func readFromStatik(filename string) ([]byte, error) {
+	sfs, err := statikfs.New()
+	if err != nil {
+		return nil, err
+	}
+	staticFDS, err := sfs.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	b, err := ioutil.ReadAll(staticFDS)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+func pack(cmd *cobra.Command, args []string) error {
+	fmt.Println("warning - not reading manifest for now, not implemented")
+
+	protoImportPaths := mustGetStringArray(cmd, "proto-path")
+	protoFilesPatterns := mustGetStringArray(cmd, "proto")
+	protoFiles, err := findProtoFiles(protoImportPaths, protoFilesPatterns)
+	if err != nil {
+		return fmt.Errorf("finding proto files: %w", err)
+	}
+	parser := protoparse.Parser{
+		ImportPaths:           protoImportPaths,
+		IncludeSourceCodeInfo: true,
+	}
+	fileDescs, err := parser.ParseFiles(protoFiles...)
+	if err != nil {
+		return fmt.Errorf("error parsing proto files %q: %w", protoFiles, err)
+	}
+
+	fds := &descriptorpb.FileDescriptorSet{}
+
+	b, err := readFromStatik("/system.pb")
+	if err != nil {
+		return err
+	}
+	_ = b
+	//	err = proto.Unmarshal(b, fds)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	for _, fd := range fileDescs {
+		fds.File = append(fds.File, fd.AsFileDescriptorProto())
+	}
+	seenFDS := make(map[string]bool)
+
+	out := &descriptorpb.FileDescriptorSet{}
+	for _, file := range fds.File {
+		s := *file.Package
+		for _, mt := range file.MessageType {
+			s += *mt.Name
+		}
+		if seenFDS[s] {
+			continue
+		}
+		out.File = append(out.File, file)
+		fmt.Printf("bundling protobuf file %q\n", *file.Name)
+		seenFDS[s] = true
+	}
+
+	b, err = proto.Marshal(out)
+	if err != nil {
+		return err
+	}
+
+	filename := "bundle.spkg"
+	fmt.Printf("Writing file: %q\n", filename)
+
+	fmt.Println(`You will need to create a file 'buf.gen.yaml' with this content:
+
+version: v1
+plugins:
+  - name: prost
+    out: gen/src
+
+And then, run 'buf generate /path/to/bundle.spkg#format=bin'`)
+
+	return ioutil.WriteFile(filename, b, fs.ModePerm)
+
 }
 
 func run(cmd *cobra.Command, args []string) error {

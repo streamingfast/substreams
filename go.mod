@@ -34,6 +34,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
+	github.com/rakyll/statik v0.1.7
 	github.com/streamingfast/cli v0.0.3
 	github.com/streamingfast/derr v0.0.0-20220307162255-f277e08753fa
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594

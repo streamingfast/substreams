@@ -49,8 +49,13 @@ version: v1
 plugins:
   - name: prost
     out: gen/src
+    opt:
+      - bytes=.
+      - compile_well_known_types
+2. run 'buf generate %s#format=bin'
 
-2. run 'buf generate %s#format=bin'`, defaultFilename)
+3. See https://crates.io/crates/protoc-gen-prost for more details
+`, defaultFilename)
 	fmt.Println("")
 	fmt.Printf("----------------------------------------\n")
 	fmt.Printf("Successfully wrote %q.\n", defaultFilename)

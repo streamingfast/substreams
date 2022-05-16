@@ -21,7 +21,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 
 	fileDescs, err := desc.CreateFileDescriptorFromSet(&descriptorpb.FileDescriptorSet{File: pkg.ProtoFiles})
 	if err != nil {
-		panic("couldn't convert, should do this check much earlier")
+		panic("couldn't convert, should do this check much earlier: " + err.Error())
 	}
 
 	for _, mod := range pkg.Modules.Modules {

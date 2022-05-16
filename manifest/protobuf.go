@@ -27,9 +27,10 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 		ImportPaths:           manif.Protobuf.ImportPaths,
 		IncludeSourceCodeInfo: true,
 	}
+
 	customFiles, err := parser.ParseFiles(manif.Protobuf.Files...)
 	if err != nil {
-		return fmt.Errorf("error parsing proto files %q: %w", manif.Protobuf.Files, err)
+		return fmt.Errorf("error parsing proto files %q (import paths: %q): %w", manif.Protobuf.Files, manif.Protobuf.ImportPaths, err)
 	}
 	for _, fd := range customFiles {
 		pkg.ProtoFiles = append(pkg.ProtoFiles, fd.AsFileDescriptorProto())

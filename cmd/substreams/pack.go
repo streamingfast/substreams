@@ -37,13 +37,12 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	fmt.Printf("Writing %q... ", defaultFilename)
 	if err := ioutil.WriteFile(defaultFilename, cnt, 0644); err != nil {
 		fmt.Println("")
 		return fmt.Errorf("writing %q: %w", defaultFilename, err)
 	}
 
-	fmt.Println(`To generate bindings for your Rust code:
+	fmt.Printf(`To generate bindings for your Rust code:
 1. create a file 'buf.gen.yaml' with this content:
 
 version: v1
@@ -51,9 +50,10 @@ plugins:
   - name: prost
     out: gen/src
 
-2. run 'buf generate /path/to/bundle.spkg#format=bin'`)
-
-	fmt.Println("done")
+2. run 'buf generate %s#format=bin'`, defaultFilename)
+	fmt.Println("")
+	fmt.Printf("----------------------------------------\n")
+	fmt.Printf("Successfully wrote %q.\n", defaultFilename)
 
 	return nil
 }

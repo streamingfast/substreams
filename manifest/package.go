@@ -52,6 +52,7 @@ func NewFromYAML(inputPath string) (pkg *pbsubstreams.Package, err error) {
 	}
 
 	if err := loadProtobufs(pkg, manif); err != nil {
+		return nil, err
 	}
 
 	if err := ValidateModules(pkg.Modules); err != nil {

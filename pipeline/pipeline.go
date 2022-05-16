@@ -3,9 +3,11 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/block"
 	"io"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -530,10 +532,27 @@ func SynchronizeStores(
 
 	for _, builder := range builders {
 		zlog.Debug("synchronizing store", zap.String("module_nane", builder.Name))
-		req, err := createSynchronizeStoreReq(ctx, builder, upToBlockNum, request)
+		req, err := createSynchronizeStoreReq(ctx, builder, upToBlockNum, request.ForkSteps, request.IrreversibilityCondition, request.Manifest)
 		if err != nil {
 			return fmt.Errorf("synchronize stores: %w", err)
 		}
+		//todo: instead of ranging over builders to send requests, loop over ranges.
+		// for each range, create a waitgroup to wait for range to be complete and then squash <-squasher code to be done separately
+	}
+
+	var ranges []*block.Range
+
+	for _, r := range ranges {
+
+		wg := sync.WaitGroup{}
+		wg.Add(len(builders))
+
+		for _, builder := range builders {
+			go func(b *state.Builder) {
+
+			}(builder)
+		}
+
 		zlog.Debug("request created")
 
 		if req == nil {
@@ -582,12 +601,19 @@ func SynchronizeStores(
 				}
 			}
 		}
+
 	}
 
 	return nil
 }
 
-func createSynchronizeStoreReq(ctx context.Context, builder *state.Builder, upToBlockNum uint64, originalReq *pbsubstreams.Request) (*pbsubstreams.Request, error) {
+func createSynchronizeStoreReq(ctx context.Context,
+	builder *state.Builder,
+	upToBlockNum uint64,
+	forkSteps []pbsubstreams.ForkStep,
+	irreversibilityCondition string,
+	manifest *pbsubstreams.Manifest,
+) (*pbsubstreams.Request, error) {
 	if upToBlockNum == builder.ModuleStartBlock {
 		return nil, nil
 	}
@@ -604,22 +630,29 @@ func createSynchronizeStoreReq(ctx context.Context, builder *state.Builder, upTo
 		return nil, nil
 	}
 
-	if lastExclusiveEndBlock == 0 {
-		req := createRequest(builder.ModuleStartBlock, endBlock, builder.Name, originalReq)
-		return req, nil
+	reqStartBlock := lastExclusiveEndBlock
+	if reqStartBlock == 0 {
+		reqStartBlock = builder.ModuleStartBlock
 	}
 
-	req := createRequest(lastExclusiveEndBlock, endBlock, builder.Name, originalReq)
+	//TODO: split up into chunks and return array of requests.
+	req := createRequest(reqStartBlock, endBlock, builder.Name, forkSteps, irreversibilityCondition, manifest)
 	return req, nil
 }
 
-func createRequest(startBlock, stopBlock uint64, outputModuleName string, originalReq *pbsubstreams.Request) *pbsubstreams.Request {
+func createRequest(
+	startBlock, stopBlock uint64,
+	outputModuleName string,
+	forkSteps []pbsubstreams.ForkStep,
+	irreversibilityCondition string,
+	manifest *pbsubstreams.Manifest,
+) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
 		StartBlockNum:            int64(startBlock),
 		StopBlockNum:             stopBlock,
-		ForkSteps:                originalReq.ForkSteps,
-		IrreversibilityCondition: originalReq.IrreversibilityCondition,
-		Manifest:                 originalReq.Manifest,
+		ForkSteps:                forkSteps,
+		IrreversibilityCondition: irreversibilityCondition,
+		Manifest:                 manifest,
 		OutputModules:            []string{outputModuleName},
 	}
 }

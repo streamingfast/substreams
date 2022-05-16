@@ -10,10 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/streamingfast/substreams/pipeline/outputs"
-
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputs"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -188,29 +187,24 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		return nil
 	}
 
-	deltasStartBlock := uint64(0)
-
 	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", floor))
 
-	deltasNeeded := false
+	deltasNeeded := true
+	deltaStartBlock := b.ModuleStartBlock
+	b.ExclusiveEndBlock = floor + b.saveInterval
 	if floor >= b.saveInterval && floor > b.ModuleStartBlock {
-		deltasStartBlock = requestedStartBlock - floor
-		deltasNeeded = deltasStartBlock > 0
-
+		deltaStartBlock = floor
+		deltasNeeded = (requestedStartBlock - floor) > 0
 		atBlock := floor - b.saveInterval // get the previous saved range
-		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
+		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltaStartBlock))
+		// b.ExclusiveEndBlock = startBlockNum + b.saveInterval occurs in the load state
 		err := b.loadState(ctx, atBlock)
 		if err != nil {
 			return fmt.Errorf("reading state file for module %q: %w", b.Name, err)
 		}
-	} else {
-		deltasNeeded = true
-		deltasStartBlock = b.ModuleStartBlock
-		b.ExclusiveEndBlock = floor + b.saveInterval
 	}
-
 	if deltasNeeded {
-		err := b.loadDelta(ctx, deltasStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
+		err := b.loadDelta(ctx, deltaStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
 		if err != nil {
 			return fmt.Errorf("loading delta for builder %q: %w", b.Name, err)
 		}
@@ -252,6 +246,7 @@ func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock u
 		zap.Uint64("from_block", fromBlock),
 		zap.Uint64("stop_block", exclusiveStopBlock),
 	)
+
 	startBlockNum := outputs.ComputeStartBlock(fromBlock, outputCacheSaveInterval)
 	outputCache := outputs.NewOutputCache(b.Name, outputCacheStore, 0)
 	err := outputCache.Load(ctx, startBlockNum)

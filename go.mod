@@ -34,6 +34,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
+	github.com/pelletier/go-toml/v2 v2.0.1
 	github.com/streamingfast/cli v0.0.3
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/wasmerio/wasmer-go v1.0.4
@@ -84,7 +85,6 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/openzipkin/zipkin-go v0.1.6 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

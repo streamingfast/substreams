@@ -25,6 +25,43 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 	return b.loadState(ctx, fileName)
 }
 
+//func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+//
+//	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
+//	floor := requestedStartBlock - requestedStartBlock%b.saveInterval
+//	if requestedStartBlock == b.ModuleStartBlock {
+//		b.startBlock = requestedStartBlock
+//		b.ExclusiveEndBlock = floor + b.saveInterval
+//		b.KV = map[string][]byte{}
+//		return nil
+//	}
+//
+//	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", floor))
+//
+//	deltasNeeded := true
+//	deltaStartBlock := b.ModuleStartBlock
+//	b.ExclusiveEndBlock = floor + b.saveInterval
+//	if floor >= b.saveInterval && floor > b.ModuleStartBlock {
+//		deltaStartBlock = floor
+//		deltasNeeded = (requestedStartBlock - floor) > 0
+//		atBlock := floor - b.saveInterval // get the previous saved range
+//		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltaStartBlock))
+//		// b.ExclusiveEndBlock = startBlockNum + b.saveInterval occurs in the load state
+//		err := b.loadState(ctx, atBlock)
+//		if err != nil {
+//			return fmt.Errorf("reading state file for module %q: %w", b.Name, err)
+//		}
+//	}
+//	if deltasNeeded {
+//		err := b.loadDelta(ctx, deltaStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
+//		if err != nil {
+//			return fmt.Errorf("loading delta for builder %q: %w", b.Name, err)
+//		}
+//	}
+//
+//	return nil
+//}
+
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
 	b.BlockRange.StartBlock = b.ModuleStartBlock
 
@@ -41,10 +78,12 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 
 	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", floor))
 
-	deltasNeeded := false
+	deltasNeeded := true
+	deltasStartBlock = b.ModuleStartBlock
+	b.BlockRange.ExclusiveEndBlock = floor + b.saveInterval
 	if floor >= b.saveInterval && floor > b.BlockRange.StartBlock {
-		deltasStartBlock = requestedStartBlock - floor
-		deltasNeeded = deltasStartBlock > 0
+		deltasStartBlock = floor
+		deltasNeeded = (requestedStartBlock - floor) > 0
 
 		atBlock := floor - b.saveInterval // get the previous saved range
 		b.BlockRange.ExclusiveEndBlock = floor
@@ -58,12 +97,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		if err != nil {
 			return fmt.Errorf("reading state file for module %q: %w", b.Name, err)
 		}
-	} else {
-		deltasNeeded = true
-		deltasStartBlock = b.BlockRange.StartBlock
-		b.BlockRange.ExclusiveEndBlock = floor + b.saveInterval
 	}
-
 	if deltasNeeded {
 		err := b.loadDelta(ctx, deltasStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
 		if err != nil {

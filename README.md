@@ -3,20 +3,37 @@ Substreams - A streaming data engine for The Graph - by StreamingFast
 
 DEVELOPER PREVIEW OF SUBSTREAMS
 
-Think Fluvio for deterministic blockchain data.
+Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
 
-The successor of https://github.com/streamingfast/sparkle, enabling greater composability, yet similar powers of parallelisation, and a much simpler model to work with.
+It enables you to write Rust modules, composing data streams alongside
+the community, and provides extremely high performance indexing by
+virtue of parallelization, in a streaming first fashion.
+
+It has all the benefits of the Firehose, like low cost caching and
+archiving of blockchain data, high throughput processing, and
+cursor-based reorgs handling.
+
+Substreams is the successor of
+https://github.com/streamingfast/sparkle, enabling greater
+composability, yet similar powers of parallelization, and a much
+simpler model to work with.
 
 
 
-Install client
---------------
+## Install the `substreams` command-line tool
 
-This client will allow you to interact with Substreams endpoints, and stream data in real-time.
+The `substreams` CLI allows you to interact with Substreams endpoints,
+stream data in real-time, as well as package your own Substreams modules.
 
-Get a [release](https://github.com/streamingfast/substreams/releases).
+1. Get a [release](https://github.com/streamingfast/substreams/releases).
 
-From source:
+2. Or build from source quickly:
+
+```
+go install github.com/streamingfast/substreams/cmd/substreams@latest
+```
+
+3. Or build from source and start hacking:
 
 ```
 git clone git@github.com:streamingfast/substreams
@@ -24,36 +41,11 @@ cd substreams
 go install -v ./cmd/substreams
 ```
 
-From source without checkout:
 
-```
-go install github.com/streamingfast/substreams/cmd/substreams@latest
-```
+## Usage
 
+Get streaming right away using. To use StreamingFast's infrastructure, dump that somewhere like `.bashrc`:
 
-Install dependencies to build Substreams
-----------------------------------------
-
-This will allow you to develop Substreams modules locally, and run them remotely.
-
-
-### Install rust
-
-We're going to be using the [Rust programming language](https://www.rust-lang.org/), to develop some custom logic.
-
-There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-Run remotely
-------------
-
-Using StreamingFast's infrastructure
-
-
-Dump that somewhere like `.bashrc`:
 ```bash
 export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  # Ask us on Discord for a key
 function sftoken {
@@ -63,33 +55,64 @@ function sftoken {
 }
 ```
 
-Then in your shell, load a key in an env var with:
+Then in your shell, load a key into an environment variable with:
 
 ```bash
 sftoken
 ```
 
-Then, try to run the **PancakeSwap Substreams** from our [Substreams Playground](https://github.com/streamingfast/substreams-playground) project
-
-> The below commands will be run from `substreams-playground`
+And run:
 
 ```
-cd ./pcs-rust/ && ./build.sh
-cd ../eth-token/ && ./build.sh
-cd ..
-substreams run -e bsc-dev.streamingfast.io:443 ./pcs-rust/substreams.yaml pairs,block_to_pairs,volumes,totals,db_out -s 6810706 -t 6810711
+substreams run -e bsc-dev.streamingfast.io:443 \
+   https://github.com/streamingfast/substreams-playground/releases/download/v0.5.0/pcs-v0.5.0.spkg \
+   block_to_pairs,pairs,db_out \
+   -s 6810706 -t 6810711
 ```
 
-Run locally
------------
 
-You can run the substreams service locally this way:
+## Packages
 
-Get a recent release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), and install `sfeth`.
+Substreams packages, ending in `.spkg` contain all what is needed to
+start streaming from Substreams endpoints from client consumers in any
+language supported by Protobuf.
+
+They contain compiled WASM code, dependent modules, documentation,
+protobuf schemas, all in one file.
+
+Build yourself a package using:
+
+```
+substreams pack ./substreams.yaml
+```
+
+See [sample packages here](https://github.com/streamingfast/substreams-playground/releases).
+
+
+
+## Develop your own Substreams Modules
+
+
+### Install rust
+
+We're going to be using the [Rust programming language](https://www.rust-lang.org/), to develop Substreams Modules.
+
+There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+
+## Running locally
+
+You can run the Substreams service locally this way:
+
+1. Get a recent release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), and install `sfeth`.
 
 Alternatively, you can use this Docker image: `ghcr.io/streamingfast/sf-ethereum:6aa70ca`, known to work with version v0.0.5-beta of the `substreams` release herein.
 
-Get some data (merged blocks) to play with locally (here on BSC mainnet):
+2. Get some data (merged blocks) to play with locally (here on BSC mainnet):
 
 ```bash
 # Downloads 2.6GB of data
@@ -97,14 +120,27 @@ sfeth tools download-from-firehose bsc-dev.streamingfast.io:443 6810000 6820000 
 sfeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
 
-Then run the `firehose` service locally in a terminal, reading blocks from your disk:
+3. Then run the `firehose` service locally in a terminal, reading blocks from your disk:
 
 ```bash
 sfeth start firehose  --config-file=  --log-to-file=false  --common-blockstream-addr=  --common-blocks-store-url=./localdata --firehose-grpc-listen-addr=:9000* --substreams-enabled --substreams-rpc-endpoint=https://URL.POINTING.TO.A.BSC.ARCHIVE.NODE/if-you/want-to-use/eth_call/within/substreams
 ```
 
-And then run the `substreams` command against your local deployment (checkout `substreams-playground` in the _Run remotely_ section above):
+4. And then run the `substreams` command against your local deployment (checkout `substreams-playground` in the _Run remotely_ section above):
 
 ```bash
-substreams run -k -e localhost:9000 wasm_substreams_manifest.yaml pairs,block_to_pairs,db_out,volumes,totals -s 6810706 -t 6810711
+substreams run -k -e localhost:9000  # ...
 ```
+
+
+## Community
+
+Need any help? Reach out!
+
+* [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
+* [The Graph Discord](https://discord.gg/vtvv7FP)
+
+
+## License
+
+[Apache 2.0](LICENSE)

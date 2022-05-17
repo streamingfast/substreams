@@ -18,7 +18,7 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 	b.partialMode = true
 	b.BlockRange = &block.Range{
 		StartBlock:        startBlock,
-		ExclusiveEndBlock: startBlock + b.saveInterval,
+		ExclusiveEndBlock: startBlock + b.SaveInterval,
 	}
 
 	fileName := PartialFileName(b.BlockRange)
@@ -66,10 +66,10 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	b.BlockRange.StartBlock = b.ModuleStartBlock
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
-	floor := requestedStartBlock - requestedStartBlock%b.saveInterval
+	floor := requestedStartBlock - requestedStartBlock%b.SaveInterval
 	if requestedStartBlock == b.BlockRange.StartBlock {
 		b.BlockRange.StartBlock = requestedStartBlock
-		b.BlockRange.ExclusiveEndBlock = floor + b.saveInterval
+		b.BlockRange.ExclusiveEndBlock = floor + b.SaveInterval
 		b.KV = map[string][]byte{}
 		return nil
 	}
@@ -80,12 +80,12 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 
 	deltasNeeded := true
 	deltasStartBlock = b.ModuleStartBlock
-	b.BlockRange.ExclusiveEndBlock = floor + b.saveInterval
-	if floor >= b.saveInterval && floor > b.BlockRange.StartBlock {
+	b.BlockRange.ExclusiveEndBlock = floor + b.SaveInterval
+	if floor >= b.SaveInterval && floor > b.BlockRange.StartBlock {
 		deltasStartBlock = floor
 		deltasNeeded = (requestedStartBlock - floor) > 0
 
-		atBlock := floor - b.saveInterval // get the previous saved range
+		atBlock := floor - b.SaveInterval // get the previous saved range
 		b.BlockRange.ExclusiveEndBlock = floor
 		fileName := FullStateFileName(&block.Range{
 			StartBlock:        b.ModuleStartBlock,

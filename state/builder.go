@@ -16,7 +16,7 @@ type BuilderOption func(b *Builder)
 type Builder struct {
 	Name         string
 	Store        dstore.Store
-	saveInterval uint64
+	SaveInterval uint64
 
 	ModuleStartBlock uint64
 	BlockRange       *block.Range
@@ -49,6 +49,22 @@ func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+func (b *Builder) FromBlockRange(blockRange *block.Range, partialMode bool) *Builder {
+	return &Builder{
+		Name:             b.Name,
+		Store:            b.Store,
+		SaveInterval:     b.SaveInterval,
+		ModuleStartBlock: b.ModuleStartBlock,
+		BlockRange:       blockRange,
+		ModuleHash:       b.ModuleHash,
+		KV:               map[string][]byte{},
+		Deltas:           []*pbsubstreams.StoreDelta{},
+		updatePolicy:     b.updatePolicy,
+		valueType:        b.valueType,
+		partialMode:      partialMode,
+	}
+}
+
 func NewBuilder(name string, saveInterval uint64, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -61,7 +77,7 @@ func NewBuilder(name string, saveInterval uint64, moduleStartBlock uint64, modul
 		updatePolicy:     updatePolicy,
 		valueType:        valueType,
 		Store:            subStore,
-		saveInterval:     saveInterval,
+		SaveInterval:     saveInterval,
 		ModuleStartBlock: moduleStartBlock,
 		BlockRange:       &block.Range{},
 	}
@@ -112,12 +128,12 @@ func (b *Builder) Flush() {
 }
 
 func (b *Builder) Roll() {
-	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.saveInterval
+	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.SaveInterval
 }
 func (b *Builder) RollPartial() {
 	b.KV = map[string][]byte{}
 	b.BlockRange.StartBlock = b.BlockRange.ExclusiveEndBlock
-	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.saveInterval
+	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.SaveInterval
 }
 
 func (b *Builder) bumpOrdinal(ord uint64) {

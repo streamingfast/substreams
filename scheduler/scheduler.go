@@ -18,7 +18,7 @@ type Scheduler struct {
 	ctx           context.Context
 	ctxCancelFunc context.CancelFunc
 
-	squasher *squasher.Squasher
+	squasher squasher.Squasher
 	requests []*pbsubstreams.Request
 }
 
@@ -82,7 +82,7 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 	}
 
 	for _, output := range r.GetOutputModules() {
-		err = s.squasher.Squash(output, &block.Range{
+		err = s.squasher.Squash(s.ctx, output, &block.Range{
 			StartBlock:        uint64(r.StartBlockNum),
 			ExclusiveEndBlock: r.StopBlockNum,
 		})

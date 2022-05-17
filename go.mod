@@ -34,7 +34,9 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
+	github.com/rakyll/statik v0.1.7
 	github.com/streamingfast/cli v0.0.3
+	github.com/streamingfast/derr v0.0.0-20220307162255-f277e08753fa
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
@@ -84,12 +86,12 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/openzipkin/zipkin-go v0.1.6 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/sethvargo/go-retry v0.1.0 // indirect
 	github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 // indirect
 	github.com/streamingfast/dauth v0.0.0-20220404140613-a40f4cd81626 // indirect
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5 // indirect
@@ -98,10 +100,12 @@ require (
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
+	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
+	golang.org/x/mod v0.5.1 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect

@@ -4,9 +4,9 @@ package sf.substreams.v1;
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
 
-message Manifest {
-  string spec_version = 1;
-  string description = 2;
+message Modules {
+  reserved 1; // was spec version, moved to Package
+  reserved 2; // was description, moved to Package
   repeated Module modules = 3;
   repeated bytes modules_code = 4;
 }

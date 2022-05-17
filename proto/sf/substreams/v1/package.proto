@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package sf.substreams.v1;
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
+
+import "google/protobuf/descriptor.proto";
+import "sf/substreams/v1/modules.proto";
+
+message Package {
+  // Needs to be one so this file can be used _directly_ as a
+  // buf `Image` andor a ProtoSet for grpcurl and other tools
+  repeated google.protobuf.FileDescriptorProto proto_files = 1;
+  reserved 2; // In case protosets add a field some day.
+  reserved 3; // In case protosets add a field some day.
+  reserved 4; // In case protosets add a field some day.
+
+  uint64 version = 5;
+  sf.substreams.v1.Modules modules = 6;
+  repeated ModuleMetadata module_meta = 7;
+  repeated PackageMetadata package_meta = 8;
+}
+
+message PackageMetadata {
+  string version = 1;
+  string url = 2;
+  string name = 3;
+  string doc = 4;
+}
+
+message ModuleMetadata {
+  // Corresponds to the index in `Package.metadata.package_meta`
+  uint64 package_index = 1;
+  string doc = 2;
+}

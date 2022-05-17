@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -11,14 +12,15 @@ import (
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"gopkg.in/yaml.v3"
 )
 
 const UNSET = math.MaxUint64
 
-var ModuleNameRegexp *regexp.Regexp
+var moduleNameRegexp *regexp.Regexp
 
 func init() {
-	ModuleNameRegexp = regexp.MustCompile(`^[a-zA-Z]+[\w]*$`)
+	moduleNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_]{0,63})$`)
 }
 
 const (
@@ -26,17 +28,34 @@ const (
 	ModuleKindMap   = "map"
 )
 
+// Manifest is a YAML structure used to create a Package and its list
+// of Modules. The notion of a manifest does not live in protobuf definitions.
 type Manifest struct {
-	SpecVersion string    `yaml:"specVersion"`
-	Description string    `yaml:"description"`
-	ProtoFiles  []string  `yaml:"protoFiles"`
-	Modules     []*Module `yaml:"modules"`
+	SpecVersion string      `yaml:"specVersion"` // check that it equals v0.1.0
+	Package     PackageMeta `yaml:"package"`
+	Protobuf    Protobuf    `yaml:"protobuf"`
+	Imports     mapSlice    `yaml:"imports"`
+	Modules     []*Module   `yaml:"modules"`
 
-	Graph *ModuleGraph `yaml:"-"`
+	Graph   *ModuleGraph `yaml:"-"`
+	Workdir string       `yaml:"-"`
+}
+
+type PackageMeta struct {
+	Name    string `yaml:"name"`
+	Version string `yaml:"version"` // Semver for package authors
+	URL     string `yaml:"url"`
+	Doc     string `yaml:"doc"`
+}
+
+type Protobuf struct {
+	Files       []string `yaml:"files"`
+	ImportPaths []string `yaml:"importPaths"`
 }
 
 type Module struct {
 	Name       string  `yaml:"name"`
+	Doc        string  `yaml:"doc"`
 	Kind       string  `yaml:"kind"`
 	StartBlock *uint64 `yaml:"startBlock"`
 
@@ -69,39 +88,21 @@ type StreamOutput struct {
 	Type string `yaml:"type"`
 }
 
-func New(manifestFile string) (m *Manifest, err error) {
-	m, err = newWithoutLoad(manifestFile)
+func loadManifestFile(inputPath string) (*Manifest, error) {
+	m, err := decodeYamlManifestFromFile(inputPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding yaml: %w", err)
 	}
 
-	absoluteManifestPath, err := filepath.Abs(manifestFile)
+	absoluteManifestPath, err := filepath.Abs(inputPath)
 	if err != nil {
 		return nil, fmt.Errorf("getting absolute path: %w", err)
 	}
 
-	workingDir := path.Dir(absoluteManifestPath)
+	m.Workdir = path.Dir(absoluteManifestPath)
 
-	for _, s := range m.Modules {
-		if s.Code.File != "" {
-			s.Code.File = path.Join(workingDir, s.Code.File)
-			cnt, err := ioutil.ReadFile(s.Code.File)
-			if err != nil {
-				return nil, fmt.Errorf("reading file %q: %w", s.Code.File, err)
-			}
-			if len(cnt) == 0 {
-				return nil, fmt.Errorf("reference wasm file empty: %s", s.Code.File)
-			}
-			s.Code.Content = cnt
-		}
-	}
-	return
-}
-
-func newWithoutLoad(path string) (*Manifest, error) {
-	_, m, err := DecodeYamlManifestFromFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("decoding yaml: %w", err)
+	if m.SpecVersion != "v0.1.0" {
+		return nil, fmt.Errorf("invalid 'specVersion', must be v0.1.0")
 	}
 
 	// TODO: put some limits on the NUMBER of modules (max 50 ?)
@@ -109,9 +110,6 @@ func newWithoutLoad(path string) (*Manifest, error) {
 
 	for _, s := range m.Modules {
 		// TODO: let's make sure this is also checked when received in Protobuf in a remote request.
-		if !ModuleNameRegexp.MatchString(s.Name) {
-			return nil, fmt.Errorf("module name %s does not match regex %s", s.Name, ModuleNameRegexp.String())
-		}
 
 		switch s.Kind {
 		case ModuleKindMap:
@@ -145,6 +143,34 @@ func newWithoutLoad(path string) (*Manifest, error) {
 	}
 
 	return m, nil
+}
+
+func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) {
+	cnt, err := ioutil.ReadFile(yamlFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("reading substreams manifest %q: %w", yamlFilePath, err)
+	}
+	if err := yaml.NewDecoder(bytes.NewReader(cnt)).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decoding manifest content: %w", err)
+	}
+	return
+}
+
+func (m *Manifest) loadSourceCode() error {
+	for _, s := range m.Modules {
+		if s.Code.File != "" {
+			s.Code.File = path.Join(m.Workdir, s.Code.File)
+			cnt, err := ioutil.ReadFile(s.Code.File)
+			if err != nil {
+				return fmt.Errorf("reading file %q: %w", s.Code.File, err)
+			}
+			if len(cnt) == 0 {
+				return fmt.Errorf("reference wasm file %q empty", s.Code.File)
+			}
+			s.Code.Content = cnt
+		}
+	}
+	return nil
 }
 
 func (i *Input) parse() error {
@@ -217,84 +243,20 @@ func validateStoreBuilder(module *Module) error {
 	return nil
 }
 
-func (m *Manifest) PrintMermaid() {
-	fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
-
-	for _, s := range m.Modules {
-		for _, in := range s.Inputs {
-			if in.Mode != "" && in.Mode == "deltas" {
-				fmt.Printf("  %s[%s] -- %q --> %s\n",
-					strings.Split(in.Name, ":")[1],
-					strings.Replace(in.Name, ":", ": ", 1),
-					in.Mode,
-					s.Name)
-			} else {
-				fmt.Printf("  %s[%s] --> %s\n",
-					strings.Split(in.Name, ":")[1],
-					strings.Replace(in.Name, ":", ": ", 1),
-					s.Name)
-			}
-		}
-	}
-
-	fmt.Println("```")
-	fmt.Println("")
-}
-
 // TODO: there needs to be some safety checks done directly on the _pbsubstreams.Manifest_ object,
 // as we'll receive it packaged like that.
 
-func (m *Manifest) ToProto() (*pbsubstreams.Manifest, error) {
-	pbManifest := &pbsubstreams.Manifest{
-		SpecVersion: m.SpecVersion,
-		Description: m.Description,
-	}
-
-	moduleCodeIndexes := map[string]int{}
-	//todo: load wasm code and keep a map of the index
-	for _, module := range m.Modules {
-
-		switch module.Code.Type {
-		case "native":
-			modProto, err := module.ToProtoNative()
-			if err != nil {
-				return nil, err
-			}
-			pbManifest.Modules = append(pbManifest.Modules, modProto)
-
-		case "wasm/rust-v1":
-			codeIndex, found := moduleCodeIndexes[module.Code.File]
-			if !found {
-				var err error
-				codeIndex, err = m.loadCode(module.Code.File, pbManifest)
-				moduleCodeIndexes[module.Code.File] = codeIndex
-				if err != nil {
-					return nil, fmt.Errorf("loading code: %w", err)
-				}
-			}
-
-			pbModule, err := module.ToProtoWASM(uint32(codeIndex))
-			if err != nil {
-				return nil, fmt.Errorf("converting mondule, %s: %w", module.Name, err)
-			}
-			pbManifest.Modules = append(pbManifest.Modules, pbModule)
-		default:
-			return nil, fmt.Errorf("invalid code type, %s for module %s", module.Code.Type, module.Name)
-		}
-
-	}
-
-	return pbManifest, nil
-}
-
-func (m *Manifest) loadCode(codePath string, pbManifest *pbsubstreams.Manifest) (int, error) {
+func (m *Manifest) loadCode(codePath string, modules *pbsubstreams.Modules) (int, error) {
 	byteCode, err := ioutil.ReadFile(codePath)
 	if err != nil {
-		return 0, fmt.Errorf("reading code from file, %s: %w", codePath, err)
+		return 0, fmt.Errorf("reading %q: %w", codePath, err)
 	}
 
-	pbManifest.ModulesCode = append(pbManifest.ModulesCode, byteCode)
-	return len(pbManifest.ModulesCode) - 1, nil
+	// OPTIM(abourget): also check if it's not already in
+	// `ModulesCode`, by comparing its, length + hash or value.
+
+	modules.ModulesCode = append(modules.ModulesCode, byteCode)
+	return len(modules.ModulesCode) - 1, nil
 }
 
 func (m *Module) String() string {

@@ -1,4 +1,4 @@
-package cli
+package main
 
 import (
 	"fmt"
@@ -8,12 +8,13 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	_ "github.com/streamingfast/substreams/pb/statik"
+
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
@@ -23,8 +24,6 @@ func init() {
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
 	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block for blockchain firehose")
-	runCmd.Flags().StringArrayP("proto-path", "I", []string{"./proto"}, "Import paths for protobuf schemas")
-	runCmd.Flags().StringArray("proto", []string{"**/*.proto"}, "Path to explicit proto files (within proto-paths)")
 
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -34,45 +33,32 @@ func init() {
 	runCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
 
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(packCmd)
 }
 
 // runCmd represents the command to run substreams remotely
 var runCmd = &cobra.Command{
 	Use:          "run <manifest> <module_name>",
 	Short:        "Run substreams remotely",
-	RunE:         run,
+	RunE:         runRun,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 }
 
-func run(cmd *cobra.Command, args []string) error {
+func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	manifestPath := args[0]
-	manif, err := manifest.New(manifestPath)
+	pkg, err := manifest.New(manifestPath)
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
 	outputStreamNames := strings.Split(args[1], ",")
 
-	protoImportPaths := mustGetStringArray(cmd, "proto-path")
-	protoFilesPatterns := mustGetStringArray(cmd, "proto")
-	protoFiles, err := findProtoFiles(protoImportPaths, protoFilesPatterns)
-	if err != nil {
-		return fmt.Errorf("finding proto files: %w", err)
-	}
-	parser := protoparse.Parser{
-		ImportPaths: protoImportPaths,
-	}
-	fileDescs, err := parser.ParseFiles(protoFiles...)
-	if err != nil {
-		return fmt.Errorf("error parsing proto files %q: %w", protoFiles, err)
-	}
-
 	returnHandler := func(any *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error { return nil }
 	if !mustGetBool(cmd, "no-return-handler") {
-		returnHandler = decode.NewPrintReturnHandler(manif, fileDescs, outputStreamNames, !mustGetBool(cmd, "compact-output"))
+		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
 	}
 
 	failureProgressHandler := func(progress *pbsubstreams.ModulesProgress) error {
@@ -96,12 +82,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	manifProto, err := manif.ToProto()
-	if err != nil {
-		return fmt.Errorf("parse manifest to proto %q: %w", manifestPath, err)
-	}
-
-	graph, err := manifest.NewModuleGraph(manifProto.Modules)
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("create module graph %w", err)
 	}
@@ -134,7 +115,7 @@ func run(cmd *cobra.Command, args []string) error {
 		StartBlockNum: startBlock,
 		StopBlockNum:  stopBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
-		Manifest:      manifProto,
+		Modules:       pkg.Modules,
 		OutputModules: outputStreamNames,
 	}
 

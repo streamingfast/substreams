@@ -11,7 +11,7 @@ import (
 )
 
 func TestManifest_YamlUnmarshal(t *testing.T) {
-	_, manifest, err := DecodeYamlManifestFromFile("./test/test_manifest.yaml")
+	manifest, err := decodeYamlManifestFromFile("./test/test_manifest.yaml")
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(manifest.Modules), 1)
 }
@@ -95,11 +95,13 @@ inputs:
 //}
 
 func TestManifest_ToProto(t *testing.T) {
-	manifest, err := newWithoutLoad("./test/test_manifest.yaml")
+	manifest, err := loadManifestFile("./test/test_manifest.yaml")
 	require.NoError(t, err)
 
-	pbManifest, err := manifest.ToProto()
+	pkg, err := manifest.intoPackage()
 	require.NoError(t, err)
+
+	pbManifest := pkg.Modules
 
 	require.Equal(t, 1, len(pbManifest.ModulesCode))
 

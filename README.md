@@ -19,6 +19,10 @@ composability, yet similar powers of parallelization, and a much
 simpler model to work with.
 
 
+## Documentation
+
+Visit the [Documentation](./docs) section for details.
+
 
 ## Install the `substreams` command-line tool
 

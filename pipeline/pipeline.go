@@ -8,6 +8,7 @@ import (
 	"io"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -151,7 +152,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 
 	zlog.Info("initializing stores")
 	if err = p.InitializeStores(ctx); err != nil {
-		return nil, fmt.Errorf("synchonizing stores: %w", err)
+		return nil, fmt.Errorf("initializing stores: %w", err)
 	}
 
 	err = p.buildWASM(ctx, p.request, p.modules)
@@ -531,14 +532,62 @@ func SynchronizeStores(
 	zlog.Info("synchronizing stores")
 
 	var sq *squasher.Squasher
-	s := scheduler.NewScheduler(context.TODO(), request, builders, sq)
+
+	s, err := scheduler.NewScheduler(ctx, request, builders, upToBlockNum, sq)
+	if err != nil {
+		return fmt.Errorf("initializing scheduler: %w", err)
+	}
+
+	const numJobs = 5 // todo: get from parameter from firehose
+	jobs := make(chan *job)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(numJobs)
+
+	go func() {
+		for w := 0; w < numJobs; w++ {
+			worker(ctx, grpcClient, grpcCallOpts, returnFunc, jobs)
+			wg.Done()
+		}
+	}()
+
 	for {
 		err := s.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
-			zlog.Debug("request", zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum), zap.Strings("stores", req.OutputModules))
+			jobs <- &job{
+				request:  request,
+				callback: callback,
+			}
+		})
 
-			stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	close(jobs)
+	wg.Wait()
+
+	return nil
+}
+
+type job struct {
+	request  *pbsubstreams.Request
+	callback func(r *pbsubstreams.Request, err error)
+}
+
+func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, returnFunc substreams.ReturnFunc, jobs <-chan *job) {
+	for {
+		select {
+		case j, ok := <-jobs:
+			if !ok {
+				return
+			}
+			stream, err := grpcClient.Blocks(ctx, j.request, grpcCallOpts...)
 			if err != nil {
-				callback(request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
+				j.callback(j.request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
 			}
 
 			for {
@@ -547,9 +596,10 @@ func SynchronizeStores(
 
 				if err != nil {
 					if err == io.EOF {
-						callback(request, nil)
+						j.callback(j.request, nil)
+						return
 					}
-					callback(request, err)
+					j.callback(j.request, err)
 				}
 
 				switch r := resp.Message.(type) {
@@ -558,7 +608,7 @@ func SynchronizeStores(
 					//todo: forward progress to end user
 					err := returnFunc(nil, r.Progress)
 					if err != nil {
-						callback(request, err)
+						j.callback(j.request, err)
 					}
 				case *pbsubstreams.Response_SnapshotData:
 					_ = r.SnapshotData
@@ -574,33 +624,9 @@ func SynchronizeStores(
 					}
 				}
 			}
-		})
-
-		if err == io.EOF {
-			break
+		case <-ctx.Done():
+			return
 		}
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func createRequest(
-	startBlock, stopBlock uint64,
-	outputModuleName string,
-	forkSteps []pbsubstreams.ForkStep,
-	irreversibilityCondition string,
-	manifest *pbsubstreams.Manifest,
-) *pbsubstreams.Request {
-	return &pbsubstreams.Request{
-		StartBlockNum:            int64(startBlock),
-		StopBlockNum:             stopBlock,
-		ForkSteps:                forkSteps,
-		IrreversibilityCondition: irreversibilityCondition,
-		Manifest:                 manifest,
-		OutputModules:            []string{outputModuleName},
 	}
 }
 

@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -11,20 +13,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func New(inputFile string) (m *pbsubstreams.Package, err error) {
-	if strings.HasSuffix(inputFile, ".yaml") {
-		return NewFromYAML(inputFile)
+func New(input string) (m *pbsubstreams.Package, err error) {
+	if u, err := url.Parse(input); err == nil && u.Scheme == "http" || u.Scheme == "https" {
+		return NewFromURL(input)
 	}
-	return NewFromPackageFile(inputFile)
+	if strings.HasSuffix(input, ".yaml") {
+		return NewFromYAML(input)
+	}
+	return NewFromFile(input)
 }
 
-func NewFromPackageFile(inputFile string) (pkg *pbsubstreams.Package, err error) {
-	pkg = &pbsubstreams.Package{}
+func NewFromFile(inputFile string) (pkg *pbsubstreams.Package, err error) {
 	cnt, err := ioutil.ReadFile(inputFile)
 	if err != nil {
 		return nil, err
 	}
-	if err := proto.Unmarshal(cnt, pkg); err != nil {
+
+	return NewFromContents(inputFile, cnt)
+}
+
+func NewFromURL(input string) (pkg *pbsubstreams.Package, err error) {
+	resp, err := http.DefaultClient.Get(input)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading %q: %w", input, err)
+	}
+	cnt, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %q: %w", input, err)
+	}
+	return NewFromContents(input, cnt)
+}
+
+func NewFromContents(inputFile string, contents []byte) (pkg *pbsubstreams.Package, err error) {
+	pkg = &pbsubstreams.Package{}
+	if err := proto.Unmarshal(contents, pkg); err != nil {
 		return nil, err
 	}
 

@@ -44,7 +44,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 					msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
 					if msgDesc != nil {
 						break
-					}name
+					}
 				}
 
 				decodeMsgType := func(in []byte) string {

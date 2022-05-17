@@ -25,7 +25,7 @@ function main() {
 
   pushd "$ROOT" >/dev/null
   TMP=$(mktemp -d) 
-  protoc -I ./proto ./proto/sf/substreams/v1/* --include_source_info --descriptor_set_out ${TMP}/system.pb 
+  protoc -I ./proto ./proto/sf/substreams/v1/* ./proto/google/protobuf/descriptor.proto --include_source_info --descriptor_set_out ${TMP}/system.pb 
   statik -src $TMP -include system.pb -dest pb
   rm -f ${TMP}/system.pb
   rmdir $TMP

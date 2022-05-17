@@ -18,7 +18,7 @@ type Scheduler struct {
 	ctx           context.Context
 	ctxCancelFunc context.CancelFunc
 
-	squasher squasher.Squasher
+	squasher *squasher.Squasher
 	requests []*pbsubstreams.Request
 }
 

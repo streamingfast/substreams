@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -52,15 +53,15 @@ func NewFromYAML(inputPath string) (pkg *pbsubstreams.Package, err error) {
 		return nil, err
 	}
 
+	if err := loadProtobufs(pkg, manif); err != nil {
+		return nil, err
+	}
+
 	if err := loadImports(pkg, manif); err != nil {
 		return nil, err
 	}
 
 	if err := validatePackage(pkg); err != nil {
-		return nil, err
-	}
-
-	if err := loadProtobufs(pkg, manif); err != nil {
 		return nil, err
 	}
 
@@ -285,9 +286,30 @@ func reindexAndMergePackage(src, dest *pbsubstreams.Package) {
 }
 
 func mergeProtoFiles(src, dest *pbsubstreams.Package) {
+	seenFiles := map[string]bool{}
+
+	for _, file := range dest.ProtoFiles {
+		cnt, _ := proto.Marshal(file)
+		key := fmt.Sprintf("%x", sha256.Sum256(cnt))
+		//fmt.Println("in DEST Seen", key, *file.Name)
+		seenFiles[key] = true
+	}
+
 	for _, file := range src.ProtoFiles {
+		cnt, _ := proto.Marshal(file)
+		key := fmt.Sprintf("%x", sha256.Sum256(cnt))
+		//fmt.Println("Seen in SRC", key, *file.Name)
+		if seenFiles[key] {
+			continue
+		}
+		seenFiles[key] = true
 		dest.ProtoFiles = append(dest.ProtoFiles, file)
 	}
+
 	// TODO: do DEDUPLICATION of those protofiles and/or of the messages therein,
 	// otherwise they can duplicate quickly.
+
+	// TODO: eventually, we want the last Message type to win, or perhaps we'd search in reverse order
+	// upon `print` or generation? The thing is we'll want tools like `protoc` and `buf` to use the most
+	// recent, but it'll simply go in list order..
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -191,7 +192,10 @@ func validatePackage(pkg *pbsubstreams.Package) error {
 
 	for _, spkg := range pkg.PackageMeta {
 		if !moduleNameRegexp.MatchString(spkg.Name) {
-			return fmt.Errorf("invalid package name %q: must match %s", spkg.Name, moduleNameRegexp.String())
+			return fmt.Errorf("package %q: invalid name: must match %s", spkg.Name, moduleNameRegexp.String())
+		}
+		if !semver.IsValid(spkg.Version) {
+			return fmt.Errorf("package %q: version %q should match Semver", spkg.Name, spkg.Version)
 		}
 	}
 

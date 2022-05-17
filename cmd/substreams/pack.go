@@ -43,21 +43,21 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing %q: %w", defaultFilename, err)
 	}
 
-	fmt.Printf(`To generate bindings for your Rust code:
+	fmt.Printf(`To generate bindings for your code:
 1. create a file 'buf.gen.yaml' with this content:
 
 version: v1
 plugins:
-  - name: prost
+  - name: prost  # Generate for Rust, used by your modules, or Rust client code.
     out: gen/src
     opt:
       - bytes=.
       - compile_well_known_types
-2. run 'buf generate %s#format=bin'
 
+2. run 'buf generate %s#format=bin'
 3. See https://crates.io/crates/protoc-gen-prost for more details
+
 `, defaultFilename)
-	fmt.Println("")
 	fmt.Printf("----------------------------------------\n")
 	fmt.Printf("Successfully wrote %q.\n", defaultFilename)
 

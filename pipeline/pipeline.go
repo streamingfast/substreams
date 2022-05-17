@@ -534,7 +534,7 @@ func SynchronizeStores(
 	s := scheduler.NewScheduler(context.TODO(), request, builders, sq)
 	for {
 		err := s.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
-			zlog.Debug("request", zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum), zap.Strings("stores", req.OutputModules))
+			zlog.Debug("request", zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum), zap.Strings("stores", request.OutputModules))
 
 			stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 			if err != nil {
@@ -617,7 +617,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 
 	if !isFirstRequestBlock && intervalReached {
 		for _, builder := range p.builders {
-			fileName, err := builder.WriteState(ctx)
+			err := builder.WriteState(ctx)
 			if err != nil {
 				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 			}
@@ -633,7 +633,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 			//
 			//builder.UpdateBlockRange(nextBlockRangeStart, nextBlockRangeEnd)
 
-			zlog.Info("state written", zap.String("store_name", builder.Name), zap.String("file_name", fileName))
+			zlog.Info("state written", zap.String("store_name", builder.Name))
 		}
 	}
 	return nil

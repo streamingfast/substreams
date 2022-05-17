@@ -9,19 +9,19 @@ import (
 	"go.uber.org/zap"
 )
 
-func (b *Builder) WriteState(ctx context.Context) (filename string, err error) {
+func (b *Builder) WriteState(ctx context.Context) (err error) {
 	zlog.Debug("writing state", zap.String("module", b.Name))
 
 	err = b.writeMergeData()
 	if err != nil {
-		return "", fmt.Errorf("writing merge values: %w", err)
+		return fmt.Errorf("writing merge values: %w", err)
 	}
 
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
 
 	content, err := json.MarshalIndent(kv, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("marshal kv state: %w", err)
+		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
 	zlog.Info("write state mode",
@@ -31,16 +31,16 @@ func (b *Builder) WriteState(ctx context.Context) (filename string, err error) {
 	)
 
 	if b.partialMode {
-		filename, err = b.writePartialState(ctx, content)
+		_, err = b.writePartialState(ctx, content)
 	} else {
-		filename, err = b.writeState(ctx, content)
+		_, err = b.writeState(ctx, content)
 	}
 
 	if err != nil {
-		return "", fmt.Errorf("writing %s kv for range %s: %w", b.Name, b.BlockRange, err)
+		return fmt.Errorf("writing %s kv for range %s: %w", b.Name, b.BlockRange, err)
 	}
 
-	return filename, nil
+	return nil
 }
 
 func (b *Builder) writeState(ctx context.Context, content []byte) (string, error) {
@@ -63,7 +63,7 @@ func (b *Builder) writeState(ctx context.Context, content []byte) (string, error
 	var info = &Info{
 		LastKVFile:        filename,
 		LastKVSavedBlock:  b.BlockRange.ExclusiveEndBlock,
-		RangeIntervalSize: b.saveInterval,
+		RangeIntervalSize: b.SaveInterval,
 	}
 	err = writeStateInfo(ctx, b.Store, info)
 	if err != nil {

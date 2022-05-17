@@ -35,6 +35,13 @@ func (r *Range) Next(size uint64) *Range {
 	}
 }
 
+func (r *Range) Previous(size uint64) *Range {
+	return &Range{
+		StartBlock:        r.StartBlock - size,
+		ExclusiveEndBlock: r.StartBlock,
+	}
+}
+
 func (r *Range) Equals(other *Range) bool {
 	return r.StartBlock == other.StartBlock && r.ExclusiveEndBlock == other.ExclusiveEndBlock
 }

@@ -146,7 +146,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 
 	p.progressTracker.startTracking(ctx)
 
-	if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, p.builders, p.requestedStartBlockNum, returnFunc); err != nil {
+	if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, p.builders, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, returnFunc); err != nil {
 		return nil, fmt.Errorf("synchonizing stores: %w", err)
 	}
 
@@ -526,14 +526,18 @@ func SynchronizeStores(
 	grpcCallOpts []grpc.CallOption,
 	request *pbsubstreams.Request,
 	builders map[string]*state.Builder,
+	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
 	returnFunc substreams.ReturnFunc,
 ) error {
 	zlog.Info("synchronizing stores")
 
-	var sq *squasher.Squasher
+	squasher, err := squasher.NewSquasher(ctx, builders, outputCache)
+	if err != nil {
+		return fmt.Errorf("initializing squasher: %w", err)
+	}
 
-	s, err := scheduler.NewScheduler(ctx, request, builders, upToBlockNum, sq)
+	s, err := scheduler.NewScheduler(ctx, request, builders, upToBlockNum, squasher)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}

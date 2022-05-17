@@ -17,10 +17,10 @@ import (
 
 const UNSET = math.MaxUint64
 
-var ModuleNameRegexp *regexp.Regexp
+var moduleNameRegexp *regexp.Regexp
 
 func init() {
-	ModuleNameRegexp = regexp.MustCompile(`^[a-zA-Z]+[\w]*$`)
+	moduleNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_]{0,63})$`)
 }
 
 const (

@@ -12,14 +12,13 @@ import (
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ReturnFunc {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
-	fileDescs, err := desc.CreateFileDescriptorFromSet(&descriptorpb.FileDescriptorSet{File: pkg.ProtoFiles})
+	fileDescs, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
 	if err != nil {
 		panic("couldn't convert, should do this check much earlier: " + err.Error())
 	}
@@ -41,12 +40,12 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 				msgTypes[mod.Name] = msgType
 
 				var msgDesc *desc.MessageDescriptor
-				// for _, file := range fileDescs {
-				msgDesc = fileDescs.FindMessage(msgType) //todo: make sure it works relatively-wise
-				if msgDesc != nil {
-					break
+				for _, file := range fileDescs {
+					msgDesc = file.FindMessage(msgType) //todo: make sure it works relatively-wise
+					if msgDesc != nil {
+						break
+					}name
 				}
-				// }
 
 				decodeMsgType := func(in []byte) string {
 					if msgDesc == nil {

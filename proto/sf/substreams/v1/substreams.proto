@@ -22,6 +22,8 @@ message Request {
   Modules modules = 6;
   repeated string output_modules = 7;
   repeated string initial_store_snapshot_for_modules = 8;
+
+  bool partial = 9;
 }
 
 message Response {

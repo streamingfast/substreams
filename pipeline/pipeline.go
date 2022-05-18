@@ -104,6 +104,10 @@ func New(
 		opt(pipe)
 	}
 
+	if request.Partial {
+		pipe.partialMode = true
+	}
+
 	return pipe
 }
 
@@ -145,8 +149,10 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 
 	p.progressTracker.startTracking(ctx)
 
-	if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, returnFunc); err != nil {
-		return nil, fmt.Errorf("synchonizing stores: %w", err)
+	if !p.partialMode {
+		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, returnFunc); err != nil {
+			return nil, fmt.Errorf("synchonizing stores: %w", err)
+		}
 	}
 
 	zlog.Info("initializing stores")

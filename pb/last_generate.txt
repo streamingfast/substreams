@@ -1,2 +1,2 @@
-generate.sh - Tue May 17 22:19:03 EDT 2022 - colin
-streamingfast/proto revision: a6983efb1a75c99d6de722ef744d36cc1ee1022b
+generate.sh - Wed May 18 08:04:47 EDT 2022 - colin
+streamingfast/proto revision: c174526621eec88474e213d527ef324dc15fa362

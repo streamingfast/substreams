@@ -77,5 +77,6 @@ func createRequest(
 		IrreversibilityCondition: irreversibilityCondition,
 		Modules:                  modules,
 		OutputModules:            []string{outputModuleName},
+		Partial:                  true,
 	}
 }

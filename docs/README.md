@@ -15,11 +15,11 @@ For streamers:
   * `map` module
   * `store` module
 * [The Substreams manifest YAML](./manifest.md)
-* Substreams [Packages](/packages.md)
+* Substreams [Packages](./packages.md)
 * [Consuming Substreams](./consuming.md)
 
 For module developers:
 * [API Reference](./api-reference.md)
 
 For Subtreams service operators:
-* [Admin guide: running Substreams for Ethereum](./admin-guide.md)
+* Admin guide: running Substreams for Ethereum. See the Firehose docs http://firehose.streamingfast.io/operate/concepts/

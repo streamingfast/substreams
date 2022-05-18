@@ -221,7 +221,7 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 		return nil
 	}
 
-	zlog.Debug("loading outputs data", zap.String("cache_module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
+	zlog.Debug("loading outputs data", zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 
 	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
 	objectReader, err := c.Store.OpenObject(ctx, filename)
@@ -274,6 +274,7 @@ func (c *OutputCache) save(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)
 	}
+	zlog.Debug("cache saved", zap.String("module_name", c.ModuleName), zap.String("file_name", filename), zap.String("url", c.Store.BaseURL().String()))
 	return nil
 	//zlog.Info("saving cache", zap.String("module_name", c.moduleName), zap.Stringer("block_range", c.currentBlockRange))
 	//filename := computeDBinFilename(pad(c.currentBlockRange.StartBlock), pad(c.currentBlockRange.ExclusiveEndBlock))

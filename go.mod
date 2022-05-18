@@ -36,9 +36,10 @@ require (
 	github.com/lib/pq v1.10.5
 	github.com/rakyll/statik v0.1.7
 	github.com/streamingfast/cli v0.0.3
-	github.com/streamingfast/derr v0.0.0-20220307162255-f277e08753fa
+	github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/wasmerio/wasmer-go v1.0.4
+	golang.org/x/mod v0.5.0
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	google.golang.org/grpc v1.44.0
 )
@@ -105,7 +106,6 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/mod v0.5.1 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect

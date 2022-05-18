@@ -3,8 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/scheduler"
-	"github.com/streamingfast/substreams/squasher"
+	"github.com/streamingfast/substreams/orchestrator"
 	"io"
 	"runtime/debug"
 	"strings"
@@ -536,17 +535,17 @@ func SynchronizeStores(
 ) error {
 	zlog.Info("synchronizing stores")
 
-	squasher, err := squasher.NewSquasher(ctx, builders, outputCache)
+	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache)
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	linearStrategy, err := scheduler.NewLinearStrategy(ctx, request, builders, upToBlockNum)
+	linearStrategy, err := orchestrator.NewLinearStrategy(ctx, request, builders, upToBlockNum)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	s, err := scheduler.NewScheduler(ctx, linearStrategy, squasher)
+	s, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}

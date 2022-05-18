@@ -1,4 +1,4 @@
-package squasher
+package orchestrator
 
 import (
 	"context"

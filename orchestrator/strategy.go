@@ -45,7 +45,7 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 			reqStartBlock = builder.ModuleStartBlock
 		}
 
-		req := createRequest(reqStartBlock, endBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Manifest)
+		req := createRequest(reqStartBlock, endBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
 		res.requests = append(res.requests, req)
 	}
 
@@ -68,14 +68,14 @@ func createRequest(
 	outputModuleName string,
 	forkSteps []pbsubstreams.ForkStep,
 	irreversibilityCondition string,
-	manifest *pbsubstreams.Manifest,
+	modules *pbsubstreams.Modules,
 ) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
 		StartBlockNum:            int64(startBlock),
 		StopBlockNum:             stopBlock,
 		ForkSteps:                forkSteps,
 		IrreversibilityCondition: irreversibilityCondition,
-		Manifest:                 manifest,
+		Modules:                  modules,
 		OutputModules:            []string{outputModuleName},
 	}
 }

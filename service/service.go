@@ -132,7 +132,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// FIXME start block resolving is an art, it should be handled here
 	}
 
-	graph, err := manifest.NewModuleGraph(request.Manifest.Modules)
+	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("creating module graph %w", err)
 	}

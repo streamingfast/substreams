@@ -335,8 +335,8 @@ func TestBuilder_Merge(t *testing.T) {
 			}
 
 			//ignore comparing these values
-			test.prev.clearMergeValues()
-			test.latest.clearMergeValues()
+			test.prev.clearMergeData()
+			test.latest.clearMergeData()
 
 			// check result both ways
 

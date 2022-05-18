@@ -5,7 +5,7 @@ option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbs
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
-import "sf/substreams/v1/manifest.proto";
+import "sf/substreams/v1/modules.proto";
 import "sf/substreams/v1/clock.proto";
 
 service Stream {
@@ -19,7 +19,7 @@ message Request {
   repeated ForkStep fork_steps = 4;
   string irreversibility_condition = 5;
 
-  Manifest manifest = 6;
+  Modules modules = 6;
   repeated string output_modules = 7;
   repeated string initial_store_snapshot_for_modules = 8;
 }

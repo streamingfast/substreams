@@ -13,10 +13,12 @@ use crate::externs;
 ///
 /// # Examples
 ///
-/// ```
-/// info!("test");
-/// info!("hello {}", "world!");
-/// info!("x = {}, y = {y}", 10, y = 30);
+/// ```no_run
+/// use substreams::log;
+///
+/// log::info!("test");
+/// log::info!("hello {}", "world!");
+/// log::info!("x = {}, y = {y}", 10, y = 30);
 /// ```
 #[doc(hidden)]
 #[macro_export]
@@ -48,10 +50,12 @@ macro_rules! log_info {
 ///
 /// # Examples
 ///
-/// ```
-/// debug!("test");
-/// debug!("hello {}", "world!");
-/// debug!("x = {}, y = {y}", 10, y = 30);
+/// ```no_run
+/// use substreams::log;
+///
+/// log::debug!("test");
+/// log::debug!("hello {}", "world!");
+/// log::debug!("x = {}, y = {y}", 10, y = 30);
 /// ```
 #[doc(hidden)]
 #[macro_export]

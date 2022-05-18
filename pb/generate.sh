@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -eu
 # Copyright 2019 dfuse Platform Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,18 +22,30 @@ function main() {
   checks
   current_dir="`pwd`"
   trap "cd \"$current_dir\"" EXIT
-  pushd "$ROOT/pb" &> /dev/null
 
-  generate "sf/ethereum/substreams/v1/rpc.proto"
+  pushd "$ROOT" >/dev/null
+  TMP=$(mktemp -d) 
+  protoc -I ./proto ./proto/sf/substreams/v1/* ./proto/google/protobuf/descriptor.proto --include_source_info --descriptor_set_out ${TMP}/system.pb 
+  statik -src $TMP -include system.pb -dest pb
+  rm -f ${TMP}/system.pb
+  rmdir $TMP
+
+
+  pushd "$ROOT/pb" > /dev/null
+
   generate "sf/substreams/v1/substreams.proto"
   generate "sf/substreams/v1/clock.proto"
-  generate "sf/substreams/v1/manifest.proto"
+  generate "sf/substreams/v1/modules.proto"
+  generate "sf/substreams/v1/package.proto"
+
+  popd >/dev/null
+  popd >/dev/null
 
   echo "generate.sh - `date` - `whoami`" > $ROOT/pb/last_generate.txt
   echo "streamingfast/proto revision: `GIT_DIR=$ROOT/.git git rev-parse HEAD`" >> $ROOT/pb/last_generate.txt
 }
 
-# usage:
+# usage
 # - generate <protoPath>
 # - generate <protoBasePath/> [<file.proto> ...]
 function generate() {
@@ -71,6 +83,13 @@ function checks() {
     echo ""
     echo "Should print 'protoc-gen-go v1.25.0' (if it just hangs, you don't have the correct version)"
     exit 1
+  fi
+
+  if ! type statik &>/dev/null; then
+    echo "You need to install 'statik' to bundle some proto files:"
+    echo ""
+    echo "    go install github.com/rakyll/statik@latest"
+    echo ""
   fi
 }
 

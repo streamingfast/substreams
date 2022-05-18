@@ -42,7 +42,6 @@ type Pipeline struct {
 	context           context.Context
 	request           *pbsubstreams.Request
 	graph             *manifest.ModuleGraph
-	manifest          *pbsubstreams.Manifest
 	outputModuleNames []string
 	outputModuleMap   map[string]bool
 
@@ -87,7 +86,6 @@ func New(
 		builders:                     map[string]*state.Builder{},
 		graph:                        graph,
 		baseStateStore:               baseStateStore,
-		manifest:                     request.Manifest,
 		outputModuleNames:            request.OutputModules,
 		outputModuleMap:              map[string]bool{},
 		blockType:                    blockType,
@@ -137,7 +135,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.StartBlock)
 		}
 
-		hash := manifest.HashModuleAsString(p.manifest, p.graph, module)
+		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
 		_, err := p.moduleOutputCache.RegisterModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
 		if err != nil {
 			return nil, fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
@@ -367,7 +365,7 @@ func (p *Pipeline) setupSource(block *bstream.Block) error {
 }
 
 func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Builder, err error) {
-	for _, module := range p.manifest.Modules {
+	for _, module := range p.request.Modules.Modules {
 		vmType := ""
 		switch module.Code.(type) {
 		case *pbsubstreams.Module_WasmCode_:
@@ -398,7 +396,7 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 			storeModule.Name,
 			p.storesSaveInterval,
 			storeModule.StartBlock,
-			manifest.HashModuleAsString(p.manifest, p.graph, storeModule),
+			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			p.baseStateStore,
@@ -464,7 +462,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		}
 		entrypoint := wasmCodeRef.Entrypoint
 
-		code := p.manifest.ModulesCode[wasmCodeRef.Index]
+		code := p.request.Modules.ModulesCode[wasmCodeRef.Index]
 		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code, module.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)

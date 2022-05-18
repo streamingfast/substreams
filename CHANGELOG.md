@@ -7,6 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+
+
+## [v0.0.6-beta]
+
+* Implemented [packages (see docs)](./docs/packages.md).
+* Added `substreams::Hex` wrapper type to more easily deal with printing and encoding bytes to hexadecimal string.
 * Added `substreams::log::info!(...)` and `substreams::log::debug!(...)` supporting formatting arguments (acts like `println!()` macro).
 * Added new field `logs_truncated` that can be used to determined if logs were truncated.
 * Augmented logs truncation limit to 128 KiB per module per block.

@@ -31,13 +31,15 @@ stream data in real-time, as well as package your own Substreams modules.
 
 1. Get a [release](https://github.com/streamingfast/substreams/releases).
 
+<!--
 2. Or build from source quickly:
 
 ```
 go install github.com/streamingfast/substreams/cmd/substreams@latest
 ```
+-->
 
-3. Or build from source and start hacking:
+2. Or build from source and start hacking:
 
 ```
 git clone git@github.com:streamingfast/substreams

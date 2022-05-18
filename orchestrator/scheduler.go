@@ -63,22 +63,4 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 			return
 		}
 	}
-
-}
-
-func createRequest(
-	startBlock, stopBlock uint64,
-	outputModuleName string,
-	forkSteps []pbsubstreams.ForkStep,
-	irreversibilityCondition string,
-	manifest *pbsubstreams.Manifest,
-) *pbsubstreams.Request {
-	return &pbsubstreams.Request{
-		StartBlockNum:            int64(startBlock),
-		StopBlockNum:             stopBlock,
-		ForkSteps:                forkSteps,
-		IrreversibilityCondition: irreversibilityCondition,
-		Manifest:                 manifest,
-		OutputModules:            []string{outputModuleName},
-	}
 }

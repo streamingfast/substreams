@@ -62,3 +62,20 @@ func (s *LinearStrategy) GetNextRequest() (*pbsubstreams.Request, error) {
 
 	return request, nil
 }
+
+func createRequest(
+	startBlock, stopBlock uint64,
+	outputModuleName string,
+	forkSteps []pbsubstreams.ForkStep,
+	irreversibilityCondition string,
+	manifest *pbsubstreams.Manifest,
+) *pbsubstreams.Request {
+	return &pbsubstreams.Request{
+		StartBlockNum:            int64(startBlock),
+		StopBlockNum:             stopBlock,
+		ForkSteps:                forkSteps,
+		IrreversibilityCondition: irreversibilityCondition,
+		Manifest:                 manifest,
+		OutputModules:            []string{outputModuleName},
+	}
+}

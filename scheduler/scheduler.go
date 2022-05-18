@@ -19,17 +19,31 @@ type Scheduler struct {
 	ctxCancelFunc context.CancelFunc
 
 	squasher *squasher.Squasher
+	strategy Strategy
 	requests []*pbsubstreams.Request
 }
 
-func NewScheduler(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64, squasher *squasher.Squasher) (*Scheduler, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	s := &Scheduler{
-		ctx:           ctx,
-		ctxCancelFunc: cancel,
-		squasher:      squasher,
-		requests:      []*pbsubstreams.Request{},
+type Strategy interface {
+	GetNextRequest() (*pbsubstreams.Request, error)
+}
+
+type LinearStrategy struct {
+	requests []*pbsubstreams.Request
+}
+
+func (s *LinearStrategy) GetNextRequest() (*pbsubstreams.Request, error) {
+	if len(s.requests) == 0 {
+		return nil, fmt.Errorf("no requests to fetch")
 	}
+
+	var request *pbsubstreams.Request
+	request, s.requests = s.requests[len(s.requests)-1], s.requests[:len(s.requests)-1]
+
+	return request, nil
+}
+
+func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64) (*LinearStrategy, error) {
+	res := &LinearStrategy{}
 
 	for _, builder := range builders {
 		zlog.Debug("builders", zap.String("builder", builder.Name))
@@ -57,14 +71,27 @@ func NewScheduler(ctx context.Context, request *pbsubstreams.Request, builders [
 		}
 
 		req := createRequest(reqStartBlock, endBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Manifest)
-		s.requests = append(s.requests, req)
+		res.requests = append(res.requests, req)
+	}
+
+	return res, nil
+}
+
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *squasher.Squasher) (*Scheduler, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	s := &Scheduler{
+		ctx:           ctx,
+		ctxCancelFunc: cancel,
+		squasher:      squasher,
+		strategy:      strategy,
+		requests:      []*pbsubstreams.Request{},
 	}
 
 	return s, nil
 }
 
 func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error))) error {
-	request, err := s.getNextRequest()
+	request, err := s.strategy.GetNextRequest()
 	if err != nil {
 		return io.EOF
 	}
@@ -94,17 +121,6 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 		}
 	}
 
-}
-
-func (s *Scheduler) getNextRequest() (*pbsubstreams.Request, error) {
-	if len(s.requests) == 0 {
-		return nil, fmt.Errorf("no requests to fetch")
-	}
-
-	var request *pbsubstreams.Request
-	request, s.requests = s.requests[len(s.requests)-1], s.requests[:len(s.requests)-1]
-
-	return request, nil
 }
 
 func createRequest(

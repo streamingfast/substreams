@@ -541,7 +541,12 @@ func SynchronizeStores(
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	s, err := scheduler.NewScheduler(ctx, request, builders, upToBlockNum, squasher)
+	linearStrategy, err := scheduler.NewLinearStrategy(ctx, request, builders, upToBlockNum)
+	if err != nil {
+		return fmt.Errorf("creating strategy: %w", err)
+	}
+
+	s, err := scheduler.NewScheduler(ctx, linearStrategy, squasher)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}

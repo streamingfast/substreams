@@ -48,6 +48,7 @@ type Pipeline struct {
 	outputModuleMap   map[string]bool
 
 	modules         []*pbsubstreams.Module
+	stores          []*pbsubstreams.Module
 	moduleExecutors []ModuleExecutor
 	wasmOutputs     map[string][]byte
 
@@ -125,7 +126,8 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 
 	var err error
 	zlog.Info("building store and executor")
-	p.modules, _, err = p.build()
+	var stores []*state.Builder
+	p.modules, _, stores, err = p.build()
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
@@ -146,7 +148,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 
 	p.progressTracker.startTracking(ctx)
 
-	if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, p.builders, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, returnFunc); err != nil {
+	if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, returnFunc); err != nil {
 		return nil, fmt.Errorf("synchonizing stores: %w", err)
 	}
 
@@ -365,7 +367,7 @@ func (p *Pipeline) setupSource(block *bstream.Block) error {
 	return nil
 }
 
-func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
+func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Builder, err error) {
 	for _, module := range p.manifest.Modules {
 		vmType := ""
 		switch module.Code.(type) {
@@ -374,18 +376,18 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 		case *pbsubstreams.Module_NativeCode_:
 			vmType = "native"
 		default:
-			return nil, nil, fmt.Errorf("invalid code type for modules %s ", module.Name)
+			return nil, nil, nil, fmt.Errorf("invalid code type for modules %s ", module.Name)
 		}
 
 		if p.vmType != "" && vmType != p.vmType {
-			return nil, nil, fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
+			return nil, nil, nil, fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
 		}
 		p.vmType = vmType
 	}
 
 	modules, err = p.graph.ModulesDownTo(p.outputModuleNames)
 	if err != nil {
-		return nil, nil, fmt.Errorf("building execution graph: %w", err)
+		return nil, nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
 	p.builders = make(map[string]*state.Builder)
@@ -404,8 +406,10 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 			options...,
 		)
 		if err != nil {
-			return nil, nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
+			return nil, nil, nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
 		}
+
+		stores = append(stores, builder)
 
 		p.builders[builder.Name] = builder
 	}
@@ -525,7 +529,7 @@ func SynchronizeStores(
 	grpcClient pbsubstreams.StreamClient,
 	grpcCallOpts []grpc.CallOption,
 	request *pbsubstreams.Request,
-	builders map[string]*state.Builder,
+	builders []*state.Builder,
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
 	returnFunc substreams.ReturnFunc,

@@ -22,7 +22,7 @@ type Scheduler struct {
 	requests []*pbsubstreams.Request
 }
 
-func NewScheduler(ctx context.Context, request *pbsubstreams.Request, builders map[string]*state.Builder, upToBlockNum uint64, squasher *squasher.Squasher) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64, squasher *squasher.Squasher) (*Scheduler, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	s := &Scheduler{
 		ctx:           ctx,

@@ -15,12 +15,12 @@ type Squasher struct {
 	builders map[string]*Squashable
 }
 
-func NewSquasher(ctx context.Context, builders map[string]*state.Builder, outputCaches map[string]*outputs.OutputCache) (*Squasher, error) {
+func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache) (*Squasher, error) {
 	sqashables := map[string]*Squashable{}
-	for bname, builder := range builders {
+	for _, builder := range builders {
 		info, err := builder.Info(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("getting info for %s: %w", bname, err)
+			return nil, fmt.Errorf("getting info for %s: %w", builder.Name, err)
 		}
 
 		var initialBuilder *state.Builder
@@ -34,11 +34,11 @@ func NewSquasher(ctx context.Context, builders map[string]*state.Builder, output
 			initialBuilder = builder.FromBlockRange(r, false)
 			err := initialBuilder.Initialize(ctx, r.ExclusiveEndBlock, info.RangeIntervalSize, outputCaches[builder.Name].Store)
 			if err != nil {
-				return nil, fmt.Errorf("initializing builder %s for range %s: %w", bname, r, err)
+				return nil, fmt.Errorf("initializing builder %s for range %s: %w", builder.Name, r, err)
 			}
 		}
 
-		sqashables[bname] = NewSquashable(initialBuilder)
+		sqashables[builder.Name] = NewSquashable(initialBuilder)
 	}
 
 	return &Squasher{sqashables}, nil

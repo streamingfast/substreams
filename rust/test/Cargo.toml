@@ -7,8 +7,13 @@ edition = "2018"
 [lib]
 crate-type = ["cdylib"]
 
+[[bin]]
+name = "substreams"
+path = "macros.rs"
+
 [dependencies]
 substreams= { path = "../substreams" }
+substreams-macro= { path = "../substreams-macro" }
 num-bigint = "0.4"
 bigdecimal = "0.3"
 prost = { version = "0.10.1" }

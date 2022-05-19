@@ -47,6 +47,7 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 
 		req := createRequest(reqStartBlock, endBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
 		res.requests = append(res.requests, req)
+		zlog.Info("request created", zap.String("module_name", builder.Name))
 	}
 
 	return res, nil

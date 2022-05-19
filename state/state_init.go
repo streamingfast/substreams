@@ -22,6 +22,17 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 	}
 
 	fileName := PartialFileName(b.BlockRange)
+
+	found, err := b.Store.FileExists(ctx, fileName)
+	if err != nil {
+		return fmt.Errorf("searching for filename %s: %w", fileName, err)
+	}
+
+	if !found {
+		b.KV = byteMap(map[string]string{})
+		return nil
+	}
+
 	return b.loadState(ctx, fileName)
 }
 

@@ -75,6 +75,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		return nil
 	}
 
+	// add this range to the squashable's range list, and sort them in ascending order
 	squashable.ranges = append(squashable.ranges, blockRange)
 	sort.Sort(squashable.ranges)
 
@@ -86,9 +87,18 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 			//
 		}
 
-		zlog.Debug("builder", zap.String("builder_name", squashable.builder.Name), zap.Bool("partial_mode", squashable.builder.PartialMode))
-		if len(squashable.ranges) > 0 && squashable.ranges[0].Equals(squashable.builder.BlockRange.Next(squashable.builder.SaveInterval)) {
-			nextBuilder := squashable.builder.FromBlockRange(squashable.ranges[0], true)
+		if len(squashable.ranges) == 0 {
+			zlog.Debug("all available squashable ranges have been merged", zap.String("squashable", squashable.String()))
+			break
+		}
+
+		nextAvailableSquashableRange := squashable.ranges[0]
+		nextBuilderRange := squashable.builder.BlockRange.Next(squashable.builder.SaveInterval)
+
+		if nextAvailableSquashableRange.Equals(nextBuilderRange) {
+			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()), zap.String("mergeable range", nextBuilderRange.String()))
+
+			nextBuilder := squashable.builder.FromBlockRange(nextAvailableSquashableRange, true)
 			err := nextBuilder.Merge(squashable.builder)
 			if err != nil {
 				return fmt.Errorf("merging: %s", err)

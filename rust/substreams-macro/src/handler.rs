@@ -1,17 +1,10 @@
-use proc_macro::{TokenStream};
-use std::borrow::BorrowMut;
-use std::convert::TryInto;
-use proc_macro2::{Ident, Span};
-use quote::{quote, quote_spanned, ToTokens, format_ident};
-use quote::__private::ext::RepToTokensExt;
-use syn::{NestedMeta, parse_quote, PatIdent, PatType, Token};
-use syn::parse::Parser;
-use syn::ReturnType::Default;
-use syn::spanned::Spanned;
 
-// syn::AttributeArgs does not implement syn::Parse
+use proc_macro::TokenStream;
+use proc_macro2::{Span};
+use quote::{quote, ToTokens, format_ident};
+use syn::{parse::Parser, spanned::Spanned};
+
 type AttributeArgs = syn::punctuated::Punctuated<syn::NestedMeta, syn::Token![,]>;
-
 
 #[derive(Clone, Copy, PartialEq)]
 enum ModuleType {
@@ -103,7 +96,7 @@ fn build_config(
                     }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`",
+                            "Unknown attribute {} is specified; expected one of: `type`",
                             name,
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -121,8 +114,6 @@ fn build_config(
     config.build()
 }
 
-
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let original = item.clone();
 
@@ -135,9 +126,9 @@ pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
             return token_stream_with_error(original, e)
         }
     };
-    let mut input = syn::parse_macro_input!(item as syn::ItemFn);
+    let input = syn::parse_macro_input!(item as syn::ItemFn);
 
-    let output_result = parse_output(final_config, input.sig.output.clone());
+    let output_result = parse_func_output(&final_config, input.sig.output.clone());
     match output_result {
         Ok(_) => {}
         Err(e) => {
@@ -145,57 +136,57 @@ pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
+    let mut args : Vec<proc_macro2::TokenStream> = vec![];
+    let mut decodings : Vec<proc_macro2::TokenStream> = vec![];
 
-    let mut new_inputs : syn::punctuated::Punctuated<syn::FnArg, syn::Token![,]> = syn::punctuated::Punctuated::new();
-
-
-    println!("input sig ident {:?}",input.sig.ident);
-    println!("input sig inputs {:?}",input.sig.inputs[0]);
     for i in (&input.sig.inputs).into_iter() {
-        let mut  varname_ptr = &format!("ptr");
-        let mut  varname_len = &format!("len");
-        
-        let mut iter = i.into_token_stream().into_iter();
-        if let Some(i) = iter.next() {
-            varname_ptr = &format!("{}_ptr", i);
-            varname_len = &format!("{}_len", i);
-        }
-
-
-        for j in i.into_token_stream().into_iter() {
-            println!("input attempt:  {:?}",j);
+        match i {
+            syn::FnArg::Receiver(_) => {
+                return token_stream_with_error(original, syn::Error::new(i.span(), format!("handler function does not support 'self' receiver")));
+            },
+            syn::FnArg::Typed(pat_type) => {
+                let mut var_name = syn::Ident::new("arg1",pat_type.span());
+                let mut var_ptr = syn::Ident::new("arg1_ptr",pat_type.span());
+                let mut var_len = syn::Ident::new("arg1_len",pat_type.span());
+                match &*pat_type.pat {
+                    syn::Pat::Ident(v) => {
+                        var_name = v.ident.clone();
+                        if final_config.module_type == ModuleType::Store && var_name.to_string().ends_with("_idx") {
+                            args.push(quote! { #pat_type });
+                            continue
+                        }
+                        // var_ptr = syn::Ident::new(&format!(), v.span());
+                        var_ptr = format_ident!("{}_ptr",var_name);
+                        var_len = format_ident!("{}_len",var_name);
+                        args.push(quote! { #var_ptr: *mut u8 });
+                        args.push(quote! { #var_len: usize });
+                    },
+                    _ => {
+                        return token_stream_with_error(original, syn::Error::new(pat_type.span(), format!("unknown argument type")));
+                    }
+                }
+                let argument_type = &*pat_type.ty;
+                decodings.push(quote! {
+                    let #var_name: #argument_type = substreams::proto::decode_ptr(#var_ptr, #var_len).unwrap();
+                })
+            },
         }
     }
 
-    // let mut new_inputs = input.sig.inputs.clone();
-    // // new_inputs.push();
-    // // new_inputs.pop();
-    // input.sig.inputs = new_inputs;
-    // input.sig.inputs.push(syn::FnArg::parse())
-    //
-    //
-    // println!("input attrs len {:?}",input.attrs.len());
-    // println!("input block stmts last {:?}",input.block.stmts.last());
-    //
-    // for i in (&input.block.stmts).into_iter() {
-    //     println!("input stmt {:?}",i);
-    // }
-    //
-    // let config = if input.sig.ident == "main" && !input.sig.inputs.is_empty() {
-    //     let msg = "the main function cannot accept arguments";
-    //     Err(syn::Error::new_spanned(&input.sig.ident, msg))
-    // } else {
-    //     AttributeArgs::parse_terminated
-    //         .parse(args)
-    //         .and_then(|args| build_config(input.clone(), args, false, rt_multi_thread))
-    // };
-    //
-    parse_func(input)
+
+    match final_config.module_type {
+        ModuleType::Store => build_store_handler(input, args, decodings),
+        ModuleType::Map => build_map_handler(input, args, decodings)
+    }
 }
 
-fn parse_output(finalConfig: FinalConfiguration,output: syn::ReturnType) -> Result<(), syn::Error> {
-    match finalConfig.module_type {
+fn parse_func_output(final_config: &FinalConfiguration, output: syn::ReturnType) -> Result<(), syn::Error> {
+    match final_config.module_type {
         ModuleType::Map => {
+            if output == syn::ReturnType::Default {
+                return Err(syn::Error::new(Span::call_site(), "Module of type Map should have a return of type Result<YOUR_TYPE, SubstreamError>"));
+            }
+
             let expected = vec!["-".to_owned(), ">".to_owned(), "Result".to_owned()];
             let mut index = 0;
             let mut valid = true;
@@ -223,62 +214,22 @@ fn parse_output(finalConfig: FinalConfiguration,output: syn::ReturnType) -> Resu
     }
 }
 
-fn parse_func(mut input: syn::ItemFn) -> TokenStream {
-    let foo = input.block.clone();
-    println!("body");
-    for i in foo.into_token_stream().into_iter() {
-        for j in i.into_token_stream().into_iter() {
-            println!("FOO      *  {:?}",j.to_string());
-        }
-    }
-    println!("done");
-    // current main function
-    let body = &input.block.clone();
-    // let brace_token = input.block.brace_token;
+fn build_map_handler(input: syn::ItemFn, collected_args: Vec<proc_macro2::TokenStream>, decodings: Vec<proc_macro2::TokenStream>) -> TokenStream {
+    let body = &input.block;
     let header = quote! {
         #[no_mangle]
     };
-
-
-    // let lambdaName = format_ident!("func");
-    // let lambdaReturnType : syn::ReturnType =  syn::parse_str("Result<bool,String>").unwrap();
-
-    input.block = syn::parse2(quote! {
-        {
-            substreams::register_panic_hook();
-            #body
-        }
-    }).expect("Parsing failure");
-    // input.block.brace_token = brace_token;
-
-
-
     let func_name = input.sig.ident.clone();
-    let transfer_ptr = format_ident!("{}_ptr","transfers");
-    let transfer_ptr_arg = quote! {
-            #transfer_ptr: *mut u8
-    };
-    let transfer_len = format_ident!("{}_len","transfers");
-    let transfer_len_arg = quote! {
-            #transfer_len: usize
-    };
-    let transfer_decode = quote! {
-        let transfers: erc721::Transfers = substreams::proto::decode_ptr(#transfer_ptr, #transfer_len).unwrap();
-    };
-
-    let args = vec![transfer_ptr_arg, transfer_len_arg];
-
-    let lambdaReturn = input.sig.output.clone();
+    let lambda_return = input.sig.output.clone();
     let lambda = quote! {
-        let func = || #lambdaReturn {
-            #transfer_decode
+        let func = || #lambda_return {
+            #(#decodings)*
             #body
         };
     };
     let result = quote! {
         #header
-
-        pub fn #func_name(#(#args),*){
+        pub extern "C" fn #func_name(#(#collected_args),*){
             substreams::register_panic_hook();
             #lambda
             let result = func();
@@ -288,9 +239,26 @@ fn parse_func(mut input: syn::ItemFn) -> TokenStream {
             substreams::output(result.unwrap());
         }
     };
-
     result.into()
 }
+
+fn build_store_handler(input: syn::ItemFn, collected_args: Vec<proc_macro2::TokenStream>, decodings: Vec<proc_macro2::TokenStream>) -> TokenStream {
+    let body = &input.block;
+    let header = quote! {
+        #[no_mangle]
+    };
+    let func_name = input.sig.ident.clone();
+    let result = quote! {
+        #header
+        pub extern "C" fn #func_name(#(#collected_args),*){
+            substreams::register_panic_hook();
+            #(#decodings)*
+            #body
+        }
+    };
+    result.into()
+}
+
 
 fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenStream {
     tokens.extend(TokenStream::from(error.into_compile_error()));

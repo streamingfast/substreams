@@ -1,14 +1,16 @@
 mod externs;
 mod hex;
 
+
 pub mod log;
 pub mod memory;
 pub mod pb;
 pub mod proto;
 pub mod rpc;
 pub mod state;
-
+pub mod errors;
 pub use crate::hex::Hex;
+//pub use subtreams_macro::handler;
 
 pub fn output<M: prost::Message>(msg: M) {
     // Need to return the buffer and forget about it issue occured when trying to write large data

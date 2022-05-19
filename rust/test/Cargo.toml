@@ -9,7 +9,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 substreams= { path = "../substreams" }
-substreams-macro= { path = "../substreams-macro" }
 num-bigint = "0.4"
 bigdecimal = "0.3"
 prost = { version = "0.10.1" }

@@ -437,7 +437,6 @@ dependencies = [
  "prost-build",
  "prost-types",
  "substreams",
- "substreams-macro",
  "wasm-bindgen",
 ]
 

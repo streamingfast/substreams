@@ -6,7 +6,7 @@ use num_bigint::{BigUint, TryFromBigIntError};
 use hex_literal::hex;
 use pb::{erc721, eth};
 
-#[substreams_macro::handler(type = "map")]
+#[substreams::handler(type = "map")]
 fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, SubstreamError> {
     let mut transfers: Vec<erc721::Transfer> = vec![];
 
@@ -49,7 +49,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, SubstreamError> {
 }
 
 
-#[substreams_macro::handler(type = "store")]
+#[substreams::handler(type = "store")]
 fn build_nft_state(transfers: erc721::Transfers,pairs_store_idx: u32) {
     for transfer in transfers.transfers {
         if hex::encode(&transfer.from) != "0000000000000000000000000000000000000000" {

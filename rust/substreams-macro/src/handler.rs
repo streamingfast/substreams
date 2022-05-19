@@ -136,8 +136,8 @@ pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let mut args : Vec<proc_macro2::TokenStream> = vec![];
-    let mut decodings : Vec<proc_macro2::TokenStream> = vec![];
+    let mut args : Vec<proc_macro2::TokenStream> = Vec::with_capacity(input.sig.inputs.len() * 2);
+    let mut decodings : Vec<proc_macro2::TokenStream> = Vec::with_capacity(input.sig.inputs.len());
 
     for i in (&input.sig.inputs).into_iter() {
         match i {
@@ -145,30 +145,25 @@ pub(crate) fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                 return token_stream_with_error(original, syn::Error::new(i.span(), format!("handler function does not support 'self' receiver")));
             },
             syn::FnArg::Typed(pat_type) => {
-                let mut var_name = syn::Ident::new("arg1",pat_type.span());
-                let mut var_ptr = syn::Ident::new("arg1_ptr",pat_type.span());
-                let mut var_len = syn::Ident::new("arg1_len",pat_type.span());
                 match &*pat_type.pat {
                     syn::Pat::Ident(v) => {
-                        var_name = v.ident.clone();
+                        let var_name = v.ident.clone();
                         if final_config.module_type == ModuleType::Store && var_name.to_string().ends_with("_idx") {
                             args.push(quote! { #pat_type });
                             continue
                         }
-                        // var_ptr = syn::Ident::new(&format!(), v.span());
-                        var_ptr = format_ident!("{}_ptr",var_name);
-                        var_len = format_ident!("{}_len",var_name);
+                        let var_ptr = format_ident!("{}_ptr",var_name);
+                        let var_len = format_ident!("{}_len",var_name);
                         args.push(quote! { #var_ptr: *mut u8 });
                         args.push(quote! { #var_len: usize });
+
+                        let argument_type = &*pat_type.ty;
+                        decodings.push(quote! { let #var_name: #argument_type = substreams::proto::decode_ptr(#var_ptr, #var_len).unwrap(); })
                     },
                     _ => {
                         return token_stream_with_error(original, syn::Error::new(pat_type.span(), format!("unknown argument type")));
                     }
                 }
-                let argument_type = &*pat_type.ty;
-                decodings.push(quote! {
-                    let #var_name: #argument_type = substreams::proto::decode_ptr(#var_ptr, #var_len).unwrap();
-                })
             },
         }
     }

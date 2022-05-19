@@ -32,10 +32,11 @@ type Builder struct {
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
 	DeletedPrefixes []string
 
-	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
-	valueType    string
-	lastOrdinal  uint64
+	UpdatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
+	ValueType    string
 	PartialMode  bool
+
+	lastOrdinal uint64
 }
 
 func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
@@ -59,8 +60,8 @@ func (b *Builder) FromBlockRange(blockRange *block.Range, partialMode bool) *Bui
 		ModuleHash:       b.ModuleHash,
 		KV:               map[string][]byte{},
 		Deltas:           []*pbsubstreams.StoreDelta{},
-		updatePolicy:     b.updatePolicy,
-		valueType:        b.valueType,
+		UpdatePolicy:     b.UpdatePolicy,
+		ValueType:        b.ValueType,
 		PartialMode:      partialMode,
 	}
 }
@@ -74,8 +75,8 @@ func NewBuilder(name string, saveInterval uint64, moduleStartBlock uint64, modul
 	b := &Builder{
 		Name:             name,
 		KV:               make(map[string][]byte),
-		updatePolicy:     updatePolicy,
-		valueType:        valueType,
+		UpdatePolicy:     updatePolicy,
+		ValueType:        valueType,
 		Store:            subStore,
 		SaveInterval:     saveInterval,
 		ModuleStartBlock: moduleStartBlock,

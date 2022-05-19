@@ -341,7 +341,7 @@ func TestBuilder_Merge(t *testing.T) {
 			// check result both ways
 
 			for k, v := range test.latest.KV {
-				if test.latest.valueType == OutputValueTypeBigFloat {
+				if test.latest.ValueType == OutputValueTypeBigFloat {
 					actual, _ := foundOrZeroBigFloat(v, true).Float64()
 					expected, _ := foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)
@@ -353,7 +353,7 @@ func TestBuilder_Merge(t *testing.T) {
 			}
 
 			for k, v := range test.expectedKV {
-				if test.latest.valueType == OutputValueTypeBigFloat {
+				if test.latest.ValueType == OutputValueTypeBigFloat {
 					actual, _ := foundOrZeroBigFloat(v, true).Float64()
 					expected, _ := foundOrZeroBigFloat(test.latest.KV[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)

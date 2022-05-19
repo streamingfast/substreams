@@ -22,8 +22,8 @@ const (
 func (b *Builder) writeMergeData() error {
 	mergeInfo := &mergeInfo{
 		StoreName:        b.Name,
-		UpdatePolicy:     b.updatePolicy,
-		ValueType:        b.valueType,
+		UpdatePolicy:     b.UpdatePolicy,
+		ValueType:        b.ValueType,
 		ModuleHash:       b.ModuleHash,
 		ModuleStartBlock: b.ModuleStartBlock,
 	}
@@ -65,19 +65,19 @@ func (b *Builder) Merge(previous *Builder) error {
 
 	next := b
 
-	if next.updatePolicy != previous.updatePolicy {
-		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", next.updatePolicy, previous.updatePolicy)
+	if next.UpdatePolicy != previous.UpdatePolicy {
+		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", next.UpdatePolicy, previous.UpdatePolicy)
 	}
 
-	if next.valueType != previous.valueType {
-		return fmt.Errorf("incompatible value types: cannot merge %q and %q", next.valueType, previous.valueType)
+	if next.ValueType != previous.ValueType {
+		return fmt.Errorf("incompatible value types: cannot merge %q and %q", next.ValueType, previous.ValueType)
 	}
 
 	for _, p := range next.DeletedPrefixes {
 		previous.DeletePrefix(previous.lastOrdinal, p)
 	}
 
-	switch next.updatePolicy {
+	switch next.UpdatePolicy {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE:
 		for k, v := range previous.KV {
 			if _, found := next.KV[k]; !found {
@@ -90,7 +90,7 @@ func (b *Builder) Merge(previous *Builder) error {
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM:
 		// check valueType to do the right thing
-		switch next.valueType {
+		switch next.ValueType {
 		case OutputValueTypeInt64:
 			sum := func(a, b uint64) uint64 {
 				return a + b
@@ -132,10 +132,10 @@ func (b *Builder) Merge(previous *Builder) error {
 				next.KV[k] = []byte(bigFloatToStr(sum(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", next.UpdatePolicy, next.ValueType)
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
-		switch next.valueType {
+		switch next.ValueType {
 		case OutputValueTypeInt64:
 			max := func(a, b uint64) uint64 {
 				if a >= b {
@@ -209,10 +209,10 @@ func (b *Builder) Merge(previous *Builder) error {
 				next.KV[k] = []byte(bigFloatToStr(max(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", next.UpdatePolicy, next.ValueType)
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
-		switch next.valueType {
+		switch next.ValueType {
 		case OutputValueTypeInt64:
 			min := func(a, b uint64) uint64 {
 				if a <= b {
@@ -286,10 +286,10 @@ func (b *Builder) Merge(previous *Builder) error {
 				next.KV[k] = []byte(bigFloatToStr(min(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", next.updatePolicy, next.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", next.UpdatePolicy, next.ValueType)
 		}
 	default:
-		return fmt.Errorf("update policy %q not supported", next.updatePolicy) // should have been validated already
+		return fmt.Errorf("update policy %q not supported", next.UpdatePolicy) // should have been validated already
 	}
 
 	next.PartialMode = previous.PartialMode

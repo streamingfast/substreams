@@ -35,12 +35,12 @@ type Builder struct {
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType    string
 	lastOrdinal  uint64
-	partialMode  bool
+	PartialMode  bool
 }
 
 func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("builder_name", b.Name)
-	enc.AddBool("partial", b.partialMode)
+	enc.AddBool("partial", b.PartialMode)
 	err := enc.AddObject("block_range", b.BlockRange)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (b *Builder) FromBlockRange(blockRange *block.Range, partialMode bool) *Bui
 		Deltas:           []*pbsubstreams.StoreDelta{},
 		updatePolicy:     b.updatePolicy,
 		valueType:        b.valueType,
-		partialMode:      partialMode,
+		PartialMode:      partialMode,
 	}
 }
 

@@ -26,11 +26,11 @@ func (b *Builder) WriteState(ctx context.Context) (err error) {
 
 	zlog.Info("write state mode",
 		zap.String("store", b.Name),
-		zap.Bool("partial", b.partialMode),
+		zap.Bool("partial", b.PartialMode),
 		zap.Object("block_range", b.BlockRange),
 	)
 
-	if b.partialMode {
+	if b.PartialMode {
 		_, err = b.writePartialState(ctx, content)
 	} else {
 		_, err = b.writeState(ctx, content)

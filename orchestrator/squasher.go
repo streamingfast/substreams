@@ -3,6 +3,8 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 	"sort"
 	"strings"
 
@@ -15,8 +17,8 @@ type Squasher struct {
 	builders map[string]*Squashable
 }
 
-func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache) (*Squasher, error) {
-	sqashables := map[string]*Squashable{}
+func NewSquasher(ctx context.Context, partialRequest *pbsubstreams.Request, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache) (*Squasher, error) {
+	squashables := map[string]*Squashable{}
 	for _, builder := range builders {
 		info, err := builder.Info(ctx)
 		if err != nil {
@@ -25,7 +27,11 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 
 		var initialBuilder *state.Builder
 		if info.LastKVSavedBlock == 0 {
-			initialBuilder = builder.FromBlockRange(nil, true)
+			r := &block.Range{
+				StartBlock:        builder.ModuleStartBlock,
+				ExclusiveEndBlock: builder.ModuleStartBlock + builder.SaveInterval,
+			}
+			initialBuilder = builder.FromBlockRange(r, true)
 		} else {
 			r := &block.Range{
 				StartBlock:        builder.ModuleStartBlock,
@@ -38,10 +44,10 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 			}
 		}
 
-		sqashables[builder.Name] = NewSquashable(initialBuilder)
+		squashables[builder.Name] = NewSquashable(initialBuilder)
 	}
 
-	return &Squasher{sqashables}, nil
+	return &Squasher{squashables}, nil
 }
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, blockRange *block.Range) error {
@@ -50,10 +56,20 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, blockRange *bl
 		return nil
 	}
 
-	return s.squash(ctx, b, blockRange)
+	blockRanges := blockRange.Split(100)
+
+	for _, br := range blockRanges {
+		err := s.squash(ctx, b, br)
+		if err != nil {
+			return fmt.Errorf("squashing range %d-%d: %w", br.StartBlock, br.ExclusiveEndBlock, err)
+		}
+	}
+
+	return nil
 }
 
 func (s *Squasher) squash(ctx context.Context, squashable *Squashable, blockRange *block.Range) error {
+	zlog.Info("squashing", zap.Object("range", blockRange), zap.String("module_name", squashable.builder.Name), zap.Uint64("block_range_size", blockRange.Size()))
 	if blockRange.Size() < squashable.builder.SaveInterval {
 		return nil
 	}
@@ -62,6 +78,7 @@ func (s *Squasher) squash(ctx context.Context, squashable *Squashable, blockRang
 	sort.Sort(squashable.ranges)
 
 	for {
+		zlog.Debug("builder", zap.String("builder_name", squashable.builder.Name), zap.Bool("partial_mode", squashable.builder.PartialMode))
 		if squashable.ranges[0].Equals(squashable.builder.BlockRange.Next(squashable.builder.SaveInterval)) {
 			nextBuilder := squashable.builder.FromBlockRange(squashable.ranges[0], true)
 			err := nextBuilder.Merge(squashable.builder)

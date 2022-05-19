@@ -15,7 +15,7 @@ import (
 )
 
 func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) error {
-	b.partialMode = true
+	b.PartialMode = true
 	b.BlockRange = &block.Range{
 		StartBlock:        startBlock,
 		ExclusiveEndBlock: startBlock + b.SaveInterval,
@@ -145,7 +145,7 @@ func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
 }
 
 func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
-	if b.partialMode {
+	if b.PartialMode {
 		panic("cannot load a state in partial mode")
 	}
 

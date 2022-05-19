@@ -321,7 +321,7 @@ func TestBuilder_Merge(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.prev.partialMode = true
+			test.prev.PartialMode = true
 			test.latest.KV = test.latestKV
 			test.prev.KV = test.prevKV
 			test.latest.DeletedPrefixes = test.deletedPrefixes

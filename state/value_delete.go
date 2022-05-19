@@ -42,7 +42,7 @@ func (b *Builder) DeletePrefix(ord uint64, prefix string) {
 
 	}
 
-	if b.partialMode {
+	if b.PartialMode {
 		b.DeletedPrefixes = append(b.DeletedPrefixes, prefix)
 	}
 }

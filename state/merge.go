@@ -292,8 +292,8 @@ func (b *Builder) Merge(previous *Builder) error {
 		return fmt.Errorf("update policy %q not supported", next.updatePolicy) // should have been validated already
 	}
 
-	next.partialMode = previous.partialMode
-	if next.partialMode {
+	next.PartialMode = previous.PartialMode
+	if next.PartialMode {
 		next.BlockRange.StartBlock = previous.BlockRange.StartBlock
 	}
 

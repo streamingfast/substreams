@@ -540,7 +540,7 @@ func SynchronizeStores(
 ) error {
 	zlog.Info("synchronizing stores")
 
-	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache)
+	squasher, err := orchestrator.NewSquasher(ctx, request, builders, outputCache)
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
@@ -564,6 +564,7 @@ func SynchronizeStores(
 	go func() {
 		for w := 0; w < numJobs; w++ {
 			worker(ctx, grpcClient, grpcCallOpts, returnFunc, jobs)
+			zlog.Debug("work done")
 			wg.Done()
 		}
 	}()
@@ -621,6 +622,7 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 						return
 					}
 					j.callback(j.request, err)
+					return
 				}
 
 				switch r := resp.Message.(type) {

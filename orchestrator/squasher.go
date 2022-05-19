@@ -87,7 +87,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		}
 
 		zlog.Debug("builder", zap.String("builder_name", squashable.builder.Name), zap.Bool("partial_mode", squashable.builder.PartialMode))
-		if squashable.ranges[0].Equals(squashable.builder.BlockRange.Next(squashable.builder.SaveInterval)) {
+		if len(squashable.ranges) > 0 && squashable.ranges[0].Equals(squashable.builder.BlockRange.Next(squashable.builder.SaveInterval)) {
 			nextBuilder := squashable.builder.FromBlockRange(squashable.ranges[0], true)
 			err := nextBuilder.Merge(squashable.builder)
 			if err != nil {

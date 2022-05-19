@@ -42,14 +42,21 @@ func TestSquash(t *testing.T) {
 
 	squashable := &Squashable{
 		builder: testStateBuilder(store),
-		ranges:  []*block.Range{{StartBlock: 30_000, ExclusiveEndBlock: 40_000}},
+		ranges:  []*block.Range{},
 	}
 
-	blockRange := &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000}
-
-	err := squash(ctx, squashable, blockRange)
+	err := squash(ctx, squashable, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000})
 	require.Nil(t, err)
-	require.Equal(t, 1, writeCount)
+	require.Equal(t, 0, writeCount)
+
+	err = squash(ctx, squashable, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000})
+	require.Nil(t, err)
+	require.Equal(t, 0, writeCount)
+
+	err = squash(ctx, squashable, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000})
+	require.Nil(t, err)
+
+	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 }
 
 func testStateBuilder(store dstore.Store) *state.Builder {

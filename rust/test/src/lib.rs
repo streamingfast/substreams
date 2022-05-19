@@ -1,5 +1,5 @@
 mod pb;
-
+use substreams;
 use bigdecimal::BigDecimal;
 use num_bigint::BigUint;
 use pb::{erc721, eth};
@@ -8,59 +8,16 @@ use pb::{erc721, eth};
 //
 // let transfers: erc721::Transfers = proto::decode_ptr(transfers_ptr, transfers_len).unwrap();
 #[substreams_macro::handler(type = "map")]
-fn build_nft_state(transfers: erc721::Transfers) -> Result<erc721::Transfers, string> {
-
+fn build_nft_state(transfers: erc721::Transfers) -> Result<erc721::Transfers, String> {
+    let t = transfers.clone();
     for transfer in transfers.transfers {
         let a = 3;
         let b = 3;
         let c = a + b;
         println!("{:?}", c)
     }
-    return Ok(transfers)
+    return Ok(t)
 }
-
-//
-// #[no_mangle]
-// fn build_nft_state_3(transfers_ptr: *mut u8, transfers_len: usize) {
-//     substreams::register_panic_hook();
-//     let func  = ||-> Result<erc721::Transfers, string> {
-//         let transfers: erc721::Transfers = substreams::proto::decode_ptr(transfers_ptr, transfers_len).unwrap();
-//         for transfer in transfers.transfers {
-//             let a = 3;
-//             let b = 3;
-//             let c = a + b;
-//             println!("{:?}", c)
-//         }
-//         return Ok(transfers);
-//     };
-//     let result = func();
-//     if result.is_err() {
-//         panic!(result.err().unwrap())
-//     }
-//     substreams::output(result.unwrap());
-// }
-//
-//
-// #[substreams_macro::handler(type = "store")]
-// fn build_tempo(block: eth::Block, transfers: erc721::Transfers)  {
-//     for transfer in transfers.transfers {
-//         let a = 3;
-//         let b = 3;
-//         let c = a + b;
-//         println!("{:?}", c)
-//     }
-// }
-
-// #[substreams_macro::handler(type = "store")]
-// fn build_tempo(block: eth::Block, transfers: erc721::Transfers) -> Result<erc721::Transfers, string> {
-//     for transfer in transfers.transfers {
-//         let a = 3;
-//         let b = 3;
-//         let c = a + b;
-//         println!("{:?}", c)
-//     }
-//     return Ok(transfers)
-// }
 
 //
 // #[no_mangle]

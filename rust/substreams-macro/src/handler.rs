@@ -233,11 +233,16 @@ fn parse_func(mut input: syn::ItemFn) -> TokenStream {
     }
     println!("done");
     // current main function
-    let body = &input.block;
+    let body = &input.block.clone();
     // let brace_token = input.block.brace_token;
     let header = quote! {
         #[no_mangle]
     };
+
+
+    // let lambdaName = format_ident!("func");
+    // let lambdaReturnType : syn::ReturnType =  syn::parse_str("Result<bool,String>").unwrap();
+
     input.block = syn::parse2(quote! {
         {
             substreams::register_panic_hook();
@@ -247,66 +252,41 @@ fn parse_func(mut input: syn::ItemFn) -> TokenStream {
     // input.block.brace_token = brace_token;
 
 
-    let foo : syn::Type =  syn::parse_str("*mut u8").unwrap();
-    let arg = syn::PatType{
-        attrs: vec![],
-        pat: Box::new(syn::Pat::Ident(syn::PatIdent{
-            // attrs: vec![],
-            // by_ref: Some(keyword!(ref)),
-            // mutability: Some(keyword!(mut)),
-            attrs: vec![],
-            by_ref: None,
-            mutability: None,
-            ident: format_ident!("{}_ptr","transfers"),
-            // ..Default::default()
-            subpat: None
-        })),
-        colon_token: syn::Token![:],
-        ty: Box::new(foo),
+
+    let func_name = input.sig.ident.clone();
+    let transfer_ptr = format_ident!("{}_ptr","transfers");
+    let transfer_ptr_arg = quote! {
+            #transfer_ptr: *mut u8
     };
-    // let varname_a = ;
-    // let varname_b = format_ident!("{}_len","transfers");
-    //
-    // // let varname_a = syn::Ident::new(&format!("{}_ptr","transfers"), Span::call_site());
-    // // // let varname_b = syn::Ident::new(&format!("{}_len","transfers"), Span::call_site());
-    // //
-    // // let inputs = vec![varname_a,varname_b];
-    //
-    // // syn::PatType{
-    // //     attrs: vec![],
-    // //     pat: Box::new(Pat::__NonExhaustive),
-    // //     colon_token: Default::default(),
-    // //     ty: Box::new(Type::__NonExhaustive)
-    // // }
-    // // let inputs = quote! {
-    // //     #varname: *mut u8
-    // // };
-    //
-    // // let func_inputs = inputs.into_iter().map( |v| {
-    // //     quote! {
-    // //         #v: *mut 8
-    // //     }
-    // // });
-    //
-    let func_inputs = vec![
-        quote! {
-            #varname_a: *mut 8
-        }
-    ];
-    //
-    // let mid = quote! {
-    //     #(#func_inputs),*
-    // };
+    let transfer_len = format_ident!("{}_len","transfers");
+    let transfer_len_arg = quote! {
+            #transfer_len: usize
+    };
+    let transfer_decode = quote! {
+        let transfers: erc721::Transfers = substreams::proto::decode_ptr(#transfer_ptr, #transfer_len).unwrap();
+    };
 
-    // let varname_a = format_ident!("{}_len","transfers");
-    // let foo = quote! {
-    //         #varname_a: *mut 8
-    // };
+    let args = vec![transfer_ptr_arg, transfer_len_arg];
 
+    let lambdaReturn = input.sig.output.clone();
+    let lambda = quote! {
+        let func = || #lambdaReturn {
+            #transfer_decode
+            #body
+        };
+    };
     let result = quote! {
         #header
-        #input
-        #arg
+
+        pub fn #func_name(#(#args),*){
+            substreams::register_panic_hook();
+            #lambda
+            let result = func();
+            if result.is_err() {
+                panic!(result.err().unwrap())
+            }
+            substreams::output(result.unwrap());
+        }
     };
 
     result.into()

@@ -1,0 +1,21 @@
+[package]
+name = "substreams-macro"
+version = "0.1.0"
+edition = "2018"
+authors = ["StreamingFast Contributors <team@streamingfast.io>"]
+license = "MIT"
+description = """
+Substream's proc macros.
+"""
+categories = ["asynchronous"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.7"
+quote = "1"
+syn = { version = "1.0.56", features = ["full", "visit-mut", "fold"] }
+
+[dev-dependencies]
+trybuild = { version = "1.0.49", features = ["diff"] }

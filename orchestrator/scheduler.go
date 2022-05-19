@@ -2,11 +2,12 @@ package orchestrator
 
 import (
 	"context"
+	"io"
+
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"io"
 )
 
 var zlog, _ = logging.PackageLogger("scheduler", "github.com/streamingfast/substreams/scheduler")
@@ -18,6 +19,7 @@ type Scheduler struct {
 	squasher *Squasher
 	strategy Strategy
 	requests []*pbsubstreams.Request
+	Err      error
 }
 
 func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher) (*Scheduler, error) {
@@ -47,6 +49,7 @@ func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(r *
 
 func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 	if err != nil {
+		s.Err = err
 		s.ctxCancelFunc()
 		return
 	}

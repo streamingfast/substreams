@@ -3,12 +3,13 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator"
 	"io"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/streamingfast/substreams/orchestrator"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -549,7 +550,7 @@ func SynchronizeStores(
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	s, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher)
+	scheduler, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
@@ -568,7 +569,7 @@ func SynchronizeStores(
 	}()
 
 	for {
-		err := s.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
+		err := scheduler.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
 			jobs <- &job{
 				request:  request,
 				callback: callback,
@@ -585,6 +586,10 @@ func SynchronizeStores(
 
 	close(jobs)
 	wg.Wait()
+
+	if scheduler.Err != nil {
+		return scheduler.Err
+	}
 
 	return nil
 }

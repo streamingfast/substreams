@@ -3,10 +3,10 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/state"
-	"go.uber.org/zap"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/state"
+	"go.uber.org/zap"
 )
 
 type Strategy interface {

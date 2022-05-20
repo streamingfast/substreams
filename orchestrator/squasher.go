@@ -15,7 +15,7 @@ import (
 )
 
 type Squasher struct {
-	builders map[string]*Squashable
+	squashables map[string]*Squashable
 }
 
 func NewSquasher(ctx context.Context, partialRequest *pbsubstreams.Request, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache) (*Squasher, error) {
@@ -52,7 +52,7 @@ func NewSquasher(ctx context.Context, partialRequest *pbsubstreams.Request, buil
 }
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, blockRange *block.Range) error {
-	b, ok := s.builders[moduleName]
+	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		return nil
 	}
@@ -60,7 +60,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, blockRange *bl
 	blockRanges := blockRange.Split(100)
 
 	for _, br := range blockRanges {
-		err := squash(ctx, b, br)
+		err := squash(ctx, squashable, br)
 		if err != nil {
 			return fmt.Errorf("squashing range %d-%d: %w", br.StartBlock, br.ExclusiveEndBlock, err)
 		}
@@ -71,7 +71,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, blockRange *bl
 
 func (s *Squasher) Close() error {
 	var nonEmptySquashables Squashables
-	for _, v := range s.builders {
+	for _, v := range s.squashables {
 		if !v.IsEmpty() {
 			nonEmptySquashables = append(nonEmptySquashables, v)
 		}

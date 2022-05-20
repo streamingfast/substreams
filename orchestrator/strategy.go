@@ -21,7 +21,7 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 	res := &LinearStrategy{}
 
 	for _, builder := range builders {
-		zlog.Debug("builders", zap.String("builder", builder.Name))
+		zlog.Debug("squashables", zap.String("builder", builder.Name))
 		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
 		if upToBlockNum == builder.ModuleStartBlock {
 			continue // nothing to synchronize

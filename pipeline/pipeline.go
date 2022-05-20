@@ -592,6 +592,10 @@ func SynchronizeStores(
 		return scheduler.Err
 	}
 
+	if err := squasher.Close(); err != nil {
+		return fmt.Errorf("closing squasher: %w", err)
+	}
+
 	return nil
 }
 

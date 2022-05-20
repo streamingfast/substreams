@@ -649,6 +649,9 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 							//todo: maybe return log ...
 						}
 					}
+					if err := returnFunc(r.Data, nil); err != nil {
+						fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
+					}
 				}
 			}
 		case <-ctx.Done():

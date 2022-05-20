@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/block"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
@@ -45,9 +47,14 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 			reqStartBlock = builder.ModuleStartBlock
 		}
 
-		req := createRequest(reqStartBlock, endBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
+		r := &block.Range{
+			StartBlock:        reqStartBlock,
+			ExclusiveEndBlock: endBlock,
+		}
+
+		req := createRequest(r.StartBlock, r.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
 		res.requests = append(res.requests, req)
-		zlog.Info("request created", zap.String("module_name", builder.Name))
+		zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", r))
 	}
 
 	return res, nil

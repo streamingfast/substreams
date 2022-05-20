@@ -63,6 +63,9 @@ func (r *Range) Split(chunkSize uint64) []*Range {
 
 	floor := r.StartBlock - r.StartBlock%chunkSize
 	currentStart := floor
+	if floor < r.StartBlock {
+		currentStart = r.StartBlock
+	}
 	currentEnd := floor + chunkSize
 
 	if r.StartBlock-floor != 0 {

@@ -324,13 +324,13 @@ func (into *Builder) Merge(builder *Builder) error {
 	switch into.UpdatePolicy {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE:
 		for k, v := range builder.KV {
-			if _, found := into.KV[k]; !found {
-				into.KV[k] = v
-			}
+			into.KV[k] = v
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE:
 		for k, v := range builder.KV {
-			into.KV[k] = v
+			if _, found := into.KV[k]; !found {
+				into.KV[k] = v
+			}
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM:
 		// check valueType to do the right thing

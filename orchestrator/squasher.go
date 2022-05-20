@@ -112,9 +112,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		if nextAvailableSquashableRange.Equals(nextBuilderRange) {
 			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()), zap.String("mergeable range", nextBuilderRange.String()))
 
-			//nextAvailableSquashableRange.StartBlock = squashable.builder.ModuleStartBlock
 			nextBuilder := squashable.builder.FromBlockRange(nextAvailableSquashableRange, true)
-			zlog.Debug("WTF")
 			err := nextBuilder.InitializePartial(ctx, nextAvailableSquashableRange.StartBlock)
 			if err != nil {
 				return fmt.Errorf("initializing next partial builder %q: %w", nextBuilder.Name, err)
@@ -127,7 +125,6 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 			//this is very weird stuff
 			nextBuilder.PartialMode = false
 			nextBuilder.BlockRange.StartBlock = nextBuilder.ModuleStartBlock
-			//nextBuilder.Roll()
 
 			err = nextBuilder.WriteState(ctx)
 			if err != nil {

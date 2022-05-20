@@ -625,6 +625,7 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 			stream, err := grpcClient.Blocks(ctx, j.request, grpcCallOpts...)
 			if err != nil {
 				j.callback(j.request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
+				return
 			}
 
 			for {
@@ -647,6 +648,7 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 					err := respFunc(resp)
 					if err != nil {
 						j.callback(j.request, err)
+						return
 					}
 				case *pbsubstreams.Response_SnapshotData:
 					_ = r.SnapshotData

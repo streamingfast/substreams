@@ -74,6 +74,11 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 			continue
 		}
 
+		isNotFullRange := br.Size() < squashable.builder.SaveInterval && br.StartBlock != squashable.builder.ModuleStartBlock
+		if isNotFullRange {
+			continue
+		}
+
 		err := squash(ctx, squashable, br)
 		if err != nil {
 			return fmt.Errorf("squashing range %d-%d: %w", br.StartBlock, br.ExclusiveEndBlock, err)

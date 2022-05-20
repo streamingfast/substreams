@@ -292,8 +292,18 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 	var modules []*pbsubstreams.ModuleProgress
 	for _, mod := range p.modules {
 		modules = append(modules, &pbsubstreams.ModuleProgress{
-			Name:            mod.Name,
-			ProcessedRanges: []*pbsubstreams.BlockRange{{StartBlock: p.requestedStartBlockNum, EndBlock: p.progressTracker.lastBlock}},
+			Name:    mod.Name,
+			CatchUp: p.partialMode,
+			RequestBlockRange: &pbsubstreams.BlockRange{
+				StartBlock: uint64(p.request.StartBlockNum),
+				EndBlock:   p.request.StopBlockNum,
+			},
+			ProcessedRanges: []*pbsubstreams.BlockRange{
+				{
+					StartBlock: p.requestedStartBlockNum,
+					EndBlock:   p.progressTracker.lastBlock,
+				},
+			},
 		})
 	}
 	progress := &pbsubstreams.ModulesProgress{Modules: modules}

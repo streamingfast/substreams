@@ -84,10 +84,13 @@ message ModulesProgress {
 
 message ModuleProgress {
   string name = 1;
-  repeated BlockRange processed_ranges = 2;
 
-  uint64 total_bytes_read = 3;
-  uint64 total_bytes_written = 4;
+  BlockRange request_block_range = 2;
+  bool catchUp = 3;
+  repeated BlockRange processed_ranges = 4;
+
+  uint64 total_bytes_read = 5;
+  uint64 total_bytes_written = 6;
 
   bool failed = 7;
   string failure_reason = 8;

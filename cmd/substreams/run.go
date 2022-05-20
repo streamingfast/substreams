@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/decode"
@@ -15,7 +14,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	_ "github.com/streamingfast/substreams/pb/statik"
 
-	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -56,30 +54,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	outputStreamNames := strings.Split(args[1], ",")
 
-	returnHandler := func(any *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error { return nil }
+	returnHandler := func(in *pbsubstreams.Response) error { return nil }
 	if !mustGetBool(cmd, "no-return-handler") {
 		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
-	}
-
-	failureProgressHandler := func(progress *pbsubstreams.ModulesProgress) error {
-		failedModule := firstFailedModuleProgress(progress)
-		if failedModule == nil {
-			return nil
-		}
-
-		fmt.Printf("---------------------- Module %s failed ---------------------\n", failedModule.Name)
-		for _, module := range progress.Modules {
-			for _, log := range module.FailureLogs {
-				fmt.Printf("%s: %s\n", module.Name, log)
-			}
-
-			if module.FailureLogsTruncated {
-				fmt.Println("<Logs Truncated>")
-			}
-		}
-
-		fmt.Printf("Error:\n%s", failedModule.FailureReason)
-		return nil
 	}
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
@@ -141,55 +118,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		switch r := resp.Message.(type) {
-		case *pbsubstreams.Response_Progress:
-			if failedModule := firstFailedModuleProgress(r.Progress); failedModule != nil {
-				if err := failureProgressHandler(r.Progress); err != nil {
-					fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
-				}
-			}
-			for _, moduleProgess := range r.Progress.Modules {
-				fmt.Printf("module:%s %s\n", moduleProgess.Name, moduleProgess.ProcessedRanges)
-			}
-
-		case *pbsubstreams.Response_SnapshotData:
-			_ = r.SnapshotData
-		case *pbsubstreams.Response_SnapshotComplete:
-			_ = r.SnapshotComplete
-		case *pbsubstreams.Response_Data:
-			if err := returnHandler(r.Data, nil); err != nil {
-				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
-			}
+		if err := returnHandler(resp); err != nil {
+			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}
-}
-
-func firstFailedModuleProgress(modulesProgress *pbsubstreams.ModulesProgress) *pbsubstreams.ModuleProgress {
-	for _, module := range modulesProgress.Modules {
-		if module.Failed == true {
-			return module
-		}
-	}
-
-	return nil
-}
-
-func findProtoFiles(importPaths []string, importFilePatterns []string) ([]string, error) {
-	var files []string
-	for _, importPath := range importPaths {
-		importPathFS := os.DirFS(importPath)
-		for _, importFile := range importFilePatterns {
-			zlog.Debug("globbing proto files", zap.String("import_path", importPath), zap.String("import_file", importFile))
-			matches, err := doublestar.Glob(importPathFS, importFile)
-			if err != nil {
-				return nil, fmt.Errorf("glob through %q, matching %q: %w", importPath, importFile, err)
-			}
-			files = append(files, matches...)
-		}
-	}
-
-	zlog.Debug("proto files found", zap.Strings("files", files))
-	return files, nil
 }
 
 func readAPIToken(cmd *cobra.Command, envFlagName string) string {

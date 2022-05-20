@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ReturnFunc {
+func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ResponseFunc {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
@@ -98,7 +98,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		}
 	}
 
-	return func(output *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error {
+	blockScopedData := func(output *pbsubstreams.BlockScopedData) error {
 		printClock(output)
 		if output == nil {
 			return nil
@@ -149,12 +149,71 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 				if data != nil {
 					panic(fmt.Sprintf("unsupported module output data type %T", data))
 				} else {
-					fmt.Println("received nil data")
+					fmt.Println("received nil data for module", out.Name)
 				}
 			}
 		}
 		return nil
 	}
+
+	progress := func(progress *pbsubstreams.ModulesProgress) error {
+		if failedModule := firstFailedModuleProgress(progress); failedModule != nil {
+			if err := failureProgressHandler(progress); err != nil {
+				fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
+			}
+		}
+		for _, moduleProgress := range progress.Modules {
+			fmt.Printf("module:%s %s\n", moduleProgress.Name, moduleProgress.ProcessedRanges)
+		}
+		return nil
+	}
+
+	return func(resp *pbsubstreams.Response) error {
+		switch m := resp.Message.(type) {
+		case *pbsubstreams.Response_Data:
+			return blockScopedData(m.Data)
+		case *pbsubstreams.Response_Progress:
+			return progress(m.Progress)
+		case *pbsubstreams.Response_SnapshotData:
+			fmt.Println("Incoming snapshot data")
+		case *pbsubstreams.Response_SnapshotComplete:
+			fmt.Println("Snapshot data dump complete")
+		default:
+			fmt.Println("Unsupported response")
+		}
+		return nil
+	}
+}
+
+func failureProgressHandler(progress *pbsubstreams.ModulesProgress) error {
+	failedModule := firstFailedModuleProgress(progress)
+	if failedModule == nil {
+		return nil
+	}
+
+	fmt.Printf("---------------------- Module %s failed ---------------------\n", failedModule.Name)
+	for _, module := range progress.Modules {
+		for _, log := range module.FailureLogs {
+			fmt.Printf("%s: %s\n", module.Name, log)
+		}
+
+		if module.FailureLogsTruncated {
+			fmt.Println("<Logs Truncated>")
+		}
+	}
+
+	fmt.Printf("Error:\n%s", failedModule.FailureReason)
+	return nil
+}
+
+func firstFailedModuleProgress(modulesProgress *pbsubstreams.ModulesProgress) *pbsubstreams.ModuleProgress {
+	for _, module := range modulesProgress.Modules {
+		if module.Failed == true {
+			return module
+		}
+	}
+
+	return nil
 }
 
 func decodeAsString(in []byte) string { return fmt.Sprintf("%q", string(in)) }

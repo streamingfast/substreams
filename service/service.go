@@ -188,41 +188,13 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// ...FIXME ?
 	}
 
-	returnHandler := func(out *pbsubstreams.BlockScopedData, progress *pbsubstreams.ModulesProgress) error {
-		if out != nil {
-			err := streamSrv.Send(&pbsubstreams.Response{
-				Message: &pbsubstreams.Response_Data{Data: out},
-			})
-			if err != nil {
-				return NewErrSendBlock(err)
-			}
-		}
-
-		if progress != nil {
-			err := streamSrv.Send(&pbsubstreams.Response{
-				Message: &pbsubstreams.Response_Progress{Progress: progress},
-			})
-			if err != nil {
-				return NewErrSendBlock(err)
-			}
-		}
-
-		return nil
-	}
-
-	progressHandler := func(modulesProgress *pbsubstreams.ModulesProgress) error {
-		err := streamSrv.Send(&pbsubstreams.Response{
-			Message: &pbsubstreams.Response_Progress{
-				Progress: modulesProgress,
-			},
-		})
-		if err != nil {
+	responseHandler := func(resp *pbsubstreams.Response) error {
+		if err := streamSrv.Send(resp); err != nil {
 			return NewErrSendBlock(err)
 		}
 		return nil
 	}
-
-	handler, err := pipe.HandlerFactory(returnHandler, progressHandler)
+	handler, err := pipe.HandlerFactory(responseHandler)
 	if err != nil {
 		return fmt.Errorf("error building substreams pipeline handler: %w", err)
 	}

@@ -116,7 +116,7 @@ func New(
 //   * if resources are available, SCHEDULE on BACKING NODES a parallel processing for that segment
 //   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
 
-func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc substreams.ProgressFunc) (bstream.Handler, error) {
+func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) error) (bstream.Handler, error) {
 	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum))
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
@@ -148,7 +148,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 	p.progressTracker.startTracking(ctx)
 
 	if !p.partialMode {
-		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, progressFunc); err != nil {
+		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc); err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
 	}
@@ -243,7 +243,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 			zlog.Debug("executing", zap.Stringer("module_name", executor))
 			err := executor.run(p.wasmOutputs, p.clock, block)
 			if err != nil {
-				if returnErr := p.returnFailureProgress(err, executor, progressFunc); returnErr != nil {
+				if returnErr := p.returnFailureProgress(err, executor, respFunc); returnErr != nil {
 					return returnErr
 				}
 
@@ -263,7 +263,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 		p.progressTracker.blockProcessed(block, time.Since(handleStart))
 
 		if p.clock.Number >= p.requestedStartBlockNum {
-			if err := p.returnOutputs(step, cursor, returnFunc); err != nil {
+			if err := p.returnOutputs(step, cursor, respFunc); err != nil {
 				return err
 			}
 		}
@@ -276,7 +276,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 	}), nil
 }
 
-func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, returnFunc substreams.ReturnFunc) error {
+func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, respFunc substreams.ResponseFunc) error {
 	var out *pbsubstreams.BlockScopedData
 	if len(p.moduleOutputs) > 0 {
 		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
@@ -306,15 +306,17 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 			},
 		})
 	}
-	progress := &pbsubstreams.ModulesProgress{Modules: modules}
 
-	if err := returnFunc(out, progress); err != nil {
+	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+	if err := respFunc(substreams.NewModulesProgressResponse(modules)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}
 	return nil
 }
 
-func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor, progressFunc substreams.ProgressFunc) error {
+func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor, respFunc substreams.ResponseFunc) error {
 	modules := make([]*pbsubstreams.ModuleProgress, len(p.moduleOutputs)+1)
 
 	for i, moduleOutput := range p.moduleOutputs {
@@ -351,7 +353,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 		TotalBytesWritten: 0,
 	}
 
-	return progressFunc(&pbsubstreams.ModulesProgress{Modules: modules})
+	return respFunc(substreams.NewModulesProgressResponse(modules))
 }
 
 func (p *Pipeline) setupSource(block *bstream.Block) error {
@@ -543,7 +545,7 @@ func SynchronizeStores(
 	builders []*state.Builder,
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
-	progressFunc substreams.ProgressFunc,
+	respFunc substreams.ResponseFunc,
 ) error {
 	zlog.Info("synchronizing stores")
 
@@ -570,7 +572,7 @@ func SynchronizeStores(
 
 	go func() {
 		for w := 0; w < numJobs; w++ {
-			worker(ctx, grpcClient, grpcCallOpts, progressFunc, jobs)
+			worker(ctx, grpcClient, grpcCallOpts, respFunc, jobs)
 			zlog.Debug("work done")
 			wg.Done()
 		}
@@ -611,7 +613,7 @@ type job struct {
 	callback func(r *pbsubstreams.Request, err error)
 }
 
-func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, progressFunc substreams.ProgressFunc, jobs <-chan *job) {
+func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, respFunc substreams.ResponseFunc, jobs <-chan *job) {
 	for {
 		select {
 		case j, ok := <-jobs:
@@ -641,7 +643,8 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 				switch r := resp.Message.(type) {
 				case *pbsubstreams.Response_Progress:
 					zlog.Debug("resp received", zap.String("type", "progress"))
-					err := progressFunc(r.Progress)
+					// TODO: aggregate, and pile up all the progresses from child workers somehow
+					err := respFunc(resp)
 					if err != nil {
 						j.callback(j.request, err)
 					}

@@ -69,6 +69,21 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, blockRange *bl
 	return nil
 }
 
+func (s *Squasher) Close() error {
+	var nonEmptySquashables Squashables
+	for _, v := range s.builders {
+		if !v.IsEmpty() {
+			nonEmptySquashables = append(nonEmptySquashables, v)
+		}
+	}
+
+	if len(nonEmptySquashables) != 0 {
+		return fmt.Errorf("squasher closed in invalid state. still waiting for %s", nonEmptySquashables)
+	}
+
+	return nil
+}
+
 func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range) error {
 	zlog.Info("squashing", zap.Object("range", blockRange), zap.String("module_name", squashable.builder.Name), zap.Uint64("block_range_size", blockRange.Size()))
 	if blockRange.Size() < squashable.builder.SaveInterval {
@@ -115,21 +130,6 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 			continue
 		}
 		break
-	}
-
-	return nil
-}
-
-func (s *Squasher) Close() error {
-	var nonEmptySquashables Squashables
-	for _, v := range s.builders {
-		if !v.IsEmpty() {
-			nonEmptySquashables = append(nonEmptySquashables, v)
-		}
-	}
-
-	if len(nonEmptySquashables) != 0 {
-		return fmt.Errorf("squasher closed in invalid state. still waiting for %s", nonEmptySquashables)
 	}
 
 	return nil

@@ -22,8 +22,6 @@ message Request {
   Modules modules = 6;
   repeated string output_modules = 7;
   repeated string initial_store_snapshot_for_modules = 8;
-
-  bool partial = 9;
 }
 
 message Response {
@@ -86,7 +84,7 @@ message ModulesProgress {
 
 message ModuleProgress {
   string name = 1;
-  BlockRange requestBlockRange = 2;
+  repeated BlockRange processed_ranges = 2;
 
   uint64 total_bytes_read = 3;
   uint64 total_bytes_written = 4;

@@ -42,6 +42,7 @@ func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(r *
 	}
 
 	zlog.Debug("request", zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum), zap.Strings("stores", request.OutputModules))
+
 	f(request, s.callback)
 
 	return nil

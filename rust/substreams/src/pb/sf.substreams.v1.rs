@@ -167,6 +167,8 @@ pub struct Request {
     pub output_modules: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="8")]
     pub initial_store_snapshot_for_modules: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(bool, tag="9")]
+    pub partial: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Response {
@@ -247,8 +249,8 @@ pub struct ModulesProgress {
 pub struct ModuleProgress {
     #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
-    #[prost(message, repeated, tag="2")]
-    pub processed_ranges: ::prost::alloc::vec::Vec<BlockRange>,
+    #[prost(message, optional, tag="2")]
+    pub request_block_range: ::core::option::Option<BlockRange>,
     #[prost(uint64, tag="3")]
     pub total_bytes_read: u64,
     #[prost(uint64, tag="4")]

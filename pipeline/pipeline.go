@@ -21,6 +21,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -103,10 +104,6 @@ func New(
 
 	for _, opt := range opts {
 		opt(pipe)
-	}
-
-	if request.Partial {
-		pipe.partialMode = true
 	}
 
 	return pipe
@@ -611,6 +608,8 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 			if !ok {
 				return
 			}
+
+			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 			stream, err := grpcClient.Blocks(ctx, j.request, grpcCallOpts...)
 			if err != nil {
 				j.callback(j.request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
@@ -657,6 +656,9 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
+	// TODO: Have the decision check be made outside of the "save" function, which indicates
+	// at the call site that we're DECIDING to do a save. Similar to Squasher::squash
+	// something like `isStoresSaveBoundary() bool`.
 	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 	intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
 

@@ -55,15 +55,6 @@ func (r *Range) Size() uint64 {
 	return r.ExclusiveEndBlock - r.StartBlock
 }
 
-func Ceiling(val, chunksize uint64) uint64 {
-	res := (val + chunksize) - (val % magnitude(chunksize))
-	return res
-}
-
-func magnitude(n uint64) uint64 {
-	val := math.Log10(float64(n))
-	return uint64(math.Pow(10.0, float64(uint64(val))))
-}
 func (r *Range) Split(chunkSize uint64) []*Range {
 	var res []*Range
 	if r.ExclusiveEndBlock-r.StartBlock <= chunkSize {
@@ -71,8 +62,7 @@ func (r *Range) Split(chunkSize uint64) []*Range {
 		return res
 	}
 
-	ceiling := Ceiling(r.StartBlock, chunkSize)
-	currentEnd := ceiling
+	currentEnd := ceiling(r.StartBlock, chunkSize)
 	currentStart := r.StartBlock
 
 	for {
@@ -115,4 +105,14 @@ func (r Ranges) Less(i, j int) bool {
 
 func (r Ranges) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
+}
+
+func ceiling(val, chunksize uint64) uint64 {
+	res := (val + chunksize) - (val % magnitude(chunksize))
+	return res
+}
+
+func magnitude(n uint64) uint64 {
+	val := math.Log10(float64(n))
+	return uint64(math.Pow(10.0, float64(uint64(val))))
 }

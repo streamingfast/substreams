@@ -148,6 +148,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 					fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
 				}
 			}
+			for _, moduleProgess := range r.Progress.Modules {
+				fmt.Printf("module:%s %s\n", moduleProgess.Name, moduleProgess.ProcessedRanges)
+			}
+
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData
 		case *pbsubstreams.Response_SnapshotComplete:

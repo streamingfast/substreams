@@ -151,7 +151,7 @@ func (p *Pipeline) HandlerFactory(returnFunc substreams.ReturnFunc, progressFunc
 	p.progressTracker.startTracking(ctx)
 
 	if !p.partialMode {
-		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, returnFunc); err != nil {
+		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, progressFunc); err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
 	}
@@ -536,7 +536,7 @@ func SynchronizeStores(
 	builders []*state.Builder,
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
-	returnFunc substreams.ReturnFunc,
+	progressFunc substreams.ProgressFunc,
 ) error {
 	zlog.Info("synchronizing stores")
 
@@ -563,7 +563,7 @@ func SynchronizeStores(
 
 	go func() {
 		for w := 0; w < numJobs; w++ {
-			worker(ctx, grpcClient, grpcCallOpts, returnFunc, jobs)
+			worker(ctx, grpcClient, grpcCallOpts, progressFunc, jobs)
 			zlog.Debug("work done")
 			wg.Done()
 		}
@@ -604,7 +604,7 @@ type job struct {
 	callback func(r *pbsubstreams.Request, err error)
 }
 
-func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, returnFunc substreams.ReturnFunc, jobs <-chan *job) {
+func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, progressFunc substreams.ProgressFunc, jobs <-chan *job) {
 	for {
 		select {
 		case j, ok := <-jobs:
@@ -632,8 +632,7 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 				switch r := resp.Message.(type) {
 				case *pbsubstreams.Response_Progress:
 					zlog.Debug("resp received", zap.String("type", "progress"))
-					//todo: forward progress to end user
-					err := returnFunc(nil, r.Progress)
+					err := progressFunc(r.Progress)
 					if err != nil {
 						j.callback(j.request, err)
 					}
@@ -648,9 +647,6 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 							fmt.Println("LOG: ", log)
 							//todo: maybe return log ...
 						}
-					}
-					if err := returnFunc(r.Data, nil); err != nil {
-						fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 					}
 				}
 			}

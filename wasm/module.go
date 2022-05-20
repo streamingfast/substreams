@@ -89,8 +89,6 @@ func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams
 	)
 }
 
-var foo int
-
 func (m *Module) NewInstance(clock *pbsubstreams.Clock, functionName string, inputs []*Input) (*Instance, error) {
 	// WARN: An instance needs to be created on the same thread that it is consumed.
 	store := wasmer.NewStore(m.engine)

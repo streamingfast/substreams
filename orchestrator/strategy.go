@@ -47,14 +47,17 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 			reqStartBlock = builder.ModuleStartBlock
 		}
 
-		r := &block.Range{
+		requestBlockRange := &block.Range{
 			StartBlock:        reqStartBlock,
 			ExclusiveEndBlock: endBlock,
 		}
 
-		req := createRequest(r.StartBlock, r.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
-		res.requests = append(res.requests, req)
-		zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", r))
+		ranges := requestBlockRange.Split(200)
+		for _, r := range ranges {
+			req := createRequest(r.StartBlock, r.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
+			res.requests = append(res.requests, req)
+			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", r))
+		}
 	}
 
 	return res, nil

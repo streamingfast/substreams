@@ -2,6 +2,7 @@ package block
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/streamingfast/bstream"
@@ -54,6 +55,15 @@ func (r *Range) Size() uint64 {
 	return r.ExclusiveEndBlock - r.StartBlock
 }
 
+func Ceiling(val, chunksize uint64) uint64 {
+	res := (val + chunksize) - (val % magnitude(chunksize))
+	return res
+}
+
+func magnitude(n uint64) uint64 {
+	val := math.Log10(float64(n))
+	return uint64(math.Pow(10.0, float64(uint64(val))))
+}
 func (r *Range) Split(chunkSize uint64) []*Range {
 	var res []*Range
 	if r.ExclusiveEndBlock-r.StartBlock <= chunkSize {
@@ -61,16 +71,9 @@ func (r *Range) Split(chunkSize uint64) []*Range {
 		return res
 	}
 
-	floor := r.StartBlock - r.StartBlock%chunkSize
-	currentStart := floor
-	if floor < r.StartBlock {
-		currentStart = r.StartBlock
-	}
-	currentEnd := floor + chunkSize
-
-	if r.StartBlock-floor != 0 {
-		currentStart = r.StartBlock
-	}
+	ceiling := Ceiling(r.StartBlock, chunkSize)
+	currentEnd := ceiling
+	currentStart := r.StartBlock
 
 	for {
 		res = append(res, &Range{

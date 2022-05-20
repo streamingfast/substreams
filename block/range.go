@@ -42,6 +42,10 @@ func (r *Range) Previous(size uint64) *Range {
 	}
 }
 
+func (r *Range) IsNext(next *Range, size uint64) bool {
+	return r.Next(size).Equals(next)
+}
+
 func (r *Range) Equals(other *Range) bool {
 	return r.StartBlock == other.StartBlock && r.ExclusiveEndBlock == other.ExclusiveEndBlock
 }

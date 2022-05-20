@@ -86,7 +86,7 @@ message ModulesProgress {
 
 message ModuleProgress {
   string name = 1;
-  repeated BlockRange processed_ranges = 2;
+  BlockRange requestBlockRange = 2;
 
   uint64 total_bytes_read = 3;
   uint64 total_bytes_written = 4;

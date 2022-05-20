@@ -326,7 +326,8 @@ func TestBuilder_Merge(t *testing.T) {
 			test.prev.KV = test.prevKV
 			test.latest.DeletedPrefixes = test.deletedPrefixes
 
-			err := test.latest.Merge(test.prev)
+			//err := test.latest.Merge(test.prev)
+			err := test.prev.Merge(test.latest)
 			if err != nil && !test.expectedError {
 				if !test.expectedError {
 					t.Errorf("got unexpected error in test %s: %s", test.name, err.Error())
@@ -340,7 +341,7 @@ func TestBuilder_Merge(t *testing.T) {
 
 			// check result both ways
 
-			for k, v := range test.latest.KV {
+			for k, v := range test.prev.KV {
 				if test.latest.ValueType == OutputValueTypeBigFloat {
 					actual, _ := foundOrZeroBigFloat(v, true).Float64()
 					expected, _ := foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
@@ -355,10 +356,10 @@ func TestBuilder_Merge(t *testing.T) {
 			for k, v := range test.expectedKV {
 				if test.latest.ValueType == OutputValueTypeBigFloat {
 					actual, _ := foundOrZeroBigFloat(v, true).Float64()
-					expected, _ := foundOrZeroBigFloat(test.latest.KV[k], true).Float64()
+					expected, _ := foundOrZeroBigFloat(test.prev.KV[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)
 				} else {
-					expected := string(test.latest.KV[k])
+					expected := string(test.prev.KV[k])
 					actual := string(v)
 					assert.Equal(t, expected, actual)
 				}

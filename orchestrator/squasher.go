@@ -103,35 +103,28 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 			break
 		}
 
-		//706-800 <- 800-900
-		//1000-1100 <- 1100-1200
-		nextAvailableSquashableRange := squashable.ranges[0]
-		nextBuilderRange := squashable.builder.BlockRange.Next(squashable.builder.SaveInterval)
-		zlog.Debug("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_builder_range", nextBuilderRange), zap.Object("next_available_squashable_range", nextAvailableSquashableRange))
+		squashableRange := squashable.ranges[0]
+		zlog.Debug("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
 
-		if nextAvailableSquashableRange.Equals(nextBuilderRange) {
-			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()), zap.String("mergeable range", nextBuilderRange.String()))
+		if squashable.builder.BlockRange.IsNext(squashableRange, squashable.builder.SaveInterval) {
+			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()))
 
-			nextBuilder := squashable.builder.FromBlockRange(nextAvailableSquashableRange, true)
-			err := nextBuilder.InitializePartial(ctx, nextAvailableSquashableRange.StartBlock)
+			partialBuilder := squashable.builder.FromBlockRange(squashableRange, true)
+			err := partialBuilder.InitializePartial(ctx, squashableRange.StartBlock)
 			if err != nil {
-				return fmt.Errorf("initializing next partial builder %q: %w", nextBuilder.Name, err)
+				return fmt.Errorf("initializing next partial builder %q: %w", partialBuilder.Name, err)
 			}
 
-			err = nextBuilder.Merge(squashable.builder)
+			err = squashable.builder.Merge(partialBuilder)
 			if err != nil {
 				return fmt.Errorf("merging: %s", err)
 			}
-			//this is very weird stuff
-			nextBuilder.PartialMode = false
-			nextBuilder.BlockRange.StartBlock = nextBuilder.ModuleStartBlock
 
-			err = nextBuilder.WriteState(ctx)
+			err = squashable.builder.WriteState(ctx)
 			if err != nil {
 				return fmt.Errorf("writing state: %w", err)
 			}
 
-			squashable.builder = nextBuilder
 			squashable.ranges = squashable.ranges[1:]
 
 			continue

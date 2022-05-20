@@ -540,7 +540,7 @@ func SynchronizeStores(
 ) error {
 	zlog.Info("synchronizing stores")
 
-	squasher, err := orchestrator.NewSquasher(ctx, request, builders, outputCache)
+	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache)
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}

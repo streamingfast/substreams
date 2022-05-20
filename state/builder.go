@@ -24,6 +24,7 @@ type Builder struct {
 	Name         string
 	Store        dstore.Store
 	SaveInterval uint64
+	Initialized  bool
 
 	ModuleStartBlock uint64
 	BlockRange       *block.Range
@@ -131,12 +132,13 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 		b.KV = byteMap(map[string]string{})
 		return nil
 	}
-
+	b.Initialized = true
 	return b.loadState(ctx, fileName)
 }
 
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
 	b.BlockRange.StartBlock = b.ModuleStartBlock
+	b.Initialized = true
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
 	floor := requestedStartBlock - requestedStartBlock%b.SaveInterval
@@ -278,7 +280,7 @@ func (b *Builder) WriteState(ctx context.Context) (err error) {
 		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	zlog.Info("write state mode",
+	zlog.Info("about to write state",
 		zap.String("store", b.Name),
 		zap.Bool("partial", b.PartialMode),
 		zap.Object("block_range", b.BlockRange),
@@ -332,6 +334,7 @@ func (b *Builder) writeState(ctx context.Context, content []byte) (string, error
 
 func (b *Builder) writePartialState(ctx context.Context, content []byte) (string, error) {
 	filename := PartialFileName(b.BlockRange)
+	zlog.Debug("writing partial state", zap.String("module_name", b.Name), zap.Object("range", b.BlockRange), zap.String("file_name", filename))
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 

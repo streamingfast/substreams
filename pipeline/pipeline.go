@@ -68,6 +68,9 @@ type Pipeline struct {
 	grpcClient                   pbsubstreams.StreamClient
 	grpcCallOpts                 []grpc.CallOption
 	outputCacheSaveBlockInterval uint64
+
+	parallelSubrequests       int
+	blockRangeSizeSubrequests int
 }
 
 func New(
@@ -80,6 +83,8 @@ func New(
 	wasmExtensions []wasm.WASMExtensioner,
 	grpcClient pbsubstreams.StreamClient,
 	grpcCallOpts []grpc.CallOption,
+	parallelSubrequests int,
+	blockRangeSizeSubrequests int,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -96,6 +101,8 @@ func New(
 		grpcClient:                   grpcClient,
 		grpcCallOpts:                 grpcCallOpts,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
+		parallelSubrequests:          parallelSubrequests,
+		blockRangeSizeSubrequests:    blockRangeSizeSubrequests,
 	}
 
 	for _, name := range request.OutputModules {
@@ -148,7 +155,8 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 	p.progressTracker.startTracking(ctx)
 
 	if !p.partialMode {
-		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc); err != nil {
+		//todo: need to inject the parallel and block range size subrequests here
+		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.parallelSubrequests, p.blockRangeSizeSubrequests); err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
 	}
@@ -546,6 +554,8 @@ func SynchronizeStores(
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
 	respFunc substreams.ResponseFunc,
+	parallelSubrequests int,
+	blockRangeSizeSubrequests int,
 ) error {
 	zlog.Info("synchronizing stores")
 
@@ -559,19 +569,18 @@ func SynchronizeStores(
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher)
+	scheduler, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher, parallelSubrequests, blockRangeSizeSubrequests)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
 
-	const numJobs = 5 // todo: get from parameter from firehose
-	jobs := make(chan *job, numJobs*2)
+	jobs := make(chan *job, scheduler.Config.GetParallelSubrequests())
 
 	wg := &sync.WaitGroup{}
-	wg.Add(numJobs)
+	wg.Add(scheduler.Config.GetParallelSubrequests())
 
 	go func() {
-		for w := 0; w < numJobs; w++ {
+		for w := 0; w < scheduler.Config.GetParallelSubrequests(); w++ {
 			worker(ctx, grpcClient, grpcCallOpts, respFunc, jobs)
 			wg.Done()
 		}

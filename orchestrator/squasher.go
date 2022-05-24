@@ -50,7 +50,7 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 	return &Squasher{squashables: squashables}, nil
 }
 
-func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
+func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range, blockRangeSizeSubrequests int) error {
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		//should panic here
@@ -58,7 +58,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
-	blockRanges := requestBlockRange.Split(100)
+	blockRanges := requestBlockRange.Split(uint64(blockRangeSizeSubrequests))
 
 	for _, br := range blockRanges {
 		zlog.Info("squashing range", zap.String("module", builder.Name), zap.Object("range", br))

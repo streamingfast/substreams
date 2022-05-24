@@ -44,6 +44,9 @@ type Service struct {
 	parallelBlocksRequests int
 
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
+
+	parallelSubrequests       int
+	blockRangeSizeSubrequests int
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -91,17 +94,19 @@ func WithOutCacheSaveInterval(block uint64) Option {
 }
 
 func WithParallelBlocksRequestsLimit(limit int) Option {
-	return func(service *Service) {
-		service.parallelBlocksRequests = limit
+	return func(s *Service) {
+		s.parallelBlocksRequests = limit
 	}
 }
 
-func New(stateStore dstore.Store, blockType string, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), opts ...Option) *Service {
+func New(stateStore dstore.Store, blockType string, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), parallelSubrequests int, blockRangeSizeSubrequests int, opts ...Option) *Service {
 	s := &Service{
-		baseStateStore:         stateStore,
-		blockType:              blockType,
-		grpcClientFactory:      grpcClientFactory,
-		parallelBlocksRequests: 1,
+		baseStateStore:            stateStore,
+		blockType:                 blockType,
+		grpcClientFactory:         grpcClientFactory,
+		parallelBlocksRequests:    1,
+		parallelSubrequests:       parallelSubrequests,
+		blockRangeSizeSubrequests: blockRangeSizeSubrequests,
 	}
 
 	for _, opt := range opts {
@@ -178,7 +183,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return fmt.Errorf("getting grpc client: %w", err)
 	}
 
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, grpcClient, grpcCallOpts, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, grpcClient, grpcCallOpts, s.parallelSubrequests, s.blockRangeSizeSubrequests, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,

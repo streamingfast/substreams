@@ -15,6 +15,7 @@ var zlog, _ = logging.PackageLogger("scheduler", "github.com/streamingfast/subst
 type Scheduler struct {
 	ctx           context.Context
 	ctxCancelFunc context.CancelFunc
+	Config        *Config
 
 	squasher *Squasher
 	strategy Strategy
@@ -22,11 +23,12 @@ type Scheduler struct {
 	Err      error
 }
 
-func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, parallelSubrequests int, blockRangeSizeSubrequests int) (*Scheduler, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	s := &Scheduler{
 		ctx:           ctx,
 		ctxCancelFunc: cancel,
+		Config:        NewConfig(parallelSubrequests, blockRangeSizeSubrequests),
 		squasher:      squasher,
 		strategy:      strategy,
 		requests:      []*pbsubstreams.Request{},
@@ -59,7 +61,7 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 		err = s.squasher.Squash(s.ctx, output, &block.Range{
 			StartBlock:        uint64(r.StartBlockNum),
 			ExclusiveEndBlock: r.StopBlockNum,
-		})
+		}, s.Config.blockRangeSizeSubrequests)
 
 		if err != nil {
 			zlog.Error("squashing output", zap.String("output", output), zap.Error(err))

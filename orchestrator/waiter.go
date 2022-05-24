@@ -7,41 +7,42 @@ import (
 	"sync"
 )
 
-type Notifier interface {
-	Notify(builder string, blockNum uint64)
+type Waiter interface {
+	Wait(ctx context.Context) <-chan interface{}
+	Signal(storeName string, blockNum uint64)
 }
 
-type WaiterItem struct {
-	builder  string
-	blockNum uint64
+type waiterItem struct {
+	storeName string
+	blockNum  uint64
 
 	waitChan chan interface{}
 }
 
-type Waiter struct {
-	items []*WaiterItem
+type BlockWaiter struct {
+	items []*waiterItem
 
 	setup sync.Once
 	done  chan interface{}
 }
 
-func NewWaiter(blockRange *block.Range, stores ...*pbsubstreams.Module) *Waiter {
-	var items []*WaiterItem
+func NewWaiter(blockRange *block.Range, stores ...*pbsubstreams.Module) *BlockWaiter {
+	var items []*waiterItem
 
 	for _, store := range stores {
-		items = append(items, &WaiterItem{
-			builder:  store.Name,
-			blockNum: blockRange.StartBlock,
-			waitChan: make(chan interface{}),
+		items = append(items, &waiterItem{
+			storeName: store.Name,
+			blockNum:  blockRange.StartBlock,
+			waitChan:  make(chan interface{}),
 		})
 	}
 
-	return &Waiter{
+	return &BlockWaiter{
 		items: items,
 	}
 }
 
-func (w *Waiter) Done(ctx context.Context) <-chan interface{} {
+func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 	w.setup.Do(func() {
 		w.done = make(chan interface{})
 
@@ -59,7 +60,7 @@ func (w *Waiter) Done(ctx context.Context) <-chan interface{} {
 		}()
 
 		for _, waiter := range w.items {
-			go func(waiter *WaiterItem) {
+			go func(waiter *waiterItem) {
 				defer wg.Done()
 
 				select {
@@ -76,9 +77,9 @@ func (w *Waiter) Done(ctx context.Context) <-chan interface{} {
 	return w.done
 }
 
-func (w *Waiter) Signal(builder string, blockNum uint64) {
+func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 	for _, waiter := range w.items {
-		if waiter.builder != builder || waiter.blockNum > blockNum {
+		if waiter.storeName != storeName || waiter.blockNum > blockNum {
 			continue
 		}
 

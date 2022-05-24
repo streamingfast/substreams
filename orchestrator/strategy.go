@@ -121,19 +121,18 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 			ExclusiveEndBlock: endBlock,
 		}
 
-		ranges := requestBlockRange.Split(200)
-		for _, r := range ranges {
+		blockRanges := requestBlockRange.Split(200)
+		for _, blockRange := range blockRanges {
 			ancestorStoreModules, err := graph.AncestorStoresOf(builder.Name)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("getting ancestore stores for %s: %w", builder.Name, err)
 			}
 
-			pool.Add(ctx, &PoolItem{
-				Request: createRequest(r.StartBlock, r.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules),
-				Waiter:  NewWaiter(r, ancestorStoreModules...),
-			})
+			request := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
+			waiter := NewWaiter(blockRange, ancestorStoreModules...)
+			_ = pool.Add(ctx, request, waiter)
 
-			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", r))
+			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", blockRange))
 		}
 	}
 

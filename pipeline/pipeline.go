@@ -564,7 +564,7 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 	defer cancelFunc()
 	zlog.Info("synchronizing stores")
 
-	pool := &orchestrator.Pool{}
+	pool := orchestrator.NewPool()
 
 	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, orchestrator.WithNotifier(pool))
 	if err != nil {

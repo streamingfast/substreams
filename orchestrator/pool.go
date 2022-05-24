@@ -2,24 +2,36 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"io"
 	"sync"
 )
 
-type PoolItem struct {
+type poolItem struct {
 	Request *pbsubstreams.Request
-	Waiter  *Waiter
+	Waiter  Waiter
+}
+
+type Notifier interface {
+	Notify(builder string, blockNum uint64)
 }
 
 type Pool struct {
-	stream chan *PoolItem
+	stream chan *poolItem
 
-	waiters map[*Waiter]struct{}
+	waiters map[Waiter]struct{}
+
+	readActive     bool
+	readActivation sync.Once
 
 	init  sync.Once
 	wg    sync.WaitGroup
 	mutex sync.Mutex
+}
+
+func NewPool() *Pool {
+	return &Pool{}
 }
 
 func (p *Pool) Notify(builder string, blockNum uint64) {
@@ -31,12 +43,21 @@ func (p *Pool) Notify(builder string, blockNum uint64) {
 	}
 }
 
-func (p *Pool) Add(ctx context.Context, item *PoolItem) {
+func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Waiter) error {
+	if p.readActive {
+		return fmt.Errorf("cannot add to pool once reading has begun")
+	}
+
 	p.wg.Add(1)
 
+	item := &poolItem{
+		Request: request,
+		Waiter:  waiter,
+	}
+
 	p.init.Do(func() {
-		p.stream = make(chan *PoolItem)
-		p.waiters = map[*Waiter]struct{}{}
+		p.stream = make(chan *poolItem)
+		p.waiters = map[Waiter]struct{}{}
 
 		go func() {
 			defer close(p.stream)
@@ -55,7 +76,7 @@ func (p *Pool) Add(ctx context.Context, item *PoolItem) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-item.Waiter.Done(ctx):
+		case <-item.Waiter.Wait(ctx):
 			select {
 			case <-ctx.Done():
 				return
@@ -64,9 +85,15 @@ func (p *Pool) Add(ctx context.Context, item *PoolItem) {
 			}
 		}
 	}()
+
+	return nil
 }
 
 func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
+	p.readActivation.Do(func() {
+		p.readActive = true
+	})
+
 	select {
 	case <-ctx.Done():
 		return nil, nil //todo(colin): is this correct?

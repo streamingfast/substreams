@@ -338,6 +338,16 @@ func (b *Builder) writePartialState(ctx context.Context, content []byte) (string
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 
+func (b *Builder) DeletePartialFile(ctx context.Context) error {
+	filename := PartialFileName(b.BlockRange)
+	zlog.Debug("deleting partial file", zap.String("file_name", filename))
+	err := b.Store.DeleteObject(ctx, filename)
+	if err != nil {
+		return fmt.Errorf("deleting partial file: %w", err)
+	}
+	return nil
+}
+
 func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
 	fmt.Printf("    OLD: %s\n", string(delta.OldValue))

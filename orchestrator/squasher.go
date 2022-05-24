@@ -53,7 +53,7 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range, blockRangeSizeSubrequests int) error {
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
-		//should panic here
+		panic(fmt.Sprintf("invalid module %q", moduleName))
 		return nil
 	}
 	builder := squashable.builder
@@ -124,6 +124,11 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 			err = squashable.builder.Merge(partialBuilder)
 			if err != nil {
 				return fmt.Errorf("merging: %s", err)
+			}
+
+			err = partialBuilder.DeletePartialFile(ctx)
+			if err != nil {
+				return fmt.Errorf("deleting builder data: %w", err)
 			}
 
 			err = squashable.builder.WriteState(ctx)

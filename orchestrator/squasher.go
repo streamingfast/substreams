@@ -14,10 +14,11 @@ import (
 )
 
 type Squasher struct {
-	squashables map[string]*Squashable
+	squashables       map[string]*Squashable
+	storeSaveInterval uint64
 }
 
-func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache) (*Squasher, error) {
+func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
 	for _, builder := range builders {
 		info, err := builder.Info(ctx)
@@ -47,10 +48,10 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 		squashables[builder.Name] = NewSquashable(initialBuilder)
 	}
 
-	return &Squasher{squashables: squashables}, nil
+	return &Squasher{squashables: squashables, storeSaveInterval: storeSaveInterval}, nil
 }
 
-func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range, blockRangeSizeSubrequests int) error {
+func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		panic(fmt.Sprintf("invalid module %q", moduleName))
@@ -58,7 +59,10 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
-	blockRanges := requestBlockRange.Split(uint64(blockRangeSizeSubrequests))
+	//todo: add config here
+	//10_000
+	//100FILES OF 100BLOCK
+	blockRanges := requestBlockRange.Split(s.storeSaveInterval)
 
 	for _, br := range blockRanges {
 		zlog.Info("squashing range", zap.String("module", builder.Name), zap.Object("range", br))

@@ -152,7 +152,7 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 	p.progressTracker.startTracking(ctx)
 
 	if !p.partialMode {
-		if err = SynchronizeStores(ctx, p.grpcClientFactory, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.parallelSubrequests, p.blockRangeSizeSubrequests); err != nil {
+		if err = SynchronizeStores(ctx, p.grpcClientFactory, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.parallelSubrequests, p.blockRangeSizeSubrequests, p.storesSaveInterval); err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
 	}
@@ -543,24 +543,14 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func SynchronizeStores(
-	ctx context.Context,
-	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
-	request *pbsubstreams.Request,
-	builders []*state.Builder,
-	outputCache map[string]*outputs.OutputCache,
-	upToBlockNum uint64,
-	respFunc substreams.ResponseFunc,
-	parallelSubRequests int,
-	blockRangeSizeSubRequests int,
-) error {
+func SynchronizeStores(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), request *pbsubstreams.Request, builders []*state.Builder, outputCache map[string]*outputs.OutputCache, upToBlockNum uint64, respFunc substreams.ResponseFunc, parallelSubRequests int, blockRangeSizeSubRequests int, storeSaveInterval uint64) error {
 	zlog.Info("synchronizing stores")
-	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache)
+	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval)
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	linearStrategy, err := orchestrator.NewLinearStrategy(ctx, request, builders, upToBlockNum)
+	linearStrategy, err := orchestrator.NewLinearStrategy(ctx, request, builders, upToBlockNum, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}

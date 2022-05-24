@@ -18,7 +18,7 @@ type LinearStrategy struct {
 	requests []*pbsubstreams.Request
 }
 
-func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64) (*LinearStrategy, error) {
+func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64, blockRangeSizeSubRequests int) (*LinearStrategy, error) {
 	res := &LinearStrategy{}
 
 	for _, builder := range builders {
@@ -46,13 +46,13 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 			reqStartBlock = builder.ModuleStartBlock
 		}
 
-		requestBlockRange := &block.Range{
+		moduleFullRangeToProcess := &block.Range{
 			StartBlock:        reqStartBlock,
 			ExclusiveEndBlock: endBlock,
 		}
 
-		ranges := requestBlockRange.Split(200)
-		for _, r := range ranges {
+		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
+		for _, r := range requestRanges {
 			req := createRequest(r.StartBlock, r.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
 			res.requests = append(res.requests, req)
 			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", r))

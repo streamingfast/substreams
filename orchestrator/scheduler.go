@@ -61,7 +61,7 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 		err = s.squasher.Squash(s.ctx, output, &block.Range{
 			StartBlock:        uint64(r.StartBlockNum),
 			ExclusiveEndBlock: r.StopBlockNum,
-		}, s.blockRangeSizeSubRequests)
+		})
 
 		if err != nil {
 			zlog.Error("squashing output", zap.String("output", output), zap.Error(err))

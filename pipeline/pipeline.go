@@ -217,8 +217,13 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 		// no need to save store if loaded from cache?
 		// TODO: eventually, handle the `undo` signals.
 		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
-		if err := p.saveStoresSnapshots(ctx); err != nil {
-			return fmt.Errorf("saving stores: %w", err)
+		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
+		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
+		if !isFirstRequestBlock && intervalReached {
+			if err := p.saveStoresSnapshots(ctx); err != nil {
+				return fmt.Errorf("saving stores: %w", err)
+			}
+
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
@@ -548,7 +553,6 @@ func SynchronizeStores(
 	respFunc substreams.ResponseFunc,
 ) error {
 	zlog.Info("synchronizing stores")
-
 	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache)
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
@@ -565,7 +569,7 @@ func SynchronizeStores(
 	}
 
 	const numJobs = 5 // todo: get from parameter from firehose
-	jobs := make(chan *job, numJobs*2)
+	jobs := make(chan *job, numJobs)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(numJobs)
@@ -657,13 +661,6 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 				case *pbsubstreams.Response_SnapshotComplete:
 					_ = r.SnapshotComplete
 				case *pbsubstreams.Response_Data:
-					//zlog.Debug("resp received", zap.String("type", "data"))
-					for _, output := range r.Data.Outputs {
-						for _, log := range output.Logs {
-							fmt.Println("LOG: ", log)
-							//todo: maybe return log ...
-						}
-					}
 				}
 			}
 		case <-ctx.Done():
@@ -673,40 +670,21 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
-	// TODO: Have the decision check be made outside of the "save" function, which indicates
-	// at the call site that we're DECIDING to do a save. Similar to Squasher::squash
-	// something like `isStoresSaveBoundary() bool`.
-	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
-	intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-
-	zlog.Debug("maybe saving stores snapshots",
-		zap.Uint64("req_start_block", p.requestedStartBlockNum),
-		zap.Uint64("block_num", p.clock.Number),
-		zap.Bool("is_first_request_block", isFirstRequestBlock),
-		zap.Bool("reach_save_interval", intervalReached),
-	)
-
-	if !isFirstRequestBlock && intervalReached {
-		for _, builder := range p.builders {
-			err := builder.WriteState(ctx)
-			if err != nil {
-				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
-			}
-
-			//var nextBlockRangeStart *uint64
-			if p.partialMode {
-				//nextBlockRangeStart = uint64Pointer(builder.BlockRange.ExclusiveEndBlock)
-				builder.RollPartial()
-				continue
-			}
-			builder.Roll()
-			//nextBlockRangeEnd := uint64Pointer(builder.BlockRange.ExclusiveEndBlock + p.storesSaveInterval)
-			//
-			//builder.UpdateBlockRange(nextBlockRangeStart, nextBlockRangeEnd)
-
-			zlog.Info("state written", zap.String("store_name", builder.Name))
+	for _, builder := range p.builders {
+		err := builder.WriteState(ctx)
+		if err != nil {
+			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
+
+		if p.partialMode {
+			builder.RollPartial()
+			continue
+		}
+		builder.Roll()
+
+		zlog.Info("state written", zap.String("store_name", builder.Name))
 	}
+
 	return nil
 }
 

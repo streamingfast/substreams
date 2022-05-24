@@ -86,16 +86,6 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 	return nil
 }
 
-func (c *ModulesOutputCache) Save(ctx context.Context) error {
-	zlog.Info("Saving caches")
-	for _, moduleCache := range c.OutputCaches {
-		if err := moduleCache.save(ctx); err != nil {
-			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
-		}
-	}
-	return nil
-}
-
 func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64) *OutputCache {
 	return &OutputCache{
 		ModuleName:        moduleName,
@@ -119,24 +109,9 @@ func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
 	defer c.lock.Unlock()
 
 	if !c.New {
-		zlog.Warn("trying to add output to an already existing module kv", zap.String("module_name", c.ModuleName))
+		zlog.Warn("trying to add output to an already existing module", zap.String("module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 		return nil
 	}
-
-	//pbBlock := &bstream.Block{
-	//	Id:             block.ID(),
-	//	Number:         block.Num(),
-	//	PreviousId:     block.PreviousID(),
-	//	Timestamp:      block.Time(),
-	//	LibNum:         block.LIBNum(),
-	//	PayloadKind:    pbbstream.Protocol_UNKNOWN,
-	//	PayloadVersion: int32(1),
-	//}
-	//
-	//_, err := bstream.MemoryBlockPayloadSetter(pbBlock, data)
-	//if err != nil {
-	//	return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
-	//}
 
 	c.kv[block.Id] = &CacheItem{
 		BlockNum: block.Num(),
@@ -145,32 +120,6 @@ func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
 	}
 
 	return nil
-	//c.lock.Lock()
-	//defer c.lock.Unlock()
-	//
-	//if !c.new {
-	//	zlog.Warn("trying to add output to an already existing module kv", zap.String("module_name", c.moduleName))
-	//	return nil
-	//}
-	//
-	//pbBlock := &bstream.Block{
-	//	Id:             block.ID(),
-	//	Number:         block.Num(),
-	//	PreviousId:     block.PreviousID(),
-	//	Timestamp:      block.Time(),
-	//	LibNum:         block.LIBNum(),
-	//	PayloadKind:    pbbstream.Protocol_UNKNOWN,
-	//	PayloadVersion: int32(1),
-	//}
-	//
-	//_, err := bstream.MemoryBlockPayloadSetter(pbBlock, data)
-	//if err != nil {
-	//	return fmt.Errorf("setting block payload for block %s: %w", block.Id, err)
-	//}
-	//
-	//c.kv[block.Id] = pbBlock
-	//
-	//return nil
 }
 
 func (c *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
@@ -184,19 +133,6 @@ func (c *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
 	}
 
 	return cacheItem.Payload, found, nil
-	//c.lock.Lock()
-	//defer c.lock.Unlock()
-	//
-	//b, found := c.kv[block.Id]
-	//
-	//if !found {
-	//	return nil, false, nil
-	//}
-	//
-	//data, err := b.Payload.Get()
-	//
-	//return data, found, err
-
 }
 
 func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {

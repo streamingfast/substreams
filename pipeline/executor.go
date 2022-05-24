@@ -85,8 +85,10 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 		return err
 	}
 
-	if err = e.cache.Set(block, e.mapperOutput); err != nil {
-		return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
+	if len(e.mapperOutput) > 0 {
+		if err = e.cache.Set(block, e.mapperOutput); err != nil {
+			return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
+		}
 	}
 
 	return nil
@@ -123,8 +125,10 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 		return fmt.Errorf("caching: marshalling delta: %w", err)
 	}
 
-	if err = e.cache.Set(block, data); err != nil {
-		return fmt.Errorf("setting delta to cache at block %d: %w", block.Num(), err)
+	if len(data) > 0 {
+		if err = e.cache.Set(block, data); err != nil {
+			return fmt.Errorf("setting delta to cache at block %d: %w", block.Num(), err)
+		}
 	}
 
 	return nil

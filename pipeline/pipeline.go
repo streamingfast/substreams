@@ -155,7 +155,6 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 	p.progressTracker.startTracking(ctx)
 
 	if !p.partialMode {
-		//todo: need to inject the parallel and block range size subrequests here
 		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.parallelSubrequests, p.blockRangeSizeSubrequests); err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
@@ -235,9 +234,6 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
-			if err := p.moduleOutputCache.Save(ctx); err != nil {
-				zlog.Error("saving mode")
-			}
 			return io.EOF
 		}
 

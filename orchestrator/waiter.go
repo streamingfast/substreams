@@ -9,14 +9,13 @@ import (
 type Waiter interface {
 	Wait(ctx context.Context) <-chan interface{}
 	Signal(storeName string, blockNum uint64)
+	Order() int
 }
 
 type waiterItem struct {
 	storeName string
 	blockNum  uint64
 
-	mu       sync.Mutex
-	closed   bool
 	waitChan chan interface{}
 }
 
@@ -67,7 +66,7 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 				defer wg.Done()
 
 				if waiter.blockNum <= w.lastSavedBlockMap[waiter.storeName] {
-					return
+					return //store has already saved up to or past the desired block.
 				}
 
 				select {
@@ -90,11 +89,10 @@ func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 			continue
 		}
 
-		waiter.mu.Lock()
-		if !waiter.closed {
-			close(waiter.waitChan)
-		}
-		waiter.closed = true
-		waiter.mu.Unlock()
+		close(waiter.waitChan)
 	}
+}
+
+func (w *BlockWaiter) Order() int {
+	return len(w.items)
 }

@@ -168,6 +168,8 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 	go func() {
 		defer close(stream)
 
+		//sleeper
+
 		for {
 			r, err := strategy.GetNextRequest(ctx)
 			if err == io.EOF || err == context.DeadlineExceeded || err == context.Canceled {
@@ -177,9 +179,13 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 			if err != nil {
 				panic(err)
 			}
+
 			if r == nil {
+				//sleeper.Sleep()
 				continue
 			}
+
+			//sleeper.Reset()
 
 			select {
 			case <-ctx.Done():

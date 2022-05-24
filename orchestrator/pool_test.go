@@ -31,6 +31,10 @@ func (tw *TestWaiter) Signal(storeName string, blockNum uint64) {
 	*tw.counter++
 }
 
+func (tw *TestWaiter) Order() int {
+	return 0
+}
+
 func TestNotify(t *testing.T) {
 	p := NewPool()
 	ctx := context.Background()

@@ -20,6 +20,7 @@ type Notifier interface {
 
 type Pool struct {
 	stream chan *poolItem
+	queue  PriorityQueue
 
 	waiters map[Waiter]struct{}
 
@@ -29,6 +30,8 @@ type Pool struct {
 	init  sync.Once
 	wg    sync.WaitGroup
 	mutex sync.Mutex
+
+	done chan struct{}
 }
 
 func NewPool() *Pool {
@@ -57,8 +60,11 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 	}
 
 	p.init.Do(func() {
-		p.stream = make(chan *poolItem)
+		p.stream = make(chan *poolItem, 5000)
 		p.waiters = map[Waiter]struct{}{}
+		p.done = make(chan struct{})
+		p.queue = make(PriorityQueue, 0)
+		(&p.queue).QInit()
 
 		go func() {
 			defer close(p.stream)
@@ -82,6 +88,12 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 			case <-ctx.Done():
 				return
 			case p.stream <- item:
+				p.mutex.Lock()
+				delete(p.waiters, item.Waiter)
+				if len(p.waiters) == 0 {
+					close(p.done)
+				}
+				p.mutex.Unlock()
 				zlog.Debug("added request to stream", zap.String("request modules", item.Request.Modules.String()))
 			}
 		}

@@ -231,6 +231,12 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
+			if p.partialMode {
+				zlog.Debug("about to save partial output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
+				if err := p.moduleOutputCache.SavePartialCaches(ctx); err != nil {
+					return fmt.Errorf("saving partial caches")
+				}
+			}
 			return io.EOF
 		}
 

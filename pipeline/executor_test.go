@@ -21,11 +21,11 @@ func TestOptimizeExecutors(t *testing.T) {
 			outputCache: map[string]*outputs.OutputCache{
 				"store1": {
 					ModuleName: "store1",
-					New:        false,
+					Completed:  true,
 				},
 				"store4": {
 					ModuleName: "store4",
-					New:        false,
+					Completed:  true,
 				},
 			},
 			moduleExecutors: []ModuleExecutor{
@@ -75,7 +75,7 @@ func TestOptimizeExecutors(t *testing.T) {
 			outputCache: map[string]*outputs.OutputCache{
 				"store1": {
 					ModuleName: "store1",
-					New:        false,
+					Completed:  true,
 				},
 			},
 			moduleExecutors: []ModuleExecutor{

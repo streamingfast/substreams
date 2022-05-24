@@ -310,7 +310,7 @@ func OptimizeExecutors(moduleOutputCache map[string]*outputs.OutputCache, module
 	skipBlockSource = false
 
 	for _, outputStore := range requestedOutputStores {
-		if moduleOutputCache[outputStore] != nil && !moduleOutputCache[outputStore].New {
+		if moduleOutputCache[outputStore] != nil && moduleOutputCache[outputStore].Completed {
 			for _, executor := range moduleExecutors {
 				if executor.String() == outputStore {
 					optimizedModuleExecutors = append(optimizedModuleExecutors, executor)

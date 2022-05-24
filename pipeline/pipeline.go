@@ -81,8 +81,8 @@ func New(
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
-	parallelSubrequests int,
-	blockRangeSizeSubrequests int,
+	parallelSubRequests int,
+	blockRangeSizeSubRequests int,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -98,8 +98,8 @@ func New(
 		wasmExtensions:               wasmExtensions,
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
-		parallelSubrequests:          parallelSubrequests,
-		blockRangeSizeSubrequests:    blockRangeSizeSubrequests,
+		parallelSubrequests:          parallelSubRequests,
+		blockRangeSizeSubrequests:    blockRangeSizeSubRequests,
 	}
 
 	for _, name := range request.OutputModules {
@@ -551,8 +551,8 @@ func SynchronizeStores(
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
 	respFunc substreams.ResponseFunc,
-	parallelSubrequests int,
-	blockRangeSizeSubrequests int,
+	parallelSubRequests int,
+	blockRangeSizeSubRequests int,
 ) error {
 	zlog.Info("synchronizing stores")
 	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache)
@@ -565,18 +565,19 @@ func SynchronizeStores(
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher, parallelSubrequests, blockRangeSizeSubrequests)
+	scheduler, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
 
-	jobs := make(chan *job, scheduler.Config.GetParallelSubrequests())
+	zlog.Debug("setting jobs chan and worker", zap.Int("parallel-sub-requests", parallelSubRequests))
+	jobs := make(chan *job, parallelSubRequests)
 
 	wg := &sync.WaitGroup{}
-	wg.Add(scheduler.Config.GetParallelSubrequests())
+	wg.Add(parallelSubRequests)
 
 	go func() {
-		for w := 0; w < scheduler.Config.GetParallelSubrequests(); w++ {
+		for w := 0; w < parallelSubRequests; w++ {
 			worker(ctx, grpcClientFactory, respFunc, jobs)
 			wg.Done()
 		}
@@ -627,12 +628,15 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 			if !ok {
 				return
 			}
+			start := time.Now()
 			grpcClient, grpcCallOpts, err := grpcClientFactory()
 			if err != nil {
 				j.callback(j.request, fmt.Errorf("getting grpc client: %w", err))
 				return
 
 			}
+			zlog.Info("got grpc client", zap.Duration("in", time.Since(start)))
+
 			zlog.Info("worker sending request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
 			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 			stream, err := grpcClient.Blocks(ctx, j.request, grpcCallOpts...)

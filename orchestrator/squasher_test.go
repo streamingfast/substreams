@@ -45,15 +45,15 @@ func TestSquash(t *testing.T) {
 		ranges:  []*block.Range{},
 	}
 
-	err := squash(ctx, squashable, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000})
+	err := squash(ctx, squashable, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000}, nil)
 	require.Nil(t, err)
 	require.Equal(t, 0, writeCount)
 
-	err = squash(ctx, squashable, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000})
+	err = squash(ctx, squashable, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000}, nil)
 	require.Nil(t, err)
 	require.Equal(t, 0, writeCount)
 
-	err = squash(ctx, squashable, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000})
+	err = squash(ctx, squashable, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000}, nil)
 	require.Nil(t, err)
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written

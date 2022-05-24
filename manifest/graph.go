@@ -221,6 +221,44 @@ func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbsubstreams.Module
 	return res, nil
 }
 
+func (g *ModuleGraph) GroupedAncestorStores(moduleName string) ([][]*pbsubstreams.Module, error) {
+	ancestorStores, err := g.AncestorStoresOf(moduleName)
+	if err != nil {
+		return nil, fmt.Errorf("getting stores down to %s: %w", moduleName, err)
+	}
+
+	distanceMap := map[int64][]*pbsubstreams.Module{}
+	distanceIndex := map[*pbsubstreams.Module]int64{}
+
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+	for _, ancestorStore := range ancestorStores {
+
+		for i, d := range distances {
+			if g.indexIndex[i].Name == ancestorStore.Name {
+				distanceMap[d] = append(distanceMap[d], ancestorStore)
+				distanceIndex[ancestorStore] = d
+			}
+		}
+	}
+
+	var result [][]*pbsubstreams.Module
+	for _, stores := range distanceMap {
+		result = append(result, stores)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		di := distanceIndex[result[i][0]]
+		dj := distanceIndex[result[i][0]]
+		return di > dj
+	})
+
+	return result, nil
+}
+
+func (g *ModuleGraph) ParentStoresOf(moduleName string) ([]*pbsubstreams.Modules, error) {
+	return nil, nil
+}
+
 func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Module, error) {
 	alreadyAdded := map[string]bool{}
 	topologicalIndex := map[string]int{}

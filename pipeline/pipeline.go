@@ -121,10 +121,10 @@ func New(
 //   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
 
 func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) error) (bstream.Handler, error) {
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Bool("partial_mode", p.partialMode))
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("partial_mode", p.partialMode))
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
 	var err error

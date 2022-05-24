@@ -230,7 +230,7 @@ func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock u
 	for {
 		deltas := outputCache.SortedCacheItem()
 		if len(deltas) == 0 {
-			panic("missing deltas")
+			panic(fmt.Sprintf("missing deltas %s", b.Name))
 		}
 
 		firstSeenBlockNum := uint64(0)
@@ -357,6 +357,9 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 func (b *Builder) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF
 	// 0xFF is reserved for internal use.
+	if len(delta.Key) == 0 {
+		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", b.Name))
+	}
 	if delta.Key[0] == byte(255) {
 		panic(fmt.Sprintf("key %q invalid, must be at least 1 character and not start with 0xFF", delta.Key))
 	}

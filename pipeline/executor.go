@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/streamingfast/substreams/pipeline/outputs"
 
@@ -115,6 +116,19 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 
 	if err = e.wasmStoreCall(vals, clock); err != nil {
 		return err
+	}
+
+	errors := []string{}
+	for _, delta := range e.outputStore.Deltas {
+		if delta.Key == "" {
+			errors = append(errors, "delta with no key")
+		}
+		if delta.Operation.String() == "UNSET" {
+			errors = append(errors, "delta with unset operation")
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("module %s at block %d invalid delta, %s", e.moduleName, clock.Number, strings.Join(errors, " | "))
 	}
 
 	deltas := &pbsubstreams.StoreDeltas{

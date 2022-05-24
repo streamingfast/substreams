@@ -110,7 +110,7 @@ func (c *ModulesOutputCache) SavePartialCaches(ctx context.Context) error {
 		filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
 		filename += ".partial"
 
-		//if moduleCache.CurrentBlockRange.Contains(bstream.NewBlockRef("", 6810917)) {
+		//if moduleCache.CurrentBlockRange.Contains(bstream.NewBlockRef("", 6810917)) && moduleCache.ModuleName == "ethtokens:tokens" {
 		//	d, found := moduleCache.kv["cad585022b800dd52c8692ba960adcdb71e47ffd86669c7fb8d60a00fc24dcf2"]
 		//	if !found {
 		//		panic("Not found!!!!")
@@ -122,9 +122,9 @@ func (c *ModulesOutputCache) SavePartialCaches(ctx context.Context) error {
 		if err := moduleCache.save(ctx, filename); err != nil {
 			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
 		}
-		if moduleCache.CurrentBlockRange.Contains(bstream.NewBlockRef("", 6810917)) {
-			panic("WTF")
-		}
+		//if moduleCache.CurrentBlockRange.Contains(bstream.NewBlockRef("", 6810917)) && moduleCache.ModuleName == "ethtokens:tokens" {
+		//	panic("WTF")
+		//}
 
 	}
 	return nil
@@ -157,11 +157,13 @@ func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
 		return nil
 	}
 
-	c.kv[block.Id] = &CacheItem{
+	ci := &CacheItem{
 		BlockNum: block.Num(),
 		BlockID:  block.Id,
 		Payload:  data,
 	}
+
+	c.kv[block.Id] = ci
 
 	return nil
 }

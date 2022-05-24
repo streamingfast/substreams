@@ -97,7 +97,7 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 
 	select {
 	case <-ctx.Done():
-		return nil, nil //todo(colin): is this correct?
+		return nil, ctx.Err()
 	case i, ok := <-p.stream:
 		if !ok {
 			return nil, io.EOF

@@ -147,7 +147,7 @@ func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Req
 		return nil, io.EOF
 	}
 	if err != nil {
-		return nil, fmt.Errorf("getting request from pool: %w", err)
+		return nil, err
 	}
 
 	return req, nil
@@ -161,9 +161,10 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 
 		for {
 			r, err := strategy.GetNextRequest(ctx)
-			if err == io.EOF {
+			if err == io.EOF || err == context.DeadlineExceeded || err == context.Canceled {
 				return
 			}
+
 			if err != nil {
 				panic(err)
 			}

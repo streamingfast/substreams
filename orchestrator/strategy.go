@@ -91,6 +91,15 @@ type OrderedStrategy struct {
 }
 
 func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *Pool, upToBlockNum uint64, blockRangeSizeSubRequests int) (*OrderedStrategy, error) {
+	lastSavedBlockMap := map[string]uint64{}
+	for _, builder := range builders {
+		info, err := builder.Info(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting builder info: %w", err)
+		}
+		lastSavedBlockMap[builder.Name] = info.LastKVSavedBlock
+	}
+
 	for _, builder := range builders {
 		zlog.Debug("squashables", zap.String("builder", builder.Name))
 		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
@@ -129,7 +138,7 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 			}
 
 			request := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
-			waiter := NewWaiter(blockRange.StartBlock, ancestorStoreModules...)
+			waiter := NewWaiter(blockRange.StartBlock, lastSavedBlockMap, ancestorStoreModules...)
 			_ = pool.Add(ctx, request, waiter)
 
 			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", blockRange))

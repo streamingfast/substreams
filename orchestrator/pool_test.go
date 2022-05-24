@@ -48,7 +48,12 @@ func TestGet(t *testing.T) {
 	p := NewPool()
 	ctx := context.Background()
 
-	waiter0 := NewWaiter(200,
+	lastSavedBlockMap := map[string]uint64{
+		"test1": 0,
+		"test2": 3000,
+	}
+
+	waiter0 := NewWaiter(200, lastSavedBlockMap,
 		&pbsubstreams.Module{Name: "test1"},
 	)
 	r0 := &pbsubstreams.Request{
@@ -58,7 +63,7 @@ func TestGet(t *testing.T) {
 	}
 	_ = p.Add(ctx, r0, waiter0)
 
-	waiter1 := NewWaiter(300,
+	waiter1 := NewWaiter(300, lastSavedBlockMap,
 		&pbsubstreams.Module{Name: "test1"},
 		&pbsubstreams.Module{Name: "test2"},
 	)
@@ -78,19 +83,11 @@ func TestGet(t *testing.T) {
 
 	shortContext, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	r, err = p.Get(shortContext)
-	require.Equal(t, err, context.DeadlineExceeded) //expected for this test
+	require.Equal(t, context.DeadlineExceeded, err) //expected for this test
 	require.Nil(t, r)
 	cancel()
 
 	p.Notify("test1", 300)
-
-	shortContext, cancel = context.WithTimeout(ctx, 10*time.Millisecond)
-	r, err = p.Get(shortContext)
-	require.Equal(t, err, context.DeadlineExceeded) //expected for this test
-	require.Nil(t, r)
-	cancel()
-
-	p.Notify("test2", 300)
 
 	r, err = p.Get(ctx)
 	require.Nil(t, err)

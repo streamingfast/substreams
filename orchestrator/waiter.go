@@ -23,11 +23,12 @@ type waiterItem struct {
 type BlockWaiter struct {
 	items []*waiterItem
 
-	setup sync.Once
-	done  chan interface{}
+	lastSavedBlockMap map[string]uint64
+	setup             sync.Once
+	done              chan interface{}
 }
 
-func NewWaiter(blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
+func NewWaiter(blockNum uint64, lastSavedBlockMap map[string]uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
 	var items []*waiterItem
 
 	for _, store := range stores {
@@ -39,7 +40,8 @@ func NewWaiter(blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
 	}
 
 	return &BlockWaiter{
-		items: items,
+		items:             items,
+		lastSavedBlockMap: lastSavedBlockMap,
 	}
 }
 
@@ -63,6 +65,10 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 		for _, waiter := range w.items {
 			go func(waiter *waiterItem) {
 				defer wg.Done()
+
+				if waiter.blockNum <= w.lastSavedBlockMap[waiter.storeName] {
+					return
+				}
 
 				select {
 				case <-waiter.waitChan:

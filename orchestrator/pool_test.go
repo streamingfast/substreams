@@ -78,7 +78,7 @@ func TestGet(t *testing.T) {
 
 	shortContext, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	r, err = p.Get(shortContext)
-	require.Nil(t, err)
+	require.Equal(t, err, context.DeadlineExceeded) //expected for this test
 	require.Nil(t, r)
 	cancel()
 
@@ -86,7 +86,7 @@ func TestGet(t *testing.T) {
 
 	shortContext, cancel = context.WithTimeout(ctx, 10*time.Millisecond)
 	r, err = p.Get(shortContext)
-	require.Nil(t, err)
+	require.Equal(t, err, context.DeadlineExceeded) //expected for this test
 	require.Nil(t, r)
 	cancel()
 

@@ -90,7 +90,7 @@ type OrderedStrategy struct {
 	requestGetter RequestGetter
 }
 
-func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *Pool, upToBlockNum uint64) (*OrderedStrategy, error) {
+func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *Pool, upToBlockNum uint64, blockRangeSizeSubRequests int) (*OrderedStrategy, error) {
 	for _, builder := range builders {
 		zlog.Debug("squashables", zap.String("builder", builder.Name))
 		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
@@ -116,13 +116,13 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 			reqStartBlock = builder.ModuleStartBlock
 		}
 
-		requestBlockRange := &block.Range{
+		moduleFullRangeToProcess := &block.Range{
 			StartBlock:        reqStartBlock,
 			ExclusiveEndBlock: endBlock,
 		}
 
-		blockRanges := requestBlockRange.Split(200)
-		for _, blockRange := range blockRanges {
+		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
+		for _, blockRange := range requestRanges {
 			ancestorStoreModules, err := graph.AncestorStoresOf(builder.Name)
 			if err != nil {
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", builder.Name, err)

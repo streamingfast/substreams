@@ -178,12 +178,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	grpcClient, grpcCallOpts, err := s.grpcClientFactory()
-	if err != nil {
-		return fmt.Errorf("getting grpc client: %w", err)
-	}
-
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, grpcClient, grpcCallOpts, s.parallelSubrequests, s.blockRangeSizeSubrequests, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.parallelSubrequests, s.blockRangeSizeSubrequests, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,

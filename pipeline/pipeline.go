@@ -65,12 +65,11 @@ type Pipeline struct {
 
 	currentBlockRef bstream.BlockRef
 
-	grpcClient                   pbsubstreams.StreamClient
-	grpcCallOpts                 []grpc.CallOption
 	outputCacheSaveBlockInterval uint64
 
 	parallelSubrequests       int
 	blockRangeSizeSubrequests int
+	grpcClientFactory         func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
 func New(
@@ -81,8 +80,7 @@ func New(
 	baseStateStore dstore.Store,
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
-	grpcClient pbsubstreams.StreamClient,
-	grpcCallOpts []grpc.CallOption,
+	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
 	parallelSubrequests int,
 	blockRangeSizeSubrequests int,
 	opts ...Option) *Pipeline {
@@ -98,8 +96,7 @@ func New(
 		blockType:                    blockType,
 		progressTracker:              newProgressTracker(),
 		wasmExtensions:               wasmExtensions,
-		grpcClient:                   grpcClient,
-		grpcCallOpts:                 grpcCallOpts,
+		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
 		parallelSubrequests:          parallelSubrequests,
 		blockRangeSizeSubrequests:    blockRangeSizeSubrequests,
@@ -155,7 +152,7 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 	p.progressTracker.startTracking(ctx)
 
 	if !p.partialMode {
-		if err = SynchronizeStores(ctx, p.grpcClient, p.grpcCallOpts, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.parallelSubrequests, p.blockRangeSizeSubrequests); err != nil {
+		if err = SynchronizeStores(ctx, p.grpcClientFactory, p.request, stores, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.parallelSubrequests, p.blockRangeSizeSubrequests); err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
 	}
@@ -548,8 +545,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 
 func SynchronizeStores(
 	ctx context.Context,
-	grpcClient pbsubstreams.StreamClient,
-	grpcCallOpts []grpc.CallOption,
+	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
 	request *pbsubstreams.Request,
 	builders []*state.Builder,
 	outputCache map[string]*outputs.OutputCache,
@@ -581,7 +577,7 @@ func SynchronizeStores(
 
 	go func() {
 		for w := 0; w < scheduler.Config.GetParallelSubrequests(); w++ {
-			worker(ctx, grpcClient, grpcCallOpts, respFunc, jobs)
+			worker(ctx, grpcClientFactory, respFunc, jobs)
 			wg.Done()
 		}
 	}()
@@ -623,13 +619,19 @@ type job struct {
 	callback func(r *pbsubstreams.Request, err error)
 }
 
-func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, respFunc substreams.ResponseFunc, jobs <-chan *job) {
+func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), respFunc substreams.ResponseFunc, jobs <-chan *job) {
 	for {
 	nextJob:
 		select {
 		case j, ok := <-jobs:
 			if !ok {
 				return
+			}
+			grpcClient, grpcCallOpts, err := grpcClientFactory()
+			if err != nil {
+				j.callback(j.request, fmt.Errorf("getting grpc client: %w", err))
+				return
+
 			}
 			zlog.Info("worker sending request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
 			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))

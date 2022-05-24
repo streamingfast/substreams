@@ -129,7 +129,7 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 			}
 
 			request := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
-			waiter := NewWaiter(blockRange, ancestorStoreModules...)
+			waiter := NewWaiter(blockRange.StartBlock, ancestorStoreModules...)
 			_ = pool.Add(ctx, request, waiter)
 
 			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", blockRange))

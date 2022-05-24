@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"sync"
 )
@@ -16,6 +15,8 @@ type waiterItem struct {
 	storeName string
 	blockNum  uint64
 
+	mu       sync.Mutex
+	closed   bool
 	waitChan chan interface{}
 }
 
@@ -26,13 +27,13 @@ type BlockWaiter struct {
 	done  chan interface{}
 }
 
-func NewWaiter(blockRange *block.Range, stores ...*pbsubstreams.Module) *BlockWaiter {
+func NewWaiter(blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
 	var items []*waiterItem
 
 	for _, store := range stores {
 		items = append(items, &waiterItem{
 			storeName: store.Name,
-			blockNum:  blockRange.StartBlock,
+			blockNum:  blockNum,
 			waitChan:  make(chan interface{}),
 		})
 	}
@@ -83,6 +84,11 @@ func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 			continue
 		}
 
-		close(waiter.waitChan)
+		waiter.mu.Lock()
+		if !waiter.closed {
+			close(waiter.waitChan)
+		}
+		waiter.closed = true
+		waiter.mu.Unlock()
 	}
 }

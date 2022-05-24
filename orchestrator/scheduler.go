@@ -5,12 +5,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
-
-var zlog, _ = logging.PackageLogger("scheduler", "github.com/streamingfast/substreams/scheduler")
 
 type Scheduler struct {
 	blockRangeSizeSubRequests int

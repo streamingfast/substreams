@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 	"io"
 	"sync"
 )
@@ -81,7 +82,7 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 			case <-ctx.Done():
 				return
 			case p.stream <- item:
-				//done!
+				zlog.Debug("added request to stream", zap.String("request modules", item.Request.Modules.String()))
 			}
 		}
 	}()

@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
-	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +32,7 @@ func (tw *TestWaiter) Signal(storeName string, blockNum uint64) {
 }
 
 func TestNotify(t *testing.T) {
-	p := &Pool{}
+	p := NewPool()
 	ctx := context.Background()
 
 	signalCounter := new(int)
@@ -45,24 +45,57 @@ func TestNotify(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	p := &Pool{}
+	p := NewPool()
 	ctx := context.Background()
 
-	waiter := NewWaiter(&block.Range{
-		StartBlock:        100,
-		ExclusiveEndBlock: 200,
-	}, &pbsubstreams.Module{
-		Name: "test1",
-	})
+	waiter0 := NewWaiter(200,
+		&pbsubstreams.Module{Name: "test1"},
+	)
+	r0 := &pbsubstreams.Request{
+		StartBlockNum: 200,
+		StopBlockNum:  300,
+		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "test1_descendant"}}},
+	}
+	_ = p.Add(ctx, r0, waiter0)
 
-	_ = p.Add(ctx, &pbsubstreams.Request{}, waiter)
+	waiter1 := NewWaiter(300,
+		&pbsubstreams.Module{Name: "test1"},
+		&pbsubstreams.Module{Name: "test2"},
+	)
+	r1 := &pbsubstreams.Request{
+		StartBlockNum: 300,
+		StopBlockNum:  400,
+		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "test2_test3_descendant"}}},
+	}
+	_ = p.Add(ctx, r1, waiter1)
 
-	p.Notify("popo", 5000)
-	p.Notify("test1", 100)
+	p.Notify("test1", 200)
 
 	r, err := p.Get(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
+	require.Equal(t, r0, r)
+
+	shortContext, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	r, err = p.Get(shortContext)
+	require.Nil(t, err)
+	require.Nil(t, r)
+	cancel()
+
+	p.Notify("test1", 300)
+
+	shortContext, cancel = context.WithTimeout(ctx, 10*time.Millisecond)
+	r, err = p.Get(shortContext)
+	require.Nil(t, err)
+	require.Nil(t, r)
+	cancel()
+
+	p.Notify("test2", 300)
+
+	r, err = p.Get(ctx)
+	require.Nil(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, r1, r)
 
 	r, err = p.Get(ctx)
 	require.NotNil(t, err)

@@ -25,8 +25,6 @@ func init() {
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
 	runCmd.Flags().BoolP("compact-output", "c", false, "Avoid pretty printing output for module and make it a single compact line")
-	runCmd.Flags().Bool("partial-mode", false, "Request partial processing mode (internal deployments only)")
-	runCmd.Flags().Bool("no-return-handler", false, "Avoid printing output for module")
 
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(packCmd)
@@ -53,7 +51,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	outputStreamNames := strings.Split(args[1], ",")
 
 	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	if !mustGetBool(cmd, "no-return-handler") {
+	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") != "" {
 		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
 	}
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/block"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"

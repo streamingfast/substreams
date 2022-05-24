@@ -360,7 +360,9 @@ func (b *Builder) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (b *Builder) Flush() {
-	zlog.Debug("flushing store", zap.String("name", b.Name), zap.Int("delta_count", len(b.Deltas)), zap.Int("entry_count", len(b.KV)))
+	if tracer.Enabled() {
+		zlog.Debug("flushing store", zap.String("name", b.Name), zap.Int("delta_count", len(b.Deltas)), zap.Int("entry_count", len(b.KV)))
+	}
 	b.Deltas = nil
 	b.lastOrdinal = 0
 }

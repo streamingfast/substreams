@@ -117,7 +117,7 @@ func New(
 //   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
 
 func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) error) (bstream.Handler, error) {
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Bool("partial_mode", p.partialMode))
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
@@ -565,7 +565,7 @@ func SynchronizeStores(
 	}
 
 	const numJobs = 5 // todo: get from parameter from firehose
-	jobs := make(chan *job)
+	jobs := make(chan *job, numJobs*2)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(numJobs)
@@ -573,13 +573,14 @@ func SynchronizeStores(
 	go func() {
 		for w := 0; w < numJobs; w++ {
 			worker(ctx, grpcClient, grpcCallOpts, respFunc, jobs)
-			zlog.Debug("work done")
 			wg.Done()
 		}
 	}()
 
 	for {
 		err := scheduler.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
+			zlog.Info("scheduling request", zap.Strings("modules", request.OutputModules), zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum))
+
 			jobs <- &job{
 				request:  request,
 				callback: callback,
@@ -615,12 +616,13 @@ type job struct {
 
 func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallOpts []grpc.CallOption, respFunc substreams.ResponseFunc, jobs <-chan *job) {
 	for {
+	nextJob:
 		select {
 		case j, ok := <-jobs:
 			if !ok {
 				return
 			}
-
+			zlog.Info("worker sending request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
 			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 			stream, err := grpcClient.Blocks(ctx, j.request, grpcCallOpts...)
 			if err != nil {
@@ -629,13 +631,13 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 			}
 
 			for {
-				zlog.Debug("waiting for stream response...")
 				resp, err := stream.Recv()
 
 				if err != nil {
 					if err == io.EOF {
+						zlog.Info("worker done with request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
 						j.callback(j.request, nil)
-						return
+						break nextJob
 					}
 					j.callback(j.request, err)
 					return
@@ -643,7 +645,7 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 
 				switch r := resp.Message.(type) {
 				case *pbsubstreams.Response_Progress:
-					zlog.Debug("resp received", zap.String("type", "progress"))
+					//zlog.Debug("resp received", zap.String("type", "progress"))
 					// TODO: aggregate, and pile up all the progresses from child workers somehow
 					err := respFunc(resp)
 					if err != nil {
@@ -655,7 +657,7 @@ func worker(ctx context.Context, grpcClient pbsubstreams.StreamClient, grpcCallO
 				case *pbsubstreams.Response_SnapshotComplete:
 					_ = r.SnapshotComplete
 				case *pbsubstreams.Response_Data:
-					zlog.Debug("resp received", zap.String("type", "data"))
+					//zlog.Debug("resp received", zap.String("type", "data"))
 					for _, output := range r.Data.Outputs {
 						for _, log := range output.Logs {
 							fmt.Println("LOG: ", log)

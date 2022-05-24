@@ -157,6 +157,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
+		zlog.Debug("extracting meta data", zap.Strings("partial_mode", partialMode))
 		if len(partialMode) == 1 && partialMode[0] == "true" {
 			// TODO: only allow partial-mode if the AUTHORIZATION layer permits it
 			// partial-mode should be

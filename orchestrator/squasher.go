@@ -61,6 +61,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	blockRanges := requestBlockRange.Split(100)
 
 	for _, br := range blockRanges {
+		zlog.Info("squashing range", zap.String("module", builder.Name), zap.Object("range", br))
 		if !builder.Initialized && builder.PartialMode && br.StartBlock == builder.ModuleStartBlock {
 			err := builder.InitializePartial(ctx, builder.ModuleStartBlock)
 			if err != nil {

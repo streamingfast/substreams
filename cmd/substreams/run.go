@@ -13,8 +13,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	_ "github.com/streamingfast/substreams/pb/statik"
-
-	"google.golang.org/grpc/metadata"
 )
 
 func init() {
@@ -94,10 +92,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:       pkg.Modules,
 		OutputModules: outputStreamNames,
-	}
-
-	if mustGetBool(cmd, "partial-mode") {
-		ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 	}
 
 	zlog.Info("connecting...")

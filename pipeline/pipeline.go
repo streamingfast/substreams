@@ -570,18 +570,18 @@ func SynchronizeStores(
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
 
-	zlog.Debug("setting jobs chan and worker", zap.Int("parallel-sub-requests", parallelSubRequests))
+	zlog.Info("setting jobs chan and worker", zap.Int("parallel-sub-requests", parallelSubRequests))
 	jobs := make(chan *job, parallelSubRequests)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(parallelSubRequests)
 
-	go func() {
-		for w := 0; w < parallelSubRequests; w++ {
+	for w := 0; w < parallelSubRequests; w++ {
+		go func() {
 			worker(ctx, grpcClientFactory, respFunc, jobs)
 			wg.Done()
-		}
-	}()
+		}()
+	}
 
 	for {
 		err := scheduler.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
@@ -624,6 +624,8 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 	for {
 	nextJob:
 		select {
+		case <-ctx.Done():
+			return
 		case j, ok := <-jobs:
 			if !ok {
 				return
@@ -635,7 +637,7 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 				return
 
 			}
-			zlog.Info("got grpc client", zap.Duration("in", time.Since(start)))
+			zlog.Debug("got grpc client", zap.Duration("in", time.Since(start)))
 
 			zlog.Info("worker sending request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
 			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
@@ -674,8 +676,6 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 				case *pbsubstreams.Response_Data:
 				}
 			}
-		case <-ctx.Done():
-			return
 		}
 	}
 }

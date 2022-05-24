@@ -17,6 +17,17 @@ They are protobuf-serialized files that use this model: https://github.com/strea
 You will notice that the conform to both https://buf.build [Images](https://docs.buf.build/reference/images) and standard Protobuf FileDescriptorSet, meaning they can be used with multiple code generation tools to scaffold.
 
 
+### Creating packages
+
+You can create a package by running:
+
+```
+substreams pack ./substreams.yaml
+```
+
+from a Substreams modules manifest.
+
+
 ### Where to find them
 
 There is currently no single point of reference for Substreams

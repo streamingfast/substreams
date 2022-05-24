@@ -24,7 +24,9 @@ simpler model to work with.
 Visit the [Documentation](./docs) section for details.
 
 
-## Install the `substreams` command-line tool
+## Getting Started
+
+### Installing the `substreams` command-line tool
 
 The `substreams` CLI allows you to interact with Substreams endpoints,
 stream data in real-time, as well as package your own Substreams modules.
@@ -47,8 +49,7 @@ cd substreams
 go install -v ./cmd/substreams
 ```
 
-
-## Usage
+### Consuming
 
 Get streaming right away using. To use StreamingFast's infrastructure, dump that somewhere like `.bashrc`:
 
@@ -77,65 +78,15 @@ substreams run -e bsc-dev.streamingfast.io:443 \
 ```
 
 
-## Packages
 
-Substreams packages, ending in `.spkg` contain all what is needed to
-start streaming from Substreams endpoints from client consumers in any
-language supported by Protobuf.
+### Developing Substreams Modules
 
-They contain compiled WASM code, dependent modules, documentation,
-protobuf schemas, all in one file.
-
-Build yourself a package using:
-
-```
-substreams pack ./substreams.yaml
-```
-
-See [sample packages here](https://github.com/streamingfast/substreams-playground/releases).
-
-
-
-## Develop your own Substreams Modules
-
-
-### Install rust
-
-We're going to be using the [Rust programming language](https://www.rust-lang.org/), to develop Substreams Modules.
+Install the [**Rust** programming language](https://www.rust-lang.org/). This is the languaged used to develop Substreams Modules.
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-
-## Running locally
-
-You can run the Substreams service locally this way:
-
-1. Get a recent release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), and install `sfeth`.
-
-Alternatively, you can use this Docker image: `ghcr.io/streamingfast/sf-ethereum:6aa70ca`, known to work with version v0.0.5-beta of the `substreams` release herein.
-
-2. Get some data (merged blocks) to play with locally (here on BSC mainnet):
-
-```bash
-# Downloads 2.6GB of data
-sfeth tools download-from-firehose bsc-dev.streamingfast.io:443 6810000 6820000 ./localblocks
-sfeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
-```
-
-3. Then run the `firehose` service locally in a terminal, reading blocks from your disk:
-
-```bash
-sfeth start firehose  --config-file=  --log-to-file=false  --common-blockstream-addr=  --common-blocks-store-url=./localdata --firehose-grpc-listen-addr=:9000* --substreams-enabled --substreams-rpc-endpoint=https://URL.POINTING.TO.A.BSC.ARCHIVE.NODE/if-you/want-to-use/eth_call/within/substreams
-```
-
-4. And then run the `substreams` command against your local deployment (checkout `substreams-playground` in the _Run remotely_ section above):
-
-```bash
-substreams run -k -e localhost:9000  # ...
 ```
 
 

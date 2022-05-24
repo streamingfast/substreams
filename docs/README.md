@@ -23,3 +23,4 @@ For module developers:
 
 For Subtreams service operators:
 * Admin guide: running Substreams for Ethereum. See the Firehose docs http://firehose.streamingfast.io/operate/concepts/
+* [Running Substreams service locally](./running-locally.md)

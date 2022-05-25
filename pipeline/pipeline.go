@@ -550,6 +550,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 }
 
 func SynchronizeStores(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), request *pbsubstreams.Request, builders []*state.Builder, outputCache map[string]*outputs.OutputCache, upToBlockNum uint64, respFunc substreams.ResponseFunc, parallelSubRequests int, blockRangeSizeSubRequests int, storeSaveInterval uint64) error {
+	ctx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
+
 	zlog.Info("synchronizing stores")
 	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval)
 	if err != nil {
@@ -561,7 +564,7 @@ func SynchronizeStores(ctx context.Context, grpcClientFactory func() (pbsubstrea
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, linearStrategy, squasher, blockRangeSizeSubRequests)
+	scheduler, err := orchestrator.NewScheduler(linearStrategy, squasher, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
@@ -574,13 +577,13 @@ func SynchronizeStores(ctx context.Context, grpcClientFactory func() (pbsubstrea
 
 	for w := 0; w < parallelSubRequests; w++ {
 		go func() {
-			worker(ctx, grpcClientFactory, respFunc, jobs)
+			worker(ctx, cancelFunc, grpcClientFactory, respFunc, jobs)
 			wg.Done()
 		}()
 	}
 
 	for {
-		err := scheduler.Next(func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error)) {
+		err := scheduler.Next(func(request *pbsubstreams.Request, callback func(ctx context.Context, r *pbsubstreams.Request, err error)) {
 			zlog.Info("scheduling request", zap.Strings("modules", request.OutputModules), zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum))
 
 			jobs <- &job{
@@ -613,10 +616,10 @@ func SynchronizeStores(ctx context.Context, grpcClientFactory func() (pbsubstrea
 
 type job struct {
 	request  *pbsubstreams.Request
-	callback func(r *pbsubstreams.Request, err error)
+	callback func(ctx context.Context, r *pbsubstreams.Request, err error)
 }
 
-func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), respFunc substreams.ResponseFunc, jobs <-chan *job) {
+func worker(ctx context.Context, cancelFunc context.CancelFunc, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), respFunc substreams.ResponseFunc, jobs <-chan *job) {
 	for {
 	nextJob:
 		select {
@@ -630,17 +633,19 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 			start := time.Now()
 			grpcClient, grpcCallOpts, err := grpcClientFactory()
 			if err != nil {
-				j.callback(j.request, fmt.Errorf("getting grpc client: %w", err))
+				j.callback(ctx, j.request, fmt.Errorf("getting grpc client: %w", err))
+				cancelFunc()
 				return
 
 			}
 			zlog.Debug("got grpc client", zap.Duration("in", time.Since(start)))
 
 			zlog.Info("worker sending request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
-			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
-			stream, err := grpcClient.Blocks(ctx, j.request, grpcCallOpts...)
+			ctx2 := metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
+			stream, err := grpcClient.Blocks(ctx2, j.request, grpcCallOpts...)
 			if err != nil {
-				j.callback(j.request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
+				j.callback(ctx, j.request, fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
+				cancelFunc()
 				return
 			}
 
@@ -658,10 +663,12 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 				if err != nil {
 					if err == io.EOF {
 						zlog.Info("worker done with request", zap.Strings("modules", j.request.OutputModules), zap.Int64("start_block", j.request.StartBlockNum), zap.Uint64("stop_block", j.request.StopBlockNum))
-						j.callback(j.request, nil)
+						j.callback(ctx, j.request, nil)
+						//No cancel here please
 						break nextJob
 					}
-					j.callback(j.request, err)
+					j.callback(ctx, j.request, err)
+					cancelFunc()
 					return
 				}
 
@@ -671,7 +678,8 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 					// TODO: aggregate, and pile up all the progresses from child workers somehow
 					err := respFunc(resp)
 					if err != nil {
-						j.callback(j.request, err)
+						j.callback(ctx, j.request, err)
+						cancelFunc()
 						return
 					}
 				case *pbsubstreams.Response_SnapshotData:

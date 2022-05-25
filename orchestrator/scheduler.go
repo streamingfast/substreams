@@ -13,8 +13,6 @@ import (
 var zlog, _ = logging.PackageLogger("scheduler", "github.com/streamingfast/substreams/scheduler")
 
 type Scheduler struct {
-	ctx                       context.Context
-	ctxCancelFunc             context.CancelFunc
 	blockRangeSizeSubRequests int
 
 	squasher *Squasher
@@ -23,11 +21,8 @@ type Scheduler struct {
 	Err      error
 }
 
-func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
-	ctx, cancel := context.WithCancel(ctx)
+func NewScheduler(strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
-		ctx:                       ctx,
-		ctxCancelFunc:             cancel,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
 		strategy:                  strategy,
@@ -37,7 +32,7 @@ func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, bl
 	return s, nil
 }
 
-func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(r *pbsubstreams.Request, err error))) error {
+func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(ctx context.Context, r *pbsubstreams.Request, err error))) error {
 	request, err := s.strategy.GetNextRequest()
 	if err != nil {
 		return io.EOF
@@ -50,15 +45,14 @@ func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(r *
 	return nil
 }
 
-func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
+func (s *Scheduler) callback(ctx context.Context, r *pbsubstreams.Request, err error) {
 	if err != nil {
 		s.Err = err
-		s.ctxCancelFunc()
 		return
 	}
 
 	for _, output := range r.GetOutputModules() {
-		err = s.squasher.Squash(s.ctx, output, &block.Range{
+		err = s.squasher.Squash(ctx, output, &block.Range{
 			StartBlock:        uint64(r.StartBlockNum),
 			ExclusiveEndBlock: r.StopBlockNum,
 		})
@@ -66,7 +60,6 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 		if err != nil {
 			zlog.Error("squashing output", zap.String("output", output), zap.Error(err))
 			s.Err = err
-			s.ctxCancelFunc()
 			return
 		}
 	}

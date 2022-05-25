@@ -55,7 +55,7 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
 	s.lock.Lock()
-	defer s.lock.Lock()
+	defer s.lock.Unlock()
 
 	squashable, ok := s.squashables[moduleName]
 	if !ok {

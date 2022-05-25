@@ -48,7 +48,7 @@ func (i *Instance) PrintStats() {
 func (i *Instance) Execute() (err error) {
 	if _, err = i.entrypoint.Call(i.args...); err != nil {
 		if i.panicError != nil {
-			fmt.Println("Grrr:", i.panicError)
+			fmt.Println("Panic error:", i.panicError)
 			return i.panicError
 		}
 		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)

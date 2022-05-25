@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -16,6 +17,7 @@ import (
 type Squasher struct {
 	squashables       map[string]*Squashable
 	storeSaveInterval uint64
+	lock              sync.Mutex
 }
 
 func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64) (*Squasher, error) {
@@ -52,6 +54,9 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 }
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
+	s.lock.Lock()
+	defer s.lock.Lock()
+
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		panic(fmt.Sprintf("invalid module %q", moduleName))

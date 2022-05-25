@@ -18,12 +18,12 @@ type Scheduler struct {
 
 }
 
-func NewScheduler(strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
-		squasher:       squasher,
-		requestsStream: GetRequestStream(ctx, strategy),
-		requests:       []*pbsubstreams.Request{},
+		squasher:                  squasher,
+		requestsStream:            GetRequestStream(ctx, strategy),
+		requests:                  []*pbsubstreams.Request{},
 	}
 
 	return s, nil
@@ -32,8 +32,10 @@ func NewScheduler(strategy Strategy, squasher *Squasher, blockRangeSizeSubReques
 func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
 	request, alive := <-s.requestsStream
 	if !alive {
-		return io.EOF
+		return nil, io.EOF
 	}
+
+	return request, nil
 }
 
 func (s *Scheduler) Callback(ctx context.Context, r *pbsubstreams.Request) error {

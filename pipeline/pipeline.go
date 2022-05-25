@@ -560,8 +560,10 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 
 	blockRangeSizeSubRequests int,
 	storeSaveInterval uint64) error {
-	ctx, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	zlog.Info("synchronizing stores")
 
 	pool := orchestrator.NewPool()
@@ -576,7 +578,7 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(strategy, squasher, blockRangeSizeSubRequests)
+	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
@@ -630,7 +632,7 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 	resultCount := 0
 
 done:
-	for {
+		for {
 		select {
 		case <-ctx.Done():
 			return nil

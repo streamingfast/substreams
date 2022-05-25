@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"container/heap"
 	"context"
 	"fmt"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -65,7 +64,7 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 		p.waiters = map[Waiter]struct{}{}
 		p.done = make(chan struct{})
 		p.queue = make(PriorityQueue, 0)
-		heap.Init(&p.queue)
+		(&p.queue).QInit()
 
 		go func() {
 			defer close(p.stream)
@@ -114,6 +113,8 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 						close(p.done)
 						return
 					}
+					// the number of stores a waiter was waiting for determines its priority in the queue.
+					// higher number of stores => higher priority.
 					(&p.queue).PushRequest(i.Request, i.Waiter.Order())
 				}
 			}

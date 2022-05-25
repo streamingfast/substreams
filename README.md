@@ -24,14 +24,45 @@ Visit the [Documentation](docs/) section for details.
 
 The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real-time, as well as package your own Substreams modules.
 
-1. Get a [release](https://github.com/streamingfast/substreams/releases).
-2. Or build from source and start hacking:
+#### From brew (for Max OS)
 
 ```
+brew install streamingfast/tap/substreams
+```
+
+#### From pre-compiled binary
+
+Download the binary
+
+```bash
+# Use correct binary for your platform
+wget https://github.com/streamingfast/substreams/releases/download/v0.0.5-beta3/substreams_0.0.5-beta3_linux_x86_64.tar.gz
+tar -xzvf substreams_0.0.5-beta3_linux_x86_64.tar.gz
+export PATH="`pwd`:$PATH"
+```
+
+{% hint style="info" %}
+Check [https://github.com/streamingfast/substreams/releases](https://github.com/streamingfast/substreams/releases) and use the latest release available
+{% endhint %}
+
+#### From Source
+
+```bash
 git clone git@github.com:streamingfast/substreams
 cd substreams
 go install -v ./cmd/substreams
 ```
+
+### Validation
+
+Ensure that `substreams` CLI works as expected:
+
+```bash
+substreams -v
+version 0.0.5-beta3 (Commit 61cc596, Built 2022-05-09T19:35:11Z)
+```
+
+
 
 ### Consuming
 

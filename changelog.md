@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## \[Unreleased]
 
 *   Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
-    
+
     `substreams::handlers::map` is used for the handlers corresponding to modules of type `map`. Modules of type `map` should return a `Result` where the error is of type `SubstreamError`
 
     ```rust
@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## \[v0.0.6-beta]
 
-* Implemented [packages (see docs)](packages.md).
+* Implemented [packages (see docs)](docs/reference/packages.md).
 * Added `substreams::Hex` wrapper type to more easily deal with printing and encoding bytes to hexadecimal string.
 * Added `substreams::log::info!(...)` and `substreams::log::debug!(...)` supporting formatting arguments (acts like `println!()` macro).
 * Added new field `logs_truncated` that can be used to determined if logs were truncated.

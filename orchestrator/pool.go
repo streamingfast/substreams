@@ -30,7 +30,7 @@ type Pool struct {
 
 	init  sync.Once
 	wg    sync.WaitGroup
-	mutex sync.Mutex
+	mutex sync.RWMutex
 
 	done chan struct{}
 }
@@ -40,8 +40,8 @@ func NewPool() *Pool {
 }
 
 func (p *Pool) Notify(builder string, blockNum uint64) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
 	for waiter := range p.waiters {
 		waiter.Signal(builder, blockNum)

@@ -142,14 +142,14 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 		case <-p.done:
 			p.requestQueueMu.Lock()
 			queueLen := p.requestQueue.Len()
-			p.requestQueueMu.Unlock()
 			if queueLen > 0 {
-				p.requestQueueMu.Lock()
 				r = (&p.requestQueue).PopRequest()
 				p.requestQueueMu.Unlock()
 				if r != nil {
 					return r, nil
 				}
+			} else {
+				p.requestQueueMu.Unlock()
 			}
 			return nil, io.EOF
 		default:
@@ -157,17 +157,14 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 		}
 
 		p.requestQueueMu.Lock()
-		queueLen := p.requestQueue.Len()
-		p.requestQueueMu.Unlock()
-
-		if queueLen == 0 {
+		if p.requestQueue.Len() == 0 {
+			p.requestQueueMu.Unlock()
 			sleeper.Sleep()
 			continue
 		}
 
 		sleeper.Reset()
 
-		p.requestQueueMu.Lock()
 		r = (&p.requestQueue).PopRequest()
 		p.requestQueueMu.Unlock()
 		if r != nil {

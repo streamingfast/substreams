@@ -301,22 +301,44 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 
 	}
 
+	/*
+		module -> 100-400
+		r1 -> 100-200
+			- 110-120 = 10
+			= 120-125 = 5
+						_
+						15
+		r2 -> 200-300
+						_
+						10
+		r3 -> 300-400
+						-
+						30
+						----
+						60
+		totalBlockStoProcess 400 -100 = 300
+			240
+	*/
+
+	//token-pair-reserve
 	var modules []*pbsubstreams.ModuleProgress
+
 	for _, mod := range p.modules {
-		modules = append(modules, &pbsubstreams.ModuleProgress{
-			Name:    mod.Name,
-			CatchUp: p.partialMode,
-			RequestBlockRange: &pbsubstreams.BlockRange{
-				StartBlock: uint64(p.request.StartBlockNum),
-				EndBlock:   p.request.StopBlockNum,
-			},
-			ProcessedRanges: []*pbsubstreams.BlockRange{
-				{
-					StartBlock: p.requestedStartBlockNum,
-					EndBlock:   p.progressTracker.lastBlock,
+		if slices.Contains(p.request.OutputModules, mod.Name) {
+			modules = append(modules, &pbsubstreams.ModuleProgress{
+				Name: mod.Name,
+				RequestBlockRange: &pbsubstreams.BlockRange{
+					StartBlock: uint64(p.request.StartBlockNum),
+					EndBlock:   p.request.StopBlockNum,
 				},
-			},
-		})
+				ProcessedRanges: []*pbsubstreams.BlockRange{
+					{
+						StartBlock: p.requestedStartBlockNum,
+						EndBlock:   p.progressTracker.lastBlock,
+					},
+				},
+			})
+		}
 	}
 
 	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
@@ -660,7 +682,8 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 				case *pbsubstreams.Response_Progress:
 					//zlog.Debug("resp received", zap.String("type", "progress"))
 					// TODO: aggregate, and pile up all the progresses from child workers somehow
-					err := respFunc(resp)
+					err := respFunc(substreams.NewModulesProgressResponse(r.Progress.Modules))
+
 					if err != nil {
 						j.callback(j.request, err)
 						return

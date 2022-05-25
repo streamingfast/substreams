@@ -3,8 +3,6 @@ package decode
 import (
 	"encoding/hex"
 	"fmt"
-	"strings"
-
 	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -12,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+	"strings"
 )
 
 func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ResponseFunc {
@@ -162,10 +161,23 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 				fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
 			}
 		}
-		for _, moduleProgress := range progress.Modules {
-			fmt.Printf("module:%s %s\n", moduleProgress.Name, moduleProgress.ProcessedRanges)
 
+		for _, moduleProgress := range progress.Modules {
+			requestedBlockRangeStartBlock := moduleProgress.RequestBlockRange.StartBlock
+			requestedBlockRangeEndBlock := moduleProgress.RequestBlockRange.EndBlock
+			processedRangeStartBlock := moduleProgress.ProcessedRanges[0].StartBlock
+			processedRangeEndBlock := moduleProgress.ProcessedRanges[0].EndBlock
+
+			fmt.Printf(
+				"\rmoduleName: %s requestedBlockRangeStartBlock: %d, requestedBlockRangeEndBlock: %d, processedRangeStartBlock: %d, processedRangeEndBlock: %d",
+				moduleProgress.Name,
+				requestedBlockRangeStartBlock,
+				requestedBlockRangeEndBlock,
+				processedRangeStartBlock,
+				processedRangeEndBlock,
+			)
 		}
+
 		return nil
 	}
 
@@ -221,7 +233,7 @@ func decodeAsString(in []byte) string { return fmt.Sprintf("%q", string(in)) }
 func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
 
 func printClock(block *pbsubstreams.BlockScopedData) {
-	fmt.Printf("----------- %s BLOCK #%s (%d) ---------------\n",
+	fmt.Printf("\n----------- %s BLOCK #%s (%d) ---------------\n",
 		strings.ToUpper(stepFromProto(block.Step).String()),
 		humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
 }

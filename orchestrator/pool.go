@@ -3,10 +3,10 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
 	"io"
 	"sync"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type requestWaiter struct {
@@ -93,7 +93,6 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 				p.mutex.Lock()
 				delete(p.waiters, item.Waiter)
 				p.mutex.Unlock()
-				zlog.Debug("added request to readyRequestStream", zap.String("request modules", item.Request.Modules.String()))
 			}
 		}
 	}()

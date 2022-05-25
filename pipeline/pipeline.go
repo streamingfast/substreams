@@ -124,7 +124,7 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 	ctx := p.context
 	// WARN: we don't support < 0 StartBlock for now
 	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("partial_mode", p.partialMode))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("partial_mode", p.partialMode), zap.Strings("outputs", p.request.OutputModules))
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
 	var err error

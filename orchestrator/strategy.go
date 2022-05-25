@@ -68,7 +68,7 @@ func (s *LinearStrategy) GetNextRequest() (*pbsubstreams.Request, error) {
 	}
 
 	var request *pbsubstreams.Request
-	request, s.requests = s.requests[len(s.requests)-1], s.requests[:len(s.requests)-1]
+	request, s.requests = s.requests[0], s.requests[1:]
 
 	return request, nil
 }

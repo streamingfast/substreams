@@ -33,7 +33,7 @@ type OutputCache struct {
 	kv                outputKV
 	Store             dstore.Store
 	saveBlockInterval uint64
-	Completed         bool
+	//Completed         bool
 }
 
 type ModulesOutputCache struct {
@@ -101,31 +101,14 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 	return nil
 }
 
-func (c *ModulesOutputCache) SavePartialCaches(ctx context.Context) error {
-	zlog.Info("Saving partial caches")
+func (c *ModulesOutputCache) Save(ctx context.Context) error {
+	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
-		if moduleCache.Completed {
-			continue
-		}
+
 		filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
-		filename += ".partial"
-
-		//if moduleCache.CurrentBlockRange.Contains(bstream.NewBlockRef("", 6810917)) && moduleCache.ModuleName == "ethtokens:tokens" {
-		//	d, found := moduleCache.kv["cad585022b800dd52c8692ba960adcdb71e47ffd86669c7fb8d60a00fc24dcf2"]
-		//	if !found {
-		//		panic("Not found!!!!")
-		//	}
-		//	b64 := base64.StdEncoding.EncodeToString(d.Payload)
-		//	panic(b64)
-		//}
-
 		if err := moduleCache.save(ctx, filename); err != nil {
 			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
 		}
-		//if moduleCache.CurrentBlockRange.Contains(bstream.NewBlockRef("", 6810917)) && moduleCache.ModuleName == "ethtokens:tokens" {
-		//	panic("WTF")
-		//}
-
 	}
 	return nil
 }
@@ -138,7 +121,7 @@ func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uin
 	}
 }
 
-func (c *OutputCache) SortedCacheItem() (out []*CacheItem) {
+func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 	for _, item := range c.kv {
 		out = append(out, item)
 	}
@@ -151,11 +134,6 @@ func (c *OutputCache) SortedCacheItem() (out []*CacheItem) {
 func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
-	if c.Completed {
-		zlog.Warn("trying to add output to an already existing module", zap.String("module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
-		return nil
-	}
 
 	ci := &CacheItem{
 		BlockNum: block.Num(),
@@ -201,27 +179,8 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 		return nil
 	}
 
-	zlog.Debug("loading outputs data", zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
-
 	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
-	exist, err := c.Store.FileExists(ctx, filename)
-	if err != nil {
-		return fmt.Errorf("check file exist %q: %w", filename, err)
-	}
-	filenamePartial := filename + ".partial"
-	partialExist, err := c.Store.FileExists(ctx, filenamePartial)
-	if err != nil {
-		return fmt.Errorf("check if parital file exist %q: %w", filenamePartial, err)
-	}
-
-	if exist && partialExist {
-		panic(fmt.Sprintf("found both partial and completed cache file %q", filename))
-	}
-	if partialExist {
-		filename = filenamePartial
-	}
-
-	c.Completed = !partialExist //burk
+	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 
 	objectReader, err := c.Store.OpenObject(ctx, filename)
 	if err != nil {

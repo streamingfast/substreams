@@ -9,17 +9,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/substreams/orchestrator"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
@@ -233,7 +233,7 @@ func (p *Pipeline) HandlerFactory(respFunc func(resp *pbsubstreams.Response) err
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
 			if p.partialMode {
 				zlog.Debug("about to save partial output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
-				if err := p.moduleOutputCache.SavePartialCaches(ctx); err != nil {
+				if err := p.moduleOutputCache.Save(ctx); err != nil {
 					return fmt.Errorf("saving partial caches")
 				}
 			}
@@ -697,15 +697,13 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 
 func (p *Pipeline) InitializeStores(ctx context.Context) error {
 	var initFunc func(builder *state.Builder) error
-	if p.partialMode {
-		initFunc = func(builder *state.Builder) error {
+	initFunc = func(builder *state.Builder) error {
+
+		if p.partialMode && slices.Contains(p.request.OutputModules, builder.Name) {
 			return builder.InitializePartial(ctx, p.requestedStartBlockNum)
 		}
-	} else {
-		initFunc = func(builder *state.Builder) error {
-			outputCache := p.moduleOutputCache.OutputCaches[builder.Name]
-			return builder.Initialize(ctx, p.requestedStartBlockNum, p.moduleOutputCache.SaveBlockInterval, outputCache.Store)
-		}
+		outputCache := p.moduleOutputCache.OutputCaches[builder.Name]
+		return builder.Initialize(ctx, p.requestedStartBlockNum, p.moduleOutputCache.SaveBlockInterval, outputCache.Store)
 	}
 
 	for _, builder := range p.builders {

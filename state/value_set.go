@@ -52,6 +52,10 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 			NewValue:  value,
 		}
 	}
+	if delta.Key == "" {
+		panic("Grrr4")
+	}
+
 	b.ApplyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)
 }
@@ -70,6 +74,9 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 		Key:       key,
 		OldValue:  nil,
 		NewValue:  value,
+	}
+	if delta.Key == "" {
+		panic("Grrr4")
 	}
 	b.ApplyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)

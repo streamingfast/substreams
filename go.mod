@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.17
+go 1.18
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
@@ -38,7 +38,8 @@ require (
 	github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/wasmerio/wasmer-go v1.0.4
-	golang.org/x/mod v0.5.0
+	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf
+	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	google.golang.org/grpc v1.44.0
 )

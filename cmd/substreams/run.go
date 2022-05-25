@@ -51,7 +51,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	outputStreamNames := strings.Split(args[1], ",")
 
 	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") != "" {
+	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
 		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
 	}
 

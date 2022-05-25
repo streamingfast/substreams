@@ -1,46 +1,30 @@
-Substreams - A streaming data engine for The Graph - by StreamingFast
-=====================================================================
+---
+description: A streaming data engine for The Graph - by StreamingFast
+---
+
+# Substreams
 
 DEVELOPER PREVIEW OF SUBSTREAMS
 
 Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
 
-It enables you to write Rust modules, composing data streams alongside
-the community, and provides extremely high performance indexing by
-virtue of parallelization, in a streaming first fashion.
+It enables you to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming first fashion.
 
-It has all the benefits of the Firehose, like low cost caching and
-archiving of blockchain data, high throughput processing, and
-cursor-based reorgs handling.
+It has all the benefits of the Firehose, like low cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
-Substreams is the successor of
-https://github.com/streamingfast/sparkle, enabling greater
-composability, yet similar powers of parallelization, and a much
-simpler model to work with.
-
+Substreams is the successor of https://github.com/streamingfast/sparkle, enabling greater composability, yet similar powers of parallelization, and a much simpler model to work with.
 
 ## Documentation
 
-Visit the [Documentation](./docs) section for details.
-
+Visit the [Documentation](docs/) section for details.
 
 ## Getting Started
 
 ### Installing the `substreams` command-line tool
 
-The `substreams` CLI allows you to interact with Substreams endpoints,
-stream data in real-time, as well as package your own Substreams modules.
+The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real-time, as well as package your own Substreams modules.
 
 1. Get a [release](https://github.com/streamingfast/substreams/releases).
-
-<!--
-2. Or build from source quickly:
-
-```
-go install github.com/streamingfast/substreams/cmd/substreams@latest
-```
--->
-
 2. Or build from source and start hacking:
 
 ```
@@ -77,8 +61,6 @@ substreams run -e bsc-dev.streamingfast.io:443 \
    -s 6810706 -t 6810711
 ```
 
-
-
 ### Developing Substreams Modules
 
 Install the [**Rust** programming language](https://www.rust-lang.org/). This is the languaged used to develop Substreams Modules.
@@ -89,7 +71,6 @@ There are [several ways to install Rust](https://www.rust-lang.org/tools/install
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-
 ## Community
 
 Need any help? Reach out!
@@ -97,7 +78,6 @@ Need any help? Reach out!
 * [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
 
-
 ## License
 
-[Apache 2.0](LICENSE)
+[Apache 2.0](LICENSE/)

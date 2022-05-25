@@ -59,9 +59,6 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
-	//todo: add config here
-	//10_000
-	//100FILES OF 100BLOCK
 	blockRanges := requestBlockRange.Split(s.storeSaveInterval)
 
 	for _, br := range blockRanges {

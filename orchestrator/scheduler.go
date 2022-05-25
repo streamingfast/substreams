@@ -65,6 +65,7 @@ func (s *Scheduler) callback(r *pbsubstreams.Request, err error) {
 
 		if err != nil {
 			zlog.Error("squashing output", zap.String("output", output), zap.Error(err))
+			s.Err = err
 			s.ctxCancelFunc()
 			return
 		}

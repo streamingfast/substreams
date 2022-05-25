@@ -621,6 +621,7 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 	nextJob:
 		select {
 		case <-ctx.Done():
+			zlog.Warn("context cancel will waiting for jobs, worker is terminating")
 			return
 		case j, ok := <-jobs:
 			if !ok {
@@ -644,6 +645,14 @@ func worker(ctx context.Context, grpcClientFactory func() (pbsubstreams.StreamCl
 			}
 
 			for {
+
+				select {
+				case <-ctx.Done():
+					zlog.Warn("context cancel will waiting for stream data, worker is terminating")
+					return
+				default:
+				}
+
 				resp, err := stream.Recv()
 
 				if err != nil {

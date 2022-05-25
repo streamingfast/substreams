@@ -114,7 +114,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		}
 
 		squashableRange := squashable.ranges[0]
-		zlog.Debug("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
+		zlog.Info("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
 
 		if squashable.builder.BlockRange.IsNext(squashableRange, squashable.builder.SaveInterval) {
 			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()))

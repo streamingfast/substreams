@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "rust/substreams",
+    "rust/substreams-macro",
     "rust/test"
 ]
 

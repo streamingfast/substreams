@@ -103,3 +103,59 @@ func TestGet(t *testing.T) {
 	require.Equal(t, io.EOF, err)
 	require.Nil(t, r)
 }
+
+func TestGetOrdered(t *testing.T) {
+	p := NewPool()
+	ctx := context.Background()
+
+	waiter0 := NewWaiter(100, nil)
+	r0 := &pbsubstreams.Request{
+		StartBlockNum: 100,
+		StopBlockNum:  200,
+		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "A"}}},
+	}
+	_ = p.Add(ctx, r0, waiter0)
+	waiter1 := NewWaiter(200, nil)
+	r1 := &pbsubstreams.Request{
+		StartBlockNum: 200,
+		StopBlockNum:  300,
+		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "A"}}},
+	}
+	_ = p.Add(ctx, r1, waiter1)
+
+	waiter2 := NewWaiter(100, nil, &pbsubstreams.Module{Name: "A"})
+	r2 := &pbsubstreams.Request{
+		StartBlockNum: 100,
+		StopBlockNum:  200,
+		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "B"}}},
+	}
+	_ = p.Add(ctx, r2, waiter2)
+
+	// first request will be for A, since they have no dependencies and are ready right away.
+	r, err := p.Get(ctx)
+	require.Nil(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, "A", r.Modules.Modules[0].Name)
+
+	// we notify that A is ready up to block 100, which will put the request for B to the front of the queue
+	p.Notify("A", 100)
+	time.Sleep(50 * time.Millisecond) // give it a teeny bit of time
+
+	// assert that the request for B got put ahead of the request for A
+	r, err = p.Get(ctx)
+	require.Nil(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, "B", r.Modules.Modules[0].Name)
+
+	// assert that the remaining request is there
+	r, err = p.Get(ctx)
+	require.Nil(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, "A", r.Modules.Modules[0].Name)
+
+	// asser the end of the stream
+	r, err = p.Get(ctx)
+	require.NotNil(t, err)
+	require.Equal(t, io.EOF, err)
+	require.Nil(t, r)
+}

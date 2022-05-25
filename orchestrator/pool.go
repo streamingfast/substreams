@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-type poolItem struct {
+type requestWaiter struct {
 	Request *pbsubstreams.Request
 	Waiter  Waiter
 }
@@ -19,8 +19,8 @@ type Notifier interface {
 }
 
 type Pool struct {
-	stream chan *poolItem
-	queue  PriorityQueue
+	readyRequestStream chan *requestWaiter
+	requestQueue       PriorityQueue
 
 	waiters map[Waiter]struct{}
 
@@ -54,20 +54,22 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 
 	p.wg.Add(1)
 
-	item := &poolItem{
+	item := &requestWaiter{
 		Request: request,
 		Waiter:  waiter,
 	}
 
 	p.init.Do(func() {
-		p.stream = make(chan *poolItem, 5000)
+		p.readyRequestStream = make(chan *requestWaiter, 5000)
 		p.waiters = map[Waiter]struct{}{}
 		p.done = make(chan struct{})
-		p.queue = make(PriorityQueue, 0)
-		(&p.queue).QInit()
+
+		p.requestQueue = make(PriorityQueue, 0)
+		(&p.requestQueue).QInit()
 
 		go func() {
-			defer close(p.stream)
+			defer close(p.readyRequestStream)
+			defer close(p.done)
 			p.wg.Wait()
 			return
 		}()
@@ -87,11 +89,11 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 			select {
 			case <-ctx.Done():
 				return
-			case p.stream <- item:
+			case p.readyRequestStream <- item:
 				p.mutex.Lock()
 				delete(p.waiters, item.Waiter)
 				p.mutex.Unlock()
-				zlog.Debug("added request to stream", zap.String("request modules", item.Request.Modules.String()))
+				zlog.Debug("added request to readyRequestStream", zap.String("request modules", item.Request.Modules.String()))
 			}
 		}
 	}()
@@ -108,14 +110,13 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 				select {
 				case <-ctx.Done():
 					return
-				case i, ok := <-p.stream:
+				case i, ok := <-p.readyRequestStream:
 					if !ok {
-						close(p.done)
 						return
 					}
 					// the number of stores a waiter was waiting for determines its priority in the queue.
 					// higher number of stores => higher priority.
-					(&p.queue).PushRequest(i.Request, i.Waiter.Order())
+					(&p.requestQueue).PushRequest(i.Request, i.Waiter.Order())
 				}
 			}
 		}()
@@ -129,8 +130,8 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-p.done:
-			if len(p.queue) > 0 {
-				r = (&p.queue).PopRequest()
+			if len(p.requestQueue) > 0 {
+				r = (&p.requestQueue).PopRequest()
 				if r != nil {
 					return r, nil
 				}
@@ -140,14 +141,14 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 			//
 		}
 
-		if len(p.queue) == 0 {
+		if len(p.requestQueue) == 0 {
 			sleeper.Sleep()
 			continue
 		}
 
 		sleeper.Reset()
 
-		r = (&p.queue).PopRequest()
+		r = (&p.requestQueue).PopRequest()
 		if r != nil {
 			return r, nil
 		}

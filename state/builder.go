@@ -8,14 +8,13 @@ import (
 	"io"
 	"sync"
 
-	"github.com/streamingfast/substreams/pipeline/outputs"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/protobuf/proto"
 )
 
 type BuilderOption func(b *Builder)
@@ -228,29 +227,35 @@ func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock u
 	}
 
 	for {
-		deltas := outputCache.SortedCacheItem()
-		if len(deltas) == 0 {
-			panic("missing deltas")
+		cacheItems := outputCache.SortedCacheItems()
+		if len(cacheItems) == 0 {
+			panic(fmt.Sprintf("missing deltas %s", b.Name))
 		}
 
 		firstSeenBlockNum := uint64(0)
 		lastSeenBlockNum := uint64(0)
 
-		for _, delta := range deltas {
-			//todo: we should check the from block?
-			if delta.BlockNum >= exclusiveStopBlock {
-				return nil //all good we reach the end
-			}
-			if firstSeenBlockNum == uint64(0) {
-				firstSeenBlockNum = delta.BlockNum
-			}
-			lastSeenBlockNum = delta.BlockNum
-			pbDelta := &pbsubstreams.StoreDelta{}
-			err := proto.Unmarshal(delta.Payload, pbDelta)
+		for _, item := range cacheItems {
+			deltas := &pbsubstreams.StoreDeltas{}
+			err := proto.Unmarshal(item.Payload, deltas)
 			if err != nil {
-				return fmt.Errorf("unmarshalling builder %q delta at block %d: %w", b.Name, delta.BlockNum, err)
+				return fmt.Errorf("unmarshalling output deltas: %w", err)
 			}
-			b.Deltas = append(b.Deltas, pbDelta)
+
+			for _, delta := range deltas.Deltas {
+				//todo: we should check the from block?
+				if item.BlockNum >= exclusiveStopBlock {
+					return nil //all good we reach the end
+				}
+				if firstSeenBlockNum == uint64(0) {
+					firstSeenBlockNum = item.BlockNum
+				}
+				lastSeenBlockNum = item.BlockNum
+				if delta.Key == "" {
+					panic("missing key, invalid delta")
+				}
+				b.Deltas = append(b.Deltas, delta)
+			}
 		}
 
 		zlog.Debug("loaded deltas", zap.String("builder_name", b.Name), zap.Uint64("from_block_num", firstSeenBlockNum), zap.Uint64("to_block_num", lastSeenBlockNum))
@@ -357,6 +362,9 @@ func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
 func (b *Builder) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF
 	// 0xFF is reserved for internal use.
+	if len(delta.Key) == 0 {
+		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", b.Name))
+	}
 	if delta.Key[0] == byte(255) {
 		panic(fmt.Sprintf("key %q invalid, must be at least 1 character and not start with 0xFF", delta.Key))
 	}

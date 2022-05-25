@@ -306,19 +306,6 @@ func (e *MapperModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData 
 // }
 
 func OptimizeExecutors(moduleOutputCache map[string]*outputs.OutputCache, moduleExecutors []ModuleExecutor, requestedOutputStores []string) (optimizedModuleExecutors []ModuleExecutor, skipBlockSource bool) {
-	optimizedModuleExecutors = []ModuleExecutor{}
-	skipBlockSource = false
 
-	for _, outputStore := range requestedOutputStores {
-		if moduleOutputCache[outputStore] != nil && !moduleOutputCache[outputStore].New {
-			for _, executor := range moduleExecutors {
-				if executor.String() == outputStore {
-					optimizedModuleExecutors = append(optimizedModuleExecutors, executor)
-					skipBlockSource = true
-				}
-			}
-		}
-	}
-
-	return optimizedModuleExecutors, skipBlockSource
+	return nil, false
 }

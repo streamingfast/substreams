@@ -164,6 +164,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		}
 		for _, moduleProgress := range progress.Modules {
 			fmt.Printf("module:%s %s\n", moduleProgress.Name, moduleProgress.ProcessedRanges)
+
 		}
 		return nil
 	}

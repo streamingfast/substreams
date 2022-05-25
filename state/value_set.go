@@ -26,7 +26,6 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 	if strings.HasPrefix(key, "__!__") {
 		panic("key prefix __!__ is reserved for internal system use.")
 	}
-
 	b.bumpOrdinal(ord)
 
 	val, found := b.GetLast(key)
@@ -53,6 +52,10 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 			NewValue:  value,
 		}
 	}
+	if delta.Key == "" {
+		panic("Grrr4")
+	}
+
 	b.ApplyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)
 }
@@ -71,6 +74,9 @@ func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
 		Key:       key,
 		OldValue:  nil,
 		NewValue:  value,
+	}
+	if delta.Key == "" {
+		panic("Grrr4")
 	}
 	b.ApplyDelta(delta)
 	b.Deltas = append(b.Deltas, delta)

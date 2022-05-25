@@ -32,8 +32,8 @@ type OutputCache struct {
 	//kv                map[string]*bstream.Block
 	kv                outputKV
 	Store             dstore.Store
-	New               bool
 	saveBlockInterval uint64
+	//Completed         bool
 }
 
 type ModulesOutputCache struct {
@@ -74,15 +74,42 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 	for _, moduleCache := range c.OutputCaches {
 		if !moduleCache.CurrentBlockRange.Contains(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
-			if err := moduleCache.save(ctx); err != nil {
+			//this is a complete range
+			filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+			if err := moduleCache.save(ctx, filename); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
+
+			partialFilename := filename + ".partial"
+			partialExist, err := moduleCache.Store.FileExists(ctx, partialFilename)
+			if err != nil {
+				return fmt.Errorf("check if parital file exist %q: %w", partialFilename, err)
+			}
+			if partialExist {
+				err := moduleCache.Store.DeleteObject(ctx, partialFilename)
+				if err != nil {
+					return fmt.Errorf("deleting partial file %q", partialFilename)
+				}
+			}
+
 			if err := moduleCache.Load(ctx, moduleCache.CurrentBlockRange.ExclusiveEndBlock); err != nil {
 				return fmt.Errorf("loading blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
 		}
 	}
 
+	return nil
+}
+
+func (c *ModulesOutputCache) Save(ctx context.Context) error {
+	zlog.Info("Saving caches")
+	for _, moduleCache := range c.OutputCaches {
+
+		filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+		if err := moduleCache.save(ctx, filename); err != nil {
+			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
+		}
+	}
 	return nil
 }
 
@@ -94,7 +121,7 @@ func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uin
 	}
 }
 
-func (c *OutputCache) SortedCacheItem() (out []*CacheItem) {
+func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 	for _, item := range c.kv {
 		out = append(out, item)
 	}
@@ -108,16 +135,13 @@ func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if !c.New {
-		zlog.Warn("trying to add output to an already existing module", zap.String("module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
-		return nil
-	}
-
-	c.kv[block.Id] = &CacheItem{
+	ci := &CacheItem{
 		BlockNum: block.Num(),
 		BlockID:  block.Id,
 		Payload:  data,
 	}
+
+	c.kv[block.Id] = ci
 
 	return nil
 }
@@ -138,7 +162,6 @@ func (c *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
 func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 	zlog.Info("loading outputs", zap.String("module_name", c.ModuleName), zap.Uint64("at_block_num", atBlock))
 
-	c.New = false
 	c.kv = make(outputKV)
 
 	var found bool
@@ -153,13 +176,12 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 			ExclusiveEndBlock: atBlock + c.saveBlockInterval,
 		}
 
-		c.New = true
 		return nil
 	}
 
-	zlog.Debug("loading outputs data", zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
-
 	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
+	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
+
 	objectReader, err := c.Store.OpenObject(ctx, filename)
 	if err != nil {
 		return fmt.Errorf("loading block reader %s: %w", filename, err)
@@ -169,36 +191,13 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 	if err != nil {
 		return fmt.Errorf("json decoding file %s: %w", filename, err)
 	}
+
 	zlog.Debug("cache loaded", zap.String("cache_module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
 	return nil
-
-	//blockReader, err := bstream.GetBlockReaderFactory.New(objectReader)
-	//if err != nil {
-	//	return fmt.Errorf("getting block reader %s: %w", filename, err)
-	//}
-	//
-	//for {
-	//	block, err := blockReader.Read()
-	//
-	//	if err != nil && err != io.EOF {
-	//		return fmt.Errorf("reading block: %w", err)
-	//	}
-	//
-	//	if block == nil {
-	//		return nil
-	//	}
-	//
-	//	c.kv[block.Id] = block
-	//
-	//	if err == io.EOF {
-	//		return nil
-	//	}
-	//}
 }
 
-func (c *OutputCache) save(ctx context.Context) error {
-	zlog.Info("saving cache", zap.String("module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
-	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
+func (c *OutputCache) save(ctx context.Context, filename string) error {
+	zlog.Info("saving cache", zap.String("module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange), zap.String("filename", filename))
 
 	buffer := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buffer).Encode(c.kv)
@@ -212,27 +211,6 @@ func (c *OutputCache) save(ctx context.Context) error {
 	}
 	zlog.Debug("cache saved", zap.String("module_name", c.ModuleName), zap.String("file_name", filename), zap.String("url", c.Store.BaseURL().String()))
 	return nil
-	//zlog.Info("saving cache", zap.String("module_name", c.moduleName), zap.Stringer("block_range", c.currentBlockRange))
-	//filename := computeDBinFilename(pad(c.currentBlockRange.StartBlock), pad(c.currentBlockRange.ExclusiveEndBlock))
-	//
-	//buffer := bytes.NewBuffer(nil)
-	//blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
-	//if err != nil {
-	//	return fmt.Errorf("write block factory: %w", err)
-	//}
-	//
-	//for _, block := range c.kv {
-	//	if err := blockWriter.Write(block); err != nil {
-	//		return fmt.Errorf("write block: %w", err)
-	//	}
-	//}
-	//
-	//err = c.store.WriteObject(ctx, filename, buffer)
-	//if err != nil {
-	//	return fmt.Errorf("writing block buffer to store: %w", err)
-	//}
-	//
-	//return nil
 }
 
 func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {

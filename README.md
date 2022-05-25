@@ -63,7 +63,7 @@ substreams run -e bsc-dev.streamingfast.io:443 \
 
 ### Developing Substreams Modules
 
-Install the [**Rust** programming language](https://www.rust-lang.org/). This is the languaged used to develop Substreams Modules.
+Install the [**Rust** programming language](https://www.rust-lang.org/). This is the language used to develop Substreams Modules.
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity:
 

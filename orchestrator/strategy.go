@@ -35,7 +35,7 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 		}
 
 		lastExclusiveEndBlock := info.LastKVSavedBlock
-		zlog.Debug("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
+		zlog.Info("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
 		if upToBlockNum <= lastExclusiveEndBlock {
 			zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
 			continue // not sure if we should pop here

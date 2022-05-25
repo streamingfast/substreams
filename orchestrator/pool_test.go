@@ -80,6 +80,8 @@ func TestGet(t *testing.T) {
 
 	p.Notify("test1", 200)
 
+	p.Start(ctx)
+
 	r, err := p.Get(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
@@ -130,6 +132,8 @@ func TestGetOrdered(t *testing.T) {
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "B"}}},
 	}
 	_ = p.Add(ctx, r2, waiter2)
+
+	p.Start(ctx)
 
 	// first request will be for A, since they have no dependencies and are ready right away.
 	r, err := p.Get(ctx)

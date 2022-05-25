@@ -137,13 +137,15 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", builder.Name, err)
 			}
 
-			request := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
+			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
 			waiter := NewWaiter(blockRange.StartBlock, lastSavedBlockMap, ancestorStoreModules...)
-			_ = pool.Add(ctx, request, waiter)
+			_ = pool.Add(ctx, req, waiter)
 
 			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", blockRange))
 		}
 	}
+
+	pool.Start(ctx)
 
 	return &OrderedStrategy{
 		requestGetter: pool,

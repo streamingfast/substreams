@@ -7,13 +7,14 @@ mod errors;
 
 
 /// Marks function to setup substream map handler wasm boilerplate
+///
 /// ## Usage
 ///
 ///
 /// ```rust
-/// #[substream::handlers::map]
-/// fn map_handler(blk: eth::Block) -> Result<u64, SubstreamError> {
-///     Ok(blk.transactions_traces.len())
+/// #[substreams::handlers::map]
+/// fn map_handler(blk: eth::Block) -> Result<eth::TransactionTrace, SubstreamError> {
+///     Ok(blk.transactions_traces[0])
 /// }
 /// ```
 ///
@@ -23,17 +24,17 @@ mod errors;
 /// #[no_mangle]
 /// pub extern "C" fn map_handler(blk_ptr: *mut u8, blk_len: usize) {
 ///     substreams::register_panic_hook();
-///     let func = || -> Result<u64, SubstreamError> {
+///     let func = || -> Result<eth::TransactionTrace, SubstreamError> {
 ///         let blk: eth::Block = substreams::proto::decode_ptr(blk_ptr, blk_len).unwrap();
 ///         {
-///             Ok(blk.transactions_traces.len())
+///		Ok(blk.transactions_traces[0])
 ///         }
 ///     };
 ///     let result = func();
 ///     if result.is_err() {
 ///         panic!(result.err().unwrap())
 ///     }
-///     substreams::output(result.unwrap());
+///     substreams::output(proto::encode(result).unwrap());
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -46,7 +47,7 @@ pub fn map(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 ///
 /// ```rust
-/// #[substream::handlers::store]
+/// #[substreams::handlers::store]
 /// fn build_nft_state(transfers: erc721::Transfers, s: store::SumInt64Writer, pairs: store::Reader, tokens: store::Reader) {
 ///     println("Length {:?}", transfers.len());
 /// }

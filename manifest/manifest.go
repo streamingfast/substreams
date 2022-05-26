@@ -212,16 +212,16 @@ func validateStoreBuilder(module *Module) error {
 		"min:int64",      // Exposes SetMinInt64
 		"min:bigfloat",   // Exposes SetMinBigFloat
 		"min:float64",    // Exposes SetMinFloat64
-		"sum:bigint",     // Exposes SumBigInt
-		"sum:int64",      // Exposes SumInt64
-		"sum:bigfloat",   // Exposes SumBigFloat
-		"sum:float64",    // Exposes SubFloat64
-		"replace:bytes",  // Exposes SetBytes
-		"replace:string", // Exposes SetString
-		"replace:proto",  // Exposes SetBytes
-		"ignore:bytes",   // Exposes SetBytesIfNotExists
-		"ignore:string",  // Exposes SetStringIfNotExists
-		"ignore:proto",   // Exposes SetBytesIfNotExists
+		"add:bigint",     // Exposes SumBigInt
+		"add:int64",      // Exposes SumInt64
+		"add:bigfloat",   // Exposes SumBigFloat
+		"add:float64",    // Exposes SubFloat64
+		"set:bytes",  // Exposes SetBytes
+		"set:string", // Exposes SetString
+		"set:proto",  // Exposes SetBytes
+		"set_if_not_exists:bytes",   // Exposes SetBytesIfNotExists
+		"set_if_not_exists:string",  // Exposes SetStringIfNotExists
+		"set_if_not_exists:proto",   // Exposes SetBytesIfNotExists
 	}
 	found := false
 	var lastCombination string
@@ -372,9 +372,9 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 }
 
 const (
-	UpdatePolicyReplace = "replace"
-	UpdatePolicyIgnore  = "ignore"
-	UpdatePolicySum     = "sum"
+	UpdatePolicySet = "replace"
+	UpdatePolicySetIfNotExists  = "ignore"
+	UpdatePolicyAdd     = "sum"
 	UpdatePolicyMax     = "max"
 	UpdatePolicyMin     = "min"
 )
@@ -390,11 +390,11 @@ func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 	case ModuleKindStore:
 		var updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 		switch m.UpdatePolicy {
-		case UpdatePolicyReplace:
+		case UpdatePolicySet:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SET
-		case UpdatePolicyIgnore:
+		case UpdatePolicySetIfNotExists:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS
-		case UpdatePolicySum:
+		case UpdatePolicyAdd:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD
 		case UpdatePolicyMax:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX

@@ -1,3 +1,4 @@
+//! Learn more about Substreams at https://substreams.streamingfast.io
 mod externs;
 mod hex;
 mod state;

@@ -85,12 +85,15 @@ func (w *Worker) run(ctx context.Context, job *Job, respFunc substreams.Response
 				zlog.Info("worker done", zap.Object("job", job))
 				return nil
 			}
+			zlog.Warn("worker done on stream error", zap.Error(err))
 			return fmt.Errorf("receiving stream resp:%w", err)
 		}
+
 		switch r := resp.Message.(type) {
 		case *pbsubstreams.Response_Progress:
 			err := respFunc(resp)
 			if err != nil {
+				zlog.Warn("worker done on respFunc error", zap.Error(err))
 				return fmt.Errorf("sending progress: %w", err)
 			}
 		case *pbsubstreams.Response_SnapshotData:

@@ -15,7 +15,6 @@ type Scheduler struct {
 	squasher       *Squasher
 	requestsStream <-chan *pbsubstreams.Request
 	requests       []*pbsubstreams.Request
-
 }
 
 func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
@@ -50,8 +49,4 @@ func (s *Scheduler) Callback(ctx context.Context, r *pbsubstreams.Request) error
 		}
 	}
 	return nil
-}
-
-func (s *Scheduler) RequestCount() int {
-	return s.strategy.RequestCount()
 }

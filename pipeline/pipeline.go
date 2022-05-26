@@ -583,7 +583,7 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
 
-	requestCount := scheduler.RequestCount()
+	requestCount := strategy.RequestCount()
 	result := make(chan error)
 	for {
 		req, err := scheduler.Next()
@@ -632,7 +632,7 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 	resultCount := 0
 
 done:
-		for {
+	for {
 		select {
 		case <-ctx.Done():
 			return nil

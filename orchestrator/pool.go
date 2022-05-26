@@ -172,3 +172,9 @@ func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 		}
 	}
 }
+
+func (p *Pool) Count() int {
+	p.waitersMu.RLock()
+	defer p.waitersMu.RUnlock()
+	return len(p.waiters)
+}

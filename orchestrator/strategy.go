@@ -7,7 +7,6 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
-	"io"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -87,6 +86,7 @@ type RequestGetter interface {
 }
 
 type OrderedStrategy struct {
+	pool          *Pool
 	requestGetter RequestGetter
 }
 
@@ -149,7 +149,12 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 
 	return &OrderedStrategy{
 		requestGetter: pool,
+		pool:          pool,
 	}, nil
+}
+
+func (d *OrderedStrategy) RequestCount() int {
+	return d.pool.Count()
 }
 
 func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {

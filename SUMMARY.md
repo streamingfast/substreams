@@ -12,9 +12,9 @@
 
 * [Substream](docs/getting-started-guide/README.md)
 * [Requirements](docs/getting-started-guide/requirements.md)
-* [Creating Protobuf schemas](docs/getting-started-guide/creating-protobuf-schemas.md)
+* [Creating Protobuf schemas](getting-started-guide/creating-protobuf-schemas/README.md)
+  * [Consuming Substreams](getting-started-guide/creating-protobuf-schemas/consuming.md)
 * [Creating your Manifest](docs/getting-started-guide/creating-your-manifest.md)
-* [Consuming Substreams](docs/consuming.md)
 
 ## Reference & Specs
 

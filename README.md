@@ -16,7 +16,7 @@ Substreams is the successor of https://github.com/streamingfast/sparkle, enablin
 
 ## Documentation
 
-Visit the [Documentation](docs/) section for details.
+Visit the [Documentation](broken-reference) section for details.
 
 ## Getting Started
 

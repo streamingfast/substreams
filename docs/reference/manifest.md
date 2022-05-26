@@ -123,7 +123,7 @@ The type of `module`. There are two types of modules:
 * `map`
 * `store`
 
-Learn [more about modules here](../concepts/)
+Learn [more about modules here](broken-reference)
 
 ### `modules[].updatePolicy`
 

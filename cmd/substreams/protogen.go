@@ -65,7 +65,6 @@ plugins:
   - name: prost
     out: ` + outputPath + `
     opt:
-      - bytes=.
 `
 		fmt.Println(`Writing to temporary 'buf.gen.yaml':
 ---

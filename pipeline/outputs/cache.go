@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/streamingfast/derr"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -182,7 +185,13 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
 	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 
-	objectReader, err := c.Store.OpenObject(ctx, filename)
+	var objectReader io.ReadCloser
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		var e error
+		objectReader, e = c.Store.OpenObject(ctx, filename)
+		return e
+	})
+
 	if err != nil {
 		return fmt.Errorf("loading block reader %s: %w", filename, err)
 	}
@@ -205,10 +214,13 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 		return fmt.Errorf("json encoding outputs: %w", err)
 	}
 
-	err = c.Store.WriteObject(ctx, filename, buffer)
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		return c.Store.WriteObject(ctx, filename, buffer)
+	})
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)
 	}
+
 	zlog.Debug("cache saved", zap.String("module_name", c.ModuleName), zap.String("file_name", filename), zap.String("url", c.Store.BaseURL().String()))
 	return nil
 }
@@ -218,7 +230,12 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 
 	paddedBlock := pad(prefixStartBlock)
 
-	files, err := store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
+	var files []string
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		var e error
+		files, e = store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
+		return e
+	})
 	if err != nil {
 		return nil, false, fmt.Errorf("walking prefix for padded block %s: %w", paddedBlock, err)
 	}

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/streamingfast/derr"
+
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
@@ -23,7 +25,9 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 		return fmt.Errorf("marshaling state info: %w", err)
 	}
 
-	err = store.WriteObject(ctx, InfoFileName(), bytes.NewReader(data))
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		return store.WriteObject(ctx, InfoFileName(), bytes.NewReader(data))
+	})
 	if err != nil {
 		return fmt.Errorf("writing file %s: %w", InfoFileName(), err)
 	}
@@ -32,7 +36,12 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 }
 
 func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
-	rc, err := store.OpenObject(ctx, InfoFileName())
+	var rc io.ReadCloser
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		var e error
+		rc, e = store.OpenObject(ctx, InfoFileName())
+		return e
+	})
 	if err != nil {
 		if err == dstore.ErrNotFound {
 			return &Info{}, nil

@@ -8,6 +8,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -185,7 +186,13 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
 	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
 
-	r, err := b.Store.OpenObject(ctx, stateFileName)
+	var r io.ReadCloser
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		var e error
+		r, e = b.Store.OpenObject(ctx, stateFileName)
+		return e
+	})
+
 	if err != nil {
 		return fmt.Errorf("opening file state file %s: %w", stateFileName, err)
 	}

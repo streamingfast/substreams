@@ -74,28 +74,16 @@ func (c *ModulesOutputCache) RegisterModule(ctx context.Context, module *pbsubst
 
 func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockRef) error {
 	for _, moduleCache := range c.OutputCaches {
-		if !moduleCache.CurrentBlockRange.Contains(blockRef) {
+		if moduleCache.IsOutOfRange(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 			//this is a complete range
-			filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
-			if err := moduleCache.save(ctx, filename); err != nil {
+			previousFilename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+			if err := moduleCache.save(ctx, previousFilename); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
 
-			partialFilename := filename + ".partial"
-			partialExist, err := moduleCache.Store.FileExists(ctx, partialFilename)
-			if err != nil {
-				return fmt.Errorf("check if parital file exist %q: %w", partialFilename, err)
-			}
-			if partialExist {
-				err := moduleCache.Store.DeleteObject(ctx, partialFilename)
-				if err != nil {
-					return fmt.Errorf("deleting partial file %q", partialFilename)
-				}
-			}
-
 			if err := moduleCache.Load(ctx, moduleCache.CurrentBlockRange.ExclusiveEndBlock); err != nil {
-				return fmt.Errorf("loading blocks for module kv %s: %w", moduleCache.ModuleName, err)
+				return fmt.Errorf("loading blocks %d for module kv %s: %w", moduleCache.CurrentBlockRange.ExclusiveEndBlock, moduleCache.ModuleName, err)
 			}
 		}
 	}
@@ -131,6 +119,10 @@ func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 		return out[i].BlockNum < out[j].BlockNum
 	})
 	return
+}
+
+func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
+	return !c.CurrentBlockRange.Contains(ref)
 }
 
 func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
@@ -279,8 +271,8 @@ func ComputeStartBlock(startBlock uint64, saveBlockInterval uint64) uint64 {
 }
 
 func getExclusiveEndBlock(filename string) (uint64, error) {
-	endBlock := strings.Split(filename, "-")[1]
-	parsedInt, err := strconv.ParseInt(strings.TrimPrefix(strings.Split(endBlock, ".")[0], "000"), 10, 64)
+	endBlock := strings.Split(strings.Split(filename, "-")[1], ".")[0]
+	parsedInt, err := strconv.ParseInt(strings.TrimLeft(endBlock, "0"), 10, 64)
 
 	if err != nil {
 		return 0, fmt.Errorf("parsing int %d: %w", parsedInt, err)

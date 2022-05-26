@@ -191,7 +191,7 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("retried: %w", err)
 	}
 
 	zlog.Debug("cache loaded", zap.String("cache_module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
@@ -225,10 +225,9 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 	paddedBlock := pad(prefixStartBlock)
 
 	var files []string
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		var e error
-		files, e = store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
-		return e
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
+		files, err = store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
+		return
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("walking prefix for padded block %s: %w", paddedBlock, err)

@@ -24,6 +24,12 @@ substreams pack ./substreams.yaml
 
 from a Substreams modules manifest.
 
+### Dependencies
+
+When `imports` is defined in a new `substreams.yaml`, it can load modules and protobuf definitions from other Substreams packages.
+
+When doing so, **local protobuf filenames will take precedence over the imported package's proto files**. Make sure, therefore, that you use different `.proto` filenames then the ones you import, to avoid conflicts.
+
 ### Where to find them
 
 There is currently no single point of reference for Substreams modules. See [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground) for now.

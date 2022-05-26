@@ -23,6 +23,7 @@ func init() {
 
 func runPack(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
+
 	pkg, err := manifest.New(manifestPath)
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
@@ -33,6 +34,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 	}
 
 	defaultFilename := fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version)
+
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
@@ -49,7 +51,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 version: v1
 plugins:
   - name: prost  # Generate for Rust, used by your modules, or Rust client code.
-    out: gen/src
+    out: src/pb
     opt:
       - bytes=.
       - compile_well_known_types

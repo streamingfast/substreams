@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -12,10 +13,15 @@ import (
 
 type Strategy interface {
 	GetNextRequest() (*pbsubstreams.Request, error)
+	RequestCount() int
 }
 
 type LinearStrategy struct {
 	requests []*pbsubstreams.Request
+}
+
+func (s *LinearStrategy) RequestCount() int {
+	return len(s.requests)
 }
 
 func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64, blockRangeSizeSubRequests int) (*LinearStrategy, error) {
@@ -64,7 +70,7 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 
 func (s *LinearStrategy) GetNextRequest() (*pbsubstreams.Request, error) {
 	if len(s.requests) == 0 {
-		return nil, fmt.Errorf("no requests to fetch")
+		return nil, io.EOF
 	}
 
 	var request *pbsubstreams.Request

@@ -64,6 +64,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
+	zlog.Info("squashing request range", zap.String("module", builder.Name), zap.Object("request_range", requestBlockRange))
 	blockRanges := requestBlockRange.Split(s.storeSaveInterval)
 
 	for _, br := range blockRanges {

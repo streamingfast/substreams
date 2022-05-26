@@ -164,7 +164,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		fileName := FullStateFileName(&block.Range{
 			StartBlock:        b.ModuleStartBlock,
 			ExclusiveEndBlock: b.BlockRange.ExclusiveEndBlock,
-		})
+		}, b.ModuleStartBlock)
 
 		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
 		err := b.loadState(ctx, fileName)
@@ -271,7 +271,7 @@ func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock u
 }
 
 func (b *Builder) WriteState(ctx context.Context) (err error) {
-	zlog.Debug("writing state", zap.String("module", b.Name))
+	zlog.Debug("writing state", zap.Object("builder", b))
 
 	err = b.writeMergeData()
 	if err != nil {
@@ -305,7 +305,7 @@ func (b *Builder) WriteState(ctx context.Context) (err error) {
 }
 
 func (b *Builder) writeState(ctx context.Context, content []byte) (string, error) {
-	filename := FullStateFileName(b.BlockRange)
+	filename := FullStateFileName(b.BlockRange, b.ModuleStartBlock)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
 		return filename, fmt.Errorf("writing state %s for range %s: %w", b.Name, b.BlockRange.String(), err)

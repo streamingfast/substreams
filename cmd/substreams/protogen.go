@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -52,18 +53,22 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	}
 
 	_, err = os.Stat("buf.gen.yaml")
-	bufFileFound := err != os.ErrNotExist
+	bufFileNotFound := errors.Is(err, os.ErrNotExist)
 
-	if !bufFileFound {
-		fmt.Println("Writing a temporary 'buf.gen.yaml'")
-		if err := ioutil.WriteFile("buf.gen.yaml", []byte(`
+	if bufFileNotFound {
+		content := `
 version: v1
 plugins:
   - name: prost
-    out: `+outputPath+`
+    out: ` + outputPath + `
     opt:
       - bytes=.
-`), 0644); err != nil {
+`
+		fmt.Println(`Writing to temporary 'buf.gen.yaml':
+---
+` + content + `
+---`)
+		if err := ioutil.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
 		}
 	}
@@ -77,7 +82,7 @@ plugins:
 		return fmt.Errorf("error executing 'buf':: %w", err)
 	}
 
-	if !bufFileFound {
+	if bufFileNotFound {
 		fmt.Println("Removing temporary 'buf.gen.yaml'")
 		if err := os.Remove("buf.gen.yaml"); err != nil {
 			fmt.Errorf("error delefing buf.gen.yaml: %w", err)

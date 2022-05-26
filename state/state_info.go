@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/derr"
 
 	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
 )
 
 type Info struct {
@@ -36,40 +35,30 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 }
 
 func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
-	var rc io.ReadCloser
-	notFound := false
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		var e error
-		rc, e = store.OpenObject(ctx, InfoFileName())
-		if e == dstore.ErrNotFound {
-			notFound = true
-			return nil
-		}
-		return e
-	})
-	if err != nil {
-		return nil, fmt.Errorf("opening object %s: %w", InfoFileName(), err)
-	}
-	if notFound {
-		return &Info{}, nil
-	}
-
-	defer func(rc io.ReadCloser) {
-		err := rc.Close()
-		if err != nil {
-			zlog.Error("closing object", zap.String("object_name", InfoFileName()), zap.Error(err))
-		}
-	}(rc)
-
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return nil, fmt.Errorf("reading data for %s: %w", InfoFileName(), err)
-	}
-
 	var info *Info
-	err = json.Unmarshal(data, &info)
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		rc, err := store.OpenObject(ctx, InfoFileName())
+		if err != nil {
+			if err == dstore.ErrNotFound {
+				return nil
+			}
+			return err
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			return fmt.Errorf("reading data for %s: %w", InfoFileName(), err)
+		}
+		info = &Info{}
+		err = json.Unmarshal(data, &info)
+		if err != nil {
+			return fmt.Errorf("unmarshaling state info data: %w", err)
+		}
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("unmarshaling state info data: %w", err)
+		return nil, err
 	}
 
 	return info, nil

@@ -604,8 +604,10 @@ func SynchronizeStores(ctx context.Context, grpcClientFactory func() (pbsubstrea
 	wg.Wait()
 
 	if scheduler.Err != nil {
+		zlog.Info("store sync completed with error", zap.Error(err))
 		return scheduler.Err
 	}
+	zlog.Info("store sync completed without error")
 
 	if err := squasher.Close(); err != nil {
 		return fmt.Errorf("closing squasher: %w", err)

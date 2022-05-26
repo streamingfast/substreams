@@ -391,11 +391,11 @@ func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 		var updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 		switch m.UpdatePolicy {
 		case UpdatePolicyReplace:
-			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SET
 		case UpdatePolicyIgnore:
-			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS
 		case UpdatePolicySum:
-			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD
 		case UpdatePolicyMax:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX
 		case UpdatePolicyMin:

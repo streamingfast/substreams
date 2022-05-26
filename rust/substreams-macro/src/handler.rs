@@ -96,22 +96,22 @@ pub fn main(_args: TokenStream, item: TokenStream, module_type: ModuleType) -> T
 }
 
 const WRITABLE_STORE: [&'static str; 14] = [
-    "UpdateWriter",
-    "ConditionalWriter",
-    "SumInt64Writer",
-    "SumFloat64Writer",
-    "SumBigFloatWriter",
-    "SumBigIntWriter",
-    "MaxInt64Writer",
-    "MaxBigIntWriter",
-    "MaxFloat64Writer",
-    "MaxBigFloatWriter",
-    "MinInt64Writer",
-    "MinBigIntWriter",
-    "MinFloat64Writer",
-    "MinBigFloatWriter"
+    "StoreSet",
+    "StoreSetIfNotExists",
+    "StoreAddInt64",
+    "StoreAddFloat64",
+    "StoreAddBigFloat",
+    "StoreAddBigInt",
+    "StoreMaxInt64",
+    "StoreMaxBigInt",
+    "StoreMaxFloat64",
+    "StoreMaxBigFloat",
+    "StoreMinInt64",
+    "StoreMinBigInt",
+    "StoreMinFloat64",
+    "StoreMinBigFloat"
 ];
-const READABLE_STORE: [&'static str; 1] = ["Reader"];
+const READABLE_STORE: [&'static str; 1] = ["StoreGet"];
 
 #[derive(Debug)]
 struct Input {

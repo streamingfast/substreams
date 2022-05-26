@@ -78,17 +78,17 @@ type mergeInfo struct {
 //	}
 //
 //	switch next.UpdatePolicy {
-//	case pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE:
+//	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET:
 //		for k, v := range previous.KV {
 //			if _, found := next.KV[k]; !found {
 //				next.KV[k] = v
 //			}
 //		}
-//	case pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE:
+//	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
 //		for k, v := range previous.KV {
 //			next.KV[k] = v
 //		}
-//	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM:
+//	case pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD:
 //		// check valueType to do the right thing
 //		switch next.ValueType {
 //		case OutputValueTypeInt64:
@@ -322,17 +322,17 @@ func (into *Builder) Merge(builder *Builder) error {
 	}
 
 	switch into.UpdatePolicy {
-	case pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET:
 		for k, v := range builder.KV {
 			into.KV[k] = v
 		}
-	case pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
 		for k, v := range builder.KV {
 			if _, found := into.KV[k]; !found {
 				into.KV[k] = v
 			}
 		}
-	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM:
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD:
 		// check valueType to do the right thing
 		switch into.ValueType {
 		case OutputValueTypeInt64:

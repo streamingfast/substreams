@@ -3,13 +3,13 @@ package manifest
 import (
 	"crypto/sha256"
 	"fmt"
+	"golang.org/x/mod/semver"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 )
 

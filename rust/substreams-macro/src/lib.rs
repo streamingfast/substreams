@@ -56,7 +56,7 @@ pub fn map(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// #[no_mangle]
-/// pub extern "C" fn build_nft_state(transfers_ptr: *mut u8,transfers_len: usize,pairs_idx: u32,tokens_idx: u32,) {
+/// pub extern "C" fn build_nft_state(transfers_ptr: *mut u8,transfers_len: usize,pairs_idx: u32,tokens_idx: u32) {
 ///    substreams::register_panic_hook();
 ///    let transfers: erc721::Transfers = substreams::proto::decode_ptr(transfers_ptr, transfers_len).unwrap();
 ///    let pairs: store::Reader = store::Reader::new(pairs_idx);

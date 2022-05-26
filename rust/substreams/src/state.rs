@@ -89,10 +89,10 @@ pub fn delete_prefix(ord: i64, prefix: &String){
         )
     }
 }
-pub fn sum_bigint(ord: i64, key: String, value: &BigInt) {
+pub fn add_bigint(ord: i64, key: String, value: &BigInt) {
     let data = value.to_string();
     unsafe {
-        externs::state::sum_bigint(
+        externs::state::add_bigint(
             ord,
             key.as_ptr(),
             key.len() as u32,
@@ -101,9 +101,9 @@ pub fn sum_bigint(ord: i64, key: String, value: &BigInt) {
         )
     }
 }
-pub fn sum_int64(ord: i64, key: String, value: i64) {
+pub fn add_int64(ord: i64, key: String, value: i64) {
     unsafe {
-        externs::state::sum_int64(
+        externs::state::add_int64(
             ord,
             key.as_ptr(),
             key.len() as u32,
@@ -111,9 +111,9 @@ pub fn sum_int64(ord: i64, key: String, value: i64) {
         )
     }
 }
-pub fn sum_float64(ord: i64, key: String, value: f64) {
+pub fn add_float64(ord: i64, key: String, value: f64) {
     unsafe {
-        externs::state::sum_float64(
+        externs::state::add_float64(
             ord,
             key.as_ptr(),
             key.len() as u32,
@@ -121,10 +121,10 @@ pub fn sum_float64(ord: i64, key: String, value: f64) {
         )
     }
 }
-pub fn sum_bigfloat(ord: i64, key: String, value: &BigDecimal) {
+pub fn add_bigfloat(ord: i64, key: String, value: &BigDecimal) {
     let data = value.to_string();
     unsafe {
-        externs::state::sum_bigfloat(
+        externs::state::add_bigfloat(
             ord,
             key.as_ptr(),
             key.len() as u32,

@@ -63,11 +63,11 @@ pub mod module {
         pub enum UpdatePolicy {
             Unset = 0,
             /// Provides a store where you can `set()` keys, and the latest key wins
-            Replace = 1,
+            Set = 1,
             /// Provides a store where you can `set_if_not_exists()` keys, and the first key wins
-            Ignore = 2,
-            /// Provides a store where you can `sum_*()` keys, where two stores merge by summing its values.
-            Sum = 3,
+            SetIfNotExists = 2,
+            /// Provides a store where you can `add_*()` keys, where two stores merge by summing its values.
+            Add = 3,
             /// Provides a store where you can `min_*()` keys, where two stores merge by leaving the minimum value.
             Min = 4,
             /// Provides a store where you can `max_*()` keys, where two stores merge by leaving the maximum value.

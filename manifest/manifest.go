@@ -204,24 +204,24 @@ func validateStoreBuilder(module *Module) error {
 	}
 
 	combinations := []string{
-		"max:bigint",     // Exposes SetMaxBigInt
-		"max:int64",      // Exposes SetMaxInt64
-		"max:bigfloat",   // Exposes SetMaxBigFloat
-		"max:float64",    // Exposes SetMaxFloat64
-		"min:bigint",     // Exposes SetMinBigInt
-		"min:int64",      // Exposes SetMinInt64
-		"min:bigfloat",   // Exposes SetMinBigFloat
-		"min:float64",    // Exposes SetMinFloat64
-		"add:bigint",     // Exposes SumBigInt
-		"add:int64",      // Exposes SumInt64
-		"add:bigfloat",   // Exposes SumBigFloat
-		"add:float64",    // Exposes SubFloat64
-		"set:bytes",  // Exposes SetBytes
-		"set:string", // Exposes SetString
-		"set:proto",  // Exposes SetBytes
-		"set_if_not_exists:bytes",   // Exposes SetBytesIfNotExists
-		"set_if_not_exists:string",  // Exposes SetStringIfNotExists
-		"set_if_not_exists:proto",   // Exposes SetBytesIfNotExists
+		"max:bigint",               // Exposes SetMaxBigInt
+		"max:int64",                // Exposes SetMaxInt64
+		"max:bigfloat",             // Exposes SetMaxBigFloat
+		"max:float64",              // Exposes SetMaxFloat64
+		"min:bigint",               // Exposes SetMinBigInt
+		"min:int64",                // Exposes SetMinInt64
+		"min:bigfloat",             // Exposes SetMinBigFloat
+		"min:float64",              // Exposes SetMinFloat64
+		"add:bigint",               // Exposes SumBigInt
+		"add:int64",                // Exposes SumInt64
+		"add:bigfloat",             // Exposes SumBigFloat
+		"add:float64",              // Exposes SubFloat64
+		"set:bytes",                // Exposes SetBytes
+		"set:string",               // Exposes SetString
+		"set:proto",                // Exposes SetBytes
+		"set_if_not_exists:bytes",  // Exposes SetBytesIfNotExists
+		"set_if_not_exists:string", // Exposes SetStringIfNotExists
+		"set_if_not_exists:proto",  // Exposes SetBytesIfNotExists
 	}
 	found := false
 	var lastCombination string
@@ -372,11 +372,11 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 }
 
 const (
-	UpdatePolicySet = "replace"
-	UpdatePolicySetIfNotExists  = "ignore"
-	UpdatePolicyAdd     = "sum"
-	UpdatePolicyMax     = "max"
-	UpdatePolicyMin     = "min"
+	UpdatePolicySet            = "set"
+	UpdatePolicySetIfNotExists = "set_if_not_exists"
+	UpdatePolicyAdd            = "add"
+	UpdatePolicyMax            = "max"
+	UpdatePolicyMin            = "min"
 )
 
 func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {

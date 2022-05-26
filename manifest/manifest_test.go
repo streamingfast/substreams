@@ -48,7 +48,7 @@ output:
 			rawYamlInput: `---
 name: prices
 kind: store
-updatePolicy: sum
+updatePolicy: add
 valueType: bigint
 code:
   file: ./pricesState.wasm
@@ -59,7 +59,7 @@ inputs:
 			expectedOutput: Module{
 				Name:         "prices",
 				Kind:         "store",
-				UpdatePolicy: "sum",
+				UpdatePolicy: "add",
 				ValueType:    "bigint",
 
 				Code:   Code{File: "./pricesState.wasm"},

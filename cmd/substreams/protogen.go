@@ -13,9 +13,9 @@ import (
 )
 
 var protogenCmd = &cobra.Command{
-	Use:          "protogen <manifest_yaml> [manifest_spkg]",
+	Use:          "protogen <manifest_yaml>",
 	RunE:         runProtogen,
-	Args:         cobra.RangeArgs(1, 2),
+	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 }
 

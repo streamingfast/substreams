@@ -12,7 +12,7 @@ It enables you to write Rust modules, composing data streams alongside the commu
 
 It has all the benefits of the Firehose, like low cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
-Substreams is the successor of https://github.com/streamingfast/sparkle, enabling greater composability, yet similar powers of parallelization, and a much simpler model to work with.
+Substreams is the successor of [https://github.com/streamingfast/sparkle](https://github.com/streamingfast/sparkle), enabling greater composability, yet similar powers of parallelization, and a much simpler model to work with.
 
 ## Documentation
 

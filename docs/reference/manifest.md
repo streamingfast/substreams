@@ -27,13 +27,28 @@ package:
     This is more detailed docs for this package.
 ```
 
-The `package.name` field is used to identify your package, and is used to infer the filename when you `substreams pack your.yaml` package.
+### `package.name`
 
-The `package.version` field must respect [Semantic Versioning version 2.0](https://semver.org/)
+This field is used to identify your package, and is used to infer the filename when you `substreams pack substreams.yaml`  your package.
 
-The `package.url` field helps your users discover the source of the package.
+* `name` must match this regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`, meaning:
+* 64 characters maximum
+* Separate words with `_`
+* Starts with `a-z` or `A-Z`and can contain numbers thereafter
 
-The `package.doc` is the doc string, used to render documentation here and there.
+### `package.version`
+
+This field identifies the package revision. It must respect [Semantic Versioning version 2.0](https://semver.org/)
+
+### `package.url`
+
+This field helps your users discover the source of the package.
+
+### `package.doc`
+
+This field holds the documentation string of the package.
+
+The first line is a short description. Longer documentation follows a blank line.
 
 ## `imports`
 
@@ -68,6 +83,9 @@ protobuf:
 ```
 
 The `protobuf` section points to the protobuf definitions used by these modules.
+
+The Substreams packager will load files in any of the listed `importPaths`.\
+Note that the `imports` section will also affect which `.proto` files end up in your package.
 
 They are packaged with the modules to help clients decode the bytestreams, but are not sent to Substreams server in any way.
 
@@ -106,9 +124,9 @@ Examples:
 
 ### `modules[].name`
 
-The identifier for the module, starting with a letter, followed by max 64 characters of `[a-zA-Z0-9_]`.
+The identifier for the module, starting with a letter, followed by max 64 characters of `[a-zA-Z0-9_]`. These are the same rules as for `package.name`.
 
-It is an internal reference
+It is the reference identify used on the command line, in inputs and elsewhere to denote this module. It is must be unique per package. Imports get prefixed so imported modules will not clash with the current YAML declaration, even though they share a name.
 
 ### `modules[].startBlock`
 
@@ -133,9 +151,9 @@ Specifies the merge strategy for two contiguous partial stores produced by paral
 
 Possible values:
 
-* `replace` (last key wins merge strategy)
-* `ignore` (first key wins)
-* `sum` (sum the two keys)
+* `set` (last key wins merge strategy)
+* `set_if_not_exists` (first key wins merge strategy)
+* `add` (sum the two keys)
 * `min` (min between two keys)
 * `max` (you get it)
 

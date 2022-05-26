@@ -1,11 +1,15 @@
 # Rust Modules API
 
-the `substreams` rust library provides the following APIs:
+The `substreams` Rust crate provides the following APIs:
 
 * a `store` API to save data in specific type of stored
-* a `log` API to log messages in your substreams
+* a `log` API to log debug messages
 * a `hex` API to manipulate and print hex types
-* a `rpc` API to perform ETH rpc calls
+* ~~a `rpc` API to perform ETH rpc calls~~
+
+## Documentation
+
+See the [official crate documentation](https://docs.rs/substreams).&#x20;
 
 ## Store API
 

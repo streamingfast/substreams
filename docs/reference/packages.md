@@ -6,7 +6,7 @@
 
 ### Definition
 
-Packages are single files containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code and modules tree specifications. They allow you to start streaming right away!
+A Substreams _package_ is a **single file** containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code and modules tree specifications. They allow you to start streaming right away!
 
 Their conventional extension is `.spkg`.
 

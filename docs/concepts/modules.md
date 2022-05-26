@@ -4,9 +4,9 @@ Modules are small pieces of code, running in a WebAssembly virtual machine, amid
 
 The top-level source of a module tree will be blockchain data, in the form of Firehose Blocks for each supported blockchain protocol. See the [Firehose documentation](http://firehose.streamingfast.io/) for more details.
 
-Modules may one or more inputs (from multiple modules, be them `map`s or `store`s, and/or from the blockchain's data in the form of a _Block_).
+Modules may have one or more inputs (from multiple modules, be them `map`s or `store`s, and/or from the blockchain's data in the form of a _Block_).
 
-> Multiple inputs are made possible because a blockchains have a clock, and allows synchronization between multiple execution streams, opening up great performance improvements even over your comparable traditional streaming engine.
+> Multiple inputs are made possible because blockchains have a clock, and allows synchronization between multiple execution streams, opening up great performance improvements even over your comparable traditional streaming engine.
 
 Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes coming out.
 

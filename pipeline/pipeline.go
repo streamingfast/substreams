@@ -598,6 +598,7 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 			w := jobWorker
 			j := job
 			err := w.Run(ctx, j, respFunc)
+			workerPool.ReturnWorker(w)
 			if err != nil {
 				result <- err
 			}

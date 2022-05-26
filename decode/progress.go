@@ -1,6 +1,9 @@
 package decode
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 type ModuleName string
 
@@ -35,7 +38,8 @@ func (bar *Bar) Play(cur uint64, moduleName string) {
 	if bar.percent != last && bar.percent%2 == 0 {
 		bar.rate += bar.graph
 	}
-	fmt.Printf("\r%s [%-50s]%3d%% %8d/%d", moduleName, bar.rate, bar.percent, bar.cur, bar.Total)
+	padding := int(math.Floor(float64(bar.Total/2))) + 1 // fixme: is this good ?
+	fmt.Printf("\r%s [%-*s]%3d%% %8d/%d", moduleName, padding, bar.rate, bar.percent, bar.cur, bar.Total)
 }
 
 func (bar *Bar) Finish() {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"sort"
 	"strconv"
@@ -185,20 +184,22 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
 	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 
-	var objectReader io.ReadCloser
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		var e error
-		objectReader, e = c.Store.OpenObject(ctx, filename)
-		return e
+		objectReader, err := c.Store.OpenObject(ctx, filename)
+		if err != nil {
+			return fmt.Errorf("loading block reader %s: %w", filename, err)
+		}
+
+		var localOut outputKV
+		if err = json.NewDecoder(objectReader).Decode(&localOut); err != nil {
+			return fmt.Errorf("json decoding file %s: %w", filename, err)
+		}
+
+		c.kv = localOut
+		return nil
 	})
-
 	if err != nil {
-		return fmt.Errorf("loading block reader %s: %w", filename, err)
-	}
-
-	err = json.NewDecoder(objectReader).Decode(&c.kv)
-	if err != nil {
-		return fmt.Errorf("json decoding file %s: %w", filename, err)
+		return err
 	}
 
 	zlog.Debug("cache loaded", zap.String("cache_module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
@@ -215,7 +216,8 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 	}
 
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		return c.Store.WriteObject(ctx, filename, buffer)
+		reader := bytes.NewReader(buffer.Bytes())
+		return c.Store.WriteObject(ctx, filename, reader)
 	})
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)

@@ -37,16 +37,21 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 
 func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
 	var rc io.ReadCloser
+	notFound := false
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		var e error
 		rc, e = store.OpenObject(ctx, InfoFileName())
+		if e == dstore.ErrNotFound {
+			notFound = true
+			return nil
+		}
 		return e
 	})
 	if err != nil {
-		if err == dstore.ErrNotFound {
-			return &Info{}, nil
-		}
 		return nil, fmt.Errorf("opening object %s: %w", InfoFileName(), err)
+	}
+	if notFound {
+		return &Info{}, nil
 	}
 
 	defer func(rc io.ReadCloser) {

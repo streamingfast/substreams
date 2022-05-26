@@ -167,8 +167,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 				if bar, ok := moduleProgressBar.Bars[ModuleName(moduleProgress.Name)]; ok {
 					if !bar.Initialized {
 						fmt.Printf("Running multiple parallel requests for %s to catch up...\n", moduleProgress.Name)
-						bar.Initialized = true
-						bar.NewOption(0, moduleProgress.RequestBlockRange.EndBlock-moduleProgress.RequestBlockRange.StartBlock)
+						bar.NewOption(0, moduleProgress.RequestBlockRange.StartBlock, moduleProgress.RequestBlockRange.EndBlock)
 					}
 
 					if bar.cur == bar.Total {

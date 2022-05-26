@@ -43,23 +43,20 @@ func NewPool(workerCount int, grpcClientFactory func() (pbsubstreams.StreamClien
 	}
 }
 
-func (p *Pool) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) error {
-	start := time.Now()
-	zlog.Info("waiting worker", zap.Object("job", job))
+func (p *Pool) Borrow() *Worker {
 	w := <-p.workers
-	zlog.Info("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
-	defer func() {
-		p.workers <- w
-	}()
+	return w
+}
 
-	return w.run(ctx, job, respFunc)
+func (p *Pool) ReturnWorker(worker *Worker) {
+	p.workers <- worker
 }
 
 type Worker struct {
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
-func (w *Worker) run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) error {
+func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) error {
 	start := time.Now()
 	zlog.Info("running job", zap.Object("job", job))
 	defer func() {

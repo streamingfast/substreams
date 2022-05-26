@@ -585,20 +585,28 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 			return err
 		}
 
-		go func(req *pbsubstreams.Request) {
-			j := &worker.Job{
-				Request: req,
-			}
-			err = workerPool.Run(ctx, j, respFunc)
+		job := &worker.Job{
+			Request: req,
+		}
+
+		start := time.Now()
+		zlog.Info("waiting worker", zap.Object("job", job))
+		jobWorker := workerPool.Borrow()
+		zlog.Info("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+
+		go func() {
+			w := jobWorker
+			j := job
+			err := w.Run(ctx, j, respFunc)
 			if err != nil {
 				result <- err
 			}
-			err = scheduler.Callback(ctx, req) //this is a bit ugly. the error will be store in the scheduler
+			err = scheduler.Callback(ctx, req)
 			if err != nil {
 				result <- fmt.Errorf("calling back scheduler: %w", err)
 			}
 			result <- nil
-		}(req)
+		}()
 	}
 
 	resultCount := 0

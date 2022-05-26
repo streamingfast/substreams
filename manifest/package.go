@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"golang.org/x/mod/semver"
 	"io/ioutil"
@@ -10,6 +9,8 @@ import (
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
+	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -315,17 +316,13 @@ func mergeProtoFiles(src, dest *pbsubstreams.Package) {
 	seenFiles := map[string]bool{}
 
 	for _, file := range dest.ProtoFiles {
-		cnt, _ := proto.Marshal(file)
-		key := fmt.Sprintf("%x", sha256.Sum256(cnt))
-		//fmt.Println("in DEST Seen", key, *file.Name)
-		seenFiles[key] = true
+		seenFiles[*file.Name] = true
 	}
 
 	for _, file := range src.ProtoFiles {
-		cnt, _ := proto.Marshal(file)
-		key := fmt.Sprintf("%x", sha256.Sum256(cnt))
-		//fmt.Println("Seen in SRC", key, *file.Name)
+		key := *file.Name
 		if seenFiles[key] {
+			zlog.Debug("skipping protofile alread seen", zap.String("proto_file", *file.Name))
 			continue
 		}
 		seenFiles[key] = true

@@ -8,6 +8,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -185,23 +186,28 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
 	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
 
-	r, err := b.Store.OpenObject(ctx, stateFileName)
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		r, err := b.Store.OpenObject(ctx, stateFileName)
+		if err != nil {
+			return fmt.Errorf("openning file: %w", err)
+		}
+		data, err := io.ReadAll(r)
+		if err != nil {
+			return fmt.Errorf("reading data: %w", err)
+		}
+		defer r.Close()
+
+		kv := map[string]string{}
+		if err = json.Unmarshal(data, &kv); err != nil {
+			return fmt.Errorf("json unmarshal of state file %s data: %w", stateFileName, err)
+		}
+		b.KV = byteMap(kv)
+		return nil
+	})
+
 	if err != nil {
 		return fmt.Errorf("opening file state file %s: %w", stateFileName, err)
 	}
-
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return fmt.Errorf("reading data: %w", err)
-	}
-	defer r.Close()
-
-	kv := map[string]string{}
-	if err = json.Unmarshal(data, &kv); err != nil {
-		return fmt.Errorf("json unmarshal of state file %s data: %w", stateFileName, err)
-	}
-
-	b.KV = byteMap(kv)
 
 	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.String("file_name", stateFileName))
 	return nil

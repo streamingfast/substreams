@@ -153,10 +153,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			ctx,
 			workerPool,
 			p.request, stores,
-			p.moduleOutputCache.OutputCaches,
-			p.requestedStartBlockNum,
-			respFunc,
-			p.blockRangeSizeSubrequests,
+			p.graph, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.blockRangeSizeSubrequests,
 			p.storesSaveInterval,
 		)
 		if err != nil {
@@ -556,27 +553,37 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalRequest *pbsubstreams.Request, builders []*state.Builder, outputCache map[string]*outputs.OutputCache, upToBlockNum uint64, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int, storeSaveInterval uint64) error {
-	ctx, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
+func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalRequest *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph,
+	outputCache map[string]*outputs.OutputCache,
+	upToBlockNum uint64,
+	respFunc substreams.ResponseFunc,
+
+	blockRangeSizeSubRequests int,
+	storeSaveInterval uint64) error {
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	zlog.Info("synchronizing stores")
-	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval)
+
+	pool := orchestrator.NewPool()
+
+	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, orchestrator.WithNotifier(pool))
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	linearStrategy, err := orchestrator.NewLinearStrategy(ctx, originalRequest, builders, upToBlockNum, blockRangeSizeSubRequests)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, pool, upToBlockNum, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(linearStrategy, squasher, blockRangeSizeSubRequests)
+	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
 
-	requestCount := scheduler.RequestCount()
+	requestCount := strategy.RequestCount()
 	result := make(chan error)
 	for {
 		req, err := scheduler.Next()

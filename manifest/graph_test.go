@@ -25,7 +25,7 @@ var testModules = []*pbsubstreams.Module{
 		Kind:       &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 		Inputs: []*pbsubstreams.Module_Input{
 			{
-				Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+				Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
 					ModuleName: "A",
 				}},
 			},
@@ -60,7 +60,7 @@ var testModules = []*pbsubstreams.Module{
 		Kind:       &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 		Inputs: []*pbsubstreams.Module_Input{
 			{
-				Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+				Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
 					ModuleName: "C",
 				}},
 			},
@@ -82,7 +82,7 @@ var testModules = []*pbsubstreams.Module{
 		Kind: &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 		Inputs: []*pbsubstreams.Module_Input{
 			{
-				Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+				Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
 					ModuleName: "D",
 				}},
 			},
@@ -160,6 +160,16 @@ func TestModuleGraph_AncestorStoresOf(t *testing.T) {
 	sort.Strings(res)
 
 	assert.Equal(t, []string{"B", "E"}, res)
+}
+
+func TestModuleGraph_GroupedAncestorStoresOf(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	groupedAncestors, err := g.GroupedAncestorStores("G")
+	require.Nil(t, err)
+
+	require.Len(t, groupedAncestors, 2)
 }
 
 func TestModuleGraph_ModulesDownTo(t *testing.T) {

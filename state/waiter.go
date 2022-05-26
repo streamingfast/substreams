@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/derr"
+
 	"github.com/streamingfast/dstore"
 
 	"github.com/abourget/llerrgroup"
@@ -136,7 +138,12 @@ func (w *FileWaiter) wait(ctx context.Context, requestStartBlock uint64, moduleS
 			}
 
 			prefix := FullStateFilePrefix(waitForBlockNum)
-			files, err := store.ListFiles(ctx, prefix, "", 1)
+			var files []string
+			err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+				var e error
+				files, e = store.ListFiles(ctx, prefix, "", 1)
+				return e
+			})
 			if err != nil {
 				done <- &fileWaitResult{fmt.Errorf("listing file with prefix %s, : %w", prefix, err)}
 				return
@@ -183,7 +190,13 @@ func pathToState(ctx context.Context, storeName string, store dstore.Store, requ
 		}
 
 		prefix := FullStateFilePrefix(nextBlockNum)
-		files, err := store.ListFiles(ctx, prefix, "", 2)
+		var files []string
+		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+			var e error
+			files, e = store.ListFiles(ctx, prefix, "", 2)
+			return e
+
+		})
 		if err != nil {
 			return nil, fmt.Errorf("listing file with prefix %s, : %w", prefix, err)
 		}

@@ -3,27 +3,25 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"io"
 
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-var zlog, _ = logging.PackageLogger("scheduler", "github.com/streamingfast/substreams/scheduler")
-
 type Scheduler struct {
 	blockRangeSizeSubRequests int
 
-	squasher *Squasher
-	strategy Strategy
-	requests []*pbsubstreams.Request
+	squasher       *Squasher
+	requestsStream <-chan *pbsubstreams.Request
+	requests       []*pbsubstreams.Request
 }
 
-func NewScheduler(strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
-		strategy:                  strategy,
+		requestsStream:            GetRequestStream(ctx, strategy),
 		requests:                  []*pbsubstreams.Request{},
 	}
 
@@ -31,7 +29,12 @@ func NewScheduler(strategy Strategy, squasher *Squasher, blockRangeSizeSubReques
 }
 
 func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
-	return s.strategy.GetNextRequest()
+	request, alive := <-s.requestsStream
+	if !alive {
+		return nil, io.EOF
+	}
+
+	return request, nil
 }
 
 func (s *Scheduler) Callback(ctx context.Context, r *pbsubstreams.Request) error {
@@ -46,8 +49,4 @@ func (s *Scheduler) Callback(ctx context.Context, r *pbsubstreams.Request) error
 		}
 	}
 	return nil
-}
-
-func (s *Scheduler) RequestCount() int {
-	return s.strategy.RequestCount()
 }

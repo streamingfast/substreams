@@ -77,7 +77,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 		if moduleCache.IsOutOfRange(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 			//this is a complete range
-			previousFilename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+			previousFilename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
 			if err := moduleCache.save(ctx, previousFilename); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
@@ -95,7 +95,7 @@ func (c *ModulesOutputCache) Save(ctx context.Context) error {
 	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
 
-		filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+		filename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
 		if err := moduleCache.save(ctx, filename); err != nil {
 			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
 		}
@@ -173,7 +173,7 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 		return nil
 	}
 
-	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
+	filename := computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
 	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -257,12 +257,12 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 	}, true, nil
 }
 
-func computeDBinFilename(startBlock, stopBlock string) string {
-	return fmt.Sprintf("%s-%s.output", startBlock, stopBlock)
+func computeDBinFilename(startBlock, stopBlock uint64) string {
+	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
 }
 
 func pad(blockNumber uint64) string {
-	return fmt.Sprintf("000%d", blockNumber)
+	return fmt.Sprintf("%010d", blockNumber)
 }
 
 func ComputeStartBlock(startBlock uint64, saveBlockInterval uint64) uint64 {

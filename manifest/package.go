@@ -321,7 +321,7 @@ func mergeProtoFiles(src, dest *pbsubstreams.Package) {
 	for _, file := range src.ProtoFiles {
 		key := *file.Name
 		if seenFiles[key] {
-			zlog.Debug("skipping protofile alread seen", zap.String("proto_file", *file.Name))
+			zlog.Debug("skipping protofile already seen", zap.String("proto_file", *file.Name))
 			continue
 		}
 		seenFiles[key] = true

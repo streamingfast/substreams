@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -16,6 +17,7 @@ import (
 type Squasher struct {
 	squashables       map[string]*Squashable
 	storeSaveInterval uint64
+	lock              sync.Mutex
 }
 
 func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64) (*Squasher, error) {
@@ -52,6 +54,9 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 }
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		panic(fmt.Sprintf("invalid module %q", moduleName))
@@ -59,9 +64,6 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
-	//todo: add config here
-	//10_000
-	//100FILES OF 100BLOCK
 	blockRanges := requestBlockRange.Split(s.storeSaveInterval)
 
 	for _, br := range blockRanges {
@@ -114,7 +116,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		}
 
 		squashableRange := squashable.ranges[0]
-		zlog.Debug("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
+		zlog.Info("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
 
 		if squashable.builder.BlockRange.IsNext(squashableRange, squashable.builder.SaveInterval) {
 			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()))

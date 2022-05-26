@@ -1,1 +1,0 @@
-# substreams-rust

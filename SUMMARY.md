@@ -1,13 +1,29 @@
 # Table of contents
 
 * [Substreams](README.md)
-* [Substreams Documentation](docs/README.md)
-  * [API Reference](docs/api-reference.md)
-  * [Substreams Concepts](docs/concepts.md)
-  * [Consuming Substreams](docs/consuming.md)
-  * [The Substreams manifest YAML file](docs/manifest.md)
-  * [Substreams Packages](docs/packages.md)
-  * [Running the Substreams service locally](docs/running-locally.md)
-  * [Change log](docs/changelog.md)
-* [rust](rust/README.md)
-  * [substreams-rust](rust/substreams/README.md)
+
+## Concept & Fundamentals
+
+* [Definition](docs/concepts/definition.md)
+* [Comparison](docs/concepts/comparison.md)
+* [Modules](docs/concepts/modules.md)
+
+## Getting Started Guide
+
+* [Substream](docs/getting-started-guide/README.md)
+* [Requirements](docs/getting-started-guide/requirements.md)
+* [Creating Protobuf schemas](docs/getting-started-guide/creating-protobuf-schemas.md)
+* [Creating your Manifest](docs/getting-started-guide/creating-your-manifest.md)
+* [Consuming Substreams](docs/consuming.md)
+
+## Reference & Specs
+
+* [Substreams Manifest](docs/reference/manifest.md)
+* [Rust Modules API](docs/reference/api-reference.md)
+* [Substreams Packages](docs/reference/packages.md)
+* [Advanced](docs/advanced/README.md)
+  * [Running the Substreams service locally](docs/advanced/running-locally.md)
+
+## Release notes
+
+* [Change log](changelog.md)

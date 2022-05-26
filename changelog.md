@@ -6,29 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## \[Unreleased]
 
-*   Added `substreams::handler` macro to reduce boilerplate when create substream modules.
+*   Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
 
-    `substreams::handler` macro needs to be specified above the module function. The Type of module must be defined, in the macro attributes. The macro currently supports type `map` & `store`. Furthermore,the macro will validate the function bases on the type your specified. For example a module of type `map` should return a `Result` where the error is of type `SubstreamError`. A module of type `store` should have no return value.
+    `substreams::handlers::map` is used for the handlers corresponding to modules of type `map`. Modules of type `map` should return a `Result` where the error is of type `SubstreamError`
 
     ```rust
     /// Map module example
-    #[substreams::handler(type = "map")]
+    #[substreams::handlers::map
     fn map_module_func(blk: eth::Block) -> Result<erc721::Transfers, SubstreamError> {
          ...
     }
     ```
 
+    `substreams::handlers::store` is used for the handlers corresponding to modules of type `store`. Modules of type `store` should have no return value.
+
     ```rust
     /// Map module example
-    #[substreams::handler(type = "store")]
-    fn store_module func(transfers: erc721::Transfers) {
+    #[substreams::handlers::store
+    fn store_module func(transfers: erc721::Transfers, s: store::SumInt64Writer, pairs: store::Reader, tokens: store::Reader) {
           ...
     }
     ```
 
 ## \[v0.0.6-beta]
 
-* Implemented [packages (see docs)](packages.md).
+* Implemented [packages (see docs)](docs/reference/packages.md).
 * Added `substreams::Hex` wrapper type to more easily deal with printing and encoding bytes to hexadecimal string.
 * Added `substreams::log::info!(...)` and `substreams::log::debug!(...)` supporting formatting arguments (acts like `println!()` macro).
 * Added new field `logs_truncated` that can be used to determined if logs were truncated.

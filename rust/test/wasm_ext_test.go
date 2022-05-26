@@ -16,15 +16,18 @@ import (
 
 func TestExtensionCalls(t *testing.T) {
 	cases := []struct {
+		wasmFile     string
 		functionName string
 		expectError  error
 		expectLogs   []string
 	}{
 		{
+			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_wasm_extension_hello",
 			expectLogs:   []string{"first", "second"},
 		},
 		{
+			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_wasm_extension_fail",
 			expectError:  errors.New(`executing entrypoint "test_wasm_extension_fail": failed running wasm extension "myext::myimport": expected hello`),
 			expectLogs:   []string{"first"},
@@ -32,7 +35,9 @@ func TestExtensionCalls(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.functionName, func(t *testing.T) {
-			file, err := os.Open("./target/wasm32-unknown-unknown/release/testing_substreams.wasm")
+			wasmFilePath := test_wasm_path(t, c.wasmFile)
+
+			file, err := os.Open(wasmFilePath)
 			require.NoError(t, err)
 			byteCode, err := ioutil.ReadAll(file)
 			require.NoError(t, err)

@@ -1,6 +1,6 @@
 use crate::externs;
 use crate::memory;
-use num_bigint::BigUint;
+use num_bigint::{BigInt};
 use bigdecimal::BigDecimal;
 
 pub fn get_at(store_idx: u32, ord: i64, key: &String) -> Option<Vec<u8>> {
@@ -21,7 +21,6 @@ pub fn get_at(store_idx: u32, ord: i64, key: &String) -> Option<Vec<u8>> {
         };
     }
 }
-
 pub fn get_last(store_idx: u32, key: &String) -> Option<Vec<u8>> {
     unsafe {
         let key_bytes = key.as_bytes();
@@ -40,7 +39,6 @@ pub fn get_last(store_idx: u32, key: &String) -> Option<Vec<u8>> {
         };
     }
 }
-
 pub fn get_first(store_idx: u32, key: &String) -> Option<Vec<u8>> {
     unsafe {
         let key_bytes = key.as_bytes();
@@ -59,7 +57,6 @@ pub fn get_first(store_idx: u32, key: &String) -> Option<Vec<u8>> {
         };
     }
 }
-
 pub fn set(ord: i64, key: String, value: &Vec<u8>) {
     unsafe {
         externs::state::set(
@@ -71,7 +68,6 @@ pub fn set(ord: i64, key: String, value: &Vec<u8>) {
         )
     }
 }
-
 pub fn set_if_not_exists(ord: i64, key: String, value: &Vec<u8>) {
     unsafe {
         externs::state::set_if_not_exists(
@@ -93,8 +89,7 @@ pub fn delete_prefix(ord: i64, prefix: &String){
         )
     }
 }
-
-pub fn sum_bigint(ord: i64, key: String, value: &BigUint) {
+pub fn sum_bigint(ord: i64, key: String, value: &BigInt) {
     let data = value.to_string();
     unsafe {
         externs::state::sum_bigint(
@@ -106,8 +101,6 @@ pub fn sum_bigint(ord: i64, key: String, value: &BigUint) {
         )
     }
 }
-
-
 pub fn sum_int64(ord: i64, key: String, value: i64) {
     unsafe {
         externs::state::sum_int64(
@@ -118,7 +111,6 @@ pub fn sum_int64(ord: i64, key: String, value: i64) {
         )
     }
 }
-
 pub fn sum_float64(ord: i64, key: String, value: f64) {
     unsafe {
         externs::state::sum_float64(
@@ -129,7 +121,6 @@ pub fn sum_float64(ord: i64, key: String, value: f64) {
         )
     }
 }
-
 pub fn sum_bigfloat(ord: i64, key: String, value: &BigDecimal) {
     let data = value.to_string();
     unsafe {
@@ -142,7 +133,6 @@ pub fn sum_bigfloat(ord: i64, key: String, value: &BigDecimal) {
         )
     }
 }
-
 pub fn set_min_int64(ord: i64, key: String, value: i64) {
     unsafe {
         externs::state::set_min_int64(
@@ -153,8 +143,7 @@ pub fn set_min_int64(ord: i64, key: String, value: i64) {
         )
     }
 }
-
-pub fn set_min_bigint(ord: i64, key: String, value: &BigUint) {
+pub fn set_min_bigint(ord: i64, key: String, value: &BigInt) {
     let data = value.to_string();
     unsafe {
         externs::state::set_min_bigint(
@@ -166,8 +155,6 @@ pub fn set_min_bigint(ord: i64, key: String, value: &BigUint) {
         )
     }
 }
-
-
 pub fn set_min_float64(ord: i64, key: String, value: f64) {
     unsafe {
         externs::state::set_min_float64(
@@ -178,7 +165,6 @@ pub fn set_min_float64(ord: i64, key: String, value: f64) {
         )
     }
 }
-
 pub fn set_min_bigfloat(ord: i64, key: String, value: &BigDecimal) {
     let data = value.to_string();
     unsafe {
@@ -191,7 +177,6 @@ pub fn set_min_bigfloat(ord: i64, key: String, value: &BigDecimal) {
         )
     }
 }
-
 pub fn set_max_int64(ord: i64, key: String, value: i64) {
     unsafe {
         externs::state::set_max_int64(
@@ -202,8 +187,7 @@ pub fn set_max_int64(ord: i64, key: String, value: i64) {
         )
     }
 }
-
-pub fn set_max_bigint(ord: i64, key: String, value: &BigUint) {
+pub fn set_max_bigint(ord: i64, key: String, value: &BigInt) {
     let data = value.to_string();
     unsafe {
         externs::state::set_max_bigint(
@@ -215,8 +199,6 @@ pub fn set_max_bigint(ord: i64, key: String, value: &BigUint) {
         )
     }
 }
-
-
 pub fn set_max_float64(ord: i64, key: String, value: f64) {
     unsafe {
         externs::state::set_max_float64(
@@ -227,7 +209,6 @@ pub fn set_max_float64(ord: i64, key: String, value: f64) {
         )
     }
 }
-
 pub fn set_max_bigfloat(ord: i64, key: String, value: &BigDecimal) {
     let data = value.to_string();
     unsafe {

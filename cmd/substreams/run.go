@@ -51,8 +51,18 @@ func runRun(cmd *cobra.Command, args []string) error {
 	outputStreamNames := strings.Split(args[1], ",")
 
 	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") != "" {
-		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
+	moduleProgressBar := &decode.ModuleProgressBar{
+		Bars: map[decode.ModuleName]*decode.Bar{},
+	}
+
+	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
+		for _, outputStreamName := range outputStreamNames {
+			bar := &decode.Bar{}
+			bar.Initialized = false
+			moduleProgressBar.Bars[decode.ModuleName(outputStreamName)] = bar
+		}
+
+		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)
 	}
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)

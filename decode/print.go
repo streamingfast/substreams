@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ResponseFunc {
+func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool, moduleProgressBar *ModuleProgressBar) substreams.ResponseFunc {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
@@ -163,19 +163,22 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		}
 
 		for _, moduleProgress := range progress.Modules {
-			requestedBlockRangeStartBlock := moduleProgress.RequestBlockRange.StartBlock
-			requestedBlockRangeEndBlock := moduleProgress.RequestBlockRange.EndBlock
-			processedRangeStartBlock := moduleProgress.ProcessedRanges[0].StartBlock
-			processedRangeEndBlock := moduleProgress.ProcessedRanges[0].EndBlock
+			if moduleProgress.CatchUp { // don't print any progress if we are not catching up the request
+				if bar, ok := moduleProgressBar.Bars[ModuleName(moduleProgress.Name)]; ok {
+					if !bar.Initialized {
+						fmt.Printf("Running multiple parallel requests for %s to catch up...\n", moduleProgress.Name)
+						bar.Initialized = true
+						bar.NewOption(0, moduleProgress.RequestBlockRange.EndBlock-moduleProgress.RequestBlockRange.StartBlock)
+					}
 
-			fmt.Printf(
-				"\rmoduleName: %s requestedBlockRangeStartBlock: %d, requestedBlockRangeEndBlock: %d, processedRangeStartBlock: %d, processedRangeEndBlock: %d",
-				moduleProgress.Name,
-				requestedBlockRangeStartBlock,
-				requestedBlockRangeEndBlock,
-				processedRangeStartBlock,
-				processedRangeEndBlock,
-			)
+					if bar.cur == bar.Total {
+						bar.Finish()
+					} else {
+						bar.cur++
+						bar.Play(bar.cur, moduleProgress.Name)
+					}
+				}
+			}
 		}
 
 		return nil

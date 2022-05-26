@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## \[Unreleased]
 
-*   Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
+
+* Added command `substreams protogen` that writes a temporary `buf.gen.yaml` and generates Rust structs based on the contents of the provided manifest or package.
+
+* Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
 
     `substreams::handlers::map` is used for the handlers corresponding to modules of type `map`. Modules of type `map` should return a `Result` where the error is of type `SubstreamError`
 

@@ -24,12 +24,8 @@ function main() {
   trap "cd \"$current_dir\"" EXIT
 
   pushd "$ROOT" >/dev/null
-  TMP=$(mktemp -d) 
-  protoc -I ./proto ./proto/sf/substreams/v1/* ./proto/google/protobuf/descriptor.proto --include_source_info --descriptor_set_out ${TMP}/system.pb 
-  statik -src $TMP -include system.pb -dest pb
-  rm -f ${TMP}/system.pb
-  rmdir $TMP
 
+  generate_system pb/system/system.pb
 
   pushd "$ROOT/pb" > /dev/null
 
@@ -62,6 +58,21 @@ function generate() {
     done
 }
 
+function generate_system() {
+  directory="`dirname $1`"
+  if [[ ! -d "$directory" ]]; then
+    mkdir "$directory" > /dev/null
+  fi
+
+  protoc -I$PROTO \
+    "$PROTO/sf/substreams/v1/"* \
+    "$PROTO/google/protobuf/any.proto" \
+    "$PROTO/google/protobuf/descriptor.proto" \
+    "$PROTO/google/protobuf/timestamp.proto" \
+    --include_source_info \
+    --descriptor_set_out "$1"
+}
+
 function checks() {
   # The old `protoc-gen-go` did not accept any flags. Just using `protoc-gen-go --version` in this
   # version waits forever. So we pipe some wrong input to make it exit fast. This in the new version
@@ -83,13 +94,6 @@ function checks() {
     echo ""
     echo "Should print 'protoc-gen-go v1.25.0' (if it just hangs, you don't have the correct version)"
     exit 1
-  fi
-
-  if ! type statik &>/dev/null; then
-    echo "You need to install 'statik' to bundle some proto files:"
-    echo ""
-    echo "    go install github.com/rakyll/statik@latest"
-    echo ""
   fi
 }
 

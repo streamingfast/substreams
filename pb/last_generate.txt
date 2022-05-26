@@ -1,2 +1,2 @@
-generate.sh - Wed May 25 18:46:32 EDT 2022 - eduardvoiculescu
-streamingfast/proto revision: 615f6dc5869b8f2d2e6f014623c5028b949baf41
+generate.sh - Thu 26 May 2022 15:19:40 EDT - julien
+streamingfast/proto revision: c02a5b443d5cbdaac0b761c84d422a3b168eee6f

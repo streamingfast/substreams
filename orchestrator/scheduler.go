@@ -2,65 +2,51 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"io"
 
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
 )
-
-var zlog, _ = logging.PackageLogger("scheduler", "github.com/streamingfast/substreams/scheduler")
 
 type Scheduler struct {
 	blockRangeSizeSubRequests int
 
-	squasher *Squasher
-	strategy Strategy
-	requests []*pbsubstreams.Request
-	Err      error
+	squasher       *Squasher
+	requestsStream <-chan *pbsubstreams.Request
+	requests       []*pbsubstreams.Request
 }
 
-func NewScheduler(strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
-		strategy:                  strategy,
+		requestsStream:            GetRequestStream(ctx, strategy),
 		requests:                  []*pbsubstreams.Request{},
 	}
 
 	return s, nil
 }
 
-func (s *Scheduler) Next(f func(request *pbsubstreams.Request, callback func(ctx context.Context, r *pbsubstreams.Request, err error))) error {
-	request, err := s.strategy.GetNextRequest()
-	if err != nil {
-		return io.EOF
+func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
+	request, alive := <-s.requestsStream
+	if !alive {
+		return nil, io.EOF
 	}
 
-	zlog.Debug("request", zap.Int64("start_block", request.StartBlockNum), zap.Uint64("stop_block", request.StopBlockNum), zap.Strings("stores", request.OutputModules))
-
-	f(request, s.callback)
-
-	return nil
+	return request, nil
 }
 
-func (s *Scheduler) callback(ctx context.Context, r *pbsubstreams.Request, err error) {
-	if err != nil {
-		s.Err = err
-		return
-	}
-
+func (s *Scheduler) Callback(ctx context.Context, r *pbsubstreams.Request) error {
 	for _, output := range r.GetOutputModules() {
-		err = s.squasher.Squash(ctx, output, &block.Range{
+		err := s.squasher.Squash(ctx, output, &block.Range{
 			StartBlock:        uint64(r.StartBlockNum),
 			ExclusiveEndBlock: r.StopBlockNum,
 		})
 
 		if err != nil {
-			zlog.Error("squashing output", zap.String("output", output), zap.Error(err))
-			s.Err = err
-			return
+			return fmt.Errorf("squashing: %w", err)
 		}
 	}
+	return nil
 }

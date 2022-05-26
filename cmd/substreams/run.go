@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	_ "github.com/streamingfast/substreams/pb/statik"
 )
 
 func init() {
@@ -62,7 +61,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 			moduleProgressBar.Bars[decode.ModuleName(outputStreamName)] = bar
 		}
 
-		returnHandler = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)
+		returnHandler, err = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)
+		if err != nil {
+			return fmt.Errorf("new printer for %q: %w", manifestPath, err)
+		}
 	}
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)

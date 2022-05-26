@@ -48,7 +48,7 @@ output:
 			rawYamlInput: `---
 name: prices
 kind: store
-updatePolicy: sum
+updatePolicy: add
 valueType: bigint
 code:
   file: ./pricesState.wasm
@@ -59,7 +59,7 @@ inputs:
 			expectedOutput: Module{
 				Name:         "prices",
 				Kind:         "store",
-				UpdatePolicy: "sum",
+				UpdatePolicy: "add",
 				ValueType:    "bigint",
 
 				Code:   Code{File: "./pricesState.wasm"},
@@ -119,7 +119,7 @@ func TestManifest_ToProto(t *testing.T) {
 	require.Equal(t, uint32(0), module.GetWasmCode().Index)
 	require.Equal(t, 1, len(module.Inputs))
 	require.Equal(t, "pair_extractor", module.Inputs[0].GetMap().ModuleName)
-	require.Equal(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE, module.GetKindStore().UpdatePolicy)
+	require.Equal(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, module.GetKindStore().UpdatePolicy)
 	require.Nil(t, module.Output)
 
 	module = pbManifest.Modules[2]

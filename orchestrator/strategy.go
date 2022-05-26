@@ -3,19 +3,26 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 )
 
 type Strategy interface {
-	GetNextRequest() (*pbsubstreams.Request, error)
+	GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error)
+	RequestCount() int
 }
 
 type LinearStrategy struct {
 	requests []*pbsubstreams.Request
+}
+
+func (s *LinearStrategy) RequestCount() int {
+	return len(s.requests)
 }
 
 func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64, blockRangeSizeSubRequests int) (*LinearStrategy, error) {
@@ -62,15 +69,140 @@ func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, build
 	return res, nil
 }
 
-func (s *LinearStrategy) GetNextRequest() (*pbsubstreams.Request, error) {
+func (s *LinearStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {
 	if len(s.requests) == 0 {
-		return nil, fmt.Errorf("no requests to fetch")
+		return nil, io.EOF
 	}
 
 	var request *pbsubstreams.Request
 	request, s.requests = s.requests[0], s.requests[1:]
 
 	return request, nil
+}
+
+type RequestGetter interface {
+	Get(ctx context.Context) (*pbsubstreams.Request, error)
+}
+
+type OrderedStrategy struct {
+	pool          *Pool
+	requestGetter RequestGetter
+}
+
+func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *Pool, upToBlockNum uint64, blockRangeSizeSubRequests int) (*OrderedStrategy, error) {
+	lastSavedBlockMap := map[string]uint64{}
+	for _, builder := range builders {
+		info, err := builder.Info(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting builder info: %w", err)
+		}
+		lastSavedBlockMap[builder.Name] = info.LastKVSavedBlock
+	}
+
+	for _, builder := range builders {
+		zlog.Debug("squashables", zap.String("builder", builder.Name))
+		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
+		if upToBlockNum == builder.ModuleStartBlock {
+			continue // nothing to synchronize
+		}
+
+		endBlock := upToBlockNum
+		info, err := builder.Info(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting builder info: %w", err)
+		}
+
+		lastExclusiveEndBlock := info.LastKVSavedBlock
+		zlog.Debug("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
+		if upToBlockNum <= lastExclusiveEndBlock {
+			zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
+			continue // not sure if we should pop here
+		}
+
+		reqStartBlock := lastExclusiveEndBlock
+		if reqStartBlock == 0 {
+			reqStartBlock = builder.ModuleStartBlock
+		}
+
+		moduleFullRangeToProcess := &block.Range{
+			StartBlock:        reqStartBlock,
+			ExclusiveEndBlock: endBlock,
+		}
+
+		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
+		for _, blockRange := range requestRanges {
+			ancestorStoreModules, err := graph.AncestorStoresOf(builder.Name)
+			if err != nil {
+				return nil, fmt.Errorf("getting ancestore stores for %s: %w", builder.Name, err)
+			}
+
+			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
+			waiter := NewWaiter(blockRange.StartBlock, lastSavedBlockMap, ancestorStoreModules...)
+			_ = pool.Add(ctx, req, waiter)
+
+			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", blockRange))
+		}
+	}
+
+	pool.Start(ctx)
+
+	return &OrderedStrategy{
+		requestGetter: pool,
+		pool:          pool,
+	}, nil
+}
+
+func (d *OrderedStrategy) RequestCount() int {
+	return d.pool.Count()
+}
+
+func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {
+	req, err := d.requestGetter.Get(ctx)
+	if err == io.EOF {
+		return nil, io.EOF
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstreams.Request {
+	stream := make(chan *pbsubstreams.Request)
+
+	go func() {
+		defer close(stream)
+
+		//sleeper
+
+		for {
+			r, err := strategy.GetNextRequest(ctx)
+			if err == io.EOF || err == context.DeadlineExceeded || err == context.Canceled {
+				return
+			}
+
+			if err != nil {
+				panic(err)
+			}
+
+			if r == nil {
+				//sleeper.Sleep()
+				continue
+			}
+
+			//sleeper.Reset()
+
+			select {
+			case <-ctx.Done():
+				return
+			case stream <- r:
+				//
+			}
+		}
+	}()
+
+	return stream
 }
 
 func createRequest(

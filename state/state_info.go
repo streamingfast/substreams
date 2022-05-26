@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/streamingfast/derr"
+
 	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
 )
 
 type Info struct {
@@ -23,7 +24,9 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 		return fmt.Errorf("marshaling state info: %w", err)
 	}
 
-	err = store.WriteObject(ctx, InfoFileName(), bytes.NewReader(data))
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		return store.WriteObject(ctx, InfoFileName(), bytes.NewReader(data))
+	})
 	if err != nil {
 		return fmt.Errorf("writing file %s: %w", InfoFileName(), err)
 	}
@@ -32,30 +35,36 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 }
 
 func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
-	rc, err := store.OpenObject(ctx, InfoFileName())
-	if err != nil {
-		if err == dstore.ErrNotFound {
-			return &Info{}, nil
-		}
-		return nil, fmt.Errorf("opening object %s: %w", InfoFileName(), err)
-	}
-
-	defer func(rc io.ReadCloser) {
-		err := rc.Close()
-		if err != nil {
-			zlog.Error("closing object", zap.String("object_name", InfoFileName()), zap.Error(err))
-		}
-	}(rc)
-
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return nil, fmt.Errorf("reading data for %s: %w", InfoFileName(), err)
-	}
-
 	var info *Info
-	err = json.Unmarshal(data, &info)
+	var notFound error
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		rc, err := store.OpenObject(ctx, InfoFileName())
+		if err != nil {
+			if err == dstore.ErrNotFound {
+				notFound = dstore.ErrNotFound
+				return nil
+			}
+			return err
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			return fmt.Errorf("reading data for %s: %w", InfoFileName(), err)
+		}
+		info = &Info{}
+		err = json.Unmarshal(data, &info)
+		if err != nil {
+			return fmt.Errorf("unmarshaling state info data: %w", err)
+		}
+		return nil
+	})
+
+	if notFound != nil {
+		return &Info{}, nil
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("unmarshaling state info data: %w", err)
+		return nil, err
 	}
 
 	return info, nil

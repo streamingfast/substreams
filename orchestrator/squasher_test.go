@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type NotifierFunc func()
+
+func (n NotifierFunc) Notify(builder string, blockNum uint64) {
+	n()
+}
+
 func TestSquash(t *testing.T) {
 	ctx := context.Background()
 
@@ -45,18 +51,24 @@ func TestSquash(t *testing.T) {
 		ranges:  []*block.Range{},
 	}
 
-	err := squash(ctx, squashable, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000})
+	notificationsSent := 0
+	notifierFunc := NotifierFunc(func() {
+		notificationsSent++
+	})
+
+	err := squash(ctx, squashable, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000}, notifierFunc)
 	require.Nil(t, err)
 	require.Equal(t, 0, writeCount)
 
-	err = squash(ctx, squashable, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000})
+	err = squash(ctx, squashable, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000}, notifierFunc)
 	require.Nil(t, err)
 	require.Equal(t, 0, writeCount)
 
-	err = squash(ctx, squashable, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000})
+	err = squash(ctx, squashable, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000}, notifierFunc)
 	require.Nil(t, err)
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
+	require.Equal(t, 2, notificationsSent)
 }
 
 func testStateBuilder(store dstore.Store) *state.Builder {
@@ -72,7 +84,7 @@ func testStateBuilder(store dstore.Store) *state.Builder {
 			StartBlock:        0,
 			ExclusiveEndBlock: 10_000,
 		},
-		UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE,
+		UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
 		ValueType:    state.OutputValueTypeString,
 	}
 }

@@ -1,13 +1,14 @@
 mod pb;
 use std::convert::TryInto;
 use bigdecimal::BigDecimal;
-use substreams::{log, Hex, errors::{SubstreamError}, store, store::{SumInt64Writer, MaxBigFloatWriter}};
+use substreams::{log, Hex, errors::{Error}, store, store::{StoreAddInt64, StoreMaxBigFloat}};
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use hex_literal::hex;
 use pb::{erc721, eth};
 
+
 #[substreams::handlers::map]
-fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, SubstreamError> {
+fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, Error> {
     let mut transfers: Vec<erc721::Transfer> = vec![];
 
     for trx in blk.transaction_traces {
@@ -49,21 +50,21 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, SubstreamError> {
 }
 
 #[substreams::handlers::store]
-fn build_nft_state(transfers: erc721::Transfers, s: store::SumInt64Writer, pairs: store::Reader, tokens: store::Reader) {
+fn build_nft_state(transfers: erc721::Transfers, pairs: store::StoreGet, tokens: store::StoreGet, output: store::StoreAddInt64) {
     let tokens_first_opt = tokens.get_first(&"tokens".to_owned());
     let pairs_last_opt = pairs.get_first(&"pairs".to_owned());
     log::info!("tokens {:?} pairs {:?}", tokens_first_opt, pairs_last_opt);
     for transfer in transfers.transfers {
         if hex::encode(&transfer.from) != "0000000000000000000000000000000000000000" {
             log::info!("found a transfer");
-            s.sum(
+            output.add(
                 transfer.ordinal as i64,
                 generate_key(transfer.from.as_ref()),
                 -1,
             );
         }
         if hex::encode(&transfer.to) != "0000000000000000000000000000000000000000" {
-            s.sum(
+            output.add(
                 transfer.ordinal as i64,
                 generate_key(transfer.to.as_ref()),
                 1,
@@ -93,13 +94,13 @@ pub fn is_erc721transfer_event(log: &eth::Log) -> bool {
 
 
 #[substreams::handlers::store]
-fn test_sum_big_int(s: store::SumBigIntWriter) {
-    s.sum(
+fn test_sum_big_int(output: store::StoreAddBigInt) {
+    output.add(
         1,
         "test.key.1".to_string(),
         &BigInt::parse_bytes(b"10", 10).unwrap(),
     );
-    s.sum(
+    output.add(
         1,
         "test.key.1".to_string(),
         &BigInt::parse_bytes(b"10", 10).unwrap(),
@@ -107,25 +108,25 @@ fn test_sum_big_int(s: store::SumBigIntWriter) {
 }
 
 #[substreams::handlers::store]
-fn test_sum_int64(s: SumInt64Writer) {
-    s.sum(1, "sum.int.64".to_string(), 10);
-    s.sum(1, "sum.int.64".to_string(), 10);
+fn test_sum_int64(o: StoreAddInt64) {
+    o.add(1, "sum.int.64".to_string(), 10);
+    o.add(1, "sum.int.64".to_string(), 10);
 }
 
 #[substreams::handlers::store]
-fn test_sum_float64(s: store::SumFloat64Writer) {
-    s.sum(1, "sum.float.64".to_string(), 10.75);
-    s.sum(1, "sum.float.64".to_string(), 10.75);
+fn test_sum_float64(o: store::StoreAddFloat64) {
+    o.add(1, "sum.float.64".to_string(), 10.75);
+    o.add(1, "sum.float.64".to_string(), 10.75);
 }
 
 #[substreams::handlers::store]
-fn test_sum_big_float_small_number(s: store::SumBigFloatWriter) {
-    s.sum(
+fn test_sum_big_float_small_number(o: store::StoreAddBigFloat) {
+    o.add(
         1,
         "sum.big.float".to_string(),
         &BigDecimal::parse_bytes(b"10.5", 10).unwrap(),
     );
-    s.sum(
+    o.add(
         1,
         "sum.big.float".to_string(),
         &BigDecimal::parse_bytes(b"10.5", 10).unwrap(),
@@ -133,13 +134,13 @@ fn test_sum_big_float_small_number(s: store::SumBigFloatWriter) {
 }
 
 #[substreams::handlers::store]
-fn test_sum_big_float_big_number(s: store::SumBigFloatWriter) {
-    s.sum(
+fn test_sum_big_float_big_number(s: store::StoreAddBigFloat) {
+    s.add(
         1,
         "sum.big.float".to_string(),
         &BigDecimal::parse_bytes(b"12345678987654321.5", 10).unwrap(),
     );
-    s.sum(
+    s.add(
         1,
         "sum.big.float".to_string(),
         &BigDecimal::parse_bytes(b"12345678987654321.5", 10).unwrap(),
@@ -147,13 +148,13 @@ fn test_sum_big_float_big_number(s: store::SumBigFloatWriter) {
 }
 
 #[substreams::handlers::store]
-fn test_set_min_int64(s: store::MinInt64Writer) {
+fn test_set_min_int64(s: store::StoreMinInt64) {
     s.min(1, "set_min_int64".to_string(), 5);
     s.min(1, "set_min_int64".to_string(), 2);
 }
 
 #[substreams::handlers::store]
-fn test_set_min_bigint(s: store::MinBigIntWriter) {
+fn test_set_min_bigint(s: store::StoreMinBigInt) {
     s.min(
         1,
         "set_min_bigint".to_string(),
@@ -167,13 +168,13 @@ fn test_set_min_bigint(s: store::MinBigIntWriter) {
 }
 
 #[substreams::handlers::store]
-fn test_set_min_float64(s: store::MinFloat64Writer) {
+fn test_set_min_float64(s: store::StoreMinFloat64) {
     s.min(1, "set_min_float64".to_string(), 10.05);
     s.min(1, "set_min_float64".to_string(), 10.04);
 }
 
 #[substreams::handlers::store]
-fn test_set_min_bigfloat(s: store::MinBigFloatWriter) {
+fn test_set_min_bigfloat(s: store::StoreMinBigFloat) {
     s.min(
         1,
         "set_min_bigfloat".to_string(),
@@ -187,13 +188,13 @@ fn test_set_min_bigfloat(s: store::MinBigFloatWriter) {
 }
 
 #[substreams::handlers::store]
-fn test_set_max_int64(s: store::MaxInt64Writer) {
+fn test_set_max_int64(s: store::StoreMaxInt64) {
     s.max(1, "set_max_int64".to_string(), 5);
     s.max(1, "set_max_int64".to_string(), 2);
 }
 
 #[substreams::handlers::store]
-fn test_set_max_bigint(my_store: store::MaxBigIntWriter) {
+fn test_set_max_bigint(my_store: store::StoreMaxBigInt) {
     my_store.max(
         1,
         "set_max_bigint".to_string(),
@@ -207,13 +208,13 @@ fn test_set_max_bigint(my_store: store::MaxBigIntWriter) {
 }
 
 #[substreams::handlers::store]
-fn test_set_max_float64(s: store::MaxFloat64Writer) {
+fn test_set_max_float64(s: store::StoreMaxFloat64) {
     s.max(1, "set_max_float64".to_string(), 10.05);
     s.max(1, "set_max_float64".to_string(), 10.04);
 }
 
 #[substreams::handlers::store]
-fn test_set_max_bigfloat(s: MaxBigFloatWriter) {
+fn test_set_max_bigfloat(s: StoreMaxBigFloat) {
     s.max(
         1,
         "set_max_bigfloat".to_string(),
@@ -262,7 +263,7 @@ fn test_wasm_extension_fail() {
 }
 
 #[substreams::handlers::store]
-extern "C" fn test_set_delete_prefix(s: store::UpdateWriter) {
+extern "C" fn test_set_delete_prefix(s: store::StoreSet) {
     s.set(1, "1:key_to_keep".to_string(), &[1, 2, 3, 4].to_vec());
     s.set(2, "2:key_to_delete".to_string(), &[5, 6, 7, 8].to_vec());
     s.delete_prefix(3, &"2:".to_string());

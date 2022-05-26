@@ -17,10 +17,21 @@ import (
 type Squasher struct {
 	squashables       map[string]*Squashable
 	storeSaveInterval uint64
+
+	notifier Notifier
+
 	lock              sync.Mutex
 }
 
-func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64) (*Squasher, error) {
+type SquasherOption func(s *Squasher)
+
+func WithNotifier(notifier Notifier) SquasherOption {
+	return func(s *Squasher) {
+		s.notifier = notifier
+	}
+}
+
+func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64, opts ...SquasherOption) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
 	for _, builder := range builders {
 		info, err := builder.Info(ctx)
@@ -50,7 +61,13 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 		squashables[builder.Name] = NewSquashable(initialBuilder)
 	}
 
-	return &Squasher{squashables: squashables, storeSaveInterval: storeSaveInterval}, nil
+	squasher := &Squasher{squashables: squashables, storeSaveInterval: storeSaveInterval}
+
+	for _, opt := range opts {
+		opt(squasher)
+	}
+
+	return squasher, nil
 }
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
@@ -64,6 +81,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
+	zlog.Info("squashing request range", zap.String("module", builder.Name), zap.Object("request_range", requestBlockRange))
 	blockRanges := requestBlockRange.Split(s.storeSaveInterval)
 
 	for _, br := range blockRanges {
@@ -86,7 +104,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 			continue
 		}
 
-		err := squash(ctx, squashable, br)
+		err := squash(ctx, squashable, br, s.notifier)
 		if err != nil {
 			return fmt.Errorf("squashing range %d-%d: %w", br.StartBlock, br.ExclusiveEndBlock, err)
 		}
@@ -95,7 +113,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	return nil
 }
 
-func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range) error {
+func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range, notifier Notifier) error {
 	zlog.Info("squashing", zap.Object("range", blockRange), zap.String("module_name", squashable.builder.Name), zap.Uint64("block_range_size", blockRange.Size()))
 
 	// add this range to the squashable's range list, and sort them in ascending order
@@ -143,6 +161,10 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 			}
 
 			squashable.ranges = squashable.ranges[1:]
+
+			if notifier != nil {
+				notifier.Notify(squashable.builder.Name, squashableRange.ExclusiveEndBlock)
+			}
 
 			continue
 		}

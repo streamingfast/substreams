@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/streamingfast/derr"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -72,28 +74,16 @@ func (c *ModulesOutputCache) RegisterModule(ctx context.Context, module *pbsubst
 
 func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockRef) error {
 	for _, moduleCache := range c.OutputCaches {
-		if !moduleCache.CurrentBlockRange.Contains(blockRef) {
+		if moduleCache.IsOutOfRange(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 			//this is a complete range
-			filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
-			if err := moduleCache.save(ctx, filename); err != nil {
+			previousFilename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
+			if err := moduleCache.save(ctx, previousFilename); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
 
-			partialFilename := filename + ".partial"
-			partialExist, err := moduleCache.Store.FileExists(ctx, partialFilename)
-			if err != nil {
-				return fmt.Errorf("check if parital file exist %q: %w", partialFilename, err)
-			}
-			if partialExist {
-				err := moduleCache.Store.DeleteObject(ctx, partialFilename)
-				if err != nil {
-					return fmt.Errorf("deleting partial file %q", partialFilename)
-				}
-			}
-
 			if err := moduleCache.Load(ctx, moduleCache.CurrentBlockRange.ExclusiveEndBlock); err != nil {
-				return fmt.Errorf("loading blocks for module kv %s: %w", moduleCache.ModuleName, err)
+				return fmt.Errorf("loading blocks %d for module kv %s: %w", moduleCache.CurrentBlockRange.ExclusiveEndBlock, moduleCache.ModuleName, err)
 			}
 		}
 	}
@@ -105,7 +95,7 @@ func (c *ModulesOutputCache) Save(ctx context.Context) error {
 	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
 
-		filename := computeDBinFilename(pad(moduleCache.CurrentBlockRange.StartBlock), pad(moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+		filename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
 		if err := moduleCache.save(ctx, filename); err != nil {
 			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
 		}
@@ -129,6 +119,10 @@ func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 		return out[i].BlockNum < out[j].BlockNum
 	})
 	return
+}
+
+func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
+	return !c.CurrentBlockRange.Contains(ref)
 }
 
 func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
@@ -179,17 +173,25 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 		return nil
 	}
 
-	filename := computeDBinFilename(pad(c.CurrentBlockRange.StartBlock), pad(c.CurrentBlockRange.ExclusiveEndBlock))
+	filename := computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
 	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
 
-	objectReader, err := c.Store.OpenObject(ctx, filename)
-	if err != nil {
-		return fmt.Errorf("loading block reader %s: %w", filename, err)
-	}
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		objectReader, err := c.Store.OpenObject(ctx, filename)
+		if err != nil {
+			return fmt.Errorf("loading block reader %s: %w", filename, err)
+		}
 
-	err = json.NewDecoder(objectReader).Decode(&c.kv)
+		var localOut outputKV
+		if err = json.NewDecoder(objectReader).Decode(&localOut); err != nil {
+			return fmt.Errorf("json decoding file %s: %w", filename, err)
+		}
+
+		c.kv = localOut
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("json decoding file %s: %w", filename, err)
+		return fmt.Errorf("retried: %w", err)
 	}
 
 	zlog.Debug("cache loaded", zap.String("cache_module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
@@ -205,10 +207,14 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 		return fmt.Errorf("json encoding outputs: %w", err)
 	}
 
-	err = c.Store.WriteObject(ctx, filename, buffer)
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		reader := bytes.NewReader(buffer.Bytes())
+		return c.Store.WriteObject(ctx, filename, reader)
+	})
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)
 	}
+
 	zlog.Debug("cache saved", zap.String("module_name", c.ModuleName), zap.String("file_name", filename), zap.String("url", c.Store.BaseURL().String()))
 	return nil
 }
@@ -218,7 +224,11 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 
 	paddedBlock := pad(prefixStartBlock)
 
-	files, err := store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
+	var files []string
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
+		files, err = store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
+		return
+	})
 	if err != nil {
 		return nil, false, fmt.Errorf("walking prefix for padded block %s: %w", paddedBlock, err)
 	}
@@ -247,12 +257,12 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 	}, true, nil
 }
 
-func computeDBinFilename(startBlock, stopBlock string) string {
-	return fmt.Sprintf("%s-%s.output", startBlock, stopBlock)
+func computeDBinFilename(startBlock, stopBlock uint64) string {
+	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
 }
 
 func pad(blockNumber uint64) string {
-	return fmt.Sprintf("000%d", blockNumber)
+	return fmt.Sprintf("%010d", blockNumber)
 }
 
 func ComputeStartBlock(startBlock uint64, saveBlockInterval uint64) uint64 {
@@ -260,8 +270,8 @@ func ComputeStartBlock(startBlock uint64, saveBlockInterval uint64) uint64 {
 }
 
 func getExclusiveEndBlock(filename string) (uint64, error) {
-	endBlock := strings.Split(filename, "-")[1]
-	parsedInt, err := strconv.ParseInt(strings.TrimPrefix(strings.Split(endBlock, ".")[0], "000"), 10, 64)
+	endBlock := strings.Split(strings.Split(filename, "-")[1], ".")[0]
+	parsedInt, err := strconv.ParseInt(strings.TrimLeft(endBlock, "0"), 10, 64)
 
 	if err != nil {
 		return 0, fmt.Errorf("parsing int %d: %w", parsedInt, err)

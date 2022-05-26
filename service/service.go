@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"github.com/streamingfast/substreams/manifest"
+	orchestratorWorker "github.com/streamingfast/substreams/orchestrator/worker"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
@@ -178,7 +179,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
 
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.parallelSubRequests, s.blockRangeSizeSubRequests, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,
@@ -195,7 +196,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 		return nil
 	}
-	handler, err := pipe.HandlerFactory(responseHandler)
+
+	workerPool := orchestratorWorker.NewPool(s.parallelSubRequests, s.grpcClientFactory)
+
+	handler, err := pipe.HandlerFactory(workerPool, responseHandler)
 	if err != nil {
 		return fmt.Errorf("error building substreams pipeline handler: %w", err)
 	}

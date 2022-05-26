@@ -55,11 +55,11 @@ message Module {
     enum UpdatePolicy {
       UPDATE_POLICY_UNSET = 0;
       // Provides a store where you can `set()` keys, and the latest key wins
-      UPDATE_POLICY_REPLACE = 1;
+      UPDATE_POLICY_SET = 1;
       // Provides a store where you can `set_if_not_exists()` keys, and the first key wins
-      UPDATE_POLICY_IGNORE = 2;
-      // Provides a store where you can `sum_*()` keys, where two stores merge by summing its values.
-      UPDATE_POLICY_SUM = 3;
+      UPDATE_POLICY_SET_IF_NOT_EXISTS = 2;
+      // Provides a store where you can `add_*()` keys, where two stores merge by summing its values.
+      UPDATE_POLICY_ADD = 3;
       // Provides a store where you can `min_*()` keys, where two stores merge by leaving the minimum value.
       UPDATE_POLICY_MIN = 4;
       // Provides a store where you can `max_*()` keys, where two stores merge by leaving the maximum value.

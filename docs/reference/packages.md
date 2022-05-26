@@ -6,7 +6,7 @@
 
 ### Definition
 
-Packages are single files containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code and modules tree specifications. They allow you to start streaming right away!
+A Substreams _package_ is a **single file** containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code and modules tree specifications. They allow you to start streaming right away!
 
 Their conventional extension is `.spkg`.
 
@@ -23,6 +23,12 @@ substreams pack ./substreams.yaml
 ```
 
 from a Substreams modules manifest.
+
+### Dependencies
+
+When `imports` is defined in a new `substreams.yaml`, it can load modules and protobuf definitions from other Substreams packages.
+
+When doing so, **local protobuf filenames will take precedence over the imported package's proto files**. Make sure, therefore, that you use different `.proto` filenames then the ones you import, to avoid conflicts.
 
 ### Where to find them
 

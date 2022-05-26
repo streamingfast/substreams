@@ -1,4 +1,4 @@
-# Consuming Substreams
+# Running Your Substreams
 
 \[What does it mean to consume Substreams?]
 

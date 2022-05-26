@@ -45,8 +45,8 @@ func PartialFileName(r *block.Range) string {
 	return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
 }
 
-func FullStateFileName(r *block.Range) string {
-	return fmt.Sprintf("%010d-%010d.kv", r.ExclusiveEndBlock, r.StartBlock)
+func FullStateFileName(r *block.Range, moduleStartBlock uint64) string {
+	return fmt.Sprintf("%010d-%010d.kv", r.ExclusiveEndBlock, moduleStartBlock)
 }
 
 func InfoFileName() string {

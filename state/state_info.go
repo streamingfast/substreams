@@ -36,10 +36,12 @@ func writeStateInfo(ctx context.Context, store dstore.Store, info *Info) error {
 
 func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
 	var info *Info
+	var notFound error
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		rc, err := store.OpenObject(ctx, InfoFileName())
 		if err != nil {
 			if err == dstore.ErrNotFound {
+				notFound = dstore.ErrNotFound
 				return nil
 			}
 			return err
@@ -56,6 +58,10 @@ func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
 		}
 		return nil
 	})
+
+	if notFound != nil {
+		return &Info{}, nil
+	}
 
 	if err != nil {
 		return nil, err

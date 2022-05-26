@@ -40,7 +40,7 @@ func TestRustScript(t *testing.T) {
 		{
 			functionName: "test_sum_big_int",
 			wasmFile:     "testing_substreams.wasm",
-			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "bigint", nil),
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigint", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("test.key.1")
 				require.True(t, found)
@@ -50,7 +50,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_sum_int64",
-			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "int64", nil),
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.int.64")
 				require.True(t, found)
@@ -61,7 +61,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_sum_float64",
-			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "float64", nil),
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "float64", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.float.64")
 				require.True(t, found)
@@ -72,7 +72,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_sum_big_float_small_number",
-			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "bigFloat", nil),
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigFloat", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)
@@ -82,7 +82,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_sum_big_float_big_number",
-			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SUM, "bigFloat", nil),
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigFloat", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				data, found := builder.GetLast("sum.big.float")
 				require.True(t, found)
@@ -176,7 +176,7 @@ func TestRustScript(t *testing.T) {
 		{
 			wasmFile:     "testing_substreams.wasm",
 			functionName: "test_set_delete_prefix",
-			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_IGNORE, "some object", nil),
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "some object", nil),
 			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Builder) {
 				_, found := builder.GetLast("1:key_to_keep")
 				require.True(t, found, "key_to_keep")

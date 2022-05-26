@@ -84,7 +84,7 @@ func testStateBuilder(store dstore.Store) *state.Builder {
 			StartBlock:        0,
 			ExclusiveEndBlock: 10_000,
 		},
-		UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_REPLACE,
+		UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
 		ValueType:    state.OutputValueTypeString,
 	}
 }

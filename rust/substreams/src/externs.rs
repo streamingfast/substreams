@@ -43,26 +43,26 @@ pub mod state {
             value_len: u32,
         );
         pub fn delete_prefix(ord: i64, prefix_ptr: *const u8, prefix_len: u32);
-        pub fn sum_bigint(
+        pub fn add_bigint(
             ord: i64,
             key_ptr: *const u8,
             key_len: u32,
             value_ptr: *const u8,
             value_len: u32,
         );
-        pub fn sum_int64(
+        pub fn add_int64(
             ord: i64,
             key_ptr: *const u8,
             key_len: u32,
             value: i64,
         );
-        pub fn sum_float64(
+        pub fn add_float64(
             ord: i64,
             key_ptr: *const u8,
             key_len: u32,
             value: f64,
         );
-        pub fn sum_bigfloat(
+        pub fn add_bigfloat(
             ord: i64,
             key_ptr: *const u8,
             key_len: u32,
@@ -120,18 +120,6 @@ pub mod state {
             key_len: u32,
             value_ptr: *const u8,
             value_len: u32,
-        );
-    }
-}
-
-// MOVE TO a Ethereum-specific Rust crate
-pub mod rpc {
-    #[link(wasm_import_module = "rpc")]
-    extern "C" {
-        pub fn eth_call(
-            rpc_call_offset: *const u8,
-            rpc_call_len: u32,
-            rpc_response_ptr: *const u8,
         );
     }
 }

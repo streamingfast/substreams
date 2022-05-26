@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"fmt"
+	"golang.org/x/mod/semver"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -9,7 +10,6 @@ import (
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 )
 

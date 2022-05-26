@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/derr"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
@@ -594,10 +596,20 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 		jobWorker := workerPool.Borrow()
 		zlog.Info("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 
+		select {
+		case <-ctx.Done():
+			zlog.Info("synchronize stores quit on cancel context")
+			return nil
+		default:
+		}
+
 		go func() {
 			w := jobWorker
 			j := job
-			err := w.Run(ctx, j, respFunc)
+
+			err := derr.RetryContext(ctx, 2, func(ctx context.Context) error {
+				return w.Run(ctx, j, respFunc)
+			})
 			workerPool.ReturnWorker(w)
 			if err != nil {
 				result <- err

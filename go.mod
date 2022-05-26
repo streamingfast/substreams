@@ -10,6 +10,9 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20220505155906-a0834b9c5258
+	github.com/streamingfast/cli v0.0.3
+	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
+	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e
 	github.com/streamingfast/firehose v0.1.1-0.20220427051727-9b108461d3a6
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
@@ -34,9 +37,6 @@ require (
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
 	github.com/rakyll/statik v0.1.7
-	github.com/streamingfast/cli v0.0.3
-	github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec
-	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
@@ -92,7 +92,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/sethvargo/go-retry v0.1.0 // indirect
+	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 // indirect
 	github.com/streamingfast/dauth v0.0.0-20220404140613-a40f4cd81626 // indirect
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5 // indirect

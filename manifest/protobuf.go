@@ -2,13 +2,11 @@ package manifest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 
 	"github.com/jhump/protoreflect/desc/protoparse"
-	statikfs "github.com/rakyll/statik/fs"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	_ "github.com/streamingfast/substreams/pb/statik"
+	"github.com/streamingfast/substreams/pb/system"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -45,22 +43,11 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 }
 
 func readSystemProtobufs() (*descriptorpb.FileDescriptorSet, error) {
-	sfs, err := statikfs.New()
-	if err != nil {
-		return nil, err
-	}
-	staticFDS, err := sfs.Open("/system.pb") // see generation in pb/generate.sh
-	if err != nil {
-		return nil, err
-	}
-	b, err := ioutil.ReadAll(staticFDS)
-	if err != nil {
-		return nil, err
-	}
 	fds := &descriptorpb.FileDescriptorSet{}
-	err = proto.Unmarshal(b, fds)
+	err := proto.Unmarshal(system.ProtobufDescriptors, fds)
 	if err != nil {
 		return nil, err
 	}
+
 	return fds, nil
 }

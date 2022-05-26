@@ -14,13 +14,13 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) substreams.ResponseFunc {
+func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) (substreams.ResponseFunc, error) {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
 	fileDescs, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
 	if err != nil {
-		panic("couldn't convert, should do this check much earlier: " + err.Error())
+		return nil, fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
 	}
 
 	for _, mod := range pkg.Modules.Modules {
@@ -183,7 +183,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 			fmt.Println("Unsupported response")
 		}
 		return nil
-	}
+	}, nil
 }
 
 func failureProgressHandler(progress *pbsubstreams.ModulesProgress) error {

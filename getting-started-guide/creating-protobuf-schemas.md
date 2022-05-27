@@ -1,23 +1,24 @@
 # Creating Protobuf Schemas
 
-Now that our manifest has been written, it is time to create your custom `Protobuf` definition, the one we've used as an input/output in your manifest file.&#x20;
+Now that our manifest has been written, it is time to create your custom _Protobuf_ definition, the one we'll use as an input/output in your manifest file.&#x20;
 
-Protocol buffers are Google's language-neutral extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. If you have not used `Protobuf` before, here are a couple of resources to get started:
+Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. If you have not used _Protobuf_ before, here are a couple of resources to get started:
 
 * Protobuf - [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
 * Tutorials - [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 
-We have defined a `Protobuf` as `proto:eth.erc721.v1.Transfers` which represents the list of ERC721 transfers.
+We have defined a _protobuf model_ as `proto:eth.erc721.v1.Transfers` which represents a list of ERC721 transfers.
 
-Firstly, you have to create a `Protobuf`.
+Firstly, let's create the `proto` folder:
 
 ```bash
 mkdir proto
-cd proto || touch erc721.proto
+cd proto
 ```
 
-We then have to make the newly created `erc721.proto` file to look like such:
+and in there, create our first protobuf definition file:
 
+{% code title="erc721.proto" %}
 ```protobuf
 syntax = "proto3";
 
@@ -35,6 +36,7 @@ message Transfer {
   uint64 ordinal = 5;
 }
 ```
+{% endcode %}
 
 Now, we need to setup some `rust` code to generate our `rust` files from the `Protobuf` defined above.
 
@@ -48,6 +50,7 @@ mv ./src/main.rs ./src/lib.rs
 
 Now, lets edit the newly created `Cargo.toml` file to look like this:
 
+{% code title="Cargo.toml" %}
 ```rust
 [package]
 name = "substreams-example"
@@ -70,10 +73,11 @@ lto = true
 opt-level = 's'
 strip = "debuginfo"
 ```
+{% endcode %}
 
 Let's go through the important changes. Our `rust` code will be compiled in [`wasm`](https://webassembly.org/). Think of `wasm` code as a binary instruction format that can be run in a virutal machine. When your `rust` code is compiled it will generate a `.so` file.&#x20;
 
-**Lets go down the file**
+**Let's break down the file**
 
 Since we are building a `rust` a dynamic system library, after the `package`, we first need to specify:
 

@@ -145,8 +145,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	sources := graph.GetSources()
 	for _, source := range sources {
-		if source != s.blockType {
-			return fmt.Errorf("input source not supported. Only %s is accepted", s.blockType)
+		if source != s.blockType && source != "sf.substreams.v1.Clock" {
+			return fmt.Errorf(`input source %q not supported, only %q and "sf.substreams.v1.Clock" are valid`, source, s.blockType)
 		}
 	}
 

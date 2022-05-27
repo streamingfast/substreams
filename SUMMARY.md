@@ -23,7 +23,6 @@
 * [Rust Modules API](docs/reference/api-reference.md)
 * [Substreams Packages](docs/reference/packages.md)
 * [Advanced](docs/advanced/README.md)
-  * [Merge Strategies](reference-and-specs/advanced/merge-strategies.md)
   * [Running the Substreams service locally](docs/advanced/running-locally.md)
 
 ## Release notes

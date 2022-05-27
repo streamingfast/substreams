@@ -147,7 +147,7 @@ Learn [more about modules here](broken-reference)
 
 Valid only for `kind: store`.
 
-Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [API Reference](api-reference.md) for details.
+Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concepts/modules.md#writing) for details.
 
 Possible values:
 

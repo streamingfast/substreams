@@ -5,5 +5,3 @@ pub enum Error {
     #[error("unexpected error: `{0}`")]
     Unexpected(String),
 }
-
-

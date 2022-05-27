@@ -1,4 +1,4 @@
-# Substreams Manifest
+# Manifests
 
 The substream manifest `substreams.yaml` defines the modules that composes the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a a reference guide of all fields in the manifest YAML files.&#x20;
 
@@ -63,7 +63,7 @@ imports:
 
 The `imports` section imports modules, with their WASM code, all of their (compiled) protobuf definitions and modules definition. The imported modules can be referred to by the _key_ later in the `modules` section.
 
-The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](packages.md) (ending in `.spkg`).
+The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](../docs/reference/packages.md) (ending in `.spkg`).
 
 The filename can be an absolute path, or relative (to the location of the `.yaml` file), or be remote if it starts with `http://` or `https://`.
 
@@ -107,7 +107,7 @@ binaries:
 
 Specifies the binary code to use to process data in modules. The field `modules[].binary` has a default value of `default` if unspecified, so will fall back on the `default` binary defined herein.
 
-You can override which binary to use in the [`modules` section](manifest.md#undefined) (see below), and define other binaries by their name (like `other` here).
+You can override which binary to use in the [`modules` section](manifests.md#undefined) (see below), and define other binaries by their name (like `other` here).
 
 #### `binaries[name].type`
 
@@ -174,7 +174,7 @@ Learn [more about modules here](broken-reference)
 
 Valid only for `kind: store`.
 
-Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concepts/modules.md#writing) for details.
+Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../docs/concepts/modules.md#writing) for details.
 
 Possible values:
 
@@ -188,7 +188,7 @@ Possible values:
 
 Valid only for `kind: store`.
 
-Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store. See [API Reference](../../reference-and-specs/rust-modules-api.md) for details.
+Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store. See [API Reference](rust-api/) for details.
 
 Possible values:
 
@@ -215,7 +215,7 @@ A single WASM Module (in WebAssembly parlance) can contain multiple entrypoints.
 
 ### `modules[].binary`
 
-A simple string pointing to a binary file defined in [`binaries`](manifest.md#binaries)
+A simple string pointing to a binary file defined in [`binaries`](manifests.md#binaries)
 
 ### `modules[].inputs`
 

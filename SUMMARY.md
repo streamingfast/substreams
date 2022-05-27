@@ -19,10 +19,12 @@
 
 ## Reference & Specs
 
-* [Rust Handler Signature](reference-and-specs/rust-handler-signature.md)
-* [Substreams Manifest](docs/reference/manifest.md)
-* [Rust Modules API](reference-and-specs/rust-modules-api.md)
-* [Substreams Packages](docs/reference/packages.md)
+* [Manifests](reference-and-specs/manifests.md)
+* [Packages](docs/reference/packages.md)
+* [Using the CLI](reference-and-specs/using-the-cli.md)
+* [Rust APIs](reference-and-specs/rust-api/README.md)
+  * [Handler Function Signature](reference-and-specs/rust-api/handler-function-signature.md)
+  * [Chain specific APIs](reference-and-specs/rust-api/chain-specific-apis.md)
 * [Advanced](docs/advanced/README.md)
   * [Rust Macros](reference-and-specs/advanced/rust-macros.md)
   * [Running the Substreams service locally](docs/advanced/running-locally.md)

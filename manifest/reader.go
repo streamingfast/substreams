@@ -77,7 +77,7 @@ func (r *Reader) newPkgFromManifest(inputPath string) (pkg *pbsubstreams.Package
 		return nil, err
 	}
 
-	pkg, err = r.manifestToPkg(manif, r.skipSourceCodeImportValidation)
+	pkg, err = r.manifestToPkg(manif)
 	if err != nil {
 		return nil, err
 	}
@@ -359,9 +359,9 @@ func mergeProtoFiles(src, dest *pbsubstreams.Package) {
 // manifestToPkg will take a Manifest object, most likely generated from a YAML file, and will create a Proto Pakcage object
 // in some cases we do not want to validate the package and ensure that all the code and dependencies are there fro example
 // when we are using the generated package transitively
-func (r *Reader) manifestToPkg(m *Manifest, ignoreError bool) (*pbsubstreams.Package, error) {
+func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, error) {
 	pkg, err := r.convertToPkg(m)
-	if err != nil && !ignoreError {
+	if err != nil {
 		return nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
 	}
 
@@ -393,8 +393,8 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 		pbmeta := &pbsubstreams.ModuleMetadata{
 			Doc: mod.Doc,
 		}
-
 		var pbmod *pbsubstreams.Module
+
 		switch mod.Code.Type {
 		case "native":
 			pbmod, err = mod.ToProtoNative()
@@ -404,15 +404,17 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 			codeIndex, found := moduleCodeIndexes[mod.Code.File]
 			if !found {
 				codePath := mod.Code.File
-				byteCode, err := ioutil.ReadFile(codePath)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
+				var byteCode []byte
+				if !r.skipSourceCodeImportValidation {
+					byteCode, err = ioutil.ReadFile(codePath)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
+					}
 				}
 				pkg.Modules.ModulesCode = append(pkg.Modules.ModulesCode, byteCode)
 				codeIndex = len(pkg.Modules.ModulesCode) - 1
 				moduleCodeIndexes[mod.Code.File] = codeIndex
 			}
-			pkg.ModuleMeta = append(pkg.ModuleMeta, pbmeta)
 			pbmod, err = mod.ToProtoWASM(uint32(codeIndex))
 		default:
 			return nil, fmt.Errorf("module %q: invalid code type %q", mod.Name, mod.Code.Type)
@@ -420,7 +422,10 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 		if err != nil {
 			return nil, err
 		}
+
+		pkg.ModuleMeta = append(pkg.ModuleMeta, pbmeta)
 		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
+
 	}
 
 	return

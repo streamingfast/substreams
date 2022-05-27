@@ -91,6 +91,36 @@ They are packaged with the modules to help clients decode the incoming streams, 
 
 Refer to [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
+## `binaries`
+
+Example:
+
+```yaml
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/my_package.wasm
+  other:
+    type: wasm/rust-v1
+    file: ./snapshot_of_my_package.wasm
+```
+
+Specifies the binary code to use to process data in modules. The field `modules[].binary` has a default value of `default` if unspecified, so will fall back on the `default` binary defined herein.
+
+You can override which binary to use in the [`modules` section](manifest.md#undefined) (see below), and define other binaries by their name (like `other` here).
+
+#### `binaries[name].type`
+
+The type of code, and the implied VM for execution.
+
+At the moment, there is only one VM available, so the value here should be `wasm/rust-v1`
+
+#### `binaries[name].file`
+
+A path pointing to a local compiled [WASM Module](https://webassembly.github.io/spec/core/syntax/modules.html). It can be absolute, or relative to the current `.yaml` file's directory.
+
+This file will be picked up and packaged into an `.spkg` upon invoking `substreams pack`.
+
 ## `modules`
 
 Examples:
@@ -98,11 +128,8 @@ Examples:
 ```yaml
   - name: events_extractor
     kind: map
-    startBlock: 5000000
-    code:
-      type: wasm/rust-v1
-      file: ../../target/wasm32-unknown-unknown/release/pcs_substreams.wasm
-      entrypoint: map_events
+    initialBlock: 5000000
+    binary: default  # Implicit
     inputs:
       - source: sf.ethereum.type.v1.Block
       - store: myimport:prices
@@ -111,12 +138,8 @@ Examples:
 
   - name: totals
     kind: store
-    updatePolicy: sum
+    updatePolicy: add
     valueType: int64
-    code:
-      type: wasm/rust-v1
-      file: ../../target/wasm32-unknown-unknown/release/pcs_substreams.wasm
-      entrypoint: sum_up_totals
     inputs:
       - source: sf.ethereum.type.v1.Block
       - map: events_extractor
@@ -128,11 +151,15 @@ The identifier for the module, starting with a letter, followed by max 64 charac
 
 It is the reference identify used on the command line, in inputs and elsewhere to denote this module. It is must be unique per package. Imports get prefixed so imported modules will not clash with the current YAML declaration, even though they share a name.
 
-### `modules[].startBlock`
+{% hint style="info" %}
+This `name` also corresponds to the **Rust function name** that will be invoked on the compiled WASM code upon execution. This is the same function you will define `#[substreams::handlers::map]` (or `store`) in your Rust code.
+{% endhint %}
 
-The start block for the module. The runtime will not process blocks prior to this one for the given module.
+### `modules[].initialBlock`
 
-The `startBlock` can be inferred by the `inputs` if all the inputs have the same `startBlock`. If some inputs have different `startBlock`, then specifying it is required.
+The initial block the module is going to start processing data. The runtime will not process blocks prior to this one for the given module.
+
+The `initialBlock` can be inferred by the `inputs` if all the inputs have the same `initialBlock`. If some inputs have different `initialBlock`, then specifying it is required.
 
 ### `modules[].kind`
 
@@ -172,21 +199,7 @@ Possible values:
 * `string`
 * `proto:some.path.to.protobuf.Model`
 
-### `modules[].code`
-
-Specifies the code used to process the data
-
-#### `modules[].code.type`
-
-The type of code, and the implied VM for execution.
-
-At the moment, there is only one VM available, so the value here should be `wasm/rust-v1`
-
-#### `modules[].code.file`
-
-A path pointing to a local compiled [WASM Module](https://webassembly.github.io/spec/core/syntax/modules.html). It can be absolute, or relative to the current `.yaml` file's directory.
-
-This file will be picked up and packaged into an `.spkg` upon invoking `substreams pack`.
+### ``
 
 #### `modules[].code.entrypoint`
 
@@ -200,8 +213,14 @@ pub extern "C" fn my_exported_func(...) {
 
 A single WASM Module (in WebAssembly parlance) can contain multiple entrypoints.
 
+### `modules[].binary`
+
+A simple string pointing to a binary file defined in [`binaries`](manifest.md#binaries)
+
 ### `modules[].inputs`
+
+\[Insert moare here]
 
 ### `modules[].output`
 
-The `output` section is to be defined for `kind: map` modules, and
+The `output` section is to be defined for `kind: map` modules. \[insert more here]

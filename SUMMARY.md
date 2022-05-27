@@ -19,10 +19,12 @@
 
 ## Reference & Specs
 
+* [Rust Handler Signature](reference-and-specs/rust-handler-signature.md)
 * [Substreams Manifest](docs/reference/manifest.md)
 * [Rust Modules API](reference-and-specs/rust-modules-api.md)
 * [Substreams Packages](docs/reference/packages.md)
 * [Advanced](docs/advanced/README.md)
+  * [Rust Macros](reference-and-specs/advanced/rust-macros.md)
   * [Running the Substreams service locally](docs/advanced/running-locally.md)
 
 ## Release notes

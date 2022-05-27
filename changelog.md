@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## \[Unreleased]
 
+* Changed `startBlock` to `initialBlock` in substreams.yaml manifests.
+* `code:` is now defined in the `binaries` section of the manifest, instead of in each module. A module can select which binary with the `binary:` field on the Module definition.
+* Added `substreams inspect ./substreams.yaml` or `inspect some.spkg` to see what's inside. Requires `protoc` to be installed (which you should have anyway).
 * Added command `substreams protogen` that writes a temporary `buf.gen.yaml` and generates Rust structs based on the contents of the provided manifest or package.
 *   Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
 
@@ -29,7 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     }
     ```
 
-## \[v0.0.6-beta]
+## [v0.0.6-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.6-beta)
 
 * Implemented [packages (see docs)](docs/reference/packages.md).
 * Added `substreams::Hex` wrapper type to more easily deal with printing and encoding bytes to hexadecimal string.
@@ -42,11 +45,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The `-c` (or `--compact-output`) can be used to print JSON as a single compact line.
 * The `--stop-block` flag on `substream run` can be defined as `+1000` to stream from start block + 1000.
 
-## \[v0.0.5-beta3]
+## [v0.0.5-beta3](https://github.com/streamingfast/substreams/releases/tag/v0.0.5-beta3)
 
 * Added Dockerfile support.
 
-## \[v0.0.5-beta2]
+## [v0.0.5-beta2](https://github.com/streamingfast/substreams/releases/tag/v0.0.5-beta2)
 
 ### Client
 
@@ -62,7 +65,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Always writes store snapshots, each 10,000 blocks.
 * A few tools to manage partial snapshots under `substreams tools`
 
-## \[v0.0.5-beta]
+## [v0.0.5-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.5-beta)
 
 First chain-agnostic release. THIS IS BETA SOFTWARE. USE AT YOUR OWN RISK. WE PROVIDE NO BACKWARDS COMPATIBILITY GUARANTEES FOR THIS RELEASE.
 

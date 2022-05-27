@@ -9,11 +9,12 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/progress"
 	"google.golang.org/protobuf/encoding/protojson"
 	"strings"
 )
 
-func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool, moduleProgressBar *ModuleProgressBar) (substreams.ResponseFunc, error) {
+func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool, moduleProgressBar *progress.ModuleProgressBar) (substreams.ResponseFunc, error) {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
@@ -155,26 +156,26 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		return nil
 	}
 
-	progress := func(progress *pbsubstreams.ModulesProgress) error {
-		if failedModule := firstFailedModuleProgress(progress); failedModule != nil {
-			if err := failureProgressHandler(progress); err != nil {
+	reponseProgress := func(moduleProgress *pbsubstreams.ModulesProgress) error {
+		if failedModule := firstFailedModuleProgress(moduleProgress); failedModule != nil {
+			if err := failureProgressHandler(moduleProgress); err != nil {
 				fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
 			}
 		}
 
-		for _, moduleProgress := range progress.Modules {
-			if moduleProgress.CatchUp { // don't print any progress if we are not catching up the request
-				if bar, ok := moduleProgressBar.Bars[ModuleName(moduleProgress.Name)]; ok {
+		for _, module := range moduleProgress.Modules {
+			if module.CatchUp { // don't print any progress if we are not catching up the request
+				if bar, ok := moduleProgressBar.Bars[progress.ModuleName(module.Name)]; ok {
 					if !bar.Initialized {
-						fmt.Printf("Running multiple parallel requests for %s to catch up...\n", moduleProgress.Name)
-						bar.NewOption(0, moduleProgress.RequestBlockRange.StartBlock, moduleProgress.RequestBlockRange.EndBlock)
+						fmt.Printf("Running multiple parallel requests for %s to catch up...\n", module.Name)
+						bar.NewOption(0, module.RequestBlockRange.StartBlock, module.RequestBlockRange.EndBlock)
 					}
 
-					if bar.cur == bar.Total {
+					if bar.Cur == bar.Total {
 						bar.Finish()
 					} else {
-						bar.cur++
-						bar.Play(bar.cur, moduleProgress.Name)
+						bar.Cur++
+						bar.Play(bar.Cur, module.Name)
 					}
 				}
 			}
@@ -188,7 +189,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		case *pbsubstreams.Response_Data:
 			return blockScopedData(m.Data)
 		case *pbsubstreams.Response_Progress:
-			return progress(m.Progress)
+			return reponseProgress(m.Progress)
 		case *pbsubstreams.Response_SnapshotData:
 			fmt.Println("Incoming snapshot data")
 		case *pbsubstreams.Response_SnapshotComplete:

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/progress"
 	"io"
 	"os"
 	"strconv"
@@ -50,15 +51,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 	outputStreamNames := strings.Split(args[1], ",")
 
 	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	moduleProgressBar := &decode.ModuleProgressBar{
-		Bars: map[decode.ModuleName]*decode.Bar{},
+	moduleProgressBar := &progress.ModuleProgressBar{
+		Bars: map[progress.ModuleName]*progress.Bar{},
 	}
 
 	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
 		for _, outputStreamName := range outputStreamNames {
-			bar := &decode.Bar{}
+			bar := &progress.Bar{}
 			bar.Initialized = false
-			moduleProgressBar.Bars[decode.ModuleName(outputStreamName)] = bar
+			moduleProgressBar.Bars[progress.ModuleName(outputStreamName)] = bar
 		}
 
 		returnHandler, err = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)

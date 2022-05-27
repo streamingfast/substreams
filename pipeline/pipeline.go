@@ -252,7 +252,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		step := obj.(bstream.Stepable).Step()
 
 		//if !skipBlockSource {
-		if err = p.setupSource(block); err != nil {
+		if err = p.assignSource(block); err != nil {
 			return fmt.Errorf("setting up sources: %w", err)
 		}
 		//}
@@ -377,16 +377,18 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 	return respFunc(substreams.NewModulesProgressResponse(modules))
 }
 
-func (p *Pipeline) setupSource(block *bstream.Block) error {
-	blk := block.ToProtocol()
+func (p *Pipeline) assignSource(block *bstream.Block) error {
 
 	switch p.vmType {
 	case "wasm/rust-v1":
-		// block.Payload.Get() could do the same, but does it go through the same
-		// CORRECTIONS of the block, that the BlockDecoder does?
-		blkBytes, err := proto.Marshal(blk.(proto.Message))
+		// TODO: avoid serializing/deserializing and all, just pass in the BYTES directly
+		// we have decided NEVER to do mutations in here, but rather to have data fixing processes
+		// when it is possible to do, otherwise have a full blown different VERSION of data,
+		// so that DATA is always the reference, and not a living process.
+		// So we can TRUST the data blindly here
+		blkBytes, err := block.Payload.Get()
 		if err != nil {
-			return fmt.Errorf("packing block: %w", err)
+			return fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
 		}
 
 		clockBytes, err := proto.Marshal(p.clock)
@@ -401,8 +403,7 @@ func (p *Pipeline) setupSource(block *bstream.Block) error {
 
 func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Builder, err error) {
 	for _, binary := range p.request.Modules.Binaries {
-
-		if binary.Type != p.vmType {
+		if binary.Type != "wasm/rust-v1" {
 			return nil, nil, nil, fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
 		}
 		p.vmType = binary.Type

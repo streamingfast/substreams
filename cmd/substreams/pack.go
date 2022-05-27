@@ -24,7 +24,8 @@ func init() {
 func runPack(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 
-	pkg, err := manifest.New(manifestPath)
+	manifestReader := manifest.NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}

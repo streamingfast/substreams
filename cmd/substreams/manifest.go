@@ -37,7 +37,8 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 	fmt.Println("Manifest Info")
 
 	manifestPath := args[0]
-	pkg, err := manifest.New(manifestPath)
+	manifestReader := manifest.NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
@@ -61,7 +62,8 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 
 func runManifestGraph(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
-	pkg, err := manifest.New(manifestPath)
+	manifestReader := manifest.NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}

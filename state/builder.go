@@ -235,7 +235,7 @@ func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock u
 	for {
 		cacheItems := outputCache.SortedCacheItems()
 		if len(cacheItems) == 0 {
-			panic(fmt.Sprintf("missing deltas %s", b.Name))
+			return fmt.Errorf("missing deltas for module %q", b.Name)
 		}
 
 		firstSeenBlockNum := uint64(0)

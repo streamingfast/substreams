@@ -580,14 +580,14 @@ func SynchronizeStores(
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	//strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, pool, upToBlockNum, blockRangeSizeSubRequests)
-	//if err != nil {
-	//	return fmt.Errorf("creating strategy: %w", err)
-	//}
-	strategy, err := orchestrator.NewLinearStrategy(ctx, originalRequest, builders, upToBlockNum, blockRangeSizeSubRequests)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, pool, upToBlockNum, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}
+	//strategy, err := orchestrator.NewLinearStrategy(ctx, originalRequest, builders, upToBlockNum, blockRangeSizeSubRequests)
+	//if err != nil {
+	//	return fmt.Errorf("creating strategy: %w", err)
+	//}
 
 	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, blockRangeSizeSubRequests)
 	if err != nil {

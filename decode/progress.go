@@ -2,7 +2,6 @@ package decode
 
 import (
 	"fmt"
-	"math"
 )
 
 type ModuleName string
@@ -42,16 +41,19 @@ func (bar *Bar) Play(cur uint64, moduleName string) {
 	bar.cur = cur
 	last := bar.percent
 	bar.percent = bar.getPercent()
+	padding := uint64(50) // size of [   ]
+	_ = padding
 	if bar.percent != last && bar.percent%2 == 0 {
 		bar.rate += bar.graph
 	}
-	padding := int(math.Floor(float64(bar.Total/2))) + 1 // fixme: is this good ?
-	fmt.Printf("\r Executing: %s to catch up for blocks %d - %d [%-*s]%3d%% %8d/%d",
+
+	fmt.Printf("\r Executing: %s to catch up for blocks %d - %d -- %3d%% %8d/%d",
+		//fmt.Printf("\r Executing: %s to catch up for blocks %d - %d [%-*s]%3d%% %8d/%d",
 		moduleName,
 		bar.BlockRangeStartBlock,
 		bar.BlockRangeEndBlock,
-		padding,
-		bar.rate,
+		//padding,
+		//bar.rate,
 		bar.percent,
 		bar.cur,
 		bar.Total)

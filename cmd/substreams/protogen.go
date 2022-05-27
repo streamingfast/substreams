@@ -31,7 +31,8 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := mustGetString(cmd, "output-path")
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
 	manifestPath := args[0]
-	pkg, err := manifest.New(manifestPath)
+	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}

@@ -22,7 +22,8 @@ func runParallelizeE(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 	streamName := args[1]
 
-	pkg, err := manifest.New(manifestPath)
+	manifestReader := manifest.NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}

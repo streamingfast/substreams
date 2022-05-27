@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"path"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -88,63 +86,6 @@ type StreamOutput struct {
 	Type string `yaml:"type"`
 }
 
-func loadManifestFile(inputPath string) (*Manifest, error) {
-	m, err := decodeYamlManifestFromFile(inputPath)
-	if err != nil {
-		return nil, fmt.Errorf("decoding yaml: %w", err)
-	}
-
-	absoluteManifestPath, err := filepath.Abs(inputPath)
-	if err != nil {
-		return nil, fmt.Errorf("getting absolute path: %w", err)
-	}
-
-	m.Workdir = path.Dir(absoluteManifestPath)
-
-	if m.SpecVersion != "v0.1.0" {
-		return nil, fmt.Errorf("invalid 'specVersion', must be v0.1.0")
-	}
-
-	// TODO: put some limits on the NUMBER of modules (max 50 ?)
-	// TODO: put a limit on the SIZE of the WASM payload (max 10MB per binary?)
-
-	for _, s := range m.Modules {
-		// TODO: let's make sure this is also checked when received in Protobuf in a remote request.
-
-		switch s.Kind {
-		case ModuleKindMap:
-			if s.Output.Type == "" {
-				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
-			}
-			// TODO: check protobuf
-			if s.Code.Entrypoint == "" {
-				s.Code.Entrypoint = "map"
-			}
-		case ModuleKindStore:
-			if err := validateStoreBuilder(s); err != nil {
-				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
-			}
-
-			if s.Code.Entrypoint == "" {
-				// TODO: let's make sure this is validated also when analyzing some incoming protobuf version
-				// of this.
-				s.Code.Entrypoint = "build_state"
-			}
-
-		default:
-			return nil, fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
-		}
-
-		for _, input := range s.Inputs {
-			if err := input.parse(); err != nil {
-				return nil, fmt.Errorf("module %q: %w", s.Name, err)
-			}
-		}
-	}
-
-	return m, nil
-}
-
 func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) {
 	cnt, err := ioutil.ReadFile(yamlFilePath)
 	if err != nil {
@@ -156,22 +97,22 @@ func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) 
 	return
 }
 
-func (m *Manifest) loadSourceCode() error {
-	for _, s := range m.Modules {
-		if s.Code.File != "" {
-			s.Code.File = path.Join(m.Workdir, s.Code.File)
-			cnt, err := ioutil.ReadFile(s.Code.File)
-			if err != nil {
-				return fmt.Errorf("reading file %q: %w", s.Code.File, err)
-			}
-			if len(cnt) == 0 {
-				return fmt.Errorf("reference wasm file %q empty", s.Code.File)
-			}
-			s.Code.Content = cnt
-		}
-	}
-	return nil
-}
+//func (m *Manifest) loadWASMCode() error {
+//	for _, s := range m.Modules {
+//		if s.Code.File != "" {
+//			s.Code.File = path.Join(m.Workdir, s.Code.File)
+//			cnt, err := ioutil.ReadFile(s.Code.File)
+//			if err != nil {
+//				return fmt.Errorf("reading file source code %q: %w", s.Code.File, err)
+//			}
+//			if len(cnt) == 0 {
+//				return fmt.Errorf("reference wasm file %q empty", s.Code.File)
+//			}
+//			s.Code.Content = cnt
+//		}
+//	}
+//	return nil
+//}
 
 func (i *Input) parse() error {
 	if i.Map != "" && i.Store == "" && i.Source == "" {

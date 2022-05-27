@@ -6,17 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## \[Unreleased]
 
-
 * Added command `substreams protogen` that writes a temporary `buf.gen.yaml` and generates Rust structs based on the contents of the provided manifest or package.
+*   Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
 
-* Added `substreams::handlers` macros to reduce boilerplate when create substream modules.
-
-    `substreams::handlers::map` is used for the handlers corresponding to modules of type `map`. Modules of type `map` should return a `Result` where the error is of type `SubstreamError`
+    `substreams::handlers::map` is used for the handlers corresponding to modules of type `map`. Modules of type `map` should return a `Result` where the error is of type `Error`
 
     ```rust
     /// Map module example
-    #[substreams::handlers::map
-    fn map_module_func(blk: eth::Block) -> Result<erc721::Transfers, SubstreamError> {
+    #[substreams::handlers::map]
+    pub fn map_module_func(blk: eth::Block) -> Result<erc721::Transfers, Error> {
          ...
     }
     ```
@@ -25,8 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
     ```rust
     /// Map module example
-    #[substreams::handlers::store
-    fn store_module func(transfers: erc721::Transfers, s: store::SumInt64Writer, pairs: store::Reader, tokens: store::Reader) {
+    #[substreams::handlers::store]
+    pub fn store_module(transfers: erc721::Transfers, s: store::StoreAddInt64, pairs: store::StoreGet, tokens: store::StoreGet) {
           ...
     }
     ```

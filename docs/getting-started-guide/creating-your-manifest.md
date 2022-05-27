@@ -7,15 +7,26 @@ mkdir subtream-template
 cd subtream-template
 ```
 
-A Substream manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain  a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module). It will also have a link to the `rust` code that implement the business logic of the module, we call this the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.&#x20;
+A Substreams manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain  a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module). It will also have a link to the `rust` code that implement the business logic of the module, we call this the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.&#x20;
 
-For the example Substream, the `manifest.yaml` is:
+For our manifest we will use:
 
+{% code title="substreams.yaml" %}
 ```yaml
-specVersion: 0.1.0
-description: Your substream(s) description here
+specVersion: v0.1.0
+package:
+  name: "substreams_example"
+  version: v0.1.0
+
 imports:
-  eth: https://github.com/streamingfast/sf-ethereum/release
+  eth: https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.2.spkg
+
+protobuf:
+  files:
+    - erc721.proto
+  importPaths:
+    - ./proto
+
 modules:
   - name: block_to_transfers
     kind: map
@@ -32,7 +43,7 @@ modules:
   - name: nft_state
     kind: store
     startBlock: 12287507
-    updatePolicy: sum
+    updatePolicy: add
     valueType: int64
     code:
       type: wasm/rust-v1
@@ -42,8 +53,15 @@ modules:
       - map: block_to_transfers
 
 ```
+{% endcode %}
 
-The manifest lists 2 modules: `block_to_transfers` and `nft_state`, where the former is a module of kind `map` and the latter is a module of kind `store`.
+Let's review a few important entries:
+
+* `imports.eth` : Our `Substreams` will consume Ethereum blocks, thus we will depend on the Ethereum substream package. You can find out more about \`Substreams\` packages [here](../reference/packages.md)\`
+* `protobuf.files`: The list of our `Substreams` custom `Protobuf` files. We will create these files in the following step
+* `protobuf.importPaths`: The locations of our custom `Protobuf` files.
+
+Furthermore, the manifest lists 2 modules: `block_to_transfers` and `nft_state`, where the former is a module of kind `map` and the latter is a module of kind `store`.
 
 `block_to_transfers`
 

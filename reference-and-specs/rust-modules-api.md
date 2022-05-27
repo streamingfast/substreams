@@ -13,7 +13,7 @@ See the [official crate documentation](https://docs.rs/substreams).&#x20;
 
 ## Store API
 
-The `store` API exposes different types of store, that you can leverage to create your `store` modules. The type of store your `store` module will use is based on the [`updatePolicy`](manifest.md#modules-.updatepolicy) and  [`valueType`](manifest.md#modules-.valuetype) of your store module.  Each `writable` store type are constrained in the way they are to enable high parallelization of processes.
+The `store` API exposes different types of store, that you can leverage to create your `store` modules. The type of store your `store` module will use is based on the [`updatePolicy`](../docs/reference/manifest.md#modules-.updatepolicy) and  [`valueType`](../docs/reference/manifest.md#modules-.valuetype) of your store module.  Each `writable` store type are constrained in the way they are to enable high parallelization of processes.
 
 When processing segments of history in parallel, two partial stores have a merge or squashing strategy particular to their data type, and/or the way keys are set.
 
@@ -21,7 +21,7 @@ The **merge strategy** below explains what happens when we have two stores that 
 
 #### Ordinal
 
-You will notice Store functions usually take an `ordinal`. This is because `store`s keep track of changes to the key/values inside a block, and produces [_StoreDeltas_ as referenced here](../../proto/sf/substreams/v1/substreams.proto). This allows keys to be set multiple times in a module that is dealing with multiple transactions.
+You will notice Store functions usually take an `ordinal`. This is because `store`s keep track of changes to the key/values inside a block, and produces [_StoreDeltas_ as referenced here](../proto/sf/substreams/v1/substreams.proto). This allows keys to be set multiple times in a module that is dealing with multiple transactions.
 
 The `ordinal` is therefore an index that helps sort and order events from multiple modules written by different people, around the `ordinal` of each event in the blockchain data.
 
@@ -397,7 +397,7 @@ The `Reader` store is only available when a `store` has been declared as a depen
 pub fn get_at(&self, ord: i64, key: &String) -> Option<Vec<u8>>
 ```
 
-`get_at` allows you to read a single `key` from the store. The type of its value can be anything, and is usually declared in the `output` section of the [manifest](manifest.md).
+`get_at` allows you to read a single `key` from the store. The type of its value can be anything, and is usually declared in the `output` section of the [manifest](../docs/reference/manifest.md).
 
 The `ordinal` is used here to go query a key that might have changed mid-block by the `store` module that built it.
 

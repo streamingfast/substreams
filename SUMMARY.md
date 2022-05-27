@@ -10,17 +10,17 @@
 
 ## Getting Started Guide
 
-* [Overview](docs/getting-started-guide/README.md)
-* [Installation](docs/getting-started-guide/requirements.md)
-* [Creating Protobuf Schemas](getting-started-guide/creating-protobuf-schemas.md)
+* [Overview](getting-started-guide/overview.md)
+* [Installation](getting-started-guide/installation-requirements.md)
 * [Creating your Manifest](docs/getting-started-guide/creating-your-manifest.md)
-* [Writing Module Handlers](getting-started-guide/creating-protobuf-schemas-1.md)
-* [Running Your Substreams](getting-started-guide/consuming.md)
+* [Creating Protobuf Schemas](getting-started-guide/creating-protobuf-schemas.md)
+* [Writing Module Handlers](getting-started-guide/writing-module-handlers.md)
+* [Running Your Substreams](getting-started-guide/running-substreams.md)
 
 ## Reference & Specs
 
 * [Substreams Manifest](docs/reference/manifest.md)
-* [Rust Modules API](docs/reference/api-reference.md)
+* [Rust Modules API](reference-and-specs/rust-modules-api.md)
 * [Substreams Packages](docs/reference/packages.md)
 * [Advanced](docs/advanced/README.md)
   * [Running the Substreams service locally](docs/advanced/running-locally.md)

@@ -1,6 +1,6 @@
 # Substreams Manifest
 
-The substream manifest `manifest.yaml` defines the modules that composes the substream. The `manifest.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a a reference guide of all fields in the manifest YAML files.&#x20;
+The substream manifest `substreams.yaml` defines the modules that composes the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a a reference guide of all fields in the manifest YAML files.&#x20;
 
 ## `specVersion`
 
@@ -63,7 +63,7 @@ imports:
 
 The `imports` section imports modules, with their WASM code, all of their (compiled) protobuf definitions and modules definition. The imported modules can be referred to by the _key_ later in the `modules` section.
 
-The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or an [Package](packages.md) (ending in `.spkg`).
+The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](packages.md) (ending in `.spkg`).
 
 The filename can be an absolute path, or relative (to the location of the `.yaml` file), or be remote if it starts with `http://` or `https://`.
 
@@ -87,7 +87,7 @@ The `protobuf` section points to the protobuf definitions used by these modules.
 The Substreams packager will load files in any of the listed `importPaths`.\
 Note that the `imports` section will also affect which `.proto` files end up in your package.
 
-They are packaged with the modules to help clients decode the bytestreams, but are not sent to Substreams server in any way.
+They are packaged with the modules to help clients decode the incoming streams, but are not sent to Substreams server in network requests.
 
 Refer to [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
@@ -161,7 +161,7 @@ Possible values:
 
 Valid only for `kind: store`.
 
-Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store. See [API Reference](api-reference.md) for details.
+Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store. See [API Reference](../../reference-and-specs/rust-modules-api.md) for details.
 
 Possible values:
 

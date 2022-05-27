@@ -2,8 +2,9 @@ package orchestrator
 
 import (
 	"context"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"sync"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Waiter interface {
@@ -13,10 +14,21 @@ type Waiter interface {
 }
 
 type waiterItem struct {
-	storeName string
-	blockNum  uint64
+	StoreName string
+	BlockNum  uint64
 
-	waitChan chan interface{}
+	closeOnce sync.Once
+	waitChan  chan interface{}
+}
+
+func (wi *waiterItem) Close() {
+	wi.closeOnce.Do(func() {
+		close(wi.waitChan)
+	})
+}
+
+func (wi *waiterItem) Wait() <-chan interface{} {
+	return wi.waitChan
 }
 
 type BlockWaiter struct {
@@ -32,8 +44,8 @@ func NewWaiter(blockNum uint64, lastSavedBlockMap map[string]uint64, stores ...*
 
 	for _, store := range stores {
 		items = append(items, &waiterItem{
-			storeName: store.Name,
-			blockNum:  blockNum,
+			StoreName: store.Name,
+			BlockNum:  blockNum,
 			waitChan:  make(chan interface{}),
 		})
 	}
@@ -47,7 +59,6 @@ func NewWaiter(blockNum uint64, lastSavedBlockMap map[string]uint64, stores ...*
 func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 	w.setup.Do(func() {
 		w.done = make(chan interface{})
-
 		if len(w.items) == 0 {
 			close(w.done)
 			return
@@ -65,12 +76,12 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 			go func(waiter *waiterItem) {
 				defer wg.Done()
 
-				if waiter.blockNum <= w.lastSavedBlockMap[waiter.storeName] {
+				if waiter.BlockNum <= w.lastSavedBlockMap[waiter.StoreName] {
 					return //store has already saved up to or past the desired block.
 				}
 
 				select {
-				case <-waiter.waitChan:
+				case <-waiter.Wait():
 					return
 				case <-ctx.Done():
 					return
@@ -85,11 +96,11 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 
 func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 	for _, waiter := range w.items {
-		if waiter.storeName != storeName || waiter.blockNum > blockNum {
+		if waiter.StoreName != storeName || waiter.BlockNum > blockNum {
 			continue
 		}
 
-		close(waiter.waitChan)
+		waiter.Close()
 	}
 }
 

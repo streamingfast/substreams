@@ -63,6 +63,10 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		zlog.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 	}()
 	grpcClient, grpcCallOpts, err := w.grpcClientFactory()
+	if err != nil {
+		zlog.Error("getting grpc client", zap.Error(err))
+		return err
+	}
 	reqCtx := metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 	stream, err := grpcClient.Blocks(reqCtx, job.Request, grpcCallOpts...)
 	if err != nil {

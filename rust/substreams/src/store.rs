@@ -11,12 +11,12 @@ pub type Deltas = Vec<pb::substreams::StoreDelta>;
 #[derive(StoreWriter)]
 pub struct StoreSet {}
 impl StoreSet {
-    pub fn set(&self, ord: i64, key: String, value: &Vec<u8>) {
-        state::set(ord, key, value);
+    pub fn set(&self, ord: u64, key: String, value: &Vec<u8>) {
+        state::set(ord as i64, key, value);
     }
-    pub fn set_many(&self, ord: i64, keys: &Vec<String>, value: &Vec<u8>) {
+    pub fn set_many(&self, ord: u64, keys: &Vec<String>, value: &Vec<u8>) {
         for key in keys {
-            state::set(ord, key.to_string(), value);
+            state::set(ord as i64, key.to_string(), value);
         }
     }
 }
@@ -26,12 +26,12 @@ impl StoreSet {
 #[derive(StoreWriter)]
 pub struct StoreSetIfNotExists {}
 impl StoreSetIfNotExists {
-    pub fn set_if_not_exists(&self, ord: i64, key: String, value: &Vec<u8>) {
-        state::set_if_not_exists(ord, key, value);
+    pub fn set_if_not_exists(&self, ord: u64, key: String, value: &Vec<u8>) {
+        state::set_if_not_exists(ord as i64, key, value);
     }
-    pub fn set_if_not_exists_many(&self, ord: i64, keys: &Vec<String>, value: &Vec<u8>) {
+    pub fn set_if_not_exists_many(&self, ord: u64, keys: &Vec<String>, value: &Vec<u8>) {
         for key in keys {
-            state::set_if_not_exists(ord, key.to_string(), value);
+            state::set_if_not_exists(ord as i64, key.to_string(), value);
         }
     }
 }
@@ -41,12 +41,12 @@ impl StoreSetIfNotExists {
 #[derive(StoreWriter)]
 pub struct StoreAddInt64 {}
 impl StoreAddInt64 {
-    pub fn add(&self, ord: i64, key: String, value: i64) {
-        state::add_int64(ord, key, value);
+    pub fn add(&self, ord: u64, key: String, value: i64) {
+        state::add_int64(ord as i64, key, value);
     }
-    pub fn add_many(&self, ord: i64, keys: &Vec<String>, value: i64) {
+    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: i64) {
         for key in keys {
-            state::add_int64(ord, key.to_string(), value);
+            state::add_int64(ord as i64, key.to_string(), value);
         }
     }
 }
@@ -56,12 +56,12 @@ impl StoreAddInt64 {
 #[derive(StoreWriter)]
 pub struct StoreAddFloat64 {}
 impl StoreAddFloat64 {
-    pub fn add(&self, ord: i64, key: String, value: f64) {
-        state::add_float64(ord, key, value);
+    pub fn add(&self, ord: u64, key: String, value: f64) {
+        state::add_float64(ord as i64, key, value);
     }
-    pub fn add_many(&self, ord: i64, keys: &Vec<String>, value: f64) {
+    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: f64) {
         for key in keys {
-            state::add_float64(ord, key.to_string(), value);
+            state::add_float64(ord as i64, key.to_string(), value);
         }
     }
 }
@@ -71,12 +71,12 @@ impl StoreAddFloat64 {
 #[derive(StoreWriter)]
 pub struct StoreAddBigFloat {}
 impl StoreAddBigFloat {
-    pub fn add(&self, ord: i64, key: String, value: &BigDecimal) {
-        state::add_bigfloat(ord, key, value);
+    pub fn add(&self, ord: u64, key: String, value: &BigDecimal) {
+        state::add_bigfloat(ord as i64, key, value);
     }
-    pub fn add_many(&self, ord: i64, keys: &Vec<String>, value: &BigDecimal) {
+    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: &BigDecimal) {
         for key in keys {
-            state::add_bigfloat(ord, key.to_string(), value);
+            state::add_bigfloat(ord as i64, key.to_string(), value);
         }
     }
 }
@@ -86,8 +86,8 @@ impl StoreAddBigFloat {
 #[derive(StoreWriter)]
 pub struct StoreAddBigInt {}
 impl StoreAddBigInt {
-    pub fn add(&self, ord: i64, key: String, value: &BigInt) {
-        state::add_bigint(ord, key, value);
+    pub fn add(&self, ord: u64, key: String, value: &BigInt) {
+        state::add_bigint(ord as i64, key, value);
     }
 }
 
@@ -96,8 +96,8 @@ impl StoreAddBigInt {
 #[derive(StoreWriter)]
 pub struct StoreMaxInt64 {}
 impl StoreMaxInt64 {
-    pub fn max(&self, ord: i64, key: String, value: i64) {
-        state::set_max_int64(ord, key, value);
+    pub fn max(&self, ord: u64, key: String, value: i64) {
+        state::set_max_int64(ord as i64, key, value);
     }
 }
 
@@ -106,8 +106,8 @@ impl StoreMaxInt64 {
 #[derive(StoreWriter)]
 pub struct StoreMaxBigInt {}
 impl StoreMaxBigInt {
-    pub fn max(&self, ord: i64, key: String, value: &BigInt) {
-        state::set_max_bigint(ord, key, value);
+    pub fn max(&self, ord: u64, key: String, value: &BigInt) {
+        state::set_max_bigint(ord as i64, key, value);
     }
 }
 
@@ -116,8 +116,8 @@ impl StoreMaxBigInt {
 #[derive(StoreWriter)]
 pub struct StoreMaxFloat64 {}
 impl StoreMaxFloat64 {
-    pub fn max(&self, ord: i64, key: String, value: f64) {
-        state::set_max_float64(ord, key, value);
+    pub fn max(&self, ord: u64, key: String, value: f64) {
+        state::set_max_float64(ord as i64, key, value);
     }
 }
 
@@ -126,8 +126,8 @@ impl StoreMaxFloat64 {
 #[derive(StoreWriter)]
 pub struct StoreMaxBigFloat {}
 impl StoreMaxBigFloat {
-    pub fn max(&self, ord: i64, key: String, value: &BigDecimal) {
-        state::set_max_bigfloat(ord, key, value);
+    pub fn max(&self, ord: u64, key: String, value: &BigDecimal) {
+        state::set_max_bigfloat(ord as i64, key, value);
     }
 }
 
@@ -136,8 +136,8 @@ impl StoreMaxBigFloat {
 #[derive(StoreWriter)]
 pub struct StoreMinInt64 {}
 impl StoreMinInt64 {
-    pub fn min(&self, ord: i64, key: String, value: i64) {
-        state::set_min_int64(ord, key, value);
+    pub fn min(&self, ord: u64, key: String, value: i64) {
+        state::set_min_int64(ord as i64, key, value);
     }
 }
 
@@ -146,8 +146,8 @@ impl StoreMinInt64 {
 #[derive(StoreWriter)]
 pub struct StoreMinBigInt {}
 impl StoreMinBigInt {
-    pub fn min(&self, ord: i64, key: String, value: &BigInt) {
-        state::set_min_bigint(ord, key, value);
+    pub fn min(&self, ord: u64, key: String, value: &BigInt) {
+        state::set_min_bigint(ord as i64, key, value);
     }
 }
 
@@ -156,8 +156,8 @@ impl StoreMinBigInt {
 #[derive(StoreWriter)]
 pub struct StoreMinFloat64 {}
 impl StoreMinFloat64 {
-    pub fn min(&self, ord: i64, key: String, value: f64) {
-        state::set_min_float64(ord, key, value);
+    pub fn min(&self, ord: u64, key: String, value: f64) {
+        state::set_min_float64(ord as i64, key, value);
     }
 }
 
@@ -166,8 +166,8 @@ impl StoreMinFloat64 {
 #[derive(StoreWriter)]
 pub struct StoreMinBigFloat {}
 impl StoreMinBigFloat {
-    pub fn min(&self, ord: i64, key: String, value: &BigDecimal) {
-        state::set_min_bigfloat(ord, key, value);
+    pub fn min(&self, ord: u64, key: String, value: &BigDecimal) {
+        state::set_min_bigfloat(ord as i64, key, value);
     }
 }
 
@@ -179,8 +179,8 @@ impl StoreGet {
     pub fn new(idx: u32) -> StoreGet {
         StoreGet { idx }
     }
-    pub fn get_at(&self, ord: i64, key: &String) -> Option<Vec<u8>> {
-        return state::get_at(self.idx, ord, key);
+    pub fn get_at(&self, ord: u64, key: &String) -> Option<Vec<u8>> {
+        return state::get_at(self.idx, ord as i64, key);
     }
     pub fn get_last(&self, key: &String) -> Option<Vec<u8>> {
         return state::get_last(self.idx, key);

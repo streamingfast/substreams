@@ -3,11 +3,12 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/progress"
 	"io"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/substreams/progress"
 
 	"github.com/streamingfast/derr"
 
@@ -135,8 +136,8 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
-		if isOutput && p.requestedStartBlockNum < module.StartBlock {
-			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.StartBlock)
+		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
+			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
 		}
 
 		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
@@ -380,8 +381,6 @@ func (p *Pipeline) setupSource(block *bstream.Block) error {
 	blk := block.ToProtocol()
 
 	switch p.vmType {
-	case "native":
-		panic("not implemented")
 	case "wasm/rust-v1":
 		// block.Payload.Get() could do the same, but does it go through the same
 		// CORRECTIONS of the block, that the BlockDecoder does?
@@ -401,21 +400,12 @@ func (p *Pipeline) setupSource(block *bstream.Block) error {
 }
 
 func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Builder, err error) {
-	for _, module := range p.request.Modules.Modules {
-		vmType := ""
-		switch module.Code.(type) {
-		case *pbsubstreams.Module_WasmCode_:
-			vmType = module.GetWasmCode().GetType()
-		case *pbsubstreams.Module_NativeCode_:
-			vmType = "native"
-		default:
-			return nil, nil, nil, fmt.Errorf("invalid code type for modules %s ", module.Name)
-		}
+	for _, binary := range p.request.Modules.Binaries {
 
-		if p.vmType != "" && vmType != p.vmType {
-			return nil, nil, nil, fmt.Errorf("cannot process modules of different code types: %s vs %s", p.vmType, vmType)
+		if binary.Type != p.vmType {
+			return nil, nil, nil, fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
 		}
-		p.vmType = vmType
+		p.vmType = binary.Type
 	}
 
 	modules, err = p.graph.ModulesDownTo(p.outputModuleNames)
@@ -431,7 +421,7 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 		builder, err := state.NewBuilder(
 			storeModule.Name,
 			p.storesSaveInterval,
-			storeModule.StartBlock,
+			storeModule.InitialBlock,
 			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
@@ -492,14 +482,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		}
 
 		modName := module.Name // to ensure it's enclosed
-		wasmCodeRef := module.GetWasmCode()
-		if wasmCodeRef == nil {
-			return fmt.Errorf("build_wasm cannot use modules that are not of type wasm")
-		}
-		entrypoint := wasmCodeRef.Entrypoint
-
-		code := p.request.Modules.ModulesCode[wasmCodeRef.Index]
-		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code, module.Name)
+		entrypoint := module.BinaryEntrypoint
+		code := p.request.Modules.Binaries[module.BinaryIndex]
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}

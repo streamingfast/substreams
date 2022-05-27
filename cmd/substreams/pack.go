@@ -11,9 +11,9 @@ import (
 )
 
 var packCmd = &cobra.Command{
-	Use:          "pack <manifest_yaml> [manifest_spkg]",
+	Use:          "pack <manifest_yaml>",
 	RunE:         runPack,
-	Args:         cobra.RangeArgs(1, 2),
+	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 }
 

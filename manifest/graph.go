@@ -55,7 +55,9 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 		return nil, fmt.Errorf("modules graph has a cycle")
 	}
 
-	computeStartBlock(modules, g)
+	if err := computeInitialBlock(modules, g); err != nil {
+		return nil, err
+	}
 
 	return g, nil
 }
@@ -72,43 +74,58 @@ func (g *ModuleGraph) GetSources() []string {
 	return sources
 }
 
-func computeStartBlock(modules []*pbsubstreams.Module, g *ModuleGraph) {
+func computeInitialBlock(modules []*pbsubstreams.Module, g *ModuleGraph) error {
 	for _, module := range modules {
-		if module.StartBlock == UNSET {
+		if module.InitialBlock == UNSET {
 			moduleIndex := g.moduleIndex[module.Name]
-			startBlock := startBlockForModule(moduleIndex, g)
-			module.StartBlock = startBlock
+			startBlock, err := startBlockForModule(moduleIndex, g)
+			if err != nil {
+				return err
+			}
+
+			module.InitialBlock = startBlock
 			zlog.Info("computed start block", zap.String("module_name", module.Name), zap.Uint64("start_block", startBlock))
 		}
 	}
+	return nil
 }
 
-func startBlockForModule(moduleIndex int, g *ModuleGraph) uint64 {
-	parentsStartBlock := int64(-1)
+func startBlockForModule(moduleIndex int, g *ModuleGraph) (out uint64, err error) {
+	parentsInitialBlock := int64(-1)
 	g.Visit(moduleIndex, func(w int, c int64) bool {
 		parent := g.modules[w]
-		currentStartBlock := int64(-1)
-		if parent.StartBlock == UNSET {
-			currentStartBlock = int64(startBlockForModule(w, g))
+		currentInitialBlock := int64(-1)
+		if parent.InitialBlock == UNSET {
+			var newVal uint64
+			newVal, err = startBlockForModule(w, g)
+			if err != nil {
+				return true
+			}
+			currentInitialBlock = int64(newVal)
 		} else {
-			currentStartBlock = int64(parent.GetStartBlock())
+			currentInitialBlock = int64(parent.GetInitialBlock())
 		}
 
-		if parentsStartBlock == -1 {
-			if currentStartBlock != -1 {
-				parentsStartBlock = currentStartBlock
+		if parentsInitialBlock == -1 {
+			if currentInitialBlock != -1 {
+				parentsInitialBlock = currentInitialBlock
 			}
 			return false
 		}
-		if parentsStartBlock != currentStartBlock {
-			panic(fmt.Sprintf("Cannot deterministically determine the start block for module %s", g.modules[moduleIndex].Name))
+		if parentsInitialBlock != currentInitialBlock {
+			err =fmt.Errorf("cannot deterministically determine the initialBlock for module %q; multiple inputs have conflicting initial blocks defined or inherited", g.modules[moduleIndex].Name)
+			return true
 		}
 		return false
 	})
-	if parentsStartBlock == -1 {
-		return bstream.GetProtocolFirstStreamableBlock
+	if err != nil {
+		return uint64(0), err
 	}
-	return uint64(parentsStartBlock)
+
+	if parentsInitialBlock == -1 {
+		return bstream.GetProtocolFirstStreamableBlock, nil
+	}
+	return uint64(parentsInitialBlock), nil
 }
 
 func (g *ModuleGraph) TopologicalSort() ([]*pbsubstreams.Module, bool) {
@@ -300,9 +317,9 @@ func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Modul
 	return res, nil
 }
 
-func (g *ModuleGraph) ModuleStartBlock(moduleName string) (uint64, error) {
+func (g *ModuleGraph) ModuleInitialBlock(moduleName string) (uint64, error) {
 	if moduleIndex, found := g.moduleIndex[moduleName]; found {
-		return g.modules[moduleIndex].GetStartBlock(), nil
+		return g.modules[moduleIndex].GetInitialBlock(), nil
 	}
 	return 0, fmt.Errorf("could not find module %s in graph", moduleName)
 }

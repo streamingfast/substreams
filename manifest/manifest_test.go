@@ -29,8 +29,7 @@ func TestStreamYamlDecode(t *testing.T) {
 			rawYamlInput: `---
 name: pairExtractor
 kind: map
-code:
-  file: ./pcs_substreams_bg.wasm.wasm
+binary: bob
 inputs:
   - source: proto:sf.ethereum.type.v1.Block
 output:
@@ -38,7 +37,7 @@ output:
 			expectedOutput: Module{
 				Name:   "pairExtractor",
 				Kind:   "map",
-				Code:   Code{File: "./pcs_substreams_bg.wasm.wasm"},
+				Binary: "bob",
 				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}},
 				Output: StreamOutput{Type: "proto:pcs.types.v1.Pairs"},
 			},
@@ -50,8 +49,6 @@ name: prices
 kind: store
 updatePolicy: add
 valueType: bigint
-code:
-  file: ./pricesState.wasm
 inputs:
   - source: proto:sf.ethereum.type.v1.Block
   - store: pairs
@@ -61,9 +58,7 @@ inputs:
 				Kind:         "store",
 				UpdatePolicy: "add",
 				ValueType:    "bigint",
-
-				Code:   Code{File: "./pricesState.wasm"},
-				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}},
+				Inputs:       []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}},
 			},
 		},
 	}
@@ -95,45 +90,42 @@ inputs:
 //}
 
 func TestManifest_ToProto(t *testing.T) {
-	manifest, err := loadManifestFile("./test/test_manifest.yaml")
-	require.NoError(t, err)
-
-	pkg, err := manifest.intoPackage()
+	pkg, err := NewReader("./test/test_manifest.yaml").Read()
 	require.NoError(t, err)
 
 	pbManifest := pkg.Modules
 
-	require.Equal(t, 1, len(pbManifest.ModulesCode))
+	require.Equal(t, 1, len(pbManifest.Binaries))
 
 	require.Equal(t, 4, len(pbManifest.Modules))
 
 	module := pbManifest.Modules[0]
-	require.Equal(t, "pair_extractor", module.Name)
-	require.Equal(t, "map_pairs", module.GetWasmCode().Entrypoint)
-	require.Equal(t, uint32(0), module.GetWasmCode().Index)
+	require.Equal(t, "map_pairs", module.Name)
+	require.Equal(t, "map_pairs", module.BinaryEntrypoint)
+	require.Equal(t, uint32(0), module.BinaryIndex)
 	require.Equal(t, "proto:pcs.types.v1.Pairs", module.Output.Type)
 
 	module = pbManifest.Modules[1]
-	require.Equal(t, "pairs", module.Name)
-	require.Equal(t, "build_pairs_state", module.GetWasmCode().Entrypoint)
-	require.Equal(t, uint32(0), module.GetWasmCode().Index)
+	require.Equal(t, "build_pairs_state", module.Name)
+	require.Equal(t, "build_pairs_state", module.BinaryEntrypoint)
+	require.Equal(t, uint32(0), module.BinaryIndex)
 	require.Equal(t, 1, len(module.Inputs))
-	require.Equal(t, "pair_extractor", module.Inputs[0].GetMap().ModuleName)
+	require.Equal(t, "map_pairs", module.Inputs[0].GetMap().ModuleName)
 	require.Equal(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, module.GetKindStore().UpdatePolicy)
 	require.Nil(t, module.Output)
 
 	module = pbManifest.Modules[2]
-	require.Equal(t, "reserves_extractor", module.Name)
-	require.Equal(t, "map_reserves", module.GetWasmCode().Entrypoint)
-	require.Equal(t, uint32(0), module.GetWasmCode().Index)
+	require.Equal(t, "map_reserves", module.Name)
+	require.Equal(t, "map_reserves", module.BinaryEntrypoint)
+	require.Equal(t, uint32(0), module.BinaryIndex)
 	require.Equal(t, 2, len(module.Inputs))
 	require.Equal(t, "sf.ethereum.type.v1.Block", module.Inputs[0].GetSource().Type)
-	require.Equal(t, "pairs", module.Inputs[1].GetStore().ModuleName)
+	require.Equal(t, "build_pairs_state", module.Inputs[1].GetStore().ModuleName)
 	require.Equal(t, "proto:pcs.types.v1.Reserves", module.Output.Type)
 
 	module = pbManifest.Modules[3]
-	require.Equal(t, "block_to_tokens", module.Name)
-	require.Equal(t, "map_block_to_tokens", module.GetWasmCode().Entrypoint)
-	require.Equal(t, uint32(0), module.GetWasmCode().Index)
+	require.Equal(t, "map_block_to_tokens", module.Name)
+	require.Equal(t, "map_block_to_tokens", module.BinaryEntrypoint)
+	require.Equal(t, uint32(0), module.BinaryIndex)
 	require.Equal(t, "proto:sf.substreams.tokens.v1.Tokens", module.Output.Type)
 }

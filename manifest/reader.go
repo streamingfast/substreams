@@ -2,16 +2,17 @@ package manifest
 
 import (
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
-	"golang.org/x/mod/semver"
-	"google.golang.org/protobuf/proto"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"path/filepath"
 	"strings"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
+	"golang.org/x/mod/semver"
+	"google.golang.org/protobuf/proto"
 )
 
 type Options func(r *Reader) *Reader
@@ -92,11 +93,11 @@ func (r *Reader) newPkgFromManifest(inputPath string) (pkg *pbsubstreams.Package
 func (r *Reader) fromContents(contents []byte) (pkg *pbsubstreams.Package, err error) {
 	pkg = &pbsubstreams.Package{}
 	if err := proto.Unmarshal(contents, pkg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshall content: %w", err)
+		return nil, fmt.Errorf("unmarshalling: %w", err)
 	}
 
 	if err := r.validate(pkg); err != nil {
-		return nil, fmt.Errorf("failed validation: %w", err)
+		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
 	return pkg, nil
@@ -104,11 +105,11 @@ func (r *Reader) fromContents(contents []byte) (pkg *pbsubstreams.Package, err e
 
 func (r *Reader) validate(pkg *pbsubstreams.Package) error {
 	if err := r.validatePackage(pkg); err != nil {
-		return fmt.Errorf("failed packagae validation: %w", err)
+		return fmt.Errorf("package validation failed: %w", err)
 	}
 
-	if err := r.validateModules(pkg.Modules); err != nil {
-		return fmt.Errorf("failed module validation: %w", err)
+	if err := ValidateModules(pkg.Modules); err != nil {
+		return fmt.Errorf("module validation failed: %w", err)
 	}
 	return nil
 }
@@ -152,16 +153,6 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 			}
 		}
 
-		switch modCode := mod.Code.(type) {
-		case *pbsubstreams.Module_WasmCode_:
-			if int(modCode.WasmCode.Index) >= len(pkg.Modules.ModulesCode) {
-				return fmt.Errorf("invalid internal reference to modules code index for module %q", mod.Name)
-			}
-		case *pbsubstreams.Module_NativeCode_:
-		default:
-			return fmt.Errorf("unsupported code type %s for package %q", mod.Code, pkg.PackageMeta[0].Name)
-		}
-
 		for _, in := range mod.Inputs {
 			_ = in
 			// TODO: do more proto ref checking for those inputs listed
@@ -174,10 +165,10 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 }
 
 // ValidateModules is run both by the client _and_ the server.
-func (r *Reader) validateModules(mods *pbsubstreams.Modules) error {
+func ValidateModules(mods *pbsubstreams.Modules) error {
 	var sumCode int
-	for _, modCode := range mods.ModulesCode {
-		sumCode += len(modCode)
+	for _, binary := range mods.Binaries {
+		sumCode += len(binary.Content)
 	}
 	if sumCode > 100_000_000 {
 		return fmt.Errorf("limit of 100MB of module code size reached")
@@ -243,19 +234,9 @@ func loadManifestFile(inputPath string) (*Manifest, error) {
 			if s.Output.Type == "" {
 				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
-			// TODO: check protobuf
-			if s.Code.Entrypoint == "" {
-				s.Code.Entrypoint = "map"
-			}
 		case ModuleKindStore:
 			if err := validateStoreBuilder(s); err != nil {
 				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
-			}
-
-			if s.Code.Entrypoint == "" {
-				// TODO: let's make sure this is validated also when analyzing some incoming protobuf version
-				// of this.
-				s.Code.Entrypoint = "build_state"
 			}
 
 		default:
@@ -315,18 +296,16 @@ func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 // modifies `src`.
 func reindexAndMergePackage(src, dest *pbsubstreams.Package) {
 	newBasePackageIndex := len(dest.PackageMeta)
-	newBaseModuleCodeIndex := len(dest.Modules.ModulesCode)
+	newBaseBinariesIndex := len(dest.Modules.Binaries)
 
 	for _, modMeta := range src.ModuleMeta {
 		modMeta.PackageIndex += uint64(newBasePackageIndex)
 	}
 	for _, mod := range src.Modules.Modules {
-		if modCode, ok := mod.Code.(*pbsubstreams.Module_WasmCode_); ok {
-			modCode.WasmCode.Index += uint32(newBaseModuleCodeIndex)
-		}
+		mod.BinaryIndex += uint32(newBaseBinariesIndex)
 	}
 	dest.Modules.Modules = append(dest.Modules.Modules, src.Modules.Modules...)
-	dest.Modules.ModulesCode = append(dest.Modules.ModulesCode, src.Modules.ModulesCode...)
+	dest.Modules.Binaries = append(dest.Modules.Binaries, src.Modules.Binaries...)
 	dest.ModuleMeta = append(dest.ModuleMeta, src.ModuleMeta...)
 	dest.PackageMeta = append(dest.PackageMeta, src.PackageMeta...)
 }
@@ -395,15 +374,24 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 		}
 		var pbmod *pbsubstreams.Module
 
-		switch mod.Code.Type {
-		case "native":
-			pbmod, err = mod.ToProtoNative()
+		binaryName := "default"
+		implicit := ""
+		if mod.Binary != "" {
+			binaryName = mod.Binary
+			implicit = "(implicit) "
+		}
+		binaryDef, found := m.Binaries[binaryName]
+		if !found {
+			return nil, fmt.Errorf("module %q refers to %sbinary %q, which is not defined in the 'binaries' section of the manifest", mod.Name, implicit, binaryName)
+		}
+
+		switch binaryDef.Type {
 		case "wasm/rust-v1":
 			// OPTIM(abourget): also check if it's not already in
-			// `ModulesCode`, by comparing its, length + hash or value.
-			codeIndex, found := moduleCodeIndexes[mod.Code.File]
+			// `Binaries`, by comparing its, length + hash or value.
+			codeIndex, found := moduleCodeIndexes[binaryDef.File]
 			if !found {
-				codePath := mod.Code.File
+				codePath := binaryDef.File
 				var byteCode []byte
 				if !r.skipSourceCodeImportValidation {
 					byteCode, err = ioutil.ReadFile(codePath)
@@ -411,13 +399,13 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
 					}
 				}
-				pkg.Modules.ModulesCode = append(pkg.Modules.ModulesCode, byteCode)
-				codeIndex = len(pkg.Modules.ModulesCode) - 1
-				moduleCodeIndexes[mod.Code.File] = codeIndex
+				pkg.Modules.Binaries = append(pkg.Modules.Binaries, &pbsubstreams.Binary{Type: binaryDef.Type, Content: byteCode})
+				codeIndex = len(pkg.Modules.Binaries) - 1
+				moduleCodeIndexes[binaryDef.File] = codeIndex
 			}
 			pbmod, err = mod.ToProtoWASM(uint32(codeIndex))
 		default:
-			return nil, fmt.Errorf("module %q: invalid code type %q", mod.Name, mod.Code.Type)
+			return nil, fmt.Errorf("module %q: invalid code type %q", mod.Name, binaryDef.Type)
 		}
 		if err != nil {
 			return nil, err

@@ -45,7 +45,7 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
-		return fmt.Errorf("create module graph %w", err)
+		return fmt.Errorf("creating module graph: %w", err)
 	}
 
 	fmt.Println("Description:", pkg.PackageMeta[0].Doc)

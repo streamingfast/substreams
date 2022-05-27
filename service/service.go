@@ -138,6 +138,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// FIXME start block resolving is an art, it should be handled here
 	}
 
+	if err := manifest.ValidateModules(request.Modules); err != nil {
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("modules validation failed: %s", err))
+	}
+
 	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("creating module graph %w", err)

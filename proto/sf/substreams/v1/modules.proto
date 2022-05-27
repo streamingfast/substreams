@@ -5,10 +5,14 @@ package sf.substreams.v1;
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
 
 message Modules {
-  reserved 1; // was spec version, moved to Package
-  reserved 2; // was description, moved to Package
-  repeated Module modules = 3;
-  repeated bytes modules_code = 4;
+  repeated Module modules = 1;
+  repeated Binary binaries = 2;
+}
+
+// Binary represents some code compiled to its binary form.
+message Binary {
+  string type = 1;
+  bytes content = 2;
 }
 
 message Module {
@@ -17,24 +21,14 @@ message Module {
     KindMap kind_map = 2;
     KindStore kind_store = 3;
   };
-  oneof code {
-    WasmCode wasm_code = 4;
-    NativeCode native_code = 5;
-  }
+
+  uint32 binary_index = 4;
+  string binary_entrypoint = 5;
 
   repeated Input inputs = 6;
-  Output output  = 7;
-  uint64 start_block = 8;
+  Output output = 7;
 
-  message WasmCode {
-    string type = 4;
-    uint32 index = 5;
-    string entrypoint = 6;
-  }
-
-  message NativeCode {
-    string entrypoint = 5;
-  }
+  uint64 initial_block = 8;
 
   message KindMap {
     string output_type = 1;

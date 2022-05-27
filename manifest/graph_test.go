@@ -20,9 +20,9 @@ var testModules = []*pbsubstreams.Module{
 		Name: "A",
 	},
 	{
-		Name:       "B",
-		StartBlock: ten,
-		Kind:       &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+		Name:         "B",
+		InitialBlock: ten,
+		Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 		Inputs: []*pbsubstreams.Module_Input{
 			{
 				Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
@@ -32,9 +32,9 @@ var testModules = []*pbsubstreams.Module{
 		},
 	},
 	{
-		Name:       "C",
-		StartBlock: twenty,
-		Kind:       &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+		Name:         "C",
+		InitialBlock: twenty,
+		Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 		Inputs: []*pbsubstreams.Module_Input{
 			{
 				Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
@@ -55,9 +55,9 @@ var testModules = []*pbsubstreams.Module{
 		},
 	},
 	{
-		Name:       "E",
-		StartBlock: ten,
-		Kind:       &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+		Name:         "E",
+		InitialBlock: ten,
+		Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 		Inputs: []*pbsubstreams.Module_Input{
 			{
 				Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
@@ -206,7 +206,7 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 	assert.Equal(t, []string{"B", "E", "G"}, res)
 }
 
-func TestModuleGraph_computeStartBlocks(t *testing.T) {
+func TestModuleGraph_computeInitialBlocks(t *testing.T) {
 	var oldValue = bstream.GetProtocolFirstStreamableBlock
 	bstream.GetProtocolFirstStreamableBlock = uint64(99)
 	defer func() {
@@ -215,12 +215,12 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 
 	var startBlockTestModule = []*pbsubstreams.Module{
 		{
-			Name:       "block_to_pairs",
-			StartBlock: twenty,
+			Name:         "block_to_pairs",
+			InitialBlock: twenty,
 		},
 		{
-			Name:       "pairs",
-			StartBlock: UNSET,
+			Name:         "pairs",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -232,8 +232,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "block_to_reserves",
-			StartBlock: UNSET,
+			Name:         "block_to_reserves",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -245,8 +245,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "reserves",
-			StartBlock: UNSET,
+			Name:         "reserves",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -265,8 +265,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "prices",
-			StartBlock: UNSET,
+			Name:         "prices",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -292,8 +292,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "mint_burn_swaps_extractor",
-			StartBlock: UNSET,
+			Name:         "mint_burn_swaps_extractor",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -312,8 +312,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "volumes",
-			StartBlock: UNSET,
+			Name:         "volumes",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -325,8 +325,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "database_output",
-			StartBlock: UNSET,
+			Name:         "database_output",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -345,8 +345,8 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 			},
 		},
 		{
-			Name:       "totals",
-			StartBlock: UNSET,
+			Name:         "totals",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -369,11 +369,11 @@ func TestModuleGraph_computeStartBlocks(t *testing.T) {
 	_, err := NewModuleGraph(startBlockTestModule)
 	require.NoError(t, err)
 
-	assert.Equal(t, uint64(20), startBlockTestModule[0].StartBlock)
-	assert.Equal(t, uint64(20), startBlockTestModule[1].StartBlock)
+	assert.Equal(t, uint64(20), startBlockTestModule[0].InitialBlock)
+	assert.Equal(t, uint64(20), startBlockTestModule[1].InitialBlock)
 }
 
-func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingNoStartBlock(t *testing.T) {
+func TestModuleGraph_ComputeInitialBlocks_WithOneParentContainingNoInitialBlock(t *testing.T) {
 	var oldValue = bstream.GetProtocolFirstStreamableBlock
 	bstream.GetProtocolFirstStreamableBlock = uint64(99)
 	defer func() {
@@ -382,12 +382,12 @@ func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingNoStartBlock(t *t
 
 	var testModules = []*pbsubstreams.Module{
 		{
-			Name:       "A",
-			StartBlock: UNSET,
+			Name:         "A",
+			InitialBlock: UNSET,
 		},
 		{
-			Name:       "B",
-			StartBlock: UNSET,
+			Name:         "B",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -403,19 +403,19 @@ func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingNoStartBlock(t *t
 	_, err := NewModuleGraph(testModules)
 	require.NoError(t, err)
 
-	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[0].StartBlock)
-	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[1].StartBlock)
+	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[0].InitialBlock)
+	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[1].InitialBlock)
 }
 
-func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingAStartBlock(t *testing.T) {
+func TestModuleGraph_ComputeInitialBlocks_WithOneParentContainingAInitialBlock(t *testing.T) {
 	var testModules = []*pbsubstreams.Module{
 		{
-			Name:       "A",
-			StartBlock: ten,
+			Name:         "A",
+			InitialBlock: ten,
 		},
 		{
-			Name:       "B",
-			StartBlock: UNSET,
+			Name:         "B",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -431,19 +431,19 @@ func TestModuleGraph_ComputeStartBlocks_WithOneParentContainingAStartBlock(t *te
 	_, err := NewModuleGraph(testModules)
 	require.NoError(t, err)
 
-	assert.Equal(t, uint64(10), testModules[0].GetStartBlock())
-	assert.Equal(t, uint64(10), testModules[1].GetStartBlock())
+	assert.Equal(t, uint64(10), testModules[0].GetInitialBlock())
+	assert.Equal(t, uint64(10), testModules[1].GetInitialBlock())
 }
 
-func TestModuleGraph_ComputeStartBlocks_WithTwoParentsAndAGrandParentContainingStartBlock(t *testing.T) {
+func TestModuleGraph_ComputeInitialBlocks_WithTwoParentsAndAGrandParentContainingInitialBlock(t *testing.T) {
 	var testModules = []*pbsubstreams.Module{
 		{
-			Name:       "A",
-			StartBlock: ten,
+			Name:         "A",
+			InitialBlock: ten,
 		},
 		{
-			Name:       "B",
-			StartBlock: UNSET,
+			Name:         "B",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -455,8 +455,8 @@ func TestModuleGraph_ComputeStartBlocks_WithTwoParentsAndAGrandParentContainingS
 			},
 		},
 		{
-			Name:       "C",
-			StartBlock: UNSET,
+			Name:         "C",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -468,8 +468,8 @@ func TestModuleGraph_ComputeStartBlocks_WithTwoParentsAndAGrandParentContainingS
 			},
 		},
 		{
-			Name:       "D",
-			StartBlock: UNSET,
+			Name:         "D",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -492,29 +492,29 @@ func TestModuleGraph_ComputeStartBlocks_WithTwoParentsAndAGrandParentContainingS
 	_, err := NewModuleGraph(testModules)
 	require.NoError(t, err)
 
-	assert.Equal(t, uint64(10), testModules[0].GetStartBlock())
-	assert.Equal(t, uint64(10), testModules[1].GetStartBlock())
-	assert.Equal(t, uint64(10), testModules[2].GetStartBlock())
-	assert.Equal(t, uint64(10), testModules[3].GetStartBlock())
+	assert.Equal(t, uint64(10), testModules[0].GetInitialBlock())
+	assert.Equal(t, uint64(10), testModules[1].GetInitialBlock())
+	assert.Equal(t, uint64(10), testModules[2].GetInitialBlock())
+	assert.Equal(t, uint64(10), testModules[3].GetInitialBlock())
 }
 
-func TestModuleGraph_ComputeStartBlocks_WithThreeParentsEachContainingAStartBlock(t *testing.T) {
+func TestModuleGraph_ComputeInitialBlocks_WithThreeParentsEachContainingAInitialBlock(t *testing.T) {
 	var testModules = []*pbsubstreams.Module{
 		{
-			Name:       "A",
-			StartBlock: ten,
+			Name:         "A",
+			InitialBlock: ten,
 		},
 		{
-			Name:       "B",
-			StartBlock: twenty,
+			Name:         "B",
+			InitialBlock: twenty,
 		},
 		{
-			Name:       "C",
-			StartBlock: thirty,
+			Name:         "C",
+			InitialBlock: thirty,
 		},
 		{
-			Name:       "D",
-			StartBlock: UNSET,
+			Name:         "D",
+			InitialBlock: UNSET,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -541,7 +541,6 @@ func TestModuleGraph_ComputeStartBlocks_WithThreeParentsEachContainingAStartBloc
 		},
 	}
 
-	require.Panics(t, func() {
-		NewModuleGraph(testModules)
-	})
+	_, err := NewModuleGraph(testModules)
+	assert.Equal(t, `cannot deterministically determine the initialBlock for module "D"; multiple inputs have conflicting initial blocks defined or inherited`, err.Error())
 }

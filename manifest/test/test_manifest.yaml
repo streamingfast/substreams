@@ -1,50 +1,42 @@
 specVersion: v0.1.0
-description: Test WASM substream
+package:
+  name: my_package
+  version: v1.2.3
 
-protoFiles:
-  - ./test/code/pancakeswap.proto
+protobuf:
+  files:
+    - ./test/code/pancakeswap.proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./test/code/pcs_substreams_bg.wasm
 
 modules:
-  - name: pair_extractor
+  - name: map_pairs
     kind: map
-    code:
-      type: wasm/rust-v1
-      file: ./test/code/pcs_substreams_bg.wasm
-      entrypoint: map_pairs
     inputs:
       - source: sf.ethereum.type.v1.Block
     output:
       type: proto:pcs.types.v1.Pairs
 
-  - name: pairs
+  - name: build_pairs_state
     kind: store
     updatePolicy: set
     valueType: bytes
-    code:
-      type: wasm/rust-v1
-      file: ./test/code/pcs_substreams_bg.wasm
-      entrypoint: build_pairs_state
     inputs:
-      - map: pair_extractor
+      - map: map_pairs
 
-  - name: reserves_extractor
+  - name: map_reserves
     kind: map
-    code:
-      type: wasm/rust-v1
-      file:  ./test/code/pcs_substreams_bg.wasm
-      entrypoint: map_reserves
     inputs:
       - source: sf.ethereum.type.v1.Block
-      - store: pairs
+      - store: build_pairs_state
     output:
       type: proto:pcs.types.v1.Reserves
 
-  - name: block_to_tokens
+  - name: map_block_to_tokens
     kind: map
-    code:
-      type: wasm/rust-v1
-      file: ./test/code/pcs_substreams_bg.wasm
-      entrypoint: map_block_to_tokens
     inputs:
       - source: sf.ethereum.type.v1.Block
     output:

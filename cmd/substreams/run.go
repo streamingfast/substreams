@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/progress"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/streamingfast/substreams/progress"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
@@ -71,12 +72,12 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
-		return fmt.Errorf("create module graph %w", err)
+		return fmt.Errorf("creating module graph: %w", err)
 	}
 
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
-		sb, err := graph.ModuleStartBlock(outputStreamNames[0])
+		sb, err := graph.ModuleInitialBlock(outputStreamNames[0])
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
 		}

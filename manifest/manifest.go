@@ -29,11 +29,12 @@ const (
 // Manifest is a YAML structure used to create a Package and its list
 // of Modules. The notion of a manifest does not live in protobuf definitions.
 type Manifest struct {
-	SpecVersion string      `yaml:"specVersion"` // check that it equals v0.1.0
-	Package     PackageMeta `yaml:"package"`
-	Protobuf    Protobuf    `yaml:"protobuf"`
-	Imports     mapSlice    `yaml:"imports"`
-	Modules     []*Module   `yaml:"modules"`
+	SpecVersion string            `yaml:"specVersion"` // check that it equals v0.1.0
+	Package     PackageMeta       `yaml:"package"`
+	Protobuf    Protobuf          `yaml:"protobuf"`
+	Imports     mapSlice          `yaml:"imports"`
+	Binaries    map[string]Binary `yaml:"binaries"`
+	Modules     []*Module         `yaml:"modules"`
 
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
@@ -52,16 +53,17 @@ type Protobuf struct {
 }
 
 type Module struct {
-	Name       string  `yaml:"name"`
-	Doc        string  `yaml:"doc"`
-	Kind       string  `yaml:"kind"`
-	StartBlock *uint64 `yaml:"startBlock"`
+	Name         string  `yaml:"name"`
+	Doc          string  `yaml:"doc"`
+	Kind         string  `yaml:"kind"`
+	InitialBlock *uint64 `yaml:"initialBlock"`
 
-	UpdatePolicy string       `yaml:"updatePolicy"`
-	ValueType    string       `yaml:"valueType"`
-	Code         Code         `yaml:"code"`
-	Inputs       []*Input     `yaml:"inputs"`
-	Output       StreamOutput `yaml:"output"`
+	UpdatePolicy string `yaml:"updatePolicy"`
+	ValueType    string `yaml:"valueType"`
+	Binary       string `yaml:"binary"`
+	//Code         Code         `yaml:"code"`
+	Inputs []*Input     `yaml:"inputs"`
+	Output StreamOutput `yaml:"output"`
 }
 
 type Input struct {
@@ -73,7 +75,7 @@ type Input struct {
 	Name string `yaml:"-"`
 }
 
-type Code struct {
+type Binary struct {
 	File       string `yaml:"file"`
 	Type       string `yaml:"type"`
 	Native     string `yaml:"native"`
@@ -184,65 +186,20 @@ func validateStoreBuilder(module *Module) error {
 	return nil
 }
 
-// TODO: there needs to be some safety checks done directly on the _pbsubstreams.Manifest_ object,
-// as we'll receive it packaged like that.
-
-func (m *Manifest) loadCode(codePath string, modules *pbsubstreams.Modules) (int, error) {
-	byteCode, err := ioutil.ReadFile(codePath)
-	if err != nil {
-		return 0, fmt.Errorf("reading %q: %w", codePath, err)
-	}
-
-	// OPTIM(abourget): also check if it's not already in
-	// `ModulesCode`, by comparing its, length + hash or value.
-
-	modules.ModulesCode = append(modules.ModulesCode, byteCode)
-	return len(modules.ModulesCode) - 1, nil
-}
-
 func (m *Module) String() string {
 	return m.Name
 }
 
-func (m *Module) ToProtoNative() (*pbsubstreams.Module, error) {
-	out := &pbsubstreams.Module{
-		Name: m.Name,
-		Code: &pbsubstreams.Module_NativeCode_{
-			NativeCode: &pbsubstreams.Module_NativeCode{
-				Entrypoint: m.Code.Entrypoint,
-			},
-		},
-	}
-
-	out.StartBlock = UNSET
-	if m.StartBlock != nil {
-		out.StartBlock = *m.StartBlock
-	}
-
-	m.setOutputToProto(out)
-	m.setKindToProto(out)
-	err := m.setInputsToProto(out)
-	if err != nil {
-		return nil, fmt.Errorf("setting input for module, %s: %w", m.Name, err)
-	}
-	return out, nil
-}
-
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 	out := &pbsubstreams.Module{
-		Name: m.Name,
-		Code: &pbsubstreams.Module_WasmCode_{
-			WasmCode: &pbsubstreams.Module_WasmCode{
-				Type:       m.Code.Type,
-				Index:      codeIndex,
-				Entrypoint: m.Code.Entrypoint,
-			},
-		},
+		Name:             m.Name,
+		BinaryIndex:      codeIndex,
+		BinaryEntrypoint: m.Name,
 	}
 
-	out.StartBlock = UNSET
-	if m.StartBlock != nil {
-		out.StartBlock = *m.StartBlock
+	out.InitialBlock = UNSET
+	if m.InitialBlock != nil {
+		out.InitialBlock = *m.InitialBlock
 	}
 
 	m.setOutputToProto(out)

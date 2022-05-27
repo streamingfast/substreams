@@ -553,11 +553,15 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalRequest *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph,
+func SynchronizeStores(
+	ctx context.Context,
+	workerPool *worker.Pool,
+	originalRequest *pbsubstreams.Request,
+	builders []*state.Builder,
+	graph *manifest.ModuleGraph,
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
 	respFunc substreams.ResponseFunc,
-
 	blockRangeSizeSubRequests int,
 	storeSaveInterval uint64) error {
 
@@ -588,6 +592,9 @@ func SynchronizeStores(ctx context.Context, workerPool *worker.Pool, originalReq
 	}
 
 	requestCount := strategy.RequestCount()
+	if requestCount == 0 {
+		return nil
+	}
 	result := make(chan error)
 	for {
 		req, err := scheduler.Next()

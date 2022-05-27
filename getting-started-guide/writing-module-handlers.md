@@ -633,11 +633,7 @@ We now define our first `map` module. As a reminder here is the module definitio
 ```yaml
   - name: block_to_transfers
     kind: map
-    startBlock: 12287507
-    code:
-      type: wasm/rust-v1
-      file: ./target/wasm32-unknown-unknown/release/substreams_nft_holders.wasm
-      entrypoint: block_to_transfers
+    initialBlock: 12287507
     inputs:
       - source: sf.ethereum.type.v1.Block
     output:

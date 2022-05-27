@@ -19,7 +19,7 @@ package:
   version: v0.1.0
 
 imports:
-  eth: https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.2.spkg
+  eth: https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg
 
 protobuf:
   files:
@@ -27,14 +27,15 @@ protobuf:
   importPaths:
     - ./proto
 
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams_nft_holders.wasm
+
 modules:
   - name: block_to_transfers
     kind: map
-    startBlock: 12287507
-    code:
-      type: wasm/rust-v1
-      file: ./target/wasm32-unknown-unknown/release/substreams_nft_holders.wasm
-      entrypoint: map_transfers
+    initialBlock: 12287507
     inputs:
       - source: sf.ethereum.type.v1.Block
     output:
@@ -42,13 +43,9 @@ modules:
 
   - name: nft_state
     kind: store
-    startBlock: 12287507
+    initialBlock: 12287507
     updatePolicy: add
     valueType: int64
-    code:
-      type: wasm/rust-v1
-      file: ./target/wasm32-unknown-unknown/release/substreams_nft_holders.wasm
-      entrypoint: build_nft_state
     inputs:
       - map: block_to_transfers
 
@@ -73,7 +70,7 @@ The outputs of the module are:
 
 * A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent the list of ERC721 transfers in a given block.&#x20;
 
-Furthermore we link the module to the wasm code (rust code compiled as web assembly) that contains the business logic. The `rust` function that implements the modules business logic is defined by the `entrypoint` and is called `map_transfers` in the example.
+Furthermore we link the module to the wasm code (rust code compiled as web assembly) that contains the business logic. The `rust` function that implements the modules business logic is defined by the `entrypoint` and is called `block_to_transfers` in the example.
 
 Lastly, since we know that the first transfers of token originating from the contracts occurs at block `12287507` we specify a `startBlock` on our `map` module.
 

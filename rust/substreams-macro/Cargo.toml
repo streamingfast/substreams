@@ -1,6 +1,6 @@
 [package]
 name = "substreams-macro"
-version = "0.1.0"
+version = "0.7.0-beta"
 edition = "2018"
 authors = ["StreamingFast Contributors <team@streamingfast.io>"]
 license = "MIT"

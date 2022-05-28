@@ -1,11 +1,11 @@
 [package]
 name = "substreams"
-version = "0.1.0"
+version = "0.7.0-beta"
 description = "Substreams base library"
 edition = "2018"
 
 [dependencies]
-substreams-macro = { path = "../substreams-macro"}
+substreams-macro = { version = "0.7.0-beta", path = "../substreams-macro" }
 prost = { version = "0.10.1" }
 prost-types = "0.10.1"
 hex = "0.4.3"

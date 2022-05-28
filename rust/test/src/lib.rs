@@ -1,11 +1,15 @@
 mod pb;
-use std::convert::TryInto;
 use bigdecimal::BigDecimal;
-use substreams::{log, Hex, errors::{Error}, store, store::{StoreAddInt64, StoreMaxBigFloat}};
-use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use hex_literal::hex;
+use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use pb::{erc721, eth};
-
+use std::convert::TryInto;
+use substreams::{
+    errors::Error,
+    log, store,
+    store::{StoreAddInt64, StoreMaxBigFloat},
+    Hex,
+};
 
 #[substreams::handlers::map]
 fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, Error> {
@@ -46,29 +50,26 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, Error> {
             }
         }));
     }
-    return Ok(erc721::Transfers { transfers })
+    return Ok(erc721::Transfers { transfers });
 }
 
 #[substreams::handlers::store]
-fn build_nft_state(transfers: erc721::Transfers, pairs: store::StoreGet, tokens: store::StoreGet, output: store::StoreAddInt64) {
+fn build_nft_state(
+    transfers: erc721::Transfers,
+    pairs: store::StoreGet,
+    tokens: store::StoreGet,
+    output: store::StoreAddInt64,
+) {
     let tokens_first_opt = tokens.get_first(&"tokens".to_owned());
     let pairs_last_opt = pairs.get_first(&"pairs".to_owned());
     log::info!("tokens {:?} pairs {:?}", tokens_first_opt, pairs_last_opt);
     for transfer in transfers.transfers {
         if hex::encode(&transfer.from) != "0000000000000000000000000000000000000000" {
             log::info!("found a transfer");
-            output.add(
-                transfer.ordinal as i64,
-                generate_key(transfer.from.as_ref()),
-                -1,
-            );
+            output.add(transfer.ordinal, generate_key(transfer.from.as_ref()), -1);
         }
         if hex::encode(&transfer.to) != "0000000000000000000000000000000000000000" {
-            output.add(
-                transfer.ordinal as i64,
-                generate_key(transfer.to.as_ref()),
-                1,
-            );
+            output.add(transfer.ordinal, generate_key(transfer.to.as_ref()), 1);
         }
     }
 }
@@ -83,7 +84,8 @@ fn generate_key(holder: &[u8]) -> String {
 
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 /// keccak value for Transfer(address,address,uint256)
-const TRANSFER_TOPIC: [u8; 32] = hex!("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef");
+const TRANSFER_TOPIC: [u8; 32] =
+    hex!("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef");
 pub fn is_erc721transfer_event(log: &eth::Log) -> bool {
     if log.topics.len() != 4 || log.data.len() != 0 {
         return false;
@@ -91,7 +93,6 @@ pub fn is_erc721transfer_event(log: &eth::Log) -> bool {
 
     return log.topics[0] == TRANSFER_TOPIC;
 }
-
 
 #[substreams::handlers::store]
 fn test_sum_big_int(output: store::StoreAddBigInt) {

@@ -1,41 +1,37 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Modules {
-    #[prost(message, repeated, tag="3")]
+    #[prost(message, repeated, tag="1")]
     pub modules: ::prost::alloc::vec::Vec<Module>,
-    #[prost(bytes="vec", repeated, tag="4")]
-    pub modules_code: ::prost::alloc::vec::Vec<::prost::alloc::vec::Vec<u8>>,
+    #[prost(message, repeated, tag="2")]
+    pub binaries: ::prost::alloc::vec::Vec<Binary>,
+}
+/// Binary represents some code compiled to its binary form.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Binary {
+    #[prost(string, tag="1")]
+    pub r#type: ::prost::alloc::string::String,
+    #[prost(bytes="vec", tag="2")]
+    pub content: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Module {
     #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
+    #[prost(uint32, tag="4")]
+    pub binary_index: u32,
+    #[prost(string, tag="5")]
+    pub binary_entrypoint: ::prost::alloc::string::String,
     #[prost(message, repeated, tag="6")]
     pub inputs: ::prost::alloc::vec::Vec<module::Input>,
     #[prost(message, optional, tag="7")]
     pub output: ::core::option::Option<module::Output>,
     #[prost(uint64, tag="8")]
-    pub start_block: u64,
+    pub initial_block: u64,
     #[prost(oneof="module::Kind", tags="2, 3")]
     pub kind: ::core::option::Option<module::Kind>,
-    #[prost(oneof="module::Code", tags="4, 5")]
-    pub code: ::core::option::Option<module::Code>,
 }
 /// Nested message and enum types in `Module`.
 pub mod module {
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct WasmCode {
-        #[prost(string, tag="4")]
-        pub r#type: ::prost::alloc::string::String,
-        #[prost(uint32, tag="5")]
-        pub index: u32,
-        #[prost(string, tag="6")]
-        pub entrypoint: ::prost::alloc::string::String,
-    }
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct NativeCode {
-        #[prost(string, tag="5")]
-        pub entrypoint: ::prost::alloc::string::String,
-    }
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct KindMap {
         #[prost(string, tag="1")]
@@ -131,13 +127,6 @@ pub mod module {
         KindMap(KindMap),
         #[prost(message, tag="3")]
         KindStore(KindStore),
-    }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Code {
-        #[prost(message, tag="4")]
-        WasmCode(WasmCode),
-        #[prost(message, tag="5")]
-        NativeCode(NativeCode),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -249,23 +238,25 @@ pub struct ModuleProgress {
     pub name: ::prost::alloc::string::String,
     #[prost(message, optional, tag="2")]
     pub request_block_range: ::core::option::Option<BlockRange>,
-    #[prost(bool, tag="3")]
+    #[prost(uint64, tag="3")]
+    pub synchronizing_up_to_block: u64,
+    #[prost(bool, tag="4")]
     pub catch_up: bool,
-    #[prost(message, repeated, tag="4")]
+    #[prost(message, repeated, tag="5")]
     pub processed_ranges: ::prost::alloc::vec::Vec<BlockRange>,
-    #[prost(uint64, tag="5")]
-    pub total_bytes_read: u64,
     #[prost(uint64, tag="6")]
+    pub total_bytes_read: u64,
+    #[prost(uint64, tag="7")]
     pub total_bytes_written: u64,
-    #[prost(bool, tag="7")]
+    #[prost(bool, tag="8")]
     pub failed: bool,
-    #[prost(string, tag="8")]
+    #[prost(string, tag="9")]
     pub failure_reason: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag="9")]
+    #[prost(string, repeated, tag="10")]
     pub failure_logs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// FailureLogsTruncated is a flag that tells you if you received all the logs or if they
     /// were truncated because you logged too much (fixed limit currently is set to 128 KiB).
-    #[prost(bool, tag="10")]
+    #[prost(bool, tag="11")]
     pub failure_logs_truncated: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

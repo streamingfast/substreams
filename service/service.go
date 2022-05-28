@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"io"
 
 	"github.com/streamingfast/bstream/stream"
@@ -18,7 +17,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
-	"github.com/streamingfast/substreams/worker"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -40,9 +38,7 @@ type Service struct {
 	firehoseServer *firehoseServer.Server
 	streamFactory  *firehose.StreamFactory
 
-	logger                 *zap.Logger
-	pool                   *worker.Pool
-	parallelBlocksRequests int
+	logger *zap.Logger
 
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 
@@ -94,18 +90,11 @@ func WithOutCacheSaveInterval(block uint64) Option {
 	}
 }
 
-func WithParallelBlocksRequestsLimit(limit int) Option {
-	return func(s *Service) {
-		s.parallelBlocksRequests = limit
-	}
-}
-
 func New(stateStore dstore.Store, blockType string, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
 	s := &Service{
 		baseStateStore:            stateStore,
 		blockType:                 blockType,
 		grpcClientFactory:         grpcClientFactory,
-		parallelBlocksRequests:    1,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 	}
@@ -113,7 +102,6 @@ func New(stateStore dstore.Store, blockType string, grpcClientFactory func() (pb
 	for _, opt := range opts {
 		opt(s)
 	}
-	s.pool = worker.NewPool(s.parallelBlocksRequests)
 
 	return s
 }

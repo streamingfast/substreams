@@ -11,9 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/streamingfast/derr"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -182,19 +181,17 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 			return fmt.Errorf("loading block reader %s: %w", filename, err)
 		}
 
-		var localOut outputKV
-		if err = json.NewDecoder(objectReader).Decode(&localOut); err != nil {
+		if err = json.NewDecoder(objectReader).Decode(&c.kv); err != nil {
 			return fmt.Errorf("json decoding file %s: %w", filename, err)
 		}
 
-		c.kv = localOut
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("retried: %w", err)
 	}
 
-	zlog.Debug("cache loaded", zap.String("cache_module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange))
+	zlog.Debug("outputs data loaded", zap.String("module_name", c.ModuleName), zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.CurrentBlockRange))
 	return nil
 }
 
@@ -217,6 +214,10 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 
 	zlog.Debug("cache saved", zap.String("module_name", c.ModuleName), zap.String("file_name", filename), zap.String("url", c.Store.BaseURL().String()))
 	return nil
+}
+
+func (o *OutputCache) String() string {
+	return o.Store.ObjectURL("")
 }
 
 func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {

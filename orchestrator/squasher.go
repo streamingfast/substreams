@@ -20,7 +20,7 @@ type Squasher struct {
 
 	notifier Notifier
 
-	lock              sync.Mutex
+	lock sync.Mutex
 }
 
 type SquasherOption func(s *Squasher)
@@ -76,8 +76,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
-		panic(fmt.Sprintf("invalid module %q", moduleName))
-		return nil
+		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)
 	}
 	builder := squashable.builder
 
@@ -129,7 +128,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		}
 
 		if len(squashable.ranges) == 0 {
-			zlog.Debug("all available squashable ranges have been merged", zap.String("squashable", squashable.String()))
+			zlog.Debug("all available squashable ranges have been merged", zap.Stringer("squashable", squashable))
 			break
 		}
 
@@ -137,7 +136,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 		zlog.Info("checking if builder squashable", zap.Object("current_builder_range", squashable.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
 
 		if squashable.builder.BlockRange.IsNext(squashableRange, squashable.builder.SaveInterval) {
-			zlog.Debug("found range to merge", zap.String("squashable", squashable.String()))
+			zlog.Debug("found range to merge", zap.Stringer("squashable", squashable))
 
 			partialBuilder := squashable.builder.FromBlockRange(squashableRange, true)
 			err := partialBuilder.InitializePartial(ctx, squashableRange.StartBlock)

@@ -174,7 +174,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		}
 	}
 	if deltasNeeded {
-		err := b.loadDelta(ctx, deltasStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
+		err := b.loadDeltas(ctx, deltasStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
 		if err != nil {
 			return fmt.Errorf("loading delta for builder %q: %w", b.Name, err)
 		}
@@ -213,19 +213,21 @@ func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
 	return nil
 }
 
-func (b *Builder) loadDelta(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+func (b *Builder) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
 	if b.PartialMode {
-		panic("cannot load a state in partial mode")
+		panic("cannot load deltas in partial mode")
 	}
+
+	startBlockNum := outputs.ComputeStartBlock(fromBlock, outputCacheSaveInterval)
+	outputCache := outputs.NewOutputCache(b.Name, outputCacheStore, 0)
 
 	zlog.Debug("loading delta",
 		zap.String("builder_name", b.Name),
 		zap.Uint64("from_block", fromBlock),
+		zap.Uint64("start_block", startBlockNum),
 		zap.Uint64("stop_block", exclusiveStopBlock),
+		zap.Stringer("output_cache", outputCache),
 	)
-
-	startBlockNum := outputs.ComputeStartBlock(fromBlock, outputCacheSaveInterval)
-	outputCache := outputs.NewOutputCache(b.Name, outputCacheStore, 0)
 
 	err := outputCache.Load(ctx, startBlockNum)
 	if err != nil {

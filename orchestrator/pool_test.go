@@ -36,7 +36,7 @@ func (tw *TestWaiter) Order() int {
 }
 
 func TestNotify(t *testing.T) {
-	p := NewPool()
+	p := NewRequestPool()
 	ctx := context.Background()
 
 	signalCounter := new(int)
@@ -49,7 +49,7 @@ func TestNotify(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	p := NewPool()
+	p := NewRequestPool()
 	ctx := context.Background()
 
 	lastSavedBlockMap := map[string]uint64{
@@ -107,7 +107,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetOrdered(t *testing.T) {
-	p := NewPool()
+	p := NewRequestPool()
 	ctx := context.Background()
 
 	waiter0 := NewWaiter(100, nil)

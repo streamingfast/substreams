@@ -18,47 +18,45 @@ type Notifier interface {
 	Notify(builder string, blockNum uint64)
 }
 
-type Pool struct {
-	requestWaiters     []*requestWaiter
+type RequestPool struct {
 	readyRequestStream chan *requestWaiter
-	requestQueue       PriorityQueue
-	requestQueueMu     sync.Mutex
 
-	waiters   map[Waiter]struct{}
-	waitersMu sync.RWMutex
+	requestWaiters []*requestWaiter
 
-	readActive     bool
-	readActivation sync.Once
+	queueSend    chan *QueueItem
+	queueReceive chan *QueueItem
 
-	init sync.Once
-	wg   sync.WaitGroup
+	waiters      map[Waiter]struct{}
+	waitersMutex sync.RWMutex
 
-	done chan struct{}
+	start      sync.Once
+	readActive bool
+	wg         sync.WaitGroup
 }
 
-func NewPool() *Pool {
-	p := Pool{}
+func NewRequestPool() *RequestPool {
+	p := RequestPool{}
 
 	p.readyRequestStream = make(chan *requestWaiter, 5000)
-	p.waiters = map[Waiter]struct{}{}
-	p.done = make(chan struct{})
 
-	p.requestQueue = make(PriorityQueue, 0)
-	(&p.requestQueue).QInit()
+	p.queueSend = make(chan *QueueItem, 5000)
+	p.queueReceive = make(chan *QueueItem)
+
+	p.waiters = map[Waiter]struct{}{}
 
 	return &p
 }
 
-func (p *Pool) Notify(builder string, blockNum uint64) {
-	p.waitersMu.RLock()
-	defer p.waitersMu.RUnlock()
+func (p *RequestPool) Notify(builder string, blockNum uint64) {
+	p.waitersMutex.RLock()
+	defer p.waitersMutex.RUnlock()
 
 	for waiter := range p.waiters {
 		waiter.Signal(builder, blockNum)
 	}
 }
 
-func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Waiter) error {
+func (p *RequestPool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Waiter) error {
 	if p.readActive {
 		return fmt.Errorf("cannot add to pool once reading has begun")
 	}
@@ -68,21 +66,24 @@ func (p *Pool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Wa
 		Waiter:  waiter,
 	}
 
-	p.waitersMu.Lock()
+	p.waitersMutex.Lock()
 	p.waiters[rw.Waiter] = struct{}{}
 	p.requestWaiters = append(p.requestWaiters, rw)
-	p.waitersMu.Unlock()
+	p.waitersMutex.Unlock()
 
 	return nil
 }
 
-func (p *Pool) Start(ctx context.Context) {
-	p.init.Do(func() {
+func (p *RequestPool) Start(ctx context.Context) {
+	p.start.Do(func() {
+		StartQueue(ctx, p.queueSend, p.queueReceive)
+
+		p.readActive = true
+
 		p.wg.Add(len(p.requestWaiters))
 
 		go func() {
 			defer close(p.readyRequestStream)
-			defer close(p.done)
 			p.wg.Wait()
 			return
 		}()
@@ -99,19 +100,16 @@ func (p *Pool) Start(ctx context.Context) {
 					case <-ctx.Done():
 						return
 					case p.readyRequestStream <- item:
-						p.waitersMu.Lock()
+						p.waitersMutex.Lock()
 						delete(p.waiters, item.Waiter)
-						p.waitersMu.Unlock()
+						p.waitersMutex.Unlock()
 					}
 				}
 			}(rw)
 		}
-	})
-
-	p.readActivation.Do(func() {
-		p.readActive = true
 
 		go func() {
+			defer close(p.queueSend) //finished sending items into queue once all
 			for {
 				select {
 				case <-ctx.Done():
@@ -122,59 +120,30 @@ func (p *Pool) Start(ctx context.Context) {
 					}
 					// the number of stores a waiter was waiting for determines its priority in the queue.
 					// higher number of stores => higher priority.
-					p.requestQueueMu.Lock()
-					(&p.requestQueue).PushRequest(i.Request, i.Waiter.Order())
-					p.requestQueueMu.Unlock()
+					p.queueSend <- &QueueItem{
+						Request:  i.Request,
+						Priority: i.Waiter.Order(),
+					}
 				}
 			}
 		}()
 	})
 }
 
-func (p *Pool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
-	sleeper := NewSleeper(10)
-
-	var r *pbsubstreams.Request
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-p.done:
-			p.requestQueueMu.Lock()
-			queueLen := p.requestQueue.Len()
-			if queueLen > 0 {
-				r = (&p.requestQueue).PopRequest()
-				p.requestQueueMu.Unlock()
-				if r != nil {
-					return r, nil
-				}
-			} else {
-				p.requestQueueMu.Unlock()
-			}
+func (p *RequestPool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case qi, ok := <-p.queueReceive:
+		if !ok {
 			return nil, io.EOF
-		default:
-			//
 		}
-
-		p.requestQueueMu.Lock()
-		if p.requestQueue.Len() == 0 {
-			p.requestQueueMu.Unlock()
-			sleeper.Sleep()
-			continue
-		}
-
-		sleeper.Reset()
-
-		r = (&p.requestQueue).PopRequest()
-		p.requestQueueMu.Unlock()
-		if r != nil {
-			return r, nil
-		}
+		return qi.Request, nil
 	}
 }
 
-func (p *Pool) Count() int {
-	p.waitersMu.RLock()
-	defer p.waitersMu.RUnlock()
+func (p *RequestPool) Count() int {
+	p.waitersMutex.RLock()
+	defer p.waitersMutex.RUnlock()
 	return len(p.waiters)
 }

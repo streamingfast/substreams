@@ -82,14 +82,14 @@ func (s *LinearStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Requ
 
 type RequestGetter interface {
 	Get(ctx context.Context) (*pbsubstreams.Request, error)
+	Count() int
 }
 
 type OrderedStrategy struct {
-	pool          *Pool
 	requestGetter RequestGetter
 }
 
-func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *Pool, upToBlockNum uint64, blockRangeSizeSubRequests int) (*OrderedStrategy, error) {
+func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *RequestPool, upToBlockNum uint64, blockRangeSizeSubRequests int) (*OrderedStrategy, error) {
 	lastSavedBlockMap := map[string]uint64{}
 	for _, builder := range builders {
 		info, err := builder.Info(ctx)
@@ -148,12 +148,11 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 
 	return &OrderedStrategy{
 		requestGetter: pool,
-		pool:          pool,
 	}, nil
 }
 
 func (d *OrderedStrategy) RequestCount() int {
-	return d.pool.Count()
+	return d.requestGetter.Count()
 }
 
 func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {
@@ -174,8 +173,6 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 	go func() {
 		defer close(stream)
 
-		//sleeper
-
 		for {
 			r, err := strategy.GetNextRequest(ctx)
 			if err == io.EOF || err == context.DeadlineExceeded || err == context.Canceled {
@@ -187,11 +184,8 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 			}
 
 			if r == nil {
-				//sleeper.Sleep()
 				continue
 			}
-
-			//sleeper.Reset()
 
 			select {
 			case <-ctx.Done():

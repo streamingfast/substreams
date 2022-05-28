@@ -560,21 +560,17 @@ func SynchronizeStores(
 
 	zlog.Info("synchronizing stores")
 
-	pool := orchestrator.NewPool()
+	requestPool := orchestrator.NewRequestPool()
 
-	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, orchestrator.WithNotifier(pool))
+	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, orchestrator.WithNotifier(requestPool))
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, pool, upToBlockNum, blockRangeSizeSubRequests)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}
-	//strategy, err := orchestrator.NewLinearStrategy(ctx, originalRequest, builders, upToBlockNum, blockRangeSizeSubRequests)
-	//if err != nil {
-	//	return fmt.Errorf("creating strategy: %w", err)
-	//}
 
 	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, blockRangeSizeSubRequests)
 	if err != nil {

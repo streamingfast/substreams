@@ -48,8 +48,8 @@ func NewRequestPool() *RequestPool {
 }
 
 func (p *RequestPool) Notify(builder string, blockNum uint64) {
-	p.waitersMutex.RLock()
-	defer p.waitersMutex.RUnlock()
+	p.waitersMutex.Lock()
+	defer p.waitersMutex.Unlock()
 
 	for waiter := range p.waiters {
 		waiter.Signal(builder, blockNum)

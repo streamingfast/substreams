@@ -1,8 +1,11 @@
 package orchestrator
 
 import (
+	"context"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestWaiterItem_Close_Once(t *testing.T) {
@@ -30,4 +33,61 @@ func TestWaiterItem_Close_Once(t *testing.T) {
 	}()
 
 	wg.Wait()
+}
+
+func TestBlockWaiter_Signal(t *testing.T) {
+	item1 := &waiterItem{
+		StoreName: "test_store_1",
+		BlockNum:  100,
+		waitChan:  make(chan interface{}),
+	}
+	item2 := &waiterItem{
+		StoreName: "test_store_2",
+		BlockNum:  300,
+		waitChan:  make(chan interface{}),
+	}
+
+	waiter := &BlockWaiter{
+		items: []*waiterItem{item1, item2},
+		setup: sync.Once{},
+		done:  make(chan interface{}),
+	}
+
+	require.Equal(t, 2, waiter.Order())
+
+	waiter.Signal("test_store_1", 50)
+	select {
+	case <-waiter.Wait(context.TODO()):
+		t.Errorf("waiter should not be done waiting yet")
+	default:
+		//
+	}
+
+	waiter.Signal("test_store_1", 150)
+	select {
+	case <-waiter.Wait(context.TODO()):
+		t.Errorf("waiter should not be done waiting yet")
+	default:
+		//
+	}
+
+	waiter.Signal("test_store_2", 150)
+	select {
+	case <-waiter.Wait(context.TODO()):
+		t.Errorf("waiter should not be done waiting yet")
+	default:
+		//
+	}
+
+	waiter.Signal("test_store_2", 300)
+
+	waitDone := false
+	select {
+	case <-waiter.Wait(context.TODO()):
+		waitDone = true
+	}
+
+	if !waitDone {
+		t.Errorf("waiter should be done waiting")
+	}
 }

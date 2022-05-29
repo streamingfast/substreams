@@ -199,7 +199,7 @@ Possible values:
 * `string`
 * `proto:some.path.to.protobuf.Model`
 
-### ``
+``
 
 #### `modules[].code.entrypoint`
 

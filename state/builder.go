@@ -139,13 +139,14 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
 	b.BlockRange.StartBlock = b.ModuleStartBlock
 	b.Initialized = true
+	b.KV = map[string][]byte{}
 
 	zlog.Debug("initializing builder", zap.String("module_name", b.Name), zap.Uint64("requested_start_block", requestedStartBlock))
 	floor := requestedStartBlock - requestedStartBlock%b.SaveInterval
+
 	if requestedStartBlock == b.BlockRange.StartBlock {
 		b.BlockRange.StartBlock = requestedStartBlock
 		b.BlockRange.ExclusiveEndBlock = floor + b.SaveInterval
-		b.KV = map[string][]byte{}
 		return nil
 	}
 
@@ -156,7 +157,9 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	deltasNeeded := true
 	deltasStartBlock = b.ModuleStartBlock
 	b.BlockRange.ExclusiveEndBlock = floor + b.SaveInterval
-	if floor >= b.SaveInterval && floor > b.BlockRange.StartBlock {
+
+	shouldLoadKV := floor >= b.SaveInterval && floor > b.BlockRange.StartBlock
+	if shouldLoadKV { //if false this mean that why only need to load the deltas...
 		deltasStartBlock = floor
 		deltasNeeded = (requestedStartBlock - floor) > 0
 

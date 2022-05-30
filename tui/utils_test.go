@@ -17,41 +17,41 @@ func Test_MergeRangeLists(t *testing.T) {
 		{
 			name: "Nothing new",
 			completedBlockRanges: []*blockRange{
-				{Start: 0, End: 100},
-				{Start: 100, End: 200},
+				{Start: 0, End: 99},
+				{Start: 100, End: 199},
 			},
 			newlyCompletedBlockRanges: []*blockRange{},
 			expectedBlockRanges: []*blockRange{
-				{Start: 0, End: 100},
-				{Start: 100, End: 200},
+				{Start: 0, End: 99},
+				{Start: 100, End: 199},
 			},
 		},
 		{
 			name: "Merging 1 block range",
 			completedBlockRanges: []*blockRange{
-				{Start: 0, End: 100},
+				{Start: 0, End: 99},
 			},
 			newlyCompletedBlockRanges: []*blockRange{
-				{Start: 100, End: 200},
+				{Start: 100, End: 199},
 			},
 			expectedBlockRanges: []*blockRange{
-				{Start: 0, End: 200},
+				{Start: 0, End: 199},
 			},
 		},
 		{
 			name: "Merging multiple block ranges",
 			completedBlockRanges: []*blockRange{
-				{Start: 0, End: 100},
+				{Start: 0, End: 99},
 			},
 			newlyCompletedBlockRanges: []*blockRange{
-				{Start: 100, End: 200},
-				{Start: 200, End: 300},
-				{Start: 400, End: 500},
-				{Start: 500, End: 600},
+				{Start: 100, End: 199},
+				{Start: 200, End: 299},
+				{Start: 400, End: 499},
+				{Start: 500, End: 599},
 			},
 			expectedBlockRanges: []*blockRange{
-				{Start: 0, End: 300},
-				{Start: 400, End: 600},
+				{Start: 0, End: 299},
+				{Start: 400, End: 599},
 			},
 		},
 	}

@@ -12,6 +12,8 @@ import (
 func (m model) View() string {
 	const width = 80
 
+	// WARN(abourget): Request.StartBlockNum cannot be relatiev here too.
+
 	buf := bytes.NewBuffer(nil)
 	err := template.Must(template.New("tpl").Funcs(template.FuncMap{
 		"pad": func(in string) string {
@@ -28,10 +30,11 @@ func (m model) View() string {
 {{- if not .Connected }}Connecting...{{ else -}}
 Connected - Progress messages received: {{ .Updates }}
 {{- if .Failures }}   Failures: {{ .Failures }}, Reason: {{ .Reason }} {{ end }}
-Backprocessing history up to request start block:
+{{ with .Request }}Backprocessing history up to requested start block {{ .StartBlockNum }}:{{end}}
 {{ range $key, $value := .Modules }}
-  {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end }}
-{{ end }}{{ end }}{{ end }}{{- with .Clock -}}
+  {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
+{{ end }}{{ end }}{{ end }}
+{{ with .Clock -}}
 -------------------- BLOCK {{ humanize .Number }} --------------------
 {{ end -}}
 `)).Execute(buf, m)

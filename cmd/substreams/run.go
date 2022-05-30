@@ -108,6 +108,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	go ui.Start()
 
+	ui.SetRequest(req)
 	ui.Connecting()
 	cli, err := ssClient.Blocks(ctx, req, callOpts...)
 	if err != nil {

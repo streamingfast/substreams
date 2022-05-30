@@ -27,6 +27,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		switch msg.String() {
+		case "enter":
+			fmt.Println("")
 		case "m":
 			m.DebugSetting = !m.DebugSetting
 		case "q":
@@ -37,9 +39,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// if m.progress.Width > maxWidth {
 		// 	m.progress.Width = maxWidth
 		// }
+	case *pbsubstreams.Request:
+		m.Request = msg
+		return m, nil
 	case *pbsubstreams.Clock:
 		if m.Clock == nil {
-			fmt.Println(m.View())
+
+			// fmt.Println(m.View())
+			// fmt.Println("")
+			// fmt.Println("")
+			// fmt.Println("")
 		}
 		m.Clock = msg
 		return m, nil

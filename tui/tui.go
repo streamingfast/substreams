@@ -27,15 +27,16 @@ type TUI struct {
 }
 
 func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) *TUI {
-	return &TUI{
+	ui := &TUI{
 		req:               req,
 		pkg:               pkg,
 		outputStreamNames: outputStreamNames,
 		prettyPrint:       prettyPrint,
 		decodeMsgTypes:    map[string]func(in []byte) string{},
 		msgTypes:          map[string]string{},
-		prog:              tea.NewProgram(newModel()),
 	}
+	ui.prog = tea.NewProgram(newModel(ui))
+	return ui
 }
 
 func (ui *TUI) Init() error {

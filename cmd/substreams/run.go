@@ -91,6 +91,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	cleanUpTerminal := func() {}
 	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
 		returnHandler, cleanUpTerminal, err = decode.NewPrintReturnHandler(req, pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
+		defer cleanUpTerminal()
 		if err != nil {
 			return fmt.Errorf("new printer for %q: %w", manifestPath, err)
 		}
@@ -109,7 +110,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			if err == io.EOF {
 				return nil
 			}
-
 			return err
 		}
 
@@ -117,8 +117,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}
-
-	cleanUpTerminal()
 
 	return nil
 }

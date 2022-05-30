@@ -20,7 +20,7 @@ type model struct {
 	Clock    *pbsubstreams.Clock
 }
 
-type ranges []blockRange
+type ranges []*blockRange
 
 func (r ranges) Len() int           { return len(r) }
 func (r ranges) Less(i, j int) bool { return r[i].Start < r[j].Start }

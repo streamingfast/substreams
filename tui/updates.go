@@ -54,7 +54,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			for _, v := range progMsg.ProcessedRanges.ProcessedRanges {
-				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], blockRange{
+				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], &blockRange{
 					Start: v.StartBlock,
 					End:   v.EndBlock,
 				})

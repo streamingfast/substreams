@@ -2,7 +2,7 @@ package tui
 
 import "sort"
 
-func mergeRangeLists(prevRanges ranges, newRange blockRange) ranges {
+func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
 	// fmt.Println("BOO", prevRanges, newRange)
 	var stretched bool
 	for _, prevRange := range prevRanges {
@@ -41,7 +41,7 @@ func reduceOverlaps(r ranges) ranges {
 		r2 := r[i+1]
 		if r1.End >= r2.Start {
 			// TODO: this would need to be recursive.. won't work otherwise
-			newRanges = append(newRanges, blockRange{Start: r1.Start, End: r2.End})
+			newRanges = append(newRanges, &blockRange{Start: r1.Start, End: r2.End})
 		} else {
 			newRanges = append(newRanges, r1)
 			if i == len(r) {

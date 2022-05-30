@@ -58,7 +58,7 @@ func linebar(ranges ranges, initialBlock uint64, startBlock uint64, screenWidth 
 	prevBound := initialBlock
 	var s []string
 	for i := 0; i < screenWidth; i++ {
-		nextBound := initialBlock + uint64(binSize*float64(i))
+		nextBound := initialBlock + uint64(binSize*float64(i+1))
 		//fmt.Println("bounds", prevBound, nextBound)
 		if ranges.Covered(prevBound, nextBound) {
 			s = append(s, "▓")

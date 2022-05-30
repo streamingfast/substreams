@@ -14,6 +14,7 @@
 * [Installation](getting-started-guide/installation-requirements.md)
 * [Creating your Manifest](docs/getting-started-guide/creating-your-manifest.md)
 * [Creating Protobuf Schemas](getting-started-guide/creating-protobuf-schemas.md)
+* [Setting Up Handlers](getting-started-guide/setting-up-handlers.md)
 * [Writing Module Handlers](getting-started-guide/writing-module-handlers.md)
 * [Running Your Substreams](getting-started-guide/running-substreams.md)
 

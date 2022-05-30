@@ -3,8 +3,8 @@
 Let's first step your directory
 
 ```bash
-mkdir subtream-template
-cd subtream-template
+mkdir substreams_example
+cd substreams_example
 ```
 
 A Substreams manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain  a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module). It will also have a link to the `rust` code that implement the business logic of the module, we call this the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.&#x20;
@@ -30,7 +30,7 @@ protobuf:
 binaries:
   default:
     type: wasm/rust-v1
-    file: ./target/wasm32-unknown-unknown/release/substreams_nft_holders.wasm
+    file: ./target/wasm32-unknown-unknown/release/substreams_example.wasm
 
 modules:
   - name: block_to_transfers

@@ -1,531 +1,5 @@
 # Writing Module Handlers
 
-Now that we generated our Protobuf Rust code, let's initiate our Rust project and write our handlers
-
-```bash
-# This is create a barebones rust project
-cargo init
-# Since we are building a library we need to rename the newly generated main.rs
-mv ./src/main.rs ./src/lib.rs
-```
-
-Lets edit the newly created `Cargo.toml` file to look like this:
-
-{% code title="Cargo.toml" %}
-```rust
-[package]
-name = "substreams-example"
-version = "0.1.0"
-description = "Substream template demo project"
-edition = "2021"
-repository = "https://github.com/streamingfast/substreams-template"
-
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-ethabi = "17.0"
-hex-literal = "0.3.4"
-prost = { version = "0.10.1" }
-substreams= { git = "https://github.com/streamingfast/substreams", branch="develop" }
-substreams-ethereum = { git = "https://github.com/streamingfast/substreams-ethereum", branch="develop" }
-
-# Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
-getrandom = { version = "0.2", features = ["custom"] }
-
-
-[build-dependencies]
-anyhow = "1"
-substreams-ethereum = { git = "https://github.com/streamingfast/substreams-ethereum", branch="develop" }
-
-[profile.release]
-lto = true
-opt-level = 's'
-strip = "debuginfo"
-```
-{% endcode %}
-
-Let's go through the important changes. Our Rust code will be compiled in [`wasm`](https://webassembly.org/). Think of `wasm` code as a binary instruction format that can be run in a virtual machine. When your Rust code is compiled it will generate a `.so` file.&#x20;
-
-**Let's break down the file**
-
-Since we are building a Rust dynamic system library, after the `package`, we first need to specify:
-
-```rust
-...
-
-[lib]
-crate-type = ["cdylib"]
-```
-
-We then need to specify our `dependencies:`
-
-* `ethabi`: This crate will be used to decode events from your ABI
-* `hex-literal`: This crate will be used to manipulate Hexadecimal values
-* `substreams`: This crate offers all the basic building blocks for your handlers
-* `substreams-ethereum`: This crate offers all the Ethereum constructs (blocks, transactions, eth) as well as useful `ABI` decoding capabilities
-
-Since we are building our building our code into `wasm` we need to configure Rust to target the correct architecture. Add this file at the root of our Substreams director
-
-```toml
-[toolchain]
-channel = "1.60.0"
-components = [ "rustfmt" ]
-targets = [ "wasm32-unknown-unknown" 
-```
-
-We can now build our code
-
-```rust
-cargo build --target wasm32-unknown-unknown --release
-```
-
-{% hint style="info" %}
-**Rust Build Target**
-
-Notice that when we run `cargo build` we specify the `target` to be `wasm32-unknown-unknown` this is important, since the goal is to generate compiled `wasm` code.
-{% endhint %}
-
-### ABI Generation
-
-In order to make it easy and type-safe to work with smart contracts, the `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contracts ABI.&#x20;
-
-We will first insert our contract ABI json file in our projects under an `abi` folder
-
-{% code title="abi/erc721.json" %}
-```json
-[
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "approved",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "Approval",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "operator",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "bool",
-				"name": "approved",
-				"type": "bool"
-			}
-		],
-		"name": "ApprovalForAll",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "Transfer",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "approve",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			}
-		],
-		"name": "balanceOf",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "balance",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "getApproved",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "operator",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "operator",
-				"type": "address"
-			}
-		],
-		"name": "isApprovedForAll",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "name",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "ownerOf",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "safeTransferFrom",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "safeTransferFrom",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "operator",
-				"type": "address"
-			},
-			{
-				"internalType": "bool",
-				"name": "_approved",
-				"type": "bool"
-			}
-		],
-		"name": "setApprovalForAll",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes4",
-				"name": "interfaceId",
-				"type": "bytes4"
-			}
-		],
-		"name": "supportsInterface",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "symbol",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "index",
-				"type": "uint256"
-			}
-		],
-		"name": "tokenByIndex",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "index",
-				"type": "uint256"
-			}
-		],
-		"name": "tokenOfOwnerByIndex",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "tokenURI",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "totalSupply",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "transferFrom",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	}
-]
-```
-{% endcode %}
-
-Now that we have our ABI in our project let's add a Rust build script.
-
-{% hint style="info" %}
-**Rust Build Script**
-
-Just before a package is built, Cargo will compile a build script into an executable (if it has not already been built). It will then run the script, which may perform any number of tasks.&#x20;
-
-Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it just before building the package
-{% endhint %}
-
-We will create a `build.rs` file in the root of our Substreams directory
-
-{% code title="build.rs" %}
-```rust
-use anyhow::{Ok, Result};
-use substreams_ethereum::Abigen;
-
-fn main() -> Result<(), anyhow::Error> {
-    Abigen::new("ERC721", "abi/erc721.json")?
-        .generate()?
-        .write_to_file("src/abi/erc721.rs")?;
-
-    Ok(())
-}
-```
-{% endcode %}
-
-We will run the build script by building the project&#x20;
-
-```bash
-cargo build --target wasm32-unknown-unknown --release
-```
-
-You should now have a generated ABI folder `src/abi` we will create a `mod.rs` file in that folder to export the generated Rust code
-
-{% code title="src/abi/mod.rs" %}
-```rust
-pub mod erc721;
-```
-{% endcode %}
-
 Now that we have our ABI & Protobuf Rust code generated lets write our handler code in `src/lib.rs`
 
 {% code title="src/lib.rs" %}
@@ -535,7 +9,7 @@ mod pb;
 use hex_literal::hex;
 use pb::erc721;
 use substreams::{log, store, Hex};
-use substreams_ethereum::{pb::eth::v1 as eth, EMPTY_ADDRESS};
+use substreams_ethereum::{pb::eth::v1 as eth, NULL_ADDRESS};
 
 // Bored Ape Club Contract
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
@@ -579,13 +53,13 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
     log::info!("NFT state builder");
     for transfer in transfers.transfers {
-        if transfer.from != EMPTY_ADDRESS {
+        if transfer.from != NULL_ADDRESS {
             log::info!("Found a transfer out");
 
             s.add(transfer.ordinal, generate_key(&transfer.from), -1);
         }
 
-        if transfer.to != EMPTY_ADDRESS {
+        if transfer.to != NULL_ADDRESS {
             log::info!("Found a transfer in");
 
             s.add(transfer.ordinal, generate_key(&transfer.to), 1);
@@ -611,7 +85,7 @@ mod pb;
 use hex_literal::hex;
 use pb::erc721;
 use substreams::{log, store, Hex};
-use substreams_ethereum::{pb::eth::v1 as eth, EMPTY_ADDRESS};
+use substreams_ethereum::{pb::eth::v1 as eth, NULL_ADDRESS};
 ...
 ```
 
@@ -628,7 +102,7 @@ substreams_ethereum::init!();
 ...
 ```
 
-We now define our first `map` module. As a reminder here is the module definition in the Manfiest&#x20;
+We now define our first `map` module. As a reminder here is the module definition in the Manifiest&#x20;
 
 ```yaml
   - name: block_to_transfers
@@ -640,7 +114,7 @@ We now define our first `map` module. As a reminder here is the module definitio
       type: proto:eth.erc721.v1.Transfers
 ```
 
-First notice the `entrypoint: block_to_transfers` this should correspond to our handler function name.&#x20;
+First notice the `name: block_to_transfers` this should correspond to our handler function name.&#x20;
 
 Secondly we have defined 1 input and 1 output,. The input has a type of `sf.ethereum.type.v1.Block`, this is a standard Ethereum block that is provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` this is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature
 
@@ -692,13 +166,13 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
             }
 
             log::debug!("NFT Contract {} invoked", Hex(&TRACKED_CONTRACT));
-            // check if the 
+            // verify if the log matches a Transfer Event
             if !abi::erc721::events::Transfer::match_log(log) {
                 return None;
             }
-
+            
+            // decode the event and store it
             let transfer = abi::erc721::events::Transfer::must_decode(log);
-
             Some(erc721::Transfer {
                 trx_hash: trx.hash.clone(),
                 from: transfer.from,
@@ -708,9 +182,95 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
             })
         }));
     }
-
+    
+    // return our list of transfers for the given block
     Ok(erc721::Transfers { transfers })
 }
 
 ```
 
+Let's  now define our  `store` module. As a reminder here is the module definition in the Manifiest&#x20;
+
+```yaml
+  - name: nft_state
+    kind: store
+    initialBlock: 12287507
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - map: block_to_transfers
+
+```
+
+First notice the `name: nft_state` this should correspond to our handler function name.&#x20;
+
+Secondly we have defined 1 input. The input corresponds to the output of the `map` module `block_to_transfer` which is of type `proto:eth.erc721.v1.Transfers` this is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature.
+
+```rust
+...
+
+/// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
+#[substreams::handlers::store]
+fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
+    ...
+}
+
+```
+
+Note that the `store` will always take as its **last input** the writable store itself. In this example the `store` module has an `updatePolicy: add` and a `valueType: int64` this yields a writable store of type `StoreAddInt64`
+
+{% hint style="info" %}
+**Store Types**
+
+The last parameter of a `store` module function should always be the writable store itself. The type of said writable store is based on your `store` module `updatePolicy` and `valueType`. You can see all the possible types of store here
+{% endhint %}
+
+The goal of the `store` we are building is to keep track of a holder's current NFT count for the given contract. We will achieve this by analyzing the transfers.&#x20;
+
+* If the transfer's  `from` address field is the null address (`0x0000000000000000000000000000000000000000`) and the `to` address field is not the null address, we know the `to` address field is minting a token, and we should increment his count.&#x20;
+* if the transfer's `from` address field is not the null address and the `to` address field is the null address, we know the `from` address field is burning a token, and we should decrement his count.
+* If the `from` address field and the `to` address field is not the null address, we should decrement the count of the `from` address and increment the count of the `to` address field as this is a basic transfer
+
+When writing to a store there are generally 3 concept you must consider:
+
+1. `ordinal`: this represents the order in which your `store` operations will be applied. Consider the following: your `store` handler will be called once per `block`- during that execution it may call the `add` operation multiple times, for multiple reasons (found a relevant event, saw a call that triggered a method call). Since a blockchain execution model is linear and deterministic, we need to make sure we can apply your `add` operations linearly and deterministically. By having to specify an ordinal, we can guarantee the order of execution. In other words, given one execution of your `store` handler for given inputs (in this example a list of transfers), your code should emit the same number of `add` calls with the same ordinal values.&#x20;
+2. `key`: Since are our stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database) we need to take care in crafting the key, to ensure that it is unique and flexible. In our example, if the `generate_key` function would simply return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders. If we the `generate_key` function would return a key that is only the holder's address, thought it would be unique amongst holders, if we wanted to track multiple contract we would run into issues.&#x20;
+3. `value`: The value we are storing, the type of dependant on the store type we are using.
+
+```rust
+/// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
+#[substreams::handlers::store]
+fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
+    log::info!("NFT state builder");
+    // iterate over the transfers event
+    for transfer in transfers.transfers {
+        // check if the from address field is not the NULL address
+        if transfer.from != NULL_ADDRESS {
+            log::info!("Found a transfer out");
+            // decrement the count
+            s.add(transfer.ordinal, generate_key(&transfer.from), -1);
+        }
+        // check if the to address field is not the NULL address
+        if transfer.to != NULL_ADDRESS {
+            log::info!("Found a transfer in");
+            // increment the count
+            s.add(transfer.ordinal, generate_key(&transfer.to), 1);
+        }
+    }
+}
+
+fn generate_key(holder: &Vec<u8>) -> String {
+    return format!("total:{}:{}", Hex(holder), Hex(TRACKED_CONTRACT));
+}
+
+```
+
+### Summary
+
+We have created both our handler functions, once for extracting transfers that are of interest to us and a second to store the token count per recipient. At this point you should be able to build your Substreams
+
+```
+cargo build --target wasm32-unknown-unknown --release
+```
+
+The last step is to run your newly created Substreams.

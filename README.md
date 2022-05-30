@@ -14,13 +14,9 @@ It has all the benefits of the Firehose, like low cost caching and archiving of 
 
 Substreams is the successor of [https://github.com/streamingfast/sparkle](https://github.com/streamingfast/sparkle), enabling greater composability, yet similar powers of parallelization, and a much simpler model to work with.
 
-## Documentation
-
-Visit the [Documentation](broken-reference) section for details.
-
 ## Getting Started
 
-### Installing the `substreams` command-line tool
+### Installing the `Substreams` command-line tool
 
 The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real-time, as well as package your own Substreams modules.
 
@@ -62,45 +58,11 @@ substreams -v
 version 0.0.5-beta3 (Commit 61cc596, Built 2022-05-09T19:35:11Z)
 ```
 
+### Ressources
 
-
-### Consuming
-
-Get streaming right away using. To use StreamingFast's infrastructure, dump that somewhere like `.bashrc`:
-
-```bash
-export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  # Ask us on Discord for a key
-function sftoken {
-    export FIREHOSE_API_TOKEN=$(curl https://auth.dfuse.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
-	export SUBSTREAMS_API_TOKEN=$FIREHOSE_API_TOKEN
-    echo Token set on FIREHOSE_API_TOKEN and SUBSTREAMS_API_TOKEN
-}
-```
-
-Then in your shell, load a key into an environment variable with:
-
-```bash
-sftoken
-```
-
-And run:
-
-```
-substreams run -e bsc-dev.streamingfast.io:443 \
-   https://github.com/streamingfast/substreams-playground/releases/download/v0.5.0/pcs-v0.5.0.spkg \
-   block_to_pairs,pairs,db_out \
-   -s 6810706 -t 6810711
-```
-
-### Developing Substreams Modules
-
-Install the [**Rust** programming language](https://www.rust-lang.org/). This is the language used to develop Substreams Modules.
-
-There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
+* Checkout our [Getting Started Guide](getting-started-guide/overview.md)
+* Take a look at the [Subtreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
+* Take a look at the [Substreams Playground](https://github.com/streamingfast/substreams-playground) repository for more learnings and examples
 
 ## Community
 

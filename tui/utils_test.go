@@ -66,5 +66,19 @@ func Test_MergeRangeLists(t *testing.T) {
 			require.Equal(t, test.expectedBlockRanges, actual)
 		})
 	}
+}
 
+func TestLineBar(t *testing.T) {
+	res := linebar(
+		ranges{
+			{Start: 1, End: 23},
+			{Start: 50, End: 100},
+			{Start: 200, End: 600},
+			{Start: 700, End: 710},
+		},
+		100,
+		1000,
+		10,
+	)
+	fmt.Println("MAMA", res)
 }

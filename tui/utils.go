@@ -20,7 +20,7 @@ func (r ranges) Hi() uint64 { _, b := r.LoHi(); return b }
 // Covered assumes block ranges have reduced overlaps/junctions.
 func (r ranges) Covered(lo, hi uint64) bool {
 	for _, blockRange := range r {
-		if lo >= blockRange.Start && hi <= blockRange.End {
+		if blockRange.Start <= lo && hi <= blockRange.End {
 			return true
 		}
 	}
@@ -30,10 +30,13 @@ func (r ranges) Covered(lo, hi uint64) bool {
 // Covered assumes block ranges have reduced overlaps/junctions.
 func (r ranges) PartiallyCovered(lo, hi uint64) bool {
 	for _, blockRange := range r {
-		if lo >= blockRange.Start && lo <= blockRange.End {
+		if r.Covered(lo, hi) {
 			return true
 		}
-		if hi >= blockRange.Start && hi <= blockRange.End {
+		if blockRange.Start <= lo && lo <= blockRange.End {
+			return true
+		}
+		if blockRange.Start <= hi && hi <= blockRange.End {
 			return true
 		}
 	}

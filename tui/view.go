@@ -58,9 +58,10 @@ func linebar(ranges ranges, initialBlock uint64, startBlock uint64, screenWidth 
 	prevBound := initialBlock
 	var s []string
 	for i := 0; i < screenWidth; i++ {
-		nextBound := uint64(binSize * float64(i))
+		nextBound := initialBlock + uint64(binSize*float64(i))
+		//fmt.Println("bounds", prevBound, nextBound)
 		if ranges.Covered(prevBound, nextBound) {
-			s = append(s, "█")
+			s = append(s, "▓")
 		} else if ranges.PartiallyCovered(prevBound, nextBound) {
 			s = append(s, "▒")
 		} else {

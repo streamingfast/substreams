@@ -65,7 +65,10 @@ main() {
   goreleaser release $args
   if [[ $? -gt 0 || "$force" == "false" ]]; then
     git tag -d "$version"
+    exit 1
   fi
+
+  cargo publish --target wasm32-unknown-unknown -p substreams substreams-macro
 }
 
 verify_github_token() {

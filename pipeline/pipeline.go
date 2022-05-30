@@ -18,7 +18,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/worker"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
-	"github.com/streamingfast/substreams/progress"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
@@ -55,7 +54,6 @@ type Pipeline struct {
 	moduleExecutors []ModuleExecutor
 	wasmOutputs     map[string][]byte
 
-	progressTracker    *progress.Tracker
 	allowInvalidState  bool
 	baseStateStore     dstore.Store
 	storesSaveInterval uint64
@@ -94,7 +92,6 @@ func New(
 		outputModuleNames:            request.OutputModules,
 		outputModuleMap:              map[string]bool{},
 		blockType:                    blockType,
-		progressTracker:              progress.NewProgressTracker(),
 		wasmExtensions:               wasmExtensions,
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
@@ -150,8 +147,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 	}
 
-	p.progressTracker.StartTracking(ctx)
-
 	if !p.partialMode {
 		err = SynchronizeStores(
 			ctx,
@@ -184,8 +179,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 	}
 
 	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		handleStart := time.Now()
-
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -281,8 +274,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			})
 		}
 
-		p.progressTracker.BlockProcessed(block, time.Since(handleStart))
-
 		if p.clock.Number >= p.requestedStartBlockNum {
 			if err := p.returnOutputs(step, cursor, respFunc); err != nil {
 				return err
@@ -325,7 +316,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 							ProcessedRanges: []*pbsubstreams.BlockRange{
 								{
 									StartBlock: p.requestedStartBlockNum,
-									EndBlock:   p.progressTracker.LastBlock,
+									EndBlock:   p.clock.Number,
 								},
 							},
 						},

@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/decode"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/tui"
 )
 
 func init() {
@@ -87,22 +87,33 @@ func runRun(cmd *cobra.Command, args []string) error {
 		OutputModules: outputStreamNames,
 	}
 
-	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	cleanUpTerminal := func() {}
-	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
-		returnHandler, cleanUpTerminal, err = decode.NewPrintReturnHandler(req, pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
-		defer cleanUpTerminal()
-		if err != nil {
-			return fmt.Errorf("new printer for %q: %w", manifestPath, err)
-		}
-	}
+	/*
+		                           | Lowest block                                        | Requested block
+		                           | 5,364,534                                           | 55,453,453
+		   ------------------------|-----------------------------------------------------|-------------
+			   pairs               | XXXXXXXXXXXXXXXXXXXx       XXX              XXXXXXX |
+			   reserves            | XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     |
+			   reserves            |            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     |
+			-----------------------|-----------------------------------------------------|
 
-	zlog.Info("connecting...")
+
+	*/
+
+	prettyPrint := !mustGetBool(cmd, "compact-output")
+	ui := tui.New(req, pkg, outputStreamNames, prettyPrint)
+	if err := ui.Init(); err != nil {
+		return fmt.Errorf("TUI initialization: %w", err)
+	}
+	defer ui.CleanUpTerminal()
+
+	go ui.Start()
+
+	ui.Connecting()
 	cli, err := ssClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
 	}
-	zlog.Info("connected")
+	ui.Connected()
 
 	for {
 		resp, err := cli.Recv()
@@ -113,7 +124,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		if err := returnHandler(resp); err != nil {
+		if err := ui.IncomingMessage(resp); err != nil {
 			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}

@@ -31,7 +31,7 @@ func PrintMermaid(mods *pbsubstreams.Modules) {
 					s.Name)
 			} else {
 				fmt.Printf("  %s[%s] --> %s\n",
-					strings.Split(name, ":")[1],
+					strings.Split(name, ":")[0],
 					strings.Replace(name, ":", ": ", 1),
 					s.Name)
 			}

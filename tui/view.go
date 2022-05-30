@@ -30,8 +30,7 @@ Connected - Progress messages received: {{ .Updates }}
 {{- if .Failures }}   Failures: {{ .Failures }}, Reason: {{ .Reason }} {{ end }}
 Backprocessing history up to request start block:
 {{ range $key, $value := .Modules }}
-  {{ pad $key }} {{ $value.Lo }}, {{ $value.Hi }} - {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
-
+  {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end }}
 {{ end }}{{ end }}{{ end }}{{- with .Clock -}}
 -------------------- BLOCK {{ humanize .Number }} --------------------
 {{ end -}}

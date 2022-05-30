@@ -139,7 +139,7 @@ func NewOrderedStrategy(
 		}
 
 		if moduleFullRangeToProcess.Size() > maxRangeSize {
-			return nil, fmt.Errorf("subrequest size too big. request must be started clsoer to the module start block")
+			return nil, fmt.Errorf("subrequest size too big. request must be started clsoer to the head block. store %s is %d blocks from head (max is %d)", builder.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
 		}
 
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))

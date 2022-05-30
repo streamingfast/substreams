@@ -1,7 +1,3 @@
----
-description: A streaming data engine for The Graph - by StreamingFast
----
-
 # Substreams
 
 DEVELOPER PREVIEW OF SUBSTREAMS

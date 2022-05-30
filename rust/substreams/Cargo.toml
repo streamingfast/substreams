@@ -1,6 +1,6 @@
 [package]
 name = "substreams"
-version = "0.0.7-beta"
+version = "0.0.8-beta"
 description = "Substreams SDK - A streaming data engine for The Graph - by StreamingFast"
 edition = "2018"
 homepage = "https://substreams.streamingfast.io/"
@@ -12,7 +12,7 @@ categories = ["api-bindings", "external-ffi-bindings", "wasm"]
 rust-version = "1.60"
 
 [dependencies]
-substreams-macro = { version = "0.0.7-beta", path = "../substreams-macro" }
+substreams-macro = { version = "0.0.8-beta", path = "../substreams-macro" }
 prost = { version = "0.10.1" }
 prost-types = "0.10.1"
 hex = "0.4.3"

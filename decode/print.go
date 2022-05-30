@@ -3,7 +3,6 @@ package decode
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,17 +12,16 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/progress"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool, moduleProgressBar *progress.ModuleProgressBar) (substreams.ResponseFunc, error) {
+func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) (substreams.ResponseFunc, func(), error) {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
 	fileDescs, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
+		return nil, nil, fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
 	}
 
 	for _, mod := range pkg.Modules.Modules {
@@ -101,12 +99,11 @@ func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package,
 		}
 	}
 
-	teaModel := newModel()
+	teaModel := NewModel()
 	teaProg := tea.NewProgram(teaModel)
 	go func() {
 		if err := teaProg.Start(); err != nil {
 			fmt.Println("Failed bubble tea program: %s", err)
-			os.Exit(1)
 		}
 	}()
 
@@ -203,20 +200,24 @@ func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package,
 	}
 
 	return func(resp *pbsubstreams.Response) error {
-		switch m := resp.Message.(type) {
-		case *pbsubstreams.Response_Data:
-			return blockScopedData(m.Data)
-		case *pbsubstreams.Response_Progress:
-			return responseProgress(m.Progress)
-		case *pbsubstreams.Response_SnapshotData:
-			fmt.Println("Incoming snapshot data")
-		case *pbsubstreams.Response_SnapshotComplete:
-			fmt.Println("Snapshot data dump complete")
-		default:
-			fmt.Println("Unsupported response")
-		}
-		return nil
-	}, nil
+			switch m := resp.Message.(type) {
+			case *pbsubstreams.Response_Data:
+				return blockScopedData(m.Data)
+			case *pbsubstreams.Response_Progress:
+				return responseProgress(m.Progress)
+			case *pbsubstreams.Response_SnapshotData:
+				fmt.Println("Incoming snapshot data")
+			case *pbsubstreams.Response_SnapshotComplete:
+				fmt.Println("Snapshot data dump complete")
+			default:
+				fmt.Println("Unsupported response")
+			}
+			return nil
+		}, func() {
+			if err := teaProg.ReleaseTerminal(); err != nil {
+				fmt.Println("Failed releasing terminal:", err)
+			}
+		}, nil
 }
 
 func failureProgressHandler(modName string, failure *pbsubstreams.ModuleProgress_Failed) error {

@@ -18,7 +18,7 @@ const (
 
 type tickMsg time.Time
 
-func newModel() model {
+func NewModel() model {
 	return model{
 		Modules: updatedRanges{},
 	}
@@ -100,6 +100,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
+			fmt.Println("Quitting...")
+			return m, tea.Quit
+		}
 		switch msg.String() {
 		case "m":
 			m.DebugSetting = !m.DebugSetting

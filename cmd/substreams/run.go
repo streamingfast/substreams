@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/substreams/progress"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/decode"
@@ -90,17 +88,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	moduleProgressBar := &progress.ModuleProgressBar{
-		Bars: map[progress.ModuleName]*progress.Bar{},
-	}
+	cleanUpTerminal := func() {}
 	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
-		for _, outputStreamName := range outputStreamNames {
-			bar := &progress.Bar{}
-			bar.Initialized = false
-			moduleProgressBar.Bars[progress.ModuleName(outputStreamName)] = bar
-		}
-
-		returnHandler, err = decode.NewPrintReturnHandler(req, pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)
+		returnHandler, cleanUpTerminal, err = decode.NewPrintReturnHandler(req, pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"))
 		if err != nil {
 			return fmt.Errorf("new printer for %q: %w", manifestPath, err)
 		}
@@ -111,7 +101,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
 	}
-
 	zlog.Info("connected")
 
 	for {
@@ -128,6 +117,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}
+
+	cleanUpTerminal()
+
+	return nil
 }
 
 func readAPIToken(cmd *cobra.Command, envFlagName string) string {

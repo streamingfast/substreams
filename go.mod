@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/drone/envsubst v1.0.2
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
@@ -31,6 +31,7 @@ replace (
 )
 
 require (
+	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
 	github.com/iancoleman/strcase v0.2.0
 	github.com/jmoiron/sqlx v1.3.4
@@ -62,7 +63,6 @@ require (
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/charmbracelet/bubbletea v0.20.0 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -71,7 +71,6 @@ require (
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
-	github.com/gosuri/uilive v0.0.4 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -92,6 +91,7 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b // indirect
+	github.com/muesli/cancelreader v0.2.0 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739 // indirect
 	github.com/openzipkin/zipkin-go v0.1.6 // indirect

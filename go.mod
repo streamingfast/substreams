@@ -36,7 +36,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
-	github.com/rakyll/statik v0.1.7
 	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3

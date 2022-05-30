@@ -68,7 +68,9 @@ main() {
     exit 1
   fi
 
-  cargo publish --target wasm32-unknown-unknown -p substreams substreams-macro
+  # We need to publish one crate at a time, one after the one
+  cargo publish --target wasm32-unknown-unknown -p substreams-macro
+  cargo publish --target wasm32-unknown-unknown -p substreams
 }
 
 verify_github_token() {

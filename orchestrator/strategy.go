@@ -89,7 +89,16 @@ type OrderedStrategy struct {
 	requestGetter RequestGetter
 }
 
-func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, graph *manifest.ModuleGraph, pool *RequestPool, upToBlockNum uint64, blockRangeSizeSubRequests int) (*OrderedStrategy, error) {
+func NewOrderedStrategy(
+	ctx context.Context,
+	request *pbsubstreams.Request,
+	builders []*state.Builder,
+	graph *manifest.ModuleGraph,
+	pool *RequestPool,
+	upToBlockNum uint64,
+	blockRangeSizeSubRequests int,
+	maxRangeSize uint64,
+) (*OrderedStrategy, error) {
 	lastSavedBlockMap := map[string]uint64{}
 	for _, builder := range builders {
 		info, err := builder.Info(ctx)
@@ -127,6 +136,10 @@ func NewOrderedStrategy(ctx context.Context, request *pbsubstreams.Request, buil
 		moduleFullRangeToProcess := &block.Range{
 			StartBlock:        reqStartBlock,
 			ExclusiveEndBlock: endBlock,
+		}
+
+		if moduleFullRangeToProcess.Size() > maxRangeSize {
+			return nil, fmt.Errorf("subrequest size too big. request must be started clsoer to the module start block")
 		}
 
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))

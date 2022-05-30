@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type Pipeline struct {
 	blockType string
 
 	requestedStartBlockNum uint64
+	maxStoreSyncRangeSize  uint64
 	partialMode            bool
 
 	preBlockHooks  []substreams.BlockHook
@@ -97,6 +99,8 @@ func New(
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
 		blockRangeSizeSubrequests:    blockRangeSizeSubRequests,
+
+		maxStoreSyncRangeSize: math.MaxUint64,
 	}
 
 	for _, name := range request.OutputModules {
@@ -155,6 +159,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			p.request, stores,
 			p.graph, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.blockRangeSizeSubrequests,
 			p.storesSaveInterval,
+			p.maxStoreSyncRangeSize,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
@@ -551,7 +556,8 @@ func SynchronizeStores(
 	upToBlockNum uint64,
 	respFunc substreams.ResponseFunc,
 	blockRangeSizeSubRequests int,
-	storeSaveInterval uint64) error {
+	storeSaveInterval uint64,
+	maxSubrequestRangeSize uint64) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -565,7 +571,7 @@ func SynchronizeStores(
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests, maxSubrequestRangeSize)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}

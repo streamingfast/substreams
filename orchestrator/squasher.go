@@ -149,10 +149,10 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 				return fmt.Errorf("merging: %s", err)
 			}
 
-			err = partialBuilder.DeletePartialFile(ctx)
-			if err != nil {
-				zlog.Warn("deleting partial file", zap.Error(err))
-			}
+			//err = partialBuilder.DeletePartialFile(ctx)
+			//if err != nil {
+			//	zlog.Warn("deleting partial file", zap.Error(err))
+			//}
 
 			err = squashable.builder.WriteState(ctx)
 			if err != nil {

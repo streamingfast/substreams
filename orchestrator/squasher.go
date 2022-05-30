@@ -151,7 +151,7 @@ func squash(ctx context.Context, squashable *Squashable, blockRange *block.Range
 
 			err = partialBuilder.DeletePartialFile(ctx)
 			if err != nil {
-				return fmt.Errorf("deleting builder data: %w", err)
+				zlog.Warn("deleting partial file", zap.Error(err))
 			}
 
 			err = squashable.builder.WriteState(ctx)

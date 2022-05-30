@@ -468,7 +468,11 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 						Name:  inputName,
 						Store: p.builders[inputName],
 					})
+					if p.builders[inputName] == nil {
+						return fmt.Errorf("no store with name %q", inputName)
+					}
 				}
+
 			case *pbsubstreams.Module_Input_Source_:
 				inputs = append(inputs, &wasm.Input{
 					Type: wasm.InputSource,

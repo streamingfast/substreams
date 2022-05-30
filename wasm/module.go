@@ -715,7 +715,9 @@ func (m *Module) registerStateImports(imports *wasmer.ImportObject, store *wasme
 			if storeIndex+1 > len(m.CurrentInstance.inputStores) {
 				return nil, fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores))
 			}
+
 			readStore := m.CurrentInstance.inputStores[storeIndex]
+
 			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
 			if err != nil {
 				return nil, fmt.Errorf("reading string: %w", err)

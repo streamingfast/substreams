@@ -3,16 +3,14 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/streamingfast/substreams/pipeline/outputs"
-
 	"github.com/streamingfast/bstream"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputs"
+	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/state"
-	"github.com/streamingfast/substreams/wasm"
 )
 
 type ModuleExecutor interface {

@@ -103,7 +103,7 @@ func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package,
 	teaProg := tea.NewProgram(teaModel)
 	go func() {
 		if err := teaProg.Start(); err != nil {
-			fmt.Println("Failed bubble tea program: %s", err)
+			fmt.Printf("Failed bubble tea program: %s\n", err)
 		}
 	}()
 

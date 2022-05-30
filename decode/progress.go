@@ -128,10 +128,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			for _, v := range progMsg.ProcessedRanges.ProcessedRanges {
+				before := len(newModules[msg.Name])
 				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], blockRange{
 					Start: v.StartBlock,
 					End:   v.EndBlock,
 				})
+				after := len(newModules[msg.Name])
+				fmt.Printf("successfully merged new block range, before: %d after: %d \n", before, after)
 			}
 
 			m.Modules = newModules
@@ -140,7 +143,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case *pbsubstreams.ModuleProgress_Failed_:
 			m.Failures += 1
 			if progMsg.Failed.Reason != "" {
-				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %s", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
+				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %T", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
 			}
 			return m, nil
 		}
@@ -169,31 +172,26 @@ Updates: {{ .Updates }}
 }
 
 func mergeRangeLists(prevRanges ranges, newRange blockRange) ranges {
-	// fmt.Println("BOO", prevRanges, newRange)
 	var stretched bool
 	for _, prevRange := range prevRanges {
 		if newRange.Start <= prevRange.End {
 			if prevRange.End < newRange.End {
-				prevRange.End = newRange.End
 				stretched = true
 				break
 			}
 		} else if newRange.End >= prevRange.Start {
 			if prevRange.Start > newRange.Start {
-				prevRange.Start = newRange.Start
 				stretched = true
 				break
 			}
 		}
 	}
-	if !stretched {
+	if stretched {
 		prevRanges = append(prevRanges, newRange)
 	}
-	// _ = stretched
-	// prevRanges = append(prevRanges, newRange)
+
 	sort.Sort(prevRanges)
 	return prevRanges
-	//return reduceOverlaps(prevRanges)
 }
 
 func reduceOverlaps(r ranges) ranges {

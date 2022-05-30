@@ -4,6 +4,7 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
 dry_run=""
 force="false"
+tag=""
 
 main() {
   pushd "$ROOT" &> /dev/null
@@ -58,19 +59,28 @@ main() {
   fi
 
   git tag "$version"
+  tag="$version"
 
-  # Remove auto-failure as we handle the errors ourself
-  set +e
+  if [[ "$force" == "false" ]]; then
+    trap cleanup_tag EXIT
+  fi
 
   goreleaser release $args
-  if [[ $? -gt 0 || "$force" == "false" ]]; then
-    git tag -d "$version"
-    exit 1
+
+  args="${CARGO_PUBISH_ARGS:-}"
+  if [[ "$force" == "false" ]]; then
+    args="--dry-run $args"
   fi
 
   # We need to publish one crate at a time, one after the one
-  cargo publish --target wasm32-unknown-unknown -p substreams-macro
-  cargo publish --target wasm32-unknown-unknown -p substreams
+  cargo publish $args --target wasm32-unknown-unknown -p substreams-macro
+  cargo publish $args --target wasm32-unknown-unknown -p substreams
+}
+
+cleanup_tag() {
+  if [[ "$tag" != "" ]]; then
+    git tag -d "$tag"
+  fi
 }
 
 verify_github_token() {

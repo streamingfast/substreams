@@ -156,9 +156,10 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 		return nil
 	}
 
+	var s []string
 	for _, out := range output.Outputs {
 		for _, log := range out.Logs {
-			fmt.Printf("%s: log: %s\n", out.Name, log)
+			s = append(s, fmt.Sprintf("%s: log: %s\n", out.Name, log))
 		}
 
 		switch data := out.Data.(type) {
@@ -169,28 +170,28 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 				if decodeValue != nil {
 					cnt := decodeValue(data.MapOutput.GetValue())
 
-					fmt.Printf("%s: message %q: %s\n", out.Name, msgType, cnt)
+					s = append(s, fmt.Sprintf("%s: message %q: %s\n", out.Name, msgType, cnt))
 				} else {
-					fmt.Printf("%s: message %q: ", out.Name, msgType)
+					s = append(s, fmt.Sprintf("%s: message %q: ", out.Name, msgType))
 
 					marshalledBytes, err := protojson.Marshal(data.MapOutput)
 					if err != nil {
 						return fmt.Errorf("return handler: marshalling: %w", err)
 					}
 
-					fmt.Println(marshalledBytes)
+					s = append(s, string(marshalledBytes))
 				}
 			}
 
 		case *pbsubstreams.ModuleOutput_StoreDeltas:
 			if len(data.StoreDeltas.Deltas) != 0 {
-				fmt.Printf("%s: store deltas:\n", out.Name)
+				s = append(s, fmt.Sprintf("%s: store deltas:\n", out.Name))
 				decodeValue := ui.decodeMsgTypes[out.Name]
 				for _, delta := range data.StoreDeltas.Deltas {
-					fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
+					s = append(s, fmt.Sprintf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key))
 
-					fmt.Printf("    OLD: %s\n", decodeValue(delta.OldValue))
-					fmt.Printf("    NEW: %s\n", decodeValue(delta.NewValue))
+					s = append(s, fmt.Sprintf("    OLD: %s\n", decodeValue(delta.OldValue)))
+					s = append(s, fmt.Sprintf("    NEW: %s\n", decodeValue(delta.NewValue)))
 				}
 			}
 
@@ -202,6 +203,11 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 			}
 		}
 	}
+
+	if len(s) != 0 {
+		ui.prog.Send(BlockMessage(strings.Join(s, "")))
+	}
+
 	return nil
 }
 

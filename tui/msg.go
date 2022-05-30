@@ -18,3 +18,5 @@ func (ui *TUI) Connected() {
 func (ui *TUI) SetRequest(req *pbsubstreams.Request) {
 	ui.prog.Send(req)
 }
+
+type BlockMessage string

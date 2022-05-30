@@ -44,14 +44,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case *pbsubstreams.Clock:
 		if m.Clock == nil {
-
-			// fmt.Println(m.View())
-			// fmt.Println("")
+			m.ui.prog.ReleaseTerminal()
+			fmt.Println(m.View())
+			fmt.Println("")
+			m.ui.prog.RestoreTerminal()
 			// fmt.Println("")
 			// fmt.Println("")
 		}
 		m.Clock = msg
 		return m, nil
+	case BlockMessage:
+		m.ui.prog.ReleaseTerminal()
+		fmt.Println(msg)
+		m.ui.prog.RestoreTerminal()
 	case *pbsubstreams.ModuleProgress:
 		m.Updates += 1
 

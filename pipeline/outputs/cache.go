@@ -81,7 +81,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
 
-			if err := moduleCache.Load(ctx, moduleCache.CurrentBlockRange.ExclusiveEndBlock); err != nil {
+			if _, err := moduleCache.Load(ctx, moduleCache.CurrentBlockRange.ExclusiveEndBlock); err != nil {
 				return fmt.Errorf("loading blocks %d for module kv %s: %w", moduleCache.CurrentBlockRange.ExclusiveEndBlock, moduleCache.ModuleName, err)
 			}
 		}
@@ -152,7 +152,7 @@ func (c *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
 	return cacheItem.Payload, found, nil
 }
 
-func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
+func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (foud bool, err error) {
 	zlog.Info("loading outputs", zap.String("module_name", c.ModuleName), zap.Uint64("at_block_num", atBlock))
 
 	c.kv = make(outputKV)
@@ -160,7 +160,7 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 	var found bool
 	c.CurrentBlockRange, found, err = findBlockRange(ctx, c.Store, atBlock)
 	if err != nil {
-		return fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
+		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
 	}
 
 	if !found {
@@ -169,7 +169,7 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 			ExclusiveEndBlock: atBlock + c.saveBlockInterval,
 		}
 
-		return nil
+		return found, nil
 	}
 
 	filename := computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
@@ -188,11 +188,11 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (err error) {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("retried: %w", err)
+		return false, fmt.Errorf("retried: %w", err)
 	}
 
 	zlog.Debug("outputs data loaded", zap.String("module_name", c.ModuleName), zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.CurrentBlockRange))
-	return nil
+	return found, nil
 }
 
 func (c *OutputCache) save(ctx context.Context, filename string) error {

@@ -229,16 +229,16 @@ func (b *Builder) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock 
 		zap.Stringer("output_cache", outputCache),
 	)
 
-	err := outputCache.Load(ctx, startBlockNum)
+	found, err := outputCache.Load(ctx, startBlockNum)
 	if err != nil {
 		return fmt.Errorf("loading init cache for builder %q with start block %d: %w", b.Name, startBlockNum, err)
 	}
 
 	for {
-		cacheItems := outputCache.SortedCacheItems()
-		if len(cacheItems) == 0 {
+		if !found {
 			return fmt.Errorf("missing deltas for module %q", b.Name)
 		}
+		cacheItems := outputCache.SortedCacheItems()
 
 		firstSeenBlockNum := uint64(0)
 		lastSeenBlockNum := uint64(0)
@@ -271,7 +271,7 @@ func (b *Builder) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock 
 		if exclusiveStopBlock <= outputCache.CurrentBlockRange.ExclusiveEndBlock {
 			return nil
 		}
-		err := outputCache.Load(ctx, outputCache.CurrentBlockRange.ExclusiveEndBlock)
+		found, err = outputCache.Load(ctx, outputCache.CurrentBlockRange.ExclusiveEndBlock)
 		if err != nil {
 			return fmt.Errorf("loading more deltas: %w", err)
 		}

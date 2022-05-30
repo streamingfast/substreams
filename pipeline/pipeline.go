@@ -8,11 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/substreams/progress"
-
-	"github.com/streamingfast/derr"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
@@ -20,6 +17,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/worker"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
+	"github.com/streamingfast/substreams/progress"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
@@ -175,7 +173,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 	for _, cache := range p.moduleOutputCache.OutputCaches {
 		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
-		if err := cache.Load(ctx, atBlock); err != nil {
+		if _, err := cache.Load(ctx, atBlock); err != nil {
 			return nil, fmt.Errorf("loading outputs caches")
 		}
 	}

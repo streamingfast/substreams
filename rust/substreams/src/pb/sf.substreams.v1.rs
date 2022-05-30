@@ -236,28 +236,50 @@ pub struct ModulesProgress {
 pub struct ModuleProgress {
     #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
-    #[prost(message, optional, tag="2")]
-    pub request_block_range: ::core::option::Option<BlockRange>,
-    #[prost(uint64, tag="3")]
-    pub synchronizing_up_to_block: u64,
-    #[prost(bool, tag="4")]
-    pub catch_up: bool,
-    #[prost(message, repeated, tag="5")]
-    pub processed_ranges: ::prost::alloc::vec::Vec<BlockRange>,
-    #[prost(uint64, tag="6")]
-    pub total_bytes_read: u64,
-    #[prost(uint64, tag="7")]
-    pub total_bytes_written: u64,
-    #[prost(bool, tag="8")]
-    pub failed: bool,
-    #[prost(string, tag="9")]
-    pub failure_reason: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag="10")]
-    pub failure_logs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    /// FailureLogsTruncated is a flag that tells you if you received all the logs or if they
-    /// were truncated because you logged too much (fixed limit currently is set to 128 KiB).
-    #[prost(bool, tag="11")]
-    pub failure_logs_truncated: bool,
+    #[prost(oneof="module_progress::Type", tags="2, 3, 4, 5")]
+    pub r#type: ::core::option::Option<module_progress::Type>,
+}
+/// Nested message and enum types in `ModuleProgress`.
+pub mod module_progress {
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct ProcessedRange {
+        #[prost(message, repeated, tag="1")]
+        pub processed_ranges: ::prost::alloc::vec::Vec<super::BlockRange>,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct InitialState {
+        #[prost(uint64, tag="2")]
+        pub available_up_to_block: u64,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct ProcessedBytes {
+        #[prost(uint64, tag="1")]
+        pub total_bytes_read: u64,
+        #[prost(uint64, tag="2")]
+        pub total_bytes_written: u64,
+    }
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct Failed {
+        #[prost(string, tag="1")]
+        pub reason: ::prost::alloc::string::String,
+        #[prost(string, repeated, tag="2")]
+        pub logs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+        /// FailureLogsTruncated is a flag that tells you if you received all the logs or if they
+        /// were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+        #[prost(bool, tag="3")]
+        pub logs_truncated: bool,
+    }
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Type {
+        #[prost(message, tag="2")]
+        ProcessedRanges(ProcessedRange),
+        #[prost(message, tag="3")]
+        InitialState(InitialState),
+        #[prost(message, tag="4")]
+        ProcessedBytes(ProcessedBytes),
+        #[prost(message, tag="5")]
+        Failed(Failed),
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BlockRange {
@@ -295,24 +317,6 @@ pub mod store_delta {
         Delete = 3,
     }
 }
-//table.1
-// create f.1 o.10 n.99
-// update f.1 o.99 n.200
-// update f.2 o.abc n.xyz
-// update f.1 o.200 n.400
-
-//table.1
-// create f.1 o.10 n.400 f.2 o.abc n.xyz
-
-//table.1
-// update f.1 o.10 n.99
-// update f.1 o.99 n.200
-// update f.2 o.abc n.xyz
-// update f.1 o.200 n.400
-
-//table.1
-// update f.1 o.10 n.400 f.2 o.abc n.xyz
-
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Output {
     #[prost(uint64, tag="1")]

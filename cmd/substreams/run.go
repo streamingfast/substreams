@@ -52,24 +52,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	outputStreamNames := strings.Split(args[1], ",")
 
-	returnHandler := func(in *pbsubstreams.Response) error { return nil }
-	moduleProgressBar := &progress.ModuleProgressBar{
-		Bars: map[progress.ModuleName]*progress.Bar{},
-	}
-
-	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
-		for _, outputStreamName := range outputStreamNames {
-			bar := &progress.Bar{}
-			bar.Initialized = false
-			moduleProgressBar.Bars[progress.ModuleName(outputStreamName)] = bar
-		}
-
-		returnHandler, err = decode.NewPrintReturnHandler(pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)
-		if err != nil {
-			return fmt.Errorf("new printer for %q: %w", manifestPath, err)
-		}
-	}
-
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("creating module graph: %w", err)
@@ -105,6 +87,23 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:       pkg.Modules,
 		OutputModules: outputStreamNames,
+	}
+
+	returnHandler := func(in *pbsubstreams.Response) error { return nil }
+	moduleProgressBar := &progress.ModuleProgressBar{
+		Bars: map[progress.ModuleName]*progress.Bar{},
+	}
+	if os.Getenv("SUBSTREAMS_NO_RETURN_HANDLER") == "" {
+		for _, outputStreamName := range outputStreamNames {
+			bar := &progress.Bar{}
+			bar.Initialized = false
+			moduleProgressBar.Bars[progress.ModuleName(outputStreamName)] = bar
+		}
+
+		returnHandler, err = decode.NewPrintReturnHandler(req, pkg, outputStreamNames, !mustGetBool(cmd, "compact-output"), moduleProgressBar)
+		if err != nil {
+			return fmt.Errorf("new printer for %q: %w", manifestPath, err)
+		}
 	}
 
 	zlog.Info("connecting...")

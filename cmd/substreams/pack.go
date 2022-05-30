@@ -13,7 +13,7 @@ import (
 var packCmd = &cobra.Command{
 	Use:          "pack <manifest_yaml>",
 	RunE:         runPack,
-	Args:         cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 }
 

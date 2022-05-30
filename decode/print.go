@@ -3,6 +3,8 @@ package decode
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
+
 	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -11,10 +13,9 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/progress"
 	"google.golang.org/protobuf/encoding/protojson"
-	"strings"
 )
 
-func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool, moduleProgressBar *progress.ModuleProgressBar) (substreams.ResponseFunc, error) {
+func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool, moduleProgressBar *progress.ModuleProgressBar) (substreams.ResponseFunc, error) {
 	decodeMsgTypes := map[string]func(in []byte) string{}
 	msgTypes := map[string]string{}
 
@@ -156,27 +157,31 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		return nil
 	}
 
-	reponseProgress := func(moduleProgress *pbsubstreams.ModulesProgress) error {
-		if failedModule := firstFailedModuleProgress(moduleProgress); failedModule != nil {
-			if err := failureProgressHandler(moduleProgress); err != nil {
-				fmt.Printf("FAILURE PROGRESS HANDLER ERROR: %s\n", err)
-			}
-		}
-
+	responseProgress := func(moduleProgress *pbsubstreams.ModulesProgress) error {
 		for _, module := range moduleProgress.Modules {
-			if module.CatchUp { // don't print any progress if we are not catching up the request
-				if bar, ok := moduleProgressBar.Bars[progress.ModuleName(module.Name)]; ok {
-					if !bar.Initialized {
-						fmt.Printf("Running multiple parallel requests for %s to catch up...\n", module.Name)
-						bar.NewOption(0, module.RequestBlockRange.StartBlock, module.RequestBlockRange.EndBlock)
-					}
+			switch progressType := module.Type.(type) {
+			case *pbsubstreams.ModuleProgress_ProcessedRanges:
 
-					if bar.Cur == bar.Total {
-						bar.Finish()
-					} else {
-						bar.Cur++
-						bar.Play(bar.Cur, module.Name)
-					}
+			case *pbsubstreams.ModuleProgress_InitialState_:
+			case *pbsubstreams.ModuleProgress_ProcessedBytes_:
+			case *pbsubstreams.ModuleProgress_Failed_:
+				if err := failureProgressHandler(module.Name, progressType.Failed); err != nil {
+					return fmt.Errorf("progress handler for failed modules; %w", err)
+				}
+			}
+
+			if bar, ok := moduleProgressBar.Bars[progress.ModuleName(module.Name)]; ok {
+				if !bar.Initialized {
+					fmt.Printf("Running multiple parallel requests for %s to catch up...\n", module.Name)
+					// FIXME: we do not support relative START BLOCKS for now.
+					bar.NewOption(0, uint64(req.StartBlockNum), req.StopBlockNum)
+				}
+
+				if bar.Cur == bar.Total {
+					bar.Finish()
+				} else {
+					bar.Cur++
+					bar.Play(bar.Cur, module.Name)
 				}
 			}
 		}
@@ -189,7 +194,7 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 		case *pbsubstreams.Response_Data:
 			return blockScopedData(m.Data)
 		case *pbsubstreams.Response_Progress:
-			return reponseProgress(m.Progress)
+			return responseProgress(m.Progress)
 		case *pbsubstreams.Response_SnapshotData:
 			fmt.Println("Incoming snapshot data")
 		case *pbsubstreams.Response_SnapshotComplete:
@@ -201,34 +206,17 @@ func NewPrintReturnHandler(pkg *pbsubstreams.Package, outputStreamNames []string
 	}, nil
 }
 
-func failureProgressHandler(progress *pbsubstreams.ModulesProgress) error {
-	failedModule := firstFailedModuleProgress(progress)
-	if failedModule == nil {
-		return nil
+func failureProgressHandler(modName string, failure *pbsubstreams.ModuleProgress_Failed) error {
+	fmt.Printf("---------------------- Module %s failed ---------------------\n", modName)
+	for _, log := range failure.Logs {
+		fmt.Printf("%s: %s\n", modName, log)
 	}
 
-	fmt.Printf("---------------------- Module %s failed ---------------------\n", failedModule.Name)
-	for _, module := range progress.Modules {
-		for _, log := range module.FailureLogs {
-			fmt.Printf("%s: %s\n", module.Name, log)
-		}
-
-		if module.FailureLogsTruncated {
-			fmt.Println("<Logs Truncated>")
-		}
+	if failure.LogsTruncated {
+		fmt.Println("<Logs Truncated>")
 	}
 
-	fmt.Printf("Error:\n%s", failedModule.FailureReason)
-	return nil
-}
-
-func firstFailedModuleProgress(modulesProgress *pbsubstreams.ModulesProgress) *pbsubstreams.ModuleProgress {
-	for _, module := range modulesProgress.Modules {
-		if module.Failed == true {
-			return module
-		}
-	}
-
+	fmt.Printf("Error:\n%s", failure.Reason)
 	return nil
 }
 

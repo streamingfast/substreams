@@ -298,44 +298,45 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 }
 
 func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, respFunc substreams.ResponseFunc) error {
-	var out *pbsubstreams.BlockScopedData
 	if len(p.moduleOutputs) > 0 {
 		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-		out = &pbsubstreams.BlockScopedData{
+		out := &pbsubstreams.BlockScopedData{
 			Outputs: p.moduleOutputs,
 			Clock:   p.clock,
 			Step:    pbsubstreams.StepToProto(step),
 			Cursor:  cursor.ToOpaque(),
 		}
 
-	}
-
-	var modules []*pbsubstreams.ModuleProgress
-
-	for _, mod := range p.modules {
-		if slices.Contains(p.request.OutputModules, mod.Name) {
-			modules = append(modules, &pbsubstreams.ModuleProgress{
-				Name:    mod.Name,
-				CatchUp: p.partialMode,
-				RequestBlockRange: &pbsubstreams.BlockRange{
-					StartBlock: uint64(p.request.StartBlockNum),
-					EndBlock:   p.request.StopBlockNum,
-				},
-				ProcessedRanges: []*pbsubstreams.BlockRange{
-					{
-						StartBlock: p.requestedStartBlockNum,
-						EndBlock:   p.progressTracker.LastBlock,
-					},
-				},
-			})
+		if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
 		}
 	}
 
-	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-		return fmt.Errorf("calling return func: %w", err)
-	}
-	if err := respFunc(substreams.NewModulesProgressResponse(modules)); err != nil {
-		return fmt.Errorf("calling return func: %w", err)
+	if p.partialMode {
+		var modules []*pbsubstreams.ModuleProgress
+
+		for _, mod := range p.modules {
+			// FIXME: build a list so we don't need to check "slices.Contains" here in the hot path
+			if slices.Contains(p.request.OutputModules, mod.Name) {
+				modules = append(modules, &pbsubstreams.ModuleProgress{
+					Name: mod.Name,
+					Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
+						ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+							ProcessedRanges: []*pbsubstreams.BlockRange{
+								{
+									StartBlock: p.requestedStartBlockNum,
+									EndBlock:   p.progressTracker.LastBlock,
+								},
+							},
+						},
+					},
+				})
+			}
+		}
+
+		if err := respFunc(substreams.NewModulesProgressResponse(modules)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
 	}
 	return nil
 }
@@ -346,17 +347,12 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 	for i, moduleOutput := range p.moduleOutputs {
 		modules[i] = &pbsubstreams.ModuleProgress{
 			Name: moduleOutput.Name,
-
-			Failed: false,
-			// It's a bit weird that for successful module, there is still FailureLogs, maybe we should revisit the semantic and
-			// maybe change back to `Logs`.
-			FailureLogs:          moduleOutput.Logs,
-			FailureLogsTruncated: moduleOutput.LogsTruncated,
-
-			// Where those comes from, should we have them populate on failure?
-			ProcessedRanges:   nil,
-			TotalBytesRead:    0,
-			TotalBytesWritten: 0,
+			Type: &pbsubstreams.ModuleProgress_Failed_{
+				Failed: &pbsubstreams.ModuleProgress_Failed{
+					Logs:          moduleOutput.Logs,
+					LogsTruncated: moduleOutput.LogsTruncated,
+				},
+			},
 		}
 	}
 
@@ -365,16 +361,14 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 	modules[len(p.moduleOutputs)] = &pbsubstreams.ModuleProgress{
 		Name: failedExecutor.Name(),
 
-		Failed: true,
-		// Should we maybe extract specific WASM error and improved the "printing" here?
-		FailureReason:        err.Error(),
-		FailureLogs:          logs,
-		FailureLogsTruncated: truncated,
-
-		// Where those comes from, should we have them populate on failure?
-		ProcessedRanges:   nil,
-		TotalBytesRead:    0,
-		TotalBytesWritten: 0,
+		Type: &pbsubstreams.ModuleProgress_Failed_{
+			Failed: &pbsubstreams.ModuleProgress_Failed{
+				// Should we maybe extract specific WASM error and improved the "printing" here?
+				Reason:        err.Error(),
+				Logs:          logs,
+				LogsTruncated: truncated,
+			},
+		},
 	}
 
 	return respFunc(substreams.NewModulesProgressResponse(modules))

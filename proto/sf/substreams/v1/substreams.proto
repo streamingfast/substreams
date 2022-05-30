@@ -85,22 +85,30 @@ message ModulesProgress {
 message ModuleProgress {
   string name = 1;
 
-  BlockRange request_block_range = 2;
-  uint64 synchronizing_up_to_block = 3;
-  bool catch_up = 4;
-  repeated BlockRange processed_ranges = 5;
+  oneof type {
+    ProcessedRange processed_ranges = 2;
+    InitialState initial_state = 3;
+    ProcessedBytes processed_bytes = 4;
+    Failed failed = 5;
+  }
 
-  uint64 total_bytes_read = 6;
-  uint64 total_bytes_written = 7;
-
-  bool failed = 8;
-  string failure_reason = 9;
-  repeated string failure_logs = 10;
-
-  // FailureLogsTruncated is a flag that tells you if you received all the logs or if they
-  // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
-  bool failure_logs_truncated = 11;
-
+  message ProcessedRange {
+    repeated BlockRange processed_ranges = 1;
+  }
+  message InitialState {
+    uint64 available_up_to_block = 2;
+  }
+  message ProcessedBytes {
+    uint64 total_bytes_read = 1;
+    uint64 total_bytes_written = 2;
+  }
+  message Failed {
+    string reason = 1;
+    repeated string logs = 2;
+    // FailureLogsTruncated is a flag that tells you if you received all the logs or if they
+    // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+    bool logs_truncated = 3;
+  }
 }
 
 message BlockRange {
@@ -125,25 +133,6 @@ message StoreDelta {
   bytes old_value = 4;
   bytes new_value = 5;
 }
-
-//table.1
-// create f.1 o.10 n.99
-// update f.1 o.99 n.200
-// update f.2 o.abc n.xyz
-// update f.1 o.200 n.400
-
-//table.1
-// create f.1 o.10 n.400 f.2 o.abc n.xyz
-
-
-//table.1
-// update f.1 o.10 n.99
-// update f.1 o.99 n.200
-// update f.2 o.abc n.xyz
-// update f.1 o.200 n.400
-
-//table.1
-// update f.1 o.10 n.400 f.2 o.abc n.xyz
 
 message Output {
   uint64 block_num = 1;

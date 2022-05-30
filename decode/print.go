@@ -3,8 +3,10 @@ package decode
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -99,6 +101,15 @@ func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package,
 		}
 	}
 
+	teaModel := newModel()
+	teaProg := tea.NewProgram(teaModel)
+	go func() {
+		if err := teaProg.Start(); err != nil {
+			fmt.Println("Failed bubble tea program: %s", err)
+			os.Exit(1)
+		}
+	}()
+
 	blockScopedData := func(output *pbsubstreams.BlockScopedData) error {
 		printClock(output)
 		if output == nil {
@@ -159,31 +170,33 @@ func NewPrintReturnHandler(req *pbsubstreams.Request, pkg *pbsubstreams.Package,
 
 	responseProgress := func(moduleProgress *pbsubstreams.ModulesProgress) error {
 		for _, module := range moduleProgress.Modules {
-			switch progressType := module.Type.(type) {
-			case *pbsubstreams.ModuleProgress_ProcessedRanges:
+			teaProg.Send(module)
 
-			case *pbsubstreams.ModuleProgress_InitialState_:
-			case *pbsubstreams.ModuleProgress_ProcessedBytes_:
-			case *pbsubstreams.ModuleProgress_Failed_:
-				if err := failureProgressHandler(module.Name, progressType.Failed); err != nil {
-					return fmt.Errorf("progress handler for failed modules; %w", err)
-				}
-			}
+			// switch progressType := module.Type.(type) {
+			// case *pbsubstreams.ModuleProgress_ProcessedRanges:
+			// 	//module.Name
+			// case *pbsubstreams.ModuleProgress_InitialState_:
+			// case *pbsubstreams.ModuleProgress_ProcessedBytes_:
+			// case *pbsubstreams.ModuleProgress_Failed_:
+			// 	if err := failureProgressHandler(module.Name, progressType.Failed); err != nil {
+			// 		return fmt.Errorf("progress handler for failed modules; %w", err)
+			// 	}
+			// }
 
-			if bar, ok := moduleProgressBar.Bars[progress.ModuleName(module.Name)]; ok {
-				if !bar.Initialized {
-					fmt.Printf("Running multiple parallel requests for %s to catch up...\n", module.Name)
-					// FIXME: we do not support relative START BLOCKS for now.
-					bar.NewOption(0, uint64(req.StartBlockNum), req.StopBlockNum)
-				}
+			// if bar, ok := moduleProgressBar.Bars[progress.ModuleName(module.Name)]; ok {
+			// 	if !bar.Initialized {
+			// 		fmt.Printf("Running multiple parallel requests for %s to catch up...\n", module.Name)
+			// 		// FIXME: we do not support relative START BLOCKS for now.
+			// 		bar.NewOption(0, uint64(req.StartBlockNum), req.StopBlockNum)
+			// 	}
 
-				if bar.Cur == bar.Total {
-					bar.Finish()
-				} else {
-					bar.Cur++
-					bar.Play(bar.Cur, module.Name)
-				}
-			}
+			// 	if bar.Cur == bar.Total {
+			// 		bar.Finish()
+			// 	} else {
+			// 		bar.Cur++
+			// 		bar.Play(bar.Cur, module.Name)
+			// 	}
+			// }
 		}
 
 		return nil

@@ -175,6 +175,8 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		if err != nil {
 			return fmt.Errorf("reading state file for module %q: %w", b.Name, err)
 		}
+	} else {
+		return fmt.Errorf("block in the future?")
 	}
 	if deltasNeeded {
 		err := b.loadDeltas(ctx, deltasStartBlock, requestedStartBlock, outputCacheSaveInterval, outputCacheStore)
@@ -207,7 +209,6 @@ func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
 		b.KV = byteMap(kv)
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("opening file state file %s: %w", stateFileName, err)
 	}

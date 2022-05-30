@@ -146,7 +146,8 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 }
 
 func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
-	printClock(output)
+	ui.prog.Send(output.Clock)
+	//printClock(output)
 	if output == nil {
 		return nil
 	}

@@ -134,7 +134,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case *pbsubstreams.ModuleProgress_ProcessedBytes_:
 		case *pbsubstreams.ModuleProgress_Failed_:
 			m.Failures += 1
-			m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %s", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
+			if progMsg.Failed.Reason != "" {
+				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %s", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
+			}
 			return m, nil
 		}
 	default:
@@ -152,7 +154,7 @@ DebugSetting: [{{ with .DebugSetting }}X{{ else }} {{ end }}]
 Event no: {{ .EventNo }} {{- if .Failures }}   Failures: {{ .Failures }}, Reason: {{ .Reason }} {{ end }}
 Updates: {{ .Updates }}
 {{ range $key, $value := .Modules }}
-  {{ $key  }}       {{ $value.Lo }}, {{ $value.Hi }} - {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
+  {{ $key }}       {{ $value.Lo }}, {{ $value.Hi }} - {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
 {{ end }}
 `)).Execute(buf, m)
 	if err != nil {

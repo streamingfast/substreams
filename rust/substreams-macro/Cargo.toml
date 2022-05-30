@@ -2,12 +2,15 @@
 name = "substreams-macro"
 version = "0.7.0-beta"
 edition = "2018"
+description = "Substream's proc macros."
 authors = ["StreamingFast Contributors <team@streamingfast.io>"]
-license = "MIT"
-description = """
-Substream's proc macros.
-"""
-categories = ["asynchronous"]
+license = "Apache-2.0"
+homepage = "https://substreams.streamingfast.io/"
+repository = "https://github.com/streamingfast/substreams/rust/substreams-macro"
+readme = "../../README.md"
+keywords = [ "substreams", "streamingfast", "firehose", "thegraph", "macros"]
+categories = ["api-bindings", "external-ffi-bindings", "wasm"]
+rust-version = "1.60"
 
 [lib]
 proc-macro = true

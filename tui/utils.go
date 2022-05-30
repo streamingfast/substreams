@@ -27,6 +27,19 @@ func (r ranges) Covered(lo, hi uint64) bool {
 	return false
 }
 
+// Covered assumes block ranges have reduced overlaps/junctions.
+func (r ranges) PartiallyCovered(lo, hi uint64) bool {
+	for _, blockRange := range r {
+		if lo >= blockRange.Start && lo <= blockRange.End {
+			return true
+		}
+		if hi >= blockRange.Start && hi <= blockRange.End {
+			return true
+		}
+	}
+	return false
+}
+
 type blockRange struct {
 	Start uint64
 	End   uint64

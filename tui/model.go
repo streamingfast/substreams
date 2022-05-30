@@ -21,6 +21,8 @@ type model struct {
 	EventNo      int
 	Updates      int
 
+	Connected bool
+
 	Failures int
 	Reason   string
 
@@ -89,6 +91,12 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.EventNo += 1
 
+	switch msg {
+	case Connecting:
+		m.Connected = false
+	case Connected:
+		m.Connected = true
+	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -146,6 +154,7 @@ func (m model) View() string {
 
 	buf := bytes.NewBuffer(nil)
 	err := template.Must(template.New("tpl").Parse(`
+{{ if .Connected }}Connected{{ else }}Connecting...{{end}}
 DebugSetting: [{{ with .DebugSetting }}X{{ else }} {{ end }}]
 Event no: {{ .EventNo }} {{- if .Failures }}   Failures: {{ .Failures }}, Reason: {{ .Reason }} {{ end }}
 Updates: {{ .Updates }}

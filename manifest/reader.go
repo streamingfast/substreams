@@ -190,10 +190,39 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 
 		for idx, in := range mod.Inputs {
 			switch i := in.Input.(type) {
+			case *pbsubstreams.Module_Input_Source_:
+				if i.Source.Type == "" {
+					return fmt.Errorf("module %q: source type empty", mod.Name)
+				}
 			case *pbsubstreams.Module_Input_Map_:
-				// TODO: validate that i.ModuleName exists in the modules list
+				seekMod := i.Map.ModuleName
+				var found bool
+				for _, mod2 := range mods.Modules {
+					if mod2.Name == seekMod {
+						found = true
+						if _, ok := mod2.Kind.(*pbsubstreams.Module_KindMap_); !ok {
+							return fmt.Errorf("module %q: input %d: referenced module %q not of 'map' kind", mod.Name, idx, seekMod)
+						}
+					}
+				}
+				if !found {
+					return fmt.Errorf("module %q: map input named %q not found", mod.Name, seekMod)
+				}
 			case *pbsubstreams.Module_Input_Store_:
-				// TODO: validate that i.ModuleName exists in the modules list
+				seekMod := i.Store.ModuleName
+				var found bool
+				for _, mod2 := range mods.Modules {
+					if mod2.Name == seekMod {
+						found = true
+						if _, ok := mod2.Kind.(*pbsubstreams.Module_KindStore_); !ok {
+							return fmt.Errorf("module %q: input %d: referenced module %q not of 'store' kind", mod.Name, idx, seekMod)
+						}
+					}
+				}
+				if !found {
+					return fmt.Errorf("module %q: store input named %q not found", mod.Name, seekMod)
+				}
+
 				switch i.Store.Mode {
 				case pbsubstreams.Module_Input_Store_GET, pbsubstreams.Module_Input_Store_DELTAS:
 				default:

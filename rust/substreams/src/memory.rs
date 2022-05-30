@@ -1,3 +1,9 @@
+//! Memory Implementation for Substreams.
+//!
+//! This crate exposes memory manipulation functions, that is utlize to manage
+//! memory in the VM
+//!
+//! Note that memory manipulation is in general a very tricky topic and should be used with great care.
 use std::convert::TryInto;
 use std::slice;
 
@@ -19,6 +25,7 @@ pub fn alloc(len: usize) -> *mut u8 {
     ptr
 }
 
+/// Disposes of a given memory range.
 #[no_mangle]
 #[allow(clippy::missing_safety_doc)]
 pub unsafe fn dealloc(ptr: *mut u8, size: usize) {

@@ -1,3 +1,9 @@
+//! Log Implementation for Substreams
+//!
+//! This crates implements helpful logging functions that
+//! are used in your handlers
+//!
+
 use crate::externs;
 
 /// Logs a message at INFO level on current substream's logger using interpolation of

@@ -1,10 +1,14 @@
 //! Learn more about Substreams at <https://substreams.streamingfast.io>
+//!
+
 pub mod errors;
 mod externs;
 pub mod handlers;
 mod hex;
 pub mod log;
 pub mod memory;
+
+/// Protobuf generated Substream models
 pub mod pb;
 pub mod proto;
 mod state;
@@ -21,11 +25,21 @@ pub fn output<M: prost::Message>(msg: M) {
     unsafe { externs::output(ptr, len as u32) }
 }
 
+///
 pub fn output_raw(data: Vec<u8>) {
     unsafe { externs::output(data.as_ptr(), data.len() as u32) }
 }
 
-pub fn hook(info: &std::panic::PanicInfo<'_>) {
+/// Registers a Substreams custom panic hook. The panic hook is invoked when then handler panics
+pub fn register_panic_hook() {
+    use std::sync::Once;
+    static SET_HOOK: Once = Once::new();
+    SET_HOOK.call_once(|| {
+        std::panic::set_hook(Box::new(hook));
+    });
+}
+
+fn hook(info: &std::panic::PanicInfo<'_>) {
     let error_msg = info
         .payload()
         .downcast_ref::<String>()
@@ -60,12 +74,4 @@ pub fn hook(info: &std::panic::PanicInfo<'_>) {
             ),
         };
     }
-}
-
-pub fn register_panic_hook() {
-    use std::sync::Once;
-    static SET_HOOK: Once = Once::new();
-    SET_HOOK.call_once(|| {
-        std::panic::set_hook(Box::new(hook));
-    });
 }

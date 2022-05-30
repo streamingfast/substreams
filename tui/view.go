@@ -12,7 +12,7 @@ import (
 func (m model) View() string {
 	const width = 80
 
-	// WARN(abourget): Request.StartBlockNum cannot be relatiev here too.
+	// WARN(abourget): Request.StartBlockNum cannot be relative here too.
 
 	buf := bytes.NewBuffer(nil)
 	err := template.Must(template.New("tpl").Funcs(template.FuncMap{

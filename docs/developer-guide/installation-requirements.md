@@ -2,7 +2,7 @@
 
 ### Install Rust
 
-Before we start creating any Substream we will need to setup our development environment. Substreams are written in the [Rust programming language](https://www.rust-lang.org/)
+Before we start creating any Substream we will need to setup our development environment. Substreams are written in the [Rust programming language](https://www.rust-lang.org/).
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity, this is the easiest:
 
@@ -13,7 +13,7 @@ source $HOME/.cargo/env # to configure your current shell
 
 ### Install `protoc`
 
-`protoc` is the reference Protocol Buffer compiler. It is needed to generate code for Rust and other languages, out of the protobuf definitions you will create or get through third-party Substreams packages.
+`protoc` is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages, out of the protobuf definitions you will create or get through third-party Substreams packages.
 
 Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
 

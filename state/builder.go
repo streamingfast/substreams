@@ -123,13 +123,13 @@ func (b *Store) Clone(newStoreStartBlock uint64) *Store {
 }
 
 func (b *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, error) {
-	s := b.Clone(blockRange.StartBlock)
+	newStore := b.Clone(blockRange.StartBlock)
 
-	if err := s.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
+	if err := newStore.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
 		return nil, err
 	}
 
-	return s, nil
+	return newStore, nil
 }
 
 func (s *Store) storageFilename(exclusiveEndBlock uint64) string {

@@ -57,16 +57,16 @@ func TestSquash(t *testing.T) {
 		notificationsSent++
 	})
 
-	err := squash(ctx, squashable, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000}, notifierFunc)
-	require.Nil(t, err)
+	squashable.cumulateBoundedRange(&block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000})
+	require.NoError(t, squashable.mergeAvailablePartials(ctx, notifierFunc))
 	require.Equal(t, 0, writeCount)
 
-	err = squash(ctx, squashable, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000}, notifierFunc)
-	require.Nil(t, err)
+	squashable.cumulateBoundedRange(&block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000})
+	require.NoError(t, squashable.mergeAvailablePartials(ctx, notifierFunc))
 	require.Equal(t, 0, writeCount)
 
-	err = squash(ctx, squashable, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000}, notifierFunc)
-	require.Nil(t, err)
+	squashable.cumulateBoundedRange(&block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000})
+	require.NoError(t, squashable.mergeAvailablePartials(ctx, notifierFunc))
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 	require.Equal(t, 2, notificationsSent)
@@ -74,13 +74,12 @@ func TestSquash(t *testing.T) {
 
 func testStateBuilder(store dstore.Store) *state.Store {
 	return &state.Store{
-		Name:             "testBuilder",
-		SaveInterval:     10_000,
+		Name:               "testBuilder",
+		SaveInterval:       10_000,
 		ModuleInitialBlock: 0,
-		Store:            store,
-		ModuleHash:       "abc",
-		KV:               map[string][]byte{},
-		PartialMode:      false,
+		Store:              store,
+		ModuleHash:         "abc",
+		KV:                 map[string][]byte{},
 		BlockRange: &block.Range{
 			StartBlock:        0,
 			ExclusiveEndBlock: 10_000,

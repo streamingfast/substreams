@@ -96,7 +96,13 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 
 func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 	for _, waiter := range w.items {
-		if waiter.StoreName != storeName || waiter.BlockNum > blockNum {
+		if waiter.StoreName != storeName {
+			continue
+		}
+
+		// TODO: The Squasher will _not_ notify you unless it has reached the desired block height
+		// from its perspective. So we can skip this check here:
+		if waiter.BlockNum > blockNum {
 			continue
 		}
 

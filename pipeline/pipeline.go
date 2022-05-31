@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/worker"
@@ -21,7 +22,6 @@ import (
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -31,9 +31,9 @@ type Pipeline struct {
 	vmType    string // wasm/rust-v1, native
 	blockType string
 
-	requestedStartBlockNum uint64
-	maxStoreSyncRangeSize  uint64
-	partialMode            bool
+	requestedStartBlockNum  uint64 // rename to: requestStartBlock, SET UPON receipt of the request
+	maxStoreSyncRangeSize   uint64
+	isOrchestratedExecution bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -41,20 +41,21 @@ type Pipeline struct {
 
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
-	builders       map[string]*state.Store
+	storesMap      map[string]*state.Store
+	stores         []*state.Store
 
-	context           context.Context
-	request           *pbsubstreams.Request
-	graph             *manifest.ModuleGraph
+	context context.Context
+	request *pbsubstreams.Request
+	graph   *manifest.ModuleGraph
+
+	modules           []*pbsubstreams.Module
 	outputModuleNames []string
 	outputModuleMap   map[string]bool
+	outputModules     []*pbsubstreams.Module
+	leafStores        []*state.Store // in orchestrated execution
+	moduleExecutors   []ModuleExecutor
+	wasmOutputs       map[string][]byte
 
-	modules         []*pbsubstreams.Module
-	stores          []*pbsubstreams.Module
-	moduleExecutors []ModuleExecutor
-	wasmOutputs     map[string][]byte
-
-	allowInvalidState  bool
 	baseStateStore     dstore.Store
 	storesSaveInterval uint64
 
@@ -84,9 +85,11 @@ func New(
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
-		context:                      ctx,
-		request:                      request,
-		builders:                     map[string]*state.Store{},
+		context: ctx,
+		request: request,
+		// WARN: we don't support < 0 StartBlock for now
+		requestedStartBlockNum:       uint64(request.StartBlockNum),
+		storesMap:                    map[string]*state.Store{},
 		graph:                        graph,
 		baseStateStore:               baseStateStore,
 		outputModuleNames:            request.OutputModules,
@@ -111,30 +114,22 @@ func New(
 	return pipe
 }
 
-// `store` aura 4 modes d'opération:
-//   * fetch an absolute snapshot from disk at EXACTLY the point we're starting
-//   * fetch a partial snapshot, and fuse with previous snapshots, in which I need local "pairExtractor" building.
-//   * connect to a remote firehose (I can cut the upstream dependencies
-//   * if resources are available, SCHEDULE on BACKING NODES a parallel processing for that segment
-//   * completely roll out LOCALLY the full historic reprocessing BEFORE continuing
-
-func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *pbsubstreams.Response) error) (bstream.Handler, error) {
+func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
 	ctx := p.context
-	// WARN: we don't support < 0 StartBlock for now
-	p.requestedStartBlockNum = uint64(p.request.StartBlockNum)
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("partial_mode", p.partialMode), zap.Strings("outputs", p.request.OutputModules))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("partial_mode", p.isOrchestratedExecution), zap.Strings("outputs", p.request.OutputModules))
+
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
-	var err error
-	zlog.Info("building store and executor")
-	var stores []*state.Store
-	p.modules, _, stores, err = p.build()
-	if err != nil {
+	if err := p.build(); err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
+	stores := p.stores
+
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
+		p.outputModules = append(p.outputModules, module)
+
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
 			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
 		}
@@ -144,10 +139,26 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		if err != nil {
 			return nil, fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
-
 	}
 
-	if !p.partialMode {
+	if p.isOrchestratedExecution {
+		totalOutputModules := len(p.outputModuleNames)
+		outputName := p.outputModuleNames[0]
+		buildingStore := p.storesMap[outputName]
+		isLastStore := len(stores) > 0 && stores[len(stores)-1] == buildingStore
+		startsAtInitialBlock := buildingStore.ModuleInitialBlock == p.requestedStartBlockNum
+
+		if totalOutputModules == 1 && buildingStore != nil && isLastStore && !startsAtInitialBlock {
+			// totalOutputModuels is a temporary restrictions, for when the orchestrator
+			// will be able to run two leaf stores from the same job
+			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
+			buildingStore.StoreInitialBlock = p.requestedStartBlockNum
+			p.leafStores = append(p.leafStores, buildingStore)
+		} else {
+			zlog.Info("conditions for leaf store not met", zap.String("module", outputName), zap.Bool("is_last_store", isLastStore), zap.Int("output_module_count", totalOutputModules))
+		}
+	} else {
+		// This launches processing for all depend stores at the requests' `startBlock`
 		err = SynchronizeStores(
 			ctx,
 			workerPool,
@@ -161,9 +172,9 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		}
 	}
 
-	zlog.Info("initializing stores")
-	if err = p.InitializeStores(ctx); err != nil {
-		return nil, fmt.Errorf("initializing stores: %w", err)
+	zlog.Info("initializing and loading stores")
+	if err = p.LoadStores(ctx); err != nil {
+		return nil, fmt.Errorf("loading stores: %w", err)
 	}
 
 	err = p.buildWASM(ctx, p.request, p.modules)
@@ -206,10 +217,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			return fmt.Errorf("updating module output cache: %w", err)
 		}
 
-		//requestedOutputStores := p.request.GetOutputModules()
-		//optimizedModuleExecutors, skipBlockSource := OptimizeExecutors(p.moduleOutputCache.outputCaches, p.moduleExecutors, requestedOutputStores)
-		//optimizedModuleExecutors, skipBlockSource := OptimizeExecutors(p.moduleOutputCache.outputCaches, p.moduleExecutors, requestedOutputStores)
-
 		for _, hook := range p.preBlockHooks {
 			if err := hook(ctx, p.clock); err != nil {
 				return fmt.Errorf("pre block hook: %w", err)
@@ -226,14 +233,15 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
 		if !isFirstRequestBlock && intervalReached {
-			if err := p.saveStoresSnapshots(ctx); err != nil {
+			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
 				return fmt.Errorf("saving stores: %w", err)
 			}
 
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
-			if p.partialMode {
+			if p.isOrchestratedExecution {
+				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
 				zlog.Debug("about to save partial output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
 				if err := p.moduleOutputCache.Save(ctx); err != nil {
 					return fmt.Errorf("saving partial caches")
@@ -280,7 +288,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			}
 		}
 
-		for _, s := range p.builders {
+		for _, s := range p.storesMap {
 			s.Flush()
 		}
 		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
@@ -303,26 +311,24 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 		}
 	}
 
-	if p.partialMode {
+	if p.isOrchestratedExecution {
+		requestedStartBlock := uint64(p.request.StartBlockNum)
 		var modules []*pbsubstreams.ModuleProgress
 
-		for _, mod := range p.modules {
-			// FIXME: build a list so we don't need to check "slices.Contains" here in the hot path
-			if slices.Contains(p.request.OutputModules, mod.Name) {
-				modules = append(modules, &pbsubstreams.ModuleProgress{
-					Name: mod.Name,
-					Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-						ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-							ProcessedRanges: []*pbsubstreams.BlockRange{
-								{
-									StartBlock: p.requestedStartBlockNum,
-									EndBlock:   p.clock.Number,
-								},
+		for _, mod := range p.outputModules {
+			modules = append(modules, &pbsubstreams.ModuleProgress{
+				Name: mod.Name,
+				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
+					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+						ProcessedRanges: []*pbsubstreams.BlockRange{
+							{
+								StartBlock: requestedStartBlock,
+								EndBlock:   p.clock.Number,
 							},
 						},
 					},
-				})
-			}
+				},
+			})
 		}
 
 		if err := respFunc(substreams.NewModulesProgressResponse(modules)); err != nil {
@@ -369,11 +375,6 @@ func (p *Pipeline) assignSource(block *bstream.Block) error {
 
 	switch p.vmType {
 	case "wasm/rust-v1":
-		// TODO: avoid serializing/deserializing and all, just pass in the BYTES directly
-		// we have decided NEVER to do mutations in here, but rather to have data fixing processes
-		// when it is possible to do, otherwise have a full blown different VERSION of data,
-		// so that DATA is always the reference, and not a living process.
-		// So we can TRUST the data blindly here
 		blkBytes, err := block.Payload.Get()
 		if err != nil {
 			return fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
@@ -389,21 +390,46 @@ func (p *Pipeline) assignSource(block *bstream.Block) error {
 	return nil
 }
 
-func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Store, err error) {
+func (p *Pipeline) build() error {
+	if err := p.validate(); err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
+	if err := p.buildModules(); err != nil {
+		return fmt.Errorf("build modules graph: %w", err)
+	}
+	if err := p.buildStores(); err != nil {
+		return fmt.Errorf("build stores graph: %w", err)
+	}
+	return nil
+}
+
+func (p *Pipeline) validate() error {
 	for _, binary := range p.request.Modules.Binaries {
 		if binary.Type != "wasm/rust-v1" {
-			return nil, nil, nil, fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
+			return fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
 		}
 		p.vmType = binary.Type
 	}
+	return nil
+}
 
-	modules, err = p.graph.ModulesDownTo(p.outputModuleNames)
+func (p *Pipeline) buildModules() error {
+	modules, err := p.graph.ModulesDownTo(p.outputModuleNames)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("building execution graph: %w", err)
+		return fmt.Errorf("building execution graph: %w", err)
+	}
+	p.modules = modules
+	return nil
+}
+
+func (p *Pipeline) buildStores() error {
+	storeModules, err := p.graph.StoresDownTo(p.outputModuleNames)
+	if err != nil {
+		return err
 	}
 
-	p.builders = make(map[string]*state.Store)
-	storeModules, err = p.graph.StoresDownTo(p.outputModuleNames)
+	p.storesMap = make(map[string]*state.Store)
+	p.stores = nil
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
 
@@ -418,15 +444,15 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 			options...,
 		)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
+			return fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
 		}
 
-		stores = append(stores, builder)
+		p.stores = append(p.stores, builder)
 
-		p.builders[builder.Name] = builder
+		p.storesMap[builder.Name] = builder
 	}
 
-	return
+	return nil
 }
 
 func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request, modules []*pbsubstreams.Module) error {
@@ -450,16 +476,16 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 					inputs = append(inputs, &wasm.Input{
 						Type:   wasm.InputStore,
 						Name:   inputName,
-						Store:  p.builders[inputName],
+						Store:  p.storesMap[inputName],
 						Deltas: true,
 					})
 				} else {
 					inputs = append(inputs, &wasm.Input{
 						Type:  wasm.InputStore,
 						Name:  inputName,
-						Store: p.builders[inputName],
+						Store: p.storesMap[inputName],
 					})
-					if p.builders[inputName] == nil {
+					if p.storesMap[inputName] == nil {
 						return fmt.Errorf("no store with name %q", inputName)
 					}
 				}
@@ -504,7 +530,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			updatePolicy := kind.KindStore.UpdatePolicy
 			valueType := kind.KindStore.ValueType
 
-			outputStore := p.builders[modName]
+			outputStore := p.storesMap[modName]
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         modName,
@@ -555,7 +581,7 @@ func SynchronizeStores(
 
 	requestPool := orchestrator.NewRequestPool()
 
-	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, orchestrator.WithNotifier(requestPool))
+	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, upToBlockNum, orchestrator.WithNotifier(requestPool))
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
@@ -642,25 +668,26 @@ done:
 
 	zlog.Info("store sync completed")
 
-	if err := squasher.Close(); err != nil {
-		return fmt.Errorf("closing squasher: %w", err)
+	if err := squasher.StoresReady(); err != nil {
+		return fmt.Errorf("squasher ready: %w", err)
 	}
 
 	return nil
 }
 
-func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
-	for _, builder := range p.builders {
-		err := builder.WriteState(ctx)
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
+	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!!
+	for _, builder := range p.storesMap {
+		// TODO: do we really need to save ALL the stores? or only the `leaf` stores?
+		err := builder.WriteState(ctx, lastBlock)
 		if err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
 
-		if p.partialMode {
-			builder.RollPartial()
-			continue
+		if builder.IsPartial() {
+			builder.Truncate()
+			builder.Roll(lastBlock)
 		}
-		builder.Roll()
 
 		zlog.Info("state written", zap.String("store_name", builder.Name))
 	}
@@ -668,19 +695,12 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pipeline) InitializeStores(ctx context.Context) error {
-	var initFunc func(builder *state.Store) error
-	initFunc = func(builder *state.Store) error {
-
-		if p.partialMode && slices.Contains(p.request.OutputModules, builder.Name) {
-			return builder.InitializePartial(ctx, p.requestedStartBlockNum)
+func (p *Pipeline) LoadStores(ctx context.Context) error {
+	for _, builder := range p.storesMap {
+		if builder.IsPartial() {
+			continue
 		}
-		outputCache := p.moduleOutputCache.OutputCaches[builder.Name]
-		return builder.Initialize(ctx, p.requestedStartBlockNum, p.moduleOutputCache.SaveBlockInterval, outputCache.Store)
-	}
-
-	for _, builder := range p.builders {
-		err := initFunc(builder)
+		err := builder.Fetch(ctx, &block.Range{StartBlock: builder.ModuleInitialBlock, ExclusiveEndBlock: p.requestedStartBlockNum})
 		if err != nil {
 			return fmt.Errorf("reading state for builder %q: %w", builder.Name, err)
 		}

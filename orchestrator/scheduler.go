@@ -39,7 +39,9 @@ func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
 
 func (s *Scheduler) Callback(ctx context.Context, outgoingReq *pbsubstreams.Request) error {
 	for _, output := range outgoingReq.GetOutputModules() {
-		// FIXME(abourget): don't call Squash on non-store modules (!)
+		// FIXME(abourget): why call Squash on non-store modules? Oh,
+		// but the orchestrator far far away won't do that
+		// anyway... hermm ok..
 		err := s.squasher.Squash(ctx, output, &block.Range{
 			StartBlock:        uint64(outgoingReq.StartBlockNum),
 			ExclusiveEndBlock: outgoingReq.StopBlockNum,

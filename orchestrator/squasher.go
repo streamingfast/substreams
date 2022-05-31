@@ -126,7 +126,7 @@ func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifi
 		if br.StartBlock < s.builder.ModuleInitialBlock {
 			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, br.StartBlock, s.builder.ModuleInitialBlock)
 		}
-		if blockRange.ExclusiveEndBlock > s.builder.StoreInitialBlock {
+		if blockRange.ExclusiveEndBlock < s.builder.StoreInitialBlock {
 			// Otherwise, risks stalling the merging (as ranges are
 			// sorted, and only the first is checked for contiguousness)
 			continue

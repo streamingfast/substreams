@@ -11,7 +11,7 @@ Don't forget to [install it](../developer-guide/installation-requirements.md#ins
 The `run` command allows you connect to a Substreams endpoint and start processing data.
 
 ```
-substreams run -e api-dev.streamingfast.io:443 \
+substreams run -e mainnet.ethereum.streamingfast.io \
    --stop-block +1 \
    ./substream.yaml \
    module_name
@@ -25,9 +25,9 @@ Let's break down everything happening above.
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
 * `module_name` this is the module we want to run, refering to the `name` [defined in the manifest](manifests.md#modules-.name).
 
-Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
+Passing a different `-s` (or `--start-block`) will running any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
 
-Here is the example of an output of the `block_to_erc_20_transfer` starting at `14440000` block for only `1` block. The `<continued ...>` was added to abbreviate the JSON output as there was a lot of ERC20 transfers.
+Here is the example of an output of the `block_to_erc_20_transfer` starting at `14440000` block for only `1` block. The `[...]` was added to abbreviate the JSON output as there was a lot of ERC20 transfers.
 
 ```
 2022-05-11T12:38:56.232-0400 INFO (substreams) connecting...

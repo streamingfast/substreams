@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,6 +55,35 @@ func Test_MergeRangeLists(t *testing.T) {
 				{Start: 400, End: 599},
 			},
 		},
+		{
+			name: "Merging multiple block ranges and reduce overlaps",
+			completedBlockRanges: []*blockRange{
+				{Start: 0, End: 99},
+			},
+			newlyCompletedBlockRanges: []*blockRange{
+				{Start: 100, End: 199},
+				{Start: 200, End: 299},
+				{Start: 400, End: 499},
+				{Start: 500, End: 599},
+				{Start: 300, End: 399},
+			},
+			expectedBlockRanges: []*blockRange{
+				{Start: 0, End: 599},
+			},
+		},
+		{
+			name: "Badly overlapping",
+			completedBlockRanges: []*blockRange{
+				{Start: 0, End: 199},
+				{Start: 0, End: 99},
+			},
+			newlyCompletedBlockRanges: []*blockRange{
+				{Start: 100, End: 220},
+			},
+			expectedBlockRanges: []*blockRange{
+				{Start: 0, End: 220},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -75,10 +105,11 @@ func TestLineBar(t *testing.T) {
 			{Start: 50, End: 100},
 			{Start: 200, End: 600},
 			{Start: 700, End: 710},
+			{Start: 822, End: 832},
 		},
 		100,
 		1000,
-		10,
+		40,
 	)
-	fmt.Println("MAMA", res)
+	assert.Equal(t, "▒░░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░▒▒░░░░▒░░░░░░░", res)
 }

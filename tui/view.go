@@ -53,18 +53,22 @@ Connected - Progress messages received: {{ .Updates }}
 }
 
 func linebar(ranges ranges, initialBlock uint64, startBlock uint64, screenWidth int) string {
+	// Make it 4 times more granular, with the Quadrants here: https://www.compart.com/en/unicode/block/U+2580
 	blocksWidth := startBlock - initialBlock
 	binSize := float64(blocksWidth) / float64(screenWidth)
 	prevBound := initialBlock
 	var s []string
 	for i := 0; i < screenWidth; i++ {
 		nextBound := initialBlock + uint64(binSize*float64(i+1))
-		//fmt.Println("bounds", prevBound, nextBound)
+		//fmt.Print("bounds", prevBound, nextBound)
 		if ranges.Covered(prevBound, nextBound) {
+			//fmt.Println(" covered")
 			s = append(s, "▓")
 		} else if ranges.PartiallyCovered(prevBound, nextBound) {
+			//fmt.Println(" partial")
 			s = append(s, "▒")
 		} else {
+			//fmt.Println("")
 			s = append(s, "░")
 		}
 		prevBound = nextBound

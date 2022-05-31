@@ -1,6 +1,10 @@
 package tui
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 type ranges []*blockRange
 
@@ -27,6 +31,14 @@ func (r ranges) Covered(lo, hi uint64) bool {
 	return false
 }
 
+func (r ranges) String() string {
+	var out []string
+	for _, m := range r {
+		out = append(out, fmt.Sprintf("%s", m.String()))
+	}
+	return strings.Join(out, ", ")
+}
+
 // Covered assumes block ranges have reduced overlaps/junctions.
 func (r ranges) PartiallyCovered(lo, hi uint64) bool {
 	for _, blockRange := range r {
@@ -39,6 +51,9 @@ func (r ranges) PartiallyCovered(lo, hi uint64) bool {
 		if blockRange.Start <= hi && hi <= blockRange.End {
 			return true
 		}
+		if blockRange.Start >= lo && hi >= blockRange.End {
+			return true
+		}
 	}
 	return false
 }
@@ -46,6 +61,10 @@ func (r ranges) PartiallyCovered(lo, hi uint64) bool {
 type blockRange struct {
 	Start uint64
 	End   uint64
+}
+
+func (b blockRange) String() string {
+	return fmt.Sprintf("%d-%d", b.Start, b.End)
 }
 
 type updatedRanges map[string]ranges
@@ -75,18 +94,20 @@ func (u updatedRanges) Hi() uint64 { _, b := u.LoHi(); return b }
 type newRange map[string]blockRange
 
 func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
-	// fmt.Println("BOO", prevRanges, newRange)
+	//	fmt.Println("merge input, prevRanges:", prevRanges, "new range:", newRange)
 	var stretched bool
 	for _, prevRange := range prevRanges {
 		if newRange.Start <= prevRange.End+1 {
 			if prevRange.End < newRange.End {
 				prevRange.End = newRange.End
+				//fmt.Println("Stretching end", newRange.End)
 				stretched = true
 				break
 			}
 		} else if newRange.End+1 >= prevRange.Start {
 			if prevRange.Start > newRange.Start {
 				prevRange.Start = newRange.Start
+				//fmt.Println("Stretching start", newRange.Start)
 				stretched = true
 				break
 			}
@@ -95,14 +116,13 @@ func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
 	if !stretched {
 		prevRanges = append(prevRanges, newRange)
 	}
-	// _ = stretched
-	// prevRanges = append(prevRanges, newRange)
 	sort.Sort(prevRanges)
-	return prevRanges
-	//return reduceOverlaps(prevRanges)
+	return reduceOverlaps(prevRanges)
 }
 
 func reduceOverlaps(r ranges) ranges {
+	//fmt.Println("reduce input:", r)
+
 	if len(r) <= 1 {
 		return r
 	}
@@ -111,15 +131,20 @@ func reduceOverlaps(r ranges) ranges {
 	for i := 0; i < len(r)-1; i++ {
 		r1 := r[i]
 		r2 := r[i+1]
-		if r1.End >= r2.Start {
-			// TODO: this would need to be recursive.. won't work otherwise
-			newRanges = append(newRanges, &blockRange{Start: r1.Start, End: r2.End})
+		if r1.End+1 >= r2.Start {
+			maxEnd := r2.End
+			if r1.End > maxEnd {
+				maxEnd = r1.End
+			}
+			newRanges = append(newRanges, &blockRange{Start: r1.Start, End: r1.End})
+
 		} else {
 			newRanges = append(newRanges, r1)
-			if i == len(r) {
+			if i+2 == len(r) {
 				newRanges = append(newRanges, r2)
 			}
 		}
 	}
+	//	fmt.Println("reduce output:", newRanges)
 	return newRanges
 }

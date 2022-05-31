@@ -7,22 +7,22 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *Builder) SetBytesIfNotExists(ord uint64, key string, value []byte) {
+func (b *Store) SetBytesIfNotExists(ord uint64, key string, value []byte) {
 	b.setIfNotExists(ord, key, value)
 }
 
-func (b *Builder) SetIfNotExists(ord uint64, key string, value string) {
+func (b *Store) SetIfNotExists(ord uint64, key string, value string) {
 	b.setIfNotExists(ord, key, []byte(value))
 }
 
-func (b *Builder) SetBytes(ord uint64, key string, value []byte) {
+func (b *Store) SetBytes(ord uint64, key string, value []byte) {
 	b.set(ord, key, value)
 }
-func (b *Builder) Set(ord uint64, key string, value string) {
+func (b *Store) Set(ord uint64, key string, value string) {
 	b.set(ord, key, []byte(value))
 }
 
-func (b *Builder) set(ord uint64, key string, value []byte) {
+func (b *Store) set(ord uint64, key string, value []byte) {
 	if strings.HasPrefix(key, "__!__") {
 		panic("key prefix __!__ is reserved for internal system use.")
 	}
@@ -60,7 +60,7 @@ func (b *Builder) set(ord uint64, key string, value []byte) {
 	b.Deltas = append(b.Deltas, delta)
 }
 
-func (b *Builder) setIfNotExists(ord uint64, key string, value []byte) {
+func (b *Store) setIfNotExists(ord uint64, key string, value []byte) {
 	b.bumpOrdinal(ord)
 
 	_, found := b.GetLast(key)

@@ -66,7 +66,7 @@ type SumBigFloatSetter interface {
 }
 
 type Mergeable interface {
-	Merge(other *Builder) error
+	Merge(other *Store) error
 }
 
 //compile-time check that Builder implements all interfaces
@@ -91,4 +91,4 @@ var _ interface {
 	SumBigFloatSetter
 
 	Mergeable
-} = (*Builder)(nil)
+} = (*Store)(nil)

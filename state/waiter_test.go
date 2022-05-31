@@ -83,14 +83,14 @@ func TestFileWaiter_Wait(t *testing.T) {
 	tests := []struct {
 		name          string
 		graph         *manifest.ModuleGraph
-		builders      []*Builder
+		builders      []*Store
 		targetBlock   uint64
 		expectedError bool
 	}{
 		{
 			name:  "files all present",
 			graph: graph,
-			builders: []*Builder{
+			builders: []*Store{
 				mustGetWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
 						"0000001000": {"0000001000-0000000000.kv"},
@@ -116,7 +116,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 		{
 			name:  "file missing on one store",
 			graph: graph,
-			builders: []*Builder{
+			builders: []*Store{
 				mustGetWaiterTestStore("B", "module.hash.1", func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error) {
 					files := map[string][]string{
 						"0000001000": {"0000001000-0000000000.kv"},
@@ -160,7 +160,7 @@ func TestFileWaiter_Wait(t *testing.T) {
 func Test_pathToState(t *testing.T) {
 	tests := []struct {
 		name             string
-		builder          *Builder
+		builder          *Store
 		storeName        string
 		moduleStartBlock uint64
 		targetBlock      uint64
@@ -263,9 +263,9 @@ func Test_pathToState(t *testing.T) {
 	}
 }
 
-func mustGetWaiterTestStore(moduleName string, moduleHash string, listFilesFunc func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error)) *Builder {
+func mustGetWaiterTestStore(moduleName string, moduleHash string, listFilesFunc func(ctx context.Context, prefix, ignoreSuffix string, max int) ([]string, error)) *Store {
 	mockDStore := &dstore.MockStore{
 		ListFilesFunc: listFilesFunc,
 	}
-	return &Builder{Name: moduleName, ModuleHash: moduleHash, Store: mockDStore}
+	return &Store{Name: moduleName, ModuleHash: moduleHash, Store: mockDStore}
 }

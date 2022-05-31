@@ -56,7 +56,7 @@ func (e *MapperModuleExecutor) String() string {
 
 type StoreModuleExecutor struct {
 	BaseExecutor
-	outputStore *state.Builder
+	outputStore *state.Store
 }
 
 // Name implements ModuleExecutor
@@ -191,7 +191,7 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
 		if err = instance.Execute(); err != nil {
-			return nil, fmt.Errorf("module %q: wasm execution failed: %w", e.moduleName, err)
+			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
 	}
 	return

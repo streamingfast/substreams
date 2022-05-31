@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func initTestBuilder(key string, value []byte) *Builder {
+func initTestBuilder(key string, value []byte) *Store {
 	b, err := NewBuilder("b", 0, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil))
 	if err != nil {
 		panic(err)

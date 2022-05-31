@@ -31,7 +31,7 @@ func WithNotifier(notifier Notifier) SquasherOption {
 	}
 }
 
-func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64, opts ...SquasherOption) (*Squasher, error) {
+func NewSquasher(ctx context.Context, builders []*state.Store, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64, opts ...SquasherOption) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
 	for _, builder := range builders {
 		info, err := builder.Info(ctx)
@@ -39,17 +39,17 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 			return nil, fmt.Errorf("getting info for %s: %w", builder.Name, err)
 		}
 
-		var initialBuilder *state.Builder
+		var initialBuilder *state.Store
 		if info.LastKVSavedBlock == 0 {
-			floor := builder.ModuleStartBlock - builder.ModuleStartBlock%builder.SaveInterval
+			floor := builder.ModuleInitialBlock - builder.ModuleInitialBlock%builder.SaveInterval
 			r := &block.Range{
-				StartBlock:        builder.ModuleStartBlock,
+				StartBlock:        builder.ModuleInitialBlock,
 				ExclusiveEndBlock: floor + builder.SaveInterval,
 			}
 			initialBuilder = builder.FromBlockRange(r, true)
 		} else {
 			r := &block.Range{
-				StartBlock:        builder.ModuleStartBlock,
+				StartBlock:        builder.ModuleInitialBlock,
 				ExclusiveEndBlock: info.LastKVSavedBlock,
 			}
 			initialBuilder = builder.FromBlockRange(r, false)
@@ -70,9 +70,12 @@ func NewSquasher(ctx context.Context, builders []*state.Builder, outputCaches ma
 	return squasher, nil
 }
 
-func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRange *block.Range) error {
+func (s *Squasher) Squash(ctx context.Context, moduleName string, outgoingReqRange *block.Range) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// TODO: STORE the Ranges we know have processed, and keep them, and
+	// we'll process them linearly.
 
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
@@ -80,13 +83,13 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 	}
 	builder := squashable.builder
 
-	zlog.Info("squashing request range", zap.String("module", builder.Name), zap.Object("request_range", requestBlockRange))
-	blockRanges := requestBlockRange.Split(s.storeSaveInterval)
+	zlog.Info("squashing request range", zap.String("module", builder.Name), zap.Object("request_range", outgoingReqRange))
+	blockRanges := outgoingReqRange.Split(s.storeSaveInterval)
 
 	for _, br := range blockRanges {
 		zlog.Info("squashing range", zap.String("module", builder.Name), zap.Object("range", br))
-		if !builder.Initialized && builder.PartialMode && br.StartBlock == builder.ModuleStartBlock {
-			err := builder.InitializePartial(ctx, builder.ModuleStartBlock)
+		if !builder.Initialized && builder.PartialMode && br.StartBlock == builder.ModuleInitialBlock {
+			err := builder.InitializePartial(ctx, builder.ModuleInitialBlock)
 			if err != nil {
 				return fmt.Errorf("initializing partial builder %q on first block range: %w", builder.Name, err)
 			}
@@ -98,7 +101,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, requestBlockRa
 			continue
 		}
 
-		isNotFullRange := br.Size() < squashable.builder.SaveInterval && br.StartBlock != squashable.builder.ModuleStartBlock
+		isNotFullRange := br.Size() < squashable.builder.SaveInterval && br.StartBlock != squashable.builder.ModuleInitialBlock
 		if isNotFullRange {
 			continue
 		}
@@ -189,11 +192,11 @@ func (s *Squasher) Close() error {
 }
 
 type Squashable struct {
-	builder *state.Builder
+	builder *state.Store
 	ranges  block.Ranges
 }
 
-func NewSquashable(initialBuilder *state.Builder) *Squashable {
+func NewSquashable(initialBuilder *state.Store) *Squashable {
 	return &Squashable{
 		builder: initialBuilder,
 		ranges:  block.Ranges(nil),
@@ -215,5 +218,5 @@ func (s Squashables) String() string {
 	for _, i := range s {
 		rs = append(rs, i.String())
 	}
-	return strings.Join(rs, ",")
+	return strings.Join(rs, ", ")
 }

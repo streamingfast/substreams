@@ -131,7 +131,7 @@ func Test_MergeRangeLists(t *testing.T) {
 func TestReduce1(t *testing.T) {
 	res := reduceOverlaps([]*blockRange{
 		{Start: 6990000, End: 6999997},
-		{Start: 6990000, End: 6992496},
+		{Start: 6990000, End: 6992496}, // Happens if a process failed and restarted, will re-send lower level, which might appear as stalled, but it's actually re-working.
 		{Start: 7000000, End: 7009999},
 	})
 	assert.Equal(t, ranges{

@@ -6,7 +6,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *Builder) GetFirst(key string) ([]byte, bool) {
+func (b *Store) GetFirst(key string) ([]byte, bool) {
 	for _, delta := range b.Deltas {
 		if delta.Key == key {
 			switch delta.Operation {
@@ -23,13 +23,13 @@ func (b *Builder) GetFirst(key string) ([]byte, bool) {
 	return b.GetLast(key)
 }
 
-func (b *Builder) GetLast(key string) ([]byte, bool) {
+func (b *Store) GetLast(key string) ([]byte, bool) {
 	val, found := b.KV[key]
 	return val, found
 }
 
 // GetAt returns the key for the state that includes the processing of `ord`.
-func (b *Builder) GetAt(ord uint64, key string) (out []byte, found bool) {
+func (b *Store) GetAt(ord uint64, key string) (out []byte, found bool) {
 	out, found = b.GetLast(key)
 
 	for i := len(b.Deltas) - 1; i >= 0; i-- {

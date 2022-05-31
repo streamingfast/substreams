@@ -13,7 +13,7 @@ import (
 func TestBuilderSetMinBigInt(t *testing.T) {
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *big.Int
 		value         *big.Int
@@ -45,7 +45,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *big.Int) {
+	initTestBuilder := func(b *Store, key string, value *big.Int) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(value.String())
@@ -79,7 +79,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *int64
 		value         int64
@@ -111,7 +111,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *int64) {
+	initTestBuilder := func(b *Store, key string, value *int64) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(fmt.Sprintf("%d", *value))
@@ -146,7 +146,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *float64
 		value         float64
@@ -178,7 +178,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *float64) {
+	initTestBuilder := func(b *Store, key string, value *float64) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(strconv.FormatFloat(*value, 'g', 100, 64))
@@ -206,7 +206,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 func TestBuilderSetMinBigFloat(t *testing.T) {
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *big.Float
 		value         *big.Float
@@ -238,7 +238,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *big.Float) {
+	initTestBuilder := func(b *Store, key string, value *big.Float) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(value.Text('g', -1))

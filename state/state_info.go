@@ -70,7 +70,7 @@ func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
 	return info, nil
 }
 
-func (b *Builder) Info(ctx context.Context) (*Info, error) {
+func (b *Store) Info(ctx context.Context) (*Info, error) {
 	if b.info == nil {
 		b.infoLock.Lock()
 		defer b.infoLock.Unlock()

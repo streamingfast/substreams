@@ -15,11 +15,11 @@ import (
 const WaiterSleepInterval = 5 * time.Second
 
 type FileWaiter struct {
-	builders          []*Builder
+	builders          []*Store
 	targetBlockNumber uint64
 }
 
-func NewFileWaiter(targetStartBlock uint64, builders []*Builder) *FileWaiter {
+func NewFileWaiter(targetStartBlock uint64, builders []*Store) *FileWaiter {
 	w := &FileWaiter{
 		builders:          builders,
 		targetBlockNumber: targetStartBlock,

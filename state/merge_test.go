@@ -10,9 +10,9 @@ import (
 func TestBuilder_Merge(t *testing.T) {
 	tests := []struct {
 		name            string
-		latest          *Builder
+		latest          *Store
 		latestKV        map[string][]byte
-		prev            *Builder
+		prev            *Store
 		prevKV          map[string][]byte
 		expectedError   bool
 		expectedKV      map[string][]byte

@@ -18,15 +18,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type BuilderOption func(b *Builder)
+type BuilderOption func(b *Store)
 
-type Builder struct {
+type Store struct {
 	Name         string
 	Store        dstore.Store
 	SaveInterval uint64
 	Initialized  bool
 
-	ModuleStartBlock uint64
+	ModuleInitialBlock uint64
 	BlockRange       *block.Range
 
 	ModuleHash string
@@ -47,7 +47,7 @@ type Builder struct {
 	lastOrdinal uint64
 }
 
-func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (b *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("builder_name", b.Name)
 	enc.AddBool("partial", b.PartialMode)
 	err := enc.AddObject("block_range", b.BlockRange)
@@ -58,12 +58,12 @@ func (b *Builder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func (b *Builder) FromBlockRange(blockRange *block.Range, partialMode bool) *Builder {
-	return &Builder{
+func (b *Store) FromBlockRange(blockRange *block.Range, partialMode bool) *Store {
+	return &Store{
 		Name:             b.Name,
 		Store:            b.Store,
 		SaveInterval:     b.SaveInterval,
-		ModuleStartBlock: b.ModuleStartBlock,
+		ModuleInitialBlock: b.ModuleInitialBlock,
 		BlockRange:       blockRange,
 		ModuleHash:       b.ModuleHash,
 		KV:               map[string][]byte{},
@@ -74,20 +74,20 @@ func (b *Builder) FromBlockRange(blockRange *block.Range, partialMode bool) *Bui
 	}
 }
 
-func NewBuilder(name string, saveInterval uint64, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Builder, error) {
+func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Store, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
 
-	b := &Builder{
+	b := &Store{
 		Name:             name,
 		KV:               make(map[string][]byte),
 		UpdatePolicy:     updatePolicy,
 		ValueType:        valueType,
 		Store:            subStore,
 		SaveInterval:     saveInterval,
-		ModuleStartBlock: moduleStartBlock,
+		ModuleInitialBlock: moduleInitialBlock,
 		BlockRange:       &block.Range{},
 	}
 
@@ -98,7 +98,7 @@ func NewBuilder(name string, saveInterval uint64, moduleStartBlock uint64, modul
 	return b, nil
 }
 
-func (b *Builder) Print() {
+func (b *Store) Print() {
 	if len(b.Deltas) == 0 {
 		return
 	}
@@ -109,12 +109,16 @@ func (b *Builder) Print() {
 	}
 }
 
-func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) error {
+func (b *Store) FetchAndMerge(ctx context.Context) error {
+	return nil
+}
+
+func (b *Store) InitializePartial(ctx context.Context, startBlock uint64) error {
 	b.PartialMode = true
 	floor := startBlock - startBlock%b.SaveInterval
 	exclusiveEndBlock := floor + b.SaveInterval
-	if startBlock == b.ModuleStartBlock {
-		floor = b.ModuleStartBlock
+	if startBlock == b.ModuleInitialBlock {
+		floor = b.ModuleInitialBlock
 	}
 	b.BlockRange = &block.Range{
 		StartBlock:        floor,
@@ -136,8 +140,8 @@ func (b *Builder) InitializePartial(ctx context.Context, startBlock uint64) erro
 	return b.loadState(ctx, fileName)
 }
 
-func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
-	b.BlockRange.StartBlock = b.ModuleStartBlock
+func (b *Store) Initialize(ctx context.Context, requestedStartBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+	b.BlockRange.StartBlock = b.ModuleInitialBlock
 	b.Initialized = true
 	b.KV = map[string][]byte{}
 
@@ -155,7 +159,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	zlog.Debug("computed info", zap.String("module_name", b.Name), zap.Uint64("start_block", floor))
 
 	deltasNeeded := true
-	deltasStartBlock = b.ModuleStartBlock
+	deltasStartBlock = b.ModuleInitialBlock
 	b.BlockRange.ExclusiveEndBlock = floor + b.SaveInterval
 
 	shouldLoadKV := floor >= b.SaveInterval && floor > b.BlockRange.StartBlock
@@ -166,9 +170,9 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 		atBlock := floor - b.SaveInterval // get the previous saved range
 		b.BlockRange.ExclusiveEndBlock = floor
 		fileName := FullStateFileName(&block.Range{
-			StartBlock:        b.ModuleStartBlock,
+			StartBlock:        b.ModuleInitialBlock,
 			ExclusiveEndBlock: b.BlockRange.ExclusiveEndBlock,
-		}, b.ModuleStartBlock)
+		}, b.ModuleInitialBlock)
 
 		zlog.Info("about to load state", zap.String("module_name", b.Name), zap.Uint64("at_block", atBlock), zap.Uint64("deltas_start_block", deltasStartBlock))
 		err := b.loadState(ctx, fileName)
@@ -188,7 +192,7 @@ func (b *Builder) Initialize(ctx context.Context, requestedStartBlock uint64, ou
 	return nil
 }
 
-func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
+func (b *Store) loadState(ctx context.Context, stateFileName string) error {
 	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
 
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -217,7 +221,7 @@ func (b *Builder) loadState(ctx context.Context, stateFileName string) error {
 	return nil
 }
 
-func (b *Builder) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
+func (b *Store) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
 	if b.PartialMode {
 		panic("cannot load deltas in partial mode")
 	}
@@ -282,7 +286,7 @@ func (b *Builder) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock 
 	}
 }
 
-func (b *Builder) WriteState(ctx context.Context) (err error) {
+func (b *Store) WriteState(ctx context.Context) (err error) {
 	zlog.Debug("writing state", zap.Object("builder", b))
 
 	err = b.writeMergeData()
@@ -316,8 +320,8 @@ func (b *Builder) WriteState(ctx context.Context) (err error) {
 	return nil
 }
 
-func (b *Builder) writeState(ctx context.Context, content []byte) (string, error) {
-	filename := FullStateFileName(b.BlockRange, b.ModuleStartBlock)
+func (b *Store) writeState(ctx context.Context, content []byte) (string, error) {
+	filename := FullStateFileName(b.BlockRange, b.ModuleInitialBlock)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
 		return filename, fmt.Errorf("writing state %s for range %s: %w", b.Name, b.BlockRange.String(), err)
@@ -349,13 +353,13 @@ func (b *Builder) writeState(ctx context.Context, content []byte) (string, error
 	return filename, err
 }
 
-func (b *Builder) writePartialState(ctx context.Context, content []byte) (string, error) {
+func (b *Store) writePartialState(ctx context.Context, content []byte) (string, error) {
 	filename := PartialFileName(b.BlockRange)
 	zlog.Debug("writing partial state", zap.String("module_name", b.Name), zap.Object("range", b.BlockRange), zap.String("file_name", filename))
 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 }
 
-func (b *Builder) DeletePartialFile(ctx context.Context) error {
+func (b *Store) DeletePartialFile(ctx context.Context) error {
 	filename := PartialFileName(b.BlockRange)
 	zlog.Debug("deleting partial file", zap.String("file_name", filename))
 	err := b.Store.DeleteObject(ctx, filename)
@@ -365,13 +369,13 @@ func (b *Builder) DeletePartialFile(ctx context.Context) error {
 	return nil
 }
 
-func (b *Builder) PrintDelta(delta *pbsubstreams.StoreDelta) {
+func (b *Store) PrintDelta(delta *pbsubstreams.StoreDelta) {
 	fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
 	fmt.Printf("    OLD: %s\n", string(delta.OldValue))
 	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
-func (b *Builder) ApplyDelta(delta *pbsubstreams.StoreDelta) {
+func (b *Store) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF
 	// 0xFF is reserved for internal use.
 	if len(delta.Key) == 0 {
@@ -389,7 +393,7 @@ func (b *Builder) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	}
 }
 
-func (b *Builder) Flush() {
+func (b *Store) Flush() {
 	if tracer.Enabled() {
 		zlog.Debug("flushing store", zap.String("name", b.Name), zap.Int("delta_count", len(b.Deltas)), zap.Int("entry_count", len(b.KV)))
 	}
@@ -397,16 +401,16 @@ func (b *Builder) Flush() {
 	b.lastOrdinal = 0
 }
 
-func (b *Builder) Roll() {
+func (b *Store) Roll() {
 	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.SaveInterval
 }
-func (b *Builder) RollPartial() {
+func (b *Store) RollPartial() {
 	b.KV = map[string][]byte{}
 	b.BlockRange.StartBlock = b.BlockRange.ExclusiveEndBlock
 	b.BlockRange.ExclusiveEndBlock = b.BlockRange.ExclusiveEndBlock + b.SaveInterval
 }
 
-func (b *Builder) bumpOrdinal(ord uint64) {
+func (b *Store) bumpOrdinal(ord uint64) {
 	if b.lastOrdinal > ord {
 		panic("cannot Set or Del a value on a state.Builder with an ordinal lower than the previous")
 	}

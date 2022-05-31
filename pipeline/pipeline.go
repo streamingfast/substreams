@@ -41,7 +41,7 @@ type Pipeline struct {
 
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
-	builders       map[string]*state.Builder
+	builders       map[string]*state.Store
 
 	context           context.Context
 	request           *pbsubstreams.Request
@@ -86,7 +86,7 @@ func New(
 	pipe := &Pipeline{
 		context:                      ctx,
 		request:                      request,
-		builders:                     map[string]*state.Builder{},
+		builders:                     map[string]*state.Store{},
 		graph:                        graph,
 		baseStateStore:               baseStateStore,
 		outputModuleNames:            request.OutputModules,
@@ -127,7 +127,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 	var err error
 	zlog.Info("building store and executor")
-	var stores []*state.Builder
+	var stores []*state.Store
 	p.modules, _, stores, err = p.build()
 	if err != nil {
 		return nil, fmt.Errorf("building pipeline: %w", err)
@@ -389,7 +389,7 @@ func (p *Pipeline) assignSource(block *bstream.Block) error {
 	return nil
 }
 
-func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Builder, err error) {
+func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, stores []*state.Store, err error) {
 	for _, binary := range p.request.Modules.Binaries {
 		if binary.Type != "wasm/rust-v1" {
 			return nil, nil, nil, fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
@@ -402,7 +402,7 @@ func (p *Pipeline) build() (modules []*pbsubstreams.Module, storeModules []*pbsu
 		return nil, nil, nil, fmt.Errorf("building execution graph: %w", err)
 	}
 
-	p.builders = make(map[string]*state.Builder)
+	p.builders = make(map[string]*state.Store)
 	storeModules, err = p.graph.StoresDownTo(p.outputModuleNames)
 	for _, storeModule := range storeModules {
 		var options []state.BuilderOption
@@ -539,7 +539,7 @@ func SynchronizeStores(
 	ctx context.Context,
 	workerPool *worker.Pool,
 	originalRequest *pbsubstreams.Request,
-	builders []*state.Builder,
+	builders []*state.Store,
 	graph *manifest.ModuleGraph,
 	outputCache map[string]*outputs.OutputCache,
 	upToBlockNum uint64,
@@ -669,8 +669,8 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 }
 
 func (p *Pipeline) InitializeStores(ctx context.Context) error {
-	var initFunc func(builder *state.Builder) error
-	initFunc = func(builder *state.Builder) error {
+	var initFunc func(builder *state.Store) error
+	initFunc = func(builder *state.Store) error {
 
 		if p.partialMode && slices.Contains(p.request.OutputModules, builder.Name) {
 			return builder.InitializePartial(ctx, p.requestedStartBlockNum)

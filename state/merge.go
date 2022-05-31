@@ -19,13 +19,13 @@ const (
 	mergeDataKey = "__!__metadata" ///NEVER EVER CHANGE THIS
 )
 
-func (b *Builder) writeMergeData() error {
+func (b *Store) writeMergeData() error {
 	mergeInfo := &mergeInfo{
 		StoreName:        b.Name,
 		UpdatePolicy:     b.UpdatePolicy,
 		ValueType:        b.ValueType,
 		ModuleHash:       b.ModuleHash,
-		ModuleStartBlock: b.ModuleStartBlock,
+		ModuleStartBlock: b.ModuleInitialBlock,
 	}
 
 	data, err := json.Marshal(mergeInfo)
@@ -38,7 +38,7 @@ func (b *Builder) writeMergeData() error {
 	return nil
 }
 
-func (b *Builder) clearMergeData() {
+func (b *Store) clearMergeData() {
 	delete(b.KV, mergeDataKey)
 }
 
@@ -300,7 +300,7 @@ type mergeInfo struct {
 //	return nil
 //}
 
-func (into *Builder) Merge(builder *Builder) error {
+func (into *Store) Merge(builder *Store) error {
 	//merge data is not of the correct type for the KV, so we delete it and set it back afterwards.
 	into.clearMergeData()
 	defer func() {

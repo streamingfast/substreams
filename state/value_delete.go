@@ -6,7 +6,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *Builder) Del(ord uint64, key string) {
+func (b *Store) Del(ord uint64, key string) {
 	b.bumpOrdinal(ord)
 
 	val, found := b.GetLast(key)
@@ -23,7 +23,7 @@ func (b *Builder) Del(ord uint64, key string) {
 	}
 }
 
-func (b *Builder) DeletePrefix(ord uint64, prefix string) {
+func (b *Store) DeletePrefix(ord uint64, prefix string) {
 	b.bumpOrdinal(ord)
 
 	for key, val := range b.KV {

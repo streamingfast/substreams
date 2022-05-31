@@ -72,11 +72,11 @@ func TestSquash(t *testing.T) {
 	require.Equal(t, 2, notificationsSent)
 }
 
-func testStateBuilder(store dstore.Store) *state.Builder {
-	return &state.Builder{
+func testStateBuilder(store dstore.Store) *state.Store {
+	return &state.Store{
 		Name:             "testBuilder",
 		SaveInterval:     10_000,
-		ModuleStartBlock: 0,
+		ModuleInitialBlock: 0,
 		Store:            store,
 		ModuleHash:       "abc",
 		KV:               map[string][]byte{},

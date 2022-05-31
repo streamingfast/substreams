@@ -14,7 +14,7 @@ type Instance struct {
 	heap         *Heap
 	store        *wasmer.Store
 	inputStores  []state.Reader
-	outputStore  *state.Builder
+	outputStore  *state.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 
 	valueType  string
@@ -93,7 +93,7 @@ func (i *Instance) Output() []byte {
 	return i.returnValue
 }
 
-func (i *Instance) SetOutputStore(store *state.Builder) {
+func (i *Instance) SetOutputStore(store *state.Store) {
 	i.outputStore = store
 }
 

@@ -17,69 +17,6 @@ type Strategy interface {
 	RequestCount() int
 }
 
-type LinearStrategy struct {
-	requests []*pbsubstreams.Request
-}
-
-func (s *LinearStrategy) RequestCount() int {
-	return len(s.requests)
-}
-
-func NewLinearStrategy(ctx context.Context, request *pbsubstreams.Request, builders []*state.Builder, upToBlockNum uint64, blockRangeSizeSubRequests int) (*LinearStrategy, error) {
-	res := &LinearStrategy{}
-
-	for _, builder := range builders {
-		zlog.Debug("squashables", zap.String("builder", builder.Name))
-		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
-		if upToBlockNum == builder.ModuleStartBlock {
-			continue // nothing to synchronize
-		}
-
-		endBlock := upToBlockNum
-		info, err := builder.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting builder info: %w", err)
-		}
-
-		lastExclusiveEndBlock := info.LastKVSavedBlock
-		zlog.Info("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
-		if upToBlockNum <= lastExclusiveEndBlock {
-			zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
-			continue // not sure if we should pop here
-		}
-
-		reqStartBlock := lastExclusiveEndBlock
-		if reqStartBlock == 0 {
-			reqStartBlock = builder.ModuleStartBlock
-		}
-
-		moduleFullRangeToProcess := &block.Range{
-			StartBlock:        reqStartBlock,
-			ExclusiveEndBlock: endBlock,
-		}
-
-		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
-		for _, r := range requestRanges {
-			req := createRequest(r.StartBlock, r.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
-			res.requests = append(res.requests, req)
-			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", r))
-		}
-	}
-
-	return res, nil
-}
-
-func (s *LinearStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {
-	if len(s.requests) == 0 {
-		return nil, io.EOF
-	}
-
-	var request *pbsubstreams.Request
-	request, s.requests = s.requests[0], s.requests[1:]
-
-	return request, nil
-}
-
 type RequestGetter interface {
 	Get(ctx context.Context) (*pbsubstreams.Request, error)
 	Count() int
@@ -92,7 +29,7 @@ type OrderedStrategy struct {
 func NewOrderedStrategy(
 	ctx context.Context,
 	request *pbsubstreams.Request,
-	builders []*state.Builder,
+	stores []*state.Store,
 	graph *manifest.ModuleGraph,
 	pool *RequestPool,
 	upToBlockNum uint64,
@@ -100,7 +37,7 @@ func NewOrderedStrategy(
 	maxRangeSize uint64,
 ) (*OrderedStrategy, error) {
 	lastSavedBlockMap := map[string]uint64{}
-	for _, builder := range builders {
+	for _, builder := range stores {
 		info, err := builder.Info(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("getting builder info: %w", err)
@@ -108,21 +45,21 @@ func NewOrderedStrategy(
 		lastSavedBlockMap[builder.Name] = info.LastKVSavedBlock
 	}
 
-	for _, builder := range builders {
-		zlog.Debug("squashables", zap.String("builder", builder.Name))
+	for _, store := range stores {
+		zlog.Debug("squashables", zap.String("builder", store.Name))
 		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
-		if upToBlockNum == builder.ModuleStartBlock {
+		if upToBlockNum == store.ModuleInitialBlock {
 			continue // nothing to synchronize
 		}
 
 		endBlock := upToBlockNum
-		info, err := builder.Info(ctx)
+		info, err := store.Info(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("getting builder info: %w", err)
 		}
 
 		lastExclusiveEndBlock := info.LastKVSavedBlock
-		zlog.Debug("got info", zap.Object("builder", builder), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
+		zlog.Debug("got info", zap.Object("builder", store), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
 		if upToBlockNum <= lastExclusiveEndBlock {
 			zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
 			continue // not sure if we should pop here
@@ -130,7 +67,7 @@ func NewOrderedStrategy(
 
 		reqStartBlock := lastExclusiveEndBlock
 		if reqStartBlock == 0 {
-			reqStartBlock = builder.ModuleStartBlock
+			reqStartBlock = store.ModuleInitialBlock
 		}
 
 		moduleFullRangeToProcess := &block.Range{
@@ -139,21 +76,21 @@ func NewOrderedStrategy(
 		}
 
 		if moduleFullRangeToProcess.Size() > maxRangeSize {
-			return nil, fmt.Errorf("subrequest size too big. request must be started clsoer to the head block. store %s is %d blocks from head (max is %d)", builder.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
+			return nil, fmt.Errorf("subrequest size too big. request must be started clsoer to the head block. store %s is %d blocks from head (max is %d)", store.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
 		}
 
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
 		for _, blockRange := range requestRanges {
-			ancestorStoreModules, err := graph.AncestorStoresOf(builder.Name)
+			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)
 			if err != nil {
-				return nil, fmt.Errorf("getting ancestore stores for %s: %w", builder.Name, err)
+				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
 			}
 
-			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, builder.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
+			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, store.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
 			waiter := NewWaiter(blockRange.StartBlock, lastSavedBlockMap, ancestorStoreModules...)
 			_ = pool.Add(ctx, req, waiter)
 
-			zlog.Info("request created", zap.String("module_name", builder.Name), zap.Object("block_range", blockRange))
+			zlog.Info("request created", zap.String("module_name", store.Name), zap.Object("block_range", blockRange))
 		}
 	}
 
@@ -191,7 +128,6 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 			if err == io.EOF || err == context.DeadlineExceeded || err == context.Canceled {
 				return
 			}
-
 			if err != nil {
 				panic(err)
 			}
@@ -204,7 +140,6 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 			case <-ctx.Done():
 				return
 			case stream <- r:
-				//
 			}
 		}
 	}()

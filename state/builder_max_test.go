@@ -16,7 +16,7 @@ import (
 func TestBuilderSetMaxBigInt(t *testing.T) {
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *big.Int
 		value         *big.Int
@@ -48,7 +48,7 @@ func TestBuilderSetMaxBigInt(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *big.Int) {
+	initTestBuilder := func(b *Store, key string, value *big.Int) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(value.String())
@@ -82,7 +82,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *int64
 		value         int64
@@ -114,7 +114,7 @@ func TestBuilderSetMaxInt64(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *int64) {
+	initTestBuilder := func(b *Store, key string, value *int64) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(fmt.Sprintf("%d", *value))
@@ -149,7 +149,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *float64
 		value         float64
@@ -181,7 +181,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *float64) {
+	initTestBuilder := func(b *Store, key string, value *float64) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(strconv.FormatFloat(*value, 'g', 100, 64))
@@ -209,7 +209,7 @@ func TestBuilderSetMaxFloat64(t *testing.T) {
 func TestBuilderSetMaxBigFloat(t *testing.T) {
 	tests := []struct {
 		name          string
-		builder       *Builder
+		builder       *Store
 		key           string
 		existingValue *big.Float
 		value         *big.Float
@@ -241,7 +241,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Builder, key string, value *big.Float) {
+	initTestBuilder := func(b *Store, key string, value *big.Float) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(value.Text('g', -1))
@@ -266,7 +266,7 @@ func TestBuilderSetMaxBigFloat(t *testing.T) {
 	}
 }
 
-func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) *Builder {
+func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) *Store {
 	t.Helper()
 	if store == nil {
 		store = dstore.NewMockStore(nil)

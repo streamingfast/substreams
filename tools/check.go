@@ -29,7 +29,7 @@ func checkE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not create store from %s: %w", args[0], err)
 	}
 
-	builder := state.Builder{
+	builder := state.Store{
 		Store: store,
 	}
 

@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-func (b *Builder) SumBigInt(ord uint64, key string, value *big.Int) {
+func (b *Store) SumBigInt(ord uint64, key string, value *big.Int) {
 	sum := new(big.Int)
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -21,7 +21,7 @@ func (b *Builder) SumBigInt(ord uint64, key string, value *big.Int) {
 	b.set(ord, key, []byte(sum.String()))
 }
 
-func (b *Builder) SumInt64(ord uint64, key string, value int64) {
+func (b *Store) SumInt64(ord uint64, key string, value int64) {
 	var sum int64
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -37,7 +37,7 @@ func (b *Builder) SumInt64(ord uint64, key string, value int64) {
 	b.set(ord, key, []byte(strconv.FormatInt(sum, 10)))
 }
 
-func (b *Builder) SumFloat64(ord uint64, key string, value float64) {
+func (b *Store) SumFloat64(ord uint64, key string, value float64) {
 	var sum float64
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -53,7 +53,7 @@ func (b *Builder) SumFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
 }
 
-func (b *Builder) SumBigFloat(ord uint64, key string, value *big.Float) {
+func (b *Store) SumBigFloat(ord uint64, key string, value *big.Float) {
 	sum := new(big.Float)
 	val, found := b.GetAt(ord, key)
 	if !found {

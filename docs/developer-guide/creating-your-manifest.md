@@ -59,7 +59,7 @@ Let's review a few important entries:
 
 Furthermore, the manifest lists two modules: `block_to_transfers` and `nft_state`, where the former is a module of kind `map` and the latter is a module of kind `store`.
 
-`block_to_transfers`
+**`block_to_transfers`**
 
 The `block_to_transfers` map module will take an Ethereum block as an input and will extract all ERC721 Transfers related to our contract into an object. The inputs of the module are:
 
@@ -69,7 +69,7 @@ The outputs of the module are:
 
 * A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent the list of ERC721 transfers in a given block.
 
-Furthermore we link the module to the wasm code (rust code compiled as web assembly) containing the business logic. The `rust` function which implements the modules' business logic is defined by the module name and is called `block_to_transfers` in this example.
+Furthermore we link the module to the wasm code (Rust code compiled as web assembly) containing the business logic. The Rust function which implements the modules' business logic is defined by the module name and is called `block_to_transfers` in this example.
 
 Lastly, since we know that the first transferz of token originating from the contracts occurs at block `12287507` we specify a `initialBlock` on our `map` module.
 

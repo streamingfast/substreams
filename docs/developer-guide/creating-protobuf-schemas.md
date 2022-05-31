@@ -38,7 +38,7 @@ message Transfer {
 ```
 {% endcode %}
 
-Now that we have created our custom Protobuf definition file. we will generate the associated rust code.&#x20;
+Now that we have created our custom Protobuf definition file. we will generate the associated Rust code.
 
 ```bash
 substreams protogen substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"

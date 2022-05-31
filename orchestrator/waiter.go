@@ -15,7 +15,7 @@ type Waiter interface {
 
 type waiterItem struct {
 	StoreName string
-	BlockNum  uint64
+	BlockNum  uint64 // This job requires waiting on this particular block number to be unblocked.
 
 	closeOnce sync.Once
 	waitChan  chan interface{}
@@ -100,8 +100,6 @@ func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 			continue
 		}
 
-		// TODO: The Squasher will _not_ notify you unless it has reached the desired block height
-		// from its perspective. So we can skip this check here:
 		if waiter.BlockNum > blockNum {
 			continue
 		}

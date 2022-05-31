@@ -203,9 +203,10 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 
 		if squashableRange.ExclusiveEndBlock == s.targetExclusiveBlock {
 			s.targetReached = true
-			if notifier != nil {
-				notifier.Notify(s.builder.Name, squashableRange.ExclusiveEndBlock)
-			}
+		}
+
+		if notifier != nil {
+			notifier.Notify(s.builder.Name, squashableRange.ExclusiveEndBlock)
 		}
 	}
 

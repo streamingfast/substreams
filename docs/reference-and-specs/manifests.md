@@ -1,6 +1,6 @@
 # Manifests
 
-The substream manifest `substreams.yaml` defines the modules composing the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a reference guide of all fields in the manifest YAML files.
+The Substreams Manifest `substreams.yaml` defines the modules composing the Substreams. The `substreams.yaml` is used, among other things, to infer the dependencies between your module's inputs and outputs. Below is a reference guide of all fields in the manifest YAML files.
 
 ## `specVersion`
 
@@ -61,7 +61,7 @@ imports:
   prices: ../eth-token/substreams.yaml
 ```
 
-The `imports` section imports modules, with their WASM code, all of their (compiled) protobuf definitions and modules definition. The imported modules can be referred to by the _key_ later in the `modules` section.
+The `imports` section imports modules with their WASM code, all of their (compiled) protobuf definitions and modules definition. The imported modules can be referred to by the _key_ later in the `modules` section.
 
 The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](packages.md) (ending in `.spkg`).
 
@@ -157,7 +157,7 @@ This `name` also corresponds to the **Rust function name** that will be invoked 
 
 ### `modules[].initialBlock`
 
-The initial block for the module is where your Substream is going to start processing data. The runtime will not process blocks prior to this one for the given module.
+The initial block for the module is where your Substreams is going to start processing data. The runtime will not process blocks prior to this one for the given module.
 
 The `initialBlock` can be inferred by the `inputs` if all the inputs have the same `initialBlock`. If some inputs have different `initialBlock`, then specifying it is required.
 
@@ -205,10 +205,10 @@ A simple string pointing to a binary file defined in [`binaries`](manifests.md#b
 
 ### `modules[].inputs`
 
-is a list of input structure, which can one of three:
+is a list of input structure, which can be one of three:
 
 * `source`
-* `store` (can also deine a `mode` key)
+* `store` (can also define a `mode` key)
 * `map`
 
 ```yaml

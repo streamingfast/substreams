@@ -1,6 +1,6 @@
 # Running Your Substreams
 
-We're now ready to run our example Substream.
+We're now ready to run our example Substreams.
 
 Let's first build our Substreams:
 
@@ -8,9 +8,9 @@ Let's first build our Substreams:
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-To connect to the Substreams server you will need to get a StreamingFast authentication token. Follow [these steps](../reference-and-specs/authentication.md).
+To connect to the Substreams server, you will need to get a StreamingFast authentication token. Follow [these steps](../reference-and-specs/authentication.md).
 
-Once you have you setup your StreamingFast authentication token you can now run your Substreams
+Once you have setup your StreamingFast authentication token, you can now run your Substreams:
 
 ```
 substreams run -e api-dev.streamingfast.io:443 \
@@ -20,20 +20,20 @@ substreams run -e api-dev.streamingfast.io:443 \
    --stop-block +1
 ```
 
-Running your Substreams against a firehose deployed locally:
+Running your Substreams against a Firehose deployed locally:
 
 ```bash
-substreams run -p -e localhost:9000 substream.yaml block_to_transfers --start-block 12370550 --stop-block +1
+substreams run -p -e localhost:9000 substreams.yaml block_to_transfers --start-block 12370550 --stop-block +1
 ```
 
 Let's break down everything happening above:
 
 * `substreams` is our executable
-* `-e api-dev.streamingfast.io:443` is the provider going to run our Substreams
-* `substream.yaml` is the path where we have defined our Substreams Manifest
-* `block_to_transfers` this is the module which we want to run, defined in the manifest
+* `-e api-dev.streamingfast.io:443` is the provider that will run our Substreams
+* `substreams.yaml` is the path where we have defined our Substreams Manifest
+* `block_to_transfers` this is the module that we want to run, defined in the manifest
 * `--start-block 12292922` start from block `12292922`
-* `--stop-block +1` only request a single block (stop block will be manifest's initial block + 1)
+* `--stop-block +1` only request a single block (stop block will be the manifest's initial block + 1)
 
 When you run the command you should get the following output:
 
@@ -111,4 +111,4 @@ block_to_transfers: message "eth.erc721.v1.Transfers": {
 }
 ```
 
-From the output above we can see we have 30 token transfers, we can confirm this by verifying on [etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).
+From the output above, we can see we have 30 token transfers. We can confirm this by verifying on [Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).

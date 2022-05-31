@@ -8,45 +8,9 @@ Lets first build our Substreams
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-To connect to the Substreams server you will need to get a StreamingFast authentication token. We will create a helpful `bash` function that you can call to get a token. Dump this function somewhere like `.bashrc`:
+To connect to the Substreams server you will need to get a StreamingFast authentication token. Follow [these steps](../reference-and-specs/authentication.md)
 
-```bash
-# Ask us on Discord for a key
-export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  
-function sftoken {
-    export FIREHOSE_API_TOKEN=$(curl https://auth.dfuse.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
-	export SUBSTREAMS_API_TOKEN=$FIREHOSE_API_TOKEN
-    echo Token set on FIREHOSE_API_TOKEN and SUBSTREAMS_API_TOKEN
-}
-```
-
-Then in your shell, load a key into an environment variable with:
-
-```bash
-sftoken
-```
-
-{% hint style="info" %}
-**Obtaining API Token**
-
-This token is used to access StreamingFast's infrastructure. You first need to get a StreamingFast key, you can [ask us in discord](https://discord.gg/jZwqxJAvRs).
-
-You can use this oneline to get your token
-
-
-
-`curl https://auth.dfuse.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token`
-
-
-
-Once you obtained a token, you should set it in an ENVIRONMENT variable
-
-``
-
-`export SUBSTREAMS_API_TOKEN="your_token"`
-{% endhint %}
-
-You can now run your Substreams
+Once you have you setup your StreamingFast authentication token you can now run your Substreams
 
 ```
 substreams run -e api-dev.streamingfast.io:443 \

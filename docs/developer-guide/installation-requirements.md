@@ -41,4 +41,4 @@ See the [installation instructions here](https://docs.buf.build/installation).
 
 ### Install **** the `substreams` CLI tool
 
-You can run through the [Getting Started](broken-reference) to install the Substreams CLI Tool
+You can run through the [Getting Started](../#getting-started) to install the Substreams CLI Tool

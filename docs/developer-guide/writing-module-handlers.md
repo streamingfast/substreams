@@ -140,12 +140,6 @@ Notice the `#[substreams::handlers::map]` above the function, this is a [rust ma
 To learn how these macros work you can view this in the [advanced section](../reference-and-specs/advanced/rust-macros.md)
 {% endhint %}
 
-{% hint style="info" %}
-**Handler Function Signature**
-
-The Rust function signature of a handler is derived based on the module kind, inputs and output define in your manifest. There are few combination that can work. You get an in-depth overview of this in the [reference section](broken-reference)
-{% endhint %}
-
 The goal of the `map` we are building is to extract `ERC721` Transfers from a given block. We can achieve this by finding all the `Transfer` events that are emitted by the contract we are tracking. Once we find such an event we will decode it and create a `Transfer` object
 
 ```rust

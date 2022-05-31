@@ -26,7 +26,6 @@ func init() {
 	runCmd.Flags().BoolP("compact-output", "c", false, "Avoid pretty printing output for module and make it a single compact line")
 
 	rootCmd.AddCommand(runCmd)
-	rootCmd.AddCommand(packCmd)
 }
 
 // runCmd represents the command to run substreams remotely

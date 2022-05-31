@@ -22,3 +22,17 @@ func TestRange_Split(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 }
+
+func TestRange_Split2(t *testing.T) {
+	og := &Range{
+		StartBlock:        6811700,
+		ExclusiveEndBlock: 6811900,
+	}
+
+	actual := og.Split(100)
+
+	require.Equal(t, []*Range{
+		{6811700, 6811800},
+		{6811800, 6811900},
+	}, actual)
+}

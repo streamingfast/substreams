@@ -13,21 +13,15 @@ type PipelineOptioner interface {
 
 type Option func(p *Pipeline)
 
-func WithPartialMode() Option {
+func WithOrchestratedExecution() Option {
 	return func(p *Pipeline) {
-		p.partialMode = true
+		p.isBackprocessing = true
 	}
 }
 
 func WithStoresSaveInterval(seconds uint64) Option {
 	return func(p *Pipeline) {
 		p.storesSaveInterval = seconds
-	}
-}
-
-func WithAllowInvalidState() Option {
-	return func(p *Pipeline) {
-		p.allowInvalidState = true
 	}
 }
 

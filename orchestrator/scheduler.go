@@ -4,33 +4,44 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/streamingfast/derr"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/worker"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 )
 
 type Scheduler struct {
 	blockRangeSizeSubRequests int
+
+	workerPool *worker.Pool
+	respFunc   substreams.ResponseFunc
 
 	squasher       *Squasher
 	requestsStream <-chan *pbsubstreams.Request
 	requests       []*pbsubstreams.Request
 }
 
-func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, workerPool *worker.Pool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
 		requestsStream:            GetRequestStream(ctx, strategy),
 		requests:                  []*pbsubstreams.Request{},
+		workerPool:                workerPool,
+		respFunc:                  respFunc,
 	}
 
 	return s, nil
 }
 
 func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
-	request, alive := <-s.requestsStream
-	if !alive {
+	fmt.Println("Getting a NEXT job from Scheduler", len(s.requestsStream))
+	request, ok := <-s.requestsStream
+	if !ok {
 		return nil, io.EOF
 	}
 
@@ -39,7 +50,9 @@ func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
 
 func (s *Scheduler) Callback(ctx context.Context, outgoingReq *pbsubstreams.Request) error {
 	for _, output := range outgoingReq.GetOutputModules() {
-		// FIXME(abourget): don't call Squash on non-store modules (!)
+		// FIXME(abourget): why call Squash on non-store modules? Oh,
+		// but the orchestrator far far away won't do that
+		// anyway... hermm ok..
 		err := s.squasher.Squash(ctx, output, &block.Range{
 			StartBlock:        uint64(outgoingReq.StartBlockNum),
 			ExclusiveEndBlock: outgoingReq.StopBlockNum,
@@ -50,4 +63,63 @@ func (s *Scheduler) Callback(ctx context.Context, outgoingReq *pbsubstreams.Requ
 		}
 	}
 	return nil
+}
+
+func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan error) {
+	out = make(chan error, 1)
+	go func() {
+		out <- s.doLaunch(ctx, result)
+	}()
+	return
+}
+
+func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
+	for {
+		fmt.Println("SCHEDULING NEXT")
+		req, err := s.Next()
+		fmt.Println("SCHEDULING NEXT DONE")
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		job := &worker.Job{
+			Request: req,
+		}
+
+		start := time.Now()
+		zlog.Info("waiting worker", zap.Object("job", job))
+		jobWorker := s.workerPool.Borrow()
+		zlog.Info("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+
+		select {
+		case <-ctx.Done():
+			zlog.Info("synchronize stores quit on cancel context")
+			return nil
+		default:
+		}
+
+		go func() {
+			result <- s.runSingleJob(ctx, jobWorker, job)
+		}()
+	}
+	return nil
+}
+
+func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *worker.Worker, job *worker.Job) error {
+	err := derr.RetryContext(ctx, 2, func(ctx context.Context) error {
+		return jobWorker.Run(ctx, job, s.respFunc)
+	})
+	s.workerPool.ReturnWorker(jobWorker)
+	if err != nil {
+		return err
+	}
+
+	if err = s.Callback(ctx, job.Request); err != nil {
+		return fmt.Errorf("calling back scheduler: %w", err)
+	}
+	return nil
+
 }

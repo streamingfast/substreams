@@ -15,7 +15,7 @@ type Waiter interface {
 
 type waiterItem struct {
 	StoreName string
-	BlockNum  uint64
+	BlockNum  uint64 // This job requires waiting on this particular block number to be unblocked.
 
 	closeOnce sync.Once
 	waitChan  chan interface{}
@@ -96,7 +96,11 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 
 func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 	for _, waiter := range w.items {
-		if waiter.StoreName != storeName || waiter.BlockNum > blockNum {
+		if waiter.StoreName != storeName {
+			continue
+		}
+
+		if waiter.BlockNum > blockNum {
 			continue
 		}
 

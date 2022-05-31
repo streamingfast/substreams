@@ -2,10 +2,10 @@
 
 Modules are small pieces of code, running in a WebAssembly virtual machine, amidst the stream of blocks arriving from a blockchain node. They can also process the network's history out of flat files, backed by the Firehose. See the [Firehose documentation](http://firehose.streamingfast.io/) for more details.
 
-Modules may have one or more inputs (from multiple modules, be they `map`s or `store`s, and/or from the blockchain's data source in the form of a _Block_ or a _Clock_).
+Modules may have one or more inputs (from multiple modules, be them `map`s or `store`s, and/or from the blockchain's data source in the form of a _Block_ or a _Clock_).
 
 {% hint style="info" %}
-Multiple inputs are made possible because blockchains are clocked, and they allow synchronization between multiple execution streams, opening up great performance improvements, even over your comparable traditional streaming engine.
+Multiple inputs are made possible because blockchains are clocked, and they allow synchronization between multiple execution streams, opening up great performance improvements even over your comparable traditional streaming engine.
 {% endhint %}
 
 Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes coming out.
@@ -40,7 +40,7 @@ A `store` module is different from a `map` in that it is a _stateful_ module. It
 
 #### Writing
 
-A `kind: store` module's code is able to write to the key/value store, but in order to ensure parallelization is always possible and deterministic, it _cannot read_ any of its values.
+A `kind: store` module's code is able to write to the key/value store, but - in order to ensure parallelization is always possible and deterministic - it _cannot read_ any of its values.
 
 A store can also declare its data type, in which case different methods become available to mutate its keys.
 
@@ -56,12 +56,12 @@ The first, `valueType`, instructs the Substreams runtime of the data that will b
 | `bytes`                        | A simple list of bytes                                                           |
 | `string`                       | A UTF-8 string                                                                   |
 | `proto:fully.qualified.Object` | Bytes that can be decoded using the protobuf definition `fully.qualified.Object` |
-| `int64`                        | A string-serialized integer, that uses int64 arithmetic operations               |
-| `float64`                      | A string-serialized floating point value, using float64 arithmetic operations    |
+| `int64`                        | A string-serialized integer, that uses int64 arithmetic operations.              |
+| `float64`                      | A string-serialized floating point value, using float64 arithmetic operations.   |
 | `bigint`                       | A string-serialized integer, with precision of any depth                         |
-| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits      |
+| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits.     |
 
-The second, `updatePolicy,` determines what methods are available in the runtime, as well as the merging strategy for identical keys found in two contiguous stores produced by parallel processing:
+The second, `updatePolicy` determines what methods are available in the runtime, as well as the merging strategy for identical keys found in two contiguous stores produced by parallel processing:
 
 | Method              | Supported Value Types                    | Merge strategy\*          |
 | ------------------- | ---------------------------------------- | ------------------------- |
@@ -89,7 +89,7 @@ To read from a store, create a downstream module with one of its inputs pointing
 
 You will see `ordinal` or `ord` in different methods of the store APIs.
 
-Ordinals allow a key/value store to have multiple versions of a key within a single block. For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B and between B and D. That is why you will need to set an ordinal each time you set a key.
+Ordinals allows a key/value store to have multiple versions of a key within a single block. For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B and between B and D. That is why you will need to set an ordinal each time you set a key.
 
 {% hint style="warning" %}
 You can only set keys in increasing _ordinal_ order, or with an _ordinal_ equal to the previous.

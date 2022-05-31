@@ -80,6 +80,7 @@ pub mod proto;
 mod state;
 pub mod store;
 pub use crate::hex::Hex;
+pub use hex_literal::hex;
 
 pub fn output<M: prost::Message>(msg: M) {
     // Need to return the buffer and forget about it issue occured when trying to write large data

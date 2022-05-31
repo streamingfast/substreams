@@ -16,6 +16,7 @@ substreams-macro = { version = "0.0.8-beta", path = "../substreams-macro" }
 prost = { version = "0.10.1" }
 prost-types = "0.10.1"
 hex = "0.4.3"
+hex-literal = "0.3.4"
 num-bigint = "0.4"
 bigdecimal = "0.3"
 thiserror = "1.0"

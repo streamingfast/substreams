@@ -310,6 +310,7 @@ version = "0.0.8-beta"
 dependencies = [
  "bigdecimal",
  "hex",
+ "hex-literal",
  "num-bigint",
  "prost",
  "prost-build",

@@ -1,4 +1,3 @@
-use hex;
 use std::fmt;
 
 /// Hex is a simple wrapper type that you can use to wrap your type so that it
@@ -26,7 +25,7 @@ pub struct Hex<T>(pub T);
 
 impl<T: AsRef<[u8]>> Hex<T> {
     pub fn decode(data: T) -> Result<Vec<u8>, hex::FromHexError> {
-        hex::decode(data)
+        ::hex::decode(data)
     }
 
     pub fn encode(input: T) -> String {

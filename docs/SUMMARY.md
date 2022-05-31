@@ -1,17 +1,17 @@
 # Table of contents
 
-* [Substreams](../README.md)
+* [Substreams](README.md)
 
 ## Concept & Fundamentals
 
-* [Definition](./concepts/definition.md)
-* [Comparison](./concepts/comparison.md)
-* [Modules](./concepts/modules.md)
-
+* [Definition](concepts/definition.md)
+* [Comparison](concepts/comparison.md)
+* [Modules](concepts/modules.md)
 
 ## Getting Started
-* [Your First Stream](./getting-started/your-first-stream.md)
-* [Awesome Packages](./getting-started/awesome-packages.md)
+
+* [Your First Stream](getting-started/your-first-stream.md)
+* [Awesome Packages](getting-started/awesome-packages.md)
 
 ## Developer Guide
 
@@ -25,16 +25,16 @@
 
 ## Reference & Specs
 
-* [Manifests](./reference-and-specs/manifests.md)
-* [Packages](./reference-and-specs/packages.md)
-* [Using the CLI](./reference-and-specs/using-the-cli.md)
-* [Rust APIs](./reference-and-specs/rust-api/README.md)
-  * [Handler Function Signature](./reference-and-specs/rust-api/handler-function-signature.md)
-  * [Chain specific APIs](./reference-and-specs/rust-api/chain-specific-apis.md)
+* [Manifests](reference-and-specs/manifests.md)
+* [Packages](reference-and-specs/packages.md)
+* [Using the CLI](reference-and-specs/using-the-cli.md)
+* [Rust APIs](reference-and-specs/rust-api/README.md)
+  * [Handler Function Signature](reference-and-specs/rust-api/handler-function-signature.md)
+  * [Chain specific APIs](reference-and-specs/rust-api/chain-specific-apis.md)
 * [Advanced](advanced/README.md)
   * [Rust Macros](reference-and-specs/advanced/rust-macros.md)
   * [Running the Substreams service locally](advanced/running-locally.md)
 
 ## Release notes
 
-* [Change log](../changelog.md)
+* [Change log](release-notes/change-log.md)

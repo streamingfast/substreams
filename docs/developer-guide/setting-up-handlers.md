@@ -151,4 +151,4 @@ pub mod erc721;
 ```
 {% endcode %}
 
-We can now writer our Rust handlers!
+We can now write our Rust handlers!

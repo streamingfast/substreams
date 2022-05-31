@@ -40,4 +40,3 @@
 ## Release notes
 
 * [Change log](release-notes/change-log.md)
-* [Changes log](../change-log.md)

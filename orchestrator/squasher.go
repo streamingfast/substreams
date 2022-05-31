@@ -121,27 +121,34 @@ func NewSquashable(initialBuilder *state.Store, targetExclusiveBlock, storeSaveI
 }
 
 func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifier Notifier) error {
+	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Object("request_range", blockRange))
+
+	if err := s.cumulateRange(ctx, blockRange); err != nil {
+		return fmt.Errorf("cumulate range: %w", err)
+	}
+
+	if err := s.mergeAvailablePartials(ctx, notifier); err != nil {
+		return fmt.Errorf("merging partials: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range) error {
 	splitBlockRanges := blockRange.Split(s.storeSaveInterval)
-	for _, br := range splitBlockRanges {
-		if br.StartBlock < s.builder.ModuleInitialBlock {
-			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, br.StartBlock, s.builder.ModuleInitialBlock)
+	for _, splitBlockRange := range splitBlockRanges {
+		if splitBlockRange.StartBlock < s.builder.ModuleInitialBlock {
+			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, splitBlockRange.StartBlock, s.builder.ModuleInitialBlock)
 		}
 		if blockRange.ExclusiveEndBlock < s.builder.StoreInitialBlock {
 			// Otherwise, risks stalling the merging (as ranges are
 			// sorted, and only the first is checked for contiguousness)
 			continue
 		}
-		s.ranges = append(s.ranges, blockRange)
+		fmt.Println("APPENDING RANGE", splitBlockRange)
+		s.ranges = append(s.ranges, splitBlockRange)
 	}
 	sort.Sort(s.ranges)
-
-	zlog.Info("squashing request range", zap.String("module", s.name), zap.Object("request_range", blockRange))
-
-	err := s.mergeAvailablePartials(ctx, notifier)
-	if err != nil {
-		return fmt.Errorf("squashing range %d-%d: %w", blockRange.StartBlock, blockRange.ExclusiveEndBlock, err)
-	}
-
 	return nil
 }
 
@@ -161,6 +168,9 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 
 		squashableRange := s.ranges[0]
 
+		if squashableRange.StartBlock < s.nextExpectedStartBlock {
+			return fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges)
+		}
 		if s.nextExpectedStartBlock != squashableRange.StartBlock {
 			break
 		}

@@ -23,20 +23,21 @@ repository = "https://github.com/streamingfast/substreams-template"
 [lib]
 crate-type = ["cdylib"]
 
-[dependencies]
+[target.wasm32-unknown-unknown.dependencies]
 ethabi = "17.0"
 hex-literal = "0.3.4"
-prost = { version = "0.10.1" }
-substreams= { git = "https://github.com/streamingfast/substreams", branch="develop" }
-substreams-ethereum = { git = "https://github.com/streamingfast/substreams-ethereum", branch="develop" }
+prost = "0.10.1"
+# Use latest from https://crates.io/crates/substreams
+substreams = "0.0.8-beta"
+# Use latest from https://crates.io/crates/substreams-ethereum
+substreams-ethereum = "0.1.0"
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 getrandom = { version = "0.2", features = ["custom"] }
 
-
 [build-dependencies]
 anyhow = "1"
-substreams-ethereum = { git = "https://github.com/streamingfast/substreams-ethereum", branch="develop" }
+substreams-ethereum = "0.1.0"
 
 [profile.release]
 lto = true
@@ -58,10 +59,11 @@ Since we are building a Rust dynamic system library, after the `package`, we fir
 crate-type = ["cdylib"]
 ```
 
-We then need to specify our `dependencies:`
+We then need to specify our `dependencies`, we specify explicitly for the `wasm32-unknown-unknown` (using
+`[target.wasm32-unknown-unknown.dependencies]`) target since our handlers compiles down to a WASM module:
 
-* `ethabi`: This crate will be used to decode events from your ABI.
-* `hex-literal`: This crate will be used to manipulate Hexadecimal values.
+* `ethabi`: This crate will be used to decode events from your ABI, require for `substreams-ethereum` ABI functionalities.
+* `hex-literal`: This crate will be used to define bytes from hexadecimal string literal at compile time.
 * `substreams`: This crate offers all the basic building blocks for your handlers.
 * `substreams-ethereum`: This crate offers all the Ethereum constructs (blocks, transactions, eth) as well as useful `ABI` decoding capabilities.
 
@@ -86,6 +88,17 @@ cargo build --target wasm32-unknown-unknown --release
 **Rust Build Target**
 
 Notice that when we run `cargo build` we specify the `target` to be `wasm32-unknown-unknown` this is important, since the goal is to generate compiled `wasm` code.
+You can avoid having to manually specify `--target wasm32-unknown-unknown` and for each `cargo` commands by creating a file named `config.toml` under folder
+`.cargo` at the root of your project with the following content:
+
+{% code title=".cargo/config.toml" %}
+```toml
+[build]
+target = "wasm32-unknown-unknown"
+```
+{% endcode %}
+
+With this config file, `cargo build` is now equivalent to `cargo build --target wasm32-unknown-unknown`.
 {% endhint %}
 
 ### ABI Generation
@@ -103,10 +116,10 @@ Now that we have our ABI in our project let's add a Rust build script.
 
 Just before a package is built, Cargo will compile a build script into an executable (if it has not already been built). It will then run the script, which may perform any number of tasks.&#x20;
 
-Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it just before building the package
+Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it just before building the package.
 {% endhint %}
 
-We will create a `build.rs` file in the root of our Substreams directory
+We will create a `build.rs` file in the root of our Substreams project:
 
 {% code title="build.rs" %}
 ```rust
@@ -138,4 +151,4 @@ pub mod erc721;
 ```
 {% endcode %}
 
-We can now writer our handlers!
+We can now writer our Rust handlers!

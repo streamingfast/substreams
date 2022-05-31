@@ -1,6 +1,6 @@
 # Creating your Manifest
 
-Let's first step your directory
+Let's first step your directory:
 
 ```bash
 mkdir substreams_example
@@ -53,11 +53,11 @@ modules:
 
 Let's review a few important entries:
 
-* `imports.eth` : Our `Substreams` will consume Ethereum blocks, thus we will depend on the Ethereum substream package. You can find out more about \`Substreams\` packages [here](../reference-and-specs/packages.md)\`
-* `protobuf.files`: The list of our `Substreams` custom `Protobuf` files. We will create these files in the following step
+* `imports.eth` : Our `Substreams` will consume Ethereum blocks, thus we will depend on the Ethereum substream package. You can find out more about `Substreams` packages [here](../reference-and-specs/packages.md).
+* `protobuf.files`: The list of our `Substreams` custom `Protobuf` files. We will create these files in the following step.
 * `protobuf.importPaths`: The locations of our custom `Protobuf` files.
 
-Furthermore, the manifest lists 2 modules: `block_to_transfers` and `nft_state`, where the former is a module of kind `map` and the latter is a module of kind `store`.
+Furthermore, the manifest lists two modules: `block_to_transfers` and `nft_state`, where the former is a module of kind `map` and the latter is a module of kind `store`.
 
 `block_to_transfers`
 
@@ -69,9 +69,9 @@ The outputs of the module are:
 
 * A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent the list of ERC721 transfers in a given block.
 
-Furthermore we link the module to the wasm code (rust code compiled as web assembly) that contains the business logic. The `rust` function that implements the modules business logic is defined by the `entrypoint` and is called `block_to_transfers` in the example.
+Furthermore we link the module to the wasm code (rust code compiled as web assembly) containing the business logic. The `rust` function which implements the modules' business logic is defined by the module name and is called `block_to_transfers` in this example.
 
-Lastly, since we know that the first transfers of token originating from the contracts occurs at block `12287507` we specify a `startBlock` on our `map` module.
+Lastly, since we know that the first transferz of token originating from the contracts occurs at block `12287507` we specify a `initialBlock` on our `map` module.
 
 **`nft_state`**
 
@@ -79,6 +79,5 @@ The `nft_state` `store` module will take as input the transfers per block that w
 
 * A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent the list of ERC721 transfers in a given block. It is the ouput for the `map` module defined above.
 
-The given store will simply store a `count` of ERC721 tokens per holder, thus our store `valueType` is `int64`. Lastly our merge strategy is `add`
+The given store will simply store a `count` of ERC721 tokens per holder, thus our store `valueType` is `int64`. Lastly our merge strategy is `add.`
 
-\\

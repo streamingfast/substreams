@@ -97,6 +97,23 @@ func Test_MergeRangeLists(t *testing.T) {
 				{Start: 10000, End: 37999},
 			},
 		},
+		{
+			name: "Preemptive overlap",
+			completedBlockRanges: []*blockRange{
+				{Start: 6950000, End: 6959999},
+				{Start: 6990000, End: 6999997},
+				{Start: 6990000, End: 6992496},
+				{Start: 7000000, End: 7009999},
+			},
+			newlyCompletedBlockRanges: []*blockRange{
+				{Start: 6990000, End: 6999998},
+				{Start: 6990000, End: 6999999},
+			},
+			expectedBlockRanges: []*blockRange{
+				{Start: 6950000, End: 6959999},
+				{Start: 6990000, End: 7009999},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -109,6 +126,28 @@ func Test_MergeRangeLists(t *testing.T) {
 			require.Equal(t, test.expectedBlockRanges, actual)
 		})
 	}
+}
+
+func TestReduce1(t *testing.T) {
+	res := reduceOverlaps([]*blockRange{
+		{Start: 6990000, End: 6999997},
+		{Start: 6990000, End: 6992496},
+		{Start: 7000000, End: 7009999},
+	})
+	assert.Equal(t, ranges{
+		{Start: 6990000, End: 6999997},
+		{Start: 7000000, End: 7009999},
+	}.String(), res.String())
+}
+
+func TestReduce2(t *testing.T) {
+	res := reduceOverlaps([]*blockRange{
+		{Start: 6990000, End: 6999997},
+		{Start: 6990000, End: 6992496},
+	})
+	assert.Equal(t, ranges{
+		{Start: 6990000, End: 6999997},
+	}.String(), res.String())
 }
 
 func TestLineBar(t *testing.T) {

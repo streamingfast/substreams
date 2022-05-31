@@ -94,20 +94,18 @@ func (u updatedRanges) Hi() uint64 { _, b := u.LoHi(); return b }
 type newRange map[string]blockRange
 
 func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
-	//	fmt.Println("merge input, prevRanges:", prevRanges, "new range:", newRange)
+	// fmt.Println("merge input, prevRanges:", prevRanges, "new range:", newRange)
 	var stretched bool
 	for _, prevRange := range prevRanges {
 		if newRange.Start <= prevRange.End+1 {
 			if prevRange.End < newRange.End {
 				prevRange.End = newRange.End
-				//fmt.Println("Stretching end", newRange.End)
 				stretched = true
 				break
 			}
 		} else if newRange.End+1 >= prevRange.Start {
 			if prevRange.Start > newRange.Start {
 				prevRange.Start = newRange.Start
-				//fmt.Println("Stretching start", newRange.Start)
 				stretched = true
 				break
 			}
@@ -121,7 +119,7 @@ func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
 }
 
 func reduceOverlaps(r ranges) ranges {
-	//fmt.Println("reduce input:", r)
+	// fmt.Println("reduce input:", r)
 
 	if len(r) <= 1 {
 		return r
@@ -131,12 +129,15 @@ func reduceOverlaps(r ranges) ranges {
 	for i := 0; i < len(r)-1; i++ {
 		r1 := r[i]
 		r2 := r[i+1]
+		// fmt.Println("r1", r1, "r2", r2)
 		if r1.End+1 >= r2.Start {
 			maxEnd := r2.End
 			if r1.End > maxEnd {
 				maxEnd = r1.End
 			}
-			newRanges = append(newRanges, &blockRange{Start: r1.Start, End: maxEnd})
+			// Reduces one hole at a time. Should recurse to do more holes at a time.
+			newRanges = append(append(newRanges, &blockRange{Start: r1.Start, End: maxEnd}), r[i+2:]...)
+			break
 
 		} else {
 			newRanges = append(newRanges, r1)
@@ -145,6 +146,6 @@ func reduceOverlaps(r ranges) ranges {
 			}
 		}
 	}
-	//	fmt.Println("reduce output:", newRanges)
+	// fmt.Println("reduce output:", newRanges)
 	return newRanges
 }

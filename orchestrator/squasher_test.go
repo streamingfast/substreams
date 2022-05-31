@@ -80,12 +80,8 @@ func testStateBuilder(store dstore.Store) *state.Store {
 		Store:              store,
 		ModuleHash:         "abc",
 		KV:                 map[string][]byte{},
-		BlockRange: &block.Range{
-			StartBlock:        0,
-			ExclusiveEndBlock: 10_000,
-		},
-		UpdatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
-		ValueType:    state.OutputValueTypeString,
+		UpdatePolicy:       pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+		ValueType:          state.OutputValueTypeString,
 	}
 }
 
@@ -158,7 +154,7 @@ func TestConcurrentSquasherClose(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		errClose1 = s1.Close()
+		errClose1 = s1.StoresReady()
 	}()
 
 	go func() {
@@ -167,7 +163,7 @@ func TestConcurrentSquasherClose(t *testing.T) {
 		if err != nil {
 			t.Fail()
 		}
-		errClose2 = s2.Close()
+		errClose2 = s2.StoresReady()
 	}()
 
 	wg.Wait()

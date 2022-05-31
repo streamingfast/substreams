@@ -27,8 +27,8 @@ type Store struct {
 	Initialized  bool
 
 	ModuleInitialBlock uint64
-	StoreInitialBlock  uint64       // block at which we initialized this store
-	BlockRange         *block.Range // TODO: take me out
+	StoreInitialBlock  uint64 // block at which we initialized this store
+	ProcessedBlock     uint64
 
 	ModuleHash string
 
@@ -125,23 +125,23 @@ func (b *Store) Clone(newStoreStartBlock uint64) *Store {
 func (b *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, error) {
 	s := b.Clone(blockRange.StartBlock)
 
-	if err := b.Fetch(ctx, blockRange); err != nil {
+	if err := b.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
 		return nil, err
 	}
 
 	return s, nil
 }
 
-func (s *Store) storageFilename(r *block.Range) string {
+func (s *Store) storageFilename(exclusiveEndBlock uint64) string {
 	if s.IsPartial() {
-		return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
+		return fmt.Sprintf("%010d-%010d.partial", exclusiveEndBlock, s.StoreInitialBlock)
 	} else {
-		return fmt.Sprintf("%010d-%010d.kv", r.ExclusiveEndBlock, r.StartBlock)
+		return fmt.Sprintf("%010d-%010d.kv", exclusiveEndBlock, s.StoreInitialBlock)
 	}
 }
 
-func (s *Store) Fetch(ctx context.Context, blockRange *block.Range) error {
-	fileName := s.storageFilename(blockRange) // PartialFileName(b.BlockRange)
+func (s *Store) Fetch(ctx context.Context, exclusiveEndBlock uint64) error {
+	fileName := s.storageFilename(exclusiveEndBlock)
 	return s.loadState(ctx, fileName)
 }
 
@@ -264,17 +264,18 @@ func (b *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
 	)
 
 	if _, err = b.writeState(ctx, content, lastBlock); err != nil {
-		return fmt.Errorf("writing %s kv for range %s: %w", b.Name, b.BlockRange, err)
+		return fmt.Errorf("writing %s kv for range %d-%d: %w", b.Name, b.StoreInitialBlock, lastBlock, err)
 	}
 
 	return nil
 }
 
 func (b *Store) writeState(ctx context.Context, content []byte, lastBlock uint64) (string, error) {
-	filename := b.storageFilename(b.BlockRange)
+	// FIXME(abourget): `lastBlock` is ASSUMED TO BE ON THE BOUNDARY
+	filename := b.storageFilename(lastBlock)
 	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	if err != nil {
-		return filename, fmt.Errorf("writing state %s for range %s: %w", b.Name, b.BlockRange.String(), err)
+		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", b.Name, b.StoreInitialBlock, lastBlock, err)
 	}
 
 	if !b.IsPartial() {
@@ -287,12 +288,14 @@ func (b *Store) writeState(ctx context.Context, content []byte, lastBlock uint64
 }
 
 func (b *Store) writeInfoState(ctx context.Context, filename string, lastBlock uint64) error {
+	// FIXME(abourget): `lastBlock` is ASSUMED TO BE ON THE BOUNDARY
+
 	currentInfo, err := b.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("getting builder info: %w", err)
 	}
 
-	if currentInfo != nil && currentInfo.LastKVSavedBlock >= b.BlockRange.ExclusiveEndBlock {
+	if currentInfo != nil && currentInfo.LastKVSavedBlock >= lastBlock {
 		zlog.Debug("skipping info save.")
 		return nil
 	}
@@ -308,7 +311,7 @@ func (b *Store) writeInfoState(ctx context.Context, filename string, lastBlock u
 	}
 
 	b.info = info
-	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Object("block_range", b.BlockRange), zap.String("file_name", filename))
+	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("last_block", lastBlock), zap.String("file_name", filename))
 
 	return nil
 }
@@ -317,11 +320,11 @@ func (b *Store) writeInfoState(ctx context.Context, filename string, lastBlock u
 // 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 // }
 
-func (b *Store) DeletePartialFile(ctx context.Context) error {
-	filename := PartialFileName(b.BlockRange)
+func (b *Store) DeletePartialFile(ctx context.Context, exclusiveEndBlock uint64) error {
+	filename := b.storageFilename(exclusiveEndBlock)
 	zlog.Debug("deleting partial file", zap.String("file_name", filename))
-	err := b.Store.DeleteObject(ctx, filename)
-	if err != nil {
+
+	if err := b.Store.DeleteObject(ctx, filename); err != nil {
 		return fmt.Errorf("deleting partial file %q: %w", filename, err)
 	}
 	return nil

@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/worker"
@@ -31,9 +30,9 @@ type Pipeline struct {
 	vmType    string // wasm/rust-v1, native
 	blockType string
 
-	requestedStartBlockNum  uint64 // rename to: requestStartBlock, SET UPON receipt of the request
-	maxStoreSyncRangeSize   uint64
-	isOrchestratedExecution bool
+	requestedStartBlockNum uint64 // rename to: requestStartBlock, SET UPON receipt of the request
+	maxStoreSyncRangeSize  uint64
+	isBackprocessing       bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -116,7 +115,7 @@ func New(
 
 func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
 	ctx := p.context
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("partial_mode", p.isOrchestratedExecution), zap.Strings("outputs", p.request.OutputModules))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_orchestrated_execution", p.isBackprocessing), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
@@ -141,7 +140,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		}
 	}
 
-	if p.isOrchestratedExecution {
+	if p.isBackprocessing {
 		totalOutputModules := len(p.outputModuleNames)
 		outputName := p.outputModuleNames[0]
 		buildingStore := p.storesMap[outputName]
@@ -157,6 +156,11 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		} else {
 			zlog.Info("conditions for leaf store not met", zap.String("module", outputName), zap.Bool("is_last_store", isLastStore), zap.Int("output_module_count", totalOutputModules))
 		}
+
+		zlog.Info("initializing and loading stores")
+		if err = p.LoadStores(ctx); err != nil {
+			return nil, fmt.Errorf("loading stores: %w", err)
+		}
 	} else {
 		// This launches processing for all depend stores at the requests' `startBlock`
 		err = SynchronizeStores(
@@ -170,11 +174,8 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		if err != nil {
 			return nil, fmt.Errorf("synchonizing stores: %w", err)
 		}
-	}
-
-	zlog.Info("initializing and loading stores")
-	if err = p.LoadStores(ctx); err != nil {
-		return nil, fmt.Errorf("loading stores: %w", err)
+		// All STORES are expected to be synchronized properly at this point, and have
+		// data up until requestedStartBlockNum.
 	}
 
 	err = p.buildWASM(ctx, p.request, p.modules)
@@ -240,7 +241,10 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
-			if p.isOrchestratedExecution {
+			// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
+			// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
+
+			if p.isBackprocessing {
 				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
 				zlog.Debug("about to save partial output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
 				if err := p.moduleOutputCache.Save(ctx); err != nil {
@@ -311,7 +315,8 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 		}
 	}
 
-	if p.isOrchestratedExecution {
+	if p.isBackprocessing {
+		// TODO(abourget): we might want to send progress for the segment after batch execution
 		requestedStartBlock := uint64(p.request.StartBlockNum)
 		var modules []*pbsubstreams.ModuleProgress
 
@@ -700,7 +705,7 @@ func (p *Pipeline) LoadStores(ctx context.Context) error {
 		if builder.IsPartial() {
 			continue
 		}
-		err := builder.Fetch(ctx, &block.Range{StartBlock: builder.ModuleInitialBlock, ExclusiveEndBlock: p.requestedStartBlockNum})
+		err := builder.Fetch(ctx, p.requestedStartBlockNum)
 		if err != nil {
 			return fmt.Errorf("reading state for builder %q: %w", builder.Name, err)
 		}

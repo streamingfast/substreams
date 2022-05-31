@@ -44,7 +44,7 @@ func NewSquasher(ctx context.Context, builders []*state.Store, outputCaches map[
 
 		storagePresent := info.LastKVSavedBlock != 0
 		if !storagePresent {
-			squashables[builder.Name] = NewSquashable(builder.Clone(builder.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval)
+			squashables[builder.Name] = NewSquashable(builder.Clone(builder.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, builder.ModuleInitialBlock)
 		} else {
 			r := &block.Range{
 				StartBlock:        builder.ModuleInitialBlock,
@@ -54,7 +54,7 @@ func NewSquasher(ctx context.Context, builders []*state.Store, outputCaches map[
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", builder.Name, r, err)
 			}
-			squashables[builder.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval)
+			squashables[builder.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval, info.LastKVSavedBlock)
 		}
 	}
 
@@ -100,21 +100,23 @@ func (s *Squasher) StoresReady() error {
 }
 
 type Squashable struct {
-	name                 string
-	builder              *state.Store
-	ranges               block.Ranges // Ranges split in `storeSaveInterval` chunks
-	storeSaveInterval    uint64
-	targetExclusiveBlock uint64
+	name                   string
+	builder                *state.Store
+	ranges                 block.Ranges // Ranges split in `storeSaveInterval` chunks
+	storeSaveInterval      uint64
+	targetExclusiveBlock   uint64
+	nextExpectedStartBlock uint64
 
 	targetReached bool
 }
 
-func NewSquashable(initialBuilder *state.Store, targetExclusiveBlock, storeSaveInterval uint64) *Squashable {
+func NewSquashable(initialBuilder *state.Store, targetExclusiveBlock, storeSaveInterval, nextExpectedStartBlock uint64) *Squashable {
 	return &Squashable{
-		name:                 initialBuilder.Name,
-		builder:              initialBuilder,
-		storeSaveInterval:    storeSaveInterval,
-		targetExclusiveBlock: targetExclusiveBlock,
+		name:                   initialBuilder.Name,
+		builder:                initialBuilder,
+		storeSaveInterval:      storeSaveInterval,
+		targetExclusiveBlock:   targetExclusiveBlock,
+		nextExpectedStartBlock: nextExpectedStartBlock,
 	}
 }
 
@@ -166,10 +168,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 
 		squashableRange := s.ranges[0]
 
-		zlog.Info("checking if builder squashable", zap.Object("current_builder_range", s.builder.BlockRange), zap.Object("next_available_squashable_range", squashableRange))
-
-		nextRangeContiguousWithStore := s.builder.BlockRange.ExclusiveEndBlock == squashableRange.StartBlock
-		if !nextRangeContiguousWithStore {
+		if s.nextExpectedStartBlock != squashableRange.StartBlock {
 			break
 		}
 
@@ -185,6 +184,8 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 			return fmt.Errorf("merging: %s", err)
 		}
 
+		s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
+
 		endsOnBoundary := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
 		if endsOnBoundary {
 			err = s.builder.WriteState(ctx, squashableRange.ExclusiveEndBlock)
@@ -192,7 +193,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 				return fmt.Errorf("writing state: %w", err)
 			}
 		} else {
-			err = nextStore.DeletePartialFile(ctx)
+			err = nextStore.DeletePartialFile(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				zlog.Warn("deleting partial file", zap.Error(err))
 			}

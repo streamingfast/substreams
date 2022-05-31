@@ -610,10 +610,12 @@ func SynchronizeStores(
 			workerPool.ReturnWorker(w)
 			if err != nil {
 				result <- err
+				return
 			}
 			err = scheduler.Callback(ctx, req)
 			if err != nil {
 				result <- fmt.Errorf("calling back scheduler: %w", err)
+				return
 			}
 			result <- nil
 		}()

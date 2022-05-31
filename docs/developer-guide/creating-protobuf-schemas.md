@@ -1,13 +1,13 @@
 # Creating Protobuf Schemas
 
-Now that our manifest has been written, it is time to create your custom _Protobuf_ definition, the one we'll use as an input/output in your manifest file.&#x20;
+Now that our manifest has been written, it is time to create your custom Protobuf definition, the one we'll use as an input/output in your manifest file.
 
-Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. If you have not used _Protobuf_ before, here are a couple of resources to get started:
+Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. If you have not used Protobuf before, here are a couple of resources to get started:
 
 * Protobuf - [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
 * Tutorials - [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 
-We have defined a _protobuf model_ as `proto:eth.erc721.v1.Transfers` which represents a list of ERC721 transfers.
+We have defined a protobuf __ model as `proto:eth.erc721.v1.Transfers` which represents a list of ERC721 transfers.
 
 Firstly, let's create the `proto` folder:
 
@@ -55,4 +55,3 @@ lastly we need to add a Rust `mod.rs` file in the `src/pb` directory to export t
 pub mod erc721;
 ```
 {% endcode %}
-

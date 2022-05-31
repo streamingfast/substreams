@@ -1,6 +1,6 @@
 # Manifests
 
-The substream manifest `substreams.yaml` defines the modules that composes the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a a reference guide of all fields in the manifest YAML files.
+The substream manifest `substreams.yaml` defines the modules composing the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a reference guide of all fields in the manifest YAML files.
 
 ## `specVersion`
 
@@ -10,7 +10,7 @@ Example:
 specVersion: v0.1.0
 ```
 
-Just make it `v0.1.0`, no questions asked.
+Just make it `v0.1.0` - no questions asked.
 
 ## `package`
 
@@ -29,12 +29,12 @@ package:
 
 ### `package.name`
 
-This field is used to identify your package, and is used to infer the filename when you `substreams pack substreams.yaml` your package.
+This field is used to identify your package, and is used to infer the filename when you  `substreams pack substreams.yaml` your package.
 
 * `name` must match this regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`, meaning:
 * 64 characters maximum
 * Separate words with `_`
-* Starts with `a-z` or `A-Z`and can contain numbers thereafter
+* Starts with `a-z` or `A-Z` and can contain numbers thereafter
 
 ### `package.version`
 
@@ -149,15 +149,15 @@ Examples:
 
 The identifier for the module, starting with a letter, followed by max 64 characters of `[a-zA-Z0-9_]`. These are the same rules as for `package.name`.
 
-It is the reference identify used on the command line, in inputs and elsewhere to denote this module. It is must be unique per package. Imports get prefixed so imported modules will not clash with the current YAML declaration, even though they share a name.
+It is the reference identity used on the command line, in inputs and elsewhere to denote this module. It is must be unique per package. Imports get prefixed so imported modules will not clash with the current YAML declaration, even though they share a name.
 
 {% hint style="info" %}
-This `name` also corresponds to the **Rust function name** that will be invoked on the compiled WASM code upon execution. This is the same function you will define `#[substreams::handlers::map]` (or `store`) in your Rust code.
+This `name` also corresponds to the **Rust function name** that will be invoked on the compiled WASM code upon execution. This is the same function you will define `#[substreams::handlers::map]`(or`store`) in your Rust code.
 {% endhint %}
 
 ### `modules[].initialBlock`
 
-The initial block the module is going to start processing data. The runtime will not process blocks prior to this one for the given module.
+The initial block for the module is where your Substream is going to start processing data. The runtime will not process blocks prior to this one for the given module.
 
 The `initialBlock` can be inferred by the `inputs` if all the inputs have the same `initialBlock`. If some inputs have different `initialBlock`, then specifying it is required.
 
@@ -182,7 +182,7 @@ Possible values:
 * `set_if_not_exists` (first key wins merge strategy)
 * `add` (sum the two keys)
 * `min` (min between two keys)
-* `max` (you get it)
+* `max` (max between two keys)
 
 ### `modules[].valueType`
 
@@ -205,7 +205,7 @@ A simple string pointing to a binary file defined in [`binaries`](manifests.md#b
 
 ### `modules[].inputs`
 
-is a list of input structure. which can one of 3:
+is a list of input structure, which can one of three:
 
 * `source`
 * `store` (can also deine a `mode` key)

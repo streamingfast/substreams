@@ -9,7 +9,7 @@ A Substream consists of a few files / folder
 In the upcoming steps we will attempt to build a Substream that tracks ERC721 holder count for a given contract. We have broken down the guide into a few steps:
 
 1. &#x20;[Requirements](installation-requirements.md): We will install all the decencies and setup your environment to create our first Substream
-2. [Creating Your Manifest](../docs/getting-started-guide/creating-your-manifest.md): We will setup our first `manifest.yaml` and give you a high level overview of the file
+2. [Creating Your Manifest](creating-your-manifest.md): We will setup our first `manifest.yaml` and give you a high level overview of the file
 3. [Creating Protobuf Schemas](creating-protobuf-schemas.md): We will write our first `Protobuf` schema that we will use in our handlers
 4. [Writing Module Handlers](writing-module-handlers.md): We will write our first module handler
 5. [Running your Substream](running-substreams.md): We will run our newly written Substream

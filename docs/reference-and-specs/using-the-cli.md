@@ -3,7 +3,7 @@
 Here are the commands you can invoke with the `substreams` command-line tool.
 
 {% hint style="info" %}
-Don't forget to [install it](../getting-started-guide/installation-requirements.md#install-the-substreams-cli-tool).
+Don't forget to [install it](../developer-guide/installation-requirements.md#install-the-substreams-cli-tool).
 {% endhint %}
 
 ### **`run`**

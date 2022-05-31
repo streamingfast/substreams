@@ -54,7 +54,7 @@ modules:
 
 Let's review a few important entries:
 
-* `imports.eth` : Our `Substreams` will consume Ethereum blocks, thus we will depend on the Ethereum substream package. You can find out more about \`Substreams\` packages [here](../reference/packages.md)\`
+* `imports.eth` : Our `Substreams` will consume Ethereum blocks, thus we will depend on the Ethereum substream package. You can find out more about \`Substreams\` packages [here](../reference-and-specs/packages.md)\`
 * `protobuf.files`: The list of our `Substreams` custom `Protobuf` files. We will create these files in the following step
 * `protobuf.importPaths`: The locations of our custom `Protobuf` files.
 

@@ -56,7 +56,7 @@ version 0.0.5-beta3 (Commit 61cc596, Built 2022-05-09T19:35:11Z)
 
 ### Ressources
 
-* Checkout our [Getting Started Guide](getting-started-guide/overview.md)
+* Checkout our [Getting Started Guide](docs/developer-guide/overview.md)
 * Take a look at the [Subtreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
 * Take a look at the [Substreams Playground](https://github.com/streamingfast/substreams-playground) repository for more learnings and examples
 
@@ -67,6 +67,6 @@ Need any help? Reach out!
 * [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
 
-## License
+## Licenses
 
 [Apache 2.0](LICENSE/)

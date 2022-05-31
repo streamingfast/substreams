@@ -63,7 +63,7 @@ imports:
 
 The `imports` section imports modules, with their WASM code, all of their (compiled) protobuf definitions and modules definition. The imported modules can be referred to by the _key_ later in the `modules` section.
 
-The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](../docs/reference/packages.md) (ending in `.spkg`).
+The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](packages.md) (ending in `.spkg`).
 
 The filename can be an absolute path, or relative (to the location of the `.yaml` file), or be remote if it starts with `http://` or `https://`.
 
@@ -174,7 +174,7 @@ Learn [more about modules here](broken-reference)
 
 Valid only for `kind: store`.
 
-Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../docs/concepts/modules.md#writing) for details.
+Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concepts/modules.md#writing) for details.
 
 Possible values:
 

@@ -21,7 +21,7 @@ The **merge strategy** below explains what happens when we have two stores that 
 
 #### Ordinal
 
-You will notice Store functions usually take an `ordinal`. This is because `store`s keep track of changes to the key/values inside a block, and produces [_StoreDeltas_ as referenced here](../../proto/sf/substreams/v1/substreams.proto). This allows keys to be set multiple times in a module that is dealing with multiple transactions.
+You will notice Store functions usually take an `ordinal`. This is because `store`s keep track of changes to the key/values inside a block, and produces [_StoreDeltas_ as referenced here](../../../proto/sf/substreams/v1/substreams.proto). This allows keys to be set multiple times in a module that is dealing with multiple transactions.
 
 The `ordinal` is therefore an index that helps sort and order events from multiple modules written by different people, around the `ordinal` of each event in the blockchain data.
 

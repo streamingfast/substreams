@@ -126,30 +126,23 @@ func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifi
 		if br.StartBlock < s.builder.ModuleInitialBlock {
 			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, br.StartBlock, s.builder.ModuleInitialBlock)
 		}
-		s.cumulateBoundedRange(br)
+		if blockRange.ExclusiveEndBlock > s.builder.StoreInitialBlock {
+			// Otherwise, risks stalling the merging (as ranges are
+			// sorted, and only the first is checked for contiguousness)
+			continue
+		}
+		s.ranges = append(s.ranges, blockRange)
 	}
+	sort.Sort(s.ranges)
 
 	zlog.Info("squashing request range", zap.String("module", s.name), zap.Object("request_range", blockRange))
 
-	for _, br := range splitBlockRanges {
-		zlog.Info("squashing range", zap.String("module", s.name), zap.Object("range", br))
-		err := s.mergeAvailablePartials(ctx, notifier)
-		if err != nil {
-			return fmt.Errorf("squashing range %d-%d: %w", br.StartBlock, br.ExclusiveEndBlock, err)
-		}
+	err := s.mergeAvailablePartials(ctx, notifier)
+	if err != nil {
+		return fmt.Errorf("squashing range %d-%d: %w", blockRange.StartBlock, blockRange.ExclusiveEndBlock, err)
 	}
 
 	return nil
-}
-
-func (s *Squashable) cumulateBoundedRange(blockRange *block.Range) {
-	if blockRange.ExclusiveEndBlock <= s.builder.StoreInitialBlock {
-		// Otherwise, risks stalling the merging (as ranges are
-		// sorted, and only the first is checked for contiguousness)
-		return
-	}
-	s.ranges = append(s.ranges, blockRange)
-	sort.Sort(s.ranges)
 }
 
 func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifier) error {

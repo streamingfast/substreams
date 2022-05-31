@@ -88,7 +88,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 				return nil
 			}
 			zlog.Warn("worker done on stream error", zap.Error(err))
-			return fmt.Errorf("receiving stream resp:%w", err)
+			return fmt.Errorf("receiving stream resp: %w", err)
 		}
 
 		switch r := resp.Message.(type) {

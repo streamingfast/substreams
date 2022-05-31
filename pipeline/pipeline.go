@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
@@ -596,7 +595,7 @@ func SynchronizeStores(
 		return fmt.Errorf("creating strategy: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, blockRangeSizeSubRequests)
+	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc, blockRangeSizeSubRequests)
 	if err != nil {
 		return fmt.Errorf("initializing scheduler: %w", err)
 	}
@@ -606,59 +605,15 @@ func SynchronizeStores(
 		return nil
 	}
 	result := make(chan error)
-	for {
-		req, err := scheduler.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
 
-		job := &worker.Job{
-			Request: req,
-		}
-
-		start := time.Now()
-		zlog.Info("waiting worker", zap.Object("job", job))
-		jobWorker := workerPool.Borrow()
-		zlog.Info("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
-
-		select {
-		case <-ctx.Done():
-			zlog.Info("synchronize stores quit on cancel context")
-			return nil
-		default:
-		}
-
-		go func() {
-			w := jobWorker
-			j := job
-
-			err := derr.RetryContext(ctx, 2, func(ctx context.Context) error {
-				return w.Run(ctx, j, respFunc)
-			})
-			workerPool.ReturnWorker(w)
-			if err != nil {
-				result <- err
-				return
-			}
-			err = scheduler.Callback(ctx, req)
-			if err != nil {
-				result <- fmt.Errorf("calling back scheduler: %w", err)
-				return
-			}
-			result <- nil
-		}()
-	}
+	scheduler.Launch(ctx, result)
 
 	resultCount := 0
-
 done:
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return nil // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
 		case err := <-result:
 			resultCount++
 			if err != nil {
@@ -705,6 +660,10 @@ func (p *Pipeline) LoadStores(ctx context.Context) error {
 		if builder.IsPartial() {
 			continue
 		}
+		if builder.StoreInitialBlock == p.requestedStartBlockNum {
+			continue
+		}
+
 		err := builder.Fetch(ctx, p.requestedStartBlockNum)
 		if err != nil {
 			return fmt.Errorf("reading state for builder %q: %w", builder.Name, err)

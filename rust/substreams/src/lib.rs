@@ -1,6 +1,72 @@
-//! Learn more about Substreams at <https://substreams.streamingfast.io>
+//! A library for writing Substreams handlers.
 //!
-
+//! Substreams consts of a numbmbder of modules that provide struct and macros for
+//! implementing Substreams handlers. The handlers are defined in your Manifest.
+//!Learn more about Substreams at <https://substreams.streamingfast.io>
+//!
+//! ## Handler Examples
+//!
+//! Below are a few `map` handler examples. The signature of then handler function is based
+//! on the inputs and output defined in the `map` module definition in the Manifest. There
+//! are a few things to note:
+//! * Best practice is to name your `map` module function `map_<your_action>'
+//! * `map` module function should *always* return a Result
+//! * The Result should have an Error type set to `subtreams::error:Error`
+//!
+//! ```no_run
+//! use substreams::{errors::Error, store};
+//!
+//! // map handler that takes a source as input
+//! #[substreams::handlers::map]
+//! fn map_transfers(blk: eth::Block) -> Result<proto::Custom, Error> {
+//!     // do something
+//! }
+//!
+//! // map handler that takes a source, and a store in get mode as inputs
+//! #[substreams::handlers::map]
+//! fn map_ownerships(blk: eth::Block, store: store::StoreGet) -> Result<proto::Custom, Error> {
+//!     // do something
+//! }
+//!
+//! // map handler that takes a source, another map, and a store in get mode as inputs
+//! #[substreams::handlers::map]
+//! fn map_mints(blk: eth::Block, mints: proto::Custom, store: store::StoreGet) -> Result<proto::Custom, Error> {
+//!     // do something
+//! }
+//! //!
+//! // map handler that takes a source, another map, and a store in delta mode as inputs
+//! #[substreams::handlers::map]
+//! fn map_db(blk: eth::Block, mints: proto::Custom, store_deltas: store::Deltas) -> Result<proto::Custom, Error> {
+//!     // do something
+//! }
+//! ```
+//!
+//! Below are a few `store` handler examples. The signature of the handler function is based
+//! on the inputs defined in the `stopre` module definition in the Manifest. There
+//! are a few things to note:
+//! * Best practice is to name your `map` module function `store_<your_action>'
+//! * `store` module function should *return nothing*
+//!
+//! ```no_run
+//! use substreams::store;
+//!
+//! #[substreams::handlers::store]
+//! fn store_transfers(objects: proto::Custom, output: store::StoreAddInt64) {
+//!     // to something
+//! }
+//!
+//! #[substreams::handlers::store]
+//! fn store_ownerships(objects: proto::Custom, store: store::StoreGet, output: store::StoreAddInt64) {
+//!     // to something
+//! }
+//!
+//! #[substreams::handlers::store]
+//! fn store_mints(objects: proto::Custom, store: store::StoreGet, another_store: store::StoreGet, store_deltas: store::Deltas, output: store::StoreAddInt64) {
+//!     // to something
+//! }
+//!```
+//!
+//!
 pub mod errors;
 mod externs;
 pub mod handlers;

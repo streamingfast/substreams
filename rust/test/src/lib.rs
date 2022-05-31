@@ -54,7 +54,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, Error> {
 }
 
 #[substreams::handlers::store]
-fn build_nft_state(
+fn store_nfts(
     transfers: erc721::Transfers,
     pairs: store::StoreGet,
     tokens: store::StoreGet,

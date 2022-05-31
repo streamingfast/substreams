@@ -1,6 +1,6 @@
 # Writing Module Handlers
 
-Now that we have our ABI & Protobuf Rust code generated lets write our handler code in `src/lib.rs`
+Now that we have our ABI and Protobuf Rust code generated let's write our handler code in `src/lib.rs`
 
 {% code title="src/lib.rs" %}
 ```rust
@@ -116,7 +116,7 @@ We now define our first `map` module. As a reminder here is the module definitio
 
 First notice the `name: block_to_transfers` this should correspond to our handler function name.&#x20;
 
-Secondly we have defined 1 input and 1 output,. The input has a type of `sf.ethereum.type.v1.Block`, this is a standard Ethereum block that is provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` this is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature
+Secondly, we have defined one input and one output. The input has a type of `sf.ethereum.type.v1.Block` which is a standard Ethereum block provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` which is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
 
 ```rust
 ...
@@ -183,7 +183,7 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 
 ```
 
-Let's  now define our  `store` module. As a reminder here is the module definition in the Manifiest&#x20;
+Let's now define our `store` module. As a reminder, here is the module definition in the Manifiest&#x20;
 
 ```yaml
   - name: nft_state
@@ -198,7 +198,7 @@ Let's  now define our  `store` module. As a reminder here is the module definiti
 
 First notice the `name: nft_state` this should correspond to our handler function name.&#x20;
 
-Secondly we have defined 1 input. The input corresponds to the output of the `map` module `block_to_transfer` which is of type `proto:eth.erc721.v1.Transfers` this is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature.
+Secondly, we have defined one input. The input corresponds to the output of the `map` module `block_to_transfer` which is of type `proto:eth.erc721.v1.Transfers` this is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
 
 ```rust
 ...
@@ -216,16 +216,16 @@ Note that the `store` will always take as its **last input** the writable store 
 {% hint style="info" %}
 **Store Types**
 
-The last parameter of a `store` module function should always be the writable store itself. The type of said writable store is based on your `store` module `updatePolicy` and `valueType`. You can see all the possible types of store here
+The last parameter of a `store` module function should always be the writable store itself. The type of said writable store is based on your `store` module `updatePolicy` and `valueType`. You can see all the possible types of store [here](../../rust/substreams/src/store.rs).
 {% endhint %}
 
 The goal of the `store` we are building is to keep track of a holder's current NFT count for the given contract. We will achieve this by analyzing the transfers.&#x20;
 
-* If the transfer's  `from` address field is the null address (`0x0000000000000000000000000000000000000000`) and the `to` address field is not the null address, we know the `to` address field is minting a token, and we should increment his count.&#x20;
+* if the transfer's `from` address field is the null address (`0x0000000000000000000000000000000000000000`) and the `to` address field is not the null address, we know the `to` address field is minting a token, and we should increment his count.&#x20;
 * if the transfer's `from` address field is not the null address and the `to` address field is the null address, we know the `from` address field is burning a token, and we should decrement his count.
-* If the `from` address field and the `to` address field is not the null address, we should decrement the count of the `from` address and increment the count of the `to` address field as this is a basic transfer
+* If the `from` address field and the `to` address field is not the null address, we should decrement the count of the `from` address and increment the count of the `to` address field as this is a basic transfer.
 
-When writing to a store there are generally 3 concept you must consider:
+When writing to a store there are generally three concept you must consider:
 
 1. `ordinal`: this represents the order in which your `store` operations will be applied. Consider the following: your `store` handler will be called once per `block`- during that execution it may call the `add` operation multiple times, for multiple reasons (found a relevant event, saw a call that triggered a method call). Since a blockchain execution model is linear and deterministic, we need to make sure we can apply your `add` operations linearly and deterministically. By having to specify an ordinal, we can guarantee the order of execution. In other words, given one execution of your `store` handler for given inputs (in this example a list of transfers), your code should emit the same number of `add` calls with the same ordinal values.&#x20;
 2. `key`: Since are our stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database) we need to take care in crafting the key, to ensure that it is unique and flexible. In our example, if the `generate_key` function would simply return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders. If we the `generate_key` function would return a key that is only the holder's address, thought it would be unique amongst holders, if we wanted to track multiple contract we would run into issues.&#x20;
@@ -261,7 +261,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 ### Summary
 
-We have created both our handler functions, once for extracting transfers that are of interest to us and a second to store the token count per recipient. At this point you should be able to build your Substreams
+We have created both our handler functions, once for extracting transfers that are of interest to us and a second to store the token count per recipient. At this point you should be able to build your Substreams.
 
 ```
 cargo build --target wasm32-unknown-unknown --release

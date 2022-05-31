@@ -125,7 +125,7 @@ func (b *Store) Clone(newStoreStartBlock uint64) *Store {
 func (b *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, error) {
 	s := b.Clone(blockRange.StartBlock)
 
-	if err := b.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
+	if err := s.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
 		return nil, err
 	}
 

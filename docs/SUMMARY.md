@@ -6,7 +6,9 @@
 
 * [Definition](concepts/definition.md)
 * [Comparison](concepts/comparison.md)
-* [Modules](concepts/modules.md)
+* [Modules](concept-and-fundamentals/modules/README.md)
+  * [Inputs](concept-and-fundamentals/modules/inputs.md)
+  * [Outputs](concept-and-fundamentals/modules/outputs.md)
 
 ## Getting Started
 

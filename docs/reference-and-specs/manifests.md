@@ -1,6 +1,6 @@
 # Manifests
 
-The substream manifest `substreams.yaml` defines the modules that composes the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a a reference guide of all fields in the manifest YAML files.&#x20;
+The substream manifest `substreams.yaml` defines the modules that composes the substream. The `substreams.yaml` is used among other things, to infer the dependencies between your module's inputs and outputs. Below is a a reference guide of all fields in the manifest YAML files.
 
 ## `specVersion`
 
@@ -29,7 +29,7 @@ package:
 
 ### `package.name`
 
-This field is used to identify your package, and is used to infer the filename when you `substreams pack substreams.yaml`  your package.
+This field is used to identify your package, and is used to infer the filename when you `substreams pack substreams.yaml` your package.
 
 * `name` must match this regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`, meaning:
 * 64 characters maximum
@@ -168,13 +168,13 @@ The type of `module`. There are two types of modules:
 * `map`
 * `store`
 
-Learn [more about modules here](broken-reference)
+Learn [more about modules here](broken-reference/)
 
 ### `modules[].updatePolicy`
 
 Valid only for `kind: store`.
 
-Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concepts/modules.md#writing) for details.
+Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concept-and-fundamentals/modules/#writing) for details.
 
 Possible values:
 
@@ -199,28 +199,32 @@ Possible values:
 * `string`
 * `proto:some.path.to.protobuf.Model`
 
-``
-
-#### `modules[].code.entrypoint`
-
-The method to invoke within the [WASM Module](https://webassembly.github.io/spec/core/syntax/modules.html), exported by the Rust code as such:
-
-```rust
-#[no_mangle]
-pub extern "C" fn my_exported_func(...) {
-}
-```
-
-A single WASM Module (in WebAssembly parlance) can contain multiple entrypoints.
-
 ### `modules[].binary`
 
 A simple string pointing to a binary file defined in [`binaries`](manifests.md#binaries)
 
 ### `modules[].inputs`
 
-\[Insert moare here]
+is a list of input structure. which can one of 3:
+
+* `source`
+* `store` (can also deine a `mode` key)
+* `map`
+
+```yaml
+  inputs:
+    - source: sf.ethereum.type.v1.Block
+    - store: my_store
+      mode: deltas
+    - store: my_store # defaults to mode: get
+    - map: my_map
+
+```
+
+See [Module Inputs](../concept-and-fundamentals/modules/inputs.md) for details.
 
 ### `modules[].output`
 
-The `output` section is to be defined for `kind: map` modules. \[insert more here]
+Valid only for `kind: map`
+
+See [Module Outputs](../concept-and-fundamentals/modules/outputs.md) for details

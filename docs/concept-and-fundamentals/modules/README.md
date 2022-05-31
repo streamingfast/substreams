@@ -13,7 +13,7 @@ Modules have a single output, that can be typed, to inform consumers what to exp
 Modules can form a graph of modules, taking each other's output as the next module's input, like so:
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kM0KwjAQhF8l7NkWvEbwIPUJ9NYUWZKtLTZJ2WwEEd_dCAr-4GFhd_h2GOYKNjoCDUfGeVD7ZmWCUqmvSQZiyr6Wy0z1eVlvpmhPbYqZLen_RKeqaq2EMaSe-OBxfhi-320Z_aF8_diYgxC3SSKT_tE7WIAn9ji6kvv6sDdQsngyoMvqqMc8iQETbgXNs0OhrRuLG-gep0QLwCxxdwkWtHCmF9SMWGrwT-p2B02rZZY" %}
-The `transfer_map` module could extract all transfers in each Block, and  `transfer_count` - a`store` module - could keep track of how many transfers occurred.
+The `transfer_map` module could extract all transfers in each Block, and `transfer_count` - a`store` module - could keep track of how many transfers occurred.
 {% endembed %}
 
 Modules can also take in multiple inputs, like this `counters` store:
@@ -32,7 +32,7 @@ There are two types of modules, a `map` module, and a `store` module.
 
 ### The `map` module type
 
-A `map` module takes bytes in, and outputs bytes. In the [manifest](../reference-and-specs/manifests.md), you would declare the protobuf types to help users decode the streams, and help generate some code to get you off the ground faster.
+A `map` module takes bytes in, and outputs bytes. In the [manifest](../../reference-and-specs/manifests.md), you would declare the protobuf types to help users decode the streams, and help generate some code to get you off the ground faster.
 
 ### The `store` module type
 
@@ -40,7 +40,7 @@ A `store` module is different from a `map` in that it is a _stateful_ module. It
 
 #### Writing
 
-A  `kind: store` module's code is able to write to the key/value store, but - in order to ensure parallelization is always possible and deterministic - it _cannot read_ any of its values.&#x20;
+A `kind: store` module's code is able to write to the key/value store, but - in order to ensure parallelization is always possible and deterministic - it _cannot read_ any of its values.
 
 A store can also declare its data type, in which case different methods become available to mutate its keys.
 
@@ -76,7 +76,7 @@ All update policies provide the `delete_prefix` method.
 {% hint style="info" %}
 The **merge strategy** is applied when, while doing parallel processing, a module has built two _partial_ stores store with keys for a segment A (say blocks 0-1000) and a contiguous segment B (say blocks 1000-2000), and is ready to merge those two _partial_ stores to make it a _complete_ store.
 
-The _complete_ store should be exactly as it would be if processing had been done linearly, processing from block 0 up to 2000.&#x20;
+The _complete_ store should be exactly as it would be if processing had been done linearly, processing from block 0 up to 2000.
 {% endhint %}
 
 {% hint style="warning" %}
@@ -104,12 +104,12 @@ When declaring a `store` as an input to a module, you can consume its data in on
 1. `get`
 2. `deltas`
 
-The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../reference-and-specs/rust-api/)) from your module's Rust code. Lookups are local, in-memory, and very fast.
+The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../../reference-and-specs/rust-api/)) from your module's Rust code. Lookups are local, in-memory, and very fast.
 
 {% hint style="info" %}
 The fastest is `get_last` as it queries the store directly. `get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key you are querying was mutated in this block. `get_at` will unwind deltas up to a certain ordinal, so you can get values for keys that were set midway through a block.
 {% endhint %}
 
-The second mode - `deltas` - provides your module with all the _changes_ that occurred in the source `store` module. See the [protobuf model here](../../proto/sf/substreams/v1/substreams.proto#L110). You are then free to pick up on updates, creates, and deletes of the different keys that were mutated during that block.
+The second mode - `deltas` - provides your module with all the _changes_ that occurred in the source `store` module. See the [protobuf model here](../../../proto/sf/substreams/v1/substreams.proto#L110). You are then free to pick up on updates, creates, and deletes of the different keys that were mutated during that block.
 
 When a store is set as an input to your module, you can only _read_ from it, not write back to it.

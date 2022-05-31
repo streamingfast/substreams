@@ -60,12 +60,12 @@ crate-type = ["cdylib"]
 
 We then need to specify our `dependencies:`
 
-* `ethabi`: This crate will be used to decode events from your ABI
-* `hex-literal`: This crate will be used to manipulate Hexadecimal values
-* `substreams`: This crate offers all the basic building blocks for your handlers
-* `substreams-ethereum`: This crate offers all the Ethereum constructs (blocks, transactions, eth) as well as useful `ABI` decoding capabilities
+* `ethabi`: This crate will be used to decode events from your ABI.
+* `hex-literal`: This crate will be used to manipulate Hexadecimal values.
+* `substreams`: This crate offers all the basic building blocks for your handlers.
+* `substreams-ethereum`: This crate offers all the Ethereum constructs (blocks, transactions, eth) as well as useful `ABI` decoding capabilities.
 
-Since we are building our building our code into `wasm` we need to configure Rust to target the correct architecture. Add this file at the root of our Substreams directory
+Since we are building our code into `wasm` we need to configure Rust to target the correct architecture. Add this file at the root of our Substreams directory
 
 {% code title="rust-toolchain.toml" %}
 ```toml
@@ -92,9 +92,9 @@ Notice that when we run `cargo build` we specify the `target` to be `wasm32-unkn
 
 In order to make it easy and type-safe to work with smart contracts, the `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contracts ABI.&#x20;
 
-We will first insert our contract ABI json file in our projects under an `abi` folder
+We will first insert our contract ABI json file in our projects under an `abi` folder.
 
-{% file src="broken-reference" %}
+{% file src="../.gitbook/assets/erc721.json" %}
 
 Now that we have our ABI in our project let's add a Rust build script.
 
@@ -133,8 +133,9 @@ You should now have a generated ABI folder `src/abi` we will create a `mod.rs` f
 
 {% code title="src/abi/mod.rs" %}
 ```rust
+#[path = "eth.erc721.v1.rs"]
 pub mod erc721;
 ```
 {% endcode %}
 
-We can not writer our handlers!
+We can now writer our handlers!

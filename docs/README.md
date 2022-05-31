@@ -8,15 +8,15 @@ It enables you to write Rust modules, composing data streams alongside the commu
 
 It has all the benefits of the Firehose, like low cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
-Substreams is the successor of [https://github.com/streamingfast/sparkle](https://github.com/streamingfast/sparkle), enabling greater composability, yet similar powers of parallelization, and a much simpler model to work with.
+Substreams is the successor of [https://github.com/streamingfast/sparkle](https://github.com/streamingfast/sparkle). This iteration enables greater composability, provides similar powers of parallelization, and is a much simpler model to work with.
 
 ## Getting Started
 
 ### Installing the `Substreams` command-line tool
 
-The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real-time, as well as package your own Substreams modules.
+The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real time, as well as package your own Substreams modules.
 
-#### From brew (for Max OS)
+#### From brew (for Mac OS)
 
 ```
 brew install streamingfast/tap/substreams
@@ -54,7 +54,7 @@ substreams -v
 version 0.0.5-beta3 (Commit 61cc596, Built 2022-05-09T19:35:11Z)
 ```
 
-### Ressources
+### Resources
 
 * Checkout our [Getting Started Guide](developer-guide/overview.md)
 * Take a look at the [Subtreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams

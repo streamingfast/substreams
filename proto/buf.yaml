@@ -1,0 +1,13 @@
+version: v1
+name: buf.build/streamingfast/substreams
+
+# TODO: Install google protobufs as deps
+deps: []
+
+lint:
+  use:
+    - DEFAULT
+
+breaking:
+  use:
+    - FILE

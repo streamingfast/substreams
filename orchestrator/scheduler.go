@@ -37,11 +37,12 @@ func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
 	return request, nil
 }
 
-func (s *Scheduler) Callback(ctx context.Context, r *pbsubstreams.Request) error {
-	for _, output := range r.GetOutputModules() {
+func (s *Scheduler) Callback(ctx context.Context, outgoingReq *pbsubstreams.Request) error {
+	for _, output := range outgoingReq.GetOutputModules() {
+		// FIXME(abourget): don't call Squash on non-store modules (!)
 		err := s.squasher.Squash(ctx, output, &block.Range{
-			StartBlock:        uint64(r.StartBlockNum),
-			ExclusiveEndBlock: r.StopBlockNum,
+			StartBlock:        uint64(outgoingReq.StartBlockNum),
+			ExclusiveEndBlock: outgoingReq.StopBlockNum,
 		})
 
 		if err != nil {

@@ -117,6 +117,7 @@ func TestGetOrdered(t *testing.T) {
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "A"}}},
 	}
 	_ = p.Add(ctx, r0, waiter0)
+
 	waiter1 := NewWaiter(200, nil)
 	r1 := &pbsubstreams.Request{
 		StartBlockNum: 200,
@@ -143,7 +144,7 @@ func TestGetOrdered(t *testing.T) {
 
 	// we notify that A is ready up to block 100, which will put the request for B to the front of the queue
 	p.Notify("A", 100)
-	time.Sleep(50 * time.Millisecond) // give it a teeny bit of time
+	time.Sleep(100 * time.Microsecond) // give it a teeny bit of time for notification to get processed
 
 	// assert that the request for B got put ahead of the request for A
 	r, err = p.Get(ctx)

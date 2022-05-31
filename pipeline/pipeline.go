@@ -7,7 +7,6 @@ import (
 	"math"
 	"runtime/debug"
 	"strings"
-	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"

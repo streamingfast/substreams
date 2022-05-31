@@ -37,10 +37,10 @@ Connected - Progress messages received: {{ .Updates }}
 (hit 'm' to switch display mode){{end}}
 {{ range $key, $value := .Modules }}
 {{- if not $.BarMode }}
-  {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
+  {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end }}
 {{- else }}
-  {{ pad $key }} {{ $value.Lo }}  ::  {{ linebar $value $ -}}
-{{- end }}
+  {{ pad $key }} {{ $value.Lo }}  ::  {{ linebar $value $ }}
+{{- end -}}
 {{ end }}{{ end }}{{ end }}
 {{ with .Clock -}}
 -------------------- BLOCK {{ humanize .Number }} --------------------

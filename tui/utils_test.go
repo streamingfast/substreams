@@ -84,6 +84,19 @@ func Test_MergeRangeLists(t *testing.T) {
 				{Start: 0, End: 220},
 			},
 		},
+		{
+			name: "Unmerging range",
+			completedBlockRanges: []*blockRange{
+				{Start: 10000, End: 19998},
+				{Start: 20000, End: 37999},
+			},
+			newlyCompletedBlockRanges: []*blockRange{
+				{Start: 10000, End: 19999},
+			},
+			expectedBlockRanges: []*blockRange{
+				{Start: 10000, End: 37999},
+			},
+		},
 	}
 
 	for _, test := range tests {

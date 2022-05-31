@@ -136,7 +136,7 @@ func reduceOverlaps(r ranges) ranges {
 			if r1.End > maxEnd {
 				maxEnd = r1.End
 			}
-			newRanges = append(newRanges, &blockRange{Start: r1.Start, End: r1.End})
+			newRanges = append(newRanges, &blockRange{Start: r1.Start, End: maxEnd})
 
 		} else {
 			newRanges = append(newRanges, r1)

@@ -174,7 +174,7 @@ Learn [more about modules here](broken-reference/)
 
 Valid only for `kind: store`.
 
-Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concept-and-fundamentals/modules/#writing) for details.
+Specifies the merge strategy for two contiguous partial stores produced by parallelized operations. See [Modules](../concepts/modules.md#writing) for details.
 
 Possible values:
 

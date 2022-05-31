@@ -32,7 +32,7 @@ There are two types of modules, a `map` module, and a `store` module.
 
 ### The `map` module type
 
-A `map` module takes bytes in, and outputs bytes. In the [manifest](../../reference-and-specs/manifests.md), you would declare the protobuf types to help users decode the streams, and help generate some code to get you off the ground faster.
+A `map` module takes bytes in, and outputs bytes. In the [manifest](../reference-and-specs/manifests.md), you would declare the protobuf types to help users decode the streams, and help generate some code to get you off the ground faster.
 
 ### The `store` module type
 
@@ -104,12 +104,12 @@ When declaring a `store` as an input to a module, you can consume its data in on
 1. `get`
 2. `deltas`
 
-The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../../reference-and-specs/rust-api/)) from your module's Rust code. Lookups are local, in-memory, and very fast.
+The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../reference-and-specs/rust-api/)) from your module's Rust code. Lookups are local, in-memory, and very fast.
 
 {% hint style="info" %}
 The fastest is `get_last` as it queries the store directly. `get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key you are querying was mutated in this block. `get_at` will unwind deltas up to a certain ordinal, so you can get values for keys that were set midway through a block.
 {% endhint %}
 
-The second mode - `deltas` - provides your module with all the _changes_ that occurred in the source `store` module. See the [protobuf model here](../../../proto/sf/substreams/v1/substreams.proto#L110). You are then free to pick up on updates, creates, and deletes of the different keys that were mutated during that block.
+The second mode - `deltas` - provides your module with all the _changes_ that occurred in the source `store` module. See the [protobuf model here](../../proto/sf/substreams/v1/substreams.proto#L110). You are then free to pick up on updates, creates, and deletes of the different keys that were mutated during that block.
 
 When a store is set as an input to your module, you can only _read_ from it, not write back to it.

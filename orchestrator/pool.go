@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"go.uber.org/zap"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -66,6 +68,8 @@ func (p *RequestPool) State() string {
 func (p *RequestPool) Notify(builder string, blockNum uint64) {
 	p.waitersMutex.Lock()
 	defer p.waitersMutex.Unlock()
+
+	zlog.Debug("pool: notification received", zap.String("builder", builder), zap.Uint64("block number", blockNum))
 
 	for waiter := range p.waiters {
 		waiter.Signal(builder, blockNum)

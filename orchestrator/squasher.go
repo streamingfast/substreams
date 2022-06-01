@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"sort"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/pipeline/outputs"

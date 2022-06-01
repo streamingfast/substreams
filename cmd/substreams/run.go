@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -23,7 +24,7 @@ func init() {
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
-	runCmd.Flags().BoolP("compact-output", "c", false, "Avoid pretty printing output for module and make it a single compact line")
+	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY context, and 'json' in pipe context.")
 
 	rootCmd.AddCommand(runCmd)
 }
@@ -39,6 +40,11 @@ var runCmd = &cobra.Command{
 
 func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	outputMode, err := defaultOutputMode(mustGetString(cmd, "output"))
+	if err != nil {
+		return err
+	}
 
 	manifestPath := args[0]
 	manifestReader := manifest.NewReader(manifestPath)
@@ -98,8 +104,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	*/
 
-	prettyPrint := !mustGetBool(cmd, "compact-output")
-	ui := tui.New(req, pkg, outputStreamNames, prettyPrint)
+	ui := tui.New(req, pkg, outputStreamNames, outputMode)
 	if err := ui.Init(); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}
@@ -128,6 +133,22 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func defaultOutputMode(outputMode string) (string, error) {
+	isTerminal := isatty.IsTerminal(os.Stdout.Fd())
+	if outputMode == "" {
+		if isTerminal {
+			outputMode = "ui"
+		} else {
+			outputMode = "json"
+		}
+	} else {
+		if !strings.Contains(";ui;json;jsonl;module-json;module-jsonl;", ";"+outputMode+";") {
+			return "", fmt.Errorf("invalid --output, choose from: ui, json, jsonl, module-json, module-jsonl")
+		}
+	}
+	return outputMode, nil
 }
 
 func readAPIToken(cmd *cobra.Command, envFlagName string) string {

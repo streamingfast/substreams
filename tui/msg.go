@@ -1,6 +1,9 @@
 package tui
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+)
 
 type msg int
 
@@ -12,13 +15,18 @@ const (
 )
 
 func (ui *TUI) Connecting() {
-	ui.prog.Send(Connecting)
+	ui.send(Connecting)
 }
 func (ui *TUI) Connected() {
-	ui.prog.Send(Connected)
+	ui.send(Connected)
 }
 func (ui *TUI) SetRequest(req *pbsubstreams.Request) {
-	ui.prog.Send(req)
+	ui.send(req)
+}
+func (ui *TUI) send(msg tea.Msg) {
+	if ui.prog != nil {
+		ui.prog.Send(msg)
+	}
 }
 
 type BlockMessage string

@@ -61,7 +61,7 @@ func NewWaiter(blockNum uint64, storageState *StorageState, stores ...*pbsubstre
 	var items []*waiterItem
 
 	for _, store := range stores {
-		if store.InitialBlock > blockNum {
+		if blockNum <= store.InitialBlock {
 			continue
 		}
 
@@ -136,7 +136,7 @@ func (w *BlockWaiter) Order() int {
 
 func (w *BlockWaiter) String() string {
 	if w.items == nil {
-		return "(empty)"
+		return fmt.Sprintf("[%s] O(%d)", "nil", w.Order())
 	}
 
 	var wis []string
@@ -144,5 +144,5 @@ func (w *BlockWaiter) String() string {
 		wis = append(wis, wi.String())
 	}
 
-	return strings.Join(wis, ",")
+	return fmt.Sprintf("[%s] O(%d)", strings.Join(wis, ","), w.Order())
 }

@@ -35,6 +35,10 @@ func (tw *TestWaiter) Order() int {
 	return 0
 }
 
+func (tw *TestWaiter) String() string {
+	return ""
+}
+
 func TestNotify(t *testing.T) {
 	p := NewRequestPool()
 	ctx := context.Background()

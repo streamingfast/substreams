@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -45,6 +47,20 @@ func NewRequestPool() *RequestPool {
 	p.waiters = map[Waiter]struct{}{}
 
 	return &p
+}
+
+func (p *RequestPool) State() string {
+	p.waitersMutex.RLock()
+	defer p.waitersMutex.RUnlock()
+
+	var waiters []string
+	for w := range p.waiters {
+		waiters = append(waiters, w.String())
+	}
+
+	sort.Strings(waiters)
+
+	return strings.Join(waiters, ",")
 }
 
 func (p *RequestPool) Notify(builder string, blockNum uint64) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
-	t.Skip("abourget: incomplete, untested")
+	//t.Skip("abourget: incomplete, untested")
 
 	saveInterval := 10
 	mods := manifest.NewTestModules()
@@ -36,36 +37,49 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 
 	pool := NewRequestPool()
 	ctx := context.Background()
-	storageState := &StorageState{lastBlocks: map[string]uint64{}}
+	storageState := NewStorageState() //&StorageState{lastBlocks: map[string]uint64{}}
 	s, err := NewOrderedStrategy(
 		ctx,
 		storageState,
 		&pbsubstreams.Request{
-			StartBlockNum: 10_000,
-			StopBlockNum:  100_000,
+			StartBlockNum: 0,
+			StopBlockNum:  30,
 		},
 		stores, // INIT
 		graph,
 		pool,
-		100_000, // corresponds to `Request.EndBlock` doesn't it?
+		30, // corresponds to `Request.EndBlock` doesn't it?
 		saveInterval,
 		1_000_000, // FIXME
 	)
 	require.NoError(t, err)
 
-	var allreqs []string
-	for {
-		req, err := s.GetNextRequest(ctx)
-		require.NoError(t, err)
-		allreqs = append(allreqs, reqstr(req))
+	//simulate squasher getting its data
+	go func() {
+		time.Sleep(1 * time.Second)
+		pool.Notify("E", 10)
+		pool.Notify("B", 10)
+
+		time.Sleep(1 * time.Second)
+		pool.Notify("E", 20)
+		time.Sleep(1 * time.Second)
+		pool.Notify("B", 20)
+	}()
+
+	var allRequests []string
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	reqChan := GetRequestStream(ctx, s)
+	for req := range reqChan {
+		fmt.Println(reqstr(req))
+		allRequests = append(allRequests, reqstr(req))
 	}
 
-	assert.Equal(t, []string{
-		"insert",
-		"the",
-		"expected",
-		"values",
-	}, allreqs)
+	fmt.Println(allRequests)
+
+	assert.Equal(t, 7, len(allRequests))
 }
 
 func reqstr(r *pbsubstreams.Request) string {

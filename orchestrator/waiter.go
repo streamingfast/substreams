@@ -2,6 +2,8 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -11,6 +13,7 @@ type Waiter interface {
 	Wait(ctx context.Context) <-chan interface{}
 	Signal(storeName string, blockNum uint64)
 	Order() int
+	String() string
 }
 
 type waiterItem struct {
@@ -31,6 +34,21 @@ func (wi *waiterItem) Wait() <-chan interface{} {
 	return wi.waitChan
 }
 
+func (wi *waiterItem) String() string {
+	return fmt.Sprintf("waiter (store:%s) (block:%d)", wi.StoreName, wi.BlockNum)
+}
+
+type waiterItems []*waiterItem
+
+func (wis waiterItems) String() string {
+	var wislice []string
+	for _, wi := range wis {
+		wislice = append(wislice, wi.String())
+	}
+
+	return strings.Join(wislice, ",")
+}
+
 type BlockWaiter struct {
 	items []*waiterItem
 
@@ -43,6 +61,10 @@ func NewWaiter(blockNum uint64, storageState *StorageState, stores ...*pbsubstre
 	var items []*waiterItem
 
 	for _, store := range stores {
+		if store.InitialBlock > blockNum {
+			continue
+		}
+
 		items = append(items, &waiterItem{
 			StoreName: store.Name,
 			BlockNum:  blockNum,
@@ -110,4 +132,17 @@ func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 
 func (w *BlockWaiter) Order() int {
 	return len(w.items)
+}
+
+func (w *BlockWaiter) String() string {
+	if w.items == nil {
+		return "(empty)"
+	}
+
+	var wis []string
+	for _, wi := range w.items {
+		wis = append(wis, wi.String())
+	}
+
+	return strings.Join(wis, ",")
 }

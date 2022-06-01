@@ -2,6 +2,7 @@ package manifest
 
 import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
+var zero = uint64(0)
 var ten = uint64(10)
 var twenty = uint64(20)
 var thirty = uint64(30)
@@ -9,7 +10,8 @@ var thirty = uint64(30)
 func NewTestModules() []*pbsubstreams.Module {
 	return []*pbsubstreams.Module{
 		{
-			Name: "A",
+			Name:         "A",
+			InitialBlock: zero,
 		},
 		{
 			Name:         "B",
@@ -25,7 +27,7 @@ func NewTestModules() []*pbsubstreams.Module {
 		},
 		{
 			Name:         "C",
-			InitialBlock: twenty,
+			InitialBlock: zero,
 			Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 			Inputs: []*pbsubstreams.Module_Input{
 				{
@@ -36,8 +38,9 @@ func NewTestModules() []*pbsubstreams.Module {
 			},
 		},
 		{
-			Name: "D",
-			Kind: &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+			Name:         "D",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{

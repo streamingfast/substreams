@@ -117,7 +117,7 @@ func (b *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 		ModuleInitialBlock: b.ModuleInitialBlock,
 		StoreInitialBlock:  newStoreStartBlock,
 		ModuleHash:         b.ModuleHash,
-		KV:                 b.KV,
+		KV:                 map[string][]byte{},
 		UpdatePolicy:       b.UpdatePolicy,
 		ValueType:          b.ValueType,
 	}

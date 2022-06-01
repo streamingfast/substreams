@@ -52,12 +52,12 @@ func TestGet(t *testing.T) {
 	p := NewRequestPool()
 	ctx := context.Background()
 
-	lastSavedBlockMap := map[string]uint64{
+	storageState := &StorageState{lastBlocks: map[string]uint64{
 		"test1": 0,
 		"test2": 3000,
-	}
+	}}
 
-	waiter0 := NewWaiter(200, lastSavedBlockMap,
+	waiter0 := NewWaiter(200, storageState,
 		&pbsubstreams.Module{Name: "test1"},
 	)
 	r0 := &pbsubstreams.Request{
@@ -67,7 +67,7 @@ func TestGet(t *testing.T) {
 	}
 	_ = p.Add(ctx, r0, waiter0)
 
-	waiter1 := NewWaiter(300, lastSavedBlockMap,
+	waiter1 := NewWaiter(300, storageState,
 		&pbsubstreams.Module{Name: "test1"},
 		&pbsubstreams.Module{Name: "test2"},
 	)

@@ -18,7 +18,6 @@ require (
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220428192744-f80aee7d4688
 	github.com/stretchr/testify v1.7.1
-	github.com/test-go/testify v1.1.4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.21.0
 	google.golang.org/protobuf v1.27.1
@@ -38,7 +37,6 @@ require (
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
 	github.com/wasmerio/wasmer-go v1.0.4
-	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	google.golang.org/grpc v1.44.0

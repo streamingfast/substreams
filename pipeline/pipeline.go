@@ -315,17 +315,16 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 
 	if p.isBackprocessing {
 		// TODO(abourget): we might want to send progress for the segment after batch execution
-		requestedStartBlock := uint64(p.request.StartBlockNum)
-		var modules []*pbsubstreams.ModuleProgress
+		var progress []*pbsubstreams.ModuleProgress
 
-		for _, mod := range p.outputModules {
-			modules = append(modules, &pbsubstreams.ModuleProgress{
-				Name: mod.Name,
+		for _, store := range p.leafStores {
+			progress = append(progress, &pbsubstreams.ModuleProgress{
+				Name: store.Name,
 				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 						ProcessedRanges: []*pbsubstreams.BlockRange{
 							{
-								StartBlock: requestedStartBlock,
+								StartBlock: store.StoreInitialBlock,
 								EndBlock:   p.clock.Number,
 							},
 						},
@@ -334,7 +333,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 			})
 		}
 
-		if err := respFunc(substreams.NewModulesProgressResponse(modules)); err != nil {
+		if err := respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
 			return fmt.Errorf("calling return func: %w", err)
 		}
 	}
@@ -584,12 +583,22 @@ func SynchronizeStores(
 
 	requestPool := orchestrator.NewRequestPool()
 
-	squasher, err := orchestrator.NewSquasher(ctx, builders, outputCache, storeSaveInterval, upToBlockNum, orchestrator.WithNotifier(requestPool))
+	storageState, err := orchestrator.FetchStorageState(ctx, builders)
+	if err != nil {
+		return fmt.Errorf("fetching stores states: %w", err)
+	}
+
+	progressMessages := storageState.ProgressMessages()
+	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
+		return fmt.Errorf("sending progress: %w", err)
+	}
+
+	squasher, err := orchestrator.NewSquasher(ctx, storageState, builders, outputCache, storeSaveInterval, upToBlockNum, orchestrator.WithNotifier(requestPool))
 	if err != nil {
 		return fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests, maxSubrequestRangeSize)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests, maxSubrequestRangeSize)
 	if err != nil {
 		return fmt.Errorf("creating strategy: %w", err)
 	}

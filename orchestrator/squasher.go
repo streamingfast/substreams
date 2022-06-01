@@ -34,27 +34,23 @@ func WithNotifier(notifier Notifier) SquasherOption {
 	}
 }
 
-func NewSquasher(ctx context.Context, builders []*state.Store, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64, targetExclusiveBlock uint64, opts ...SquasherOption) (*Squasher, error) {
+func NewSquasher(ctx context.Context, storageState *StorageState, builders []*state.Store, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64, targetExclusiveBlock uint64, opts ...SquasherOption) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
 	for _, builder := range builders {
-		info, err := builder.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting info for %s: %w", builder.Name, err)
-		}
-
-		storagePresent := info.LastKVSavedBlock != 0
+		lastKVSavedBlock := storageState.lastBlocks[builder.Name]
+		storagePresent := lastKVSavedBlock != 0
 		if !storagePresent {
 			squashables[builder.Name] = NewSquashable(builder.Clone(builder.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, builder.ModuleInitialBlock)
 		} else {
 			r := &block.Range{
 				StartBlock:        builder.ModuleInitialBlock,
-				ExclusiveEndBlock: info.LastKVSavedBlock, // This ASSUMES we have scheduled jobs that are going to pipe us new results in.
+				ExclusiveEndBlock: lastKVSavedBlock, // This ASSUMES we have scheduled jobs that are going to pipe us new results in.
 			}
 			squish, err := builder.LoadFrom(ctx, r)
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", builder.Name, r, err)
 			}
-			squashables[builder.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval, info.LastKVSavedBlock)
+			squashables[builder.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval, lastKVSavedBlock)
 		}
 	}
 

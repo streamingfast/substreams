@@ -28,6 +28,7 @@ type OrderedStrategy struct {
 
 func NewOrderedStrategy(
 	ctx context.Context,
+	storageState *StorageState,
 	request *pbsubstreams.Request,
 	stores []*state.Store,
 	graph *manifest.ModuleGraph,
@@ -36,15 +37,6 @@ func NewOrderedStrategy(
 	blockRangeSizeSubRequests int,
 	maxRangeSize uint64,
 ) (*OrderedStrategy, error) {
-	lastSavedBlockMap := map[string]uint64{}
-	for _, builder := range stores {
-		info, err := builder.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting builder info: %w", err)
-		}
-		lastSavedBlockMap[builder.Name] = info.LastKVSavedBlock
-	}
-
 	for _, store := range stores {
 		zlog.Debug("squashables", zap.String("builder", store.Name))
 		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
@@ -52,13 +44,7 @@ func NewOrderedStrategy(
 			continue // nothing to synchronize
 		}
 
-		endBlock := upToBlockNum
-		info, err := store.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting builder info: %w", err)
-		}
-
-		lastExclusiveEndBlock := info.LastKVSavedBlock
+		lastExclusiveEndBlock := storageState.lastBlocks[store.Name]
 		zlog.Debug("got info", zap.Object("builder", store), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
 		if upToBlockNum <= lastExclusiveEndBlock {
 			zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
@@ -72,11 +58,11 @@ func NewOrderedStrategy(
 
 		moduleFullRangeToProcess := &block.Range{
 			StartBlock:        reqStartBlock,
-			ExclusiveEndBlock: endBlock,
+			ExclusiveEndBlock: upToBlockNum,
 		}
 
 		if moduleFullRangeToProcess.Size() > maxRangeSize {
-			return nil, fmt.Errorf("subrequest size too big. request must be started clsoer to the head block. store %s is %d blocks from head (max is %d)", store.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
+			return nil, fmt.Errorf("subrequest size too big. request must be started closer to the head block. store %s is %d blocks from head (max is %d)", store.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
 		}
 
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
@@ -86,8 +72,8 @@ func NewOrderedStrategy(
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
 			}
 
-			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, store.Name, request.ForkSteps, request.IrreversibilityCondition, request.Modules)
-			waiter := NewWaiter(blockRange.StartBlock, lastSavedBlockMap, ancestorStoreModules...)
+			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, store.Name, request.IrreversibilityCondition, request.Modules)
+			waiter := NewWaiter(blockRange.StartBlock, storageState, ancestorStoreModules...)
 			_ = pool.Add(ctx, req, waiter)
 
 			zlog.Info("request created", zap.String("module_name", store.Name), zap.Object("block_range", blockRange))
@@ -150,16 +136,15 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 func createRequest(
 	startBlock, stopBlock uint64,
 	outputModuleName string,
-	forkSteps []pbsubstreams.ForkStep,
 	irreversibilityCondition string,
 	modules *pbsubstreams.Modules,
 ) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
-		StartBlockNum:            int64(startBlock),
-		StopBlockNum:             stopBlock,
-		ForkSteps:                forkSteps,
-		IrreversibilityCondition: irreversibilityCondition,
-		Modules:                  modules,
-		OutputModules:            []string{outputModuleName},
+		StartBlockNum: int64(startBlock),
+		StopBlockNum:  stopBlock,
+		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
+		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
+		Modules:       modules,
+		OutputModules: []string{outputModuleName},
 	}
 }

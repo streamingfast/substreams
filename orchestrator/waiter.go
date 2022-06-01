@@ -34,12 +34,12 @@ func (wi *waiterItem) Wait() <-chan interface{} {
 type BlockWaiter struct {
 	items []*waiterItem
 
-	lastSavedBlockMap map[string]uint64
-	setup             sync.Once
-	done              chan interface{}
+	storageState *StorageState
+	setup        sync.Once
+	done         chan interface{}
 }
 
-func NewWaiter(blockNum uint64, lastSavedBlockMap map[string]uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
+func NewWaiter(blockNum uint64, storageState *StorageState, stores ...*pbsubstreams.Module) *BlockWaiter {
 	var items []*waiterItem
 
 	for _, store := range stores {
@@ -51,8 +51,8 @@ func NewWaiter(blockNum uint64, lastSavedBlockMap map[string]uint64, stores ...*
 	}
 
 	return &BlockWaiter{
-		items:             items,
-		lastSavedBlockMap: lastSavedBlockMap,
+		items:        items,
+		storageState: storageState,
 	}
 }
 
@@ -76,7 +76,7 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 			go func(waiter *waiterItem) {
 				defer wg.Done()
 
-				if waiter.BlockNum <= w.lastSavedBlockMap[waiter.StoreName] {
+				if waiter.BlockNum <= w.storageState.lastBlocks[waiter.StoreName] {
 					return //store has already saved up to or past the desired block.
 				}
 

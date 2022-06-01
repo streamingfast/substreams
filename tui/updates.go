@@ -2,14 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"io/ioutil"
 
 	tea "github.com/charmbracelet/bubbletea"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (m model) Init() tea.Cmd {
-	return nil
-}
+// Implement the tea.Model interface
+func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg {
@@ -17,12 +17,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Connected = false
 	case Connected:
 		m.Connected = true
+		// case Quit:
+		// 	return nil, tea.Quit
 	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
 			fmt.Println("Quitting...")
+			m.ui.Cancel()
 			// TODO: trigger downstream shutdown of the blocks processing
 			return m, tea.Quit
 		}
@@ -36,10 +39,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
-		// m.progress.Width = msg.Width - padding*2 - 4
-		// if m.progress.Width > maxWidth {
-		// 	m.progress.Width = maxWidth
-		// }
+		m.screenWidth = msg.Width - 45
 	case *pbsubstreams.Request:
 		m.Request = msg
 		return m, nil
@@ -47,14 +47,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Clock == nil {
 			m.ui.prog.ReleaseTerminal()
 			fmt.Println(m.View())
+			m.Clock = msg
 			fmt.Println("")
 			m.ui.prog.RestoreTerminal()
-			// fmt.Println("")
-			// fmt.Println("")
 		}
-		m.Clock = msg
 		return m, nil
 	case BlockMessage:
+		m.Updates += 1
+		ioutil.WriteFile("/tmp/mama.txt", []byte(fmt.Sprintf("updates: %d", m.Updates)), 0644)
 		m.ui.prog.ReleaseTerminal()
 		fmt.Println(msg)
 		m.ui.prog.RestoreTerminal()

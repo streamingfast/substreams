@@ -105,8 +105,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 	defer ui.CleanUpTerminal()
 
-	go ui.Start()
-
 	ui.SetRequest(req)
 	ui.Connecting()
 	cli, err := ssClient.Blocks(ctx, req, callOpts...)

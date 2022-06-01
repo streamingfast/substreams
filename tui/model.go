@@ -1,6 +1,8 @@
 package tui
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import (
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+)
 
 func newModel(ui *TUI) model {
 	return model{

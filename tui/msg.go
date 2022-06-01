@@ -2,11 +2,13 @@ package tui
 
 import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
-type connectingSignals int
+type msg int
 
 const (
-	Connecting connectingSignals = iota
+	Connecting msg = iota
 	Connected
+
+	Quit
 )
 
 func (ui *TUI) Connecting() {

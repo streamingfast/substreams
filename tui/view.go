@@ -42,7 +42,7 @@ Connected - Progress messages received: {{ .Updates }}
   {{ pad $key }} {{ $value.Lo }}  ::  {{ linebar $value $ }}
 {{- end -}}
 {{ end }}{{ end }}{{ end }}
-{{ with .Clock -}}
+{{- with .Clock -}}
 -------------------- BLOCK {{ humanize .Number }} --------------------
 {{ end -}}
 `)).Execute(buf, m)

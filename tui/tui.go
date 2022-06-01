@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dustin/go-humanize"
@@ -35,7 +36,9 @@ func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames
 		decodeMsgTypes:    map[string]func(in []byte) string{},
 		msgTypes:          map[string]string{},
 	}
-	ui.prog = tea.NewProgram(newModel(ui))
+
+	ui.ensureTerminalLocked()
+
 	return ui
 }
 
@@ -122,17 +125,19 @@ func (ui *TUI) Init() error {
 	return nil
 }
 
-func (ui *TUI) Start() {
-	if err := ui.prog.Start(); err != nil {
-		fmt.Printf("Failed bubble tea program: %s\n", err)
-	}
+func (ui *TUI) Cancel() {
+	fmt.Println("TODO: Shutting down...")
+	// cancel a context or something we got from upstream, passing the command-line control here.
+	// a Shutter or something
 }
 
 func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreams.Response_Data:
+		ui.ensureTerminalUnlocked()
 		return ui.blockScopedData(m.Data)
 	case *pbsubstreams.Response_Progress:
+		ui.ensureTerminalLocked()
 		for _, module := range m.Progress.Modules {
 			ui.prog.Send(module)
 		}
@@ -146,9 +151,31 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 	return nil
 }
 
+func (ui *TUI) ensureTerminalUnlocked() {
+	if ui.prog == nil {
+		return
+	}
+	ui.prog.ReleaseTerminal()
+	ui.prog.Kill()
+	ui.prog = nil
+	time.Sleep(10 * time.Millisecond)
+}
+
+func (ui *TUI) ensureTerminalLocked() {
+	if ui.prog != nil {
+		return
+	}
+	ui.prog = tea.NewProgram(newModel(ui))
+	go func() {
+		if err := ui.prog.Start(); err != nil {
+			fmt.Printf("Failed bubble tea program: %s\n", err)
+		}
+	}()
+}
+
 func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
-	ui.prog.Send(output.Clock)
-	//printClock(output)
+	//ui.prog.Send(output.Clock)
+	printClock(output)
 	if output == nil {
 		return nil
 	}
@@ -205,15 +232,18 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 	}
 
 	if len(s) != 0 {
-		ui.prog.Send(BlockMessage(strings.Join(s, "")))
+		fmt.Println(strings.Join(s, ""))
+		//ui.prog.Send(BlockMessage(strings.Join(s, "")))
 	}
 
 	return nil
 }
 
 func (ui *TUI) CleanUpTerminal() {
-	if err := ui.prog.ReleaseTerminal(); err != nil {
-		fmt.Println("failed releasing terminal:", err)
+	if ui.prog != nil {
+		if err := ui.prog.ReleaseTerminal(); err != nil {
+			fmt.Println("failed releasing terminal:", err)
+		}
 	}
 }
 
@@ -235,9 +265,7 @@ func decodeAsString(in []byte) string { return fmt.Sprintf("%q", string(in)) }
 func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
 
 func printClock(block *pbsubstreams.BlockScopedData) {
-	fmt.Printf("\n----------- %s BLOCK #%s (%d) ---------------\n",
-		strings.ToUpper(stepFromProto(block.Step).String()),
-		humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
+	fmt.Printf("----------- BLOCK #%s (%d) ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
 }
 
 func stepFromProto(step pbsubstreams.ForkStep) bstream.StepType {

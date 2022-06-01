@@ -45,7 +45,6 @@ type Pipeline struct {
 	modules              []*pbsubstreams.Module
 	outputModuleNames    []string
 	outputModuleMap      map[string]bool
-	outputModules        []*pbsubstreams.Module
 	storeModules         []*pbsubstreams.Module
 	storeMap             map[string]*state.Store
 	backprocessingStores []*state.Store
@@ -123,9 +122,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
-		if isOutput {
-			p.outputModules = append(p.outputModules, module)
-		}
 
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
 			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)

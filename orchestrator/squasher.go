@@ -192,7 +192,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 				return fmt.Errorf("writing state: %w", err)
 			}
 		} else {
-			err = nextStore.DeletePartialFile(ctx, squashableRange.ExclusiveEndBlock)
+			err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				zlog.Warn("deleting partial file", zap.Error(err))
 			}

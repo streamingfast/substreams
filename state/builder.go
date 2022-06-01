@@ -317,12 +317,12 @@ func (b *Store) writeInfoState(ctx context.Context, filename string, lastBlock u
 // 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 // }
 
-func (b *Store) DeletePartialFile(ctx context.Context, exclusiveEndBlock uint64) error {
+func (b *Store) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) error {
 	filename := b.storageFilename(exclusiveEndBlock)
-	zlog.Debug("deleting partial file", zap.String("file_name", filename))
+	zlog.Debug("deleting store file", zap.String("file_name", filename))
 
 	if err := b.Store.DeleteObject(ctx, filename); err != nil {
-		return fmt.Errorf("deleting partial file %q: %w", filename, err)
+		return fmt.Errorf("deleting store file %q: %w", filename, err)
 	}
 	return nil
 }

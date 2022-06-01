@@ -232,7 +232,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		// no need to save store if loaded from cache?
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-		if !isFirstRequestBlock && intervalReached {
+		if !isFirstRequestBlock && (intervalReached || p.isBackprocessing) {
 			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
 				return fmt.Errorf("saving stores: %w", err)
 			}

@@ -6,7 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### `substreams` crate
+
 * Added `substreams::hex` wrapper around hex_literal::hex macro
+
+### `substreams` CLI
+
+* Added `substreams run -o ui|json|jsonl|module-json|module-jsonl`.
+
+### Server
+
+* Fixed a whole bunch of issues, in parallel processing. More stable caching.
+
 
 ## [v0.0.8-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.8-beta)
 

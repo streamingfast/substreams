@@ -2,6 +2,7 @@ package tui
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -19,7 +20,12 @@ type TUI struct {
 	req               *pbsubstreams.Request
 	pkg               *pbsubstreams.Package
 	outputStreamNames []string
-	prettyPrint       bool
+
+	outputMode string
+	// Output flags
+	decorateOutput    bool
+	moduleWrapOutput  bool
+	prettyPrintOutput bool
 
 	prog *tea.Program
 
@@ -27,17 +33,20 @@ type TUI struct {
 	msgTypes       map[string]string
 }
 
-func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string, prettyPrint bool) *TUI {
+func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string, outputMode string) *TUI {
 	ui := &TUI{
 		req:               req,
 		pkg:               pkg,
 		outputStreamNames: outputStreamNames,
-		prettyPrint:       prettyPrint,
+		outputMode:        outputMode,
 		decodeMsgTypes:    map[string]func(in []byte) string{},
 		msgTypes:          map[string]string{},
 	}
 
-	ui.ensureTerminalLocked()
+	ui.configureOutputMode()
+	if ui.decorateOutput {
+		ui.ensureTerminalLocked()
+	}
 
 	return ui
 }
@@ -47,6 +56,9 @@ func (ui *TUI) Init() error {
 	if err != nil {
 		return fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
 	}
+
+	toJson := ui.jsonFunc()
+	decorate := ui.decorateOutput
 
 	for _, mod := range ui.pkg.Modules.Modules {
 		for _, outputStreamName := range ui.outputStreamNames {
@@ -71,7 +83,7 @@ func (ui *TUI) Init() error {
 						break
 					}
 				}
-
+				modName := mod.Name
 				decodeMsgType := func(in []byte) string {
 					if msgDesc == nil {
 						return "(unknown proto schema) " + decodeAsString(in)
@@ -83,14 +95,7 @@ func (ui *TUI) Init() error {
 						return ""
 					}
 
-					var cnt []byte
-					var err error
-					if ui.prettyPrint {
-						cnt, err = msg.MarshalJSONIndent()
-					} else {
-						cnt, err = msg.MarshalJSON()
-					}
-
+					cnt, err := toJson(modName, msg)
 					if err != nil {
 						fmt.Printf("error encoding protobuf %s into json: %s\n", msgType, err)
 						return decodeAsString(in)
@@ -103,7 +108,10 @@ func (ui *TUI) Init() error {
 					if msgDesc != nil {
 						decodeMsgTypeWithIndent := func(in []byte) string {
 							out := decodeMsgType(in)
-							return strings.Replace(out, "\n", "\n    ", -1)
+							if decorate {
+								out = strings.Replace(out, "\n", "\n    ", -1)
+							}
+							return out
 						}
 						ui.decodeMsgTypes[mod.Name] = decodeMsgTypeWithIndent
 					} else {
@@ -125,6 +133,22 @@ func (ui *TUI) Init() error {
 	return nil
 }
 
+func (ui *TUI) configureOutputMode() {
+	switch ui.outputMode {
+	case "ui":
+		ui.prettyPrintOutput = true
+		ui.decorateOutput = true
+	case "jsonl":
+	case "json":
+		ui.prettyPrintOutput = true
+	case "module-jsonl":
+		ui.moduleWrapOutput = true
+	case "module-json":
+		ui.prettyPrintOutput = true
+		ui.moduleWrapOutput = true
+	}
+}
+
 func (ui *TUI) Cancel() {
 	fmt.Println("TODO: Shutting down...")
 	// cancel a context or something we got from upstream, passing the command-line control here.
@@ -134,12 +158,27 @@ func (ui *TUI) Cancel() {
 func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreams.Response_Data:
-		ui.ensureTerminalUnlocked()
-		return ui.blockScopedData(m.Data)
+		if ui.decorateOutput {
+			printClock(m.Data)
+		}
+		if m.Data == nil {
+			return nil
+		}
+		if len(m.Data.Outputs) == 0 {
+			return nil
+		}
+		if ui.decorateOutput {
+			ui.ensureTerminalUnlocked()
+			return ui.decoratedBlockScopedData(m.Data)
+		} else {
+			return ui.jsonBlockScopedData(m.Data)
+		}
 	case *pbsubstreams.Response_Progress:
-		ui.ensureTerminalLocked()
-		for _, module := range m.Progress.Modules {
-			ui.prog.Send(module)
+		if ui.decorateOutput {
+			ui.ensureTerminalLocked()
+			for _, module := range m.Progress.Modules {
+				ui.prog.Send(module)
+			}
 		}
 	case *pbsubstreams.Response_SnapshotData:
 		fmt.Println("Incoming snapshot data")
@@ -173,16 +212,7 @@ func (ui *TUI) ensureTerminalLocked() {
 	}()
 }
 
-func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
-	//ui.prog.Send(output.Clock)
-	printClock(output)
-	if output == nil {
-		return nil
-	}
-	if len(output.Outputs) == 0 {
-		return nil
-	}
-
+func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) error {
 	var s []string
 	for _, out := range output.Outputs {
 		for _, log := range out.Logs {
@@ -209,7 +239,6 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 					s = append(s, string(marshalledBytes))
 				}
 			}
-
 		case *pbsubstreams.ModuleOutput_StoreDeltas:
 			if len(data.StoreDeltas.Deltas) != 0 {
 				s = append(s, fmt.Sprintf("%s: store deltas:\n", out.Name))
@@ -221,7 +250,6 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 					s = append(s, fmt.Sprintf("    NEW: %s\n", decodeValue(delta.NewValue)))
 				}
 			}
-
 		default:
 			if data != nil {
 				panic(fmt.Sprintf("unsupported module output data type %T", data))
@@ -230,12 +258,59 @@ func (ui *TUI) blockScopedData(output *pbsubstreams.BlockScopedData) error {
 			}
 		}
 	}
-
 	if len(s) != 0 {
 		fmt.Println(strings.Join(s, ""))
-		//ui.prog.Send(BlockMessage(strings.Join(s, "")))
+	}
+	return nil
+}
+
+func (ui *TUI) jsonBlockScopedData(output *pbsubstreams.BlockScopedData) error {
+	encoder := protojson.MarshalOptions{}
+	if ui.prettyPrintOutput {
+		encoder.Multiline = true
+		encoder.Indent = "  "
 	}
 
+	for _, out := range output.Outputs {
+		switch data := out.Data.(type) {
+		case *pbsubstreams.ModuleOutput_MapOutput:
+			if len(data.MapOutput.Value) != 0 {
+				decodeValue := ui.decodeMsgTypes[out.Name]
+				if decodeValue != nil {
+					cnt := decodeValue(data.MapOutput.GetValue())
+
+					fmt.Println(cnt)
+				} else {
+					return fmt.Errorf("no function to decode type")
+					// cnt, err := encoder.Marshal(data.MapOutput)a
+					// if err != nil {
+					// 	return fmt.Errorf("return handler: marshalling: %w", err)
+					// }
+					// fmt.Println(string(cnt))
+				}
+			}
+		case *pbsubstreams.ModuleOutput_StoreDeltas:
+			if len(data.StoreDeltas.Deltas) != 0 {
+				cnt, err := encoder.Marshal(data.StoreDeltas)
+				if err != nil {
+					return fmt.Errorf("encoding deltas: %w", err)
+				}
+				if ui.moduleWrapOutput {
+					cnt, err = json.MarshalIndent(moduleWrap{Module: out.Name, Data: json.RawMessage(cnt)}, "", "  ")
+					if err != nil {
+						return fmt.Errorf("encoding: module wrap: %w", err)
+					}
+				}
+				fmt.Println(string(cnt))
+			}
+		default:
+			if data != nil {
+				panic(fmt.Sprintf("unsupported module output data type %T", data))
+			} else {
+				//fmt.Println("received nil data for module", out.Name)
+			}
+		}
+	}
 	return nil
 }
 

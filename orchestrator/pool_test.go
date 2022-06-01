@@ -110,7 +110,7 @@ func TestGetOrdered(t *testing.T) {
 	p := NewRequestPool()
 	ctx := context.Background()
 
-	waiter0 := NewWaiter(100, nil)
+	waiter0 := NewWaiter(100, NewStorageState())
 	r0 := &pbsubstreams.Request{
 		StartBlockNum: 100,
 		StopBlockNum:  200,
@@ -118,7 +118,7 @@ func TestGetOrdered(t *testing.T) {
 	}
 	_ = p.Add(ctx, r0, waiter0)
 
-	waiter1 := NewWaiter(200, nil)
+	waiter1 := NewWaiter(200, NewStorageState())
 	r1 := &pbsubstreams.Request{
 		StartBlockNum: 200,
 		StopBlockNum:  300,
@@ -126,7 +126,7 @@ func TestGetOrdered(t *testing.T) {
 	}
 	_ = p.Add(ctx, r1, waiter1)
 
-	waiter2 := NewWaiter(100, nil, &pbsubstreams.Module{Name: "A"})
+	waiter2 := NewWaiter(100, NewStorageState(), &pbsubstreams.Module{Name: "A"})
 	r2 := &pbsubstreams.Request{
 		StartBlockNum: 100,
 		StopBlockNum:  200,

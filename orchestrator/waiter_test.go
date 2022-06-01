@@ -48,9 +48,10 @@ func TestBlockWaiter_Signal(t *testing.T) {
 	}
 
 	waiter := &BlockWaiter{
-		items: []*waiterItem{item1, item2},
-		setup: sync.Once{},
-		done:  make(chan interface{}),
+		items:        []*waiterItem{item1, item2},
+		setup:        sync.Once{},
+		storageState: NewStorageState(),
+		done:         make(chan interface{}),
 	}
 
 	require.Equal(t, 2, waiter.Order())

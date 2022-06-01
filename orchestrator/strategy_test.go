@@ -54,11 +54,10 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	//simulate squasher getting its data
+	//simulate squasher squashing the data and notifying the pool
 	go func() {
 		time.Sleep(1 * time.Second)
 		pool.Notify("E", 10)
-		pool.Notify("B", 10)
 
 		time.Sleep(1 * time.Second)
 		pool.Notify("E", 20)
@@ -79,7 +78,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 
 	fmt.Println(allRequests)
 
-	assert.Equal(t, 7, len(allRequests))
+	assert.Equal(t, 8, len(allRequests))
 }
 
 func reqstr(r *pbsubstreams.Request) string {

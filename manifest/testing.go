@@ -3,6 +3,7 @@ package manifest
 import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 var zero = uint64(0)
+var five = uint64(5)
 var ten = uint64(10)
 var twenty = uint64(20)
 var thirty = uint64(30)
@@ -51,7 +52,7 @@ func NewTestModules() []*pbsubstreams.Module {
 		},
 		{
 			Name:         "E",
-			InitialBlock: ten,
+			InitialBlock: five,
 			Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 			Inputs: []*pbsubstreams.Module_Input{
 				{

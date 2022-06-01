@@ -117,7 +117,7 @@ func (b *Store) Clone(newStoreStartBlock uint64) *Store {
 		ModuleInitialBlock: b.ModuleInitialBlock,
 		StoreInitialBlock:  newStoreStartBlock,
 		ModuleHash:         b.ModuleHash,
-		KV:                 map[string][]byte{},
+		KV:                 b.KV,
 		Deltas:             []*pbsubstreams.StoreDelta{},
 		UpdatePolicy:       b.UpdatePolicy,
 		ValueType:          b.ValueType,

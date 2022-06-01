@@ -109,7 +109,7 @@ func (b *Store) Print() {
 	}
 }
 
-func (b *Store) Clone(newStoreStartBlock uint64) *Store {
+func (b *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 	s := &Store{
 		Name:               b.Name,
 		Store:              b.Store,
@@ -118,7 +118,6 @@ func (b *Store) Clone(newStoreStartBlock uint64) *Store {
 		StoreInitialBlock:  newStoreStartBlock,
 		ModuleHash:         b.ModuleHash,
 		KV:                 b.KV,
-		Deltas:             []*pbsubstreams.StoreDelta{},
 		UpdatePolicy:       b.UpdatePolicy,
 		ValueType:          b.ValueType,
 	}
@@ -126,7 +125,7 @@ func (b *Store) Clone(newStoreStartBlock uint64) *Store {
 }
 
 func (b *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, error) {
-	newStore := b.Clone(blockRange.StartBlock)
+	newStore := b.CloneStructure(blockRange.StartBlock)
 
 	if err := newStore.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
 		return nil, err

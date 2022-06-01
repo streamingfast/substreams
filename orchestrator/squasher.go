@@ -40,7 +40,7 @@ func NewSquasher(ctx context.Context, storageState *StorageState, builders []*st
 		lastKVSavedBlock := storageState.lastBlocks[builder.Name]
 		storagePresent := lastKVSavedBlock != 0
 		if !storagePresent {
-			squashables[builder.Name] = NewSquashable(builder.Clone(builder.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, builder.ModuleInitialBlock)
+			squashables[builder.Name] = NewSquashable(builder.CloneStructure(builder.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, builder.ModuleInitialBlock)
 		} else {
 			r := &block.Range{
 				StartBlock:        builder.ModuleInitialBlock,

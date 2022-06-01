@@ -38,20 +38,21 @@ type Pipeline struct {
 
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
-	storesMap      map[string]*state.Store
-	stores         []*state.Store
 
 	context context.Context
 	request *pbsubstreams.Request
 	graph   *manifest.ModuleGraph
 
-	modules           []*pbsubstreams.Module
-	outputModuleNames []string
-	outputModuleMap   map[string]bool
-	outputModules     []*pbsubstreams.Module
-	leafStores        []*state.Store // in orchestrated execution
-	moduleExecutors   []ModuleExecutor
-	wasmOutputs       map[string][]byte
+	modules              []*pbsubstreams.Module
+	outputModuleNames    []string
+	outputModuleMap      map[string]bool
+	outputModules        []*pbsubstreams.Module
+	storeModules         []*pbsubstreams.Module
+	storeMap             map[string]*state.Store
+	backprocessingStores []*state.Store
+
+	moduleExecutors []ModuleExecutor
+	wasmOutputs     map[string][]byte
 
 	baseStateStore     dstore.Store
 	storesSaveInterval uint64
@@ -86,7 +87,7 @@ func New(
 		request: request,
 		// WARN: we don't support < 0 StartBlock for now
 		requestedStartBlockNum:       uint64(request.StartBlockNum),
-		storesMap:                    map[string]*state.Store{},
+		storeMap:                     map[string]*state.Store{},
 		graph:                        graph,
 		baseStateStore:               baseStateStore,
 		outputModuleNames:            request.OutputModules,
@@ -113,7 +114,7 @@ func New(
 
 func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
 	ctx := p.context
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_orchestrated_execution", p.isBackprocessing), zap.Strings("outputs", p.request.OutputModules))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isBackprocessing), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
@@ -121,11 +122,11 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		return nil, fmt.Errorf("building pipeline: %w", err)
 	}
 
-	stores := p.stores
-
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
-		p.outputModules = append(p.outputModules, module)
+		if isOutput {
+			p.outputModules = append(p.outputModules, module)
+		}
 
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
 			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
@@ -141,15 +142,16 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 	if p.isBackprocessing {
 		totalOutputModules := len(p.outputModuleNames)
 		outputName := p.outputModuleNames[0]
-		buildingStore := p.storesMap[outputName]
-		isLastStore := len(stores) > 0 && stores[len(stores)-1] == buildingStore
+		backprocessingStore := p.storeMap[outputName]
+		lastStoreName := p.storeModules[len(p.storeModules)-1].Name
+		isLastStore := lastStoreName == backprocessingStore.Name
 
-		if totalOutputModules == 1 && buildingStore != nil && isLastStore {
+		if totalOutputModules == 1 && backprocessingStore != nil && isLastStore {
 			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
 			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
-			buildingStore.StoreInitialBlock = p.requestedStartBlockNum
-			p.leafStores = append(p.leafStores, buildingStore)
+			backprocessingStore.StoreInitialBlock = p.requestedStartBlockNum
+			p.backprocessingStores = append(p.backprocessingStores, backprocessingStore)
 		} else {
 			zlog.Info("conditions for leaf store not met",
 				zap.String("module", outputName),
@@ -163,7 +165,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		}
 	} else {
 		// This launches processing for all depend stores at the requests' `startBlock`
-		err = SynchronizeStores(
+		newStores, err := SynchronizeStores(
 			ctx,
 			workerPool,
 			p.request,
@@ -175,6 +177,8 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		if err != nil {
 			return nil, fmt.Errorf("synchronizing stores: %w", err)
 		}
+
+		p.resetStores(newStores)
 		// All STORES are expected to be synchronized properly at this point, and have
 		// data up until requestedStartBlockNum.
 	}
@@ -292,7 +296,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			}
 		}
 
-		for _, s := range p.storesMap {
+		for _, s := range p.storeMap {
 			s.Flush()
 		}
 
@@ -320,7 +324,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 		// TODO(abourget): we might want to send progress for the segment after batch execution
 		var progress []*pbsubstreams.ModuleProgress
 
-		for _, store := range p.leafStores {
+		for _, store := range p.backprocessingStores {
 			progress = append(progress, &pbsubstreams.ModuleProgress{
 				Name: store.Name,
 				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
@@ -432,12 +436,11 @@ func (p *Pipeline) buildStores() error {
 		return err
 	}
 
-	p.storesMap = make(map[string]*state.Store)
-	p.stores = nil
-	for _, storeModule := range storeModules {
-		var options []state.BuilderOption
+	p.storeModules = storeModules
 
-		builder, err := state.NewBuilder(
+	var newStores []*state.Store
+	for _, storeModule := range storeModules {
+		newStore, err := state.NewBuilder(
 			storeModule.Name,
 			p.storesSaveInterval,
 			storeModule.InitialBlock,
@@ -445,18 +448,24 @@ func (p *Pipeline) buildStores() error {
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			p.baseStateStore,
-			options...,
 		)
 		if err != nil {
 			return fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
 		}
-
-		p.stores = append(p.stores, builder)
-
-		p.storesMap[builder.Name] = builder
+		newStores = append(newStores, newStore)
 	}
 
+	p.resetStores(newStores)
+
 	return nil
+}
+
+func (p *Pipeline) resetStores(newStores []*state.Store) {
+	p.storeMap = make(map[string]*state.Store)
+	p.backprocessingStores = nil
+	for _, store := range newStores {
+		p.storeMap[store.Name] = store
+	}
 }
 
 func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request, modules []*pbsubstreams.Module) error {
@@ -480,16 +489,16 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 					inputs = append(inputs, &wasm.Input{
 						Type:   wasm.InputStore,
 						Name:   inputName,
-						Store:  p.storesMap[inputName],
+						Store:  p.storeMap[inputName],
 						Deltas: true,
 					})
 				} else {
 					inputs = append(inputs, &wasm.Input{
 						Type:  wasm.InputStore,
 						Name:  inputName,
-						Store: p.storesMap[inputName],
+						Store: p.storeMap[inputName],
 					})
-					if p.storesMap[inputName] == nil {
+					if p.storeMap[inputName] == nil {
 						return fmt.Errorf("no store with name %q", inputName)
 					}
 				}
@@ -534,7 +543,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			updatePolicy := kind.KindStore.UpdatePolicy
 			valueType := kind.KindStore.ValueType
 
-			outputStore := p.storesMap[modName]
+			outputStore := p.storeMap[modName]
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         modName,
@@ -565,7 +574,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func SynchronizeStores(
+func (p *Pipeline) backprocessStores(
 	ctx context.Context,
 	workerPool *worker.Pool,
 	originalRequest *pbsubstreams.Request,
@@ -576,7 +585,11 @@ func SynchronizeStores(
 	respFunc substreams.ResponseFunc,
 	blockRangeSizeSubRequests int,
 	storeSaveInterval uint64,
-	maxSubrequestRangeSize uint64) error {
+	maxSubrequestRangeSize uint64,
+) (
+	[]*state.Store,
+	error,
+) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -587,32 +600,32 @@ func SynchronizeStores(
 
 	storageState, err := orchestrator.FetchStorageState(ctx, builders)
 	if err != nil {
-		return fmt.Errorf("fetching stores states: %w", err)
+		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
 	progressMessages := storageState.ProgressMessages()
 	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
-		return fmt.Errorf("sending progress: %w", err)
+		return nil, fmt.Errorf("sending progress: %w", err)
 	}
 
 	squasher, err := orchestrator.NewSquasher(ctx, storageState, builders, outputCache, storeSaveInterval, upToBlockNum, orchestrator.WithNotifier(requestPool))
 	if err != nil {
-		return fmt.Errorf("initializing squasher: %w", err)
+		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
 
 	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests, maxSubrequestRangeSize)
 	if err != nil {
-		return fmt.Errorf("creating strategy: %w", err)
+		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
 	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc, blockRangeSizeSubRequests)
 	if err != nil {
-		return fmt.Errorf("initializing scheduler: %w", err)
+		return nil, fmt.Errorf("initializing scheduler: %w", err)
 	}
 
 	requestCount := strategy.RequestCount()
 	if requestCount == 0 {
-		return nil
+		return builders, nil
 	}
 	result := make(chan error)
 
@@ -627,7 +640,7 @@ done:
 		case err := <-result:
 			resultCount++
 			if err != nil {
-				return fmt.Errorf("from worker: %w", err)
+				return nil, fmt.Errorf("from worker: %w", err)
 			}
 			zlog.Debug("received result", zap.Int("result_count", resultCount), zap.Int("request_count", requestCount), zap.Error(err))
 			if resultCount == requestCount {
@@ -647,7 +660,7 @@ done:
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
 	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!!
-	for _, builder := range p.storesMap {
+	for _, builder := range p.storeMap {
 		// TODO: implement parallel writing and upload for the different stores involved.
 		err := builder.WriteState(ctx, lastBlock)
 		if err != nil {
@@ -666,17 +679,17 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) er
 }
 
 func (p *Pipeline) LoadStores(ctx context.Context) error {
-	for _, builder := range p.storesMap {
-		if builder.IsPartial() {
+	for _, store := range p.storeMap {
+		if store.IsPartial() {
 			continue
 		}
-		if builder.StoreInitialBlock == p.requestedStartBlockNum {
+		if store.StoreInitialBlock == p.requestedStartBlockNum {
 			continue
 		}
 
-		err := builder.Fetch(ctx, p.requestedStartBlockNum)
+		err := store.Fetch(ctx, p.requestedStartBlockNum)
 		if err != nil {
-			return fmt.Errorf("reading state for builder %q: %w", builder.Name, err)
+			return fmt.Errorf("reading state for builder %q: %w", store.Name, err)
 		}
 	}
 	return nil

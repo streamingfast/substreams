@@ -27,12 +27,12 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	mockDStore := dstore.NewMockStore(nil)
-	var stores []*state.Store
+	stores := map[string]*state.Store{}
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
 		newStore, err := state.NewBuilder(mod.Name, uint64(saveInterval), mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
 		require.NoError(t, err)
-		stores = append(stores, newStore)
+		stores[newStore.Name] = newStore
 	}
 
 	pool := NewRequestPool()

@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/worker"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
@@ -66,7 +65,7 @@ type Pipeline struct {
 	currentBlockRef bstream.BlockRef
 
 	outputCacheSaveBlockInterval uint64
-	blockRangeSizeSubrequests    int
+	blockRangeSizeSubRequests    int
 	grpcClientFactory            func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
@@ -96,7 +95,7 @@ func New(
 		wasmExtensions:               wasmExtensions,
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
-		blockRangeSizeSubrequests:    blockRangeSizeSubRequests,
+		blockRangeSizeSubRequests:    blockRangeSizeSubRequests,
 
 		maxStoreSyncRangeSize: math.MaxUint64,
 	}
@@ -164,23 +163,13 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			return nil, fmt.Errorf("loading stores: %w", err)
 		}
 	} else {
-		// This launches processing for all depend stores at the requests' `startBlock`
-		newStores, err := SynchronizeStores(
-			ctx,
-			workerPool,
-			p.request,
-			stores,
-			p.graph, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.blockRangeSizeSubrequests,
-			p.storesSaveInterval,
-			p.maxStoreSyncRangeSize,
-		)
+		newStores, err := p.backprocessStores(ctx, workerPool, respFunc)
 		if err != nil {
 			return nil, fmt.Errorf("synchronizing stores: %w", err)
 		}
 
-		p.resetStores(newStores)
-		// All STORES are expected to be synchronized properly at this point, and have
-		// data up until requestedStartBlockNum.
+		p.storeMap = newStores
+		p.backprocessingStores = nil
 	}
 
 	err = p.buildWASM(ctx, p.request, p.modules)
@@ -438,7 +427,7 @@ func (p *Pipeline) buildStores() error {
 
 	p.storeModules = storeModules
 
-	var newStores []*state.Store
+	p.storeMap = map[string]*state.Store{}
 	for _, storeModule := range storeModules {
 		newStore, err := state.NewBuilder(
 			storeModule.Name,
@@ -452,20 +441,10 @@ func (p *Pipeline) buildStores() error {
 		if err != nil {
 			return fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
 		}
-		newStores = append(newStores, newStore)
+		p.storeMap[newStore.Name] = newStore
 	}
-
-	p.resetStores(newStores)
 
 	return nil
-}
-
-func (p *Pipeline) resetStores(newStores []*state.Store) {
-	p.storeMap = make(map[string]*state.Store)
-	p.backprocessingStores = nil
-	for _, store := range newStores {
-		p.storeMap[store.Name] = store
-	}
 }
 
 func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request, modules []*pbsubstreams.Module) error {
@@ -569,90 +548,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		default:
 			return fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name)
 		}
-	}
-
-	return nil
-}
-
-func (p *Pipeline) backprocessStores(
-	ctx context.Context,
-	workerPool *worker.Pool,
-	originalRequest *pbsubstreams.Request,
-	builders []*state.Store,
-	graph *manifest.ModuleGraph,
-	outputCache map[string]*outputs.OutputCache,
-	upToBlockNum uint64,
-	respFunc substreams.ResponseFunc,
-	blockRangeSizeSubRequests int,
-	storeSaveInterval uint64,
-	maxSubrequestRangeSize uint64,
-) (
-	[]*state.Store,
-	error,
-) {
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	zlog.Info("synchronizing stores")
-
-	requestPool := orchestrator.NewRequestPool()
-
-	storageState, err := orchestrator.FetchStorageState(ctx, builders)
-	if err != nil {
-		return nil, fmt.Errorf("fetching stores states: %w", err)
-	}
-
-	progressMessages := storageState.ProgressMessages()
-	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
-		return nil, fmt.Errorf("sending progress: %w", err)
-	}
-
-	squasher, err := orchestrator.NewSquasher(ctx, storageState, builders, outputCache, storeSaveInterval, upToBlockNum, orchestrator.WithNotifier(requestPool))
-	if err != nil {
-		return nil, fmt.Errorf("initializing squasher: %w", err)
-	}
-
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, originalRequest, builders, graph, requestPool, upToBlockNum, blockRangeSizeSubRequests, maxSubrequestRangeSize)
-	if err != nil {
-		return nil, fmt.Errorf("creating strategy: %w", err)
-	}
-
-	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc, blockRangeSizeSubRequests)
-	if err != nil {
-		return nil, fmt.Errorf("initializing scheduler: %w", err)
-	}
-
-	requestCount := strategy.RequestCount()
-	if requestCount == 0 {
-		return builders, nil
-	}
-	result := make(chan error)
-
-	scheduler.Launch(ctx, result)
-
-	resultCount := 0
-done:
-	for {
-		select {
-		case <-ctx.Done():
-			return nil // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
-		case err := <-result:
-			resultCount++
-			if err != nil {
-				return nil, fmt.Errorf("from worker: %w", err)
-			}
-			zlog.Debug("received result", zap.Int("result_count", resultCount), zap.Int("request_count", requestCount), zap.Error(err))
-			if resultCount == requestCount {
-				break done
-			}
-		}
-	}
-
-	zlog.Info("store sync completed")
-
-	if err := squasher.StoresReady(); err != nil {
-		return fmt.Errorf("squasher ready: %w", err)
 	}
 
 	return nil

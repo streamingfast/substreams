@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
 )
 
@@ -34,23 +33,23 @@ func WithNotifier(notifier Notifier) SquasherOption {
 	}
 }
 
-func NewSquasher(ctx context.Context, storageState *StorageState, builders []*state.Store, outputCaches map[string]*outputs.OutputCache, storeSaveInterval uint64, targetExclusiveBlock uint64, opts ...SquasherOption) (*Squasher, error) {
+func NewSquasher(ctx context.Context, storageState *StorageState, stores map[string]*state.Store, storeSaveInterval uint64, targetExclusiveBlock uint64, opts ...SquasherOption) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
-	for _, builder := range builders {
-		lastKVSavedBlock := storageState.lastBlocks[builder.Name]
+	for _, store := range stores {
+		lastKVSavedBlock := storageState.lastBlocks[store.Name]
 		storagePresent := lastKVSavedBlock != 0
 		if !storagePresent {
-			squashables[builder.Name] = NewSquashable(builder.CloneStructure(builder.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, builder.ModuleInitialBlock)
+			squashables[store.Name] = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, store.ModuleInitialBlock)
 		} else {
 			r := &block.Range{
-				StartBlock:        builder.ModuleInitialBlock,
+				StartBlock:        store.ModuleInitialBlock,
 				ExclusiveEndBlock: lastKVSavedBlock, // This ASSUMES we have scheduled jobs that are going to pipe us new results in.
 			}
-			squish, err := builder.LoadFrom(ctx, r)
+			squish, err := store.LoadFrom(ctx, r)
 			if err != nil {
-				return nil, fmt.Errorf("loading store %q: range %s: %w", builder.Name, r, err)
+				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, r, err)
 			}
-			squashables[builder.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval, lastKVSavedBlock)
+			squashables[store.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval, lastKVSavedBlock)
 		}
 	}
 
@@ -79,7 +78,8 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, outgoingReqRan
 	return squashable.squash(ctx, outgoingReqRange, s.notifier)
 }
 
-func (s *Squasher) StoresReady() error {
+func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
+	out = map[string]*state.Store{}
 	var errs []string
 	for _, v := range s.squashables {
 		if !v.targetReached {
@@ -88,16 +88,17 @@ func (s *Squasher) StoresReady() error {
 		if !v.IsEmpty() {
 			errs = append(errs, fmt.Sprintf("module %q missing ranges %s", v.name, v.ranges))
 		}
+		out[v.store.Name] = v.store
 	}
 	if len(errs) != 0 {
-		return errors.New(strings.Join(errs, "; "))
+		return nil, errors.New(strings.Join(errs, "; "))
 	}
-	return nil
+	return out, nil
 }
 
 type Squashable struct {
 	name                   string
-	builder                *state.Store
+	store                  *state.Store
 	ranges                 block.Ranges // Ranges split in `storeSaveInterval` chunks
 	storeSaveInterval      uint64
 	targetExclusiveBlock   uint64
@@ -106,10 +107,10 @@ type Squashable struct {
 	targetReached bool
 }
 
-func NewSquashable(initialBuilder *state.Store, targetExclusiveBlock, storeSaveInterval, nextExpectedStartBlock uint64) *Squashable {
+func NewSquashable(initialStore *state.Store, targetExclusiveBlock, storeSaveInterval, nextExpectedStartBlock uint64) *Squashable {
 	return &Squashable{
-		name:                   initialBuilder.Name,
-		builder:                initialBuilder,
+		name:                   initialStore.Name,
+		store:                  initialStore,
 		storeSaveInterval:      storeSaveInterval,
 		targetExclusiveBlock:   targetExclusiveBlock,
 		nextExpectedStartBlock: nextExpectedStartBlock,
@@ -133,10 +134,10 @@ func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifi
 func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range) error {
 	splitBlockRanges := blockRange.Split(s.storeSaveInterval)
 	for _, splitBlockRange := range splitBlockRanges {
-		if splitBlockRange.StartBlock < s.builder.ModuleInitialBlock {
-			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, splitBlockRange.StartBlock, s.builder.ModuleInitialBlock)
+		if splitBlockRange.StartBlock < s.store.ModuleInitialBlock {
+			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, splitBlockRange.StartBlock, s.store.ModuleInitialBlock)
 		}
-		if blockRange.ExclusiveEndBlock < s.builder.StoreInitialBlock {
+		if blockRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
 			// Otherwise, risks stalling the merging (as ranges are
 			// sorted, and only the first is checked for contiguousness)
 			continue
@@ -149,7 +150,7 @@ func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range)
 }
 
 func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifier) error {
-	zlog.Info("squashing", zap.String("module_name", s.builder.Name))
+	zlog.Info("squashing", zap.String("module_name", s.store.Name))
 
 	for {
 		select {
@@ -173,12 +174,12 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 
 		zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 
-		nextStore, err := s.builder.LoadFrom(ctx, squashableRange)
+		nextStore, err := s.store.LoadFrom(ctx, squashableRange)
 		if err != nil {
-			return fmt.Errorf("initializing next partial builder %q: %w", s.name, err)
+			return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 		}
 
-		err = s.builder.Merge(nextStore)
+		err = s.store.Merge(nextStore)
 		if err != nil {
 			return fmt.Errorf("merging: %s", err)
 		}
@@ -187,7 +188,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 
 		endsOnBoundary := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
 		if endsOnBoundary {
-			err = s.builder.WriteState(ctx, squashableRange.ExclusiveEndBlock)
+			err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				return fmt.Errorf("writing state: %w", err)
 			}
@@ -205,7 +206,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 		}
 
 		if notifier != nil {
-			notifier.Notify(s.builder.Name, squashableRange.ExclusiveEndBlock)
+			notifier.Notify(s.store.Name, squashableRange.ExclusiveEndBlock)
 		}
 	}
 

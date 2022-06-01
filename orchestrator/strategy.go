@@ -30,7 +30,7 @@ func NewOrderedStrategy(
 	ctx context.Context,
 	storageState *StorageState,
 	request *pbsubstreams.Request,
-	stores []*state.Store,
+	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 	pool *RequestPool,
 	upToBlockNum uint64,

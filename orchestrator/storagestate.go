@@ -20,7 +20,7 @@ func NewStorageState() *StorageState {
 	}
 }
 
-func FetchStorageState(ctx context.Context, stores []*state.Store) (out *StorageState, err error) {
+func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out *StorageState, err error) {
 	out = NewStorageState()
 	for _, builder := range stores {
 		info, err := builder.Info(ctx)

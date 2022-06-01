@@ -146,7 +146,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		startsAtInitialBlock := buildingStore.ModuleInitialBlock == p.requestedStartBlockNum
 
 		if totalOutputModules == 1 && buildingStore != nil && isLastStore && !startsAtInitialBlock {
-			// totalOutputModuels is a temporary restrictions, for when the orchestrator
+			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
 			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
 			buildingStore.StoreInitialBlock = p.requestedStartBlockNum
@@ -236,7 +236,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
 				return fmt.Errorf("saving stores: %w", err)
 			}
-
 		}
 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
@@ -245,7 +244,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 			if p.isBackprocessing {
 				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
-				zlog.Debug("about to save partial output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
+				zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
 				if err := p.moduleOutputCache.Save(ctx); err != nil {
 					return fmt.Errorf("saving partial caches")
 				}

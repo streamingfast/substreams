@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"sort"
 	"strings"
 	"sync"
-
-	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/pipeline/outputs"
@@ -141,7 +140,7 @@ func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range)
 			// sorted, and only the first is checked for contiguousness)
 			continue
 		}
-		fmt.Println("APPENDING RANGE", splitBlockRange)
+		zlog.Debug("appending range", zap.Stringer("split_block_range", splitBlockRange))
 		s.ranges = append(s.ranges, splitBlockRange)
 	}
 	sort.Sort(s.ranges)
@@ -171,7 +170,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 			break
 		}
 
-		zlog.Debug("found range to merge", zap.Stringer("squashable", s))
+		zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 
 		nextStore, err := s.builder.LoadFrom(ctx, squashableRange)
 		if err != nil {

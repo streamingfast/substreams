@@ -47,7 +47,14 @@ type Store struct {
 	lastOrdinal uint64
 }
 
-func (b *Store) IsPartial() bool { return b.ModuleInitialBlock != b.StoreInitialBlock }
+func (b *Store) IsPartial() bool {
+	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", b.ModuleInitialBlock), zap.Uint64("store_initial_block", b.StoreInitialBlock))
+	//fixme: this seems to cause an issue when we run ethtokens:tokens -s 6810707 -t +1
+	// we will create a subrequest which is from 6810706 to 6810707 and it will not detect
+	// that we are in partial mode, because we only check the starting point
+	// and will try to get a [...].kv file instead of a [...].partial file
+	return b.ModuleInitialBlock != b.StoreInitialBlock
+}
 
 func (b *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("builder_name", b.Name)
@@ -241,7 +248,7 @@ func (b *Store) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock ui
 }
 
 func (b *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
-	zlog.Debug("writing state", zap.Object("builder", b))
+	zlog.Debug("writing state", zap.Object("builder", b), zap.Uint64("last_block", lastBlock))
 
 	err = b.writeMergeData()
 	if err != nil {

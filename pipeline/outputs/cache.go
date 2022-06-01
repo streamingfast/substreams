@@ -93,8 +93,11 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 func (c *ModulesOutputCache) Save(ctx context.Context) error {
 	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
-
 		filename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
+		zlog.Debug("saving cache for current block range", zap.String("module_name", moduleCache.ModuleName),
+			zap.Uint64("start_block", moduleCache.CurrentBlockRange.StartBlock),
+			zap.Uint64("end_block", moduleCache.CurrentBlockRange.ExclusiveEndBlock))
+
 		if err := moduleCache.save(ctx, filename); err != nil {
 			return fmt.Errorf("save: saving outpust or module kv %s: %w", moduleCache.ModuleName, err)
 		}
@@ -110,8 +113,8 @@ func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uin
 	}
 }
 
-func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
-	for _, item := range c.kv {
+func (o *OutputCache) SortedCacheItems() (out []*CacheItem) {
+	for _, item := range o.kv {
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -120,13 +123,13 @@ func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 	return
 }
 
-func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
-	return !c.CurrentBlockRange.Contains(ref)
+func (o *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
+	return !o.CurrentBlockRange.Contains(ref)
 }
 
-func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (o *OutputCache) Set(block *bstream.Block, data []byte) error {
+	o.lock.Lock()
+	defer o.lock.Unlock()
 
 	ci := &CacheItem{
 		BlockNum: block.Num(),
@@ -134,16 +137,16 @@ func (c *OutputCache) Set(block *bstream.Block, data []byte) error {
 		Payload:  data,
 	}
 
-	c.kv[block.Id] = ci
+	o.kv[block.Id] = ci
 
 	return nil
 }
 
-func (c *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (o *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
 
-	cacheItem, found := c.kv[block.Id]
+	cacheItem, found := o.kv[block.Id]
 
 	if !found {
 		return nil, false, nil
@@ -152,36 +155,36 @@ func (c *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
 	return cacheItem.Payload, found, nil
 }
 
-func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (foud bool, err error) {
-	zlog.Info("loading outputs", zap.String("module_name", c.ModuleName), zap.Uint64("at_block_num", atBlock))
+func (o *OutputCache) Load(ctx context.Context, atBlock uint64) (foud bool, err error) {
+	zlog.Info("loading outputs", zap.String("module_name", o.ModuleName), zap.Uint64("at_block_num", atBlock))
 
-	c.kv = make(outputKV)
+	o.kv = make(outputKV)
 
 	var found bool
-	c.CurrentBlockRange, found, err = findBlockRange(ctx, c.Store, atBlock)
+	o.CurrentBlockRange, found, err = findBlockRange(ctx, o.Store, atBlock)
 	if err != nil {
-		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
+		return found, fmt.Errorf("computing block range for module %q: %w", o.ModuleName, err)
 	}
 
 	if !found {
-		c.CurrentBlockRange = &block.Range{
+		o.CurrentBlockRange = &block.Range{
 			StartBlock:        atBlock,
-			ExclusiveEndBlock: atBlock + c.saveBlockInterval,
+			ExclusiveEndBlock: atBlock + o.saveBlockInterval,
 		}
 
 		return found, nil
 	}
 
-	filename := computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
-	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", c.CurrentBlockRange))
+	filename := computeDBinFilename(o.CurrentBlockRange.StartBlock, o.CurrentBlockRange.ExclusiveEndBlock)
+	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", o.ModuleName), zap.Object("block_range", o.CurrentBlockRange))
 
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		objectReader, err := c.Store.OpenObject(ctx, filename)
+		objectReader, err := o.Store.OpenObject(ctx, filename)
 		if err != nil {
 			return fmt.Errorf("loading block reader %s: %w", filename, err)
 		}
 
-		if err = json.NewDecoder(objectReader).Decode(&c.kv); err != nil {
+		if err = json.NewDecoder(objectReader).Decode(&o.kv); err != nil {
 			return fmt.Errorf("json decoding file %s: %w", filename, err)
 		}
 
@@ -191,28 +194,28 @@ func (c *OutputCache) Load(ctx context.Context, atBlock uint64) (foud bool, err 
 		return false, fmt.Errorf("retried: %w", err)
 	}
 
-	zlog.Debug("outputs data loaded", zap.String("module_name", c.ModuleName), zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.CurrentBlockRange))
+	zlog.Debug("outputs data loaded", zap.String("module_name", o.ModuleName), zap.Int("output_count", len(o.kv)), zap.Stringer("block_range", o.CurrentBlockRange))
 	return found, nil
 }
 
-func (c *OutputCache) save(ctx context.Context, filename string) error {
-	zlog.Info("saving cache", zap.String("module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange), zap.String("filename", filename))
+func (o *OutputCache) save(ctx context.Context, filename string) error {
+	zlog.Info("saving cache", zap.String("module_name", o.ModuleName), zap.Stringer("block_range", o.CurrentBlockRange), zap.String("filename", filename))
 
 	buffer := bytes.NewBuffer(nil)
-	err := json.NewEncoder(buffer).Encode(c.kv)
+	err := json.NewEncoder(buffer).Encode(o.kv)
 	if err != nil {
 		return fmt.Errorf("json encoding outputs: %w", err)
 	}
 
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		reader := bytes.NewReader(buffer.Bytes())
-		return c.Store.WriteObject(ctx, filename, reader)
+		return o.Store.WriteObject(ctx, filename, reader)
 	})
 	if err != nil {
 		return fmt.Errorf("writing block buffer to store: %w", err)
 	}
 
-	zlog.Debug("cache saved", zap.String("module_name", c.ModuleName), zap.String("file_name", filename), zap.String("url", c.Store.BaseURL().String()))
+	zlog.Debug("cache saved", zap.String("module_name", o.ModuleName), zap.String("file_name", filename), zap.String("url", o.Store.BaseURL().String()))
 	return nil
 }
 

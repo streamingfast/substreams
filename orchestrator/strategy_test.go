@@ -15,6 +15,8 @@ import (
 )
 
 func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
+	t.Skip("abourget: incomplete, untested")
+
 	saveInterval := 10
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
@@ -59,10 +61,10 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	}
 
 	assert.Equal(t, []string{
-		"",
-		"",
-		"",
-		"",
+		"insert",
+		"the",
+		"expected",
+		"values",
 	}, allreqs)
 }
 

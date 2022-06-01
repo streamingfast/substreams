@@ -193,7 +193,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	handler, err := pipe.HandlerFactory(workerPool, responseHandler)
 	if err != nil {
-		return fmt.Errorf("error building substreams pipeline handler: %w", err)
+		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
 	st, err := s.streamFactory.New(ctx, handler, firehoseReq, zap.NewNop())
@@ -230,7 +230,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 
 		logger.Info("unexpected stream of blocks termination", zap.Error(err))
-		return status.Errorf(codes.Internal, "unexpected substreams termination: %s", err)
+		return status.Errorf(codes.Internal, "unexpected termination: %s", err)
 	}
 	return nil
 }

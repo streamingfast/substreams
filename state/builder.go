@@ -145,10 +145,6 @@ func (s *Store) Fetch(ctx context.Context, exclusiveEndBlock uint64) error {
 	return s.loadState(ctx, fileName)
 }
 
-// func (b *Store) IsFirstRange(r *block.Range) bool {
-// 	return b.ModuleInitialBlock == r.StartBlock
-// }
-
 func (b *Store) loadState(ctx context.Context, stateFileName string) error {
 	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -164,14 +160,14 @@ func (b *Store) loadState(ctx context.Context, stateFileName string) error {
 
 		kv := map[string]string{}
 		if err = json.Unmarshal(data, &kv); err != nil {
-			return fmt.Errorf("json unmarshal of state file %s data: %w", stateFileName, err)
+			return fmt.Errorf("unmarshal data: %w", err)
 		}
 		b.KV = byteMap(kv)
 		b.Initialized = true
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("opening file state file %s: %w", stateFileName, err)
+		return fmt.Errorf("storage file %s: %w", stateFileName, err)
 	}
 
 	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.String("file_name", stateFileName))
@@ -227,6 +223,7 @@ func (b *Store) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock ui
 				if delta.Key == "" {
 					panic("missing key, invalid delta")
 				}
+				// FIXME(abourget): this never did anything.. soooo what's the goal here? :)
 				b.Deltas = append(b.Deltas, delta)
 			}
 		}

@@ -164,13 +164,14 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		err = SynchronizeStores(
 			ctx,
 			workerPool,
-			p.request, stores,
+			p.request,
+			stores,
 			p.graph, p.moduleOutputCache.OutputCaches, p.requestedStartBlockNum, respFunc, p.blockRangeSizeSubrequests,
 			p.storesSaveInterval,
 			p.maxStoreSyncRangeSize,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("synchonizing stores: %w", err)
+			return nil, fmt.Errorf("synchronizing stores: %w", err)
 		}
 		// All STORES are expected to be synchronized properly at this point, and have
 		// data up until requestedStartBlockNum.
@@ -204,6 +205,8 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 			}
 		}()
 
+		// TODO(abourget): eventually, handle the `undo` signals.
+
 		p.clock = &pbsubstreams.Clock{
 			Number:    block.Num(),
 			Id:        block.Id,
@@ -227,8 +230,6 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 
 		//todo? should we only save store if in partial mode or in catchup?
 		// no need to save store if loaded from cache?
-		// TODO: eventually, handle the `undo` signals.
-		//  NOTE: The RUNTIME will handle the undo signals. It'll have all it needs.
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
 		if !isFirstRequestBlock && intervalReached {
@@ -257,11 +258,9 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		cursor := obj.(bstream.Cursorable).Cursor()
 		step := obj.(bstream.Stepable).Step()
 
-		//if !skipBlockSource {
 		if err = p.assignSource(block); err != nil {
 			return fmt.Errorf("setting up sources: %w", err)
 		}
-		//}
 
 		for _, executor := range p.moduleExecutors {
 			zlog.Debug("executing", zap.Stringer("module_name", executor))
@@ -293,6 +292,7 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		for _, s := range p.storesMap {
 			s.Flush()
 		}
+
 		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 		return nil
 	}), nil
@@ -374,7 +374,6 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 }
 
 func (p *Pipeline) assignSource(block *bstream.Block) error {
-
 	switch p.vmType {
 	case "wasm/rust-v1":
 		blkBytes, err := block.Payload.Get()
@@ -646,7 +645,7 @@ done:
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
 	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!!
 	for _, builder := range p.storesMap {
-		// TODO: do we really need to save ALL the stores? or only the `leaf` stores?
+		// TODO: implement parallel writing and upload for the different stores involved.
 		err := builder.WriteState(ctx, lastBlock)
 		if err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)

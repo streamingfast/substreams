@@ -58,15 +58,12 @@ func readStateInfo(ctx context.Context, store dstore.Store) (*Info, error) {
 		}
 		return nil
 	})
-
 	if notFound != nil {
 		return &Info{}, nil
 	}
-
 	if err != nil {
 		return nil, err
 	}
-
 	return info, nil
 }
 

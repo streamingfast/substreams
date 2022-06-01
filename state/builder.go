@@ -47,13 +47,9 @@ type Store struct {
 	lastOrdinal uint64
 }
 
-func (b *Store) IsPartial() bool {
-	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", b.ModuleInitialBlock), zap.Uint64("store_initial_block", b.StoreInitialBlock))
-	//fixme: this seems to cause an issue when we run ethtokens:tokens -s 6810707 -t +1
-	// we will create a subrequest which is from 6810706 to 6810707 and it will not detect
-	// that we are in partial mode, because we only check the starting point
-	// and will try to get a [...].kv file instead of a [...].partial file
-	return b.ModuleInitialBlock != b.StoreInitialBlock
+func (s *Store) IsPartial() bool {
+	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.StoreInitialBlock))
+	return s.ModuleInitialBlock != s.StoreInitialBlock
 }
 
 func (b *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
@@ -282,7 +278,8 @@ func (b *Store) writeState(ctx context.Context, content []byte, lastBlock uint64
 		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", b.Name, b.StoreInitialBlock, lastBlock, err)
 	}
 
-	if !b.IsPartial() {
+	endsOnBoundary := lastBlock%b.SaveInterval == 0
+	if !b.IsPartial() && endsOnBoundary {
 		if err := b.writeInfoState(ctx, filename, lastBlock); err != nil {
 			return filename, fmt.Errorf("writing info state: %w", err)
 		}

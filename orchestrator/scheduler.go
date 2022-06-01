@@ -39,7 +39,7 @@ func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, wo
 }
 
 func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
-	fmt.Println("Getting a NEXT job from Scheduler", len(s.requestsStream))
+	zlog.Debug("Getting a next job from scheduler", zap.Int("requests_stream", len(s.requestsStream)))
 	request, ok := <-s.requestsStream
 	if !ok {
 		return nil, io.EOF
@@ -75,9 +75,9 @@ func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan err
 
 func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 	for {
-		fmt.Println("SCHEDULING NEXT")
+		zlog.Debug("scheduling next")
 		req, err := s.Next()
-		fmt.Println("SCHEDULING NEXT DONE")
+		zlog.Debug("scheduling next done")
 		if err == io.EOF {
 			break
 		}

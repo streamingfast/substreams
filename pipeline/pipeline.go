@@ -143,16 +143,18 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		outputName := p.outputModuleNames[0]
 		buildingStore := p.storesMap[outputName]
 		isLastStore := len(stores) > 0 && stores[len(stores)-1] == buildingStore
-		startsAtInitialBlock := buildingStore.ModuleInitialBlock == p.requestedStartBlockNum
 
-		if totalOutputModules == 1 && buildingStore != nil && isLastStore && !startsAtInitialBlock {
+		if totalOutputModules == 1 && buildingStore != nil && isLastStore {
 			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
 			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
 			buildingStore.StoreInitialBlock = p.requestedStartBlockNum
 			p.leafStores = append(p.leafStores, buildingStore)
 		} else {
-			zlog.Info("conditions for leaf store not met", zap.String("module", outputName), zap.Bool("is_last_store", isLastStore), zap.Int("output_module_count", totalOutputModules))
+			zlog.Info("conditions for leaf store not met",
+				zap.String("module", outputName),
+				zap.Bool("is_last_store", isLastStore),
+				zap.Int("output_module_count", totalOutputModules))
 		}
 
 		zlog.Info("initializing and loading stores")
@@ -232,7 +234,9 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		// no need to save store if loaded from cache?
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-		if !isFirstRequestBlock && (intervalReached || p.isBackprocessing) {
+		isTemporaryStore := p.isBackprocessing && p.clock.Number == p.request.StopBlockNum && p.request.StopBlockNum != 0
+
+		if !isFirstRequestBlock && (intervalReached || isTemporaryStore) {
 			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
 				return fmt.Errorf("saving stores: %w", err)
 			}

@@ -43,7 +43,7 @@ func TestSquash(t *testing.T) {
 			}
 			return io.NopCloser(bytes.NewReader(infoBytes)), nil
 		}
-		if name == "0000020000-0000010000.kv" || name == "0000030000-0000010000.kv" {
+		if name == "0000020000-0000010000.kv" || name == "0000030000-0000020000.partial" {
 			return io.NopCloser(bytes.NewReader([]byte("{}"))), nil
 		}
 		return nil, fmt.Errorf("file %q not mocked", name)

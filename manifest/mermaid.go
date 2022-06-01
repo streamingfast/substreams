@@ -11,29 +11,30 @@ func PrintMermaid(mods *pbsubstreams.Modules) {
 	fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
 
 	for _, s := range mods.Modules {
+		// fmt.Println("module", s.Name)
+		switch s.Kind.(type) {
+		case *pbsubstreams.Module_KindMap_:
+			fmt.Printf("  %s[map: %s]\n", s.Name, s.Name)
+		case *pbsubstreams.Module_KindStore_:
+			fmt.Printf("  %s[store: %s]\n", s.Name, s.Name)
+		}
+
 		for _, in := range s.Inputs {
-			var name string
-			var mode string
 			switch input := in.Input.(type) {
 			case *pbsubstreams.Module_Input_Source_:
-				name = input.Source.Type
+				name := input.Source.Type
+				fmt.Printf("  %s[source: %s] --> %s\n", name, name, s.Name)
 			case *pbsubstreams.Module_Input_Map_:
-				name = input.Map.ModuleName
+				name := input.Map.ModuleName
+				fmt.Printf("  %s --> %s\n", name, s.Name)
 			case *pbsubstreams.Module_Input_Store_:
-				name = input.Store.ModuleName
-				mode = strings.ToLower(fmt.Sprintf("%s", input.Store.Mode))
-			}
-			if mode != "" && mode == "deltas" {
-				fmt.Printf("  %s[%s] -- %q --> %s\n",
-					strings.Split(name, ":")[1],
-					strings.Replace(name, ":", ": ", 1),
-					mode,
-					s.Name)
-			} else {
-				fmt.Printf("  %s[%s] --> %s\n",
-					strings.Split(name, ":")[0],
-					strings.Replace(name, ":", ": ", 1),
-					s.Name)
+				name := input.Store.ModuleName
+				mode := strings.ToLower(fmt.Sprintf("%s", input.Store.Mode))
+				if mode == "deltas" {
+					fmt.Printf("  %s -- deltas --> %s\n", name, s.Name)
+				} else {
+					fmt.Printf("  %s --> %s\n", name, s.Name)
+				}
 			}
 		}
 	}

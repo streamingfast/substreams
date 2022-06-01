@@ -81,7 +81,7 @@ done:
 
 	newStores, err := squasher.StoresReady()
 	if err != nil {
-		return nil, fmt.Errorf("squasher ready: %w", err)
+		return nil, fmt.Errorf("squasher incomplete: %w", err)
 	}
 
 	return newStores, nil

@@ -26,6 +26,6 @@ type model struct {
 	Connected bool
 
 	Failures int
+	LastFailure *pbsubstreams.ModuleProgress_Failed
 	Reason   string
-	Clock    *pbsubstreams.Clock
 }

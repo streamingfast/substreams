@@ -2,11 +2,11 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -79,24 +79,36 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, outgoingReqRan
 }
 
 func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
+	// FIXME(abourget): Before checking the state of all those squashables,
+	// we need to make sure all those Scheduler::Callback and Squash() calls
+	// have finished, and that those `merge()` operations have completed..
+	// otherwise here we can't loop the squashables and expect to have
+	// merged stores.
+	// LET'S CHECK THAT LATER
+	time.Sleep(100 * time.Millisecond) // And remove this!
+
 	out = map[string]*state.Store{}
 	var errs []string
 	for _, v := range s.squashables {
+		v.RLock() // REVISE the use of this lock
 		if !v.targetReached {
-			errs = append(errs, fmt.Sprintf("module %q target not reached", v.name))
+			errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", v.name, v.targetExclusiveBlock, v.ranges, v.nextExpectedStartBlock))
 		}
 		if !v.IsEmpty() {
-			errs = append(errs, fmt.Sprintf("module %q missing ranges %s", v.name, v.ranges))
+			errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", v.name, v.ranges))
 		}
 		out[v.store.Name] = v.store
+		v.RUnlock() // REVISE
 	}
 	if len(errs) != 0 {
-		return nil, errors.New(strings.Join(errs, "; "))
+		return nil, fmt.Errorf("%d errors: %s", len(errs), strings.Join(errs, "; "))
 	}
 	return out, nil
 }
 
 type Squashable struct {
+	sync.RWMutex
+
 	name                   string
 	store                  *state.Store
 	ranges                 block.Ranges // Ranges split in `storeSaveInterval` chunks
@@ -118,6 +130,9 @@ func NewSquashable(initialStore *state.Store, targetExclusiveBlock, storeSaveInt
 }
 
 func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifier Notifier) error {
+	s.Lock()
+	defer s.Unlock()
+
 	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Object("request_range", blockRange))
 
 	if err := s.cumulateRange(ctx, blockRange); err != nil {

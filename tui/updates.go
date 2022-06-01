@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"io/ioutil"
 
 	tea "github.com/charmbracelet/bubbletea"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -43,21 +42,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *pbsubstreams.Request:
 		m.Request = msg
 		return m, nil
-	case *pbsubstreams.Clock:
-		if m.Clock == nil {
-			m.ui.prog.ReleaseTerminal()
-			fmt.Println(m.View())
-			m.Clock = msg
-			fmt.Println("")
-			m.ui.prog.RestoreTerminal()
-		}
-		return m, nil
-	case BlockMessage:
-		m.Updates += 1
-		ioutil.WriteFile("/tmp/mama.txt", []byte(fmt.Sprintf("updates: %d", m.Updates)), 0644)
-		m.ui.prog.ReleaseTerminal()
-		fmt.Println(msg)
-		m.ui.prog.RestoreTerminal()
 	case *pbsubstreams.ModuleProgress:
 		m.Updates += 1
 
@@ -83,6 +67,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if progMsg.Failed.Reason != "" {
 				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %v", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
 			}
+			m.LastFailure = progMsg.Failed
 			return m, nil
 		}
 	default:

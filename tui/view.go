@@ -9,30 +9,9 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-func (m model) View() string {
-	const width = 80
-
-	// WARN(abourget): Request.StartBlockNum cannot be relative here too.
-
-	buf := bytes.NewBuffer(nil)
-	err := template.Must(template.New("tpl").Funcs(template.FuncMap{
-		"pad": func(in string) string {
-			l := len(in)
-			if l > 25 {
-				return in[:25]
-			}
-			return in + strings.Repeat(" ", 25-l)
-		},
-		"humanize": func(in uint64) string {
-			return humanize.Comma(int64(in))
-		},
-		"linebar": func(ranges ranges, m model) string {
-			return linebar(ranges, m.Modules.Lo(), uint64(m.Request.StartBlockNum), m.screenWidth)
-		},
-	}).Parse(`{{ if not .Clock -}}
+var viewTpl = `
 {{- if not .Connected }}Connecting...{{ else -}}
 Connected - Progress messages received: {{ .Updates }}
-{{- if .Failures }}   Failures: {{ .Failures }}, Reason: {{ .Reason }} {{ end }}
 {{ with .Request }}Backprocessing history up to requested start block {{ .StartBlockNum }}:
 (hit 'm' to switch display mode){{end}}
 {{ range $key, $value := .Modules }}
@@ -41,11 +20,40 @@ Connected - Progress messages received: {{ .Updates }}
 {{- else }}
   {{ pad $key }} {{ $value.Lo }}  ::  {{ linebar $value $ }}
 {{- end -}}
-{{ end }}{{ end }}{{ end }}
-{{- with .Clock -}}
--------------------- BLOCK {{ humanize .Number }} --------------------
+{{ end }}{{ end }}
+{{ if .Failures }}
+Failures: {{ .Failures }}.
+Last failure:
+  Reason: {{ .LastFailure.Reason }}
+  Logs:
+{{ range .LastFailure.Logs }}
+    {{ . }}
+{{ end }}
+{{- with .LastFailure.LogsTruncated }}  <logs truncated>{{ end }}
 {{ end -}}
-`)).Execute(buf, m)
+`
+
+var tpl = template.Must(template.New("tpl").Funcs(template.FuncMap{
+	"pad": func(in string) string {
+		l := len(in)
+		if l > 25 {
+			return in[:25]
+		}
+		return in + strings.Repeat(" ", 25-l)
+	},
+	"humanize": func(in uint64) string {
+		return humanize.Comma(int64(in))
+	},
+	"linebar": func(ranges ranges, m model) string {
+		return linebar(ranges, m.Modules.Lo(), uint64(m.Request.StartBlockNum), m.screenWidth)
+	},
+}).Parse(viewTpl))
+
+func (m model) View() string {
+	// WARN(abourget): Request.StartBlockNum cannot be relative here too.
+
+	buf := bytes.NewBuffer(nil)
+	err := tpl.Execute(buf, m)
 	if err != nil {
 		return fmt.Errorf("failed rendering template: %w", err).Error()
 	}

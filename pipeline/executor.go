@@ -193,6 +193,12 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 		if err = instance.Execute(); err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
+	} else {
+		// even-though we are not going to execute a VM, we set the current Instance to nil to ensure
+		// that the logs of the last ran block do not propagate to the user for the current block. Furthermore,
+		// since there is not going to be a VM that is run for this block and module, setting the current instance to nil
+		// explicitly handle said case.
+		e.wasmModule.CurrentInstance = nil
 	}
 	return
 }

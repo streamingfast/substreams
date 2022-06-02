@@ -13,7 +13,6 @@
 ## Getting Started
 
 * [Your First Stream](getting-started/your-first-stream.md)
-* [Awesome Packages](getting-started/awesome-packages.md)
 
 ## Developer Guide
 

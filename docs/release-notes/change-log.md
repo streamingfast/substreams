@@ -4,11 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## \[Unreleased]
+
+## [v0.0.9-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.9-beta)
 
 ### `substreams` crate
 
-* Added `substreams::hex` wrapper around hex_literal::hex macro
+* Added `substreams::hex` wrapper around hex\_literal::hex macro
 
 ### `substreams` CLI
 
@@ -16,8 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-* Fixed a whole bunch of issues, in parallel processing. More stable caching.
-
+* Fixed a whole bunch of issues, in parallel processing. More stable caching. See chain-specific releases.
 
 ## [v0.0.8-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.8-beta)
 

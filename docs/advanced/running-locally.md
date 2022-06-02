@@ -4,13 +4,13 @@ You can run the Substreams service locally this way:
 
 1. Get a recent release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), and install `sfeth`.
 
-Alternatively, you can use this Docker image: `ghcr.io/streamingfast/sf-ethereum:6aa70ca`, known to work with version v0.0.5-beta of the `substreams` release herein.
+Alternatively, you can use [Docker images produced automatically](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum) in the repository.
 
-1. Get some data (merged blocks) to play with locally (here on BSC mainnet):
+1. Get some data (merged blocks) to play with locally:
 
 ```bash
 # Downloads 2.6GB of data
-sfeth tools download-from-firehose bsc-dev.streamingfast.io:443 6810000 6820000 ./localblocks
+sfeth tools download-from-firehose api-dev.streamingfast.io:443 6810000 6820000 ./localblocks
 # You can skip this one:
 sfeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
@@ -46,5 +46,5 @@ sfeth start -c config.yaml
 1. And then run the `substreams` command against your local deployment (checkout `substreams-playground` in the _Run remotely_ section above):
 
 ```bash
-substreams run -k -e localhost:9000  # ...
+substreams run -p -e localhost:9000  # ...
 ```

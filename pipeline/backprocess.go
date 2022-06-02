@@ -44,10 +44,6 @@ func (p *Pipeline) backprocessStores(
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	if strategy.RequestCount() == 0 {
-		return p.storeMap, nil
-	}
-
 	squasher, err := orchestrator.NewSquasher(ctx, storageState, p.storeMap, p.storesSaveInterval, upToBlock, orchestrator.WithNotifier(requestPool))
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
@@ -60,24 +56,21 @@ func (p *Pipeline) backprocessStores(
 
 	result := make(chan error)
 
-	scheduler.Launch(ctx, result)
+	schedulerErr := scheduler.Launch(ctx, result)
 
-	requestCount := strategy.RequestCount() // Is this expected to be the TOTAL number of requests we've seen?
-	resultCount := 0
-done:
-	for {
+	requestCount := requestPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
+	for resultCount := 0; resultCount < requestCount; {
 		select {
 		case <-ctx.Done():
 			return nil, context.Canceled // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
+		case err := <-schedulerErr:
+			return nil, fmt.Errorf("scheduler: %w", err)
 		case err := <-result:
 			resultCount++
 			if err != nil {
 				return nil, fmt.Errorf("from worker: %w", err)
 			}
 			zlog.Debug("received result", zap.Int("result_count", resultCount), zap.Int("request_count", requestCount), zap.Error(err))
-			if resultCount == requestCount {
-				break done
-			}
 		}
 	}
 

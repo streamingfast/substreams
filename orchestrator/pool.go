@@ -33,6 +33,8 @@ type RequestPool struct {
 	waiters      map[Waiter]struct{}
 	waitersMutex sync.RWMutex
 
+	totalRequests int
+
 	start      sync.Once
 	readActive bool
 	wg         sync.WaitGroup
@@ -87,6 +89,7 @@ func (p *RequestPool) Add(ctx context.Context, request *pbsubstreams.Request, wa
 	}
 
 	p.waitersMutex.Lock()
+	p.totalRequests++
 	p.waiters[rw.Waiter] = struct{}{}
 	p.requestWaiters = append(p.requestWaiters, rw)
 	p.waitersMutex.Unlock()
@@ -163,7 +166,5 @@ func (p *RequestPool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 }
 
 func (p *RequestPool) Count() int {
-	p.waitersMutex.RLock()
-	defer p.waitersMutex.RUnlock()
-	return len(p.waiters)
+	return p.totalRequests
 }

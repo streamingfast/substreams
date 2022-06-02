@@ -66,9 +66,11 @@ func (s *Scheduler) Callback(ctx context.Context, outgoingReq *pbsubstreams.Requ
 }
 
 func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan error) {
-	out = make(chan error, 1)
+	out = make(chan error, 1) // FIXME: not used, not necessary?
 	go func() {
-		out <- s.doLaunch(ctx, result)
+		if err := s.doLaunch(ctx, result); err != nil {
+			out <- err
+		}
 	}()
 	return
 }

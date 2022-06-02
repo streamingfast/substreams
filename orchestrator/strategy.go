@@ -14,12 +14,10 @@ import (
 
 type Strategy interface {
 	GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error)
-	RequestCount() int
 }
 
 type RequestGetter interface {
 	Get(ctx context.Context) (*pbsubstreams.Request, error)
-	Count() int
 }
 
 type OrderedStrategy struct {
@@ -86,10 +84,6 @@ func NewOrderedStrategy(
 	return &OrderedStrategy{
 		requestGetter: pool,
 	}, nil
-}
-
-func (d *OrderedStrategy) RequestCount() int {
-	return d.requestGetter.Count()
 }
 
 func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {

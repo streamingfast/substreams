@@ -336,6 +336,10 @@ func TestBuilder_Merge(t *testing.T) {
 				return
 			}
 
+			//ignore comparing these values
+			test.prev.clearMergeData()
+			test.latest.clearMergeData()
+
 			// check result both ways
 
 			for k, v := range test.prev.KV {

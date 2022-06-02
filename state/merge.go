@@ -15,9 +15,27 @@ const (
 	OutputValueTypeBigInt   = "bigint"
 	OutputValueTypeBigFloat = "bigfloat"
 	OutputValueTypeString   = "string"
+
+	mergeDataKey = "__!__metadata" ///NEVER EVER CHANGE THIS
 )
 
+func (b *Store) clearMergeData() {
+	delete(b.KV, mergeDataKey) // kept for backwards compatibility of files. will not be written again
+}
+
+type mergeInfo struct {
+	StoreName        string                                     `json:"store_name,omitempty"`
+	UpdatePolicy     pbsubstreams.Module_KindStore_UpdatePolicy `json:"update_policy,omitempty"`
+	ValueType        string                                     `json:"value_type,omitempty"`
+	ModuleHash       string                                     `json:"module_hash,omitempty"`
+	ModuleStartBlock uint64                                     `json:"module_start_block,omitempty"`
+}
+
 func (into *Store) Merge(builder *Store) error {
+	//old merge data.  clear this.
+	into.clearMergeData()
+	builder.clearMergeData()
+
 	if builder.UpdatePolicy != into.UpdatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", into.UpdatePolicy, builder.UpdatePolicy)
 	}

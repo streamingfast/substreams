@@ -16,9 +16,9 @@ Connected - Progress messages received: {{ .Updates }} ({{ .UpdatesPerSecond }}/
 (hit 'm' to switch display mode){{end}}
 {{ range $key, $value := .Modules }}
 {{- if $.BarMode }}
-  {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end }}
+  {{ pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end }}
 {{- else }}
-  {{ pad $key }} {{ $value.Lo }}  ::  {{ linebar $value $ }}
+  {{ pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ linebar $value $ }}
 {{- end -}}
 {{ end }}{{ end }}
 {{ if .Failures }}
@@ -34,12 +34,19 @@ Last failure:
 `
 
 var tpl = template.Must(template.New("tpl").Funcs(template.FuncMap{
-	"pad": func(in string) string {
+	"pad": func(max int, in string) string {
 		l := len(in)
-		if l > 25 {
-			return in[:25]
+		if l > max {
+			return in[:max]
 		}
-		return in + strings.Repeat(" ", 25-l)
+		return in + strings.Repeat(" ", max-l)
+	},
+	"rpad": func(max int, in string) string {
+		l := len(in)
+		if l > max {
+			return in[:max]
+		}
+		return strings.Repeat(" ", max-l) + in
 	},
 	"humanize": func(in uint64) string {
 		return humanize.Comma(int64(in))

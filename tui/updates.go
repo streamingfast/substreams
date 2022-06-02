@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -44,6 +45,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case *pbsubstreams.ModuleProgress:
 		m.Updates += 1
+		thisSec := time.Now().Unix()
+		if m.UpdatedSecond != thisSec {
+			m.UpdatesPerSecond = m.UpdatesThisSecond
+			m.UpdatesThisSecond = 0
+			m.UpdatedSecond = thisSec
+		}
+		m.UpdatesThisSecond += 1
 
 		switch progMsg := msg.Type.(type) {
 		case *pbsubstreams.ModuleProgress_ProcessedRanges:

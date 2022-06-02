@@ -11,7 +11,7 @@ import (
 
 var viewTpl = `
 {{- if not .Connected }}Connecting...{{ else -}}
-Connected - Progress messages received: {{ .Updates }}
+Connected - Progress messages received: {{ .Updates }} ({{ .UpdatesPerSecond }}/sec)
 {{ with .Request }}Backprocessing history up to requested start block {{ .StartBlockNum }}:
 (hit 'm' to switch display mode){{end}}
 {{ range $key, $value := .Modules }}

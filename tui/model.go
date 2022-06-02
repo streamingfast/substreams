@@ -17,15 +17,18 @@ type model struct {
 
 	screenWidth int
 
-	Modules      updatedRanges
-	BarMode      bool
-	DebugSetting bool
-	Updates      int
+	Modules           updatedRanges
+	BarMode           bool
+	DebugSetting      bool
+	Updates           int
+	UpdatedSecond     int64
+	UpdatesPerSecond  int
+	UpdatesThisSecond int
 
 	Request   *pbsubstreams.Request
 	Connected bool
 
-	Failures int
+	Failures    int
 	LastFailure *pbsubstreams.ModuleProgress_Failed
-	Reason   string
+	Reason      string
 }

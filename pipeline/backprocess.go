@@ -26,6 +26,9 @@ func (p *Pipeline) backprocessStores(
 	zlog.Info("synchronizing stores")
 
 	requestPool := orchestrator.NewRequestPool()
+	if requestPool.Count() == 0 {
+		return p.storeMap, nil
+	}
 
 	storageState, err := orchestrator.FetchStorageState(ctx, p.storeMap)
 	if err != nil {

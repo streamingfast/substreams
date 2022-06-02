@@ -15,7 +15,7 @@ Connected - Progress messages received: {{ .Updates }}
 {{ with .Request }}Backprocessing history up to requested start block {{ .StartBlockNum }}:
 (hit 'm' to switch display mode){{end}}
 {{ range $key, $value := .Modules }}
-{{- if not $.BarMode }}
+{{- if $.BarMode }}
   {{ pad $key }} {{ $value.Lo }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end }}
 {{- else }}
   {{ pad $key }} {{ $value.Lo }}  ::  {{ linebar $value $ }}

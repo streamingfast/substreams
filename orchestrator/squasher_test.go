@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,6 +19,111 @@ type NotifierFunc func()
 
 func (n NotifierFunc) Notify(builder string, blockNum uint64) {
 	n()
+}
+
+// func TestInitSquasher(t *testing.T) {
+// 	ctx := context.Background()
+// 	fileStore := dstore.NewMockStore(nil)
+// 	fileStore.OpenObjectFunc = func(ctx context.Context, name string) (out io.ReadCloser, err error) {
+// 		return io.NopCloser(bytes.NewReader([]byte("{}"))), nil
+// 	}
+
+// 	store := testStateBuilder(fileStore)
+// 	storageState := NewStorageState()
+
+// 	storageState.lastBlocks["store"] = 12
+// 	storageState.initialBlocks["store"] = 10
+// 	s := NewSquasher(ctx, storageState, map[string]*state.Store{"store": store}, 10, 7)
+// 	assert.Equal(t, 12, s.targetExclusiveBlock)
+
+// }
+
+func TestComputeExclusiveEndBlock(t *testing.T) {
+	tests := []struct {
+		name        string
+		lastSaved   int
+		target      int
+		expect      int
+		expectPanic bool
+	}{
+		{
+			name:      "target equal to last saved, on bound",
+			lastSaved: 90,
+			target:    90,
+			expect:    90,
+		},
+		{
+			name:      "target later than last saved, on bound",
+			lastSaved: 100,
+			target:    90,
+			expect:    90,
+		},
+		{
+			name:      "target later than last saved, off bound",
+			lastSaved: 100,
+			target:    91,
+			expect:    90,
+		},
+		{
+			name:      "target later than last saved, off bound",
+			lastSaved: 100,
+			target:    91,
+			expect:    90,
+		},
+		{
+			name:      "target prior to last saved, on bound",
+			lastSaved: 80,
+			target:    90,
+			expect:    80,
+		},
+		{
+			name:      "target prior to last saved, off bound",
+			lastSaved: 80,
+			target:    92,
+			expect:    80,
+		},
+		{
+			name:      "nothing saved, target off bound",
+			lastSaved: 0,
+			target:    92,
+			expect:    0,
+		},
+		{
+			name:      "nothing saved, target on bound",
+			lastSaved: 0,
+			target:    80,
+			expect:    0,
+		},
+		{
+			name:        "target after last saved, but below init block",
+			lastSaved:   20,
+			target:      40,
+			expectPanic: true,
+		},
+		{
+			name:        "target before last saved, but below init block",
+			lastSaved:   30,
+			target:      10,
+			expectPanic: true,
+		},
+	}
+	moduleInitBlock := 50
+	saveInterval := 10
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var res uint64
+			f := func() {
+				res = ComputeStoreExclusiveEndBlock(uint64(test.lastSaved), uint64(test.target), uint64(saveInterval), uint64(moduleInitBlock))
+			}
+			if test.expectPanic {
+				assert.Panics(t, f)
+			} else {
+				f()
+				assert.Equal(t, test.expect, int(res))
+			}
+		})
+	}
 }
 
 func TestSquash(t *testing.T) {

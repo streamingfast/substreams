@@ -75,10 +75,9 @@ func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan err
 
 func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 	for {
-		zlog.Debug("scheduling next")
 		req, err := s.Next()
-		zlog.Debug("scheduling next done")
 		if err == io.EOF {
+			zlog.Debug("scheduler do launch EOF")
 			break
 		}
 		if err != nil {
@@ -89,10 +88,11 @@ func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 			Request: req,
 		}
 
+		zlog.Info("scheduling job", zap.Object("job", job))
+
 		start := time.Now()
-		zlog.Info("waiting worker", zap.Object("job", job))
 		jobWorker := s.workerPool.Borrow()
-		zlog.Info("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+		zlog.Debug("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 
 		select {
 		case <-ctx.Done():

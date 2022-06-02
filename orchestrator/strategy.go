@@ -40,6 +40,7 @@ func NewOrderedStrategy(
 	for _, store := range stores {
 		zlog.Debug("squashables", zap.String("builder", store.Name))
 		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
+
 		if upToBlockNum == store.ModuleInitialBlock {
 			continue // nothing to synchronize
 		}

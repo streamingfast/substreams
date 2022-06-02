@@ -61,7 +61,7 @@ func (p *Pipeline) backprocessStores(
 
 	scheduler.Launch(ctx, result)
 
-	requestCount := strategy.RequestCount()
+	requestCount := strategy.RequestCount() // Is this expected to be the TOTAL number of requests we've seen?
 	resultCount := 0
 done:
 	for {

@@ -33,30 +33,58 @@ func WithNotifier(notifier Notifier) SquasherOption {
 	}
 }
 
-func NewSquasher(ctx context.Context, storageState *StorageState, stores map[string]*state.Store, storeSaveInterval uint64, targetExclusiveBlock uint64, opts ...SquasherOption) (*Squasher, error) {
+func ComputeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, saveInterval, moduleInitialBlock uint64) uint64 {
+	if reqStartBlock < moduleInitialBlock {
+		panic("requested start block prior to the module's initial block")
+	}
+
+	previousBoundary := reqStartBlock - reqStartBlock%saveInterval
+	startBlockOnBoundary := reqStartBlock%saveInterval == 0
+
+	if reqStartBlock >= lastSavedBlock {
+		return lastSavedBlock
+	} else if previousBoundary < moduleInitialBlock {
+		return 0
+	} else if startBlockOnBoundary {
+		return reqStartBlock
+	}
+	return previousBoundary
+}
+
+// NewSquasher receives stores, initializes them and fetches them from
+// the existing storage. It prepares itself to receive Squash()
+// requests that should correspond to what is missing for those stores
+// to reach `targetExclusiveBlock`.  This is managed externally by the
+// Scheduler/Strategy. Eventually, ideally, all components are
+// synchronizes around the actually data: the state of storages
+// present, the requests needed to fill in those stores up to the
+// target block, etc..
+func NewSquasher(ctx context.Context, storageState *StorageState, stores map[string]*state.Store, storeSaveInterval uint64, reqStartBlock uint64, opts ...SquasherOption) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
 	for _, store := range stores {
-		lastKVSavedBlock := storageState.lastBlocks[store.Name]
-		storagePresent := lastKVSavedBlock != 0
-		if !storagePresent {
-			squashables[store.Name] = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), targetExclusiveBlock, storeSaveInterval, store.ModuleInitialBlock)
+		lastSavedBlock := storageState.lastBlocks[store.Name]
+
+		exclusiveEndBlock := ComputeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
+
+		if exclusiveEndBlock == 0 {
+			squashables[store.Name] = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
 		} else {
 			r := &block.Range{
 				StartBlock:        store.ModuleInitialBlock,
-				ExclusiveEndBlock: lastKVSavedBlock, // This ASSUMES we have scheduled jobs that are going to pipe us new results in.
+				ExclusiveEndBlock: exclusiveEndBlock,
 			}
 			squish, err := store.LoadFrom(ctx, r)
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, r, err)
 			}
-			squashables[store.Name] = NewSquashable(squish, targetExclusiveBlock, storeSaveInterval, lastKVSavedBlock)
+			squashables[store.Name] = NewSquashable(squish, reqStartBlock, storeSaveInterval, lastSavedBlock)
 		}
 	}
 
 	squasher := &Squasher{
 		squashables:          squashables,
 		storeSaveInterval:    storeSaveInterval,
-		targetExclusiveBlock: targetExclusiveBlock,
+		targetExclusiveBlock: reqStartBlock,
 	}
 
 	for _, opt := range opts {

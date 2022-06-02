@@ -35,7 +35,6 @@
   * [Handler Function Signature](reference-and-specs/rust-api/handler-function-signature.md)
   * [Chain specific APIs](reference-and-specs/rust-api/chain-specific-apis.md)
 * [Advanced](advanced/README.md)
-  * [Rust Macros](reference-and-specs/advanced/rust-macros.md)
   * [Running the Substreams service locally](advanced/running-locally.md)
 
 ## Release notes

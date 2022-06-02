@@ -12,13 +12,13 @@ curl https://auth.dfuse.io/v1/auth/issue -s \
     '{"api_key":"'$SF_API_KEY'"}' | jq -r .token
 ```
 
-Once you obtained a token, you should set it in an ENV variable:
+Once you have obtained a token, you should set it in an ENV variable:
 
 ```
 export SUBSTREAMS_API_TOKEN="your_token"
 ```
 
-The `substreams run`  command will by check by default the `SUBSTREAMS_API_TOKEN` environment variable for your StreamingFast Authentication token.
+The `substreams run`  command will check by default the `SUBSTREAMS_API_TOKEN` environment variable for your StreamingFast Authentication token.
 
 {% hint style="info" %}
 **Authentication Token Env Flag**

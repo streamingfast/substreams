@@ -54,7 +54,11 @@ substreams -v
 version 0.0.5-beta3 (Commit 61cc596, Built 2022-05-09T19:35:11Z)
 ```
 
-### Resources
+### Run your first stream
+
+Jump into the docs, and [run your first stream](getting-started/your-first-stream.md).
+
+## Resources
 
 * Checkout our [Getting Started Guide](developer-guide/overview.md)
 * Take a look at the [Subtreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
@@ -67,6 +71,6 @@ Need any help? Reach out!
 * [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
 
-## Licenses
+## License
 
 [Apache 2.0](../LICENSE/)

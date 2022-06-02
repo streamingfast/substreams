@@ -245,11 +245,6 @@ func (b *Store) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock ui
 func (b *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
 	zlog.Debug("writing state", zap.Object("builder", b), zap.Uint64("last_block", lastBlock))
 
-	err = b.writeMergeData()
-	if err != nil {
-		return fmt.Errorf("writing merge values: %w", err)
-	}
-
 	kv := stringMap(b.KV) // FOR READABILITY ON DISK
 
 	content, err := json.MarshalIndent(kv, "", "  ")

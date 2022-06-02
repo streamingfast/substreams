@@ -26,9 +26,6 @@ func (p *Pipeline) backprocessStores(
 	zlog.Info("synchronizing stores")
 
 	requestPool := orchestrator.NewRequestPool()
-	if requestPool.Count() == 0 {
-		return p.storeMap, nil
-	}
 
 	storageState, err := orchestrator.FetchStorageState(ctx, p.storeMap)
 	if err != nil {
@@ -42,14 +39,18 @@ func (p *Pipeline) backprocessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	squasher, err := orchestrator.NewSquasher(ctx, storageState, p.storeMap, p.storesSaveInterval, upToBlock, orchestrator.WithNotifier(requestPool))
-	if err != nil {
-		return nil, fmt.Errorf("initializing squasher: %w", err)
-	}
-
 	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, p.request, p.storeMap, p.graph, requestPool, upToBlock, p.blockRangeSizeSubRequests, p.maxStoreSyncRangeSize)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
+	}
+
+	if strategy.RequestCount() == 0 {
+		return p.storeMap, nil
+	}
+
+	squasher, err := orchestrator.NewSquasher(ctx, storageState, p.storeMap, p.storesSaveInterval, upToBlock, orchestrator.WithNotifier(requestPool))
+	if err != nil {
+		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
 
 	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc, p.blockRangeSizeSubRequests)

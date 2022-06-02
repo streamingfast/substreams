@@ -194,7 +194,7 @@ Possible values:
 
 Valid only for `kind: store`.
 
-Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store. See [API Reference](rust-api/) for details.
+Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store. See [API Reference](rust-api.md) for details.
 
 Possible values:
 

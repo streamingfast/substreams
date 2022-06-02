@@ -104,7 +104,7 @@ When declaring a `store` as an input to a module, you can consume its data in on
 1. `get`
 2. `deltas`
 
-The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../reference-and-specs/rust-api/)) from your module's Rust code. Lookups are local, in-memory, and very fast.
+The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../reference-and-specs/rust-api.md)) from your module's Rust code. Lookups are local, in-memory, and very fast.
 
 {% hint style="info" %}
 The fastest is `get_last` as it queries the store directly. `get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key you are querying was mutated in this block. `get_at` will unwind deltas up to a certain ordinal, so you can get values for keys that were set midway through a block.

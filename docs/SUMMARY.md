@@ -30,9 +30,7 @@
 * [Packages](reference-and-specs/packages.md)
 * [Using the CLI](reference-and-specs/using-the-cli.md)
 * [Authentication](reference-and-specs/authentication.md)
-* [Rust APIs](reference-and-specs/rust-api/README.md)
-  * [Handler Function Signature](reference-and-specs/rust-api/handler-function-signature.md)
-  * [Chain specific APIs](reference-and-specs/rust-api/chain-specific-apis.md)
+* [Rust APIs](reference-and-specs/rust-api.md)
 * [Advanced](advanced/README.md)
   * [Running the Substreams service locally](advanced/running-locally.md)
 

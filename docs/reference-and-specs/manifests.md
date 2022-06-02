@@ -1,6 +1,8 @@
 # Manifests
 
-The Substreams Manifest `substreams.yaml` defines the modules composing the Substreams. The `substreams.yaml` is used, among other things, to infer the dependencies between your module's inputs and outputs. Below is a reference guide of all fields in the manifest YAML files.
+The Substreams Manifest `substreams.yaml` defines the modules composing the Substreams. The manifest is used, among other things, to define the dependencies between your module's inputs and outputs.
+
+Below is a reference guide of all fields in a manifest YAML file.
 
 ## `specVersion`
 
@@ -105,21 +107,21 @@ binaries:
     file: ./snapshot_of_my_package.wasm
 ```
 
-Specifies the binary code to use to process data in modules. The field `modules[].binary` has a default value of `default` if unspecified, so will fall back on the `default` binary defined herein.
+Specifies the binary code to use when executing modules. The field [`modules[].binary`](manifests.md#modules-.binary) has a default value of `default`. Therefore, make sure to define the `default` binary here.
 
-You can override which binary to use in the [`modules` section](manifests.md#undefined) (see below), and define other binaries by their name (like `other` here).
+You can override which binary to use in the [`modules` section](manifests.md#undefined) (see below), and define other binaries by their name (like `other` in the example above).
 
-#### `binaries[name].type`
+### `binaries[name].type`
 
 The type of code, and the implied VM for execution.
 
 At the moment, there is only one VM available, so the value here should be `wasm/rust-v1`
 
-#### `binaries[name].file`
+### `binaries[name].file`
 
-A path pointing to a local compiled [WASM Module](https://webassembly.github.io/spec/core/syntax/modules.html). It can be absolute, or relative to the current `.yaml` file's directory.
+A path pointing to a local compiled [WASM Module](https://webassembly.github.io/spec/core/syntax/modules.html). It can be an absolute path, or relative to the current `.yaml` file's directory.
 
-This file will be picked up and packaged into an `.spkg` upon invoking `substreams pack`.
+This file will be picked up and packaged into an `.spkg` when invoking `substreams pack`, as well as any `substreams run`.
 
 ## `modules`
 
@@ -147,19 +149,23 @@ Examples:
 
 ### `modules[].name`
 
-The identifier for the module, starting with a letter, followed by max 64 characters of `[a-zA-Z0-9_]`. These are the same rules as for `package.name`.
+The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. These are the same rules as for `package.name`.
 
-It is the reference identity used on the command line, in inputs and elsewhere to denote this module. It is must be unique per package. Imports get prefixed so imported modules will not clash with the current YAML declaration, even though they share a name.
+It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). It is must be unique per package.&#x20;
 
 {% hint style="info" %}
 This `name` also corresponds to the **Rust function name** that will be invoked on the compiled WASM code upon execution. This is the same function you will define `#[substreams::handlers::map]`(or`store`) in your Rust code.
 {% endhint %}
 
+{% hint style="success" %}
+When importing another package, all of its modules' names will be prefixed with the package's name and a colon. This way, there are no name clashes across imported packages, and you can safely reuse the same names in your manifest.
+{% endhint %}
+
 ### `modules[].initialBlock`
 
-The initial block for the module is where your Substreams is going to start processing data. The runtime will not process blocks prior to this one for the given module.
+The initial block for the module is where your Substreams is going to start processing data for that particular module. The runtime will simply never process blocks prior to this one for the given module.
 
-The `initialBlock` can be inferred by the `inputs` if all the inputs have the same `initialBlock`. If some inputs have different `initialBlock`, then specifying it is required.
+The `initialBlock` field can be elided and its value will be inferred by its dependent [`inputs`](manifests.md#modules-.inputs), as long as all the inputs have the same `initialBlock`. If some _inputs_ have different `initialBlock`, then it becomes mandatory.
 
 ### `modules[].kind`
 
@@ -201,30 +207,42 @@ Possible values:
 
 ### `modules[].binary`
 
-A simple string pointing to a binary file defined in [`binaries`](manifests.md#binaries)
+An identifier defined in the [`binaries`](manifests.md#binaries) section.
+
+This module will execute using the code specified, allowing you to have multiple WASM for different modules, and allowing you to leverage caching while iterating on your WASM code.
 
 ### `modules[].inputs`
 
-is a list of input structure, which can be one of three:
-
-* `source`
-* `store` (can also define a `mode` key)
-* `map`
+Example:
 
 ```yaml
-  inputs:
+inputs:
     - source: sf.ethereum.type.v1.Block
     - store: my_store
       mode: deltas
     - store: my_store # defaults to mode: get
     - map: my_map
-
 ```
+
+`inputs` is a list of _input_ structures. For each object, one of three keys is required:
+
+* `source`
+* `store` (can also define a `mode` key)
+* `map`
 
 See [Module Inputs](../concept-and-fundamentals/modules/inputs.md) for details.
 
 ### `modules[].output`
 
 Valid only for `kind: map`
+
+Example:
+
+```yaml
+output:
+    type: proto:eth.erc721.v1.Transfers
+```
+
+The value for `type` will always be prefixed by `proto:` followed by a definition you have specified in protobuf definitions, and referenced in the [`protobuf`](manifests.md#protobuf) section.
 
 See [Module Outputs](../concept-and-fundamentals/modules/outputs.md) for details

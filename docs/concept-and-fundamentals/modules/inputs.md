@@ -1,35 +1,38 @@
 # Inputs
 
-A `map` and `store` module can define one or multiple inputs. The possible inputs are `map`, `store`, `source`
+A `map` and `store` module can define one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
 
-#### `Source`
+### `Source`
 
-Input of type `source` Protobuf objects that represents native objects, Currently we only support Blockchain blocks, for Ethereum Substreams that would be `sf.ethereum.type.v1.Block`
+An _Input_ of type `source` represent a chain-specific, firehose-provisioned protobuf object.
+
+For example, for Substreams on Ethereum you would specify `sf.ethereum.type.v1.Block.`
 
 ```yaml
   inputs:
     - source: sf.ethereum.type.v1.Block
 ```
 
-#### `Map`
+Another `source` type available on any chains is the `sf.substreams.v1.Clock` object, representing the block number, a block ID and a block timestamp.
 
-Input of type `map` is the the output of another `map` module. The type of the object would be type defined in the `output` attribute of the said `map` module. **A map module cannot depend on itself**
+### `Map`
+
+An _Input_ of type `map` represents the output of another `map` module. The type of the object would be type defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module. **A map module cannot depend on itself.**
+
+Example:
 
 ```yaml
   inputs:
     - map: my_map
 ```
 
-#### `Store`
+Read more about maps [here](../../concepts/modules.md#the-map-module-type).
 
-Input of type store is the the state of another store, there are two possible `mode` that you can define.
+### `Store`
 
-* `get`: in get mode you will be provided with a key/value store that is guaranteed to be synced up to the block being processed, readily queryable.
-* `delta`: in delta mode you will be provided with all the changes that occurred in the `store` module that occurred at the given block.
+An _Input_ of type `store` is the state of another store. &#x20;
 
-If the  `mode` is not defined in the Manifest it will default to `get` mode.&#x20;
-
-Stores that are passed as `inputs` are only read only and not writeable. **A store module cannot depend on, since it needs to have the ability to write to it.**&#x20;
+Example:
 
 ```yaml
   inputs:
@@ -37,3 +40,17 @@ Stores that are passed as `inputs` are only read only and not writeable. **A sto
       mode: deltas
     - store: my_store # defaults to mode: get
 ```
+
+There are two possible `mode` that you can define:
+
+* `get`: in this mode you will be provided with a key/value store that is guaranteed to be synced up to the block being processed, readily queryable. **This is the default value.**
+* `delta`: in this mode you will be provided with a protobuf _object_ containing all the changes that occurred in the `store` module in the same block.
+
+{% hint style="warning" %}
+Here are some constraints on stores:
+
+* Stores received as `inputs` are _read-only_.
+* A `store` cannot depend on itself
+{% endhint %}
+
+Read more about stores [here](../../concepts/modules.md#the-store-module-type).

@@ -136,6 +136,8 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 Notice the `#[substreams::handlers::map]` above the function, this is a [rust macro](https://doc.rust-lang.org/book/ch19-06-macros.html) that is provided by the `substreams` crate. This macro decorates our handler function as a `map`. There is also a macro used to decorate handler of kind `store`:&#x20;
 
 `#[substreams::handlers::store]`&#x20;
+
+To learn how these macros work you can view this in the [advanced section](../reference-and-specs/advanced/rust-macros.md)
 {% endhint %}
 
 The goal of the `map` we are building is to extract `ERC721` Transfers from a given block. We can achieve this by finding all the `Transfer` events that are emitted by the contract we are tracking. Once we find such an event we will decode it and create a `Transfer` object

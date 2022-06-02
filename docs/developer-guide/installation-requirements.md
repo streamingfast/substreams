@@ -2,7 +2,7 @@
 
 ### Install Rust
 
-Before we start creating any Substreams, we will need to setup our development environment. Substreams are written in the [Rust programming language](https://www.rust-lang.org/).
+Before we start creating any Substream we will need to setup our development environment. Substreams are written in the [Rust programming language](https://www.rust-lang.org/).
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of brevity, this is the easiest:
 
@@ -18,12 +18,12 @@ source $HOME/.cargo/env # to configure your current shell
 Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
 
 {% hint style="info" %}
-If you forget to install `protoc`, when generating the definitions, you might receive an error about `cmake` not being defined, this is a fallback when `protoc` is not found.
+If you forget to install `protoc`, when generating the definitions, you might see error about `cmake` not defined, this is a fallback when `protoc` is not found.
 {% endhint %}
 
 ### Install `protoc-gen-prost`
 
-This tool helps you render Rust structures out of protobuf definitions, for use in your Substreams modules. It is called by `protoc` following their plugin system.
+This tool helps you render Rust structures out of protobuf definitions, for using in your Substreams modules. It is called by `protoc` following their plugin system.
 
 Install it with:
 
@@ -35,10 +35,10 @@ Read more about it here: [https://crates.io/crates/protoc-gen-prost-crate](https
 
 ### Install `buf`
 
-[https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams packages are compatible with [buf Images](https://docs.buf.build/reference/images).
+[https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams Packages are compatible with [buf Images](https://docs.buf.build/reference/images).
 
 See the [installation instructions here](https://docs.buf.build/installation).
 
 ### Install **** the `substreams` CLI tool
 
-You can run through [Getting Started](../#getting-started) to install the Substreams CLI Tool.
+You can run through the [Getting Started](../#getting-started) to install the Substreams CLI Tool

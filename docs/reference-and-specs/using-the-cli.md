@@ -27,35 +27,31 @@ Let's break down everything happening above.
 
 Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
 
-Here is the example of an output of the `block_to_erc_20_transfer` starting at `14440000` block for only `1` block. The `<continued ...>` was added to abbreviate the JSON output as there were a lot of ERC20 transfers.
+Here is the example of an output of the `graviatar_updates` starting at block 6200807:
 
 ```
-2022-05-11T12:38:56.232-0400 INFO (substreams) connecting...
-2022-05-11T12:38:56.259-0400 INFO (substreams) connected
------------ Block #14 440 000 (irreversible) ---------------
-block_to_erc_20_transfer: message "eth.erc20.v1.Transfers": {
-  "transfers": [
+$ substreams run -e api-dev.streamingfast.io:443 \
+                 gravity-v0.1.0.spkg gravatar_updates -o json
+{
+  "updates": [
     {
-      "from": "0x48acf41d10a063f9a6b718b9aad2e2ff5b319ca2",
-      "to": "0x109403ab5c5896711699dd3de01c1d520f79801a",
-      "amount": "7752235492486228145381410794440202021481973102607839495265831900745419456512",
-      "balanceChangeFrom": [
-        {
-          "oldBalance": "13569385457497991651199724805705614201555076328004753598373935625927319879680",
-          "newBalance": "14021698306081258039573048965895801341606912205604912051653066813458230542336"
-        }
-      ],
-      "balanceChangeTo": [
-        {
-          "oldBalance": "9498569820248594155839807363993929941088553429603327518861754938149123915776",
-          "newBalance": "9950882668831860544213131524184117081140389307203485972140886125680034578432"
-        }
-      ]
-    },
-    <continued ...>
+      "id": "39",
+      "owner": "0xaadcc13071fdf9c73cfbb8d97639ea68aa6fd1d2",
+      "displayName": "alex | OpenSea",
+      "imageUrl": "https://ucarecdn.com/13a67247-cb89-417a-92d2-50a7d7aa481c/-/crop/382x382/0,0/-/preview/"
+    }
   ]
 }
+...
 ```
+
+Notice the `-o` (or `--output`), that can alter the output format. The options are:
+
+* `ui`, a nicely formatted, UI-driven interface, with progress information, and execution logs.
+* `json`, an indented stream of data, with no progress information nor logs, but just data output for blocks following the start block.
+* `jsonl`, same as `json` but with each output on a single line
+* `module-json`, same as `json` but wrapped in a json structure specifying the module name
+* `module-jsonl`, sam eas `module-json`, but on a single line.
 
 ### `pack`
 

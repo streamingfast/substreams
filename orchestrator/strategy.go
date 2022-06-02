@@ -32,37 +32,36 @@ func NewOrderedStrategy(
 	graph *manifest.ModuleGraph,
 	pool *RequestPool,
 	upToBlockNum uint64,
+	storeSaveInterval uint64,
 	blockRangeSizeSubRequests int,
 	maxRangeSize uint64,
 ) (*OrderedStrategy, error) {
 	for _, store := range stores {
-		zlog.Debug("squashables", zap.String("builder", store.Name))
-		zlog.Debug("up to block num", zap.Uint64("up_to_block_num", upToBlockNum))
+		zlog.Debug("new ordered strategy", zap.String("builder", store.Name), zap.Uint64("up_to_block_num", upToBlockNum))
 
 		if upToBlockNum == store.ModuleInitialBlock {
+			zlog.Debug("nothing to sync")
 			continue // nothing to synchronize
 		}
 
-		lastExclusiveEndBlock := storageState.lastBlocks[store.Name]
-		zlog.Debug("got info", zap.Object("builder", store), zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("end_block", lastExclusiveEndBlock))
-		if upToBlockNum <= lastExclusiveEndBlock {
-			zlog.Debug("no request created", zap.Uint64("up_to_block", upToBlockNum), zap.Uint64("last_exclusive_end_block", lastExclusiveEndBlock))
-			continue // not sure if we should pop here
+		storeLastBlock := storageState.lastBlocks[store.Name]
+		subreqStartBlock := ComputeStoreExclusiveEndBlock(storeLastBlock, upToBlockNum, storeSaveInterval, store.ModuleInitialBlock)
+		if subreqStartBlock == upToBlockNum {
+			zlog.Debug("already produced up to start block", zap.Uint64("up_to_block", upToBlockNum))
+			continue
 		}
-
-		reqStartBlock := lastExclusiveEndBlock
-		if reqStartBlock == 0 {
-			reqStartBlock = store.ModuleInitialBlock
+		if subreqStartBlock == 0 {
+			subreqStartBlock = store.ModuleInitialBlock
 		}
 
 		moduleFullRangeToProcess := &block.Range{
-			StartBlock:        reqStartBlock,
+			StartBlock:        subreqStartBlock,
 			ExclusiveEndBlock: upToBlockNum,
 		}
 
-		if moduleFullRangeToProcess.Size() > maxRangeSize {
-			return nil, fmt.Errorf("subrequest size too big. request must be started closer to the head block. store %s is %d blocks from head (max is %d)", store.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
-		}
+		// if moduleFullRangeToProcess.Size() > maxRangeSize {
+		// 	return nil, fmt.Errorf("subrequest size too big. request must be started closer to the head block. store %s is %d blocks from head (max is %d)", store.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
+		// }
 
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
 		rangeLen := len(requestRanges)

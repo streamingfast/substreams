@@ -39,7 +39,7 @@ func (p *Pipeline) backprocessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, p.request, p.storeMap, p.graph, requestPool, upToBlock, p.blockRangeSizeSubRequests, p.maxStoreSyncRangeSize)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, p.request, p.storeMap, p.graph, requestPool, upToBlock, p.storesSaveInterval, p.blockRangeSizeSubRequests, p.maxStoreSyncRangeSize)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}

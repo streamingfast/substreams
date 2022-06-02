@@ -14,8 +14,9 @@ import (
 )
 
 type requestWaiter struct {
-	Request *pbsubstreams.Request
-	Waiter  Waiter
+	ReverseIndex int // per module decrementing index
+	Request      *pbsubstreams.Request
+	Waiter       Waiter
 }
 
 type Notifier interface {
@@ -78,14 +79,15 @@ func (p *RequestPool) Notify(builder string, blockNum uint64) {
 	}
 }
 
-func (p *RequestPool) Add(ctx context.Context, request *pbsubstreams.Request, waiter Waiter) error {
+func (p *RequestPool) Add(ctx context.Context, reverseIdx int, request *pbsubstreams.Request, waiter Waiter) error {
 	if p.readActive {
 		return fmt.Errorf("cannot add to pool once reading has begun")
 	}
 
 	rw := &requestWaiter{
-		Request: request,
-		Waiter:  waiter,
+		ReverseIndex: reverseIdx,
+		Request:      request,
+		Waiter:       waiter,
 	}
 
 	p.waitersMutex.Lock()
@@ -112,6 +114,7 @@ func (p *RequestPool) Start(ctx context.Context) {
 		}()
 
 		for _, rw := range p.requestWaiters {
+
 			go func(item *requestWaiter) {
 				defer p.wg.Done()
 
@@ -145,13 +148,29 @@ func (p *RequestPool) Start(ctx context.Context) {
 					// higher number of stores => higher priority.
 					p.queueSend <- &QueueItem{
 						Request:  i.Request,
-						Priority: i.Waiter.Order(),
+						Priority: i.Waiter.Order() + i.ReverseIndex,
 					}
 				}
 			}
 		}()
 	})
 }
+
+/**
+
+
+  0 0 0 0 0 0
+  0 1 2
+  0 2 4
+
+
+  6 5 4 3 2 1
+
+  6 5 4 3 2 1
+  6 6 6 .....
+  6 7 8 .....
+
+*/
 
 func (p *RequestPool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 	select {

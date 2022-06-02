@@ -65,7 +65,8 @@ func NewOrderedStrategy(
 		}
 
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
-		for _, blockRange := range requestRanges {
+		rangeLen := len(requestRanges)
+		for idx, blockRange := range requestRanges {
 			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)
 			if err != nil {
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
@@ -73,7 +74,7 @@ func NewOrderedStrategy(
 
 			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, store.Name, request.IrreversibilityCondition, request.Modules)
 			waiter := NewWaiter(blockRange.StartBlock, storageState, ancestorStoreModules...)
-			_ = pool.Add(ctx, req, waiter)
+			_ = pool.Add(ctx, rangeLen-idx, req, waiter)
 
 			zlog.Info("request created", zap.String("module_name", store.Name), zap.Object("block_range", blockRange))
 		}

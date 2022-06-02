@@ -20,6 +20,9 @@ type ModuleExecutor interface {
 	// String returns the module executor representation, usually its name directly.
 	String() string
 
+	// Reset the wasm instance, avoid propagating logs.
+	Reset()
+
 	run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error
 
 	moduleLogs() (logs []string, truncated bool)
@@ -193,12 +196,6 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 		if err = instance.Execute(); err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
-	} else {
-		// even-though we are not going to execute a VM, we set the current Instance to nil to ensure
-		// that the logs of the last ran block do not propagate to the user for the current block. Furthermore,
-		// since there is not going to be a VM that is run for this block and module, setting the current instance to nil
-		// explicitly handle said case.
-		e.wasmModule.CurrentInstance = nil
 	}
 	return
 }
@@ -255,6 +252,10 @@ func (e *StoreModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
 
 // 	return moduleOutputs
 // }
+
+func (e *StoreModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
+
+func (e *MapperModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
 
 func (e *MapperModuleExecutor) moduleLogs() (logs []string, truncated bool) {
 	if !e.isOutput {

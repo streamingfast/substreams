@@ -273,6 +273,8 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 				Logs:          logs,
 				LogsTruncated: truncated,
 			})
+
+			executor.Reset()
 		}
 
 		if p.clock.Number >= p.requestedStartBlockNum {

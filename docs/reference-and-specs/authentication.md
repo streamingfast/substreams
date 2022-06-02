@@ -2,7 +2,7 @@
 
 To connect to the Substreams server you will need to get a StreamingFast authentication token. The authentication token is essentially a [JWT](https://jwt.io/) that will give you access to the StreamingFast infrastructure.&#x20;
 
-The first step is to get a StreamingFast API key that will allow you to get a token. You can [ask us in discord](https://discord.gg/jZwqxJAvRs) for an API key.
+The first step is to get a StreamingFast API key that will allow you to get a token. You can sign up [https://app.dfuse.io/](https://app.dfuse.io/) and get a key or [ask us in discord](https://discord.gg/jZwqxJAvRs) for an API key.
 
 You can use this one-liner to get your token:
 
@@ -12,13 +12,13 @@ curl https://auth.dfuse.io/v1/auth/issue -s \
     '{"api_key":"'$SF_API_KEY'"}' | jq -r .token
 ```
 
-Once you obtained a token, you should set it in an ENV variable:
+Once you have obtained a token, you should set it in an ENV variable:
 
 ```
 export SUBSTREAMS_API_TOKEN="your_token"
 ```
 
-The `substreams run`  command will by check by default the `SUBSTREAMS_API_TOKEN` environment variable for your StreamingFast Authentication token.
+The `substreams run`  command will check by default the `SUBSTREAMS_API_TOKEN` environment variable for your StreamingFast Authentication token.
 
 {% hint style="info" %}
 **Authentication Token Env Flag**

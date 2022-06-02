@@ -111,7 +111,7 @@ func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 }
 
 func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *worker.Worker, job *worker.Job) error {
-	err := derr.RetryContext(ctx, 2, func(ctx context.Context) error {
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		return jobWorker.Run(ctx, job, s.respFunc)
 	})
 	s.workerPool.ReturnWorker(jobWorker)

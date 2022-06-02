@@ -267,7 +267,10 @@ func (b *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
 func (b *Store) writeState(ctx context.Context, content []byte, lastBlock uint64) (string, error) {
 	// FIXME(abourget): `lastBlock` is ASSUMED TO BE ON THE BOUNDARY
 	filename := b.storageFilename(lastBlock)
-	err := b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
+
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		return b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
+	})
 	if err != nil {
 		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", b.Name, b.StoreInitialBlock, lastBlock, err)
 	}

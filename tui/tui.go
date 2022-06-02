@@ -151,7 +151,10 @@ func (ui *TUI) configureOutputMode() {
 }
 
 func (ui *TUI) Cancel() {
-	fmt.Println("TODO: Shutting down...")
+	err := ui.prog.ReleaseTerminal()
+	if err != nil {
+		_ = fmt.Errorf("releasing terminal: %w", err)
+	}
 	// cancel a context or something we got from upstream, passing the command-line control here.
 	// a Shutter or something
 }

@@ -37,6 +37,10 @@ type OutputCache struct {
 	//Completed         bool
 }
 
+func (c *OutputCache) currentFilename() string {
+	return computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
+}
+
 type ModulesOutputCache struct {
 	OutputCaches      map[string]*OutputCache
 	SaveBlockInterval uint64
@@ -76,7 +80,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 		if moduleCache.IsOutOfRange(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 			//this is a complete range
-			previousFilename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
+			previousFilename := moduleCache.currentFilename()
 			if err := moduleCache.save(ctx, previousFilename); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)
 			}
@@ -93,7 +97,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 func (c *ModulesOutputCache) Save(ctx context.Context) error {
 	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
-		filename := computeDBinFilename(moduleCache.CurrentBlockRange.StartBlock, moduleCache.CurrentBlockRange.ExclusiveEndBlock)
+		filename := moduleCache.currentFilename()
 		zlog.Debug("saving cache for current block range", zap.String("module_name", moduleCache.ModuleName),
 			zap.Uint64("start_block", moduleCache.CurrentBlockRange.StartBlock),
 			zap.Uint64("end_block", moduleCache.CurrentBlockRange.ExclusiveEndBlock))
@@ -206,16 +210,18 @@ func (o *OutputCache) save(ctx context.Context, filename string) error {
 	if err != nil {
 		return fmt.Errorf("json encoding outputs: %w", err)
 	}
+	cnt := buffer.Bytes()
 
-	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		reader := bytes.NewReader(buffer.Bytes())
-		return o.Store.WriteObject(ctx, filename, reader)
-	})
-	if err != nil {
-		return fmt.Errorf("writing block buffer to store: %w", err)
-	}
+	go func() {
+		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+			reader := bytes.NewReader(cnt)
+			return o.Store.WriteObject(ctx, filename, reader)
+		})
+		if err != nil {
+			zlog.Warn("failed writing output cache", zap.Error(err))
+		}
+	}()
 
-	zlog.Debug("cache saved", zap.String("module_name", o.ModuleName), zap.String("file_name", filename), zap.String("url", o.Store.BaseURL().String()))
 	return nil
 }
 

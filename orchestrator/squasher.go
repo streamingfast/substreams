@@ -118,15 +118,20 @@ func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
 	out = map[string]*state.Store{}
 	var errs []string
 	for _, v := range s.squashables {
-		v.RLock() // REVISE the use of this lock
-		if !v.targetReached {
-			errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", v.name, v.targetExclusiveBlock, v.ranges, v.nextExpectedStartBlock))
-		}
-		if !v.IsEmpty() {
-			errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", v.name, v.ranges))
-		}
-		out[v.store.Name] = v.store
-		v.RUnlock() // REVISE
+		func() {
+			v.RLock()         // REVISE the use of this lock
+			defer v.RUnlock() // REVISE
+
+			// the second check was added to take care of the use-case of a subsequent execution of the same request
+			// where the target wasn't "reached" because there were no ranges to be done
+			if !v.targetReached && !v.IsEmpty() {
+				errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", v.name, v.targetExclusiveBlock, v.ranges, v.nextExpectedStartBlock))
+			}
+			if !v.IsEmpty() {
+				errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", v.name, v.ranges))
+			}
+			out[v.store.Name] = v.store
+		}()
 	}
 	if len(errs) != 0 {
 		return nil, fmt.Errorf("%d errors: %s", len(errs), strings.Join(errs, "; "))

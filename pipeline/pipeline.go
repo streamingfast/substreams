@@ -255,24 +255,30 @@ func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *p
 		}
 
 		for _, executor := range p.moduleExecutors {
-			zlog.Debug("executing", zap.Stringer("module_name", executor))
-			err := executor.run(p.wasmOutputs, p.clock, block)
-			if err != nil {
-				if returnErr := p.returnFailureProgress(err, executor, respFunc); returnErr != nil {
-					return returnErr
-				}
+			executorName := executor.Name()
+			zlog.Debug("executing", zap.String("module_name", executorName))
 
-				return err
+			executionError := executor.run(p.wasmOutputs, p.clock, block)
+
+			if isOutput := p.outputModuleMap[executorName]; isOutput {
+				logs, truncated := executor.moduleLogs()
+				outputData := executor.moduleOutputData()
+				if len(logs) != 0 || outputData != nil {
+					p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+						Name:          executorName,
+						Data:          outputData,
+						Logs:          logs,
+						LogsTruncated: truncated,
+					})
+				}
 			}
 
-			logs, truncated := executor.moduleLogs()
-
-			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-				Name:          executor.Name(),
-				Data:          executor.moduleOutputData(),
-				Logs:          logs,
-				LogsTruncated: truncated,
-			})
+			if executionError != nil {
+				if returnErr := p.returnFailureProgress(executionError, executor, respFunc); returnErr != nil {
+					return fmt.Errorf("progress error: %w", returnErr)
+				}
+				return fmt.Errorf("exec error: %w", executionError)
+			}
 
 			executor.Reset()
 		}
@@ -335,36 +341,31 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 }
 
 func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor, respFunc substreams.ResponseFunc) error {
-	modules := make([]*pbsubstreams.ModuleProgress, len(p.moduleOutputs)+1)
+	var out []*pbsubstreams.ModuleProgress
 
-	for i, moduleOutput := range p.moduleOutputs {
-		modules[i] = &pbsubstreams.ModuleProgress{
-			Name: moduleOutput.Name,
-			Type: &pbsubstreams.ModuleProgress_Failed_{
-				Failed: &pbsubstreams.ModuleProgress_Failed{
-					Logs:          moduleOutput.Logs,
-					LogsTruncated: moduleOutput.LogsTruncated,
+	for _, moduleOutput := range p.moduleOutputs {
+		var reason string
+		if moduleOutput.Name == failedExecutor.Name() {
+			reason = err.Error()
+		}
+
+		// FIXME(abourget): eventually, would we also return the data for each of
+		// the modules that produced some?
+		if len(moduleOutput.Logs) != 0 || len(reason) != 0 {
+			out = append(out, &pbsubstreams.ModuleProgress{
+				Name: moduleOutput.Name,
+				Type: &pbsubstreams.ModuleProgress_Failed_{
+					Failed: &pbsubstreams.ModuleProgress_Failed{
+						Reason:        reason,
+						Logs:          moduleOutput.Logs,
+						LogsTruncated: moduleOutput.LogsTruncated,
+					},
 				},
-			},
+			})
 		}
 	}
 
-	logs, truncated := failedExecutor.moduleLogs()
-
-	modules[len(p.moduleOutputs)] = &pbsubstreams.ModuleProgress{
-		Name: failedExecutor.Name(),
-
-		Type: &pbsubstreams.ModuleProgress_Failed_{
-			Failed: &pbsubstreams.ModuleProgress_Failed{
-				// Should we maybe extract specific WASM error and improved the "printing" here?
-				Reason:        err.Error(),
-				Logs:          logs,
-				LogsTruncated: truncated,
-			},
-		},
-	}
-
-	return respFunc(substreams.NewModulesProgressResponse(modules))
+	return respFunc(substreams.NewModulesProgressResponse(out))
 }
 
 func (p *Pipeline) assignSource(block *bstream.Block) error {

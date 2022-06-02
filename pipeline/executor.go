@@ -201,28 +201,18 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 }
 
 func (e *StoreModuleExecutor) moduleLogs() (logs []string, truncated bool) {
-	if !e.isOutput {
-		return
-	}
-
 	if instance := e.wasmModule.CurrentInstance; instance != nil {
 		return instance.Logs, instance.ReachedLogsMaxByteCount()
 	}
-
 	return
 }
 
 func (e *StoreModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
-	if !e.isOutput {
-		return nil
-	}
-
 	if len(e.outputStore.Deltas) != 0 {
 		return &pbsubstreams.ModuleOutput_StoreDeltas{
 			StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
 		}
 	}
-
 	return nil
 }
 
@@ -258,28 +248,18 @@ func (e *StoreModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
 func (e *MapperModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
 
 func (e *MapperModuleExecutor) moduleLogs() (logs []string, truncated bool) {
-	if !e.isOutput {
-		return
-	}
-
 	if instance := e.wasmModule.CurrentInstance; instance != nil {
 		return instance.Logs, instance.ReachedLogsMaxByteCount()
 	}
-
 	return
 }
 
 func (e *MapperModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
-	if !e.isOutput {
-		return nil
-	}
-
 	if e.mapperOutput != nil {
 		return &pbsubstreams.ModuleOutput_MapOutput{
 			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
 		}
 	}
-
 	return nil
 }
 

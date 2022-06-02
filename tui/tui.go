@@ -27,7 +27,8 @@ type TUI struct {
 	moduleWrapOutput  bool
 	prettyPrintOutput bool
 
-	prog *tea.Program
+	prog          *tea.Program
+	seenFirstData bool
 
 	decodeMsgTypes map[string]func(in []byte) string
 	msgTypes       map[string]string
@@ -167,6 +168,7 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 		if len(m.Data.Outputs) == 0 {
 			return nil
 		}
+		ui.seenFirstData = true
 		if ui.decorateOutput {
 			ui.ensureTerminalUnlocked()
 			return ui.decoratedBlockScopedData(m.Data)
@@ -174,10 +176,14 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 			return ui.jsonBlockScopedData(m.Data)
 		}
 	case *pbsubstreams.Response_Progress:
-		if ui.decorateOutput {
-			ui.ensureTerminalLocked()
-			for _, module := range m.Progress.Modules {
-				ui.prog.Send(module)
+		if ui.seenFirstData {
+			ui.formatPostDataProgress(m)
+		} else {
+			if ui.decorateOutput {
+				ui.ensureTerminalLocked()
+				for _, module := range m.Progress.Modules {
+					ui.prog.Send(module)
+				}
 			}
 		}
 	case *pbsubstreams.Response_SnapshotData:
@@ -210,6 +216,40 @@ func (ui *TUI) ensureTerminalLocked() {
 			fmt.Printf("Failed bubble tea program: %s\n", err)
 		}
 	}()
+}
+
+func (ui *TUI) formatPostDataProgress(msg *pbsubstreams.Response_Progress) {
+	var displayedFailure bool
+	for _, mod := range msg.Progress.Modules {
+		switch progMsg := mod.Type.(type) {
+		case *pbsubstreams.ModuleProgress_ProcessedRanges:
+			fmt.Println("debug: still processing ranges after data?")
+		case *pbsubstreams.ModuleProgress_InitialState_:
+		case *pbsubstreams.ModuleProgress_ProcessedBytes_:
+		case *pbsubstreams.ModuleProgress_Failed_:
+			failure := progMsg.Failed
+			if !displayedFailure {
+				fmt.Println("--------------------------------------------")
+				fmt.Println("EXECUTION FAILURE")
+				displayedFailure = true
+			}
+
+			if failure.Reason != "" {
+				fmt.Printf("%s: failed: %s\n", mod.Name, failure.Reason)
+			}
+			if len(failure.Logs) != 0 {
+				for _, log := range failure.Logs {
+					fmt.Printf("%s: log: %s\n", mod.Name, log)
+				}
+				if failure.LogsTruncated {
+					fmt.Printf("%s: <logs truncated>\n", mod.Name)
+				}
+			}
+		}
+	}
+	if displayedFailure {
+		fmt.Println("--------------------------------------------")
+	}
 }
 
 func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) error {

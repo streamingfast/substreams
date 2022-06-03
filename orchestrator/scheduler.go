@@ -54,12 +54,12 @@ func (s *Scheduler) Callback(ctx context.Context, job *Job) error {
 }
 
 func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan error) {
-	out = make(chan error, 1) // FIXME: not used, not necessary?
+	out = make(chan error, 1)
+
 	go func() {
-		if err := s.doLaunch(ctx, result); err != nil {
-			out <- err
-		}
+		out <- s.doLaunch(ctx, result)
 	}()
+
 	return
 }
 
@@ -83,7 +83,7 @@ func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 		select {
 		case <-ctx.Done():
 			zlog.Info("synchronize stores quit on cancel context")
-			return nil
+			return ctx.Err()
 		default:
 		}
 

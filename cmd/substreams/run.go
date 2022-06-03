@@ -133,8 +133,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}
-
-	return nil
 }
 
 func defaultOutputMode(outputMode string) (string, error) {

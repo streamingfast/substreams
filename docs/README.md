@@ -28,8 +28,8 @@ Download the binary
 
 ```bash
 # Use correct binary for your platform
-wget https://github.com/streamingfast/substreams/releases/download/v0.0.5-beta3/substreams_0.0.5-beta3_linux_x86_64.tar.gz
-tar -xzvf substreams_0.0.5-beta3_linux_x86_64.tar.gz
+wget https://github.com/streamingfast/substreams/releases/download/v0.0.12/substreams_0.0.12_linux_x86_64.tar.gz
+tar -xzvf substreams_0.0.12_linux_x86_64.tar.gz
 export PATH="`pwd`:$PATH"
 ```
 
@@ -50,8 +50,8 @@ go install -v ./cmd/substreams
 Ensure that `substreams` CLI works as expected:
 
 ```bash
-substreams -v
-version 0.0.5-beta3 (Commit 61cc596, Built 2022-05-09T19:35:11Z)
+substreams --version
+substreams version 0.0.12 (Commit 7b30088, Built 2022-06-03T18:32:00Z)
 ```
 
 ### Run your first stream
@@ -61,7 +61,7 @@ Jump into the docs, and [run your first stream](getting-started/your-first-strea
 ## Resources
 
 * Checkout our [Getting Started Guide](developer-guide/overview.md)
-* Take a look at the [Subtreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
+* Take a look at the [Substreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
 * Take a look at the [Substreams Playground](https://github.com/streamingfast/substreams-playground) repository for more learnings and examples
 
 ## Community

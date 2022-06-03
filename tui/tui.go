@@ -151,6 +151,9 @@ func (ui *TUI) configureOutputMode() {
 }
 
 func (ui *TUI) Cancel() {
+	if ui.prog == nil {
+		return
+	}
 	err := ui.prog.ReleaseTerminal()
 	if err != nil {
 		_ = fmt.Errorf("releasing terminal: %w", err)

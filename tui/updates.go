@@ -30,8 +30,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		switch msg.String() {
-		case "enter":
-			fmt.Println("")
 		case "m":
 			m.BarMode = !m.BarMode
 			m.DebugSetting = !m.DebugSetting

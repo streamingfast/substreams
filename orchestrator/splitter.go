@@ -29,7 +29,7 @@ func splitWork(modName string, storeSplit, subreqSplit, modInitBlock, storeLastB
 	}
 
 	subreqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, incomingReqStartBlock, storeSplit, modInitBlock)
-	if storeLastBlock != 0 && storeLastBlock != modInitBlock {
+	if storeLastBlock != 0 && storeLastBlock != modInitBlock && subreqStartBlock != 0 {
 		out.loadInitialStore = block.NewRange(modInitBlock, subreqStartBlock)
 	}
 

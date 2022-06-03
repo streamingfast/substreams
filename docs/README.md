@@ -1,6 +1,6 @@
 # Substreams
 
-DEVELOPER PREVIEW OF SUBSTREAMS
+> Developer Preview
 
 Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
 

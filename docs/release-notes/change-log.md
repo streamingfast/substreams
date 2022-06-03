@@ -4,9 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [v0.0.12](https://github.com/streamingfast/substreams/releases/tag/v0.0.12)
+
+### `substreams` server
+
+* Various bug fixes around store and parallel execution.
 
 ### `substreams` CLI
+
+* Fix null pointer exception at the end of CLI run in some cases.
 
 * Do log last error when the CLI exit with an error has the error is already printed to the user and it creates a weird behavior.
 

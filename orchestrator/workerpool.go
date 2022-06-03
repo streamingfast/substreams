@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -77,9 +76,6 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		}
 
 		resp, err := stream.Recv()
-		zlog.Debug("is context cancelled", zap.Error(ctx.Err()))
-
-		err = errors.New("erreur bidon")
 		if err != nil {
 			if err == io.EOF {
 				zlog.Info("worker done", zap.Object("job", job))
@@ -101,7 +97,6 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		case *pbsubstreams.Response_SnapshotComplete:
 			_ = r.SnapshotComplete
 		case *pbsubstreams.Response_Data:
-			// Here we ignored everything, unsure why we'd keep them
 		}
 	}
 }

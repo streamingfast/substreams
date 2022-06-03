@@ -71,6 +71,9 @@ func (p *Pipeline) backprocessStores(
 		case <-ctx.Done():
 			return nil, ctx.Err() // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
 		case err := <-schedulerErr:
+			if err == nil {
+				continue
+			}
 			return nil, fmt.Errorf("scheduler: %w", err)
 		case err := <-result:
 			resultCount++

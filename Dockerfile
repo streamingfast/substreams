@@ -28,4 +28,4 @@ ADD /substreams /app/substreams
 # ENV PATH "/app:$HOME/.cargo/bin:$PATH"
 ENV PATH "/app:/usr/local/cargo/bin:$PATH"
 
-ENTRYPOINT /app/substreams
+ENTRYPOINT ["/app/substreams"]

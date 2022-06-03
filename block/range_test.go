@@ -13,9 +13,10 @@ func TestRange_Split(t *testing.T) {
 	}
 
 	expected := []*Range{
-		{706, 900},
-		{900, 1100},
-		{1100, 1250},
+		{706, 800},
+		{800, 1000},
+		{1000, 1200},
+		{1200, 1250},
 	}
 
 	actual := og.Split(200)

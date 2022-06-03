@@ -2,7 +2,6 @@ package block
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/streamingfast/bstream"
@@ -66,7 +65,7 @@ func (r *Range) Split(chunkSize uint64) []*Range {
 		return res
 	}
 
-	currentEnd := ceiling(r.StartBlock, chunkSize)
+	currentEnd := (r.StartBlock + chunkSize) - (r.StartBlock+chunkSize)%chunkSize
 	currentStart := r.StartBlock
 
 	for {
@@ -109,14 +108,4 @@ func (r Ranges) Less(i, j int) bool {
 
 func (r Ranges) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
-}
-
-func ceiling(val, chunksize uint64) uint64 {
-	res := (val + chunksize) - (val % magnitude(chunksize))
-	return res
-}
-
-func magnitude(n uint64) uint64 {
-	val := math.Log10(float64(n))
-	return uint64(math.Pow(10.0, float64(uint64(val))))
 }

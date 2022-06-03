@@ -122,6 +122,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		resp, err := cli.Recv()
 		if err != nil {
 			if err == io.EOF {
+				ui.Cancel()
+				fmt.Println("all done")
 				return nil
 			}
 			return err

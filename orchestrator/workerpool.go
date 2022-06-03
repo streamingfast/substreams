@@ -97,6 +97,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		case *pbsubstreams.Response_SnapshotComplete:
 			_ = r.SnapshotComplete
 		case *pbsubstreams.Response_Data:
+			// Here we ignored everything, unsure why we'd keep them
 		}
 	}
 }

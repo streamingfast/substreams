@@ -299,20 +299,6 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 }
 
 func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, respFunc substreams.ResponseFunc) error {
-	if len(p.moduleOutputs) > 0 {
-		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-		out := &pbsubstreams.BlockScopedData{
-			Outputs: p.moduleOutputs,
-			Clock:   p.clock,
-			Step:    pbsubstreams.StepToProto(step),
-			Cursor:  cursor.ToOpaque(),
-		}
-
-		if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
-	}
-
 	if p.isBackprocessing {
 		// TODO(abourget): we might want to send progress for the segment after batch execution
 		var progress []*pbsubstreams.ModuleProgress
@@ -336,6 +322,19 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 		if err := respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
 			return fmt.Errorf("calling return func: %w", err)
 		}
+	} else {
+		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+		out := &pbsubstreams.BlockScopedData{
+			Outputs: p.moduleOutputs,
+			Clock:   p.clock,
+			Step:    pbsubstreams.StepToProto(step),
+			Cursor:  cursor.ToOpaque(),
+		}
+
+		if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
+
 	}
 	return nil
 }

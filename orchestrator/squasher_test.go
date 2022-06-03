@@ -73,13 +73,13 @@ func TestSquash(t *testing.T) {
 		notificationsSent++
 	})
 
-	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 20_000, end: 30_000}, notifierFunc))
+	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 20_000, end: 30_000, storeChunks: []*storeChunk{{20_000, 30_000, false}}}, notifierFunc))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 70_000, end: 80_000}, notifierFunc))
+	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 70_000, end: 80_000, storeChunks: []*storeChunk{{70_000, 80_000, false}}}, notifierFunc))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 10_000, end: 20_000}, notifierFunc))
+	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 10_000, end: 20_000, storeChunks: []*storeChunk{{10_000, 20_000, false}}}, notifierFunc))
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 	require.Equal(t, 2, notificationsSent)

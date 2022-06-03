@@ -18,7 +18,6 @@ pub type Deltas = Vec<pb::substreams::StoreDelta>;
 #[derive(StoreWriter)]
 pub struct StoreSet {}
 impl StoreSet {
-
     /// Set a given key to a given value, if the key existed before, it will be replaced.
     pub fn set(&self, ord: u64, key: String, value: &Vec<u8>) {
         state::set(ord as i64, key, value);
@@ -37,7 +36,6 @@ impl StoreSet {
 #[derive(StoreWriter)]
 pub struct StoreSetIfNotExists {}
 impl StoreSetIfNotExists {
-
     /// Set a given key to a given value, if the key existed before, it will be ignored and not set.
     pub fn set_if_not_exists(&self, ord: u64, key: String, value: &Vec<u8>) {
         state::set_if_not_exists(ord as i64, key, value);
@@ -56,7 +54,6 @@ impl StoreSetIfNotExists {
 #[derive(StoreWriter)]
 pub struct StoreAddInt64 {}
 impl StoreAddInt64 {
-
     /// Will add the value to the already present value at the key (or default to
     /// zero if the key was not set)
     pub fn add(&self, ord: u64, key: String, value: i64) {
@@ -77,7 +74,6 @@ impl StoreAddInt64 {
 #[derive(StoreWriter)]
 pub struct StoreAddFloat64 {}
 impl StoreAddFloat64 {
-
     /// Will add the value to the already present value at the key (or default to
     /// zero if the key was not set)
     pub fn add(&self, ord: u64, key: String, value: f64) {
@@ -98,7 +94,6 @@ impl StoreAddFloat64 {
 #[derive(StoreWriter)]
 pub struct StoreAddBigFloat {}
 impl StoreAddBigFloat {
-
     /// Will add the value to the already present value at the key (or default to
     /// zero if the key was not set)
     pub fn add(&self, ord: u64, key: String, value: &BigDecimal) {
@@ -119,7 +114,6 @@ impl StoreAddBigFloat {
 #[derive(StoreWriter)]
 pub struct StoreAddBigInt {}
 impl StoreAddBigInt {
-
     /// Will add the value to the already present value of the keys (or default to
     /// zero if the key was not set)
     pub fn add(&self, ord: u64, key: String, value: &BigInt) {
@@ -140,7 +134,6 @@ impl StoreAddBigInt {
 #[derive(StoreWriter)]
 pub struct StoreMaxInt64 {}
 impl StoreMaxInt64 {
-
     /// max will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -154,7 +147,6 @@ impl StoreMaxInt64 {
 #[derive(StoreWriter)]
 pub struct StoreMaxBigInt {}
 impl StoreMaxBigInt {
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -168,7 +160,6 @@ impl StoreMaxBigInt {
 #[derive(StoreWriter)]
 pub struct StoreMaxFloat64 {}
 impl StoreMaxFloat64 {
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -182,7 +173,6 @@ impl StoreMaxFloat64 {
 #[derive(StoreWriter)]
 pub struct StoreMaxBigFloat {}
 impl StoreMaxBigFloat {
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -196,8 +186,6 @@ impl StoreMaxBigFloat {
 #[derive(StoreWriter)]
 pub struct StoreMinInt64 {}
 impl StoreMinInt64 {
-
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -211,7 +199,6 @@ impl StoreMinInt64 {
 #[derive(StoreWriter)]
 pub struct StoreMinBigInt {}
 impl StoreMinBigInt {
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -225,7 +212,6 @@ impl StoreMinBigInt {
 #[derive(StoreWriter)]
 pub struct StoreMinFloat64 {}
 impl StoreMinFloat64 {
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -239,7 +225,6 @@ impl StoreMinFloat64 {
 #[derive(StoreWriter)]
 pub struct StoreMinBigFloat {}
 impl StoreMinBigFloat {
-
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
@@ -254,7 +239,6 @@ pub struct StoreGet {
 }
 
 impl StoreGet {
-
     /// Return a StoreGet object with a store index set
     pub fn new(idx: u32) -> StoreGet {
         StoreGet { idx }

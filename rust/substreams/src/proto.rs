@@ -4,8 +4,6 @@
 //! is used across Substreams
 //!
 
-
-
 use prost::{DecodeError, EncodeError};
 
 /// Given an array of bytes, it will decode data in a Protobuf Message

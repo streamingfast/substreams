@@ -15,29 +15,31 @@
 //!
 //! ```no_run
 //! use substreams::{errors::Error, store};
+//! # mod eth { pub type Block = (); }
+//! # mod proto { pub type Custom = (); }
 //!
-//! // map handler that takes a source as input
+//! /// Map handler that takes a source as input
 //! #[substreams::handlers::map]
 //! fn map_transfers(blk: eth::Block) -> Result<proto::Custom, Error> {
-//!     // do something
+//!     unimplemented!("do something");
 //! }
 //!
-//! // map handler that takes a source, and a store in get mode as inputs
+//! /// Map handler that takes a source, and a store in get mode as inputs
 //! #[substreams::handlers::map]
 //! fn map_ownerships(blk: eth::Block, store: store::StoreGet) -> Result<proto::Custom, Error> {
-//!     // do something
+//!     unimplemented!("do something");
 //! }
 //!
-//! // map handler that takes a source, another map, and a store in get mode as inputs
+//! /// Map handler that takes a source, another map, and a store in get mode as inputs
 //! #[substreams::handlers::map]
 //! fn map_mints(blk: eth::Block, mints: proto::Custom, store: store::StoreGet) -> Result<proto::Custom, Error> {
-//!     // do something
+//!     unimplemented!("do something");
 //! }
-//! //!
-//! // map handler that takes a source, another map, and a store in delta mode as inputs
+//!
+//! /// Map handler that takes a source, another map, and a store in delta mode as inputs
 //! #[substreams::handlers::map]
 //! fn map_db(blk: eth::Block, mints: proto::Custom, store_deltas: store::Deltas) -> Result<proto::Custom, Error> {
-//!     // do something
+//!     unimplemented!("do something");
 //! }
 //! ```
 //!
@@ -49,6 +51,7 @@
 //!
 //! ```no_run
 //! use substreams::store;
+//! # mod proto { pub type Custom = (); }
 //!
 //! #[substreams::handlers::store]
 //! fn store_transfers(objects: proto::Custom, output: store::StoreAddInt64) {
@@ -65,8 +68,6 @@
 //!     // to something
 //! }
 //!```
-//!
-//!
 pub mod errors;
 mod externs;
 pub mod handlers;

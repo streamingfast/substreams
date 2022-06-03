@@ -45,6 +45,7 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^GitBook:'
 
 signs:
 - cmd: keybase

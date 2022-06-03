@@ -59,3 +59,48 @@ func TestQueue(t *testing.T) {
 	expected := []*Job{r2, r1, r3}
 	require.Equal(t, expected, pops)
 }
+
+func TestQueueLoadTest(t *testing.T) {
+	t.Skip()
+
+	in := make(chan *QueueItem, 5_000)
+	out := make(chan *QueueItem)
+	ctx := context.Background()
+
+	StartQueue(ctx, in, out)
+
+	wg := sync.WaitGroup{}
+
+	n := 1_000_000
+
+	wg.Add(n)
+
+	go func() {
+		for i := 0; i < n; i++ {
+			go func() {
+				defer wg.Done()
+				select {
+				case <-ctx.Done():
+					return
+				case in <- &QueueItem{
+					job:      &Job{},
+					Priority: 0,
+				}:
+					return
+				}
+			}()
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(in)
+	}()
+
+	var resultCount int
+	for _ = range out {
+		resultCount++
+	}
+
+	require.Equal(t, n, resultCount)
+}

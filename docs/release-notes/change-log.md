@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## \[Unreleased]
+## [Unreleased]
+
+### `substreams` Docker
+
+* Ensure arguments can be passed to Docker built image.
+
+## [v0.0.10-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.10-beta)
+
+### `substreams` server
+
+* Various bug fixes around store and parallel execution.
+* Fixed logs being repeated on module with inputs that was receiving nothing.
 
 ## [v0.0.9-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.9-beta)
 

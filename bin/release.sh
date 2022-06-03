@@ -42,6 +42,10 @@ main() {
     mode="Publishing"
   fi
 
+  # We need to prepare a commit updating the crate's version, so we need change:
+  # ^version\s*=\s*"[^"]+" => version = "<version>"
+  # substreams-([^ ]+)\s*=\s*\{\s*version\s*=\s*"[^"]+" => substreams-$1 = { version = "<version>"
+
   echo "About to release version tagged $version ($mode)"
   sleep 3
 

@@ -6,10 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## [v0.0.13](https://github.com/streamingfast/substreams/releases/tag/v0.0.13)
+
 ### CLI
 
 * Changed `substreams manifest info` -> `substreams info`
 * Changed `substreams manifest graph` -> `substreams graph`
+* Updated usage
+
+### Service
+
+* Multiple fixes to boundaries
+
 
 ## [v0.0.12](https://github.com/streamingfast/substreams/releases/tag/v0.0.12)
 

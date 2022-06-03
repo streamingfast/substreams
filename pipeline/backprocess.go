@@ -63,18 +63,13 @@ func (p *Pipeline) backprocessStores(
 
 	result := make(chan error)
 
-	schedulerErr := scheduler.Launch(ctx, result)
+	go scheduler.Launch(ctx, result)
 
 	requestCount := requestPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
 	for resultCount := 0; resultCount < requestCount; {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err() // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
-		case err := <-schedulerErr:
-			if err == nil {
-				continue
-			}
-			return nil, fmt.Errorf("scheduler: %w", err)
+			return nil, ctx.Err()
 		case err := <-result:
 			resultCount++
 			if err != nil {

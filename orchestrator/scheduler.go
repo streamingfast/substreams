@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/streamingfast/derr"
@@ -35,14 +34,14 @@ func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, wo
 	return s, nil
 }
 
-func (s *Scheduler) Next() (*Job, error) {
+func (s *Scheduler) Next() *Job {
 	zlog.Debug("Getting a next job from scheduler", zap.Int("requests_stream", len(s.requestsStream)))
 	request, ok := <-s.requestsStream
 	if !ok {
-		return nil, io.EOF
+		return nil
 	}
 
-	return request, nil
+	return request
 }
 
 func (s *Scheduler) Callback(ctx context.Context, job *Job) error {
@@ -53,25 +52,12 @@ func (s *Scheduler) Callback(ctx context.Context, job *Job) error {
 	return nil
 }
 
-func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan error) {
-	out = make(chan error, 1)
-
-	go func() {
-		out <- s.doLaunch(ctx, result)
-	}()
-
-	return
-}
-
-func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
+func (s *Scheduler) Launch(ctx context.Context, result chan error) {
 	for {
-		job, err := s.Next()
-		if err == io.EOF {
-			zlog.Debug("scheduler do launch EOF")
+		job := s.Next()
+		if job == nil {
+			zlog.Debug("no more job in scheduler")
 			break
-		}
-		if err != nil {
-			return err
 		}
 
 		zlog.Info("scheduling job", zap.Object("job", job))
@@ -83,15 +69,17 @@ func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 		select {
 		case <-ctx.Done():
 			zlog.Info("synchronize stores quit on cancel context")
-			return ctx.Err()
+			break
 		default:
 		}
 
 		go func() {
-			result <- s.runSingleJob(ctx, jobWorker, job)
+			select {
+			case result <- s.runSingleJob(ctx, jobWorker, job):
+			case <-ctx.Done():
+			}
 		}()
 	}
-	return nil
 }
 
 func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job) error {

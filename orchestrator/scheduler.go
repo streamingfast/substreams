@@ -21,26 +21,24 @@ type Scheduler struct {
 	requests       []*reqChunk
 }
 
-func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
-		requestsStream:            GetRequestStream(ctx, strategy),
+		requestsStream:            strategy.getRequestStream(ctx),
 		requests:                  []*reqChunk{},
 		workerPool:                workerPool,
 		respFunc:                  respFunc,
 	}
-
 	return s, nil
 }
 
 func (s *Scheduler) Next() *Job {
-	zlog.Debug("Getting a next job from scheduler", zap.Int("requests_stream", len(s.requestsStream)))
+	zlog.Debug("getting a next job from scheduler", zap.Int("buffered_requests", len(s.requestsStream)))
 	request, ok := <-s.requestsStream
 	if !ok {
 		return nil
 	}
-
 	return request
 }
 
@@ -56,7 +54,7 @@ func (s *Scheduler) Launch(ctx context.Context, result chan error) {
 	for {
 		job := s.Next()
 		if job == nil {
-			zlog.Debug("no more job in scheduler")
+			zlog.Debug("no more job in scheduler, or context cancelled")
 			break
 		}
 

@@ -55,6 +55,7 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 	fmt.Println("----")
 	for modIdx, module := range pkg.Modules.Modules {
 		fmt.Println("Name:", module.Name)
+		fmt.Println("Initial block:", module.InitialBlock)
 		kind := module.GetKind()
 		switch v := kind.(type) {
 		case *pbsubstreams.Module_KindMap_:

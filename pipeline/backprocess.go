@@ -51,7 +51,7 @@ func (p *Pipeline) backprocessStores(
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, p.storeMap, upToBlock, orchestrator.WithNotifier(requestPool))
+	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, p.storeMap, upToBlock, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}

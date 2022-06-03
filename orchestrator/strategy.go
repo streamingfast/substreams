@@ -11,16 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type Strategy interface {
-	GetNextRequest(ctx context.Context) (*Job, error)
-}
-
-type RequestGetter interface {
-	Get(ctx context.Context) (*Job, error)
-}
-
 type OrderedStrategy struct {
-	requestGetter RequestGetter
+	requestPool *RequestPool
 }
 
 func NewOrderedStrategy(
@@ -61,48 +53,28 @@ func NewOrderedStrategy(
 	pool.Start(ctx)
 
 	return &OrderedStrategy{
-		requestGetter: pool,
+		requestPool: pool,
 	}, nil
 }
 
-func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*Job, error) {
-	req, err := d.requestGetter.Get(ctx)
-	if err == io.EOF {
-		return nil, io.EOF
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *Job {
-	stream := make(chan *Job)
-
+func (s *OrderedStrategy) getRequestStream(ctx context.Context) <-chan *Job {
+	requestsStream := make(chan *Job)
 	go func() {
-		defer close(stream)
+		defer close(requestsStream)
 
 		for {
-			r, err := strategy.GetNextRequest(ctx)
-			if err == io.EOF || err == context.DeadlineExceeded || err == context.Canceled {
+			job, err := s.requestPool.getNext(ctx)
+			if err == io.EOF {
+				zlog.Debug("EOF in getRequestStream")
 				return
 			}
-			if err != nil {
-				panic(err)
-			}
-
-			if r == nil {
-				continue
-			}
-
 			select {
 			case <-ctx.Done():
+				zlog.Debug("ctx cannnlaskdfjlkj")
 				return
-			case stream <- r:
+			case requestsStream <- job:
 			}
 		}
 	}()
-
-	return stream
+	return requestsStream
 }

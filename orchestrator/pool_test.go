@@ -80,25 +80,25 @@ func TestGet(t *testing.T) {
 
 	p.Start(ctx)
 
-	r, err := p.Get(ctx)
+	r, err := p.getNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, r0, r)
 
 	shortContext, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	r, err = p.Get(shortContext)
+	r, err = p.getNext(shortContext)
 	require.Equal(t, context.DeadlineExceeded, err) //expected for this test
 	require.Nil(t, r)
 	cancel()
 
 	p.Notify("test1", 300)
 
-	r, err = p.Get(ctx)
+	r, err = p.getNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, r1, r)
 
-	r, err = p.Get(ctx)
+	r, err = p.getNext(ctx)
 	require.NotNil(t, err)
 	require.Equal(t, io.EOF, err)
 	require.Nil(t, r)
@@ -132,7 +132,7 @@ func TestGetOrdered(t *testing.T) {
 	p.Start(ctx)
 
 	// first request will be for A, since they have no dependencies and are ready right away.
-	r, err := p.Get(ctx)
+	r, err := p.getNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "A", r.moduleName)
@@ -142,19 +142,19 @@ func TestGetOrdered(t *testing.T) {
 	time.Sleep(100 * time.Microsecond) // give it a teeny bit of time for notification to get processed
 
 	// assert that the request for B got put ahead of the request for A
-	r, err = p.Get(ctx)
+	r, err = p.getNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "B", r.moduleName)
 
 	// assert that the remaining request is there
-	r, err = p.Get(ctx)
+	r, err = p.getNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "A", r.moduleName)
 
 	// asser the end of the stream
-	r, err = p.Get(ctx)
+	r, err = p.getNext(ctx)
 	require.NotNil(t, err)
 	require.Equal(t, io.EOF, err)
 	require.Nil(t, r)

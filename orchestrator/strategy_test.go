@@ -77,7 +77,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	reqChan := GetRequestStream(ctx, s)
+	reqChan := s.getRequestStream(ctx)
 	for req := range reqChan {
 		fmt.Println(jobstr(req))
 		allRequests = append(allRequests, jobstr(req))

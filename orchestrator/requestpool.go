@@ -41,14 +41,10 @@ type RequestPool struct {
 
 func NewRequestPool() *RequestPool {
 	p := RequestPool{}
-
 	p.readyRequestStream = make(chan *requestWaiter, 5000)
-
 	p.queueSend = make(chan *QueueItem, 5000)
 	p.queueReceive = make(chan *QueueItem)
-
 	p.waiters = map[Waiter]struct{}{}
-
 	return &p
 }
 
@@ -98,21 +94,23 @@ func (p *RequestPool) Add(ctx context.Context, reverseIdx int, job *Job, waiter 
 }
 
 func (p *RequestPool) Start(ctx context.Context) {
+	zlog.Debug("starting request pool")
 	p.start.Do(func() {
+		zlog.Debug("starting queue")
 		StartQueue(ctx, p.queueSend, p.queueReceive)
 
 		p.readActive = true
 
+		zlog.Debug("adding to waitgroup", zap.Int("waiters", len(p.requestWaiters)))
 		p.wg.Add(len(p.requestWaiters))
 
 		go func() {
-			defer close(p.readyRequestStream)
 			p.wg.Wait()
-			return
+			zlog.Debug("done waiting for waitgroup")
+			close(p.readyRequestStream)
 		}()
 
 		for _, rw := range p.requestWaiters {
-
 			go func(item *requestWaiter) {
 				defer p.wg.Done()
 
@@ -124,6 +122,7 @@ func (p *RequestPool) Start(ctx context.Context) {
 					case <-ctx.Done():
 						return
 					case p.readyRequestStream <- item:
+						zlog.Debug("sent to ready request stream")
 						p.waitersMutex.Lock()
 						delete(p.waiters, item.Waiter)
 						p.waitersMutex.Unlock()
@@ -133,7 +132,10 @@ func (p *RequestPool) Start(ctx context.Context) {
 		}
 
 		go func() {
-			defer close(p.queueSend) //finished sending items into queue once all
+			defer func() {
+				zlog.Debug("closing queue send")
+				close(p.queueSend) //finished sending items into queue once all
+			}()
 			for {
 				select {
 				case <-ctx.Done():
@@ -144,10 +146,12 @@ func (p *RequestPool) Start(ctx context.Context) {
 					}
 					// the number of stores a waiter was waiting for determines its priority in the queue.
 					// higher number of stores => higher priority.
+					zlog.Debug("sending in queue")
 					p.queueSend <- &QueueItem{
 						job:      waiter.job,
 						Priority: waiter.Waiter.Order() + waiter.ReverseIndex,
 					}
+					zlog.Debug("sent to queue")
 				}
 			}
 		}()
@@ -170,11 +174,13 @@ func (p *RequestPool) Start(ctx context.Context) {
 
 */
 
-func (p *RequestPool) Get(ctx context.Context) (*Job, error) {
+func (p *RequestPool) getNext(ctx context.Context) (*Job, error) {
+	zlog.Debug("in getNext")
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, nil
 	case qi, ok := <-p.queueReceive:
+		zlog.Debug("got something from queue")
 		if !ok {
 			return nil, io.EOF
 		}

@@ -28,9 +28,8 @@ Download the binary
 
 ```bash
 # Use correct binary for your platform
-wget https://github.com/streamingfast/substreams/releases/download/v0.0.12/substreams_0.0.12_linux_x86_64.tar.gz
-tar -xzvf substreams_0.0.12_linux_x86_64.tar.gz
-export PATH="`pwd`:$PATH"
+LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest%7C awk '/download.url.*linux/ {print $2}' | sed 's/"//g')
+curl -L  $LINK  | tar xf -
 ```
 
 {% hint style="info" %}

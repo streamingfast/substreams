@@ -1,6 +1,6 @@
 # Manifests
 
-The Substreams Manifest `substreams.yaml` defines the modules composing the Substreams. The manifest is used, among other things, to define the dependencies between your module's inputs and outputs.
+The Substreams Manifest, `substreams.yaml`, defines the modules composing the Substreams. The manifest is used, among other things, to define the dependencies between your module's inputs and outputs.
 
 Below is a reference guide of all fields in a manifest YAML file.
 
@@ -67,9 +67,9 @@ The `imports` section imports modules with their WASM code, all of their (compil
 
 The _value_ should be a pointer to either a YAML manifest for Substreams Modules (ending in `.yaml`), or a [Package](packages.md) (ending in `.spkg`).
 
-The filename can be an absolute path, or relative (to the location of the `.yaml` file), or be remote if it starts with `http://` or `https://`.
+The filename can be an absolute, relative (to the location of the `.yaml` file), or remote path as long as it starts with `http://` or `https://`.
 
-## `protobuf`
+## `Protobuf`
 
 Example:
 
@@ -84,7 +84,7 @@ protobuf:
     - ../../external-proto
 ```
 
-The `protobuf` section points to the protobuf definitions used by these modules.
+The `Protobuf` section points to the protobuf definitions used by these modules.
 
 The Substreams packager will load files in any of the listed `importPaths`.\
 Note that the `imports` section will also affect which `.proto` files end up in your package.
@@ -107,7 +107,7 @@ binaries:
     file: ./snapshot_of_my_package.wasm
 ```
 
-Specifies the binary code to use when executing modules. The field [`modules[].binary`](manifests.md#modules-.binary) has a default value of `default`. Therefore, make sure to define the `default` binary here.
+This specifies the binary code to use when executing modules. The field [`modules[].binary`](manifests.md#modules-.binary) has a default value of `default`. Therefore, make sure to define the `default` binary here.
 
 You can override which binary to use in the [`modules` section](manifests.md#undefined) (see below), and define other binaries by their name (like `other` in the example above).
 
@@ -151,7 +151,7 @@ Examples:
 
 The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. These are the same rules as for `package.name`.
 
-It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). It is must be unique per package.&#x20;
+It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Each package should have a unique name.
 
 {% hint style="info" %}
 This `name` also corresponds to the **Rust function name** that will be invoked on the compiled WASM code upon execution. This is the same function you will define `#[substreams::handlers::map]`(or`store`) in your Rust code.
@@ -174,7 +174,7 @@ The type of `module`. There are two types of modules:
 * `map`
 * `store`
 
-Learn [more about modules here](broken-reference/)
+Learn more about modules [here](../concepts/modules.md)
 
 ### `modules[].updatePolicy`
 

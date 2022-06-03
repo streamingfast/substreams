@@ -1,6 +1,6 @@
 # Using the CLI
 
-Here are the commands you can invoke with the `substreams` command-line tool.
+Here are the commands you can invoke with the Substreams command-line tool.
 
 {% hint style="info" %}
 In the commands below, any time a package is specified, you can use either a local `substreams.yaml` file, a local `.spkg` or a remote `.spkg` url.
@@ -22,7 +22,7 @@ Let's break down everything happening above.
 * `-e api-dev.streamingfast.io:443` is the endpoint of the provider running our Substreams
 * `--stop-block +1` only requests a single block (stop block will be manifest's `initialBlock` + 1)
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
-* `module_name` this is the module we want to run, refering to the `name` [defined in the manifest](manifests.md#modules-.name).
+* `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
 Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
 
@@ -48,9 +48,9 @@ Notice the `-o` (or `--output`), that can alter the output format. The options a
 
 * `ui`, a nicely formatted, UI-driven interface, with progress information, and execution logs.
 * `json`, an indented stream of data, with no progress information nor logs, but just data output for blocks following the start block.
-* `jsonl`, same as `json` but with each output on a single line
-* `module-json`, same as `json` but wrapped in a json structure specifying the module name
-* `module-jsonl`, sam eas `module-json`, but on a single line.
+* `jsonl`, same as `json` but with each output on a single line.
+* `module-json`, same as `json` but wrapped in a json structure specifying the module name.
+* `module-jsonl`, same as `module-json`, but on a single line.
 
 ### `pack`
 
@@ -64,14 +64,14 @@ $ substreams pack ./substreams.yaml
 Successfully wrote "your-package-v0.1.0.spkg".
 ```
 
-### `info`
+### `manifest info`
 
 This command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
 
 Example:
 
 ```bash
-$ substreams info ./substreams.yaml
+$ substreams manifest info ./substreams.yaml
 Package name: solana_spl_transfers
 Version: v0.5.2
 Doc: Solana SPL Token Transfers stream
@@ -93,7 +93,7 @@ Hash: b08127b2f900cb4562f7d9597c98d9d09a8088d4
 
 ```
 
-### `graph`
+### `manifest graph`
 
 This command prints out a graph of the package in the _mermaid-js_ format.
 
@@ -104,7 +104,7 @@ See [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor
 Example:
 
 ````bash
-$ substreams graph ./substreams.yaml                                 [±master ●●]
+$ substreams manifest graph ./substreams.yaml                         [±master ●●]
 Mermaid graph:
 
 ```mermaid
@@ -124,7 +124,9 @@ Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to 
 
 ### `inspect`
 
-This command goes deep into the file structure of a package (`yaml` or `spkg`). Used mostly for debugging or for the curious:
+This command goes deep into the file structure of a package (`yaml` or `spkg`). Used mostly for debugging or for the curious ;)&#x20;
+
+Example:
 
 ```
 $ substreams inspect ./substreams.yaml | less

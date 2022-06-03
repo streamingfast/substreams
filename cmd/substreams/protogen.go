@@ -14,7 +14,8 @@ import (
 )
 
 var protogenCmd = &cobra.Command{
-	Use:          "protogen <manifest_yaml>",
+	Use:          "protogen <package>",
+	Short:        "Generate Rust bindings from a package",
 	RunE:         runProtogen,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

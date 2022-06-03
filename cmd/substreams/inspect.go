@@ -13,7 +13,8 @@ import (
 )
 
 var inspectCmd = &cobra.Command{
-	Use:          "inspect <manifest_yaml>",
+	Use:          "inspect <package>",
+	Short:        "Display low-level package structure",
 	RunE:         runInspect,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

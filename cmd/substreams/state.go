@@ -8,12 +8,13 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/substreams/tools"
 )
 
 func init() {
 	stateCmd.Flags().String("state-store-url", "./localdata", "URL of state store")
 
-	rootCmd.AddCommand(stateCmd)
+	tools.Cmd.AddCommand(stateCmd)
 }
 
 // localCmd represents the base command when called without any subcommands

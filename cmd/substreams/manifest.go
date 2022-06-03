@@ -13,26 +13,19 @@ import (
 // 	Use:          "manifest",
 // 	SilenceUsage: true,
 // }
-var manifestInfoCmd = &cobra.Command{
+var infoCmd = &cobra.Command{
 	Use:          "info <manifest_file>",
-	RunE:         runManifestInfo,
-	Args:         cobra.ExactArgs(1),
-	SilenceUsage: true,
-}
-
-var manifestGraphCmd = &cobra.Command{
-	Use:          "graph <manifest_file>",
-	RunE:         runManifestGraph,
+	Short:        "Display package modules and docs",
+	RunE:         runInfo,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 }
 
 func init() {
-	rootCmd.AddCommand(manifestInfoCmd)
-	rootCmd.AddCommand(manifestGraphCmd)
+	rootCmd.AddCommand(infoCmd)
 }
 
-func runManifestInfo(cmd *cobra.Command, args []string) error {
+func runInfo(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
@@ -75,19 +68,6 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println("")
 	}
-
-	return nil
-}
-
-func runManifestGraph(cmd *cobra.Command, args []string) error {
-	manifestPath := args[0]
-	manifestReader := manifest.NewReader(manifestPath)
-	pkg, err := manifestReader.Read()
-	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	manifest.PrintMermaid(pkg.Modules)
 
 	return nil
 }

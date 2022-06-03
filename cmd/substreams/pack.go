@@ -11,7 +11,8 @@ import (
 )
 
 var packCmd = &cobra.Command{
-	Use:          "pack <manifest_yaml>",
+	Use:          "pack <package>",
+	Short:        "Build an .spkg out of a .yaml manifest",
 	RunE:         runPack,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

@@ -8,6 +8,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:          "substreams",
 	Short:        "A tool to manipulate Substreams, and process them locally and remotely",
+	Long:         "Any place where <package> is specified, a 'substreams.yaml', a local '.spkg' file or an https://...spkg file can be specified",
 	SilenceUsage: true,
 }
 

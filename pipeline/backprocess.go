@@ -32,6 +32,10 @@ func (p *Pipeline) backprocessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
+	// for _, mod := range p.storeModules {
+	// 	splitWork()
+	// }
+
 	progressMessages := storageState.ProgressMessages()
 	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)

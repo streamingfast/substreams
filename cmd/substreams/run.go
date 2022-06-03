@@ -18,7 +18,7 @@ import (
 func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
-	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose")
+	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose. Defaults to -1, which means the initialBlock of the first module you are streaming")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block for blockchain firehose")
 
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")

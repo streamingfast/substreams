@@ -191,7 +191,7 @@ func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range)
 			continue
 		}
 		zlog.Debug("appending range", zap.Stringer("split_block_range", splitBlockRange))
-		if splitBlockRange.Size() == s.storeSaveInterval {
+		if splitBlockRange.Size() != s.storeSaveInterval {
 			continue
 		}
 		s.ranges = append(s.ranges, splitBlockRange)

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/stretchr/testify/require"
@@ -67,20 +66,20 @@ func TestSquash(t *testing.T) {
 	}
 
 	s := testStateBuilder(store)
-	squashable := NewSquashable(s, 80_000, 10_000, 10_000)
+	squashable := NewSquashable(s, 80_000, 10_000)
 
 	notificationsSent := 0
 	notifierFunc := NotifierFunc(func() {
 		notificationsSent++
 	})
 
-	require.NoError(t, squashable.squash(ctx, &block.Range{StartBlock: 20_000, ExclusiveEndBlock: 30_000}, notifierFunc))
+	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 20_000, end: 30_000}, notifierFunc))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, &block.Range{StartBlock: 70_000, ExclusiveEndBlock: 80_000}, notifierFunc))
+	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 70_000, end: 80_000}, notifierFunc))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000}, notifierFunc))
+	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 10_000, end: 20_000}, notifierFunc))
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 	require.Equal(t, 2, notificationsSent)

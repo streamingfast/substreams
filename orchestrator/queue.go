@@ -3,13 +3,11 @@ package orchestrator
 import (
 	"container/heap"
 	"context"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type QueueItem struct {
-	Request  *pbsubstreams.Request // The value of the item; arbitrary.
-	Priority int                   // The Priority of the item in the queue.
+	job      *Job // The value of the item; arbitrary.
+	Priority int  // The Priority of the item in the queue.
 
 	// The index is needed by update and is maintained by the heap.Interface methods.
 	index int // The index of the item in the heap.

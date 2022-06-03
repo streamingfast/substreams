@@ -1,59 +1,48 @@
-package worker
+package orchestrator
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
-type Job struct {
-	Request *pbsubstreams.Request
-}
-
-func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("request_outputs", strings.Join(j.Request.OutputModules, "|"))
-	enc.AddInt64("start_block", j.Request.StartBlockNum)
-	enc.AddUint64("stop_block", j.Request.StopBlockNum)
-	return nil
-}
-
-type Pool struct {
+type WorkerPool struct {
 	workers chan *Worker
 }
 
-func NewPool(workerCount int, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)) *Pool {
+func NewWorkerPool(workerCount int, originalRequestModules *pbsubstreams.Modules, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
 		workers <- &Worker{
-			grpcClientFactory: grpcClientFactory,
+			originalRequestModules: originalRequestModules,
+			grpcClientFactory:      grpcClientFactory,
 		}
 	}
-	return &Pool{
+	return &WorkerPool{
 		workers: workers,
 	}
 }
 
-func (p *Pool) Borrow() *Worker {
+func (p *WorkerPool) Borrow() *Worker {
 	w := <-p.workers
 	return w
 }
 
-func (p *Pool) ReturnWorker(worker *Worker) {
+func (p *WorkerPool) ReturnWorker(worker *Worker) {
 	p.workers <- worker
 }
 
 type Worker struct {
-	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
+	grpcClientFactory      func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
+	originalRequestModules *pbsubstreams.Modules
 }
 
 func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) error {
@@ -68,9 +57,12 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		zlog.Error("getting grpc client", zap.Error(err))
 		return fmt.Errorf("grpc client factory: %w", err)
 	}
-	
+
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
-	stream, err := grpcClient.Blocks(ctx, job.Request, grpcCallOpts...)
+
+	request := job.createRequest(w.originalRequestModules)
+
+	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
 		return fmt.Errorf("getting block stream: %w", err)
 	}

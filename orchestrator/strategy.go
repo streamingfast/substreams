@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -13,11 +12,11 @@ import (
 )
 
 type Strategy interface {
-	GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error)
+	GetNextRequest(ctx context.Context) (*Job, error)
 }
 
 type RequestGetter interface {
-	Get(ctx context.Context) (*pbsubstreams.Request, error)
+	Get(ctx context.Context) (*Job, error)
 }
 
 type OrderedStrategy struct {
@@ -26,48 +25,18 @@ type OrderedStrategy struct {
 
 func NewOrderedStrategy(
 	ctx context.Context,
-	storageState *StorageState,
+	splitWorks SplitWorkModules,
 	request *pbsubstreams.Request,
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 	pool *RequestPool,
-	upToBlockNum uint64,
-	storeSaveInterval uint64,
-	blockRangeSizeSubRequests int,
-	maxRangeSize uint64,
 ) (*OrderedStrategy, error) {
-	for _, store := range stores {
-		zlog.Debug("new ordered strategy", zap.String("builder", store.Name), zap.Uint64("up_to_block_num", upToBlockNum))
+	for storeName, store := range stores {
+		workUnit := splitWorks[storeName]
+		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
 
-		// TODO(abourget): this logic is to be replaced by obedience to the SplitWork
-		if upToBlockNum == store.ModuleInitialBlock {
-			zlog.Debug("nothing to sync")
-			continue // nothing to synchronize
-		}
-
-		storeLastBlock := storageState.lastBlocks[store.Name]
-		subreqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, upToBlockNum, storeSaveInterval, store.ModuleInitialBlock)
-		if subreqStartBlock == upToBlockNum {
-			zlog.Debug("already produced up to start block", zap.Uint64("up_to_block", upToBlockNum))
-			continue
-		}
-		if subreqStartBlock == 0 {
-			subreqStartBlock = store.ModuleInitialBlock
-		}
-
-		// TODO(abourget): this was done in `splitWork` already
-		moduleFullRangeToProcess := &block.Range{
-			StartBlock:        subreqStartBlock,
-			ExclusiveEndBlock: upToBlockNum,
-		}
-
-		// if moduleFullRangeToProcess.Size() > maxRangeSize {
-		// 	return nil, fmt.Errorf("subrequest size too big. request must be started closer to the head block. store %s is %d blocks from head (max is %d)", store.Name, moduleFullRangeToProcess.Size(), maxRangeSize)
-		// }
-
-		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
-		rangeLen := len(requestRanges)
-		for idx, blockRange := range requestRanges {
+		rangeLen := len(workUnit.reqChunks)
+		for idx, reqChunk := range workUnit.reqChunks {
 			// TODO(abourget): here we loop SplitWork.reqChunks, and grab the ancestor modules
 			// to setup the waiter.
 			// blockRange's start/end come from `reqChunk`
@@ -76,11 +45,16 @@ func NewOrderedStrategy(
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
 			}
 
-			req := createRequest(blockRange.StartBlock, blockRange.ExclusiveEndBlock, store.Name, request.IrreversibilityCondition, request.Modules)
-			waiter := NewWaiter(blockRange.StartBlock, storageState, ancestorStoreModules...)
-			_ = pool.Add(ctx, rangeLen-idx, req, waiter)
+			job := &Job{
+				moduleName: store.Name,
+				reqChunk:   reqChunk,
+			}
 
-			zlog.Info("request created", zap.String("module_name", store.Name), zap.Object("block_range", blockRange))
+			//req := createRequest(reqChunk, store.Name, request.IrreversibilityCondition, request.Modules)
+			waiter := NewWaiter(reqChunk.start, ancestorStoreModules...)
+			_ = pool.Add(ctx, rangeLen-idx, job, waiter)
+
+			zlog.Info("request created", zap.String("module_name", store.Name), zap.Uint64("start_block", reqChunk.start), zap.Uint64("end_block", reqChunk.end))
 		}
 	}
 
@@ -91,7 +65,7 @@ func NewOrderedStrategy(
 	}, nil
 }
 
-func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Request, error) {
+func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*Job, error) {
 	req, err := d.requestGetter.Get(ctx)
 	if err == io.EOF {
 		return nil, io.EOF
@@ -103,8 +77,8 @@ func (d *OrderedStrategy) GetNextRequest(ctx context.Context) (*pbsubstreams.Req
 	return req, nil
 }
 
-func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstreams.Request {
-	stream := make(chan *pbsubstreams.Request)
+func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *Job {
+	stream := make(chan *Job)
 
 	go func() {
 		defer close(stream)
@@ -131,20 +105,4 @@ func GetRequestStream(ctx context.Context, strategy Strategy) <-chan *pbsubstrea
 	}()
 
 	return stream
-}
-
-func createRequest(
-	startBlock, stopBlock uint64,
-	outputModuleName string,
-	irreversibilityCondition string,
-	modules *pbsubstreams.Modules,
-) *pbsubstreams.Request {
-	return &pbsubstreams.Request{
-		StartBlockNum: int64(startBlock),
-		StopBlockNum:  stopBlock,
-		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
-		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
-		Modules:       modules,
-		OutputModules: []string{outputModuleName},
-	}
 }

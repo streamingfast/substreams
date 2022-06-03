@@ -5,15 +5,43 @@ import (
 	"strings"
 
 	"github.com/streamingfast/substreams/block"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+// FIXME(abourget): WorkPlan ?
+
+type SplitWorkModules map[string]*SplitWork
+
+func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+	for storeName, work := range mods {
+		if work.loadInitialStore == nil {
+			continue
+		}
+		out = append(out, &pbsubstreams.ModuleProgress{
+			Name: storeName,
+			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
+				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+					ProcessedRanges: []*pbsubstreams.BlockRange{
+						{
+							StartBlock: work.loadInitialStore.StartBlock,
+							EndBlock:   work.loadInitialStore.ExclusiveEndBlock,
+						},
+					},
+				},
+			},
+		})
+	}
+	return
+}
+
+// FIXME(abourget): StoreWorkUnit ?
 type SplitWork struct {
 	modName          string
 	loadInitialStore *block.Range // Send a Progress message, saying the store is already processed for this range
 	reqChunks        []*reqChunk  // All jobs that needs to be scheduled
 }
 
-func splitWork(modName string, storeSplit, subreqSplit, modInitBlock, storeLastBlock, incomingReqStartBlock uint64) (out *SplitWork) {
+func SplitSomeWork(modName string, storeSplit, subreqSplit, modInitBlock, storeLastBlock, incomingReqStartBlock uint64) (out *SplitWork) {
 	// FIXME: Make sure `storeSplit` and `subreqSplit` are a multiple of one another.
 	// storeSplit must actually be a factor of subreqSplit
 	// panic otherwise, and bring that check higher up the chain
@@ -24,7 +52,7 @@ func splitWork(modName string, storeSplit, subreqSplit, modInitBlock, storeLastB
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
 	}
 
-	if incomingReqStartBlock < modInitBlock {
+	if incomingReqStartBlock <= modInitBlock {
 		return out
 	}
 
@@ -112,6 +140,14 @@ type storeChunk struct {
 	start       uint64
 	end         uint64 // exclusive end
 	tempPartial bool   // for off-of-bound stores (like ending in 1123, and not on 1000)
+}
+
+func (s storeChunk) String() string {
+	var add string
+	if s.tempPartial {
+		add = "TMP:"
+	}
+	return fmt.Sprintf("%s%d-%d", add, s.start, s.end)
 }
 
 /////////////////////////////////////////////////////////////////////////////////

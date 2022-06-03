@@ -8,29 +8,26 @@ import (
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/orchestrator/worker"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
 type Scheduler struct {
 	blockRangeSizeSubRequests int
 
-	workerPool *worker.Pool
+	workerPool *WorkerPool
 	respFunc   substreams.ResponseFunc
 
 	squasher       *Squasher
-	requestsStream <-chan *pbsubstreams.Request
-	requests       []*pbsubstreams.Request
+	requestsStream <-chan *Job
+	requests       []*reqChunk
 }
 
-func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, workerPool *worker.Pool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
 	s := &Scheduler{
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
 		requestsStream:            GetRequestStream(ctx, strategy),
-		requests:                  []*pbsubstreams.Request{},
+		requests:                  []*reqChunk{},
 		workerPool:                workerPool,
 		respFunc:                  respFunc,
 	}
@@ -38,7 +35,7 @@ func NewScheduler(ctx context.Context, strategy Strategy, squasher *Squasher, wo
 	return s, nil
 }
 
-func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
+func (s *Scheduler) Next() (*Job, error) {
 	zlog.Debug("Getting a next job from scheduler", zap.Int("requests_stream", len(s.requestsStream)))
 	request, ok := <-s.requestsStream
 	if !ok {
@@ -48,19 +45,10 @@ func (s *Scheduler) Next() (*pbsubstreams.Request, error) {
 	return request, nil
 }
 
-func (s *Scheduler) Callback(ctx context.Context, outgoingReq *pbsubstreams.Request) error {
-	for _, output := range outgoingReq.GetOutputModules() {
-		// FIXME(abourget): why call Squash on non-store modules? Oh,
-		// but the orchestrator far far away won't do that
-		// anyway... hermm ok..
-		err := s.squasher.Squash(ctx, output, &block.Range{
-			StartBlock:        uint64(outgoingReq.StartBlockNum),
-			ExclusiveEndBlock: outgoingReq.StopBlockNum,
-		})
-
-		if err != nil {
-			return fmt.Errorf("squashing: %w", err)
-		}
+func (s *Scheduler) Callback(ctx context.Context, job *Job) error {
+	err := s.squasher.Squash(ctx, job.moduleName, job.reqChunk)
+	if err != nil {
+		return fmt.Errorf("squashing: %w", err)
 	}
 	return nil
 }
@@ -77,17 +65,13 @@ func (s *Scheduler) Launch(ctx context.Context, result chan error) (out chan err
 
 func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 	for {
-		req, err := s.Next()
+		job, err := s.Next()
 		if err == io.EOF {
 			zlog.Debug("scheduler do launch EOF")
 			break
 		}
 		if err != nil {
 			return err
-		}
-
-		job := &worker.Job{
-			Request: req,
 		}
 
 		zlog.Info("scheduling job", zap.Object("job", job))
@@ -110,7 +94,7 @@ func (s *Scheduler) doLaunch(ctx context.Context, result chan error) error {
 	return nil
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *worker.Worker, job *worker.Job) error {
+func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job) error {
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		return jobWorker.Run(ctx, job, s.respFunc)
 	})
@@ -119,7 +103,7 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *worker.Worker, 
 		return err
 	}
 
-	if err = s.Callback(ctx, job.Request); err != nil {
+	if err = s.Callback(ctx, job); err != nil {
 		return fmt.Errorf("calling back scheduler: %w", err)
 	}
 	return nil

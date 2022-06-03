@@ -13,7 +13,7 @@ import (
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 	"github.com/streamingfast/substreams/manifest"
-	orchestratorWorker "github.com/streamingfast/substreams/orchestrator/worker"
+	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
@@ -189,7 +189,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	workerPool := orchestratorWorker.NewPool(s.parallelSubRequests, s.grpcClientFactory)
+	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
 
 	handler, err := pipe.HandlerFactory(workerPool, responseHandler)
 	if err != nil {

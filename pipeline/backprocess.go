@@ -6,14 +6,13 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
-	"github.com/streamingfast/substreams/orchestrator/worker"
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 )
 
 func (p *Pipeline) backprocessStores(
 	ctx context.Context,
-	workerPool *worker.Pool,
+	workerPool *orchestrator.WorkerPool,
 	respFunc substreams.ResponseFunc,
 ) (
 	map[string]*state.Store,
@@ -32,23 +31,24 @@ func (p *Pipeline) backprocessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	// for _, mod := range p.storeModules {
-	// 	splitWork()
-	// }
+	splitWorks := orchestrator.SplitWorkModules{}
+	for _, mod := range p.storeModules {
+		splitWorks[mod.Name] = orchestrator.SplitSomeWork(mod.Name, p.storesSaveInterval, uint64(p.blockRangeSizeSubRequests), mod.InitialBlock, storageState.LastBlock(mod.Name), uint64(p.request.StartBlockNum))
+	}
 
-	progressMessages := storageState.ProgressMessages()
+	progressMessages := splitWorks.ProgressMessages()
 	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, storageState, p.request, p.storeMap, p.graph, requestPool, upToBlock, p.storesSaveInterval, p.blockRangeSizeSubRequests, p.maxStoreSyncRangeSize)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, p.request, p.storeMap, p.graph, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, storageState, p.storeMap, p.storesSaveInterval, upToBlock, orchestrator.WithNotifier(requestPool))
+	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, p.storeMap, upToBlock, orchestrator.WithNotifier(requestPool))
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}

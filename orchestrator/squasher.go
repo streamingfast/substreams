@@ -41,32 +41,25 @@ func WithNotifier(notifier Notifier) SquasherOption {
 // synchronizes around the actually data: the state of storages
 // present, the requests needed to fill in those stores up to the
 // target block, etc..
-func NewSquasher(ctx context.Context, storageState *StorageState, stores map[string]*state.Store, storeSaveInterval uint64, reqStartBlock uint64, opts ...SquasherOption) (*Squasher, error) {
+func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[string]*state.Store, reqStartBlock uint64, opts ...SquasherOption) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
-	for _, store := range stores {
-		lastSavedBlock := storageState.lastBlocks[store.Name]
+	for storeName, store := range stores {
+		workUnit := splitWorks[storeName]
+		// what is workUnit has nothing to do?
 
-		exclusiveEndBlock := computeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
-
-		// TODO(abourget): base this decision off StoreWork.loadInitialStore
-		if exclusiveEndBlock == 0 {
-			squashables[store.Name] = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
+		if workUnit.loadInitialStore == nil {
+			squashables[store.Name] = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock)
 		} else {
-			r := &block.Range{
-				StartBlock:        store.ModuleInitialBlock,
-				ExclusiveEndBlock: exclusiveEndBlock,
-			}
-			squish, err := store.LoadFrom(ctx, r)
+			squish, err := store.LoadFrom(ctx, workUnit.loadInitialStore)
 			if err != nil {
-				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, r, err)
+				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.loadInitialStore, err)
 			}
-			squashables[store.Name] = NewSquashable(squish, reqStartBlock, storeSaveInterval, lastSavedBlock)
+			squashables[store.Name] = NewSquashable(squish, reqStartBlock, workUnit.loadInitialStore.ExclusiveEndBlock)
 		}
 	}
 
 	squasher := &Squasher{
 		squashables:          squashables,
-		storeSaveInterval:    storeSaveInterval,
 		targetExclusiveBlock: reqStartBlock,
 	}
 
@@ -77,7 +70,7 @@ func NewSquasher(ctx context.Context, storageState *StorageState, stores map[str
 	return squasher, nil
 }
 
-func (s *Squasher) Squash(ctx context.Context, moduleName string, outgoingReqRange *block.Range) error {
+func (s *Squasher) Squash(ctx context.Context, moduleName string, reqChunk *reqChunk) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -90,7 +83,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, outgoingReqRan
 		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)
 	}
 
-	return squashable.squash(ctx, outgoingReqRange, s.notifier)
+	return squashable.squash(ctx, reqChunk, s.notifier)
 }
 
 func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
@@ -112,7 +105,7 @@ func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
 			// the second check was added to take care of the use-case of a subsequent execution of the same request
 			// where the target wasn't "reached" because there were no ranges to be done
 			if !v.targetReached && !v.IsEmpty() {
-				errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", v.name, v.targetExclusiveBlock, v.ranges, v.nextExpectedStartBlock))
+				errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", v.name, v.reqChunk.end, v.ranges, v.nextExpectedStartBlock))
 			}
 			if !v.IsEmpty() {
 				errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", v.name, v.ranges))
@@ -131,7 +124,8 @@ type Squashable struct {
 
 	name                   string
 	store                  *state.Store
-	ranges                 block.Ranges // Ranges split in `storeSaveInterval` chunks
+	reqChunk               *reqChunk
+	ranges                 []*storeChunk // Ranges split in `storeSaveInterval` chunks
 	storeSaveInterval      uint64
 	targetExclusiveBlock   uint64
 	nextExpectedStartBlock uint64
@@ -139,54 +133,30 @@ type Squashable struct {
 	targetReached bool
 }
 
-func NewSquashable(initialStore *state.Store, targetExclusiveBlock, storeSaveInterval, nextExpectedStartBlock uint64) *Squashable {
+func NewSquashable(initialStore *state.Store, targetExclusiveBlock, nextExpectedStartBlock uint64) *Squashable {
 	return &Squashable{
 		name:                   initialStore.Name,
 		store:                  initialStore,
-		storeSaveInterval:      storeSaveInterval,
 		targetExclusiveBlock:   targetExclusiveBlock,
 		nextExpectedStartBlock: nextExpectedStartBlock,
 	}
 }
 
-func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifier Notifier) error {
+func (s *Squashable) squash(ctx context.Context, reqChunk *reqChunk, notifier Notifier) error {
 	s.Lock()
 	defer s.Unlock()
 
-	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Object("request_range", blockRange))
+	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Stringer("req_chunk", reqChunk))
 
-	// TODO(abourget): this is all done in advance now, in the SplitWork
-	if err := s.cumulateRange(ctx, blockRange); err != nil {
-		return fmt.Errorf("cumulate range: %w", err)
-	}
+	s.ranges = append(s.ranges, reqChunk.storeChunks...)
+	sort.Slice(s.ranges, func(i, j int) bool {
+		return s.ranges[i].start < s.ranges[j].start
+	})
 
 	if err := s.mergeAvailablePartials(ctx, notifier); err != nil {
 		return fmt.Errorf("merging partials: %w", err)
 	}
 
-	return nil
-}
-
-func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range) error {
-	// TODO(abourget): this disappears BUT we now need to SIGNAL the
-	// storeChunks that we received and put them in order.
-
-	splitBlockRanges := blockRange.Split(s.storeSaveInterval)
-	for _, splitBlockRange := range splitBlockRanges {
-		if splitBlockRange.StartBlock < s.store.ModuleInitialBlock {
-			return fmt.Errorf("module %q: received a squash request for a start block %d prior to the module's initial block %d", s.name, splitBlockRange.StartBlock, s.store.ModuleInitialBlock)
-		}
-		if blockRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
-			// Otherwise, risks stalling the merging (as ranges are
-			// sorted, and only the first is checked for contiguousness)
-			continue
-		}
-		zlog.Debug("appending range", zap.Stringer("split_block_range", splitBlockRange))
-		// TODO(abourget): we still need to keep track of which reqChunks were completed, in
-		// order
-		s.ranges = append(s.ranges, splitBlockRange)
-	}
-	sort.Sort(s.ranges)
 	return nil
 }
 
@@ -207,16 +177,16 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 		// TODO(abourget): we still need to keep track of which ranges were completed in order
 		squashableRange := s.ranges[0]
 
-		if squashableRange.StartBlock < s.nextExpectedStartBlock {
-			return fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges)
+		if squashableRange.start < s.nextExpectedStartBlock {
+			return fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.start, s.ranges)
 		}
-		if s.nextExpectedStartBlock != squashableRange.StartBlock {
+		if s.nextExpectedStartBlock != squashableRange.start {
 			break
 		}
 
 		zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 
-		nextStore, err := s.store.LoadFrom(ctx, squashableRange)
+		nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.start, squashableRange.end))
 		if err != nil {
 			return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 		}
@@ -226,31 +196,31 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 			return fmt.Errorf("merging: %s", err)
 		}
 
-		s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
+		s.nextExpectedStartBlock = squashableRange.end
 
 		// TODO(abourget): the decision to write or not to write, is determined in
 		// splitWork, with the `tempPartial` variable on the storeChunk.
-		endsOnBoundary := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
-		if endsOnBoundary {
-			err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
-			if err != nil {
-				return fmt.Errorf("writing state: %w", err)
-			}
-		} else {
-			err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+		// endsOnBoundary := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
+		if squashableRange.tempPartial {
+			err = nextStore.DeleteStore(ctx, squashableRange.end)
 			if err != nil {
 				zlog.Warn("deleting partial file", zap.Error(err))
+			}
+		} else {
+			err = s.store.WriteState(ctx, squashableRange.end)
+			if err != nil {
+				return fmt.Errorf("writing state: %w", err)
 			}
 		}
 
 		s.ranges = s.ranges[1:]
 
-		if squashableRange.ExclusiveEndBlock == s.targetExclusiveBlock {
+		if squashableRange.end == s.targetExclusiveBlock {
 			s.targetReached = true
 		}
 
 		if notifier != nil {
-			notifier.Notify(s.store.Name, squashableRange.ExclusiveEndBlock)
+			notifier.Notify(s.store.Name, squashableRange.end)
 		}
 	}
 

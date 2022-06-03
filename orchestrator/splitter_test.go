@@ -68,6 +68,14 @@ func TestSplitWork(t *testing.T) {
 			/* expected initial _Progress_, expected requests(store chunks) */
 			"", "50-60, 60-70, 70-80, 80-90, 90-100",
 		),
+		splitTest("nothing to work for, nothing to initialize", 10, 10,
+			55, 0, 55,
+			"", "",
+		),
+		splitTest("reqStart before module init, don't process anything and start with a clean store", 10, 10,
+			50, 0, 10,
+			"", "",
+		),
 		splitTest("reqStart", 10, 10,
 			50, 0, 100,
 			"", "50-60, 60-70, 70-80, 80-90, 90-100",
@@ -140,15 +148,11 @@ func TestSplitWork(t *testing.T) {
 			50, 30, 10,
 			"", "PANIC",
 		),
-		splitTest("reqStart before module init, don't process anything and start with a clean store", 10, 10,
-			50, 0, 10,
-			"", "",
-		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var work *SplitWork
 			f := func() {
-				work = splitWork("mod", tt.storeSplit, tt.subreqSplit, tt.modInitBlock, tt.lastBlock, tt.reqStart)
+				work = SplitSomeWork("mod", tt.storeSplit, tt.subreqSplit, tt.modInitBlock, tt.lastBlock, tt.reqStart)
 			}
 			if tt.expectSubreqs == "PANIC" {
 				assert.Panics(t, f, "bob")

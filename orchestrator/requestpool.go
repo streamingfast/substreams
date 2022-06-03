@@ -9,13 +9,11 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type requestWaiter struct {
 	ReverseIndex int // per module decrementing index
-	Request      *pbsubstreams.Request
+	job          *Job
 	Waiter       Waiter
 }
 
@@ -79,14 +77,14 @@ func (p *RequestPool) Notify(builder string, blockNum uint64) {
 	}
 }
 
-func (p *RequestPool) Add(ctx context.Context, reverseIdx int, request *pbsubstreams.Request, waiter Waiter) error {
+func (p *RequestPool) Add(ctx context.Context, reverseIdx int, job *Job, waiter Waiter) error {
 	if p.readActive {
 		return fmt.Errorf("cannot add to pool once reading has begun")
 	}
 
 	rw := &requestWaiter{
 		ReverseIndex: reverseIdx,
-		Request:      request,
+		job:          job,
 		Waiter:       waiter,
 	}
 
@@ -140,15 +138,15 @@ func (p *RequestPool) Start(ctx context.Context) {
 				select {
 				case <-ctx.Done():
 					return
-				case i, ok := <-p.readyRequestStream:
+				case waiter, ok := <-p.readyRequestStream:
 					if !ok {
 						return
 					}
 					// the number of stores a waiter was waiting for determines its priority in the queue.
 					// higher number of stores => higher priority.
 					p.queueSend <- &QueueItem{
-						Request:  i.Request,
-						Priority: i.Waiter.Order() + i.ReverseIndex,
+						job:      waiter.job,
+						Priority: waiter.Waiter.Order() + waiter.ReverseIndex,
 					}
 				}
 			}
@@ -172,7 +170,7 @@ func (p *RequestPool) Start(ctx context.Context) {
 
 */
 
-func (p *RequestPool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
+func (p *RequestPool) Get(ctx context.Context) (*Job, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -180,7 +178,7 @@ func (p *RequestPool) Get(ctx context.Context) (*pbsubstreams.Request, error) {
 		if !ok {
 			return nil, io.EOF
 		}
-		return qi.Request, nil
+		return qi.job, nil
 	}
 }
 

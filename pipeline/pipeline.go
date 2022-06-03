@@ -12,7 +12,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/worker"
+	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
@@ -110,7 +110,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) HandlerFactory(workerPool *worker.Pool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
+func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
 	ctx := p.context
 	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isBackprocessing), zap.Strings("outputs", p.request.OutputModules))
 

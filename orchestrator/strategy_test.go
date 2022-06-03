@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +18,6 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	//t.Skip("abourget: incomplete, untested")
 
 	storeSplit := uint64(10)
-	subreqSplit := 10
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
@@ -36,12 +34,18 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		stores[newStore.Name] = newStore
 	}
 
+	splitWorkMods := SplitWorkModules{
+		"E": &SplitWork{
+			modName:   "E",
+			reqChunks: []*reqChunk{},
+		},
+	}
+
 	pool := NewRequestPool()
 	ctx := context.Background()
-	storageState := NewStorageState() //&StorageState{lastBlocks: map[string]uint64{}}
 	s, err := NewOrderedStrategy(
 		ctx,
-		storageState,
+		splitWorkMods,
 		&pbsubstreams.Request{
 			StartBlockNum: 0,
 			StopBlockNum:  30,
@@ -49,10 +53,6 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		stores, // INIT
 		graph,
 		pool,
-		30, // corresponds to `Request.EndBlock` doesn't it?
-		storeSplit,
-		subreqSplit,
-		1_000_000, // FIXME
 	)
 	require.NoError(t, err)
 
@@ -74,8 +74,8 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 
 	reqChan := GetRequestStream(ctx, s)
 	for req := range reqChan {
-		fmt.Println(reqstr(req))
-		allRequests = append(allRequests, reqstr(req))
+		fmt.Println(jobstr(req))
+		allRequests = append(allRequests, jobstr(req))
 	}
 
 	fmt.Println(allRequests)
@@ -83,6 +83,6 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	assert.Equal(t, 8, len(allRequests))
 }
 
-func reqstr(r *pbsubstreams.Request) string {
-	return fmt.Sprintf("%s %d-%d", strings.Join(r.OutputModules, ","), r.StartBlockNum, r.StopBlockNum)
+func jobstr(j *Job) string {
+	return fmt.Sprintf("%s %d-%d", j.moduleName, j.reqChunk.start, j.reqChunk.end)
 }

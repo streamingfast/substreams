@@ -1,6 +1,6 @@
 # Writing Module Handlers
 
-Now that we have our ABI and Protobuf Rust code generated, let's write our handler code in `src/lib.rs`
+Now that we have our ABI and `Protobuf` Rust code generated, let's write our handler code in `src/lib.rs` as such:
 
 {% code title="src/lib.rs" %}
 ```rust
@@ -77,7 +77,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 **Let's break it down**
 
-We setup our imports
+Firstly, we setup our imports
 
 ```rust
 mod abi;
@@ -89,7 +89,7 @@ use substreams_ethereum::{pb::eth::v1 as eth, NULL_ADDRESS};
 ...
 ```
 
-We store as a `constant` the contract we are tracking, and initiate our Ethereum Substreams
+We then store the contract that we're tracking as a `constant`, and initiate our Ethereum Substreams
 
 ```rust
 ...
@@ -102,7 +102,7 @@ substreams_ethereum::init!();
 ...
 ```
 
-We now define our first `map` module. As a reminder, here is the module definition in the Manifiest&#x20;
+We then define our first `map` module. As a reminder, here is the module definition in the Manifiest that we created:&#x20;
 
 ```yaml
   - name: block_to_transfers
@@ -114,9 +114,9 @@ We now define our first `map` module. As a reminder, here is the module definiti
       type: proto:eth.erc721.v1.Transfers
 ```
 
-First, notice the `name: block_to_transfers.` This should correspond to our handler function name.&#x20;
+Notice the: `name: block_to_transfers`. This name should correspond to our handler function name.&#x20;
 
-Second, we have defined one input and one output. The input has a type of `sf.ethereum.type.v1.Block` which is a standard Ethereum block provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` which is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
+Second, we have defined one input and one output. The input has a type of `sf.ethereum.type.v1.Block` which is a standard Ethereum block provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` which is our custom `Protobuf` definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
 
 ```rust
 ...
@@ -194,9 +194,9 @@ Let's now define our `store` module. As a reminder, here is the module definitio
 
 ```
 
-First notice the `name: nft_state.` This should correspond to our handler function name.&#x20;
+First, notice the: `name: nft_state`. This name should also correspond to our handler function name.&#x20;
 
-Second, we have defined one input. The input corresponds to the output of the `map` module `block_to_transfers`, which is of type `proto:eth.erc721.v1.Transfers`. This is our custom Protobuf definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
+Second, we have defined one input. The input corresponds to the output of the `map` module `block_to_transfers`, which is of type `proto:eth.erc721.v1.Transfers`. This is our custom `Protobuf` definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
 
 ```rust
 ...

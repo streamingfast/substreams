@@ -1,13 +1,13 @@
 # Creating your Manifest
 
-Let's first step your directory:
+Firstly, create and step into your directory:
 
 ```bash
 mkdir substreams_example
 cd substreams_example
 ```
 
-A Substreams manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module). It will also have a link to the `rust` code that implements the business logic of the module, we call this the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
+A Substreams manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module). It will also have a link to the Rust code that implements the business logic of the module, we call this the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
 
 For our manifest we will use:
 
@@ -67,11 +67,11 @@ The `block_to_transfers` map module will take an Ethereum block as an input and 
 
 The outputs of the module are:
 
-* A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent the list of ERC721 transfers in a given block.
+* A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent a list of ERC721 transfers in a given block.
 
 Furthermore, we link the module to the wasm code (Rust code compiled as web assembly) containing the business logic. The Rust function which implements the modules' business logic is defined by the module name and is called `block_to_transfers` in this example.
 
-Lastly, since we know that the first transfers of tokens originating from the contracts occurs at block `12287507,` we specify an `initialBlock` on our `map` module.
+Lastly, since we know that the first transfers of tokens originating from the contracts occurs at block `12287507,` we specify an `initialBlock` in our `map` module.
 
 **`nft_state`**
 

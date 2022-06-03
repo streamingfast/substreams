@@ -1,6 +1,6 @@
 # Setting Up Handlers
 
-Now that we generated our Protobuf Rust code, let's initiate our Rust project and generate some code to set us up to write our handlers:
+Now that we generated our `Protobuf` Rust code, let's initiate our Rust project and generate some code to set us up to write our handlers:
 
 ```bash
 # This is to create a barebones rust project
@@ -28,9 +28,9 @@ ethabi = "17.0"
 hex-literal = "0.3.4"
 prost = "0.10.1"
 # Use latest from https://crates.io/crates/substreams
-substreams = "0.0.8-beta"
+substreams = "0.0.11"
 # Use latest from https://crates.io/crates/substreams-ethereum
-substreams-ethereum = "0.1.0"
+substreams-ethereum = "0.1.2"
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 getrandom = { version = "0.2", features = ["custom"] }
@@ -48,7 +48,7 @@ strip = "debuginfo"
 
 Let's go through the important changes. Our Rust code will be compiled in [`wasm`](https://webassembly.org/). Think of `wasm` code as a binary instruction format that can be run in a virtual machine. When your Rust code is compiled, it will generate a `.so` file.
 
-**Let's break down the file**
+**Let's break down our `Cargo.toml` file**
 
 Since we are building a Rust dynamic system library, after the `package`, we first need to specify:
 
@@ -59,7 +59,7 @@ Since we are building a Rust dynamic system library, after the `package`, we fir
 crate-type = ["cdylib"]
 ```
 
-We then need to specify our `dependencies.` We specify explicitly for the `wasm32-unknown-unknown` (using `[target.wasm32-unknown-unknown.dependencies]`) target since our handlers compile down to a WASM module:
+We then need to specify our `dependencies`. We specify explicitly the `wasm32-unknown-unknown` (using `[target.wasm32-unknown-unknown.dependencies]`) target since our handlers compile down to a WASM module:
 
 * `ethabi`: This crate will be used to decode events from your ABI, required for `substreams-ethereum` ABI functionalities.
 * `hex-literal`: This crate will be used to define bytes from hexadecimal string literal at compile time.
@@ -143,7 +143,6 @@ You should now have a generated ABI folder `src/abi.` Next, we will create a `mo
 
 {% code title="src/abi/mod.rs" %}
 ```rust
-#[path = "eth.erc721.v1.rs"]
 pub mod erc721;
 ```
 {% endcode %}

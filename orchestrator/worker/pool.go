@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -68,7 +69,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		zlog.Error("getting grpc client", zap.Error(err))
 		return fmt.Errorf("grpc client factory: %w", err)
 	}
-	
+
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 	stream, err := grpcClient.Blocks(ctx, job.Request, grpcCallOpts...)
 	if err != nil {
@@ -84,6 +85,9 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		}
 
 		resp, err := stream.Recv()
+		zlog.Debug("is context cancelled", zap.Error(ctx.Err()))
+
+		err = errors.New("erreur bidon")
 		if err != nil {
 			if err == io.EOF {
 				zlog.Info("worker done", zap.Object("job", job))

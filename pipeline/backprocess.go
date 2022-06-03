@@ -21,7 +21,10 @@ func (p *Pipeline) backprocessStores(
 ) {
 
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer func() {
+		cancel()
+		zlog.Debug("backprocessing canceling ctx", zap.Error(ctx.Err()))
+	}()
 
 	zlog.Info("synchronizing stores")
 
@@ -62,7 +65,7 @@ func (p *Pipeline) backprocessStores(
 	for resultCount := 0; resultCount < requestCount; {
 		select {
 		case <-ctx.Done():
-			return nil, context.Canceled // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
+			return nil, ctx.Err() // FIXME: If we exit here without killing the go func() above, this will clog the `result` chan
 		case err := <-schedulerErr:
 			return nil, fmt.Errorf("scheduler: %w", err)
 		case err := <-result:

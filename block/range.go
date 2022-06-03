@@ -14,6 +14,10 @@ type Range struct {
 	ExclusiveEndBlock uint64
 }
 
+func NewRange(startBlock, exclusiveEndBlock uint64) *Range {
+	return &Range{startBlock, exclusiveEndBlock}
+}
+
 func (r *Range) String() string {
 	return fmt.Sprintf("[%d, %d)", r.StartBlock, r.ExclusiveEndBlock)
 }

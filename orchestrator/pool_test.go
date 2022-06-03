@@ -45,8 +45,8 @@ func TestNotify(t *testing.T) {
 
 	signalCounter := new(int)
 
-	_ = p.Add(ctx, &pbsubstreams.Request{}, NewTestWaiter(signalCounter))
-	_ = p.Add(ctx, &pbsubstreams.Request{}, NewTestWaiter(signalCounter))
+	_ = p.Add(ctx, 0, &pbsubstreams.Request{}, NewTestWaiter(signalCounter))
+	_ = p.Add(ctx, 0, &pbsubstreams.Request{}, NewTestWaiter(signalCounter))
 
 	p.Notify("", 0)
 	require.Equal(t, 2, *signalCounter)
@@ -69,7 +69,7 @@ func TestGet(t *testing.T) {
 		StopBlockNum:  300,
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "test1_descendant"}}},
 	}
-	_ = p.Add(ctx, r0, waiter0)
+	_ = p.Add(ctx, 0, r0, waiter0)
 
 	waiter1 := NewWaiter(300, storageState,
 		&pbsubstreams.Module{Name: "test1"},
@@ -80,7 +80,7 @@ func TestGet(t *testing.T) {
 		StopBlockNum:  400,
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "test2_test3_descendant"}}},
 	}
-	_ = p.Add(ctx, r1, waiter1)
+	_ = p.Add(ctx, 0, r1, waiter1)
 
 	p.Notify("test1", 200)
 
@@ -120,7 +120,7 @@ func TestGetOrdered(t *testing.T) {
 		StopBlockNum:  200,
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "A"}}},
 	}
-	_ = p.Add(ctx, r0, waiter0)
+	_ = p.Add(ctx, 0, r0, waiter0)
 
 	waiter1 := NewWaiter(200, NewStorageState())
 	r1 := &pbsubstreams.Request{
@@ -128,7 +128,7 @@ func TestGetOrdered(t *testing.T) {
 		StopBlockNum:  300,
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "A"}}},
 	}
-	_ = p.Add(ctx, r1, waiter1)
+	_ = p.Add(ctx, 0, r1, waiter1)
 
 	waiter2 := NewWaiter(100, NewStorageState(), &pbsubstreams.Module{Name: "A"})
 	r2 := &pbsubstreams.Request{
@@ -136,7 +136,7 @@ func TestGetOrdered(t *testing.T) {
 		StopBlockNum:  200,
 		Modules:       &pbsubstreams.Modules{Modules: []*pbsubstreams.Module{{Name: "B"}}},
 	}
-	_ = p.Add(ctx, r2, waiter2)
+	_ = p.Add(ctx, 0, r2, waiter2)
 
 	p.Start(ctx)
 

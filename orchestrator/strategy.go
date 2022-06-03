@@ -39,13 +39,14 @@ func NewOrderedStrategy(
 	for _, store := range stores {
 		zlog.Debug("new ordered strategy", zap.String("builder", store.Name), zap.Uint64("up_to_block_num", upToBlockNum))
 
+		// TODO(abourget): this logic is to be replaced by obedience to the SplitWork
 		if upToBlockNum == store.ModuleInitialBlock {
 			zlog.Debug("nothing to sync")
 			continue // nothing to synchronize
 		}
 
 		storeLastBlock := storageState.lastBlocks[store.Name]
-		subreqStartBlock := ComputeStoreExclusiveEndBlock(storeLastBlock, upToBlockNum, storeSaveInterval, store.ModuleInitialBlock)
+		subreqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, upToBlockNum, storeSaveInterval, store.ModuleInitialBlock)
 		if subreqStartBlock == upToBlockNum {
 			zlog.Debug("already produced up to start block", zap.Uint64("up_to_block", upToBlockNum))
 			continue
@@ -54,6 +55,7 @@ func NewOrderedStrategy(
 			subreqStartBlock = store.ModuleInitialBlock
 		}
 
+		// TODO(abourget): this was done in `splitWork` already
 		moduleFullRangeToProcess := &block.Range{
 			StartBlock:        subreqStartBlock,
 			ExclusiveEndBlock: upToBlockNum,
@@ -66,6 +68,9 @@ func NewOrderedStrategy(
 		requestRanges := moduleFullRangeToProcess.Split(uint64(blockRangeSizeSubRequests))
 		rangeLen := len(requestRanges)
 		for idx, blockRange := range requestRanges {
+			// TODO(abourget): here we loop SplitWork.reqChunks, and grab the ancestor modules
+			// to setup the waiter.
+			// blockRange's start/end come from `reqChunk`
 			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)
 			if err != nil {
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)

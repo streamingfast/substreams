@@ -33,24 +33,6 @@ func WithNotifier(notifier Notifier) SquasherOption {
 	}
 }
 
-func ComputeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, saveInterval, moduleInitialBlock uint64) uint64 {
-	if reqStartBlock < moduleInitialBlock {
-		panic("requested start block prior to the module's initial block")
-	}
-
-	previousBoundary := reqStartBlock - reqStartBlock%saveInterval
-	startBlockOnBoundary := reqStartBlock%saveInterval == 0
-
-	if reqStartBlock >= lastSavedBlock {
-		return lastSavedBlock
-	} else if previousBoundary < moduleInitialBlock {
-		return 0
-	} else if startBlockOnBoundary {
-		return reqStartBlock
-	}
-	return previousBoundary
-}
-
 // NewSquasher receives stores, initializes them and fetches them from
 // the existing storage. It prepares itself to receive Squash()
 // requests that should correspond to what is missing for those stores
@@ -64,8 +46,9 @@ func NewSquasher(ctx context.Context, storageState *StorageState, stores map[str
 	for _, store := range stores {
 		lastSavedBlock := storageState.lastBlocks[store.Name]
 
-		exclusiveEndBlock := ComputeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
+		exclusiveEndBlock := computeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
 
+		// TODO(abourget): base this decision off StoreWork.loadInitialStore
 		if exclusiveEndBlock == 0 {
 			squashables[store.Name] = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, storeSaveInterval, store.ModuleInitialBlock)
 		} else {
@@ -97,6 +80,10 @@ func NewSquasher(ctx context.Context, storageState *StorageState, stores map[str
 func (s *Squasher) Squash(ctx context.Context, moduleName string, outgoingReqRange *block.Range) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// TODO(abourget): what is dispatched here would much better be some of those objects
+	// in the SplitWork instead, like the reqChunk directly
+	// Ideally the Callback over there carries the reqChunk, and was seeded with that reqChunk
 
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
@@ -168,6 +155,7 @@ func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifi
 
 	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Object("request_range", blockRange))
 
+	// TODO(abourget): this is all done in advance now, in the SplitWork
 	if err := s.cumulateRange(ctx, blockRange); err != nil {
 		return fmt.Errorf("cumulate range: %w", err)
 	}
@@ -180,6 +168,9 @@ func (s *Squashable) squash(ctx context.Context, blockRange *block.Range, notifi
 }
 
 func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range) error {
+	// TODO(abourget): this disappears BUT we now need to SIGNAL the
+	// storeChunks that we received and put them in order.
+
 	splitBlockRanges := blockRange.Split(s.storeSaveInterval)
 	for _, splitBlockRange := range splitBlockRanges {
 		if splitBlockRange.StartBlock < s.store.ModuleInitialBlock {
@@ -190,10 +181,9 @@ func (s *Squashable) cumulateRange(ctx context.Context, blockRange *block.Range)
 			// sorted, and only the first is checked for contiguousness)
 			continue
 		}
-		if splitBlockRange.Size() < s.storeSaveInterval {
-			continue
-		}
-		zlog.Info("appending range", zap.Stringer("split_block_range", splitBlockRange), zap.Uint64("size", splitBlockRange.Size()), zap.Uint64("save interval", s.storeSaveInterval))
+		zlog.Debug("appending range", zap.Stringer("split_block_range", splitBlockRange))
+		// TODO(abourget): we still need to keep track of which reqChunks were completed, in
+		// order
 		s.ranges = append(s.ranges, splitBlockRange)
 	}
 	sort.Sort(s.ranges)
@@ -214,6 +204,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 			break
 		}
 
+		// TODO(abourget): we still need to keep track of which ranges were completed in order
 		squashableRange := s.ranges[0]
 
 		if squashableRange.StartBlock < s.nextExpectedStartBlock {
@@ -237,6 +228,8 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context, notifier Notifi
 
 		s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 
+		// TODO(abourget): the decision to write or not to write, is determined in
+		// splitWork, with the `tempPartial` variable on the storeChunk.
 		endsOnBoundary := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
 		if endsOnBoundary {
 			err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)

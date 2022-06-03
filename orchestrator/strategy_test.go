@@ -18,7 +18,8 @@ import (
 func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	//t.Skip("abourget: incomplete, untested")
 
-	saveInterval := 10
+	storeSplit := uint64(10)
+	subreqSplit := 10
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
@@ -30,7 +31,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	stores := map[string]*state.Store{}
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-		newStore, err := state.NewBuilder(mod.Name, uint64(saveInterval), mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
+		newStore, err := state.NewBuilder(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
 		require.NoError(t, err)
 		stores[newStore.Name] = newStore
 	}
@@ -49,7 +50,8 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		graph,
 		pool,
 		30, // corresponds to `Request.EndBlock` doesn't it?
-		saveInterval,
+		storeSplit,
+		subreqSplit,
 		1_000_000, // FIXME
 	)
 	require.NoError(t, err)

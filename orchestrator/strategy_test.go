@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
-	//t.Skip("abourget: incomplete, untested")
+	t.Skip("abourget: incomplete, untested")
 
 	storeSplit := uint64(10)
 	mods := manifest.NewTestModules()
@@ -35,10 +35,15 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	}
 
 	splitWorkMods := SplitWorkModules{
-		"E": &SplitWork{
-			modName:   "E",
-			reqChunks: []*reqChunk{},
-		},
+		"A": &SplitWork{modName: "A"},
+		"B": &SplitWork{modName: "B"},
+		"C": &SplitWork{modName: "C"},
+		"D": &SplitWork{modName: "D"},
+		"E": &SplitWork{modName: "E"},
+		"F": &SplitWork{modName: "F"},
+		"G": &SplitWork{modName: "G"},
+		"H": &SplitWork{modName: "H"},
+		"K": &SplitWork{modName: "K"},
 	}
 
 	pool := NewRequestPool()

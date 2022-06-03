@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-var manifestCmd = &cobra.Command{
-	Use:          "manifest",
-	SilenceUsage: true,
-}
+// var manifestCmd = &cobra.Command{
+// 	Use:          "manifest",
+// 	SilenceUsage: true,
+// }
 var manifestInfoCmd = &cobra.Command{
 	Use:          "info <manifest_file>",
 	RunE:         runManifestInfo,
@@ -27,10 +28,8 @@ var manifestGraphCmd = &cobra.Command{
 }
 
 func init() {
-	manifestCmd.AddCommand(manifestInfoCmd)
-	manifestCmd.AddCommand(manifestGraphCmd)
-
-	rootCmd.AddCommand(manifestCmd)
+	rootCmd.AddCommand(manifestInfoCmd)
+	rootCmd.AddCommand(manifestGraphCmd)
 }
 
 func runManifestInfo(cmd *cobra.Command, args []string) error {
@@ -49,8 +48,11 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating module graph: %w", err)
 	}
 
-	fmt.Println("Description:", pkg.PackageMeta[0].Doc)
 	fmt.Println("Version:", pkg.PackageMeta[0].Version)
+	if doc := pkg.PackageMeta[0].Doc; doc != "" {
+		fmt.Println("Doc: " + strings.Replace(doc, "\n", "\n  ", -1))
+	}
+
 	fmt.Println("Modules:")
 	fmt.Println("----")
 	for _, module := range pkg.Modules.Modules {

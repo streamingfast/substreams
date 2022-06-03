@@ -79,7 +79,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 	for _, moduleCache := range c.OutputCaches {
 		if moduleCache.IsOutOfRange(blockRef) {
 			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
-			//this is a complete range
+
 			previousFilename := moduleCache.currentFilename()
 			if err := moduleCache.save(ctx, previousFilename); err != nil {
 				return fmt.Errorf("saving blocks for module kv %s: %w", moduleCache.ModuleName, err)

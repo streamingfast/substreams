@@ -386,7 +386,7 @@ func decodeAsString(in []byte) string { return fmt.Sprintf("%q", string(in)) }
 func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
 
 func printClock(block *pbsubstreams.BlockScopedData) {
-	fmt.Printf("----------- BLOCK #%s (%d) ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
+	fmt.Printf("----------- %s BLOCK #%s (%d) ---------------\n", strings.ToUpper(stepFromProto(block.Step).String()), humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
 }
 
 func stepFromProto(step pbsubstreams.ForkStep) bstream.StepType {

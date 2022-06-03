@@ -389,6 +389,7 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 		Version: m.Package.Version,
 		Url:     m.Package.URL,
 		Name:    m.Package.Name,
+		Doc:     m.Package.Doc,
 	}
 	pkg = &pbsubstreams.Package{
 		Version:     1,

@@ -33,9 +33,6 @@ func init() {
 }
 
 func runManifestInfo(cmd *cobra.Command, args []string) error {
-
-	fmt.Println("Manifest Info")
-
 	manifestPath := args[0]
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
@@ -48,6 +45,7 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating module graph: %w", err)
 	}
 
+	fmt.Println("Package name:", pkg.PackageMeta[0].Name)
 	fmt.Println("Version:", pkg.PackageMeta[0].Version)
 	if doc := pkg.PackageMeta[0].Doc; doc != "" {
 		fmt.Println("Doc: " + strings.Replace(doc, "\n", "\n  ", -1))
@@ -55,21 +53,25 @@ func runManifestInfo(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Modules:")
 	fmt.Println("----")
-	for _, module := range pkg.Modules.Modules {
+	for modIdx, module := range pkg.Modules.Modules {
 		fmt.Println("Name:", module.Name)
 		kind := module.GetKind()
 		switch v := kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
-			fmt.Println("Kind: Map")
-			fmt.Println("Output Type: ", v.KindMap.OutputType)
+			fmt.Println("Kind: map")
+			fmt.Println("Output Type:", v.KindMap.OutputType)
 		case *pbsubstreams.Module_KindStore_:
-			fmt.Println("Kind: Store")
-			fmt.Println("Value Type: ", v.KindStore.ValueType)
-			fmt.Println("Update Policy: ", v.KindStore.UpdatePolicy)
+			fmt.Println("Kind: store")
+			fmt.Println("Value Type:", v.KindStore.ValueType)
+			fmt.Println("Update Policy:", v.KindStore.UpdatePolicy)
 		default:
 			fmt.Println("Kind: Unknown")
 		}
 		fmt.Println("Hash:", manifest.HashModuleAsString(pkg.Modules, graph, module))
+		moduleMeta := pkg.ModuleMeta[modIdx]
+		if moduleMeta != nil && moduleMeta.Doc != "" {
+			fmt.Println("Doc: " + strings.Replace(moduleMeta.Doc, "\n", "\n  ", -1))
+		}
 		fmt.Println("")
 	}
 

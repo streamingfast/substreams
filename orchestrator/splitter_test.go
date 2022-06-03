@@ -46,7 +46,6 @@ type splitTestCase struct {
 	expectSubreqs   string
 }
 
-
 func splitTest(name string, storeSplit, subreqSplit uint64, modInitBlock, lastBlock, reqStart uint64, expectProgress, expectSubreqs string,
 ) splitTestCase {
 	return splitTestCase{
@@ -96,6 +95,14 @@ func TestSplitWork(t *testing.T) {
 		splitTest("modInit off bounds, reqStart off bound too", 10, 10,
 			55, 0, 85,
 			"", "55-60, 60-70, 70-80, 80-85(TMP:80-85)",
+		),
+		splitTest("reqStart just above the modInit, and lower bound lower than modInit", 10, 10,
+			55, 0, 60,
+			"", "55-60",
+		),
+		splitTest("reqStart off bound just above the modInit, and lower bound lower than modInit", 10, 10,
+			55, 0, 59,
+			"", "55-59(TMP:55-59)",
 		),
 		splitTest("reqStart equal to lastSaved, on bound", 10, 10,
 			50, 90, 90,

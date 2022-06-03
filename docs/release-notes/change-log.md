@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### `substreams` CLI
+
+* Do log last error when the CLI exit with an error has the error is already printed to the user and it creates a weird behavior.
+
 ## [v0.0.11](https://github.com/streamingfast/substreams/releases/tag/v0.0.11)
 
 ### `substreams` Docker

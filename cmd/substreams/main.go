@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-
-	"github.com/streamingfast/derr"
 )
 
 // Commit sha1 value, injected via go build `ldflags` at build time
@@ -19,7 +17,10 @@ var date = ""
 func main() {
 	rootCmd.Version = computeVersionString(version, commit, date)
 	setup()
-	derr.Check("substreams", rootCmd.Execute())
+
+	if err := rootCmd.Execute(); err != nil {
+
+	}
 }
 
 func computeVersionString(version, commit, date string) string {

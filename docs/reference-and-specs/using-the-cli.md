@@ -26,11 +26,12 @@ Let's break down everything happening above.
 
 Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
 
-Here is the example of an output of the `graviatar_updates` starting at block 6200807:
+Here is the example of an output of the `gravatar_updates` starting at block 6200807:
 
 ```
 $ substreams run -e api-dev.streamingfast.io:443 \
-                 gravity-v0.1.0.spkg gravatar_updates -o json
+    https://github.com/Jannis/gravity-substream/releases/download/v0.0.1/gravity-v0.1.0.spkg \
+    gravatar_updates -o json
 {
   "updates": [
     {

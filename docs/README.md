@@ -16,6 +16,10 @@ Substreams is the successor of [https://github.com/streamingfast/sparkle](https:
 
 The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real time, as well as package your own Substreams modules.
 
+{% hint style="info" %}
+Alternatively to installing the `substreams` locally, you can [use Gitpod to get started quickly](developer-guide/overview.md#gitpod-quick-start).
+{% endhint %}
+
 #### From brew (for Mac OS)
 
 ```

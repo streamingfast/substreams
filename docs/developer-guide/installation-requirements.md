@@ -1,7 +1,7 @@
 # Installing Dependencies
 
 {% hint style="success" %}
-#### Develop in the cloud
+#### Develop in the cloud with Gitpod
 
 Optionally, and instead of installing dependencies locally, you can use [Gitpod](https://www.gitpod.io/) to launch a developer environment purely in the cloud, through your browser:
 

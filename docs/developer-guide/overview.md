@@ -1,23 +1,10 @@
 # Overview
 
-In the upcoming guide, we will attempt to build a Substream that tracks ERC721 holder count for a given contract.&#x20;
+In the upcoming guide, we will attempt to build a Substream that tracks ERC721 holder count for a given contract.
 
 {% hint style="info" %}
 You can find the accompanying repository here: [https://github.com/streamingfast/substreams-template](https://github.com/streamingfast/substreams-template)
 {% endhint %}
-
-### Gitpod Quick Start
-
-If you want to just get up and running and not go through the detailed steps, you can follow this Quickstart guide. Use these steps to conveniently open your repository in a Gitpod.
-
-1. First, [copy this repository](https://github.com/streamingfast/substreams-template/generate)
-2. Grab a StreamingFast key from [https://app.dfuse.io/](https://app.dfuse.io/)
-3. Create a [Gitpod](https://gitpod.io/) account
-4. Configure a `STREAMINGFAST_KEY` variable in your [Gitpod account settings](https://gitpod.io/variables)
-5. Open your repository as a [Gitpod workspace](https://gitpod.io/workspaces)
-6. The substream template comes with a `Makefile` that makes building and running the substream easy:
-   1. `make build` will rebuild your substream. Run this whenever you have made changes.
-   2. `make stream` will run the stream for a few blocks. As you make changes to your substream, you'll want to change this command to use your own substream modules and a block range more suitable to the data your indexing. Simply edit `Makefile` to do this.
 
 ### Developer Guide
 

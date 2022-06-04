@@ -1,4 +1,23 @@
-# Installation
+# Installing Dependencies
+
+{% hint style="success" %}
+#### Develop in the cloud
+
+Optionally, and instead of installing dependencies locally, you can use [Gitpod](https://www.gitpod.io/) to launch a developer environment purely in the cloud, through your browser:
+
+1. First, [copy this repository](https://github.com/streamingfast/substreams-template/generate)
+2. Grab a StreamingFast key from [https://app.dfuse.io/](https://app.dfuse.io/)
+3. Create a [Gitpod](https://gitpod.io/) account
+4. Configure a `STREAMINGFAST_KEY` variable in your [Gitpod account settings](https://gitpod.io/variables)
+5. Open your repository as a [Gitpod workspace](https://gitpod.io/workspaces)
+6. The substream template comes with a `Makefile` that makes building and running the substream easy:
+   1. `make build` will rebuild your substream. Run this whenever you have made changes.
+   2. `make stream` will run the stream for a few blocks. As you make changes to your substream, you'll want to change this command to use your own substream modules and a block range more suitable to the data your indexing. Simply edit `Makefile` to do this.
+{% endhint %}
+
+### Install the `substreams` CLI
+
+If you haven't already, make sure that you [install the `substreams` command-line interface](../getting-started/installing-the-cli.md).
 
 ### Install Rust
 
@@ -13,7 +32,7 @@ source $HOME/.cargo/env # to configure your current shell
 
 ### Install `protoc`
 
-`protoc` is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages.  Out of the protobuf definitions you're able to create and get through third-party Substreams packages.
+`protoc` is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages. Out of the protobuf definitions you're able to create and get through third-party Substreams packages.
 
 Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
 
@@ -39,6 +58,3 @@ Read more about it here: [https://crates.io/crates/protoc-gen-prost-crate](https
 
 See the [installation instructions here](https://docs.buf.build/installation).
 
-### Install **** the `substreams` CLI tool
-
-Before creating your manifest, make sure you've read through [Getting Started](../#getting-started) to install the Substreams CLI Tool.

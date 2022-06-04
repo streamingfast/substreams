@@ -1,8 +1,8 @@
-# Your First Stream
+# Get Streaming
 
-#### Substreams `CLI`
-
-To run your first Substreams you will first need to install the `CLI` tool. You. Run through [Getting Started](../#getting-started) to set it up.
+{% hint style="info" %}
+Make sure you first [installed the `substreams` CLI](installing-the-cli.md).
+{% endhint %}
 
 #### Authentication
 
@@ -27,13 +27,12 @@ Let's break down everything happening above.
 * `https://github.com/../substreams-template-v0.5.0.spkg` : Path to the Substreams you wish to run. This examples points to our [template Substreams](https://github.com/streamingfast/substreams-template). This can be an `.spkg` or a `substreams.yaml` file.
 * `map_transfers`: this is the module which we want to run, defined in the manifest
 * `--start-block 12292922`: start mapping as of block `12292922`
-* `--stop-block +1` only request a single block (stop block will be start block + 1)\
-
+* `--stop-block +1` only request a single block (stop block will be start block + 1)\\
 
 {% hint style="info" %}
 **Packages & Manifest**
 
-The example above runs a Substreams based on a published `.spkg` file (a.k.a [Package](../reference-and-specs/packages.md)). You can also run a Substreams by pointing it directly to a .yaml file (a.k.a [Manifest](../reference-and-specs/manifests.md)).&#x20;
+The example above runs a Substreams based on a published `.spkg` file (a.k.a [Package](../reference-and-specs/packages.md)). You can also run a Substreams by pointing it directly to a .yaml file (a.k.a [Manifest](../reference-and-specs/manifests.md)).
 
-You can think of Package as published Substreams that you can utilize and start streaming data right away.&#x20;
+You can think of Package as published Substreams that you can utilize and start streaming data right away.
 {% endhint %}

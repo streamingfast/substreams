@@ -11,6 +11,8 @@ A Substreams manifest mainly defines a list of [modules](../concepts/modules.md)
 
 For our manifest we will use:
 
+{% github_embed "https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml" %}{% endgithub_embed %}
+
 {% code title="substreams.yaml" %}
 ```yaml
 specVersion: v0.1.0

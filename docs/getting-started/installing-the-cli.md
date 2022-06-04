@@ -5,7 +5,7 @@ description: Installation instructions for the `substreams` command-line interfa
 # Installing the CLI
 
 {% hint style="success" %}
-Alternatively to installing the `substreams` locally, you can [use Gitpod to get started quickly](../developer-guide/overview.md#gitpod-quick-start).
+Alternatively to installing the `substreams` locally, you can [use Gitpod to get started quickly](../developer-guide/installation-requirements.md).
 {% endhint %}
 
 ### Installing the `substreams` command-line interface

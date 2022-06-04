@@ -28,7 +28,7 @@ ethabi = "17.0"
 hex-literal = "0.3.4"
 prost = "0.10.1"
 # Use latest from https://crates.io/crates/substreams
-substreams = "0.0.11"
+substreams = "0.0.12"
 # Use latest from https://crates.io/crates/substreams-ethereum
 substreams-ethereum = "0.1.2"
 
@@ -86,7 +86,7 @@ cargo build --target wasm32-unknown-unknown --release
 {% hint style="info" %}
 **Rust Build Target**
 
-Notice that when we run `cargo build` we specify the `target` to be `wasm32-unknown-unknown.` This is important, since the goal is to generate compiled `wasm` code. You can avoid having to manually specify `--target wasm32-unknown-unknown`  for each `cargo` command by creating a file named `config.toml` under folder `.cargo` at the root of your project with the following content:
+Notice that when we run `cargo build` we specify the `target` to be `wasm32-unknown-unknown.` This is important, since the goal is to generate compiled `wasm` code. You can avoid having to manually specify `--target wasm32-unknown-unknown` for each `cargo` command by creating a file named `config.toml` under folder `.cargo` at the root of your project with the following content:
 
 {% code title=".cargo/config.toml" %}
 ```toml

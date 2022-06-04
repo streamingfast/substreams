@@ -26,5 +26,6 @@ The **word** _Substreams_ refers to:
 * Packed in a single package, but streamable individually (a _sub_unit of a package)
 * _Streams_ composed from imported modules, blended, enriched or refined together (as in _sub_ or downstream component).
 * A wink to Subgraphs
+* A manifest or package will usually contain more than one module, and/or import one or more modules. It is therefore fitting to talk about a package being a _Substreams_ package.
 
 The Substreams engine is completely agnostic of the underlying blockchain protocol, and works solely on _data_ extracted from nodes using the Firehose. Different protocols have different chain-specific extensions (e.g. Ethereum, which exposes `eth_call`s).

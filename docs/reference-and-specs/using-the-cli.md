@@ -12,7 +12,7 @@ The `run` command allows you connect to a Substreams endpoint and start processi
 
 ```
 substreams run -e api-dev.streamingfast.io:443 \
-   --stop-block +1 \
+   -t +1 \
    ./substreams.yaml \
    module_name
 ```
@@ -20,7 +20,7 @@ substreams run -e api-dev.streamingfast.io:443 \
 Let's break down everything happening above.
 
 * `-e api-dev.streamingfast.io:443` is the endpoint of the provider running our Substreams
-* `--stop-block +1` only requests a single block (stop block will be manifest's `initialBlock` + 1)
+* `-t +1`  (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
@@ -65,14 +65,14 @@ $ substreams pack ./substreams.yaml
 Successfully wrote "your-package-v0.1.0.spkg".
 ```
 
-### `manifest info`
+### `info`
 
 This command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
 
 Example:
 
 ```bash
-$ substreams manifest info ./substreams.yaml
+$ substreams info ./substreams.yaml
 Package name: solana_spl_transfers
 Version: v0.5.2
 Doc: Solana SPL Token Transfers stream
@@ -82,19 +82,21 @@ Doc: Solana SPL Token Transfers stream
 Modules:
 ----
 Name: spl_transfers
+Initial block: 130000000
 Kind: map
 Output Type: proto:solana.spl.v1.TokenTransfers
-Hash: 9d72f37f043229c88eb8494c72f830b9990acb8e
+Hash: 2b59e4e840f814f4154a688c2935da9c3b61dc61
 
 Name: transfer_store
+Initial block: 130000000
 Kind: store
 Value Type: proto:solana.spl.v1.TokenTransfers
 Update Policy: UPDATE_POLICY_SET
-Hash: b08127b2f900cb4562f7d9597c98d9d09a8088d4
+Hash: 11fd70768029bebce3741b051c15191d099d2436
 
 ```
 
-### `manifest graph`
+### `graph`
 
 This command prints out a graph of the package in the _mermaid-js_ format.
 
@@ -105,7 +107,7 @@ See [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor
 Example:
 
 ````bash
-$ substreams manifest graph ./substreams.yaml                         [±master ●●]
+$ substreams graph ./substreams.yaml                         [±master ●●]
 Mermaid graph:
 
 ```mermaid
@@ -125,7 +127,7 @@ Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to 
 
 ### `inspect`
 
-This command goes deep into the file structure of a package (`yaml` or `spkg`). Used mostly for debugging or for the curious ;)&#x20;
+This command goes deep into the file structure of a package (`yaml` or `spkg`). Used mostly for debugging or for the curious ;)
 
 Example:
 

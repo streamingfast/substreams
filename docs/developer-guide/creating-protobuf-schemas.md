@@ -18,6 +18,9 @@ cd proto
 
 and in there, create our first protobuf definition file:
 
+{% github_embed "https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto" %}{% endgithub_embed %}
+
+
 {% code title="eth/erc721/v1/erc721.proto" %}
 ```protobuf
 syntax = "proto3";

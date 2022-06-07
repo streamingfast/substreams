@@ -30,31 +30,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env # to configure your current shell
 ```
 
-### Install `protoc`
-
-`protoc` is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages. Out of the protobuf definitions you're able to create and get through third-party Substreams packages.
-
-Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
-
-{% hint style="info" %}
-If you forget to install `protoc`, when generating the definitions, you might receive an error about `cmake` not being defined, this is a fallback when `protoc` is not found.
-{% endhint %}
-
-### Install `protoc-gen-prost`
-
-This tool helps you render Rust structures out of protobuf definitions in your Substreams modules. It is called by `protoc` following their plugin system.
-
-Install it with:
-
-```bash
-cargo install protoc-gen-prost
-```
-
-Read more about it here: [https://crates.io/crates/protoc-gen-prost-crate](https://crates.io/crates/protoc-gen-prost-crate)
-
 ### Install `buf`
 
 [https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams packages are compatible with [buf Images](https://docs.buf.build/reference/images).
 
 See the [installation instructions here](https://docs.buf.build/installation).
-

@@ -64,7 +64,7 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		content := `
 version: v1
 plugins:
-  - name: prost
+  - remote: buf.build/prost/plugins/prost:v0.1.3-2
     out: ` + outputPath + `
     opt:
 `

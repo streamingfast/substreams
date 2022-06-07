@@ -236,7 +236,7 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 
 	var files []string
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
-		files, err = store.ListFiles(ctx, paddedBlock, ".tmp", math.MaxInt64)
+		files, err = store.ListFiles(ctx, paddedBlock, math.MaxInt64)
 		return
 	})
 	if err != nil {

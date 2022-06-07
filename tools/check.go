@@ -3,7 +3,6 @@ package tools
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
@@ -33,48 +32,27 @@ func checkE(cmd *cobra.Command, args []string) error {
 		Store: store,
 	}
 
-	info, err := builder.Info(ctx)
+	snapshots, err := builder.ListSnapshots(ctx)
 	if err != nil {
-		return fmt.Errorf("getting store info")
+		return fmt.Errorf("listing snapshots: %w", err)
 	}
 
-	var intervalSize uint64 = info.RangeIntervalSize
-
-	var fileInfos []*state.FileInfo
-	err = store.Walk(ctx, "", "", func(filename string) (err error) {
-		if !strings.HasSuffix(filename, ".kv") {
-			return nil
-		}
-
-		currentFileInfo, ok := state.ParseFileName(filename)
-		if !ok {
-			err = fmt.Errorf("could not parse filename %s", filename)
-		}
-
-		fileInfos = append(fileInfos, currentFileInfo)
-		return nil
+	sort.Slice(snapshots.Files, func(i, j int) bool {
+		return snapshots.Files[i].Range.ExclusiveEndBlock < snapshots.Files[j].Range.ExclusiveEndBlock
 	})
 
-	if err != nil {
-		return fmt.Errorf("walking file store: %w", err)
-	}
-
-	sort.Slice(fileInfos, func(i, j int) bool {
-		return fileInfos[i].EndBlock < fileInfos[j].EndBlock
-	})
-
-	var prevFileInfo *state.FileInfo
-	for _, info := range fileInfos {
-		if prevFileInfo == nil {
-			prevFileInfo = info
+	var prevSnapshot *state.Snapshot
+	for _, snapshot := range snapshots.Files {
+		if prevSnapshot == nil {
+			prevSnapshot = &snapshot
 			continue
 		}
 
-		if info.EndBlock-prevFileInfo.EndBlock > intervalSize {
-			return fmt.Errorf("**hole found** between %d and %d", prevFileInfo.EndBlock, info.EndBlock)
+		if snapshot.StartBlock != prevSnapshot.ExclusiveEndBlock {
+			return fmt.Errorf("**hole found** between %d and %d", prevSnapshot.Range.ExclusiveEndBlock, snapshot.Range.ExclusiveEndBlock)
 		}
 
-		prevFileInfo = info
+		prevSnapshot = &snapshot
 	}
 
 	return err

@@ -36,7 +36,7 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 	highestKVBlock := uint64(0)
 	partialFiles := map[uint64]string{}
 
-	_ = store.Walk(ctx, "", "", func(filename string) (err error) {
+	_ = store.Walk(ctx, "", func(filename string) (err error) {
 		fileinfo, ok := state.ParseFileName(filename)
 		if !ok {
 			return nil

@@ -41,7 +41,7 @@ func (p *Pipeline) backprocessStores(
 
 	splitWorks := orchestrator.SplitWorkModules{}
 	for _, mod := range p.storeModules {
-		splitWorks[mod.Name] = orchestrator.SplitSomeWork(mod.Name, p.storesSaveInterval, uint64(p.blockRangeSizeSubRequests), mod.InitialBlock, storageState.LastBlock(mod.Name), uint64(p.request.StartBlockNum))
+		splitWorks[mod.Name] = orchestrator.SplitSomeWork(mod.Name, p.storesSaveInterval, uint64(p.blockRangeSizeSubRequests), mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
 	}
 
 	progressMessages := splitWorks.ProgressMessages()

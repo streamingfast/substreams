@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/state"
 )
 
 // FIXME(abourget): WorkPlan ?
@@ -41,12 +42,14 @@ type SplitWork struct {
 	reqChunks        []*reqChunk  // All jobs that needs to be scheduled
 }
 
-func SplitSomeWork(modName string, storeSplit, subreqSplit, modInitBlock, storeLastBlock, incomingReqStartBlock uint64) (out *SplitWork) {
+func SplitSomeWork(modName string, storeSplit, subreqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (out *SplitWork) {
 	// FIXME: Make sure `storeSplit` and `subreqSplit` are a multiple of one another.
 	// storeSplit must actually be a factor of subreqSplit
 	// panic otherwise, and bring that check higher up the chain
 
 	out = &SplitWork{modName: modName}
+
+	storeLastBlock := snapshots.LastBlock()
 
 	if storeLastBlock != 0 && storeLastBlock < modInitBlock {
 		panic("cannot have saved last store before module's init block") // 0 has special meaning

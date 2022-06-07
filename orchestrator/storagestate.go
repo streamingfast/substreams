@@ -3,32 +3,45 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/state"
 )
 
 type StorageState struct {
-	lastBlocks map[string]uint64
+	sync.Mutex
+	Snapshots map[string]*state.Snapshots
 }
 
 func NewStorageState() *StorageState {
 	return &StorageState{
-		lastBlocks: map[string]uint64{},
+		Snapshots: map[string]*state.Snapshots{},
 	}
 }
 
 func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out *StorageState, err error) {
 	out = NewStorageState()
-	for _, builder := range stores {
-		info, err := builder.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting builder info: %w", err)
+	eg := llerrgroup.New(10)
+	for storeName, store := range stores {
+		if eg.Stop() {
+			continue
 		}
-		out.lastBlocks[builder.Name] = info.LastKVSavedBlock
+
+		s := store
+		eg.Go(func() error {
+			snapshots, err := s.ListSnapshots(ctx)
+			if err != nil {
+				return err
+			}
+			out.Lock()
+			out.Snapshots[storeName] = snapshots
+			out.Unlock()
+			return nil
+		})
+	}
+	if err = eg.Wait(); err != nil {
+		return nil, fmt.Errorf("running list snapshots: %w", err)
 	}
 	return
-}
-
-func (s *StorageState) LastBlock(modName string) uint64 {
-	return s.lastBlocks[modName]
 }

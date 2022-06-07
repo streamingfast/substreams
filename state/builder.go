@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -22,20 +21,13 @@ type BuilderOption func(b *Store)
 
 type Store struct {
 	Name         string
+	ModuleHash   string
 	Store        dstore.Store
 	SaveInterval uint64
-	Initialized  bool
 
 	ModuleInitialBlock uint64
 	StoreInitialBlock  uint64 // block at which we initialized this store
 	ProcessedBlock     uint64
-
-	ModuleHash string
-
-	info     *Info
-	infoLock sync.RWMutex
-
-	complete bool
 
 	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -53,26 +45,11 @@ func (s *Store) IsPartial() bool {
 }
 
 func (b *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("builder_name", b.Name)
+	enc.AddString("name", b.Name)
 	enc.AddBool("partial", b.IsPartial())
 
 	return nil
 }
-
-// func (b *Store) FromBlockRange(blockRange *block.Range) *Store {
-// 	return &Store{
-// 		Name:               b.Name,
-// 		Store:              b.Store,
-// 		SaveInterval:       b.SaveInterval,
-// 		ModuleInitialBlock: b.ModuleInitialBlock,
-// 		BlockRange:         blockRange,
-// 		ModuleHash:         b.ModuleHash,
-// 		KV:                 map[string][]byte{},
-// 		Deltas:             []*pbsubstreams.StoreDelta{},
-// 		UpdatePolicy:       b.UpdatePolicy,
-// 		ValueType:          b.ValueType,
-// 	}
-// }
 
 func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Store, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
@@ -96,17 +73,6 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 	}
 
 	return b, nil
-}
-
-func (b *Store) Print() {
-	if len(b.Deltas) == 0 {
-		return
-	}
-
-	fmt.Printf("State deltas for %q\n", b.Name)
-	for _, delta := range b.Deltas {
-		b.PrintDelta(delta)
-	}
 }
 
 func (b *Store) CloneStructure(newStoreStartBlock uint64) *Store {
@@ -165,7 +131,6 @@ func (b *Store) loadState(ctx context.Context, stateFileName string) error {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
 		b.KV = byteMap(kv)
-		b.Initialized = true
 		return nil
 	})
 	if err != nil {
@@ -275,45 +240,47 @@ func (b *Store) writeState(ctx context.Context, content []byte, lastBlock uint64
 		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", b.Name, b.StoreInitialBlock, lastBlock, err)
 	}
 
-	endsOnBoundary := lastBlock%b.SaveInterval == 0
-	if !b.IsPartial() && endsOnBoundary {
-		if err := b.writeInfoState(ctx, filename, lastBlock); err != nil {
-			return filename, fmt.Errorf("writing info state: %w", err)
-		}
-	}
+	// FIXME(abourget): not needed when we don't use that state file anymore
+	// endsOnBoundary := lastBlock%b.SaveInterval == 0
+	// if !b.IsPartial() && endsOnBoundary {
+	// 	if err := b.writeInfoState(ctx, filename, lastBlock); err != nil {
+	// 		return filename, fmt.Errorf("writing info state: %w", err)
+	// 	}
+	// }
 
 	return filename, err
 }
 
-func (b *Store) writeInfoState(ctx context.Context, filename string, lastBlock uint64) error {
-	// FIXME(abourget): `lastBlock` is ASSUMED TO BE ON THE BOUNDARY
-
-	currentInfo, err := b.Info(ctx)
-	if err != nil {
-		return fmt.Errorf("getting builder info: %w", err)
-	}
-
-	if currentInfo != nil && currentInfo.LastKVSavedBlock >= lastBlock {
-		zlog.Debug("skipping info save.")
-		return nil
-	}
-
-	var info = &Info{
-		LastKVFile:        filename,
-		LastKVSavedBlock:  lastBlock,
-		RangeIntervalSize: b.SaveInterval,
-	}
-	err = writeStateInfo(ctx, b.Store, info)
-	if err != nil {
-		return fmt.Errorf("writing state info for builder %q: %w", b.Name, err)
-	}
-
-	b.info = info
-	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("last_block", lastBlock), zap.String("file_name", filename))
-
-	return nil
-}
-
+// FIXME(abourget): not needed when we don't have a state file anymore.
+// func (b *Store) writeInfoState(ctx context.Context, filename string, lastBlock uint64) error {
+// 	// FIXME(abourget): `lastBlock` is ASSUMED TO BE ON THE BOUNDARY
+//
+// 	currentInfo, err := b.Info(ctx)
+// 	if err != nil {
+// 		return fmt.Errorf("getting builder info: %w", err)
+// 	}
+//
+// 	if currentInfo != nil && currentInfo.LastKVSavedBlock >= lastBlock {
+// 		zlog.Debug("skipping info save.")
+// 		return nil
+// 	}
+//
+// 	var info = &Info{
+// 		LastKVFile:        filename,
+// 		LastKVSavedBlock:  lastBlock,
+// 		RangeIntervalSize: b.SaveInterval,
+// 	}
+// 	err = writeStateInfo(ctx, b.Store, info)
+// 	if err != nil {
+// 		return fmt.Errorf("writing state info for builder %q: %w", b.Name, err)
+// 	}
+//
+// 	b.info = info
+// 	zlog.Debug("state file written", zap.String("module_name", b.Name), zap.Uint64("last_block", lastBlock), zap.String("file_name", filename))
+//
+// 	return nil
+// }
+//
 // 	zlog.Debug("writing partial state", zap.String("module_name", b.Name), zap.Object("range", b.BlockRange), zap.String("file_name", filename))
 // 	return filename, b.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 // }
@@ -326,12 +293,6 @@ func (b *Store) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) error
 		return fmt.Errorf("deleting store file %q: %w", filename, err)
 	}
 	return nil
-}
-
-func (b *Store) PrintDelta(delta *pbsubstreams.StoreDelta) {
-	fmt.Printf("  %s (%d) KEY: %q\n", delta.Operation.String(), delta.Ordinal, delta.Key)
-	fmt.Printf("    OLD: %s\n", string(delta.OldValue))
-	fmt.Printf("    NEW: %s\n", string(delta.NewValue))
 }
 
 func (b *Store) ApplyDelta(delta *pbsubstreams.StoreDelta) {

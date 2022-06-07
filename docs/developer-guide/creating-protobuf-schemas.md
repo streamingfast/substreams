@@ -7,7 +7,7 @@ Protocol Buffers are Google's language-neutral extensible mechanism for serializ
 * Protobuf - [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
 * Tutorials - [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 
-We have defined a protobuf __ model as `proto:eth.erc721.v1.Transfers` which represents a list of ERC721 transfers.
+We have defined a protobuf \_\_ model as `proto:eth.erc721.v1.Transfers` which represents a list of ERC721 transfers.
 
 Firstly, let's create the `proto` folder:
 
@@ -17,9 +17,6 @@ cd proto
 ```
 
 and in there, create our first protobuf definition file:
-
-{% github_embed "https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto" %}{% endgithub_embed %}
-
 
 {% code title="eth/erc721/v1/erc721.proto" %}
 ```protobuf
@@ -41,7 +38,7 @@ message Transfer {
 ```
 {% endcode %}
 
-{% hint style="warning" %}
+{% hint style="success" %}
 It is recommended that you use a fully qualified path for your protobuf files, so there are fewer risks of conflict when people build on your [_Substreams Package_](../reference-and-specs/packages.md#dependencies)_._
 {% endhint %}
 

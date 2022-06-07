@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/streamingfast/derr"
@@ -13,8 +14,20 @@ type Snapshots struct {
 	Files []Snapshot
 }
 
+func (s *Snapshots) Len() int {
+	return len(s.Files)
+}
+
+func (s *Snapshots) Less(i, j int) bool {
+	return s.Files[i].ExclusiveEndBlock < s.Files[j].ExclusiveEndBlock
+}
+
+func (s *Snapshots) Swap(i, j int) {
+	s.Files[i], s.Files[j] = s.Files[j], s.Files[i]
+}
+
 func (s *Snapshots) LastBlock() uint64 {
-	// TODO: are we SURE that the LAST file contains the HIGHEST block number?
+	sort.Sort(s)
 	if len(s.Files) == 0 {
 		return 0
 	}

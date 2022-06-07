@@ -130,6 +130,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("modules validation failed: %s", err))
 	}
 
+	if err := pbsubstreams.ValidateRequest(request); err != nil {
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("validate request: %s", err))
+	}
+
 	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("creating module graph %w", err)

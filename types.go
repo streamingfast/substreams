@@ -20,5 +20,17 @@ func NewModulesProgressResponse(in []*pbsubstreams.ModuleProgress) *pbsubstreams
 	}
 }
 
+func NewSnapshotData(in *pbsubstreams.InitialSnapshotData) *pbsubstreams.Response {
+	return &pbsubstreams.Response{
+		Message: &pbsubstreams.Response_SnapshotData{SnapshotData: in},
+	}
+}
+
+func NewSnapshotComplete() *pbsubstreams.Response {
+	return &pbsubstreams.Response{
+		Message: &pbsubstreams.Response_SnapshotComplete{SnapshotComplete: &pbsubstreams.InitialSnapshotComplete{}},
+	}
+}
+
 type BlockHook func(ctx context.Context, clock *pbsubstreams.Clock) error
 type PostJobHook func(ctx context.Context, clock *pbsubstreams.Clock) error

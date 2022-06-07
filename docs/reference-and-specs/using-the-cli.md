@@ -50,8 +50,6 @@ Notice the `-o` (or `--output`), that can alter the output format. The options a
 * `ui`, a nicely formatted, UI-driven interface, with progress information, and execution logs.
 * `json`, an indented stream of data, with no progress information nor logs, but just data output for blocks following the start block.
 * `jsonl`, same as `json` but with each output on a single line.
-* `module-json`, same as `json` but wrapped in a json structure specifying the module name.
-* `module-jsonl`, same as `module-json`, but on a single line.
 
 ### `pack`
 
@@ -78,7 +76,7 @@ Version: v0.5.2
 Doc: Solana SPL Token Transfers stream
 
   This streams out SPL token transfers to the nearest human being.
-  
+
 Modules:
 ----
 Name: spl_transfers

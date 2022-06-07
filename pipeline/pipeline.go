@@ -134,10 +134,17 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		}
 	}
 
+	// Fetch the stores
+
 	if p.isBackprocessing {
+		storeMap, err := p.buildStoreMap()
+		if err != nil {
+			return nil, fmt.Errorf("building store map: %w", err)
+		}
+
 		totalOutputModules := len(p.outputModuleNames)
 		outputName := p.outputModuleNames[0]
-		backprocessingStore := p.storeMap[outputName]
+		backprocessingStore := storeMap[outputName]
 		lastStoreName := p.storeModules[len(p.storeModules)-1].Name
 		isLastStore := lastStoreName == backprocessingStore.Name
 
@@ -155,9 +162,11 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		}
 
 		zlog.Info("initializing and loading stores")
-		if err = p.LoadStores(ctx); err != nil {
+		if err = loadStores(ctx, storeMap, p.requestedStartBlockNum); err != nil {
 			return nil, fmt.Errorf("loading stores: %w", err)
 		}
+
+		p.storeMap = storeMap
 	} else {
 		newStores, err := p.backprocessStores(ctx, workerPool, respFunc)
 		if err != nil {
@@ -166,6 +175,13 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 
 		p.storeMap = newStores
 		p.backprocessingStores = nil
+
+		if len(p.request.InitialStoreSnapshotForModules) != 0 {
+			zlog.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
+			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules, respFunc); err != nil {
+				return nil, fmt.Errorf("send initial snapshots: %w", err)
+			}
+		}
 	}
 
 	err = p.buildWASM(ctx, p.request, p.modules)
@@ -392,9 +408,6 @@ func (p *Pipeline) build() error {
 	if err := p.buildModules(); err != nil {
 		return fmt.Errorf("build modules graph: %w", err)
 	}
-	if err := p.buildStores(); err != nil {
-		return fmt.Errorf("build stores graph: %w", err)
-	}
 	return nil
 }
 
@@ -414,33 +427,12 @@ func (p *Pipeline) buildModules() error {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 	p.modules = modules
-	return nil
-}
 
-func (p *Pipeline) buildStores() error {
 	storeModules, err := p.graph.StoresDownTo(p.outputModuleNames)
 	if err != nil {
 		return err
 	}
-
 	p.storeModules = storeModules
-
-	p.storeMap = map[string]*state.Store{}
-	for _, storeModule := range storeModules {
-		newStore, err := state.NewBuilder(
-			storeModule.Name,
-			p.storesSaveInterval,
-			storeModule.InitialBlock,
-			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
-			storeModule.GetKindStore().UpdatePolicy,
-			storeModule.GetKindStore().ValueType,
-			p.baseStateStore,
-		)
-		if err != nil {
-			return fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
-		}
-		p.storeMap[newStore.Name] = newStore
-	}
 
 	return nil
 }
@@ -520,7 +512,10 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 			updatePolicy := kind.KindStore.UpdatePolicy
 			valueType := kind.KindStore.ValueType
 
-			outputStore := p.storeMap[modName]
+			outputStore, found := p.storeMap[modName]
+			if !found {
+				return fmt.Errorf("store %q not found", modName)
+			}
 			inputs = append(inputs, &wasm.Input{
 				Type:         wasm.OutputStore,
 				Name:         modName,
@@ -571,16 +566,36 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) er
 	return nil
 }
 
-func (p *Pipeline) LoadStores(ctx context.Context) error {
-	for _, store := range p.storeMap {
+func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error) {
+	storeMap = map[string]*state.Store{}
+	for _, storeModule := range p.storeModules {
+		newStore, err := state.NewBuilder(
+			storeModule.Name,
+			p.storesSaveInterval,
+			storeModule.InitialBlock,
+			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
+			storeModule.GetKindStore().UpdatePolicy,
+			storeModule.GetKindStore().ValueType,
+			p.baseStateStore,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)
+		}
+		storeMap[newStore.Name] = newStore
+	}
+	return storeMap, nil
+}
+
+func loadStores(ctx context.Context, storeMap map[string]*state.Store, requestedStartBlock uint64) error {
+	for _, store := range storeMap {
 		if store.IsPartial() {
 			continue
 		}
-		if store.StoreInitialBlock == p.requestedStartBlockNum {
+		if store.StoreInitialBlock == requestedStartBlock {
 			continue
 		}
 
-		err := store.Fetch(ctx, p.requestedStartBlockNum)
+		err := store.Fetch(ctx, requestedStartBlock)
 		if err != nil {
 			return fmt.Errorf("reading state for builder %q: %w", store.Name, err)
 		}

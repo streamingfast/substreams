@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+* Changed the output modes: `module-*` modes are gone and become the
+  format for `jsonl` and `json`. This means all printed outputs are
+  wrapped to provide the module name, and other metadata.
+
+* Added `--initial-snapshots` (or `-i`) to the `run` command, which
+  will dump the stores specified as output modules.
+
+* Added color for `ui` output mode under a tty.
+
+* Added some request validation on both client and server (validate
+  that output modules are present in the modules graph)
+
+### Service
+
+* Added support to serve the initial snapshot
+
 ## [v0.0.13](https://github.com/streamingfast/substreams/releases/tag/v0.0.13)
 
 ### CLI

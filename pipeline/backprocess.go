@@ -29,7 +29,12 @@ func (p *Pipeline) backprocessStores(
 
 	requestPool := orchestrator.NewRequestPool()
 
-	storageState, err := orchestrator.FetchStorageState(ctx, p.storeMap)
+	initialStoreMap, err := p.buildStoreMap()
+	if err != nil {
+		return nil, fmt.Errorf("build initial store map: %w", err)
+	}
+
+	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
@@ -46,12 +51,12 @@ func (p *Pipeline) backprocessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, p.request, p.storeMap, p.graph, requestPool)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, p.request, initialStoreMap, p.graph, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, p.storeMap, upToBlock, requestPool)
+	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, initialStoreMap, upToBlock, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}

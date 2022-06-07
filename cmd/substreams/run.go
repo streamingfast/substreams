@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -24,7 +23,8 @@ func init() {
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
-	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY context, and 'json' in pipe context.")
+	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
+	runCmd.Flags().BoolP("initial-snapshots", "i", false, "Fetch an initial snapshot at start block, before continuing processing.")
 
 	rootCmd.AddCommand(runCmd)
 }
@@ -41,10 +41,7 @@ var runCmd = &cobra.Command{
 func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	outputMode, err := defaultOutputMode(mustGetString(cmd, "output"))
-	if err != nil {
-		return err
-	}
+	outputMode := mustGetString(cmd, "output")
 
 	manifestPath := args[0]
 	manifestReader := manifest.NewReader(manifestPath)
@@ -91,6 +88,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 		Modules:       pkg.Modules,
 		OutputModules: outputStreamNames,
 	}
+	if mustGetBool(cmd, "initial-snapshots") {
+		req.InitialStoreSnapshotForModules = req.OutputModules
+	}
+
+	if err := pbsubstreams.ValidateRequest(req); err != nil {
+		return fmt.Errorf("validate request: %w", err)
+	}
 
 	/*
 		                           | Lowest block                                        | Requested block
@@ -104,8 +108,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	*/
 
-	ui := tui.New(req, pkg, outputStreamNames, outputMode)
-	if err := ui.Init(); err != nil {
+	ui := tui.New(req, pkg, outputStreamNames)
+	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}
 	defer ui.CleanUpTerminal()
@@ -133,22 +137,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}
-}
-
-func defaultOutputMode(outputMode string) (string, error) {
-	isTerminal := isatty.IsTerminal(os.Stdout.Fd())
-	if outputMode == "" {
-		if isTerminal {
-			outputMode = "ui"
-		} else {
-			outputMode = "json"
-		}
-	} else {
-		if !strings.Contains(";ui;json;jsonl;module-json;module-jsonl;", ";"+outputMode+";") {
-			return "", fmt.Errorf("invalid --output, choose from: ui, json, jsonl, module-json, module-jsonl")
-		}
-	}
-	return outputMode, nil
 }
 
 func readAPIToken(cmd *cobra.Command, envFlagName string) string {

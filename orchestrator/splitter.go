@@ -43,9 +43,9 @@ type SplitWork struct {
 	reqChunks            []*reqChunk // All jobs that needs to be scheduled
 }
 
-func SplitSomeWork(modName string, storeSplit, subreqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (out *SplitWork) {
-	// FIXME: Make sure `storeSplit` and `subreqSplit` are a multiple of one another.
-	// storeSplit must actually be a factor of subreqSplit
+func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (out *SplitWork) {
+	// FIXME: Make sure `storeSplit` and `subReqSplit` are a multiple of one another.
+	// storeSplit must actually be a factor of subReqSplit
 	// panic otherwise, and bring that check higher up the chain
 
 	out = &SplitWork{modName: modName}
@@ -60,19 +60,19 @@ func SplitSomeWork(modName string, storeSplit, subreqSplit, modInitBlock, incomi
 		return out
 	}
 
-	subreqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, incomingReqStartBlock, storeSplit, modInitBlock)
-	if storeLastBlock != 0 && storeLastBlock != modInitBlock && subreqStartBlock != 0 {
-		out.loadInitialStore = block.NewRange(modInitBlock, subreqStartBlock)
+	subReqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, incomingReqStartBlock, storeSplit, modInitBlock)
+	if storeLastBlock != 0 && storeLastBlock != modInitBlock && subReqStartBlock != 0 {
+		out.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
 	}
 
-	if subreqStartBlock == incomingReqStartBlock {
+	if subReqStartBlock == incomingReqStartBlock {
 		return
 	}
-	if subreqStartBlock == 0 {
-		subreqStartBlock = modInitBlock
+	if subReqStartBlock == 0 {
+		subReqStartBlock = modInitBlock
 	}
 
-	requestRanges := block.NewRange(subreqStartBlock, incomingReqStartBlock).Split(subreqSplit)
+	requestRanges := block.NewRange(subReqStartBlock, incomingReqStartBlock).Split(subReqSplit)
 
 	for _, reqRange := range requestRanges {
 		addReqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}

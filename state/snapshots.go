@@ -34,7 +34,15 @@ func (s *Snapshots) LastBlock() uint64 {
 	if len(s.Files) == 0 {
 		return 0
 	}
-	return s.Files[len(s.Files)-1].ExclusiveEndBlock
+
+	for i := len(s.Files) - 1; i >= 0; i-- {
+		snapshots := s.Files[i]
+		if !snapshots.Partial {
+			return snapshots.ExclusiveEndBlock
+		}
+	}
+
+	return 0
 }
 
 type Snapshot struct {

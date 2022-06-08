@@ -568,8 +568,6 @@ github.com/spf13/viper v1.10.0/go.mod h1:SoyBPwAtKDzypXNDFKN5kzH7ppppbGZtls1UpIy
 github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 h1:fGJnUx0shX9Y312QOlz+/+yLquihXRhNqctJ26jtZZM=
 github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680/go.mod h1:iISPGAstbUsPgyC3auLLi7PYUTi9lHv5z0COam0OPOY=
 github.com/streamingfast/bstream v0.0.2-0.20220330124346-02408ab3db65/go.mod h1:Cd/32kGRHt2aqJ62PLQZQ9O3azBT/vCPvCrP7vBc2cs=
-github.com/streamingfast/bstream v0.0.2-0.20220505155906-a0834b9c5258 h1:eQgMxScR/3b5QWSIDbhTA11VRYvlpCiN11DXUjU/f54=
-github.com/streamingfast/bstream v0.0.2-0.20220505155906-a0834b9c5258/go.mod h1:5uiGlDGmqMmjY5rz4uIet74NyAiv/YZRShjFftFJtDE=
 github.com/streamingfast/bstream v0.0.2-0.20220607202937-611660228ea2 h1:W2VZnt+f/mco9c39E0h0HEjIdhZrxDWxlMY6BlhsxxQ=
 github.com/streamingfast/bstream v0.0.2-0.20220607202937-611660228ea2/go.mod h1:0sqqhWoeKV+YXP31unQHjAPNssh0YUrN9rbo7s3Jkl0=
 github.com/streamingfast/cli v0.0.3 h1:L1tANHTFZUOTDDExlNmtOUXAiPJ1Xb65kFFscrAtDcY=
@@ -590,8 +588,6 @@ github.com/streamingfast/dmetering v0.0.0-20220307162406-37261b4b3de9/go.mod h1:
 github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447 h1:oZwOVjxpWCqLUjgcPgVigVCHYR40JkmXfm1kuMcCOQk=
 github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447/go.mod h1:VLdQY/FwczmC/flqWkcsBbqXO4BhU4zQDSK7GMrpcjY=
 github.com/streamingfast/dstore v0.1.1-0.20220304164644-696f9c5fc231/go.mod h1:aii8QXJg+2b5CXw+Y1SkTf5QJkJOu8ujq6+rw8J1OK0=
-github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e h1:yXNSEK3eu2CXJvuk2RoZIbgmDJ+gaCLEzRSn+2/T6gw=
-github.com/streamingfast/dstore v0.1.1-0.20220419183635-aad7bcb15b8e/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648 h1:xpy3HNXeUHaZexf42duj7NeOmXcGfDMJXlZaj3CX18Y=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=

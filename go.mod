@@ -36,6 +36,9 @@ require (
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/jszwec/csvutil v1.6.0
 	github.com/lib/pq v1.10.5
+	github.com/mattn/go-isatty v0.0.14
+	github.com/test-go/testify v1.1.4
+	github.com/tidwall/pretty v1.2.0
 	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
@@ -82,7 +85,6 @@ require (
 	github.com/manifoldco/promptui v0.8.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
@@ -108,7 +110,6 @@ require (
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
-	github.com/tidwall/pretty v1.2.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect

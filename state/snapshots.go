@@ -14,6 +14,10 @@ type Snapshots struct {
 	Files []Snapshot
 }
 
+func (s *Snapshots) Sort() {
+	sort.Sort(s)
+}
+
 func (s *Snapshots) Len() int {
 	return len(s.Files)
 }
@@ -34,11 +38,9 @@ func (s *Snapshots) LastBlock() uint64 {
 }
 
 type Snapshot struct {
-	Path              string
-	Range             *block.Range
-	StartBlock        uint64
-	ExclusiveEndBlock uint64
-	Partial           bool
+	block.Range
+	Path    string
+	Partial bool
 }
 
 func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
@@ -55,8 +57,8 @@ func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
 			}
 
 			out.Files = append(out.Files, Snapshot{
+				Range:   *block.NewRange(fileInfo.StartBlock, fileInfo.EndBlock),
 				Path:    filename,
-				Range:   block.NewRange(fileInfo.StartBlock, fileInfo.EndBlock),
 				Partial: fileInfo.Partial,
 			})
 			return nil
@@ -68,6 +70,6 @@ func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Sort(out)
+	out.Sort()
 	return out, nil
 }

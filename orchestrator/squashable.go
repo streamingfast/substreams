@@ -18,7 +18,7 @@ type Squashable struct {
 	name                   string
 	store                  *state.Store
 	reqChunk               *reqChunk
-	ranges                 []*storeChunk // Ranges split in `storeSaveInterval` chunks
+	ranges                 []*chunk // Ranges split in `storeSaveInterval` chunks
 	targetExclusiveBlock   uint64
 	nextExpectedStartBlock uint64
 
@@ -43,7 +43,7 @@ func (s *Squashable) squash(ctx context.Context, reqChunk *reqChunk) error {
 
 	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Stringer("req_chunk", reqChunk))
 
-	s.ranges = append(s.ranges, reqChunk.storeChunks...)
+	s.ranges = append(s.ranges, reqChunk.chunks...)
 	sort.Slice(s.ranges, func(i, j int) bool {
 		return s.ranges[i].start < s.ranges[j].start
 	})

@@ -45,6 +45,16 @@ func (s *Snapshots) LastBlock() uint64 {
 	return 0
 }
 
+func (s *Snapshots) ContainsPartial(r *block.Range) bool {
+	for _, file := range s.Files {
+		if file.Range.StartBlock == r.StartBlock && file.Range.ExclusiveEndBlock == r.ExclusiveEndBlock {
+			return true
+		}
+	}
+
+	return false
+}
+
 type Snapshot struct {
 	block.Range
 	Path    string

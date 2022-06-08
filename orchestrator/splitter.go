@@ -43,12 +43,12 @@ type SplitWork struct {
 	reqChunks            []*reqChunk // All jobs that needs to be scheduled
 }
 
-func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (out *SplitWork) {
+func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (work *SplitWork) {
 	// FIXME: Make sure `storeSplit` and `subReqSplit` are a multiple of one another.
 	// storeSplit must actually be a factor of subReqSplit
 	// panic otherwise, and bring that check higher up the chain
 
-	out = &SplitWork{modName: modName}
+	work = &SplitWork{modName: modName}
 
 	storeLastBlock := snapshots.LastBlock()
 
@@ -57,12 +57,12 @@ func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomi
 	}
 
 	if incomingReqStartBlock <= modInitBlock {
-		return out
+		return work
 	}
 
 	subReqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, incomingReqStartBlock, storeSplit, modInitBlock)
 	if storeLastBlock != 0 && storeLastBlock != modInitBlock && subReqStartBlock != 0 {
-		out.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
+		work.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
 	}
 
 	if subReqStartBlock == incomingReqStartBlock {
@@ -75,27 +75,32 @@ func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomi
 	requestRanges := block.NewRange(subReqStartBlock, incomingReqStartBlock).Split(subReqSplit)
 
 	for _, reqRange := range requestRanges {
-		addReqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
+		reqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
 		// Now do the SECOND split, for chunks for `storeSplit`
 		storeSplitRanges := reqRange.Split(storeSplit)
 		for _, storeSplitRange := range storeSplitRanges {
 			if storeSplitRange.StartBlock < modInitBlock {
 				panic(fmt.Sprintf("module %q: received a squash request for a start block %d prior to the module's initial block %d", modName, storeSplitRange.StartBlock, modInitBlock))
 			}
+
+			if snapshots.ContainsPartial(storeSplitRange) {
+				continue
+			}
+
 			// FIXME(abourget): check this one again
 			// if reqRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
 			// 	// Otherwise, risks stalling the merging (as ranges are
 			// 	// sorted, and only the first is checked for contiguousness)
 			// 	continue
 			// }
-			addStoreChunk := &storeChunk{
+			addStoreChunk := &chunk{
 				start:       storeSplitRange.StartBlock,
 				end:         storeSplitRange.ExclusiveEndBlock,
 				tempPartial: storeSplitRange.ExclusiveEndBlock%storeSplit != 0,
 			}
-			addReqChunk.storeChunks = append(addReqChunk.storeChunks, addStoreChunk)
+			reqChunk.chunks = append(reqChunk.chunks, addStoreChunk)
 		}
-		out.reqChunks = append(out.reqChunks, addReqChunk)
+		work.reqChunks = append(work.reqChunks, reqChunk)
 	}
 
 	return
@@ -120,12 +125,12 @@ type reqChunk struct {
 	start uint64
 	end   uint64 // exclusive end
 
-	storeChunks []*storeChunk // All partial stores that are expected to be produced by this subreq
+	chunks []*chunk // All partial stores that are expected to be produced by this subreq
 }
 
 func (c reqChunk) String() string {
 	var sc []string
-	for _, s := range c.storeChunks {
+	for _, s := range c.chunks {
 		var add string
 		if s.tempPartial {
 			add = "TMP:"
@@ -140,13 +145,13 @@ func (c reqChunk) String() string {
 	return out
 }
 
-type storeChunk struct {
+type chunk struct {
 	start       uint64
 	end         uint64 // exclusive end
 	tempPartial bool   // for off-of-bound stores (like ending in 1123, and not on 1000)
 }
 
-func (s storeChunk) String() string {
+func (s chunk) String() string {
 	var add string
 	if s.tempPartial {
 		add = "TMP:"

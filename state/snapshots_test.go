@@ -3,9 +3,8 @@ package state
 import (
 	"testing"
 
-	"github.com/test-go/testify/require"
-
 	"github.com/streamingfast/substreams/block"
+	"github.com/test-go/testify/require"
 )
 
 func TestSnapshots_LastBlock(t *testing.T) {

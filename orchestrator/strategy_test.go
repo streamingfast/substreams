@@ -51,10 +51,6 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	s, err := NewOrderedStrategy(
 		ctx,
 		splitWorkMods,
-		&pbsubstreams.Request{
-			StartBlockNum: 0,
-			StopBlockNum:  30,
-		},
 		stores, // INIT
 		graph,
 		pool,

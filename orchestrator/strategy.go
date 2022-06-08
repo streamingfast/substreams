@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 )
@@ -18,7 +17,6 @@ type OrderedStrategy struct {
 func NewOrderedStrategy(
 	ctx context.Context,
 	splitWorks SplitWorkModules,
-	request *pbsubstreams.Request,
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 	pool *RequestPool,

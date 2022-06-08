@@ -22,7 +22,7 @@ func (p *Pipeline) backprocessStores(
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		zlog.Debug("backprocessing canceling ctx", zap.Error(ctx.Err()))
+		zlog.Debug("back processing canceling ctx", zap.Error(ctx.Err()))
 	}()
 
 	zlog.Info("synchronizing stores")
@@ -51,7 +51,7 @@ func (p *Pipeline) backprocessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, p.request, initialStoreMap, p.graph, requestPool)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, initialStoreMap, p.graph, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}

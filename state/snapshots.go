@@ -27,7 +27,6 @@ func (s *Snapshots) Swap(i, j int) {
 }
 
 func (s *Snapshots) LastBlock() uint64 {
-	sort.Sort(s)
 	if len(s.Files) == 0 {
 		return 0
 	}
@@ -69,5 +68,6 @@ func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
 	if err != nil {
 		return nil, err
 	}
+	sort.Sort(out)
 	return out, nil
 }

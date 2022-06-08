@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func parseRange(in string) *block.Range {
@@ -26,9 +27,12 @@ func parseRange(in string) *block.Range {
 	return &block.Range{StartBlock: uint64(lo), ExclusiveEndBlock: uint64(hi)}
 }
 
-func rngs(in string) (out block.Ranges) {
+func parseRanges(in string) (out block.Ranges) {
 	for _, e := range strings.Split(in, ",") {
-		out = append(out, parseRange(strings.Trim(e, " ")))
+		newRange := parseRange(strings.Trim(e, " "))
+		if newRange != nil {
+			out = append(out, newRange)
+		}
 	}
 	return
 }
@@ -63,10 +67,11 @@ type splitTestCase struct {
 	reqStart     uint64           // the request's absolute start block
 
 	expectStoreInit *block.Range // used both to LoadFrom() in the Squasher, and to send an initial Progress notification
+	expectCovered   block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
 	expectSubreqs   string
 }
 
-func splitTest(name string, storeSplit, subreqSplit uint64, modInitBlock uint64, snapshotsSpec string, reqStart uint64, expectProgress, expectSubreqs string,
+func splitTest(name string, storeSplit, subreqSplit uint64, modInitBlock uint64, snapshotsSpec string, reqStart uint64, expectProgress, expectCovered, expectSubreqs string,
 ) splitTestCase {
 	return splitTestCase{
 		name:            name,
@@ -76,6 +81,7 @@ func splitTest(name string, storeSplit, subreqSplit uint64, modInitBlock uint64,
 		modInitBlock:    modInitBlock,
 		reqStart:        reqStart,
 		expectStoreInit: parseRange(expectProgress),
+		expectCovered:   parseRanges(expectCovered),
 		expectSubreqs:   expectSubreqs,
 	}
 }
@@ -85,88 +91,108 @@ func TestSplitWork(t *testing.T) {
 		splitTest("simple", 10, 10,
 			/* modInit, snapshots, reqStart */
 			50, "", 100,
-			/* expected initial _Progress_, expected requests(store chunks) */
-			"", "50-60, 60-70, 70-80, 80-90, 90-100",
+			/* expected initial _Progress_, expected covered ranges, expected requests(store chunks) */
+			"", "", "50-60, 60-70, 70-80, 80-90, 90-100",
 		),
 		splitTest("nothing to work for, nothing to initialize", 10, 10,
 			55, "", 55,
-			"", "",
+			"", "", "",
 		),
 		splitTest("reqStart before module init, don't process anything and start with a clean store", 10, 10,
 			50, "", 10,
-			"", "",
+			"", "", "",
 		),
 		splitTest("reqStart", 10, 10,
 			50, "", 100,
-			"", "50-60, 60-70, 70-80, 80-90, 90-100",
+			"", "", "50-60, 60-70, 70-80, 80-90, 90-100",
 		),
 		splitTest("one case", 1000, 10000,
-			0, "0-6811000,6811000-7021000", 6811000,
-			"0-6811000", "",
+			0, "0-6811000,p6811000-7021000", 6811000,
+			"0-6811000", "0-6811000", "",
 		),
 		splitTest("different splits for store and reqs, 10 blocks already processed", 10, 20,
 			50, "50-60", 90,
-			"50-60", "60-80(60-70,70-80), 80-90",
+			"50-60", "50-60", "60-80(60-70,70-80), 80-90",
 		),
 		splitTest("different splits for store and reqs, 40 blocks already processed", 10, 20,
-			50, "50-60,60-80", 100,
-			"50-80", "80-100(80-90,90-100)",
+			50, "50-60,p60-70,p70-80", 100,
+			"50-80", "50-80", "80-100(80-90,90-100)",
 		),
 		splitTest("different splits for store and reqs, no blocks processed", 10, 20,
 			55, "", 92,
-			"", "55-60,60-80(60-70,70-80),80-92(80-90,TMP:90-92)",
-		),
-		splitTest("store synchronized at modInit, which shouldn't happen", 10, 10,
-			50, "50-50", 100,
-			"", "50-60, 60-70, 70-80, 80-90, 90-100",
+			"", "", "55-60,60-80(60-70,70-80),80-92(80-90,TMP:90-92)",
 		),
 		splitTest("modInit off bounds, reqStart off bound too", 10, 10,
 			55, "", 85,
-			"", "55-60, 60-70, 70-80, 80-85(TMP:80-85)",
+			"", "", "55-60, 60-70, 70-80, 80-85(TMP:80-85)",
 		),
 		splitTest("reqStart just above the modInit, and lower bound lower than modInit", 10, 10,
 			55, "", 60,
-			"", "55-60",
+			"", "", "55-60",
 		),
 		splitTest("reqStart just above the modInit, and lower bound lower than modInit, lastBlock higher", 10, 10,
-			55, "55-60,60-70,70-80,80-90,90-100", 60,
-			"55-60", "",
+			55, "55-60,p60-70,p70-80,p80-90,p90-100", 60,
+			"55-60", "55-60", "",
 		),
 		splitTest("reqStart off bound just above the modInit, and lower bound lower than modInit", 10, 10,
 			55, "", 59,
-			"", "55-59(TMP:55-59)",
+			"", "", "55-59(TMP:55-59)",
 		),
 		splitTest("reqStart off bound just above the modInit, and lower bound lower than modInit, lastBlock higher", 10, 10,
-			55, "55-60,60-70,70-80,80-90,90-100", 59,
-			"", "55-59(TMP:55-59)",
+			55, "55-60,p60-70,p70-80,p80-90,p90-100", 59,
+			"", "", "55-59(TMP:55-59)",
 		),
 		splitTest("reqStart equal to lastSaved, on bound", 10, 10,
-			50, "50-60,60-70,70-80,80-90", 90,
-			"50-90", "",
+			50, "50-60,p60-70,p70-80,p80-90", 90,
+			"50-90", "50-90", "",
 		),
 		splitTest("reqStart equal to lastSaved, off bound", 10, 10,
-			50, "50-60,60-70,70-80", 92,
-			"50-80", "80-90,90-92(TMP:90-92)",
+			50, "50-60,p60-70,p70-80", 92,
+			"50-80", "50-80", "80-90,90-92(TMP:90-92)",
 		),
 		splitTest("nothing saved, reqStart off bound", 10, 10,
 			50, "", 72,
-			"", "50-60,60-70,70-72(TMP:70-72)",
+			"", "", "50-60,60-70,70-72(TMP:70-72)",
 		),
 		splitTest("nothing saved, reqStart on bound", 10, 10,
 			50, "", 70,
-			"", "50-60,60-70",
+			"", "", "50-60,60-70",
 		),
 		splitTest("nothing saved, reqStart on bound", 10, 10,
 			50, "", 70,
-			"", "50-60,60-70",
+			"", "", "50-60,60-70",
+		),
+		splitTest("sparse snapshots", 10, 10,
+			50, "50-60,p70-80", 90,
+			"50-60", "50-60,70-80", "",
+		),
+		splitTest("sparse snapshots, with partials, job size smaller than interval", 10, 20,
+			50, "50-60,p70-80,p80-90", 100,
+			"50-60", "50-60,70-90", "60-70",
+		),
+		splitTest("sparse snapshots, with complete, job size smaller than interval", 10, 20,
+			50, "50-60,50-90", 100,
+			"50-90", "50-90", "90-100",
+		),
+		splitTest("sparse snapshots, with complete, job size smaller than interval", 10, 20,
+			50, "50-60,50-90", 95,
+			"50-90", "50-90", "90-95(TMP:90-95)",
+		),
+		splitTest("sparse snapshots, job size smaller than interval", 10, 20,
+			50, "50-60,p80-90", 95,
+			"50-60", "50-60,80-90", "90-96(TMP:90-95)",
+		),
+		splitTest("sparse snapshots, job size smaller than interval", 10, 20,
+			50, "50-60,p80-90", 130,
+			"50-60", "50-60,80-90", "90-100,100-120,120-130(TMP:120-130)",
 		),
 		splitTest("reqStart after last saved but below init block, can't have last saved below module's init block", 10, 10,
 			50, "0-20", 40,
-			"", "PANIC",
+			"", "", "PANIC",
 		),
 		splitTest("reqStart before last saved but below init block, can't have last saved below module's init block", 10, 10,
 			50, "0-30", 10,
-			"", "PANIC",
+			"", "", "PANIC",
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -179,6 +205,10 @@ func TestSplitWork(t *testing.T) {
 			} else {
 				f()
 				assert.Equal(t, tt.expectStoreInit, work.loadInitialStore)
+				if work.loadInitialStore != nil {
+					require.True(t, len(work.initialCoveredRanges) > 0)
+					assert.Equal(t, work.loadInitialStore.String(), work.initialCoveredRanges[0].String())
+				}
 				var reqChunks []string
 				for _, rc := range work.reqChunks {
 					reqChunks = append(reqChunks, rc.String())
@@ -186,6 +216,11 @@ func TestSplitWork(t *testing.T) {
 				assert.Equal(t,
 					strings.Replace(tt.expectSubreqs, " ", "", -1),
 					strings.Replace(strings.Join(reqChunks, ","), " ", "", -1),
+				)
+
+				assert.Equal(t,
+					tt.expectCovered.String(),
+					work.initialCoveredRanges.String(),
 				)
 			}
 		})

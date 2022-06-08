@@ -37,9 +37,10 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 
 // FIXME(abourget): StoreWorkUnit ?
 type SplitWork struct {
-	modName          string
-	loadInitialStore *block.Range // Send a Progress message, saying the store is already processed for this range
-	reqChunks        []*reqChunk  // All jobs that needs to be scheduled
+	modName              string
+	loadInitialStore     *block.Range // Send a Progress message, saying the store is already processed for this range
+	initialCoveredRanges block.Ranges
+	reqChunks            []*reqChunk // All jobs that needs to be scheduled
 }
 
 func SplitSomeWork(modName string, storeSplit, subreqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (out *SplitWork) {

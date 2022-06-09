@@ -109,3 +109,67 @@ func (r Ranges) Less(i, j int) bool {
 func (r Ranges) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
+
+func (r Ranges) Merged() (out Ranges) {
+	for i := 0; i < len(r); i++ {
+		curRange := r[i]
+		if i == len(r)-1 {
+			out = append(out, curRange)
+			break
+		}
+		nextRange := r[i+1]
+		if curRange.ExclusiveEndBlock != nextRange.StartBlock {
+			out = append(out, curRange)
+			continue
+		}
+
+		i++
+
+		// Loop to squash all the next ones and create a new Range
+		// from `curRange` and the latest matching `nextRange`.
+		for j := i + 1; j < len(r); j++ {
+			nextNextRange := r[j]
+			if nextRange.ExclusiveEndBlock != nextNextRange.StartBlock {
+				break
+			}
+			i++
+			nextRange = nextNextRange
+		}
+		out = append(out, NewRange(curRange.StartBlock, nextRange.ExclusiveEndBlock))
+	}
+	return out
+}
+
+func (r Ranges) MergedChunked(chunk uint64) (out Ranges) {
+	for i := 0; i < len(r); i++ {
+		curRange := r[i]
+		if i == len(r)-1 {
+			out = append(out, curRange)
+			break
+		}
+		if curRange.Size() > chunk {
+			out = append(out, curRange)
+			continue
+		}
+		nextRange := r[i+1]
+		if curRange.ExclusiveEndBlock != nextRange.StartBlock && (curRange.Size() > chunk || nextRange.ExclusiveEndBlock-curRange.StartBlock > chunk) {
+			out = append(out, curRange)
+			continue
+		}
+
+		i++
+
+		// Loop to squash all the next ones and create a new Range
+		// from `curRange` and the latest matching `nextRange`.
+		for j := i + 1; j < len(r); j++ {
+			nextNextRange := r[j]
+			if nextRange.ExclusiveEndBlock != nextNextRange.StartBlock || nextNextRange.ExclusiveEndBlock-curRange.StartBlock > chunk {
+				break
+			}
+			i++
+			nextRange = nextNextRange
+		}
+		out = append(out, NewRange(curRange.StartBlock, nextRange.ExclusiveEndBlock))
+	}
+	return out
+}

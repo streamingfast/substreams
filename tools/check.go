@@ -2,10 +2,10 @@ package tools
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
 )
 
@@ -37,22 +37,18 @@ func checkE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("listing snapshots: %w", err)
 	}
 
-	sort.Slice(snapshots.Files, func(i, j int) bool {
-		return snapshots.Files[i].Range.ExclusiveEndBlock < snapshots.Files[j].Range.ExclusiveEndBlock
-	})
-
-	var prevSnapshot *state.Snapshot
-	for _, snapshot := range snapshots.Files {
-		if prevSnapshot == nil {
-			prevSnapshot = &snapshot
+	var prevRange *block.Range
+	for _, curRange := range snapshots.Partials {
+		if prevRange == nil {
+			prevRange = curRange
 			continue
 		}
 
-		if snapshot.StartBlock != prevSnapshot.ExclusiveEndBlock {
-			return fmt.Errorf("**hole found** between %d and %d", prevSnapshot.Range.ExclusiveEndBlock, snapshot.Range.ExclusiveEndBlock)
+		if curRange.StartBlock != prevRange.ExclusiveEndBlock {
+			return fmt.Errorf("**hole found** between %d and %d", prevRange.ExclusiveEndBlock, curRange.ExclusiveEndBlock)
 		}
 
-		prevSnapshot = &snapshot
+		prevRange = curRange
 	}
 
 	return err

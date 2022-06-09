@@ -1,4 +1,4 @@
-package state
+package orchestrator
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/state"
 )
 
 type Snapshots struct {
@@ -31,6 +32,17 @@ func (s *Snapshots) LastCompletedBlock() uint64 {
 	return s.Completes[len(s.Completes)-1].ExclusiveEndBlock
 }
 
+func (s *Snapshots) LastCompleteBefore(blockNum uint64) uint64 {
+	for i := len(s.Completes); i > 0; i-- {
+		comp := s.Completes[i-1]
+		if comp.ExclusiveEndBlock > blockNum {
+			continue
+		}
+		return comp.ExclusiveEndBlock
+	}
+	return 0
+}
+
 func (s *Snapshots) ContainsPartial(r *block.Range) bool {
 	for _, file := range s.Partials {
 		if file.StartBlock == r.StartBlock && file.ExclusiveEndBlock == r.ExclusiveEndBlock {
@@ -45,7 +57,7 @@ type Snapshot struct {
 	Path string
 }
 
-func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
+func listSnapshots(ctx context.Context, b *state.Store) (out *Snapshots, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		out = &Snapshots{}
 		if err := b.Store.Walk(ctx, "", func(filename string) (err error) {
@@ -53,7 +65,7 @@ func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
 				return nil
 			}
 
-			fileInfo, ok := ParseFileName(filename)
+			fileInfo, ok := state.ParseFileName(filename)
 			if !ok {
 				return nil
 			}

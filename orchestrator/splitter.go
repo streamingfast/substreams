@@ -6,7 +6,6 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/state"
 )
 
 // FIXME(abourget): WorkPlan ?
@@ -40,86 +39,125 @@ type SplitWork struct {
 	modName              string
 	loadInitialStore     *block.Range // Send a Progress message, saying the store is already processed for this range
 	initialCoveredRanges block.Ranges
-	reqChunks            []*reqChunk // All jobs that needs to be scheduled
+	partialsMissing      block.Ranges // Used to prep the reqChunks
+	partialsPresent      block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
+
+	reqChunks []*reqChunk // All jobs that needs to be scheduled
 }
 
-func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (work *SplitWork) {
+func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
 	// FIXME: Make sure `storeSplit` and `subReqSplit` are a multiple of one another.
 	// storeSplit must actually be a factor of subReqSplit
 	// panic otherwise, and bring that check higher up the chain
 
 	work = &SplitWork{modName: modName}
 
-	storeLastBlock := snapshots.LastBlock()
-
-	if storeLastBlock != 0 && storeLastBlock < modInitBlock {
-		panic("cannot have saved last store before module's init block") // 0 has special meaning
-	}
-
 	if incomingReqStartBlock <= modInitBlock {
 		return work
 	}
 
-	subReqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, incomingReqStartBlock, storeSplit, modInitBlock)
-	if storeLastBlock != 0 && storeLastBlock != modInitBlock && subReqStartBlock != 0 {
-		work.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
+	storeLastComplete := snapshots.LastCompleteBefore(incomingReqStartBlock)
+
+	if storeLastComplete != 0 && storeLastComplete <= modInitBlock {
+		panic("cannot have saved last store before module's init block") // 0 has special meaning
 	}
 
-	if subReqStartBlock == incomingReqStartBlock {
+	if storeLastComplete == incomingReqStartBlock {
 		return
 	}
-	if subReqStartBlock == 0 {
-		subReqStartBlock = modInitBlock
+
+	backprocessStartBlock := modInitBlock
+	if storeLastComplete != 0 {
+		backprocessStartBlock = storeLastComplete
+		work.loadInitialStore = block.NewRange(modInitBlock, storeLastComplete)
 	}
+	// if storeLastComplete != 0 && storeLastComplete != modInitBlock && subReqStartBlock != 0 {
+	// }
 
-	requestRanges := block.NewRange(subReqStartBlock, incomingReqStartBlock).Split(subReqSplit)
-
-	for _, reqRange := range requestRanges {
-		reqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
-		// Now do the SECOND split, for chunks for `storeSplit`
-		storeSplitRanges := reqRange.Split(storeSplit)
-		for _, storeSplitRange := range storeSplitRanges {
-			if storeSplitRange.StartBlock < modInitBlock {
-				panic(fmt.Sprintf("module %q: received a squash request for a start block %d prior to the module's initial block %d", modName, storeSplitRange.StartBlock, modInitBlock))
-			}
-
-			if snapshots.ContainsPartial(storeSplitRange) {
-				continue
-			}
-
-			// FIXME(abourget): check this one again
-			// if reqRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
-			// 	// Otherwise, risks stalling the merging (as ranges are
-			// 	// sorted, and only the first is checked for contiguousness)
-			// 	continue
-			// }
-			addStoreChunk := &chunk{
-				start:       storeSplitRange.StartBlock,
-				end:         storeSplitRange.ExclusiveEndBlock,
-				tempPartial: storeSplitRange.ExclusiveEndBlock%storeSplit != 0,
-			}
-			reqChunk.chunks = append(reqChunk.chunks, addStoreChunk)
+	for ptr := backprocessStartBlock; ptr < incomingReqStartBlock; {
+		end := minOf(ptr-ptr%storeSplit+storeSplit, incomingReqStartBlock)
+		newPartial := block.NewRange(ptr, end)
+		if !snapshots.ContainsPartial(newPartial) {
+			work.partialsMissing = append(work.partialsMissing, newPartial)
+		} else {
+			work.partialsPresent = append(work.partialsPresent, newPartial)
 		}
-		work.reqChunks = append(work.reqChunks, reqChunk)
+		ptr = end
 	}
 
-	return
+	return work
 }
 
-// computeStoreExclusiveEndBlock tells us WHERE we have a snapshot ready that can be queried in the conditions of this query.
-func computeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, saveInterval, moduleInitialBlock uint64) uint64 {
-	previousBoundary := reqStartBlock - reqStartBlock%saveInterval
-	startBlockOnBoundary := reqStartBlock%saveInterval == 0
-
-	if reqStartBlock >= lastSavedBlock {
-		return lastSavedBlock
-	} else if previousBoundary < moduleInitialBlock {
-		return 0
-	} else if startBlockOnBoundary {
-		return reqStartBlock
+func (work *SplitWork) computeRequests(subreqSplit uint64) {
+	for _, rngs := range work.partialsMissing.MergedChunked(subreqSplit) {
+		_ = rngs
 	}
-	return previousBoundary
 }
+
+// 	// subReqStartBlock := computeStoreExclusiveEndBlock(storeLastComplete, incomingReqStartBlock, storeSplit, modInitBlock)
+// 	// if storeLastComplete != 0 && storeLastComplete != modInitBlock && subReqStartBlock != 0 {
+// 	// 	work.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
+// 	// }
+
+// 	// if subReqStartBlock == incomingReqStartBlock {
+// 	// 	return
+// 	// }
+
+// 	requestRanges := block.NewRange(subReqStartBlock, incomingReqStartBlock).Split(subReqSplit)
+
+// 	for _, reqRange := range requestRanges {
+// 		reqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
+// 		// Now do the SECOND split, for chunks for `storeSplit`
+// 		storeSplitRanges := reqRange.Split(storeSplit)
+// 		for _, storeSplitRange := range storeSplitRanges {
+// 			if storeSplitRange.StartBlock < modInitBlock {
+// 				panic(fmt.Sprintf("module %q: received a squash request for a start block %d prior to the module's initial block %d", modName, storeSplitRange.StartBlock, modInitBlock))
+// 			}
+
+// 			if snapshots.ContainsPartial(storeSplitRange) {
+// 				continue
+// 			}
+
+// 			// FIXME(abourget): check this one again
+// 			// if reqRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
+// 			// 	// Otherwise, risks stalling the merging (as ranges are
+// 			// 	// sorted, and only the first is checked for contiguousness)
+// 			// 	continue
+// 			// }
+// 			addStoreChunk := &chunk{
+// 				start:       storeSplitRange.StartBlock,
+// 				end:         storeSplitRange.ExclusiveEndBlock,
+// 				tempPartial: storeSplitRange.ExclusiveEndBlock%storeSplit != 0,
+// 			}
+// 			reqChunk.chunks = append(reqChunk.chunks, addStoreChunk)
+// 		}
+// 		work.reqChunks = append(work.reqChunks, reqChunk)
+// 	}
+
+// 	return
+// }
+
+func minOf(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// // computeStoreExclusiveEndBlock tells us WHERE we have a snapshot ready that can be queried in the conditions of this query.
+// func computeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, saveInterval, moduleInitialBlock uint64) uint64 {
+// 	previousBoundary := reqStartBlock - reqStartBlock%saveInterval
+// 	startBlockOnBoundary := reqStartBlock%saveInterval == 0
+
+// 	if reqStartBlock >= lastSavedBlock {
+// 		return lastSavedBlock
+// 	} else if previousBoundary < moduleInitialBlock {
+// 		return 0
+// 	} else if startBlockOnBoundary {
+// 		return reqStartBlock
+// 	}
+// 	return previousBoundary
+// }
 
 type reqChunk struct {
 	start uint64

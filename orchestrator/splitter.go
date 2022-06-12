@@ -36,20 +36,15 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 
 // FIXME(abourget): StoreWorkUnit ?
 type SplitWork struct {
-	modName              string
-	loadInitialStore     *block.Range // Send a Progress message, saying the store is already processed for this range
-	initialCoveredRanges block.Ranges
-	partialsMissing      block.Ranges // Used to prep the reqChunks
-	partialsPresent      block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
+	modName          string
+	loadInitialStore *block.Range // Send a Progress message, saying the store is already processed for this range
+	partialsMissing  block.Ranges // Used to prep the reqChunks
+	partialsPresent  block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
 
-	reqChunks []*reqChunk // All jobs that needs to be scheduled
+	reqChunks block.Ranges // All jobs that needs to be scheduled
 }
 
 func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
-	// FIXME: Make sure `storeSplit` and `subReqSplit` are a multiple of one another.
-	// storeSplit must actually be a factor of subReqSplit
-	// panic otherwise, and bring that check higher up the chain
-
 	work = &SplitWork{modName: modName}
 
 	if incomingReqStartBlock <= modInitBlock {
@@ -62,17 +57,15 @@ func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlo
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
 	}
 
-	if storeLastComplete == incomingReqStartBlock {
-		return
-	}
-
 	backprocessStartBlock := modInitBlock
 	if storeLastComplete != 0 {
 		backprocessStartBlock = storeLastComplete
 		work.loadInitialStore = block.NewRange(modInitBlock, storeLastComplete)
 	}
-	// if storeLastComplete != 0 && storeLastComplete != modInitBlock && subReqStartBlock != 0 {
-	// }
+
+	if storeLastComplete == incomingReqStartBlock {
+		return
+	}
 
 	for ptr := backprocessStartBlock; ptr < incomingReqStartBlock; {
 		end := minOf(ptr-ptr%storeSplit+storeSplit, incomingReqStartBlock)
@@ -88,10 +81,13 @@ func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlo
 	return work
 }
 
+// What to send to end-users to inform them of already processed segments
+func (work *SplitWork) InitialProcessedPartials() block.Ranges {
+	return work.partialsPresent.Merged()
+}
+
 func (work *SplitWork) computeRequests(subreqSplit uint64) {
-	for _, rngs := range work.partialsMissing.MergedChunked(subreqSplit) {
-		_ = rngs
-	}
+	work.reqChunks = work.partialsMissing.MergedChunked(subreqSplit)
 }
 
 // 	// subReqStartBlock := computeStoreExclusiveEndBlock(storeLastComplete, incomingReqStartBlock, storeSplit, modInitBlock)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -78,6 +79,15 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		resp, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
+				trailers := stream.Trailer().Get("substreams-partials-written")
+				if len(trailers) != 0 {
+					partialsWritten := block.ParseRanges(trailers[0])
+					// TODO: send partialsWritten INTO the Squasher, to notify, or callback, or
+					// whatever it is that needs to be informed that we have NEW PARTIALS that were
+					// written.
+					_ = partialsWritten
+				}
+
 				zlog.Info("worker done", zap.Object("job", job))
 				return nil
 			}

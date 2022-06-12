@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -60,6 +61,8 @@ type Pipeline struct {
 	logs          []string
 
 	moduleOutputCache *outputs.ModulesOutputCache
+
+	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 
 	currentBlockRef bstream.BlockRef
 
@@ -239,7 +242,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		// no need to save store if loaded from cache?
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-		isTemporaryStore := p.isBackprocessing && p.clock.Number == p.request.StopBlockNum && p.request.StopBlockNum != 0
+		isTemporaryStore := p.isBackprocessing && p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
 
 		if !isFirstRequestBlock && (intervalReached || isTemporaryStore) {
 			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
@@ -547,7 +550,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
-	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!!
+	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!! The caller or this function
+	// should handle this, with a previous boundary that was passed, etc.. to support
+	// chains that skip blocks.
 	for _, builder := range p.storeMap {
 		// TODO: implement parallel writing and upload for the different stores involved.
 		err := builder.WriteState(ctx, lastBlock)
@@ -556,6 +561,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) er
 		}
 
 		if builder.IsPartial() {
+			p.partialsWritten = append(p.partialsWritten, block.NewRange(builder.StoreInitialBlock, lastBlock))
 			builder.Truncate()
 			builder.Roll(lastBlock)
 		}
@@ -601,4 +607,8 @@ func loadStores(ctx context.Context, storeMap map[string]*state.Store, requested
 		}
 	}
 	return nil
+}
+
+func (p *Pipeline) PartialsWritten() block.Ranges {
+	return p.partialsWritten
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -206,6 +207,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	}
 	if err := st.Run(ctx); err != nil {
 		if errors.Is(err, io.EOF) {
+			var d []string
+			for _, rng := range pipe.PartialsWritten() {
+				d = append(d, fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock))
+			}
+			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": []string{strings.Join(d, ",")}})
 			return nil
 		}
 

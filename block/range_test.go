@@ -46,6 +46,18 @@ func TestRangeMergedChunked(t *testing.T) {
 		ParseRanges("10-20,20-30,30-40").MergedChunked(5).String(),
 	)
 	assert.Equal(t,
+		ParseRanges("10-20,20-30,30-40,40-50").String(),
+		ParseRanges("10-20,20-30,30-40,40-50").MergedChunked(11).String(),
+	)
+	assert.Equal(t,
+		ParseRanges("10-20,20-30,30-40,40-50").String(),
+		ParseRanges("10-20,20-30,30-40,40-50").MergedChunked(19).String(),
+	)
+	assert.Equal(t,
+		ParseRanges("10-30,30-50").String(),
+		ParseRanges("10-20,20-30,30-40,40-50").MergedChunked(20).String(),
+	)
+	assert.Equal(t,
 		ParseRanges("1-4,4-5,10-12,13-14").String(),
 		ParseRanges("1-2,2-3,3-4,4-5,10-12,13-14").MergedChunked(3).String(),
 	)

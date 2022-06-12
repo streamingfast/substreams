@@ -152,7 +152,7 @@ func (r Ranges) MergedChunked(chunk uint64) (out Ranges) {
 			continue
 		}
 		nextRange := r[i+1]
-		if curRange.ExclusiveEndBlock != nextRange.StartBlock && (curRange.Size() > chunk || nextRange.ExclusiveEndBlock-curRange.StartBlock > chunk) {
+		if curRange.ExclusiveEndBlock != nextRange.StartBlock || nextRange.ExclusiveEndBlock-curRange.StartBlock > chunk {
 			out = append(out, curRange)
 			continue
 		}

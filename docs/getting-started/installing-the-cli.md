@@ -5,7 +5,7 @@ description: Installation instructions for the `substreams` command-line interfa
 # Installing the CLI
 
 {% hint style="success" %}
-Alternatively to installing the `substreams` locally, you can [use Gitpod to get started quickly](../developer-guide/overview.md#gitpod-quick-start).
+Alternatively to installing the `substreams` locally, you can [use Gitpod to get started quickly](../developer-guide/installation-requirements.md).
 {% endhint %}
 
 ### Installing the `substreams` command-line interface
@@ -24,8 +24,8 @@ Download the binary
 
 ```bash
 # Use correct binary for your platform
-LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest%7C awk '/download.url.*linux/ {print $2}' | sed 's/"//g')
-curl -L  $LINK  | tar xf -
+LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest | awk '/download.url.*linux/ {print $2}' | sed 's/"//g')
+curl -L  $LINK  | tar zxf -
 ```
 
 {% hint style="info" %}

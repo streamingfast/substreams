@@ -1,7 +1,7 @@
 # Installing Dependencies
 
 {% hint style="success" %}
-#### Develop in the cloud with Gitpod
+**Develop in the cloud with Gitpod**
 
 Optionally, and instead of installing dependencies locally, you can use [Gitpod](https://www.gitpod.io/) to launch a developer environment purely in the cloud, through your browser:
 
@@ -35,3 +35,20 @@ source $HOME/.cargo/env # to configure your current shell
 [https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams packages are compatible with [buf Images](https://docs.buf.build/reference/images).
 
 See the [installation instructions here](https://docs.buf.build/installation).
+
+### Install `cmake` and `build-essential`
+
+For linux based machines `cmake` and `build-essential` is needed to install `protoc-gen-prost` cargo crate. There are multiple ways to do this, we can check out how to install `cmake` [here](https://cmake.org/install/) and how to install `build-essential` [here](https://itsfoss.com/build-essential-ubuntu/).
+
+```
+apt update
+apt install cmake build-essential
+```
+
+### Install `protoc-gen-prost`
+
+Once `cmake` and `build-essential` are properly installed, we can install `protoc-gen-prost` crate to generate protobuf files.
+
+```
+cargo install protoc-gen-prost
+```

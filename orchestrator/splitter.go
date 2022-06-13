@@ -91,10 +91,10 @@ func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 //	requestRanges := work.partialsMissing.MergeRange(subReqSplit)
 //	for _, r := range requestRanges {
 //		expectedPartials := r.Split(storesSaveInterval)
-//		var chunks []*chunk
+//		var reqChunks []*chunk
 //
 //		for _, p := range expectedPartials {
-//			chunks = append(chunks, &chunk{
+//			reqChunks = append(reqChunks, &chunk{
 //				start:       p.StartBlock,
 //				end:         p.ExclusiveEndBlock,
 //				tempPartial: p.ExclusiveEndBlock%storesSaveInterval != 0,
@@ -104,7 +104,7 @@ func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 //		work.reqChunks = append(work.reqChunks, &reqChunk{
 //			start:  r.StartBlock,
 //			end:    r.ExclusiveEndBlock,
-//			chunks: chunks,
+//			reqChunks: reqChunks,
 //		})
 //	}
 //}
@@ -122,7 +122,7 @@ func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 
 // 	for _, reqRange := range requestRanges {
 // 		reqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
-// 		// Now do the SECOND split, for chunks for `storeSplit`
+// 		// Now do the SECOND split, for reqChunks for `storeSplit`
 // 		storeSplitRanges := reqRange.Split(storeSplit)
 // 		for _, storeSplitRange := range storeSplitRanges {
 // 			if storeSplitRange.StartBlock < modInitBlock {
@@ -144,7 +144,7 @@ func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 // 				end:         storeSplitRange.ExclusiveEndBlock,
 // 				tempPartial: storeSplitRange.ExclusiveEndBlock%storeSplit != 0,
 // 			}
-// 			reqChunk.chunks = append(reqChunk.chunks, addStoreChunk)
+// 			reqChunk.reqChunks = append(reqChunk.reqChunks, addStoreChunk)
 // 		}
 // 		work.reqChunks = append(work.reqChunks, reqChunk)
 // 	}
@@ -174,28 +174,30 @@ func minOf(a, b uint64) uint64 {
 // 	return previousBoundary
 // }
 type reqChunks []*reqChunk
+
 type reqChunk struct {
 	start uint64
 	end   uint64 // exclusive end
 
-	chunks []*chunk // All partial stores that are expected to be produced by this subreq
 }
 
 func (c reqChunk) String() string {
+	out := fmt.Sprintf("%d-%d", c.start, c.end)
+	return out
+}
+
+type chunks []*chunk
+
+func (c chunks) String() string {
 	var sc []string
-	for _, s := range c.chunks {
+	for _, s := range c {
 		var add string
 		if s.tempPartial {
 			add = "TMP:"
 		}
 		sc = append(sc, fmt.Sprintf("%s%d-%d", add, s.start, s.end))
 	}
-	out := fmt.Sprintf("%d-%d", c.start, c.end)
-	if len(sc) != 0 {
-		out += " (" + strings.Join(sc, ", ") + ")"
-	}
-	out = strings.Replace(out, fmt.Sprintf(" (%d-%d)", c.start, c.end), "", 1)
-	return out
+	return strings.Join(sc, ", ")
 }
 
 type chunk struct {

@@ -63,7 +63,7 @@ func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[st
 	return squasher, nil
 }
 
-func (s *Squasher) Squash(ctx context.Context, moduleName string, reqChunk *reqChunk) error {
+func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks chunks) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -76,7 +76,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, reqChunk *reqC
 		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)
 	}
 
-	return squashable.squash(ctx, reqChunk)
+	return squashable.squash(ctx, partialsChunks)
 }
 
 func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {

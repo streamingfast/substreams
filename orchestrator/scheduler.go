@@ -44,9 +44,9 @@ func (s *Scheduler) Next() *Job {
 	return request
 }
 
-func (s *Scheduler) Callback(ctx context.Context, job *Job) error {
+func (s *Scheduler) Callback(ctx context.Context, job *Job, partialsChunks chunks) error {
 
-	err := s.squasher.Squash(ctx, job.moduleName, job.reqChunk)
+	err := s.squasher.Squash(ctx, job.moduleName, partialsChunks)
 	if err != nil {
 		return fmt.Errorf("squashing: %w", err)
 	}
@@ -98,15 +98,16 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Jo
 		return err
 	}
 
+	var partialsChunks chunks
 	for _, p := range partialsWritten {
-		job.reqChunk.chunks = append(job.reqChunk.chunks, &chunk{
+		partialsChunks = append(partialsChunks, &chunk{
 			start:       p.StartBlock,
 			end:         p.ExclusiveEndBlock,
 			tempPartial: p.ExclusiveEndBlock%job.moduleSaveInterval != 0,
 		})
 	}
 
-	if err = s.Callback(ctx, job); err != nil {
+	if err = s.Callback(ctx, job, partialsChunks); err != nil {
 		return fmt.Errorf("calling back scheduler: %w", err)
 	}
 	return nil

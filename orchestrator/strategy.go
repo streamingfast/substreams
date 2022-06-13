@@ -25,11 +25,11 @@ func NewOrderedStrategy(
 		workUnit := splitWorks[storeName]
 		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
 
-		rangeLen := len(workUnit.reqChunks)
-		for idx, reqChunk := range workUnit.reqChunks {
+		rangeLen := len(workUnit.RequestRanges)
+		for idx, requestRange := range workUnit.RequestRanges {
 			// TODO(abourget): here we loop SplitWork.reqChunks, and grab the ancestor modules
 			// to setup the waiter.
-			// blockRange's start/end come from `reqChunk`
+			// blockRange's start/end come from `requestRange`
 			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)
 			if err != nil {
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
@@ -38,14 +38,14 @@ func NewOrderedStrategy(
 			job := &Job{
 				moduleName:         store.Name,
 				moduleSaveInterval: store.SaveInterval,
-				reqChunk:           reqChunk,
+				requestRange:       requestRange,
 			}
 
-			//req := createRequest(reqChunk, store.Name, request.IrreversibilityCondition, request.Modules)
-			waiter := NewWaiter(reqChunk.start, ancestorStoreModules...)
+			//req := createRequest(requestRange, store.Name, request.IrreversibilityCondition, request.Modules)
+			waiter := NewWaiter(requestRange.StartBlock, ancestorStoreModules...)
 			_ = pool.Add(ctx, rangeLen-idx, job, waiter)
 
-			zlog.Info("request created", zap.String("module_name", store.Name), zap.Uint64("start_block", reqChunk.start), zap.Uint64("end_block", reqChunk.end))
+			zlog.Info("request created", zap.String("module_name", store.Name), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
 		}
 	}
 

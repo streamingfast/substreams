@@ -46,7 +46,7 @@ func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[st
 			}
 			squashable = NewSquashable(squish, reqStartBlock, workUnit.loadInitialStore.ExclusiveEndBlock, notifier)
 		}
-		if len(workUnit.reqChunks) == 0 {
+		if len(workUnit.RequestRanges) == 0 {
 			squashable.targetReached = true
 			squashable.notifyWaiters(reqStartBlock)
 		}
@@ -98,7 +98,7 @@ func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
 			// the second check was added to take care of the use-case of a subsequent execution of the same request
 			// where the target wasn't "reached" because there were no ranges to be done
 			if !squashable.targetReached && !squashable.IsEmpty() {
-				errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", squashable.name, squashable.reqChunk.end, squashable.ranges, squashable.nextExpectedStartBlock))
+				errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", squashable.name, s.targetExclusiveBlock, squashable.ranges, squashable.nextExpectedStartBlock))
 			}
 			if !squashable.IsEmpty() {
 				errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", squashable.name, squashable.ranges))

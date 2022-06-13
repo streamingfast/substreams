@@ -20,7 +20,6 @@ type Scheduler struct {
 
 	squasher       *Squasher
 	requestsStream <-chan *Job
-	requests       []*reqChunk
 }
 
 func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
@@ -28,7 +27,6 @@ func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squa
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		squasher:                  squasher,
 		requestsStream:            strategy.getRequestStream(ctx),
-		requests:                  []*reqChunk{},
 		workerPool:                workerPool,
 		respFunc:                  respFunc,
 	}

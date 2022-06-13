@@ -36,16 +36,16 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 
 // FIXME(abourget): StoreWorkUnit ?
 type SplitWork struct {
-	modName          string
-	loadInitialStore *block.Range // Send a Progress message, saying the store is already processed for this range
-	partialsMissing  block.Ranges // Used to prep the reqChunks
-	partialsPresent  block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
-
-	reqChunks reqChunks // All jobs that needs to be scheduled
+	modName            string
+	loadInitialStore   *block.Range // Send a Progress message, saying the store is already processed for this range
+	partialsMissing    block.Ranges // Used to prep the reqChunks
+	partialsPresent    block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
+	subRequestSlipSize uint64
+	RequestRanges      block.Ranges
 }
 
-func SplitSomeWork(modName string, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
-	work = &SplitWork{modName: modName}
+func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
+	work = &SplitWork{modName: modName, subRequestSlipSize: subRequestSlipSize}
 
 	if incomingReqStartBlock <= modInitBlock {
 		return work
@@ -68,7 +68,7 @@ func SplitSomeWork(modName string, subReqSplit, modInitBlock, incomingReqStartBl
 	}
 
 	for ptr := backprocessStartBlock; ptr < incomingReqStartBlock; {
-		end := minOf(ptr-ptr%subReqSplit+subReqSplit, incomingReqStartBlock)
+		end := minOf(ptr-ptr%subRequestSlipSize+subRequestSlipSize, incomingReqStartBlock)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {
 			work.partialsMissing = append(work.partialsMissing, newPartial)
@@ -77,12 +77,17 @@ func SplitSomeWork(modName string, subReqSplit, modInitBlock, incomingReqStartBl
 		}
 		ptr = end
 	}
+	work.computeRequests()
 	return work
 }
 
 // What to send to end-users to inform them of already processed segments
 func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 	return work.partialsPresent.Merged()
+}
+
+func (work *SplitWork) computeRequests() {
+	work.RequestRanges = work.partialsMissing.MergeRange(work.subRequestSlipSize)
 }
 
 //
@@ -173,18 +178,18 @@ func minOf(a, b uint64) uint64 {
 // 	}
 // 	return previousBoundary
 // }
-type reqChunks []*reqChunk
-
-type reqChunk struct {
-	start uint64
-	end   uint64 // exclusive end
-
-}
-
-func (c reqChunk) String() string {
-	out := fmt.Sprintf("%d-%d", c.start, c.end)
-	return out
-}
+//type reqChunks []*reqChunk
+//
+//type reqChunk struct {
+//	start uint64
+//	end   uint64 // exclusive end
+//
+//}
+//
+//func (c reqChunk) String() string {
+//	out := fmt.Sprintf("%d-%d", c.start, c.end)
+//	return out
+//}
 
 type chunks []*chunk
 

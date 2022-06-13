@@ -1,12 +1,13 @@
 package orchestrator
 
 import (
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap/zapcore"
 )
 
 type Job struct {
-	reqChunk           *reqChunk
+	requestRange       *block.Range
 	moduleName         string // target
 	moduleSaveInterval uint64
 }
@@ -14,15 +15,15 @@ type Job struct {
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module_name", j.moduleName)
 	enc.AddUint64("module_save_interval", j.moduleSaveInterval)
-	enc.AddUint64("start_block", j.reqChunk.start)
-	enc.AddUint64("end_block", j.reqChunk.end)
+	enc.AddUint64("start_block", j.requestRange.StartBlock)
+	enc.AddUint64("end_block", j.requestRange.ExclusiveEndBlock)
 	return nil
 }
 
 func (job *Job) createRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
-		StartBlockNum: int64(job.reqChunk.start),
-		StopBlockNum:  job.reqChunk.end,
+		StartBlockNum: int64(job.requestRange.StartBlock),
+		StopBlockNum:  job.requestRange.ExclusiveEndBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
 		Modules:       originalModules,

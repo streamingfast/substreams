@@ -17,7 +17,7 @@ type Squashable struct {
 
 	name                   string
 	store                  *state.Store
-	reqChunk               *reqChunk
+	requestRange           *block.Range
 	ranges                 []*chunk // Ranges split in `storeSaveInterval` reqChunks
 	targetExclusiveBlock   uint64
 	nextExpectedStartBlock uint64

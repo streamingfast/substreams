@@ -36,8 +36,9 @@ func NewOrderedStrategy(
 			}
 
 			job := &Job{
-				moduleName: store.Name,
-				reqChunk:   reqChunk,
+				moduleName:         store.Name,
+				moduleSaveInterval: store.SaveInterval,
+				reqChunk:           reqChunk,
 			}
 
 			//req := createRequest(reqChunk, store.Name, request.IrreversibilityCondition, request.Modules)

@@ -34,8 +34,6 @@ func TestSplitSomeWork(t *testing.T) {
 	type splitTestCase struct {
 		name string
 
-		storeSplit uint64 // storeSaveInterval, boundaries at which we want a new store snapshot
-
 		modInitBlock uint64     // ModuleInitialBlock
 		snapshots    *Snapshots // store's Last block saved from the store's Info file
 		reqStart     uint64     // the request's absolute start block
@@ -43,13 +41,14 @@ func TestSplitSomeWork(t *testing.T) {
 		expectInitLoad *block.Range // Used for LoadFrom()
 		expectMissing  block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
 		expectPresent  block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
+		reqSlip        uint64
 	}
 
-	splitTest := func(name string, storeSplit uint64, modInitBlock uint64, snapshotsSpec string, reqStart uint64, expectInitLoad, expectMissing, expectPresent string,
+	splitTest := func(name string, reqSplit uint64, modInitBlock uint64, snapshotsSpec string, reqStart uint64, expectInitLoad, expectMissing, expectPresent string,
 	) splitTestCase {
 		c := splitTestCase{
 			name:         name,
-			storeSplit:   storeSplit,
+			reqSlip:      reqSplit,
 			snapshots:    parseSnapshotSpec(snapshotsSpec),
 			modInitBlock: modInitBlock,
 			reqStart:     reqStart,
@@ -79,7 +78,7 @@ func TestSplitSomeWork(t *testing.T) {
 			0, "0-20,p20-30", 20,
 			"0-20", "", "",
 		),
-		splitTest("10 blocks already processed", 10, // 20,
+		splitTest("10 blocks already processed", 10,
 			50, "50-60,p70-80", 90,
 			"50-60", "60-70,80-90", "70-80",
 		),
@@ -121,7 +120,7 @@ func TestSplitSomeWork(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			work := SplitSomeWork("mod", tt.storeSplit, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			work := SplitSomeWork("mod", tt.reqSlip, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			assert.Equal(t, tt.expectInitLoad, work.loadInitialStore)
 			assert.Equal(t,
 				tt.expectMissing.String(),

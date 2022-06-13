@@ -46,7 +46,7 @@ type Worker struct {
 	originalRequestModules *pbsubstreams.Modules
 }
 
-func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) error {
+func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	start := time.Now()
 	zlog.Info("running job", zap.Object("job", job))
 	defer func() {
@@ -56,7 +56,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 	grpcClient, grpcCallOpts, err := w.grpcClientFactory()
 	if err != nil {
 		zlog.Error("getting grpc client", zap.Error(err))
-		return fmt.Errorf("grpc client factory: %w", err)
+		return nil, fmt.Errorf("grpc client factory: %w", err)
 	}
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
@@ -65,14 +65,14 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
-		return fmt.Errorf("getting block stream: %w", err)
+		return nil, fmt.Errorf("getting block stream: %w", err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			zlog.Warn("context cancel will waiting for stream data, worker is terminating")
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
@@ -80,19 +80,16 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		if err != nil {
 			if err == io.EOF {
 				trailers := stream.Trailer().Get("substreams-partials-written")
+				var partialsWritten []*block.Range
 				if len(trailers) != 0 {
-					partialsWritten := block.ParseRanges(trailers[0])
-					// TODO: send partialsWritten INTO the Squasher, to notify, or callback, or
-					// whatever it is that needs to be informed that we have NEW PARTIALS that were
-					// written.
-					_ = partialsWritten
+					partialsWritten = block.ParseRanges(trailers[0])
 				}
 
 				zlog.Info("worker done", zap.Object("job", job))
-				return nil
+				return partialsWritten, nil
 			}
 			zlog.Warn("worker done on stream error", zap.Error(err))
-			return fmt.Errorf("receiving stream resp: %w", err)
+			return nil, fmt.Errorf("receiving stream resp: %w", err)
 		}
 
 		switch r := resp.Message.(type) {
@@ -100,7 +97,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 			err := respFunc(resp)
 			if err != nil {
 				zlog.Warn("worker done on respFunc error", zap.Error(err))
-				return fmt.Errorf("sending progress: %w", err)
+				return nil, fmt.Errorf("sending progress: %w", err)
 			}
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData

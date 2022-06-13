@@ -41,10 +41,10 @@ type SplitWork struct {
 	partialsMissing  block.Ranges // Used to prep the reqChunks
 	partialsPresent  block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
 
-	reqChunks block.Ranges // All jobs that needs to be scheduled
+	reqChunks reqChunks // All jobs that needs to be scheduled
 }
 
-func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
+func SplitSomeWork(modName string, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
 	work = &SplitWork{modName: modName}
 
 	if incomingReqStartBlock <= modInitBlock {
@@ -68,7 +68,7 @@ func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlo
 	}
 
 	for ptr := backprocessStartBlock; ptr < incomingReqStartBlock; {
-		end := minOf(ptr-ptr%storeSplit+storeSplit, incomingReqStartBlock)
+		end := minOf(ptr-ptr%subReqSplit+subReqSplit, incomingReqStartBlock)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {
 			work.partialsMissing = append(work.partialsMissing, newPartial)
@@ -77,7 +77,6 @@ func SplitSomeWork(modName string, storeSplit, modInitBlock, incomingReqStartBlo
 		}
 		ptr = end
 	}
-
 	return work
 }
 
@@ -86,9 +85,29 @@ func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 	return work.partialsPresent.Merged()
 }
 
-func (work *SplitWork) computeRequests(subreqSplit uint64) {
-	work.reqChunks = work.partialsMissing.MergedChunked(subreqSplit)
-}
+//
+//func (work *SplitWork) computeRequests(storesSaveInterval, subReqSplit uint64) {
+//
+//	requestRanges := work.partialsMissing.MergeRange(subReqSplit)
+//	for _, r := range requestRanges {
+//		expectedPartials := r.Split(storesSaveInterval)
+//		var chunks []*chunk
+//
+//		for _, p := range expectedPartials {
+//			chunks = append(chunks, &chunk{
+//				start:       p.StartBlock,
+//				end:         p.ExclusiveEndBlock,
+//				tempPartial: p.ExclusiveEndBlock%storesSaveInterval != 0,
+//			})
+//		}
+//
+//		work.reqChunks = append(work.reqChunks, &reqChunk{
+//			start:  r.StartBlock,
+//			end:    r.ExclusiveEndBlock,
+//			chunks: chunks,
+//		})
+//	}
+//}
 
 // 	// subReqStartBlock := computeStoreExclusiveEndBlock(storeLastComplete, incomingReqStartBlock, storeSplit, modInitBlock)
 // 	// if storeLastComplete != 0 && storeLastComplete != modInitBlock && subReqStartBlock != 0 {
@@ -154,7 +173,7 @@ func minOf(a, b uint64) uint64 {
 // 	}
 // 	return previousBoundary
 // }
-
+type reqChunks []*reqChunk
 type reqChunk struct {
 	start uint64
 	end   uint64 // exclusive end

@@ -140,7 +140,7 @@ func (r Ranges) Merged() (out Ranges) {
 	return out
 }
 
-func (r Ranges) MergedChunked(chunk uint64) (out Ranges) {
+func (r Ranges) MergeRange(chunk uint64) (out Ranges) {
 	for i := 0; i < len(r); i++ {
 		curRange := r[i]
 		if i == len(r)-1 {

@@ -6,13 +6,14 @@ import (
 )
 
 type Job struct {
-	reqChunk   *reqChunk
-	moduleName string // target
-	//	Request    *pbsubstreams.Request
+	reqChunk           *reqChunk
+	moduleName         string // target
+	moduleSaveInterval uint64
 }
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module_name", j.moduleName)
+	enc.AddUint64("module_save_interval", j.moduleSaveInterval)
 	enc.AddUint64("start_block", j.reqChunk.start)
 	enc.AddUint64("end_block", j.reqChunk.end)
 	return nil

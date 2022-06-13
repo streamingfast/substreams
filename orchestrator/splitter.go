@@ -221,27 +221,27 @@ func (s chunk) String() string {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-type Splitter struct {
-	chunkSize uint64
-}
-
-func NewSplitter(chunkSize uint64) *Splitter {
-	// The splitter should accomodate and produce the outgoing subrequests necessary for the
-	// the incoming request to be satisfied, and for a squasher to know what to expect and do its
-	// squashing job, knowing what the subrequests should produce
-	return &Splitter{
-		chunkSize: chunkSize,
-	}
-}
-
-func (s *Splitter) Split(moduleInitialBlock uint64, lastSavedBlock uint64, blockRange *block.Range) []*block.Range {
-	if moduleInitialBlock > blockRange.StartBlock {
-		blockRange.StartBlock = moduleInitialBlock
-	}
-
-	if lastSavedBlock > blockRange.StartBlock {
-		blockRange.StartBlock = lastSavedBlock
-	}
-
-	return blockRange.Split(s.chunkSize)
-}
+//type Splitter struct {
+//	chunkSize uint64
+//}
+//
+//func NewSplitter(chunkSize uint64) *Splitter {
+//	// The splitter should accomodate and produce the outgoing subrequests necessary for the
+//	// the incoming request to be satisfied, and for a squasher to know what to expect and do its
+//	// squashing job, knowing what the subrequests should produce
+//	return &Splitter{
+//		chunkSize: chunkSize,
+//	}
+//}
+//
+//func (s *Splitter) Split(moduleInitialBlock uint64, lastSavedBlock uint64, blockRange *block.Range) []*block.Range {
+//	if moduleInitialBlock > blockRange.StartBlock {
+//		blockRange.StartBlock = moduleInitialBlock
+//	}
+//
+//	if lastSavedBlock > blockRange.StartBlock {
+//		blockRange.StartBlock = lastSavedBlock
+//	}
+//
+//	return blockRange.Split(s.chunkSize)
+//}

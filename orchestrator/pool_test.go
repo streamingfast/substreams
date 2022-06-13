@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/substreams/block"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
 )
@@ -61,8 +63,8 @@ func TestGet(t *testing.T) {
 		&pbsubstreams.Module{Name: "test1"},
 	)
 	r0 := &Job{
-		moduleName: "test1_descendant",
-		reqChunk:   &reqChunk{start: 200, end: 300},
+		moduleName:   "test1_descendant",
+		requestRange: block.NewRange(200, 300),
 	}
 	_ = p.Add(ctx, 0, r0, waiter0)
 
@@ -71,8 +73,8 @@ func TestGet(t *testing.T) {
 		&pbsubstreams.Module{Name: "test2"},
 	)
 	r1 := &Job{
-		moduleName: "test2_test3_descendant",
-		reqChunk:   &reqChunk{start: 300, end: 400},
+		moduleName:   "test2_test3_descendant",
+		requestRange: block.NewRange(300, 400),
 	}
 	_ = p.Add(ctx, 0, r1, waiter1)
 
@@ -110,22 +112,22 @@ func TestGetOrdered(t *testing.T) {
 
 	waiter0 := NewWaiter(100)
 	r0 := &Job{
-		moduleName: "A",
-		reqChunk:   &reqChunk{start: 100, end: 200},
+		moduleName:   "A",
+		requestRange: block.NewRange(100, 200),
 	}
 	_ = p.Add(ctx, 0, r0, waiter0)
 
 	waiter1 := NewWaiter(200)
 	r1 := &Job{
-		moduleName: "A",
-		reqChunk:   &reqChunk{start: 200, end: 300},
+		moduleName:   "A",
+		requestRange: block.NewRange(200, 300),
 	}
 	_ = p.Add(ctx, 0, r1, waiter1)
 
 	waiter2 := NewWaiter(100, &pbsubstreams.Module{Name: "A"})
 	r2 := &Job{
-		moduleName: "B",
-		reqChunk:   &reqChunk{start: 100, end: 200},
+		moduleName:   "B",
+		requestRange: block.NewRange(100, 200),
 	}
 	_ = p.Add(ctx, 0, r2, waiter2)
 

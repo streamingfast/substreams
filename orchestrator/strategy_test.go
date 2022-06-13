@@ -85,5 +85,5 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 }
 
 func jobstr(j *Job) string {
-	return fmt.Sprintf("%s %d-%d", j.moduleName, j.reqChunk.start, j.reqChunk.end)
+	return fmt.Sprintf("%s %d-%d", j.moduleName, j.requestRange.StartBlock, j.requestRange.ExclusiveEndBlock)
 }

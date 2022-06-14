@@ -27,7 +27,7 @@ func NewOrderedStrategy(
 
 		rangeLen := len(workUnit.RequestRanges)
 		for idx, requestRange := range workUnit.RequestRanges {
-			// TODO(abourget): here we loop SplitWork.reqChunks, and grab the ancestor modules
+			// TODO(abourget): here we loop WorkUnit.reqChunks, and grab the ancestor modules
 			// to setup the waiter.
 			// blockRange's start/end come from `requestRange`
 			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)

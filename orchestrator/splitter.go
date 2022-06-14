@@ -12,11 +12,11 @@ import (
 
 // FIXME(abourget): WorkPlan ?
 
-type SplitWorkModules map[string]*SplitWork
+type SplitWorkModules map[string]*WorkUnit
 
 func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, work := range mods {
-		if work.loadInitialStore == nil {
+		if work.completedRange == nil {
 			continue
 		}
 		out = append(out, &pbsubstreams.ModuleProgress{
@@ -25,8 +25,8 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: work.loadInitialStore.StartBlock,
-							EndBlock:   work.loadInitialStore.ExclusiveEndBlock,
+							StartBlock: work.completedRange.StartBlock,
+							EndBlock:   work.completedRange.ExclusiveEndBlock,
 						},
 					},
 				},
@@ -36,18 +36,24 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 	return
 }
 
-// FIXME(abourget): StoreWorkUnit ?
-type SplitWork struct {
-	modName             string
-	loadInitialStore    *block.Range // Send a Progress message, saying the store is already processed for this range
-	partialsMissing     block.Ranges // Used to prep the reqChunks
-	partialsPresent     block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user, so they know those segments have been processed already.
+type WorkUnit struct {
+	modName string
+
+	completedRange *block.Range // Send a Progress message, saying the store is already processed for this range
+
+	partialsMissing block.Ranges
+	partialsPresent block.Ranges
+
 	subRequestSplitSize uint64
 	RequestRanges       block.Ranges
 }
 
-func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
-	work = &SplitWork{modName: modName, subRequestSplitSize: subRequestSlipSize}
+func (work *WorkUnit) InitialProcessedPartials() block.Ranges {
+	return work.partialsPresent.Merged()
+}
+
+func SplitWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *WorkUnit) {
+	work = &WorkUnit{modName: modName, subRequestSplitSize: subRequestSlipSize}
 
 	if incomingReqStartBlock <= modInitBlock {
 		return work
@@ -62,7 +68,7 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 	backProcessStartBlock := modInitBlock
 	if storeLastComplete != 0 {
 		backProcessStartBlock = storeLastComplete
-		work.loadInitialStore = block.NewRange(modInitBlock, storeLastComplete)
+		work.completedRange = block.NewRange(modInitBlock, storeLastComplete)
 	}
 
 	if storeLastComplete == incomingReqStartBlock {
@@ -81,12 +87,6 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 	}
 	work.RequestRanges = work.partialsMissing.MergeRanges(work.subRequestSplitSize)
 	return work
-}
-
-// What to send to end-users to inform them of already processed segments
-
-func (work *SplitWork) InitialProcessedPartials() block.Ranges {
-	return work.partialsPresent.Merged()
 }
 
 func minOf(a, b uint64) uint64 {

@@ -35,15 +35,15 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	}
 
 	splitWorkMods := SplitWorkModules{
-		"A": &SplitWork{modName: "A"},
-		"B": &SplitWork{modName: "B"},
-		"C": &SplitWork{modName: "C"},
-		"D": &SplitWork{modName: "D"},
-		"E": &SplitWork{modName: "E"},
-		"F": &SplitWork{modName: "F"},
-		"G": &SplitWork{modName: "G"},
-		"H": &SplitWork{modName: "H"},
-		"K": &SplitWork{modName: "K"},
+		"A": &WorkUnit{modName: "A"},
+		"B": &WorkUnit{modName: "B"},
+		"C": &WorkUnit{modName: "C"},
+		"D": &WorkUnit{modName: "D"},
+		"E": &WorkUnit{modName: "E"},
+		"F": &WorkUnit{modName: "F"},
+		"G": &WorkUnit{modName: "G"},
+		"H": &WorkUnit{modName: "H"},
+		"K": &WorkUnit{modName: "K"},
 	}
 
 	pool := NewRequestPool()

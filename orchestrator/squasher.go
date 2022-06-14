@@ -69,7 +69,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks
 	defer s.lock.Unlock()
 
 	// TODO(abourget): what is dispatched here would much better be some of those objects
-	// in the SplitWork instead, like the reqChunk directly
+	// in the WorkUnit instead, like the reqChunk directly
 	// Ideally the Callback over there carries the reqChunk, and was seeded with that reqChunk
 
 	squashable, ok := s.squashables[moduleName]

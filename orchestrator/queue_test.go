@@ -98,7 +98,7 @@ func TestQueueLoadTest(t *testing.T) {
 	}()
 
 	var resultCount int
-	for _ = range out {
+	for range out {
 		resultCount++
 	}
 

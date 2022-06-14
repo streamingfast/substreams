@@ -20,13 +20,13 @@ func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func (job *Job) createRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
+func (j *Job) createRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
-		StartBlockNum: int64(job.requestRange.StartBlock),
-		StopBlockNum:  job.requestRange.ExclusiveEndBlock,
+		StartBlockNum: int64(j.requestRange.StartBlock),
+		StopBlockNum:  j.requestRange.ExclusiveEndBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
 		Modules:       originalModules,
-		OutputModules: []string{job.moduleName},
+		OutputModules: []string{j.moduleName},
 	}
 }

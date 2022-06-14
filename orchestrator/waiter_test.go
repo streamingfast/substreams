@@ -53,7 +53,7 @@ func TestBlockWaiter_Signal(t *testing.T) {
 		done:  make(chan interface{}),
 	}
 
-	require.Equal(t, 2, waiter.Order())
+	require.Equal(t, 2, waiter.Size())
 
 	waiter.Signal("test_store_1", 50)
 	select {

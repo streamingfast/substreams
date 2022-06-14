@@ -36,7 +36,6 @@ type RequestPool struct {
 
 	start      sync.Once
 	readActive bool
-	wg         sync.WaitGroup
 }
 
 func NewRequestPool() *RequestPool {
@@ -101,18 +100,20 @@ func (p *RequestPool) Start(ctx context.Context) {
 
 		p.readActive = true
 
+		wg := sync.WaitGroup{}
+
 		zlog.Debug("adding to waitgroup", zap.Int("waiters", len(p.requestWaiters)))
-		p.wg.Add(len(p.requestWaiters))
+		wg.Add(len(p.requestWaiters))
 
 		go func() {
-			p.wg.Wait()
+			wg.Wait()
 			zlog.Debug("done waiting for waitgroup")
 			close(p.readyRequestStream)
 		}()
 
 		for _, rw := range p.requestWaiters {
 			go func(item *requestWaiter) {
-				defer p.wg.Done()
+				defer wg.Done()
 
 				select {
 				case <-ctx.Done():
@@ -149,7 +150,7 @@ func (p *RequestPool) Start(ctx context.Context) {
 					zlog.Debug("sending in queue")
 					p.queueSend <- &QueueItem{
 						job:      waiter.job,
-						Priority: waiter.Waiter.Order() + waiter.ReverseIndex,
+						Priority: waiter.Waiter.Size() + waiter.ReverseIndex,
 					}
 					zlog.Debug("sent to queue")
 				}
@@ -158,24 +159,8 @@ func (p *RequestPool) Start(ctx context.Context) {
 	})
 }
 
-/**
-
-
-  0 0 0 0 0 0
-  0 1 2
-  0 2 4
-
-
-  6 5 4 3 2 1
-
-  6 5 4 3 2 1
-  6 6 6 .....
-  6 7 8 .....
-
-*/
-
-func (p *RequestPool) getNext(ctx context.Context) (*Job, error) {
-	zlog.Debug("in getNext")
+func (p *RequestPool) GetNext(ctx context.Context) (*Job, error) {
+	zlog.Debug("in GetNext")
 	select {
 	case <-ctx.Done():
 		return nil, nil

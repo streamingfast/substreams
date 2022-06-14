@@ -62,7 +62,7 @@ func (s *OrderedStrategy) getRequestStream(ctx context.Context) <-chan *Job {
 		defer close(requestsStream)
 
 		for {
-			job, err := s.requestPool.getNext(ctx)
+			job, err := s.requestPool.GetNext(ctx)
 			if err == io.EOF {
 				zlog.Debug("EOF in getRequestStream")
 				return

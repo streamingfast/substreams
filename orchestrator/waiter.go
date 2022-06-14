@@ -12,7 +12,7 @@ import (
 type Waiter interface {
 	Wait(ctx context.Context) <-chan interface{}
 	Signal(storeName string, blockNum uint64)
-	Order() int
+	Size() int
 	String() string
 }
 
@@ -124,13 +124,13 @@ func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 	}
 }
 
-func (w *BlockWaiter) Order() int {
+func (w *BlockWaiter) Size() int {
 	return len(w.items)
 }
 
 func (w *BlockWaiter) String() string {
 	if w.items == nil {
-		return fmt.Sprintf("[%s] O(%d)", "nil", w.Order())
+		return fmt.Sprintf("[%s] O(%d)", "nil", w.Size())
 	}
 
 	var wis []string
@@ -138,5 +138,5 @@ func (w *BlockWaiter) String() string {
 		wis = append(wis, wi.String())
 	}
 
-	return fmt.Sprintf("[%s] O(%d)", strings.Join(wis, ","), w.Order())
+	return fmt.Sprintf("[%s] O(%d)", strings.Join(wis, ","), w.Size())
 }

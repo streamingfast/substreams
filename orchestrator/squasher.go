@@ -28,7 +28,7 @@ type Squasher struct {
 // requests that should correspond to what is missing for those stores
 // to reach `targetExclusiveBlock`.  This is managed externally by the
 // Scheduler/Strategy. Eventually, ideally, all components are
-// synchronizes around the actually data: the state of storages
+// synchronizes around the actual data: the state of storages
 // present, the requests needed to fill in those stores up to the
 // target block, etc..
 func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[string]*state.Store, reqStartBlock uint64, notifier Notifier) (*Squasher, error) {
@@ -47,6 +47,7 @@ func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[st
 			}
 			squashable = NewSquashable(squish, reqStartBlock, workUnit.loadInitialStore.ExclusiveEndBlock, notifier)
 		}
+
 		if len(workUnit.RequestRanges) == 0 {
 			squashable.targetReached = true
 			squashable.notifyWaiters(reqStartBlock)

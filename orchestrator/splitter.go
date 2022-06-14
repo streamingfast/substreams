@@ -41,7 +41,7 @@ type SplitWork struct {
 	modName            string
 	loadInitialStore   *block.Range // Send a Progress message, saying the store is already processed for this range
 	partialsMissing    block.Ranges // Used to prep the reqChunks
-	partialsPresent    block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user so they know those segments have been processed already.
+	partialsPresent    block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user, so they know those segments have been processed already.
 	subRequestSlipSize uint64
 	RequestRanges      block.Ranges
 }
@@ -53,7 +53,7 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 		return work
 	}
 
-	storeLastComplete := snapshots.LastCompleteBefore(incomingReqStartBlock)
+	storeLastComplete := snapshots.LastCompletedBlockBefore(incomingReqStartBlock)
 
 	if storeLastComplete != 0 && storeLastComplete <= modInitBlock {
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
@@ -116,16 +116,16 @@ type chunk struct {
 	tempPartial bool   // for off-of-bound stores (like ending in 1123, and not on 1000)
 }
 
-func (s chunk) String() string {
+func (c *chunk) String() string {
 	var add string
-	if s.tempPartial {
+	if c.tempPartial {
 		add = "TMP:"
 	}
-	return fmt.Sprintf("%s%d-%d", add, s.start, s.end)
+	return fmt.Sprintf("%s%d-%d", add, c.start, c.end)
 }
-func (r *chunk) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddUint64("start_block", r.start)
-	enc.AddUint64("end_block", r.end)
+func (c *chunk) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddUint64("start_block", c.start)
+	enc.AddUint64("end_block", c.end)
 
 	return nil
 }

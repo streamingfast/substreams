@@ -32,7 +32,7 @@ func (s *Snapshots) LastCompletedBlock() uint64 {
 	return s.Completes[len(s.Completes)-1].ExclusiveEndBlock
 }
 
-func (s *Snapshots) LastCompleteBefore(blockNum uint64) uint64 {
+func (s *Snapshots) LastCompletedBlockBefore(blockNum uint64) uint64 {
 	for i := len(s.Completes); i > 0; i-- {
 		comp := s.Completes[i-1]
 		if comp.ExclusiveEndBlock > blockNum {
@@ -81,9 +81,11 @@ func listSnapshots(ctx context.Context, b *state.Store) (out *Snapshots, err err
 		}
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	out.Sort()
 	return out, nil
 }

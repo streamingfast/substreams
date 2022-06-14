@@ -15,7 +15,7 @@ type Option func(p *Pipeline)
 
 func WithOrchestratedExecution() Option {
 	return func(p *Pipeline) {
-		p.isBackprocessing = true
+		p.isOrchestrated = true
 	}
 }
 

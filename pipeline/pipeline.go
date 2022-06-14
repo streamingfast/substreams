@@ -30,7 +30,7 @@ type Pipeline struct {
 
 	requestedStartBlockNum uint64 // rename to: requestStartBlock, SET UPON receipt of the request
 	maxStoreSyncRangeSize  uint64
-	isBackprocessing       bool
+	isOrchestrated         bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -120,7 +120,7 @@ func (p *Pipeline) IsOutputModule(name string) bool {
 
 func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
 	ctx := p.context
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isBackprocessing), zap.Strings("outputs", p.request.OutputModules))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isOrchestrated), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
@@ -144,7 +144,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 
 	// Fetch the stores
 
-	if p.isBackprocessing {
+	if p.isOrchestrated {
 		storeMap, err := p.buildStoreMap()
 		if err != nil {
 			return nil, fmt.Errorf("building store map: %w", err)
@@ -177,7 +177,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 
 		p.storeMap = storeMap
 	} else {
-		newStores, err := p.backprocessStores(ctx, workerPool, respFunc)
+		newStores, err := p.backProcessStores(ctx, workerPool, respFunc)
 		if err != nil {
 			return nil, fmt.Errorf("synchronizing stores: %w", err)
 		}
@@ -248,7 +248,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		// no need to save store if loaded from cache?
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
 		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-		isTemporaryStore := p.isBackprocessing && p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
+		isTemporaryStore := p.isOrchestrated && p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
 
 		if !isFirstRequestBlock && (intervalReached || isTemporaryStore) {
 			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
@@ -260,7 +260,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 			// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
 			// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
 
-			if p.isBackprocessing {
+			if p.isOrchestrated {
 				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
 				zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
 				if err := p.moduleOutputCache.Save(ctx); err != nil {
@@ -324,7 +324,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 }
 
 func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, respFunc substreams.ResponseFunc) error {
-	if p.isBackprocessing {
+	if p.isOrchestrated {
 		// TODO(abourget): we might want to send progress for the segment after batch execution
 		var progress []*pbsubstreams.ModuleProgress
 

@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (p *Pipeline) backprocessStores(
+func (p *Pipeline) backProcessStores(
 	ctx context.Context,
 	workerPool *orchestrator.WorkerPool,
 	respFunc substreams.ResponseFunc,

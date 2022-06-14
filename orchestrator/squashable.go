@@ -71,6 +71,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 
 		// TODO(abourget): we still need to keep track of which ranges were completed in order
 		squashableRange := s.ranges[0]
+		zlog.Info("testing first range", zap.String("module_name", s.store.Name), zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))
 
 		if squashableRange.start < s.nextExpectedStartBlock {
 			return fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.start, s.ranges)
@@ -94,12 +95,12 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 		s.nextExpectedStartBlock = squashableRange.end
 
 		if squashableRange.tempPartial {
-			err = nextStore.DeleteStore(ctx, squashableRange.end)
+			err = nextStore.DeleteStore(ctx)
 			if err != nil {
 				zlog.Warn("deleting partial file", zap.Error(err))
 			}
 		} else {
-			err = s.store.WriteState(ctx, squashableRange.end)
+			err = s.store.WriteState(ctx)
 			if err != nil {
 				return fmt.Errorf("writing state: %w", err)
 			}

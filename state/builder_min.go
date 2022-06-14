@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-func (b *Store) SetMinBigInt(ord uint64, key string, value *big.Int) {
+func (s *Store) SetMinBigInt(ord uint64, key string, value *big.Int) {
 	min := new(big.Int)
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -19,12 +19,12 @@ func (b *Store) SetMinBigInt(ord uint64, key string, value *big.Int) {
 			min = prev
 		}
 	}
-	b.set(ord, key, []byte(min.String()))
+	s.set(ord, key, []byte(min.String()))
 }
 
-func (b *Store) SetMinInt64(ord uint64, key string, value int64) {
+func (s *Store) SetMinInt64(ord uint64, key string, value int64) {
 	var min int64
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -35,12 +35,12 @@ func (b *Store) SetMinInt64(ord uint64, key string, value int64) {
 			min = prev
 		}
 	}
-	b.set(ord, key, []byte(fmt.Sprintf("%d", min)))
+	s.set(ord, key, []byte(fmt.Sprintf("%d", min)))
 }
 
-func (b *Store) SetMinFloat64(ord uint64, key string, value float64) {
+func (s *Store) SetMinFloat64(ord uint64, key string, value float64) {
 	var min float64
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -52,12 +52,12 @@ func (b *Store) SetMinFloat64(ord uint64, key string, value float64) {
 			min = prev
 		}
 	}
-	b.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
+	s.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }
 
-func (b *Store) SetMinBigFloat(ord uint64, key string, value *big.Float) {
+func (s *Store) SetMinBigFloat(ord uint64, key string, value *big.Float) {
 	min := new(big.Float)
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -69,5 +69,5 @@ func (b *Store) SetMinBigFloat(ord uint64, key string, value *big.Float) {
 			min = prev
 		}
 	}
-	b.set(ord, key, []byte(min.Text('g', -1)))
+	s.set(ord, key, []byte(min.Text('g', -1)))
 }

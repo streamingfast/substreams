@@ -79,13 +79,14 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		resp, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
+				zlog.Info("worker done", zap.Object("job", job))
 				trailers := stream.Trailer().Get("substreams-partials-written")
 				var partialsWritten []*block.Range
 				if len(trailers) != 0 {
+					zlog.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
 
-				zlog.Info("worker done", zap.Object("job", job))
 				return partialsWritten, nil
 			}
 			zlog.Warn("worker done on stream error", zap.Error(err))

@@ -14,6 +14,9 @@ type Range struct {
 }
 
 func NewRange(startBlock, exclusiveEndBlock uint64) *Range {
+	if exclusiveEndBlock <= startBlock {
+		panic(fmt.Sprintf("invalid block range start %d, end %d", startBlock, exclusiveEndBlock))
+	}
 	return &Range{startBlock, exclusiveEndBlock}
 }
 
@@ -140,36 +143,39 @@ func (r Ranges) Merged() (out Ranges) {
 	return out
 }
 
-func (r Ranges) MergeRange(chunk uint64) (out Ranges) {
+func (r Ranges) MergeRanges(chunk uint64) (out Ranges) {
 	for i := 0; i < len(r); i++ {
-		curRange := r[i]
-		if i == len(r)-1 {
-			out = append(out, curRange)
+		currentRange := r[i]
+		isLast := i == len(r)-1
+		if isLast {
+			out = append(out, currentRange)
 			break
 		}
-		if curRange.Size() > chunk {
-			out = append(out, curRange)
+
+		if currentRange.Size() > chunk {
+			out = append(out, currentRange)
 			continue
 		}
+
 		nextRange := r[i+1]
-		if curRange.ExclusiveEndBlock != nextRange.StartBlock || nextRange.ExclusiveEndBlock-curRange.StartBlock > chunk {
-			out = append(out, curRange)
+		if currentRange.ExclusiveEndBlock != nextRange.StartBlock || nextRange.ExclusiveEndBlock-currentRange.StartBlock > chunk {
+			out = append(out, currentRange)
 			continue
 		}
 
 		i++
 
 		// Loop to squash all the next ones and create a new Range
-		// from `curRange` and the latest matching `nextRange`.
+		// from `currentRange` and the latest matching `nextRange`.
 		for j := i + 1; j < len(r); j++ {
 			nextNextRange := r[j]
-			if nextRange.ExclusiveEndBlock != nextNextRange.StartBlock || nextNextRange.ExclusiveEndBlock-curRange.StartBlock > chunk {
+			if nextRange.ExclusiveEndBlock != nextNextRange.StartBlock || nextNextRange.ExclusiveEndBlock-currentRange.StartBlock > chunk {
 				break
 			}
 			i++
 			nextRange = nextNextRange
 		}
-		out = append(out, NewRange(curRange.StartBlock, nextRange.ExclusiveEndBlock))
+		out = append(out, NewRange(currentRange.StartBlock, nextRange.ExclusiveEndBlock))
 	}
 	return out
 }

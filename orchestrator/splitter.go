@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -57,9 +59,9 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
 	}
 
-	backprocessStartBlock := modInitBlock
+	backProcessStartBlock := modInitBlock
 	if storeLastComplete != 0 {
-		backprocessStartBlock = storeLastComplete
+		backProcessStartBlock = storeLastComplete
 		work.loadInitialStore = block.NewRange(modInitBlock, storeLastComplete)
 	}
 
@@ -67,7 +69,7 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 		return
 	}
 
-	for ptr := backprocessStartBlock; ptr < incomingReqStartBlock; {
+	for ptr := backProcessStartBlock; ptr < incomingReqStartBlock; {
 		end := minOf(ptr-ptr%subRequestSlipSize+subRequestSlipSize, incomingReqStartBlock)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {
@@ -77,85 +79,15 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 		}
 		ptr = end
 	}
-	work.computeRequests()
+	work.RequestRanges = work.partialsMissing.MergeRanges(work.subRequestSlipSize)
 	return work
 }
 
 // What to send to end-users to inform them of already processed segments
+
 func (work *SplitWork) InitialProcessedPartials() block.Ranges {
 	return work.partialsPresent.Merged()
 }
-
-func (work *SplitWork) computeRequests() {
-	work.RequestRanges = work.partialsMissing.MergeRange(work.subRequestSlipSize)
-}
-
-//
-//func (work *SplitWork) computeRequests(storesSaveInterval, subReqSplit uint64) {
-//
-//	requestRanges := work.partialsMissing.MergeRange(subReqSplit)
-//	for _, r := range requestRanges {
-//		expectedPartials := r.Split(storesSaveInterval)
-//		var reqChunks []*chunk
-//
-//		for _, p := range expectedPartials {
-//			reqChunks = append(reqChunks, &chunk{
-//				start:       p.StartBlock,
-//				end:         p.ExclusiveEndBlock,
-//				tempPartial: p.ExclusiveEndBlock%storesSaveInterval != 0,
-//			})
-//		}
-//
-//		work.reqChunks = append(work.reqChunks, &reqChunk{
-//			start:  r.StartBlock,
-//			end:    r.ExclusiveEndBlock,
-//			reqChunks: reqChunks,
-//		})
-//	}
-//}
-
-// 	// subReqStartBlock := computeStoreExclusiveEndBlock(storeLastComplete, incomingReqStartBlock, storeSplit, modInitBlock)
-// 	// if storeLastComplete != 0 && storeLastComplete != modInitBlock && subReqStartBlock != 0 {
-// 	// 	work.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
-// 	// }
-
-// 	// if subReqStartBlock == incomingReqStartBlock {
-// 	// 	return
-// 	// }
-
-// 	requestRanges := block.NewRange(subReqStartBlock, incomingReqStartBlock).Split(subReqSplit)
-
-// 	for _, reqRange := range requestRanges {
-// 		reqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
-// 		// Now do the SECOND split, for reqChunks for `storeSplit`
-// 		storeSplitRanges := reqRange.Split(storeSplit)
-// 		for _, storeSplitRange := range storeSplitRanges {
-// 			if storeSplitRange.StartBlock < modInitBlock {
-// 				panic(fmt.Sprintf("module %q: received a squash request for a start block %d prior to the module's initial block %d", modName, storeSplitRange.StartBlock, modInitBlock))
-// 			}
-
-// 			if snapshots.ContainsPartial(storeSplitRange) {
-// 				continue
-// 			}
-
-// 			// FIXME(abourget): check this one again
-// 			// if reqRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
-// 			// 	// Otherwise, risks stalling the merging (as ranges are
-// 			// 	// sorted, and only the first is checked for contiguousness)
-// 			// 	continue
-// 			// }
-// 			addStoreChunk := &chunk{
-// 				start:       storeSplitRange.StartBlock,
-// 				end:         storeSplitRange.ExclusiveEndBlock,
-// 				tempPartial: storeSplitRange.ExclusiveEndBlock%storeSplit != 0,
-// 			}
-// 			reqChunk.reqChunks = append(reqChunk.reqChunks, addStoreChunk)
-// 		}
-// 		work.reqChunks = append(work.reqChunks, reqChunk)
-// 	}
-
-// 	return
-// }
 
 func minOf(a, b uint64) uint64 {
 	if a < b {
@@ -163,33 +95,6 @@ func minOf(a, b uint64) uint64 {
 	}
 	return b
 }
-
-// // computeStoreExclusiveEndBlock tells us WHERE we have a snapshot ready that can be queried in the conditions of this query.
-// func computeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, saveInterval, moduleInitialBlock uint64) uint64 {
-// 	previousBoundary := reqStartBlock - reqStartBlock%saveInterval
-// 	startBlockOnBoundary := reqStartBlock%saveInterval == 0
-
-// 	if reqStartBlock >= lastSavedBlock {
-// 		return lastSavedBlock
-// 	} else if previousBoundary < moduleInitialBlock {
-// 		return 0
-// 	} else if startBlockOnBoundary {
-// 		return reqStartBlock
-// 	}
-// 	return previousBoundary
-// }
-//type reqChunks []*reqChunk
-//
-//type reqChunk struct {
-//	start uint64
-//	end   uint64 // exclusive end
-//
-//}
-//
-//func (c reqChunk) String() string {
-//	out := fmt.Sprintf("%d-%d", c.start, c.end)
-//	return out
-//}
 
 type chunks []*chunk
 
@@ -218,30 +123,9 @@ func (s chunk) String() string {
 	}
 	return fmt.Sprintf("%s%d-%d", add, s.start, s.end)
 }
+func (r *chunk) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddUint64("start_block", r.start)
+	enc.AddUint64("end_block", r.end)
 
-/////////////////////////////////////////////////////////////////////////////////
-
-//type Splitter struct {
-//	chunkSize uint64
-//}
-//
-//func NewSplitter(chunkSize uint64) *Splitter {
-//	// The splitter should accomodate and produce the outgoing subrequests necessary for the
-//	// the incoming request to be satisfied, and for a squasher to know what to expect and do its
-//	// squashing job, knowing what the subrequests should produce
-//	return &Splitter{
-//		chunkSize: chunkSize,
-//	}
-//}
-//
-//func (s *Splitter) Split(moduleInitialBlock uint64, lastSavedBlock uint64, blockRange *block.Range) []*block.Range {
-//	if moduleInitialBlock > blockRange.StartBlock {
-//		blockRange.StartBlock = moduleInitialBlock
-//	}
-//
-//	if lastSavedBlock > blockRange.StartBlock {
-//		blockRange.StartBlock = lastSavedBlock
-//	}
-//
-//	return blockRange.Split(s.chunkSize)
-//}
+	return nil
+}

@@ -7,28 +7,28 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *Store) SetBytesIfNotExists(ord uint64, key string, value []byte) {
-	b.setIfNotExists(ord, key, value)
+func (s *Store) SetBytesIfNotExists(ord uint64, key string, value []byte) {
+	s.setIfNotExists(ord, key, value)
 }
 
-func (b *Store) SetIfNotExists(ord uint64, key string, value string) {
-	b.setIfNotExists(ord, key, []byte(value))
+func (s *Store) SetIfNotExists(ord uint64, key string, value string) {
+	s.setIfNotExists(ord, key, []byte(value))
 }
 
-func (b *Store) SetBytes(ord uint64, key string, value []byte) {
-	b.set(ord, key, value)
+func (s *Store) SetBytes(ord uint64, key string, value []byte) {
+	s.set(ord, key, value)
 }
-func (b *Store) Set(ord uint64, key string, value string) {
-	b.set(ord, key, []byte(value))
+func (s *Store) Set(ord uint64, key string, value string) {
+	s.set(ord, key, []byte(value))
 }
 
-func (b *Store) set(ord uint64, key string, value []byte) {
+func (s *Store) set(ord uint64, key string, value []byte) {
 	if strings.HasPrefix(key, "__!__") {
 		panic("key prefix __!__ is reserved for internal system use.")
 	}
-	b.bumpOrdinal(ord)
+	s.bumpOrdinal(ord)
 
-	val, found := b.GetLast(key)
+	val, found := s.GetLast(key)
 
 	var delta *pbsubstreams.StoreDelta
 	if found {
@@ -56,14 +56,14 @@ func (b *Store) set(ord uint64, key string, value []byte) {
 		panic("Grrr4")
 	}
 
-	b.ApplyDelta(delta)
-	b.Deltas = append(b.Deltas, delta)
+	s.ApplyDelta(delta)
+	s.Deltas = append(s.Deltas, delta)
 }
 
-func (b *Store) setIfNotExists(ord uint64, key string, value []byte) {
-	b.bumpOrdinal(ord)
+func (s *Store) setIfNotExists(ord uint64, key string, value []byte) {
+	s.bumpOrdinal(ord)
 
-	_, found := b.GetLast(key)
+	_, found := s.GetLast(key)
 	if found {
 		return
 	}
@@ -78,6 +78,6 @@ func (b *Store) setIfNotExists(ord uint64, key string, value []byte) {
 	if delta.Key == "" {
 		panic("Grrr4")
 	}
-	b.ApplyDelta(delta)
-	b.Deltas = append(b.Deltas, delta)
+	s.ApplyDelta(delta)
+	s.Deltas = append(s.Deltas, delta)
 }

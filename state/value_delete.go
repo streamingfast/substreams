@@ -6,10 +6,10 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *Store) Del(ord uint64, key string) {
-	b.bumpOrdinal(ord)
+func (s *Store) Del(ord uint64, key string) {
+	s.bumpOrdinal(ord)
 
-	val, found := b.GetLast(key)
+	val, found := s.GetLast(key)
 	if found {
 		delta := &pbsubstreams.StoreDelta{
 			Operation: pbsubstreams.StoreDelta_DELETE,
@@ -18,15 +18,15 @@ func (b *Store) Del(ord uint64, key string) {
 			OldValue:  val,
 			NewValue:  nil,
 		}
-		b.ApplyDelta(delta)
-		b.Deltas = append(b.Deltas, delta)
+		s.ApplyDelta(delta)
+		s.Deltas = append(s.Deltas, delta)
 	}
 }
 
-func (b *Store) DeletePrefix(ord uint64, prefix string) {
-	b.bumpOrdinal(ord)
+func (s *Store) DeletePrefix(ord uint64, prefix string) {
+	s.bumpOrdinal(ord)
 
-	for key, val := range b.KV {
+	for key, val := range s.KV {
 		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
@@ -37,12 +37,12 @@ func (b *Store) DeletePrefix(ord uint64, prefix string) {
 			OldValue:  val,
 			NewValue:  nil,
 		}
-		b.ApplyDelta(delta)
-		b.Deltas = append(b.Deltas, delta)
+		s.ApplyDelta(delta)
+		s.Deltas = append(s.Deltas, delta)
 
 	}
 
-	if b.IsPartial() {
-		b.DeletedPrefixes = append(b.DeletedPrefixes, prefix)
+	if s.IsPartial() {
+		s.DeletedPrefixes = append(s.DeletedPrefixes, prefix)
 	}
 }

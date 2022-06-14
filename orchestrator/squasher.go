@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/substreams/state"
 )
 
@@ -37,7 +39,7 @@ func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[st
 
 		var squashable *Squashable
 		if workUnit.loadInitialStore == nil {
-			squashable = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, notifier)
+			squashable = NewSquashable(store.CloneStructure(block.NewRange(store.ModuleInitialBlock, store.ModuleInitialBlock+store.SaveInterval)), reqStartBlock, store.ModuleInitialBlock, notifier)
 		} else {
 			fmt.Println("work unit", workUnit.loadInitialStore)
 			squish, err := store.LoadFrom(ctx, workUnit.loadInitialStore)

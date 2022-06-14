@@ -45,10 +45,10 @@ type Snapshot struct {
 	Path string
 }
 
-func (b *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
+func (s *Store) ListSnapshots(ctx context.Context) (out *Snapshots, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		out = &Snapshots{}
-		if err := b.Store.Walk(ctx, "", func(filename string) (err error) {
+		if err := s.Store.Walk(ctx, "", func(filename string) (err error) {
 			if filename == "___store-metadata.json" || strings.HasPrefix(filename, "__") {
 				return nil
 			}

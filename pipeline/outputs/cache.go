@@ -171,10 +171,7 @@ func (o *OutputCache) Load(ctx context.Context, atBlock uint64) (foud bool, err 
 	}
 
 	if !found {
-		o.CurrentBlockRange = &block.Range{
-			StartBlock:        atBlock,
-			ExclusiveEndBlock: atBlock + o.saveBlockInterval,
-		}
+		o.CurrentBlockRange = block.NewRange(atBlock, atBlock+o.saveBlockInterval)
 
 		return found, nil
 	}
@@ -261,10 +258,7 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 
 	exclusiveEndBlock = biggestEndBlock
 
-	return &block.Range{
-		StartBlock:        prefixStartBlock,
-		ExclusiveEndBlock: exclusiveEndBlock,
-	}, true, nil
+	return block.NewRange(prefixStartBlock, exclusiveEndBlock), true, nil
 }
 
 func computeDBinFilename(startBlock, stopBlock uint64) string {

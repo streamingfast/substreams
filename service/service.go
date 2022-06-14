@@ -211,7 +211,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			for _, rng := range pipe.PartialsWritten() {
 				d = append(d, fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock))
 			}
-			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": []string{strings.Join(d, ",")}})
+			partialsWritten := []string{strings.Join(d, ",")}
+			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
+			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
 			return nil
 		}
 

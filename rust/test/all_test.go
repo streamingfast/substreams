@@ -260,7 +260,7 @@ func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHa
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}
-	builder, err := state.NewBuilder(name, moduleStartBlock, 100, moduleHash, updatePolicy, valueType, store, opts...)
+	builder, err := state.NewBuilder(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)
 	}

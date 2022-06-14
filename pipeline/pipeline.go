@@ -160,7 +160,15 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
 			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
-			r := block.NewRange(p.requestedStartBlockNum, p.requestedStartBlockNum+backProcessingStore.SaveInterval)
+
+			endBlock := int64(p.requestedStartBlockNum + backProcessingStore.SaveInterval)
+			delta := int64(p.request.StopBlockNum) - p.request.StartBlockNum
+			if delta < int64(backProcessingStore.SaveInterval) {
+				endBlock = p.request.StartBlockNum + delta
+			}
+
+			r := block.NewRange(p.requestedStartBlockNum, uint64(endBlock))
+
 			backProcessingStore.BlockRange = r //todo: smell like s...
 			p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
 		} else {

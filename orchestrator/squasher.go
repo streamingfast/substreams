@@ -41,7 +41,6 @@ func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[st
 		if workUnit.loadInitialStore == nil {
 			squashable = NewSquashable(store.CloneStructure(block.NewRange(store.ModuleInitialBlock, store.ModuleInitialBlock+store.SaveInterval)), reqStartBlock, store.ModuleInitialBlock, notifier)
 		} else {
-			fmt.Println("work unit", workUnit.loadInitialStore)
 			squish, err := store.LoadFrom(ctx, workUnit.loadInitialStore)
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.loadInitialStore, err)

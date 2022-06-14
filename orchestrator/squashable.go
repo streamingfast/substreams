@@ -100,6 +100,7 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 		s.store.BlockRange.ExclusiveEndBlock = nextStore.BlockRange.ExclusiveEndBlock
 
 		if squashableRange.tempPartial {
+			zlog.Info("deleting temp store", zap.Object("store", nextStore))
 			err = nextStore.DeleteStore(ctx)
 			if err != nil {
 				zlog.Warn("deleting partial file", zap.Error(err))

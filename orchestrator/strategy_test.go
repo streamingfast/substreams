@@ -34,7 +34,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		stores[newStore.Name] = newStore
 	}
 
-	splitWorkMods := SplitWorkModules{
+	splitWorkMods := WorkPlan{
 		"A": &WorkUnit{modName: "A"},
 		"B": &WorkUnit{modName: "B"},
 		"C": &WorkUnit{modName: "C"},

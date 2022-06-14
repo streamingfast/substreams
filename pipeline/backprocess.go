@@ -39,7 +39,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	splitWorks := orchestrator.SplitWorkModules{}
+	splitWorks := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
 		splitWorks[mod.Name] = orchestrator.SplitWork(mod.Name, uint64(p.blockRangeSizeSubRequests), mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
 	}

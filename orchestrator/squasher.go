@@ -30,21 +30,21 @@ type Squasher struct {
 // synchronizes around the actual data: the state of storages
 // present, the requests needed to fill in those stores up to the
 // target block, etc..
-func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[string]*state.Store, reqStartBlock uint64, notifier Notifier) (*Squasher, error) {
+func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*state.Store, reqStartBlock uint64, notifier Notifier) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
 	for storeName, store := range stores {
-		workUnit := splitWorks[storeName]
+		workUnit := workPlan[storeName]
 		// FIXME(abourget): what if workUnit has nothing to do?
 
 		var squashable *Squashable
-		if workUnit.loadInitialStore == nil {
+		if workUnit.completedRange == nil {
 			squashable = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, notifier)
 		} else {
-			squish, err := store.LoadFrom(ctx, workUnit.loadInitialStore)
+			squish, err := store.LoadFrom(ctx, workUnit.completedRange)
 			if err != nil {
-				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.loadInitialStore, err)
+				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.completedRange, err)
 			}
-			squashable = NewSquashable(squish, reqStartBlock, workUnit.loadInitialStore.ExclusiveEndBlock, notifier)
+			squashable = NewSquashable(squish, reqStartBlock, workUnit.completedRange.ExclusiveEndBlock, notifier)
 		}
 
 		if len(workUnit.RequestRanges) == 0 {

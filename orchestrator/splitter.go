@@ -10,13 +10,11 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// FIXME(abourget): WorkPlan ?
+type WorkPlan map[string]*WorkUnit
 
-type SplitWorkModules map[string]*WorkUnit
-
-func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
-	for storeName, work := range mods {
-		if work.completedRange == nil {
+func (plan WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+	for storeName, unit := range plan {
+		if unit.completedRange == nil {
 			continue
 		}
 		out = append(out, &pbsubstreams.ModuleProgress{
@@ -25,8 +23,8 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: work.completedRange.StartBlock,
-							EndBlock:   work.completedRange.ExclusiveEndBlock,
+							StartBlock: unit.completedRange.StartBlock,
+							EndBlock:   unit.completedRange.ExclusiveEndBlock,
 						},
 					},
 				},

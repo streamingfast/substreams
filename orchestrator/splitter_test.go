@@ -121,7 +121,7 @@ func TestSplitSomeWork(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			work := SplitWork("mod", tt.reqSlip, tt.modInitBlock, tt.reqStart, tt.snapshots)
-			assert.Equal(t, tt.expectInitLoad, work.loadInitialStore)
+			assert.Equal(t, tt.expectInitLoad, work.completedRange)
 			assert.Equal(t,
 				tt.expectMissing.String(),
 				work.partialsMissing.String(),

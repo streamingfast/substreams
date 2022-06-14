@@ -16,13 +16,13 @@ type OrderedStrategy struct {
 
 func NewOrderedStrategy(
 	ctx context.Context,
-	splitWorks SplitWorkModules,
+	workPlan WorkPlan,
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 	pool *RequestPool,
 ) (*OrderedStrategy, error) {
 	for storeName, store := range stores {
-		workUnit := splitWorks[storeName]
+		workUnit := workPlan[storeName]
 		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
 
 		rangeLen := len(workUnit.RequestRanges)

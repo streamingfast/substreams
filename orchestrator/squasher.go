@@ -79,6 +79,11 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks
 
 	zlog.Debug("checking if squashable store loaded", zap.Object("store", squashable.store))
 	if !squashable.store.IsLoaded() {
+		// FIXME(abourget): before `Squash` is ever called, we'll have
+		// gone through NewSquasher, which will initialize the
+		// Squashable, and have gone through `LoadFrom()` (which
+		// `Fetch()`s already). So there's no need for an IsLoaded(),
+		// nor a Fetch() here.
 		err := squashable.store.Fetch(ctx, squashable.nextExpectedStartBlock)
 		if err != nil {
 			zlog.Warn("loading state for squashing", zap.Object("store", squashable.store))

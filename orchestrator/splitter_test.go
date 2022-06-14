@@ -41,6 +41,7 @@ func TestSplitSomeWork(t *testing.T) {
 		expectInitLoad *block.Range // Used for LoadFrom()
 		expectMissing  block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
 		expectPresent  block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
+		// FIXME(abourget): make that a `StoreSplit` again
 		reqSlip        uint64
 	}
 

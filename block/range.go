@@ -143,6 +143,9 @@ func (r Ranges) Merged() (out Ranges) {
 	return out
 }
 
+// TODO(abourget): rename this to `MergedBins(binSize uint64)`
+// ... that's what it does. Past tense as it is returning a new
+// object, it is not an action on the object.
 func (r Ranges) MergeRanges(chunk uint64) (out Ranges) {
 	for i := 0; i < len(r); i++ {
 		currentRange := r[i]

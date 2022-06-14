@@ -101,6 +101,18 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Jo
 		partialsChunks = append(partialsChunks, &chunk{
 			start:       p.StartBlock,
 			end:         p.ExclusiveEndBlock,
+			// TODO(abourget): tant qu'à computer ça à chaque fois,
+			// autant le computer au moment où on devrait s'en servir,
+			// ce qui veut dire qu'on le ferait à un seul endroit,
+			// qu'on pourrait utiliser des `block.Range` normaux à la
+			// place de cet objet.
+			//
+			// Le seul risque: si la config de `storeSaveInterval` est
+			// différent entre l'orchestrateur et le backprocessing
+			// node, on pourrait considérer certain stores comme étant
+			// temporaire et les effacer. C'est plus ou moins un
+			// problème maintenant qu'on query le ObjectStore pour
+			// savoir ce qu'il y a effectivement.
 			tempPartial: p.ExclusiveEndBlock%job.moduleSaveInterval != 0,
 		})
 	}

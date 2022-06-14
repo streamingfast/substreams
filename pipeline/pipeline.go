@@ -566,6 +566,15 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) er
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
 
+		// FIXME(abourget): we'll need to add to `partialsWritten` if
+		// we're backprocessing and tasked to build the first complete
+		// store.  Also, it is implicit, if we are backprocessing,
+		// that the edge stores are to be processed BUT this assumes
+		// we are building a single store, and will not scale to
+		// multiple stores.  The `partialsWritten` array is a single
+		// array and assumes a single output module.  Perhaps that
+		// needs to be revised, or we ned to panic here if there are
+		// two leaf stores.
 		if builder.IsPartial() {
 			if p.IsOutputModule(builder.Name) {
 				r := block.NewRange(builder.StoreInitialBlock, lastBlock)

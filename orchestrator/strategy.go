@@ -22,11 +22,23 @@ func NewOrderedStrategy(
 	pool *RequestPool,
 ) (*OrderedStrategy, error) {
 	for storeName, store := range stores {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			// do nothing
+		}
 		workUnit := workPlan[storeName]
 		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
 
 		rangeLen := len(workUnit.RequestRanges)
 		for idx, requestRange := range workUnit.RequestRanges {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				// do nothing
+			}
 			// TODO(abourget): here we loop WorkUnit.reqChunks, and grab the ancestor modules
 			// to setup the waiter.
 			// blockRange's start/end come from `requestRange`

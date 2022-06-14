@@ -11,10 +11,8 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/outputs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"google.golang.org/protobuf/proto"
 )
 
 type BuilderOption func(b *Store)
@@ -151,72 +149,6 @@ func (s *Store) LoadState(ctx context.Context) error {
 	zlog.Debug("state loaded", zap.String("builder_name", s.Name), zap.String("file_name", stateFileName))
 	s.loaded = true
 	return nil
-}
-
-func (s *Store) loadDeltas(ctx context.Context, fromBlock, exclusiveStopBlock uint64, outputCacheSaveInterval uint64, outputCacheStore dstore.Store) error {
-	if s.IsPartial() {
-		panic("cannot load deltas in partial mode")
-	}
-
-	startBlockNum := outputs.ComputeStartBlock(fromBlock, outputCacheSaveInterval)
-	outputCache := outputs.NewOutputCache(s.Name, outputCacheStore, 0)
-
-	zlog.Debug("loading delta",
-		zap.String("builder_name", s.Name),
-		zap.Uint64("from_block", fromBlock),
-		zap.Uint64("start_block", startBlockNum),
-		zap.Uint64("stop_block", exclusiveStopBlock),
-		zap.Stringer("output_cache", outputCache),
-	)
-
-	found, err := outputCache.Load(ctx, startBlockNum)
-	if err != nil {
-		return fmt.Errorf("loading init cache for builder %q with start block %d: %w", s.Name, startBlockNum, err)
-	}
-
-	for {
-		if !found {
-			return fmt.Errorf("missing deltas for module %q", s.Name)
-		}
-		cacheItems := outputCache.SortedCacheItems()
-
-		firstSeenBlockNum := uint64(0)
-		lastSeenBlockNum := uint64(0)
-
-		for _, item := range cacheItems {
-			deltas := &pbsubstreams.StoreDeltas{}
-			err := proto.Unmarshal(item.Payload, deltas)
-			if err != nil {
-				return fmt.Errorf("unmarshalling output deltas: %w", err)
-			}
-
-			for _, delta := range deltas.Deltas {
-				//todo: we should check the from block?
-				if item.BlockNum >= exclusiveStopBlock {
-					return nil //all good we reach the end
-				}
-				if firstSeenBlockNum == uint64(0) {
-					firstSeenBlockNum = item.BlockNum
-				}
-				lastSeenBlockNum = item.BlockNum
-				if delta.Key == "" {
-					panic("missing key, invalid delta")
-				}
-				// FIXME(abourget): this never did anything.. soooo what's the goal here? :)
-				s.Deltas = append(s.Deltas, delta)
-			}
-		}
-
-		zlog.Debug("loaded deltas", zap.String("builder_name", s.Name), zap.Uint64("from_block_num", firstSeenBlockNum), zap.Uint64("to_block_num", lastSeenBlockNum))
-
-		if exclusiveStopBlock <= outputCache.CurrentBlockRange.ExclusiveEndBlock {
-			return nil
-		}
-		found, err = outputCache.Load(ctx, outputCache.CurrentBlockRange.ExclusiveEndBlock)
-		if err != nil {
-			return fmt.Errorf("loading more deltas: %w", err)
-		}
-	}
 }
 
 func (s *Store) WriteState(ctx context.Context) (err error) {

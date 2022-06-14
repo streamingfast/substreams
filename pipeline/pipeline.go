@@ -585,7 +585,6 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
 func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error) {
 	storeMap = map[string]*state.Store{}
 	for _, storeModule := range p.storeModules {
-		fmt.Println("Grrrr: store module", storeModule.Name)
 		newStore, err := state.NewBuilder(
 			storeModule.Name,
 			p.storesSaveInterval,

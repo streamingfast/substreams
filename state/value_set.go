@@ -52,9 +52,6 @@ func (s *Store) set(ord uint64, key string, value []byte) {
 			NewValue:  value,
 		}
 	}
-	if delta.Key == "" {
-		panic("Grrr4")
-	}
 
 	s.ApplyDelta(delta)
 	s.Deltas = append(s.Deltas, delta)
@@ -74,9 +71,6 @@ func (s *Store) setIfNotExists(ord uint64, key string, value []byte) {
 		Key:       key,
 		OldValue:  nil,
 		NewValue:  value,
-	}
-	if delta.Key == "" {
-		panic("Grrr4")
 	}
 	s.ApplyDelta(delta)
 	s.Deltas = append(s.Deltas, delta)

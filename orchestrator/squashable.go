@@ -87,12 +87,17 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 			return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 		}
 
+		zlog.Debug("next store loaded", zap.Object("store", nextStore))
+
 		err = s.store.Merge(nextStore)
 		if err != nil {
 			return fmt.Errorf("merging: %s", err)
 		}
 
+		zlog.Debug("store merge", zap.Object("store", s.store))
+
 		s.nextExpectedStartBlock = squashableRange.end
+		s.store.BlockRange.ExclusiveEndBlock = nextStore.BlockRange.ExclusiveEndBlock
 
 		if squashableRange.tempPartial {
 			err = nextStore.DeleteStore(ctx)

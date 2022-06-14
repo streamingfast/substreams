@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/substreams/state"
+	"go.uber.org/zap"
 )
 
 // Squasher produces _complete_ stores, by merging backing partial stores.
@@ -76,6 +76,16 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)
+	}
+
+	zlog.Debug("checking if squashable store loaded", zap.Object("store", squashable.store))
+	if !squashable.store.IsLoaded() {
+		err := squashable.store.LoadState(ctx)
+		if err != nil {
+			zlog.Warn("loading state for squashing", zap.Object("store", squashable.store))
+			return nil
+		}
+		squashable.nextExpectedStartBlock = squashable.store.BlockRange.ExclusiveEndBlock
 	}
 
 	return squashable.squash(ctx, partialsChunks)

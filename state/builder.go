@@ -38,6 +38,8 @@ type Store struct {
 	ValueType    string
 
 	lastOrdinal uint64
+
+	loaded bool
 }
 
 func (s *Store) IsPartial() bool {
@@ -45,10 +47,15 @@ func (s *Store) IsPartial() bool {
 	return s.ModuleInitialBlock != s.BlockRange.StartBlock
 }
 
+func (s *Store) IsLoaded() bool {
+	return s.loaded
+}
+
 func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", s.Name)
 	enc.AddString("hash", s.ModuleHash)
 	enc.AddBool("partial", s.IsPartial())
+	enc.AddBool("loaded", s.loaded)
 	err := enc.AddObject("range", s.BlockRange)
 	if err != nil {
 		return err
@@ -142,6 +149,7 @@ func (s *Store) LoadState(ctx context.Context) error {
 	}
 
 	zlog.Debug("state loaded", zap.String("builder_name", s.Name), zap.String("file_name", stateFileName))
+	s.loaded = true
 	return nil
 }
 

@@ -265,9 +265,6 @@ func (s *Store) Merge(builder *Store) error {
 		return fmt.Errorf("update policy %q not supported", s.UpdatePolicy) // should have been validated already
 	}
 
-	// Not your responsibility anymore:
-	//s.BlockRange.ExclusiveEndBlock = builder.BlockRange.ExclusiveEndBlock
-
 	return nil
 }
 

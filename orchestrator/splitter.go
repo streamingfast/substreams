@@ -38,16 +38,16 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 
 // FIXME(abourget): StoreWorkUnit ?
 type SplitWork struct {
-	modName            string
-	loadInitialStore   *block.Range // Send a Progress message, saying the store is already processed for this range
-	partialsMissing    block.Ranges // Used to prep the reqChunks
-	partialsPresent    block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user, so they know those segments have been processed already.
-	subRequestSlipSize uint64
-	RequestRanges      block.Ranges
+	modName             string
+	loadInitialStore    *block.Range // Send a Progress message, saying the store is already processed for this range
+	partialsMissing     block.Ranges // Used to prep the reqChunks
+	partialsPresent     block.Ranges // To be fed into the Squasher, primed with those partials that already exist, also can be Merged() and sent to the end user, so they know those segments have been processed already.
+	subRequestSplitSize uint64
+	RequestRanges       block.Ranges
 }
 
 func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *SplitWork) {
-	work = &SplitWork{modName: modName, subRequestSlipSize: subRequestSlipSize}
+	work = &SplitWork{modName: modName, subRequestSplitSize: subRequestSlipSize}
 
 	if incomingReqStartBlock <= modInitBlock {
 		return work
@@ -79,7 +79,7 @@ func SplitSomeWork(modName string, subRequestSlipSize, modInitBlock, incomingReq
 		}
 		ptr = end
 	}
-	work.RequestRanges = work.partialsMissing.MergeRanges(work.subRequestSlipSize)
+	work.RequestRanges = work.partialsMissing.MergeRanges(work.subRequestSplitSize)
 	return work
 }
 

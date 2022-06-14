@@ -161,15 +161,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 			// will be able to run two leaf stores from the same job
 			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
 
-			endBlock := int64(p.requestedStartBlockNum + backProcessingStore.SaveInterval)
-			delta := int64(p.request.StopBlockNum) - p.request.StartBlockNum
-			if delta < int64(backProcessingStore.SaveInterval) {
-				endBlock = p.request.StartBlockNum + delta
-			}
-
-			r := block.NewRange(p.requestedStartBlockNum, uint64(endBlock))
-
-			backProcessingStore.BlockRange = r //todo: smell like s...
+			backProcessingStore.StoreInitialBlock = p.requestedStartBlockNum
 			p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
 		} else {
 			zlog.Info("conditions for leaf store not met",
@@ -259,7 +251,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		isTemporaryStore := p.isBackprocessing && p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
 
 		if !isFirstRequestBlock && (intervalReached || isTemporaryStore) {
-			if err := p.saveStoresSnapshots(ctx); err != nil {
+			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
 				return fmt.Errorf("saving stores: %w", err)
 			}
 		}
@@ -343,7 +335,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 						ProcessedRanges: []*pbsubstreams.BlockRange{
 							{
-								StartBlock: store.BlockRange.StartBlock,
+								StartBlock: store.StoreInitialBlock,
 								EndBlock:   p.clock.Number,
 							},
 						},
@@ -563,26 +555,26 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func (p *Pipeline) saveStoresSnapshots(ctx context.Context) error {
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
 	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!! The caller or this function
 	// should handle this, with a previous boundary that was passed, etc.. to support
 	// chains that skip blocks.
 	for _, builder := range p.storeMap {
 		// TODO: implement parallel writing and upload for the different stores involved.
-		err := builder.WriteState(ctx)
+		err := builder.WriteState(ctx, lastBlock)
 		if err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
 
 		if builder.IsPartial() {
 			if p.IsOutputModule(builder.Name) {
-				r := block.NewRange(builder.BlockRange.StartBlock, builder.BlockRange.ExclusiveEndBlock)
+				r := block.NewRange(builder.StoreInitialBlock, lastBlock)
 				p.partialsWritten = append(p.partialsWritten, r)
-				zlog.Debug("adding partials written", zap.Object("range", builder.BlockRange), zap.Stringer("ranges", p.partialsWritten))
+				zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
 			}
+			builder.Roll(lastBlock)
 			builder.Truncate()
 		}
-		builder.Roll(p.isBackprocessing)
 
 		zlog.Info("state written", zap.String("store_name", builder.Name))
 	}
@@ -615,11 +607,11 @@ func loadStores(ctx context.Context, storeMap map[string]*state.Store, requested
 		if store.IsPartial() {
 			continue
 		}
-		if store.BlockRange.StartBlock == requestedStartBlock {
+		if store.StoreInitialBlock == requestedStartBlock {
 			continue
 		}
 
-		err := store.LoadState(ctx)
+		err := store.Fetch(ctx, requestedStartBlock)
 		if err != nil {
 			return fmt.Errorf("reading state for builder %q: %w", store.Name, err)
 		}

@@ -24,8 +24,8 @@ type Store struct {
 	SaveInterval uint64
 
 	ModuleInitialBlock uint64
-	//StoreInitialBlock  uint64 // block at which we initialized this store
-	BlockRange     *block.Range
+	StoreInitialBlock  uint64 // block at which we initialized this store
+	//BlockRange     *block.Range
 	ProcessedBlock uint64
 
 	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
@@ -41,8 +41,8 @@ type Store struct {
 }
 
 func (s *Store) IsPartial() bool {
-	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Object("range", s.BlockRange))
-	return s.ModuleInitialBlock != s.BlockRange.StartBlock
+	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.StoreInitialBlock))
+	return s.ModuleInitialBlock != s.StoreInitialBlock
 }
 
 func (s *Store) IsLoaded() bool {
@@ -52,12 +52,10 @@ func (s *Store) IsLoaded() bool {
 func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", s.Name)
 	enc.AddString("hash", s.ModuleHash)
+	enc.AddUint64("StoreInitialBlock", s.StoreInitialBlock)
 	enc.AddBool("partial", s.IsPartial())
 	enc.AddBool("loaded", s.loaded)
-	err := enc.AddObject("range", s.BlockRange)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -66,7 +64,7 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
-	blockRange := block.NewRange(moduleInitialBlock, moduleInitialBlock+saveInterval)
+
 	b := &Store{
 		Name:               name,
 		KV:                 make(map[string][]byte),
@@ -75,7 +73,7 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 		Store:              subStore,
 		SaveInterval:       saveInterval,
 		ModuleInitialBlock: moduleInitialBlock,
-		BlockRange:         blockRange,
+		StoreInitialBlock:  moduleInitialBlock,
 	}
 
 	for _, opt := range opts {
@@ -86,13 +84,13 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 	return b, nil
 }
 
-func (s *Store) CloneStructure(blockRange *block.Range) *Store {
+func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 	store := &Store{
 		Name:               s.Name,
 		Store:              s.Store,
 		SaveInterval:       s.SaveInterval,
 		ModuleInitialBlock: s.ModuleInitialBlock,
-		BlockRange:         blockRange,
+		StoreInitialBlock:  newStoreStartBlock,
 		ModuleHash:         s.ModuleHash,
 		KV:                 map[string][]byte{},
 		UpdatePolicy:       s.UpdatePolicy,
@@ -103,9 +101,9 @@ func (s *Store) CloneStructure(blockRange *block.Range) *Store {
 }
 
 func (s *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, error) {
-	newStore := s.CloneStructure(blockRange)
+	newStore := s.CloneStructure(blockRange.StartBlock)
 
-	if err := newStore.LoadState(ctx); err != nil {
+	if err := newStore.Fetch(ctx, blockRange.ExclusiveEndBlock); err != nil {
 		return nil, err
 	}
 
@@ -113,19 +111,23 @@ func (s *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, 
 	return newStore, nil
 }
 
-func (s *Store) storageFilename() string {
+func (s *Store) storageFilename(exclusiveEndBlock uint64) string {
 	if s.IsPartial() {
-		return fmt.Sprintf("%010d-%010d.partial", s.BlockRange.ExclusiveEndBlock, s.BlockRange.StartBlock)
+		return fmt.Sprintf("%010d-%010d.partial", exclusiveEndBlock, s.StoreInitialBlock)
 	} else {
-		return fmt.Sprintf("%010d-%010d.kv", s.BlockRange.ExclusiveEndBlock, s.BlockRange.StartBlock)
+		return fmt.Sprintf("%010d-%010d.kv", exclusiveEndBlock, s.StoreInitialBlock)
 	}
 }
 
-func (s *Store) LoadState(ctx context.Context) error {
-	stateFileName := s.storageFilename()
-	zlog.Debug("loading state from file", zap.String("module_name", s.Name), zap.String("file_name", stateFileName))
+func (s *Store) Fetch(ctx context.Context, exclusiveEndBlock uint64) error {
+	fileName := s.storageFilename(exclusiveEndBlock)
+	return s.loadState(ctx, fileName)
+}
+
+func (b *Store) loadState(ctx context.Context, stateFileName string) error {
+	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		r, err := s.Store.OpenObject(ctx, stateFileName)
+		r, err := b.Store.OpenObject(ctx, stateFileName)
 		if err != nil {
 			return fmt.Errorf("openning file: %w", err)
 		}
@@ -139,20 +141,19 @@ func (s *Store) LoadState(ctx context.Context) error {
 		if err = json.Unmarshal(data, &kv); err != nil {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
-		s.KV = byteMap(kv)
+		b.KV = byteMap(kv)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("storage file %s: %w", stateFileName, err)
 	}
 
-	zlog.Debug("state loaded", zap.String("builder_name", s.Name), zap.String("file_name", stateFileName))
-	s.loaded = true
+	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.String("file_name", stateFileName))
 	return nil
 }
 
-func (s *Store) WriteState(ctx context.Context) (err error) {
-	zlog.Debug("writing state", zap.Object("builder", s), zap.Object("range", s.BlockRange))
+func (s *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
+	zlog.Debug("writing state", zap.Object("builder", s), zap.Uint64("last_block", lastBlock))
 
 	kv := stringMap(s.KV) // FOR READABILITY ON DISK
 
@@ -166,22 +167,21 @@ func (s *Store) WriteState(ctx context.Context) (err error) {
 		zap.Bool("partial", s.IsPartial()),
 	)
 
-	if _, err = s.writeState(ctx, content); err != nil {
-		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.BlockRange.StartBlock, s.BlockRange.ExclusiveEndBlock, err)
+	if _, err = s.writeState(ctx, content, lastBlock); err != nil {
+		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.StoreInitialBlock, lastBlock, err)
 	}
 
 	return nil
 }
 
-func (s *Store) writeState(ctx context.Context, content []byte) (string, error) {
-	filename := s.storageFilename()
-	zlog.Info("writing state", zap.Object("store", s), zap.Object("range", s.BlockRange), zap.String("file_name", filename))
+func (s *Store) writeState(ctx context.Context, content []byte, lastBlock uint64) (string, error) {
+	filename := s.storageFilename(lastBlock)
 
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		return s.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	})
 	if err != nil {
-		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.BlockRange.StartBlock, s.BlockRange.ExclusiveEndBlock, err)
+		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.StoreInitialBlock, lastBlock, err)
 	}
 
 	// FIXME(abourget): not needed when we don't use that state file anymore
@@ -195,8 +195,8 @@ func (s *Store) writeState(ctx context.Context, content []byte) (string, error) 
 	return filename, err
 }
 
-func (s *Store) DeleteStore(ctx context.Context) error {
-	filename := s.storageFilename()
+func (s *Store) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) error {
+	filename := s.storageFilename(exclusiveEndBlock)
 	zlog.Debug("deleting store file", zap.String("file_name", filename))
 
 	if err := s.Store.DeleteObject(ctx, filename); err != nil {
@@ -231,11 +231,8 @@ func (s *Store) Flush() {
 	s.lastOrdinal = 0
 }
 
-func (s *Store) Roll(rollStart bool) {
-	if rollStart {
-		s.BlockRange.StartBlock = s.BlockRange.ExclusiveEndBlock
-	}
-	s.BlockRange.ExclusiveEndBlock += s.SaveInterval
+func (b *Store) Roll(lastBlock uint64) {
+	b.StoreInitialBlock = lastBlock
 }
 
 func (s *Store) Truncate() {

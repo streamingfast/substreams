@@ -7,8 +7,6 @@ import (
 	"io"
 	"testing"
 
-	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -92,7 +90,7 @@ func testStateBuilder(store dstore.Store) *state.Store {
 		Name:               "testBuilder",
 		SaveInterval:       10_000,
 		ModuleInitialBlock: 10_000,
-		BlockRange:         &block.Range{StartBlock: 10_000, ExclusiveEndBlock: 20_000},
+		StoreInitialBlock:  10_000,
 		Store:              store,
 		ModuleHash:         "abc",
 		KV:                 map[string][]byte{},

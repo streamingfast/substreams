@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 )
@@ -39,7 +38,7 @@ func NewSquasher(ctx context.Context, splitWorks SplitWorkModules, stores map[st
 
 		var squashable *Squashable
 		if workUnit.loadInitialStore == nil {
-			squashable = NewSquashable(store.CloneStructure(block.NewRange(store.ModuleInitialBlock, store.ModuleInitialBlock+store.SaveInterval)), reqStartBlock, store.ModuleInitialBlock, notifier)
+			squashable = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, notifier)
 		} else {
 			squish, err := store.LoadFrom(ctx, workUnit.loadInitialStore)
 			if err != nil {
@@ -80,12 +79,12 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks
 
 	zlog.Debug("checking if squashable store loaded", zap.Object("store", squashable.store))
 	if !squashable.store.IsLoaded() {
-		err := squashable.store.LoadState(ctx)
+		err := squashable.store.Fetch(ctx, squashable.nextExpectedStartBlock)
 		if err != nil {
 			zlog.Warn("loading state for squashing", zap.Object("store", squashable.store))
 			return nil
 		}
-		squashable.nextExpectedStartBlock = squashable.store.BlockRange.ExclusiveEndBlock
+		//squashable.nextExpectedStartBlock = squashable.store.BlockRange.ExclusiveEndBlock
 	}
 
 	return squashable.squash(ctx, partialsChunks)

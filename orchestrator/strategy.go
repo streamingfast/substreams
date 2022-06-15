@@ -32,8 +32,6 @@ func NewOrderedStrategy(
 		workUnit := workPlan[storeName]
 		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
 
-		//TODO(abourget): get the requests we want to submit here..
-
 		requests := workUnit.batchRequests(subreqSplit)
 		rangeLen := len(requests)
 		for idx, requestRange := range requests {

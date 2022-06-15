@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/substreams/state"
 )
 
@@ -18,8 +16,6 @@ type Squasher struct {
 	targetExclusiveBlock uint64
 
 	notifier Notifier
-
-	lock sync.Mutex
 }
 
 // NewSquasher receives stores, initializes them and fetches them from
@@ -64,9 +60,6 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 }
 
 func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsRanges block.Ranges) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)
@@ -75,24 +68,17 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsRanges
 	return squashable.squash(ctx, partialsRanges)
 }
 
-func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
+func (s *Squasher) ValidateStoresReady() (out map[string]*state.Store, err error) {
 	out = map[string]*state.Store{}
 	var errs []string
 	for _, squashable := range s.squashables {
-		func() {
-			squashable.RLock()         // REVISE the use of this lock
-			defer squashable.RUnlock() // REVISE
-
-			// the second check was added to take care of the use-case of a subsequent execution of the same request
-			// where the target wasn't "reached" because there were no ranges to be done
-			if !squashable.targetReached && !squashable.IsEmpty() {
-				errs = append(errs, fmt.Sprintf("module %q: target %d not reached (ranges left: %s, next expected: %d)", squashable.name, s.targetExclusiveBlock, squashable.ranges, squashable.nextExpectedStartBlock))
-			}
-			if !squashable.IsEmpty() {
-				errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", squashable.name, squashable.ranges))
-			}
-			out[squashable.store.Name] = squashable.store
-		}()
+		if !squashable.targetReached {
+			errs = append(errs, fmt.Sprintf("module %q: target %d not reached (next expected: %d)", squashable.name, s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
+		}
+		if !squashable.IsEmpty() {
+			errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", squashable.name, squashable.ranges))
+		}
+		out[squashable.store.Name] = squashable.store
 	}
 	if len(errs) != 0 {
 		return nil, fmt.Errorf("%d errors: %s", len(errs), strings.Join(errs, "; "))

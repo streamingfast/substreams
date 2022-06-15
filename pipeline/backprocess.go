@@ -90,7 +90,7 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Info("store sync completed")
 
-	newStores, err := squasher.StoresReady()
+	newStores, err := squasher.ValidateStoresReady()
 	if err != nil {
 		return nil, fmt.Errorf("squasher incomplete: %w", err)
 	}

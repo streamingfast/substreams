@@ -13,7 +13,7 @@ import (
 )
 
 type Squashable struct {
-	sync.RWMutex
+	sync.Mutex
 
 	name                   string
 	store                  *state.Store

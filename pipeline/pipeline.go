@@ -617,47 +617,26 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
-	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!! The caller or this function
-	// should handle this, with a previous boundary that was passed, etc.. to support
-	// chains that skip blocks.
-
 	for _, builder := range p.storeMap {
-		// expectedNextBoundary + saveInterval
-		// loop through incremental boundaries
-
-		for builder.NextBoundary() < lastBlock {
-
-			// TODO: implement parallel writing and upload for the different stores involved.
-			err := builder.WriteState(ctx, builder.NextBoundary())
+		// TODO: implement parallel writing and upload for the different stores involved.
+		nextBoundary := builder.NextBoundary()
+		for nextBoundary < lastBlock {
+			err := builder.WriteState(ctx, nextBoundary)
 			if err != nil {
 				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 			}
+			zlog.Info("state written", zap.String("store_name", builder.Name))
 
-			// FIXME(abourget): we'll need to add to `partialsWritten` if
-			// we're backprocessing and tasked to build the first complete
-			// store.  Also, it is implicit, if we are backprocessing,
-			// that the edge stores are to be processed BUT this assumes
-			// we are building a single store, and will not scale to
-			// multiple stores.  The `partialsWritten` array is a single
-			// array and assumes a single output module.  Perhaps that
-			// needs to be revised, or we ned to panic here if there are
-			// two leaf stores.
-			//
-			// FIXME(abourget): If the job starts at module start block,
-			// we want it to BECOME a partial after the FIRST kv being written.
 			if p.isOrchestrated && p.IsOutputModule(builder.Name) {
-				r := block.NewRange(builder.StoreInitBlock(), lastBlock)
+				r := block.NewRange(builder.StoreInitBlock(), nextBoundary)
 				p.partialsWritten = append(p.partialsWritten, r)
 				zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
-				builder.Roll(lastBlock)
+				builder.Roll(nextBoundary)
 			} else {
 				builder.PushBoundary()
 			}
-
-			zlog.Info("state written", zap.String("store_name", builder.Name))
 		}
 	}
-
 	return nil
 }
 

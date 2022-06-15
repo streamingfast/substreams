@@ -143,19 +143,18 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		}
 	}
 
+	zlog.Info("initializing and loading stores")
+	initialStoreMap, err := p.buildStoreMap()
+	if err != nil {
+		return fmt.Errorf("building store map: %w", err)
+	}
+
 	// Fetch the stores
-
 	if p.isOrchestrated {
-		zlog.Info("initializing and loading stores")
-		storeMap, err := p.buildStoreMap()
-		if err != nil {
-			return fmt.Errorf("building store map: %w", err)
-		}
-
 		// truncateLeaf()
 		totalOutputModules := len(p.request.OutputModules)
 		outputName := p.request.OutputModules[0]
-		backProcessingStore := storeMap[outputName]
+		backProcessingStore := initialStoreMap[outputName]
 		lastStoreName := p.storeModules[len(p.storeModules)-1].Name
 		isLastStore := lastStoreName == backProcessingStore.Name
 
@@ -171,18 +170,16 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 		zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
 
-		// FIXME(abourget):  we actually shouldn't be laoding the backProcessingStore here,
-		// because we want it clean, and we want to start producing a new partial with it.
-		if err = loadStores(ctx, storeMap, p.requestedStartBlockNum); err != nil {
+		backProcessingStore.Roll(p.requestedStartBlockNum)
+
+		if err = loadCompleteStores(ctx, initialStoreMap, p.requestedStartBlockNum); err != nil {
 			return fmt.Errorf("loading stores: %w", err)
 		}
 
-		backProcessingStore.Roll(p.requestedStartBlockNum)
+		p.storeMap = initialStoreMap
 		p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
-
-		p.storeMap = storeMap
 	} else {
-		newStores, err := p.backProcessStores(ctx, workerPool)
+		newStores, err := p.backProcessStores(ctx, workerPool, initialStoreMap)
 		if err != nil {
 			return fmt.Errorf("synchronizing stores: %w", err)
 		}
@@ -687,11 +684,8 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 	return storeMap, nil
 }
 
-func loadStores(ctx context.Context, storeMap map[string]*state.Store, requestedStartBlock uint64) error {
+func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, requestedStartBlock uint64) error {
 	for _, store := range storeMap {
-		if store.IsPartial() {
-			continue
-		}
 		if store.StoreInitBlock() == requestedStartBlock {
 			continue
 		}

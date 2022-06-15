@@ -13,11 +13,11 @@ import (
 func (p *Pipeline) backProcessStores(
 	ctx context.Context,
 	workerPool *orchestrator.WorkerPool,
+	initialStoreMap map[string]*state.Store,
 ) (
 	map[string]*state.Store,
 	error,
 ) {
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
@@ -27,11 +27,6 @@ func (p *Pipeline) backProcessStores(
 	zlog.Info("synchronizing stores")
 
 	requestPool := orchestrator.NewRequestPool()
-
-	initialStoreMap, err := p.buildStoreMap()
-	if err != nil {
-		return nil, fmt.Errorf("build initial store map: %w", err)
-	}
 
 	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
 	if err != nil {

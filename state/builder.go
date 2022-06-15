@@ -52,8 +52,8 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 		SaveInterval:         saveInterval,
 		ModuleInitialBlock:   moduleInitialBlock,
 		storeInitialBlock:    moduleInitialBlock,
-		nextExpectedBoundary: moduleInitialBlock - moduleInitialBlock%saveInterval + saveInterval,
 	}
+	store.resetNextBoundary()
 
 	for _, opt := range opts {
 		opt(b)
@@ -70,12 +70,12 @@ func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 		SaveInterval:         s.SaveInterval,
 		ModuleInitialBlock:   s.ModuleInitialBlock,
 		storeInitialBlock:    newStoreStartBlock,
-		nextExpectedBoundary: newStoreStartBlock - newStoreStartBlock%s.SaveInterval + s.SaveInterval,
 		ModuleHash:           s.ModuleHash,
 		KV:                   map[string][]byte{},
 		UpdatePolicy:         s.UpdatePolicy,
 		ValueType:            s.ValueType,
 	}
+	store.resetNextBoundary()
 	zlog.Info("store cloned", zap.Object("store", store))
 	return store
 }
@@ -222,14 +222,13 @@ func (s *Store) Flush() {
 	s.lastOrdinal = 0
 }
 
+func (s *Store) resetNextBoundary() {
+	s.nextExpectedBoundary = s.storeInitialBlock - s.storeInitialBlock%s.SaveInterval + s.SaveInterval
+}
 func (s *Store) Roll(lastBlock uint64) {
 	s.storeInitialBlock = lastBlock
 	s.KV = map[string][]byte{}
-	s.PushBoundary()
-}
-
-func (s *Store) PushBoundary() {
-	s.nextExpectedBoundary += s.SaveInterval
+	s.resetNextBoundary()
 }
 
 func (s *Store) bumpOrdinal(ord uint64) {

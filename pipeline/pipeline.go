@@ -50,8 +50,9 @@ type Pipeline struct {
 	storeMap             map[string]*state.Store
 	backprocessingStores []*state.Store
 
-	moduleExecutors []ModuleExecutor
-	wasmOutputs     map[string][]byte
+	moduleExecutors       []ModuleExecutor
+	wasmOutputs           map[string][]byte
+	nextStoreSaveBoundary uint64 // The next expected block at which we should flush stores (at save interval)
 
 	baseStateStore    dstore.Store
 	storeSaveInterval uint64
@@ -195,6 +196,8 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		}
 	}
 
+	p.initStoreSaveBoundary()
+
 	err = p.buildWASM(ctx, p.request, p.modules)
 	if err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
@@ -210,36 +213,18 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	return nil
 }
 
-func isFirstRequestedBlock(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
-	return clock.Number == uint64(request.StartBlockNum)
+func (p *Pipeline) initStoreSaveBoundary() {
+	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
 }
-
-func isIntervalReached(clock *pbsubstreams.Clock, saveInterval uint64) bool {
-	return saveInterval > 0 && clock.Number%saveInterval == 0
+func (p *Pipeline) bumpStoreSaveBoundary() {
+	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
 }
-
-func shouldSaveTemporaryStore(clock *pbsubstreams.Clock, request *pbsubstreams.Request, isSubrequest bool) bool {
-	if !isSubrequest {
-		return false
+func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
+	nextBoundary := fromBlock - fromBlock%p.storeSaveInterval + p.storeSaveInterval
+	if p.isOrchestrated && p.request.StopBlockNum != 0 && p.request.StopBlockNum < nextBoundary {
+		return p.request.StopBlockNum
 	}
-
-	return request.StopBlockNum > 0 && clock.Number == request.StopBlockNum
-}
-
-func shouldSaveStoreSnapshot(clock *pbsubstreams.Clock, request *pbsubstreams.Request, saveInterval uint64, isSubrequest bool) bool {
-	if isFirstRequestedBlock(clock, request) {
-		return false
-	}
-
-	return isIntervalReached(clock, saveInterval) || shouldSaveTemporaryStore(clock, request, isSubrequest)
-}
-
-func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
-	if request.StopBlockNum <= 0 { //never stop
-		return false
-	}
-
-	return clock.Number >= request.StopBlockNum
+	return nextBoundary
 }
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
@@ -262,8 +247,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	// TODO(abourget): eventually, handle the `undo` signals.
 
+	blockNum := block.Num()
 	p.clock = &pbsubstreams.Clock{
-		Number:    block.Num(),
+		Number:    blockNum,
 		Id:        block.Id,
 		Timestamp: timestamppb.New(block.Time()),
 	}
@@ -282,14 +268,12 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	p.moduleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
-	if shouldSaveStoreSnapshot(p.clock, p.request, p.storeSaveInterval, p.isOrchestrated) {
-		// FIXME(abourget): READ the NEXT FIXME below, because we're using the p.clock.Number
-		//
-		// Must EITHER BE the request.StopBlockNum OR a proper BOUNDARY of a store, NO MATTER
-		// what the p.clock.Number is.  Here, we're passing THE CLOCK NUMBER, scarrrryy:
-		if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
+	for p.nextStoreSaveBoundary < blockNum {
+		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
 			return fmt.Errorf("saving stores: %w", err)
 		}
+
+		p.bumpStoreSaveBoundary()
 	}
 
 	if isStopBlockReached(p.clock, p.request) {
@@ -300,7 +284,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		// expected boundary by our work units, and NOT the
 		// clock.Number, in case we skipped some.
 
-		zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
+		zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
 		if err := p.moduleOutputCache.Flush(ctx); err != nil {
 			return fmt.Errorf("saving partial caches")
 		}
@@ -349,7 +333,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		executor.Reset()
 	}
 
-	if p.clock.Number >= p.requestedStartBlockNum {
+	if blockNum >= p.requestedStartBlockNum {
 		if err := p.returnModuleProgressOutputs(step, cursor, p.isOrchestrated); err != nil {
 			return err
 		}
@@ -367,6 +351,14 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
+func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
+	if request.StopBlockNum <= 0 { //never stop
+		return false
+	}
+
+	return clock.Number >= request.StopBlockNum
+}
+
 func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
 	if !isSubrequest {
 		return nil
@@ -380,7 +372,7 @@ func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bs
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: store.StoreInitBlock(),
+							StartBlock: store.StoreInitialBlock(),
 							EndBlock:   p.clock.Number,
 						},
 					},
@@ -616,25 +608,20 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) error {
 	for _, builder := range p.storeMap {
 		// TODO: implement parallel writing and upload for the different stores involved.
-		nextBoundary := builder.NextBoundary()
-		for nextBoundary < lastBlock {
-			err := builder.WriteState(ctx, nextBoundary)
-			if err != nil {
-				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
-			}
-			zlog.Info("state written", zap.String("store_name", builder.Name))
+		err := builder.WriteState(ctx, boundaryBlock)
+		if err != nil {
+			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
+		}
+		zlog.Info("state written", zap.String("store_name", builder.Name))
 
-			if p.isOrchestrated && p.IsOutputModule(builder.Name) {
-				r := block.NewRange(builder.StoreInitBlock(), nextBoundary)
-				p.partialsWritten = append(p.partialsWritten, r)
-				zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
-				builder.Roll(nextBoundary)
-			} else {
-				builder.PushBoundary()
-			}
+		if p.isOrchestrated && p.IsOutputModule(builder.Name) {
+			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)
+			p.partialsWritten = append(p.partialsWritten, r)
+			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
+			builder.Roll(boundaryBlock)
 		}
 	}
 	return nil
@@ -662,7 +649,7 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 
 func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, requestedStartBlock uint64) error {
 	for _, store := range storeMap {
-		if store.StoreInitBlock() == requestedStartBlock {
+		if store.StoreInitialBlock() == requestedStartBlock {
 			continue
 		}
 

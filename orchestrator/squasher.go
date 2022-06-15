@@ -79,7 +79,6 @@ func (s *Squasher) ValidateStoresReady() (out map[string]*state.Store, err error
 			errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", squashable.name, squashable.ranges))
 		}
 
-		squashable.store.SetNextLiveBoundary(s.targetExclusiveBlock)
 		out[squashable.store.Name] = squashable.store
 	}
 	if len(errs) != 0 {

@@ -23,15 +23,15 @@ type Store struct {
 	Store        dstore.Store
 	SaveInterval uint64
 
-	ModuleInitialBlock   uint64
-	storeInitialBlock    uint64 // block at which we initialized this store
-	nextExpectedBoundary uint64 // nextExpectedBoundary is used ONLY UPON WRITING store snapshots, reading boundaries are always explicitly passed. The Squasher does NOT use this variable.
+	ModuleInitialBlock uint64
+	storeInitialBlock  uint64 // block at which we initialized this store
+	// nextExpectedBoundary uint64 // nextExpectedBoundary is used ONLY UPON WRITING store snapshots, reading boundaries are always explicitly passed. The Squasher does NOT use this variable.
 
-	// FIXME(abourget): rename `nextExpectedBoundary` to
-	// `nextLiveBoundary`? This, in the end, is ONLY USED to write
-	// snapshots while doing live processing, not in the Squasher,
-	// which has its own boundary checker, and wants to handle bounds
-	// that are off of its own local `saveInterval` configuration.
+	// // FIXME(abourget): rename `nextExpectedBoundary` to
+	// // `nextLiveBoundary`? This, in the end, is ONLY USED to write
+	// // snapshots while doing live processing, not in the Squasher,
+	// // which has its own boundary checker, and wants to handle bounds
+	// // that are off of its own local `saveInterval` configuration.
 
 	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -59,7 +59,7 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 		ModuleInitialBlock: moduleInitialBlock,
 		storeInitialBlock:  moduleInitialBlock,
 	}
-	b.resetNextBoundary()
+	//b.resetNextBoundary()
 
 	for _, opt := range opts {
 		opt(b)
@@ -81,13 +81,12 @@ func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 		UpdatePolicy:       s.UpdatePolicy,
 		ValueType:          s.ValueType,
 	}
-	store.resetNextBoundary()
+	//store.resetNextBoundary()
 	zlog.Info("store cloned", zap.Object("store", store))
 	return store
 }
 
-func (s *Store) StoreInitBlock() uint64 { return s.storeInitialBlock }
-func (s *Store) NextBoundary() uint64   { return s.nextExpectedBoundary }
+func (s *Store) StoreInitialBlock() uint64 { return s.storeInitialBlock }
 
 func (s *Store) IsPartial() bool {
 	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.storeInitialBlock))
@@ -98,7 +97,7 @@ func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", s.Name)
 	enc.AddString("hash", s.ModuleHash)
 	enc.AddUint64("store_initial_block", s.storeInitialBlock)
-	enc.AddUint64("next_expected_boundary", s.nextExpectedBoundary)
+	//enc.AddUint64("next_expected_boundary", s.nextExpectedBoundary)
 	enc.AddBool("partial", s.IsPartial())
 
 	return nil
@@ -175,7 +174,7 @@ func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (err er
 	)
 
 	if _, err = s.writeState(ctx, content, endBoundaryBlock); err != nil {
-		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.storeInitialBlock, s.nextExpectedBoundary, err)
+		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.storeInitialBlock, endBoundaryBlock, err)
 	}
 
 	return nil
@@ -187,7 +186,7 @@ func (s *Store) writeState(ctx context.Context, content []byte, endBoundaryBlock
 		return s.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	})
 	if err != nil {
-		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.storeInitialBlock, s.nextExpectedBoundary, err)
+		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.storeInitialBlock, endBoundaryBlock, err)
 	}
 	return filename, err
 }
@@ -228,24 +227,25 @@ func (s *Store) Flush() {
 	s.lastOrdinal = 0
 }
 
-func (s *Store) resetNextBoundary() {
-	s.nextExpectedBoundary = s.storeInitialBlock - s.storeInitialBlock%s.SaveInterval + s.SaveInterval
-}
+// func (s *Store) resetNextBoundary() {
+// 	s.nextExpectedBoundary = s.storeInitialBlock - s.storeInitialBlock%s.SaveInterval + s.SaveInterval
+// }
+
+// func (s *Store) NextBoundary() uint64 { return s.nextExpectedBoundary }
 
 func (s *Store) Roll(lastBlock uint64) {
 	s.storeInitialBlock = lastBlock
 	s.KV = map[string][]byte{}
-	s.resetNextBoundary()
 }
 
-func (s *Store) SetNextLiveBoundary(requestedStartBlock uint64) {
-	s.nextExpectedBoundary = requestedStartBlock - requestedStartBlock%s.SaveInterval + s.SaveInterval
-}
+// func (s *Store) SetNextLiveBoundary(requestedStartBlock uint64) {
+// 	s.nextExpectedBoundary = requestedStartBlock - requestedStartBlock%s.SaveInterval + s.SaveInterval
+// }
 
-// PushBoundary to be called when the store has written its snapshot and gets ready for the next.
-func (s *Store) PushBoundary() {
-	s.nextExpectedBoundary += s.SaveInterval
-}
+// // PushBoundary to be called when the store has written its snapshot and gets ready for the next.
+// func (s *Store) PushBoundary() {
+// 	s.nextExpectedBoundary += s.SaveInterval
+// }
 
 func (s *Store) bumpOrdinal(ord uint64) {
 	if s.lastOrdinal > ord {

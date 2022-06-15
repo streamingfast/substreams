@@ -38,26 +38,31 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	splitWorks := orchestrator.WorkPlan{}
+	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
-		splitWorks[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
+		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
 	}
 
-	progressMessages := splitWorks.ProgressMessages()
+	progressMessages := workPlan.ProgressMessages()
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, uint64(p.subreqSplitSize), initialStoreMap, p.graph, requestPool)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, workPlan, uint64(p.subreqSplitSize), initialStoreMap, p.graph, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, initialStoreMap, upToBlock, requestPool)
+	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
+	}
+
+	err = workPlan.SquashPartialsPresent(ctx, squasher)
+	if err != nil {
+		return nil, err
 	}
 
 	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, p.respFunc)

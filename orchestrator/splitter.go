@@ -1,11 +1,24 @@
 package orchestrator
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type WorkPlan map[string]*WorkUnit
+
+func (p WorkPlan) SquashPartialsPresent(ctx context.Context, squasher *Squasher) error {
+	for _, w := range p {
+		err := squasher.Squash(ctx, w.modName, w.partialsPresent)
+		if err != nil {
+			return fmt.Errorf("squash partials present for module %s: %w", w.modName, err)
+		}
+	}
+	return nil
+}
 
 func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p {
@@ -46,13 +59,7 @@ type WorkUnit struct {
 
 	initialStoreFile *block.Range // Points to a complete .kv file, to initialize the store upon getting started.
 	partialsMissing  block.Ranges
-
-	// TODO(abourget): To be fed into the Squasher, primed with those
-	// partials that already exist, also can be Merged() and sent to
-	// the end user so they know those segments have been processed
-	// already.  Please don't remove the comment until it is
-	// implemented (!)
-	partialsPresent block.Ranges
+	partialsPresent  block.Ranges
 }
 
 func (w *WorkUnit) initialProcessedPartials() block.Ranges {

@@ -97,16 +97,14 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 		zlog.Debug("store merge", zap.Object("store", s.store))
 
 		s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
-		//s.store.BlockRange.ExclusiveEndBlock = nextStore.BlockRange.ExclusiveEndBlock
 
-		if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval != 0 {
-			//if squashableRange.tempPartial {
-			zlog.Info("deleting temp store", zap.Object("store", nextStore))
-			err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
-			if err != nil {
-				zlog.Warn("deleting partial file", zap.Error(err))
-			}
-		} else {
+		zlog.Info("deleting temp store", zap.Object("store", nextStore))
+		err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+		if err != nil {
+			zlog.Warn("deleting partial file", zap.Error(err))
+		}
+
+		if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0 {
 			err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				return fmt.Errorf("writing state: %w", err)

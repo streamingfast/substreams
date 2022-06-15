@@ -25,7 +25,13 @@ type Store struct {
 
 	ModuleInitialBlock   uint64
 	storeInitialBlock    uint64 // block at which we initialized this store
-	nextExpectedBoundary uint64 // nextExpectedBoundary is used ONLY UPON WRITING store snapshots, reading boundaries are always explicitly passed.
+	nextExpectedBoundary uint64 // nextExpectedBoundary is used ONLY UPON WRITING store snapshots, reading boundaries are always explicitly passed. The Squasher does NOT use this variable.
+
+	// FIXME(abourget): rename `nextExpectedBoundary` to
+	// `nextLiveBoundary`? This, in the end, is ONLY USED to write
+	// snapshots while doing live processing, not in the Squasher,
+	// which has its own boundary checker, and wants to handle bounds
+	// that are off of its own local `saveInterval` configuration.
 
 	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -44,14 +50,14 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 	}
 
 	b := &Store{
-		Name:                 name,
-		KV:                   make(map[string][]byte),
-		UpdatePolicy:         updatePolicy,
-		ValueType:            valueType,
-		Store:                subStore,
-		SaveInterval:         saveInterval,
-		ModuleInitialBlock:   moduleInitialBlock,
-		storeInitialBlock:    moduleInitialBlock,
+		Name:               name,
+		KV:                 make(map[string][]byte),
+		UpdatePolicy:       updatePolicy,
+		ValueType:          valueType,
+		Store:              subStore,
+		SaveInterval:       saveInterval,
+		ModuleInitialBlock: moduleInitialBlock,
+		storeInitialBlock:  moduleInitialBlock,
 	}
 	b.resetNextBoundary()
 
@@ -65,15 +71,15 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 
 func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 	store := &Store{
-		Name:                 s.Name,
-		Store:                s.Store,
-		SaveInterval:         s.SaveInterval,
-		ModuleInitialBlock:   s.ModuleInitialBlock,
-		storeInitialBlock:    newStoreStartBlock,
-		ModuleHash:           s.ModuleHash,
-		KV:                   map[string][]byte{},
-		UpdatePolicy:         s.UpdatePolicy,
-		ValueType:            s.ValueType,
+		Name:               s.Name,
+		Store:              s.Store,
+		SaveInterval:       s.SaveInterval,
+		ModuleInitialBlock: s.ModuleInitialBlock,
+		storeInitialBlock:  newStoreStartBlock,
+		ModuleHash:         s.ModuleHash,
+		KV:                 map[string][]byte{},
+		UpdatePolicy:       s.UpdatePolicy,
+		ValueType:          s.ValueType,
 	}
 	store.resetNextBoundary()
 	zlog.Info("store cloned", zap.Object("store", store))
@@ -225,10 +231,20 @@ func (s *Store) Flush() {
 func (s *Store) resetNextBoundary() {
 	s.nextExpectedBoundary = s.storeInitialBlock - s.storeInitialBlock%s.SaveInterval + s.SaveInterval
 }
+
 func (s *Store) Roll(lastBlock uint64) {
 	s.storeInitialBlock = lastBlock
 	s.KV = map[string][]byte{}
 	s.resetNextBoundary()
+}
+
+func (s *Store) SetNextLiveBoundary(requestedStartBlock uint64) {
+	s.nextExpectedBoundary = requestedStartBlock - requestedStartBlock%s.SaveInterval + s.SaveInterval
+}
+
+// PushBoundary to be called when the store has written its snapshot and gets ready for the next.
+func (s *Store) PushBoundary() {
+	s.nextExpectedBoundary += s.SaveInterval
 }
 
 func (s *Store) bumpOrdinal(ord uint64) {

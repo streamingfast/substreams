@@ -45,7 +45,6 @@ type Pipeline struct {
 	respFunc func(resp *pbsubstreams.Response) error
 
 	modules              []*pbsubstreams.Module
-	outputModuleNames    []string
 	outputModuleMap      map[string]bool
 	storeModules         []*pbsubstreams.Module
 	storeMap             map[string]*state.Store
@@ -93,7 +92,6 @@ func New(
 		storeMap:                     map[string]*state.Store{},
 		graph:                        graph,
 		baseStateStore:               baseStateStore,
-		outputModuleNames:            request.OutputModules,
 		outputModuleMap:              map[string]bool{},
 		blockType:                    blockType,
 		wasmExtensions:               wasmExtensions,
@@ -153,8 +151,8 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 			return fmt.Errorf("building store map: %w", err)
 		}
 
-		totalOutputModules := len(p.outputModuleNames)
-		outputName := p.outputModuleNames[0]
+		totalOutputModules := len(p.request.OutputModules)
+		outputName := p.request.OutputModules[0]
 		backProcessingStore := storeMap[outputName]
 		lastStoreName := p.storeModules[len(p.storeModules)-1].Name
 		isLastStore := lastStoreName == backProcessingStore.Name
@@ -211,6 +209,38 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	return nil
 }
 
+func isFirstRequestedBlock(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
+	return clock.Number == uint64(request.StartBlockNum)
+}
+
+func isIntervalReached(clock *pbsubstreams.Clock, saveInterval uint64) bool {
+	return saveInterval > 0 && clock.Number%saveInterval == 0
+}
+
+func shouldSaveTemporaryStore(clock *pbsubstreams.Clock, request *pbsubstreams.Request, isSubrequest bool) bool {
+	if !isSubrequest {
+		return false
+	}
+
+	return request.StopBlockNum > 0 && clock.Number == request.StopBlockNum
+}
+
+func shouldSaveStoreSnapshot(clock *pbsubstreams.Clock, request *pbsubstreams.Request, saveInterval uint64, isSubrequest bool) bool {
+	if isFirstRequestedBlock(clock, request) {
+		return false
+	}
+
+	return isIntervalReached(clock, saveInterval) || shouldSaveTemporaryStore(clock, request, isSubrequest)
+}
+
+func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
+	if request.StopBlockNum <= 0 { //never stop
+		return false
+	}
+
+	return clock.Number >= request.StopBlockNum
+}
+
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	ctx := p.context
 
@@ -236,7 +266,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		Id:        block.Id,
 		Timestamp: timestamppb.New(block.Time()),
 	}
-
 	p.currentBlockRef = block.AsRef()
 
 	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
@@ -252,15 +281,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	p.moduleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
-	//todo? should we only save store if in partial mode or in catchup?
-	// no need to save store if loaded from cache?
-	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
-	// FIXME(abourget): handle skippable blocks, and compute boundary passing.
-	intervalReached := p.storeSaveInterval != 0 && p.clock.Number%p.storeSaveInterval == 0
-	reachedStopBlock := p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
-	saveTemporaryStore := p.isOrchestrated && reachedStopBlock
-
-	if !isFirstRequestBlock && (intervalReached || saveTemporaryStore) {
+	if shouldSaveStoreSnapshot(p.clock, p.request, p.storeSaveInterval, p.isOrchestrated) {
 		// FIXME(abourget): READ the NEXT FIXME below, because we're using the p.clock.Number
 		//
 		// Must EITHER BE the request.StopBlockNum OR a proper BOUNDARY of a store, NO MATTER
@@ -270,7 +291,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
+	if isStopBlockReached(p.clock, p.request) {
 		// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
 		// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
 		//
@@ -331,7 +352,11 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	if p.clock.Number >= p.requestedStartBlockNum {
-		if err := p.returnOutputs(step, cursor); err != nil {
+		if err := p.returnModuleProgressOutputs(step, cursor, p.isOrchestrated); err != nil {
+			return err
+		}
+
+		if err := p.returnModuleDataOutputs(step, cursor, p.isOrchestrated); err != nil {
 			return err
 		}
 	}
@@ -344,42 +369,62 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
-func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
-	if p.isOrchestrated {
-		// TODO(abourget): we might want to send progress for the segment after batch execution
-		var progress []*pbsubstreams.ModuleProgress
+func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
+	if !isSubrequest {
+		return nil
+	}
 
-		for _, store := range p.backprocessingStores {
-			progress = append(progress, &pbsubstreams.ModuleProgress{
-				Name: store.Name,
-				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-						ProcessedRanges: []*pbsubstreams.BlockRange{
-							{
-								StartBlock: store.StoreInitialBlock,
-								EndBlock:   p.clock.Number,
-							},
+	// TODO(abourget): we might want to send progress for the segment after batch execution
+	var progress []*pbsubstreams.ModuleProgress
+
+	for _, store := range p.backprocessingStores {
+		progress = append(progress, &pbsubstreams.ModuleProgress{
+			Name: store.Name,
+			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
+				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+					ProcessedRanges: []*pbsubstreams.BlockRange{
+						{
+							StartBlock: store.StoreInitialBlock,
+							EndBlock:   p.clock.Number,
 						},
 					},
 				},
-			})
-		}
+			},
+		})
+	}
 
-		if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
+	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
+	if isSubrequest {
+		return nil
+	}
+
+	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+	out := &pbsubstreams.BlockScopedData{
+		Outputs: p.moduleOutputs,
+		Clock:   p.clock,
+		Step:    pbsubstreams.StepToProto(step),
+		Cursor:  cursor.ToOpaque(),
+	}
+
+	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
+}
+
+//todo(colin): break this up into two
+func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
+	if p.isOrchestrated {
+
 	} else {
-		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-		out := &pbsubstreams.BlockScopedData{
-			Outputs: p.moduleOutputs,
-			Clock:   p.clock,
-			Step:    pbsubstreams.StepToProto(step),
-			Cursor:  cursor.ToOpaque(),
-		}
-
-		if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
 
 	}
 	return nil
@@ -452,13 +497,13 @@ func (p *Pipeline) validate() error {
 }
 
 func (p *Pipeline) buildModules() error {
-	modules, err := p.graph.ModulesDownTo(p.outputModuleNames)
+	modules, err := p.graph.ModulesDownTo(p.request.OutputModules)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 	p.modules = modules
 
-	storeModules, err := p.graph.StoresDownTo(p.outputModuleNames)
+	storeModules, err := p.graph.StoresDownTo(p.request.OutputModules)
 	if err != nil {
 		return err
 	}

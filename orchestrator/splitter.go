@@ -41,7 +41,6 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 			})
 		}
 
-		// TODO(abourget): also send the `partialsPresent` messages, along with the initialStoreFile
 		out = append(out, &pbsubstreams.ModuleProgress{
 			Name: storeName,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
@@ -63,7 +62,6 @@ type WorkUnit struct {
 }
 
 func (w *WorkUnit) initialProcessedPartials() block.Ranges {
-	//TODO(abourget): make sure we call this when the time comes to send Progress messages initially.
 	return w.partialsPresent.Merged()
 }
 

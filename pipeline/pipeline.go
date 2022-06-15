@@ -39,9 +39,10 @@ type Pipeline struct {
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
 
-	context context.Context
-	request *pbsubstreams.Request
-	graph   *manifest.ModuleGraph
+	context  context.Context
+	request  *pbsubstreams.Request
+	graph    *manifest.ModuleGraph
+	respFunc func(resp *pbsubstreams.Response) error
 
 	modules              []*pbsubstreams.Module
 	outputModuleNames    []string
@@ -81,6 +82,7 @@ func New(
 	wasmExtensions []wasm.WASMExtensioner,
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
 	subreqSplitSize int,
+	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -98,8 +100,8 @@ func New(
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
 		subreqSplitSize:              subreqSplitSize,
-
-		maxStoreSyncRangeSize: math.MaxUint64,
+		maxStoreSyncRangeSize:        math.MaxUint64,
+		respFunc:                     respFunc,
 	}
 
 	for _, name := range request.OutputModules {
@@ -118,27 +120,28 @@ func (p *Pipeline) IsOutputModule(name string) bool {
 	return found
 }
 
-func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
+func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
+
 	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isOrchestrated), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
 	if err := p.build(); err != nil {
-		return nil, fmt.Errorf("building pipeline: %w", err)
+		return fmt.Errorf("building pipeline: %w", err)
 	}
 
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
 
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
-			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
+			return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
 		}
 
 		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
 		_, err := p.moduleOutputCache.RegisterModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
 		if err != nil {
-			return nil, fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
 	}
 
@@ -147,7 +150,7 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 	if p.isOrchestrated {
 		storeMap, err := p.buildStoreMap()
 		if err != nil {
-			return nil, fmt.Errorf("building store map: %w", err)
+			return fmt.Errorf("building store map: %w", err)
 		}
 
 		totalOutputModules := len(p.outputModuleNames)
@@ -172,14 +175,14 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 
 		zlog.Info("initializing and loading stores")
 		if err = loadStores(ctx, storeMap, p.requestedStartBlockNum); err != nil {
-			return nil, fmt.Errorf("loading stores: %w", err)
+			return fmt.Errorf("loading stores: %w", err)
 		}
 
 		p.storeMap = storeMap
 	} else {
-		newStores, err := p.backProcessStores(ctx, workerPool, respFunc)
+		newStores, err := p.backProcessStores(ctx, workerPool)
 		if err != nil {
-			return nil, fmt.Errorf("synchronizing stores: %w", err)
+			return fmt.Errorf("synchronizing stores: %w", err)
 		}
 
 		p.storeMap = newStores
@@ -187,157 +190,161 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 
 		if len(p.request.InitialStoreSnapshotForModules) != 0 {
 			zlog.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
-			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules, respFunc); err != nil {
-				return nil, fmt.Errorf("send initial snapshots: %w", err)
+			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules); err != nil {
+				return fmt.Errorf("send initial snapshots: %w", err)
 			}
 		}
 	}
 
 	err = p.buildWASM(ctx, p.request, p.modules)
 	if err != nil {
-		return nil, fmt.Errorf("initiating module output caches: %w", err)
+		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
 	for _, cache := range p.moduleOutputCache.OutputCaches {
 		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
 		if _, err := cache.Load(ctx, atBlock); err != nil {
-			return nil, fmt.Errorf("loading outputs caches")
+			return fmt.Errorf("loading outputs caches")
 		}
 	}
 
-	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-				zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
-				zlog.Error(string(debug.Stack()))
-			}
-			if err != nil {
-				for _, hook := range p.postJobHooks {
-					if err := hook(ctx, p.clock); err != nil {
-						zlog.Warn("post job hook failed", zap.Error(err))
-					}
-				}
-			}
-		}()
-
-		// TODO(abourget): eventually, handle the `undo` signals.
-
-		p.clock = &pbsubstreams.Clock{
-			Number:    block.Num(),
-			Id:        block.Id,
-			Timestamp: timestamppb.New(block.Time()),
-		}
-
-		p.currentBlockRef = block.AsRef()
-
-		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-			return fmt.Errorf("updating module output cache: %w", err)
-		}
-
-		for _, hook := range p.preBlockHooks {
-			if err := hook(ctx, p.clock); err != nil {
-				return fmt.Errorf("pre block hook: %w", err)
-			}
-		}
-
-		p.moduleOutputs = nil
-		p.wasmOutputs = map[string][]byte{}
-
-		//todo? should we only save store if in partial mode or in catchup?
-		// no need to save store if loaded from cache?
-		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
-		// FIXME(abourget): handle skippable blocks, and compute boundary passing.
-		intervalReached := p.storeSaveInterval != 0 && p.clock.Number%p.storeSaveInterval == 0
-		reachedStopBlock := p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
-		saveTemporaryStore := p.isOrchestrated && reachedStopBlock
-
-		if !isFirstRequestBlock && (intervalReached || saveTemporaryStore) {
-			// FIXME(abourget): READ the NEXT FIXME below, because we're using the p.clock.Number
-			//
-			// Must EITHER BE the request.StopBlockNum OR a proper BOUNDARY of a store, NO MATTER
-			// what the p.clock.Number is.  Here, we're passing THE CLOCK NUMBER, scarrrryy:
-			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
-				return fmt.Errorf("saving stores: %w", err)
-			}
-		}
-
-		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
-			// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
-			// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
-			//
-			// Would we use the StopBlockNum as a boundary? That's the
-			// expected boundary by our work units, and NOT the
-			// clock.Number, in case we skipped some.
-
-			if p.isOrchestrated {
-				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
-				zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
-				if err := p.moduleOutputCache.Save(ctx); err != nil {
-					return fmt.Errorf("saving partial caches")
-				}
-			}
-			return io.EOF
-		}
-
-		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
-
-		cursor := obj.(bstream.Cursorable).Cursor()
-		step := obj.(bstream.Stepable).Step()
-
-		if err = p.assignSource(block); err != nil {
-			return fmt.Errorf("setting up sources: %w", err)
-		}
-
-		for _, executor := range p.moduleExecutors {
-			//FIXME(abourget): should we ever skip that work?
-			// if executor.ModuleInitialBlock < block.Number {
-			// 	continue ??
-			// }
-			executorName := executor.Name()
-			zlog.Debug("executing", zap.String("module_name", executorName))
-
-			executionError := executor.run(p.wasmOutputs, p.clock, block)
-
-			if isOutput := p.outputModuleMap[executorName]; isOutput {
-				logs, truncated := executor.moduleLogs()
-				outputData := executor.moduleOutputData()
-				if len(logs) != 0 || outputData != nil {
-					p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-						Name:          executorName,
-						Data:          outputData,
-						Logs:          logs,
-						LogsTruncated: truncated,
-					})
-				}
-			}
-
-			if executionError != nil {
-				if returnErr := p.returnFailureProgress(executionError, executor, respFunc); returnErr != nil {
-					return fmt.Errorf("progress error: %w", returnErr)
-				}
-				return fmt.Errorf("exec error: %w", executionError)
-			}
-
-			executor.Reset()
-		}
-
-		if p.clock.Number >= p.requestedStartBlockNum {
-			if err := p.returnOutputs(step, cursor, respFunc); err != nil {
-				return err
-			}
-		}
-
-		for _, s := range p.storeMap {
-			s.Flush()
-		}
-
-		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
-		return nil
-	}), nil
+	return nil
 }
 
-func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, respFunc substreams.ResponseFunc) error {
+func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
+	ctx := p.context
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+			zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
+			zlog.Error(string(debug.Stack()))
+		}
+		if err != nil {
+			for _, hook := range p.postJobHooks {
+				if err := hook(ctx, p.clock); err != nil {
+					zlog.Warn("post job hook failed", zap.Error(err))
+				}
+			}
+		}
+	}()
+
+	// TODO(abourget): eventually, handle the `undo` signals.
+
+	p.clock = &pbsubstreams.Clock{
+		Number:    block.Num(),
+		Id:        block.Id,
+		Timestamp: timestamppb.New(block.Time()),
+	}
+
+	p.currentBlockRef = block.AsRef()
+
+	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+		return fmt.Errorf("updating module output cache: %w", err)
+	}
+
+	for _, hook := range p.preBlockHooks {
+		if err := hook(ctx, p.clock); err != nil {
+			return fmt.Errorf("pre block hook: %w", err)
+		}
+	}
+
+	p.moduleOutputs = nil
+	p.wasmOutputs = map[string][]byte{}
+
+	//todo? should we only save store if in partial mode or in catchup?
+	// no need to save store if loaded from cache?
+	isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
+	// FIXME(abourget): handle skippable blocks, and compute boundary passing.
+	intervalReached := p.storeSaveInterval != 0 && p.clock.Number%p.storeSaveInterval == 0
+	reachedStopBlock := p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
+	saveTemporaryStore := p.isOrchestrated && reachedStopBlock
+
+	if !isFirstRequestBlock && (intervalReached || saveTemporaryStore) {
+		// FIXME(abourget): READ the NEXT FIXME below, because we're using the p.clock.Number
+		//
+		// Must EITHER BE the request.StopBlockNum OR a proper BOUNDARY of a store, NO MATTER
+		// what the p.clock.Number is.  Here, we're passing THE CLOCK NUMBER, scarrrryy:
+		if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
+			return fmt.Errorf("saving stores: %w", err)
+		}
+	}
+
+	if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
+		// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
+		// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
+		//
+		// Would we use the StopBlockNum as a boundary? That's the
+		// expected boundary by our work units, and NOT the
+		// clock.Number, in case we skipped some.
+
+		if p.isOrchestrated {
+			// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
+			zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
+			if err := p.moduleOutputCache.Save(ctx); err != nil {
+				return fmt.Errorf("saving partial caches")
+			}
+		}
+		return io.EOF
+	}
+
+	zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
+
+	cursor := obj.(bstream.Cursorable).Cursor()
+	step := obj.(bstream.Stepable).Step()
+
+	if err = p.assignSource(block); err != nil {
+		return fmt.Errorf("setting up sources: %w", err)
+	}
+
+	for _, executor := range p.moduleExecutors {
+		//FIXME(abourget): should we ever skip that work?
+		// if executor.ModuleInitialBlock < block.Number {
+		// 	continue ??
+		// }
+		executorName := executor.Name()
+		zlog.Debug("executing", zap.String("module_name", executorName))
+
+		executionError := executor.run(p.wasmOutputs, p.clock, block)
+
+		if isOutput := p.outputModuleMap[executorName]; isOutput {
+			logs, truncated := executor.moduleLogs()
+			outputData := executor.moduleOutputData()
+			if len(logs) != 0 || outputData != nil {
+				p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+					Name:          executorName,
+					Data:          outputData,
+					Logs:          logs,
+					LogsTruncated: truncated,
+				})
+			}
+		}
+
+		if executionError != nil {
+			if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
+				return fmt.Errorf("progress error: %w", returnErr)
+			}
+			return fmt.Errorf("exec error: %w", executionError)
+		}
+
+		executor.Reset()
+	}
+
+	if p.clock.Number >= p.requestedStartBlockNum {
+		if err := p.returnOutputs(step, cursor); err != nil {
+			return err
+		}
+	}
+
+	for _, s := range p.storeMap {
+		s.Flush()
+	}
+
+	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
+	return nil
+}
+
+func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
 	if p.isOrchestrated {
 		// TODO(abourget): we might want to send progress for the segment after batch execution
 		var progress []*pbsubstreams.ModuleProgress
@@ -358,7 +365,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 			})
 		}
 
-		if err := respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
+		if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
 			return fmt.Errorf("calling return func: %w", err)
 		}
 	} else {
@@ -370,7 +377,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 			Cursor:  cursor.ToOpaque(),
 		}
 
-		if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
 			return fmt.Errorf("calling return func: %w", err)
 		}
 
@@ -378,7 +385,7 @@ func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, 
 	return nil
 }
 
-func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor, respFunc substreams.ResponseFunc) error {
+func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
 	var out []*pbsubstreams.ModuleProgress
 
 	for _, moduleOutput := range p.moduleOutputs {
@@ -403,7 +410,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 		}
 	}
 
-	return respFunc(substreams.NewModulesProgressResponse(out))
+	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
 func (p *Pipeline) assignSource(block *bstream.Block) error {

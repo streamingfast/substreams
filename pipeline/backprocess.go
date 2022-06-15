@@ -13,7 +13,6 @@ import (
 func (p *Pipeline) backProcessStores(
 	ctx context.Context,
 	workerPool *orchestrator.WorkerPool,
-	respFunc substreams.ResponseFunc,
 ) (
 	map[string]*state.Store,
 	error,
@@ -45,7 +44,7 @@ func (p *Pipeline) backProcessStores(
 	}
 
 	progressMessages := splitWorks.ProgressMessages()
-	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
+	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}
 
@@ -61,7 +60,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc)
+	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, p.respFunc)
 	if err != nil {
 		return nil, fmt.Errorf("initializing scheduler: %w", err)
 	}

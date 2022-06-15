@@ -175,8 +175,16 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
+	responseHandler := func(resp *pbsubstreams.Response) error {
+		if err := streamSrv.Send(resp); err != nil {
+			return NewErrSendBlock(err)
+		}
+		return nil
+	}
 
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, opts...)
+	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
+
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum: request.StartBlockNum,
@@ -187,21 +195,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// ...FIXME ?
 	}
 
-	responseHandler := func(resp *pbsubstreams.Response) error {
-		if err := streamSrv.Send(resp); err != nil {
-			return NewErrSendBlock(err)
-		}
-		return nil
-	}
-
-	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
-
-	handler, err := pipe.HandlerFactory(workerPool, responseHandler)
-	if err != nil {
+	if err := pipe.Init(workerPool); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
-	st, err := s.streamFactory.New(ctx, handler, firehoseReq, zap.NewNop())
+	st, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}

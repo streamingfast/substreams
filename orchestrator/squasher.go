@@ -68,10 +68,6 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsRanges
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// TODO(abourget): what is dispatched here would much better be some of those objects
-	// in the WorkUnit instead, like the reqChunk directly
-	// Ideally the Callback over there carries the reqChunk, and was seeded with that reqChunk
-
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)

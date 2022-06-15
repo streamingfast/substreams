@@ -32,19 +32,15 @@ func (s *Snapshots) LastCompletedBlock() uint64 {
 	return s.Completes[len(s.Completes)-1].ExclusiveEndBlock
 }
 
-
-// FIXME(abourget): rename to `LastCompleteSnapshotBeforeBlock()`
-// LastCompleteSnapshotBeforeBlock returns the ExclusiveEndBlock of
-// the snapshot that is the highest below the input _blockNum_.
-func (s *Snapshots) LastCompletedBlockBefore(blockNum uint64) uint64 {
+func (s *Snapshots) LastCompleteSnapshotBefore(blockNum uint64) *block.Range {
 	for i := len(s.Completes); i > 0; i-- {
 		comp := s.Completes[i-1]
 		if comp.ExclusiveEndBlock > blockNum {
 			continue
 		}
-		return comp.ExclusiveEndBlock
+		return comp
 	}
-	return 0
+	return nil
 }
 
 func (s *Snapshots) ContainsPartial(r *block.Range) bool {

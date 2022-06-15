@@ -67,19 +67,19 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 		return work
 	}
 
-	storeLastComplete := snapshots.LastCompletedBlockBefore(incomingReqStartBlock)
+	completeSnapshot := snapshots.LastCompleteSnapshotBefore(incomingReqStartBlock)
 
-	if storeLastComplete != 0 && storeLastComplete <= modInitBlock {
+	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock <= modInitBlock {
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
 	}
 
 	backProcessStartBlock := modInitBlock
-	if storeLastComplete != 0 {
-		backProcessStartBlock = storeLastComplete
-		work.initialStoreFile = block.NewRange(modInitBlock, storeLastComplete)
+	if completeSnapshot != nil {
+		backProcessStartBlock = completeSnapshot.ExclusiveEndBlock
+		work.initialStoreFile = block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock)
 	}
 
-	if storeLastComplete == incomingReqStartBlock {
+	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
 		return
 	}
 

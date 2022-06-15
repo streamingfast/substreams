@@ -7,11 +7,11 @@ import (
 	"io"
 	"testing"
 
-	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -88,8 +88,56 @@ func TestSquash(t *testing.T) {
 }
 
 func testStateBuilder(store dstore.Store) *state.Store {
-	s, _ := state.NewBuilder("testBuilder", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
+	s, _ := state.NewBuilder("test", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
 	return s
+}
+
+func TestValidateStoresReady(t *testing.T) {
+	objStore := dstore.NewMockStore(nil)
+	tests := []struct {
+		name               string
+		reqStartBlock      uint64
+		targetReached      bool
+		nextExpected       uint64
+		expectError        string
+		expectNextBoundary int
+	}{
+		{
+			name:               "simple",
+			reqStartBlock:      92,
+			targetReached:      true,
+			nextExpected:       100,
+			expectNextBoundary: 100,
+		},
+		{
+			name:          "error",
+			reqStartBlock: 90,
+			targetReached: false,
+			nextExpected:  100,
+			expectError:   `1 errors: module "test": target 90 not reached (next expected: 100)`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			store, _ := state.NewBuilder("test", 10, 50, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, objStore)
+
+			squish := NewSquashable(store, test.reqStartBlock, test.nextExpected, nil)
+			squish.targetReached = test.targetReached
+			s := &Squasher{
+				targetExclusiveBlock: test.reqStartBlock,
+				squashables:          map[string]*Squashable{"test": squish}}
+			stores, err := s.ValidateStoresReady()
+			if test.expectError != "" {
+				assert.Equal(t, test.expectError, err.Error())
+			} else {
+				assert.Equal(t, test.expectNextBoundary, int(store.NextBoundary()))
+				assert.Len(t, stores, 1)
+			}
+		})
+	}
+
 }
 
 // func TestConcurrentSquasherClose(t *testing.T) {

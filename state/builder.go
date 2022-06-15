@@ -36,8 +36,6 @@ type Store struct {
 	ValueType    string
 
 	lastOrdinal uint64
-
-	loaded bool
 }
 
 func (s *Store) IsPartial() bool {
@@ -45,16 +43,11 @@ func (s *Store) IsPartial() bool {
 	return s.ModuleInitialBlock != s.StoreInitialBlock
 }
 
-func (s *Store) IsLoaded() bool {
-	return s.loaded
-}
-
 func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", s.Name)
 	enc.AddString("hash", s.ModuleHash)
 	enc.AddUint64("StoreInitialBlock", s.StoreInitialBlock)
 	enc.AddBool("partial", s.IsPartial())
-	enc.AddBool("loaded", s.loaded)
 
 	return nil
 }

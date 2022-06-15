@@ -23,22 +23,22 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		Completes: parseRanges("10-20,10-50,10-1000"),
 	}
 
-	assert.Equal(t, 0, int(s.LastCompletedBlockBefore(0)))
-	assert.Equal(t, 0, int(s.LastCompletedBlockBefore(5)))
-	assert.Equal(t, 0, int(s.LastCompletedBlockBefore(19)))
-	assert.Equal(t, 20, int(s.LastCompletedBlockBefore(20)))
-	assert.Equal(t, 20, int(s.LastCompletedBlockBefore(21)))
-	assert.Equal(t, 20, int(s.LastCompletedBlockBefore(49)))
-	assert.Equal(t, 50, int(s.LastCompletedBlockBefore(50)))
-	assert.Equal(t, 50, int(s.LastCompletedBlockBefore(51)))
-	assert.Equal(t, 50, int(s.LastCompletedBlockBefore(999)))
-	assert.Equal(t, 1000, int(s.LastCompletedBlockBefore(1000)))
-	assert.Equal(t, 1000, int(s.LastCompletedBlockBefore(1001)))
-	assert.Equal(t, 1000, int(s.LastCompletedBlockBefore(10000)))
+	assert.Nil(t, s.LastCompleteSnapshotBefore(0))
+	assert.Nil(t, s.LastCompleteSnapshotBefore(5))
+	assert.Nil(t, s.LastCompleteSnapshotBefore(19))
+	assert.Equal(t, 20, int(s.LastCompleteSnapshotBefore(20).ExclusiveEndBlock))
+	assert.Equal(t, 20, int(s.LastCompleteSnapshotBefore(21).ExclusiveEndBlock))
+	assert.Equal(t, 20, int(s.LastCompleteSnapshotBefore(49).ExclusiveEndBlock))
+	assert.Equal(t, 50, int(s.LastCompleteSnapshotBefore(50).ExclusiveEndBlock))
+	assert.Equal(t, 50, int(s.LastCompleteSnapshotBefore(51).ExclusiveEndBlock))
+	assert.Equal(t, 50, int(s.LastCompleteSnapshotBefore(999).ExclusiveEndBlock))
+	assert.Equal(t, 1000, int(s.LastCompleteSnapshotBefore(1000).ExclusiveEndBlock))
+	assert.Equal(t, 1000, int(s.LastCompleteSnapshotBefore(1001).ExclusiveEndBlock))
+	assert.Equal(t, 1000, int(s.LastCompleteSnapshotBefore(10000).ExclusiveEndBlock))
 
 	s = &Snapshots{
 		Completes: parseRanges(""),
 	}
-	assert.Equal(t, 0, int(s.LastCompletedBlockBefore(0)))
-	assert.Equal(t, 0, int(s.LastCompletedBlockBefore(5)))
+	assert.Nil(t, s.LastCompleteSnapshotBefore(0))
+	assert.Nil(t, s.LastCompleteSnapshotBefore(5))
 }

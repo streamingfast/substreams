@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/substreams/block"
 
 	"github.com/streamingfast/substreams/state"
-	"go.uber.org/zap"
 )
 
 // Squasher produces _complete_ stores, by merging backing partial stores.
@@ -76,24 +75,6 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsRanges
 	squashable, ok := s.squashables[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in squashables module registry", moduleName)
-	}
-
-	zlog.Debug("checking if squashable store loaded", zap.Object("store", squashable.store))
-	if !squashable.store.IsLoaded() {
-		// FIXME(abourget): before `Squash` is ever called, we'll have
-		// gone through NewSquasher, which will initialize the
-		// Squashable, and have gone through `LoadFrom()` (which
-		// `Fetch()`s already). So there's no need for an IsLoaded(),
-		// nor a Fetch() here.
-
-		//This is actually not true
-
-		err := squashable.store.Fetch(ctx, squashable.nextExpectedStartBlock)
-		if err != nil {
-			zlog.Warn("loading state for squashing", zap.Object("store", squashable.store))
-			return nil
-		}
-		//squashable.nextExpectedStartBlock = squashable.store.BlockRange.ExclusiveEndBlock
 	}
 
 	return squashable.squash(ctx, partialsRanges)

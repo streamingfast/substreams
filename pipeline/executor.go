@@ -107,7 +107,7 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 		if err != nil {
 			return fmt.Errorf("unmarshalling output deltas: %w", err)
 		}
-		e.outputStore.Deltas = deltas.Deltas //todo: unmarshall cached data as delta
+		e.outputStore.Deltas = deltas.Deltas
 		for _, delta := range deltas.Deltas {
 			e.outputStore.ApplyDelta(delta)
 		}

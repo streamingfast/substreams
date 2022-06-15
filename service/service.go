@@ -122,9 +122,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	_ = logger
 
 	if request.StartBlockNum < 0 {
-		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
-		// FIXME we want logger too
 		// FIXME start block resolving is an art, it should be handled here
+		zlog.Error("invalid negative startblock (not handled in substreams)", zap.Int64("start_block", request.StartBlockNum))
+		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
 	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {

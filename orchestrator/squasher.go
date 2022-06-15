@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 )
@@ -64,7 +66,7 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 	return squasher, nil
 }
 
-func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks chunks) error {
+func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsRanges block.Ranges) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -84,6 +86,9 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks
 		// Squashable, and have gone through `LoadFrom()` (which
 		// `Fetch()`s already). So there's no need for an IsLoaded(),
 		// nor a Fetch() here.
+
+		//This is actually not true
+
 		err := squashable.store.Fetch(ctx, squashable.nextExpectedStartBlock)
 		if err != nil {
 			zlog.Warn("loading state for squashing", zap.Object("store", squashable.store))
@@ -92,7 +97,7 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsChunks
 		//squashable.nextExpectedStartBlock = squashable.store.BlockRange.ExclusiveEndBlock
 	}
 
-	return squashable.squash(ctx, partialsChunks)
+	return squashable.squash(ctx, partialsRanges)
 }
 
 func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {

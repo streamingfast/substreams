@@ -18,7 +18,7 @@ type Squashable struct {
 	name                   string
 	store                  *state.Store
 	requestRange           *block.Range
-	ranges                 []*chunk // Ranges split in `storeSaveInterval` reqChunks
+	ranges                 block.Ranges
 	targetExclusiveBlock   uint64
 	nextExpectedStartBlock uint64
 
@@ -37,7 +37,7 @@ func NewSquashable(initialStore *state.Store, targetExclusiveBlock, nextExpected
 	}
 }
 
-func (s *Squashable) squash(ctx context.Context, partialsChunks chunks) error {
+func (s *Squashable) squash(ctx context.Context, partialsChunks block.Ranges) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -45,7 +45,7 @@ func (s *Squashable) squash(ctx context.Context, partialsChunks chunks) error {
 
 	s.ranges = append(s.ranges, partialsChunks...)
 	sort.Slice(s.ranges, func(i, j int) bool {
-		return s.ranges[i].start < s.ranges[j].start
+		return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
 	})
 
 	if err := s.mergeAvailablePartials(ctx); err != nil {
@@ -73,16 +73,16 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 		squashableRange := s.ranges[0]
 		zlog.Info("testing first range", zap.String("module_name", s.store.Name), zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))
 
-		if squashableRange.start < s.nextExpectedStartBlock {
-			return fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.start, s.ranges)
+		if squashableRange.StartBlock < s.nextExpectedStartBlock {
+			return fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges)
 		}
-		if s.nextExpectedStartBlock != squashableRange.start {
+		if s.nextExpectedStartBlock != squashableRange.StartBlock {
 			break
 		}
 
 		zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 
-		nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.start, squashableRange.end))
+		nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.StartBlock, squashableRange.ExclusiveEndBlock))
 		if err != nil {
 			return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 		}
@@ -96,17 +96,18 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 
 		zlog.Debug("store merge", zap.Object("store", s.store))
 
-		s.nextExpectedStartBlock = squashableRange.end
+		s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 		//s.store.BlockRange.ExclusiveEndBlock = nextStore.BlockRange.ExclusiveEndBlock
 
-		if squashableRange.tempPartial {
+		if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval != 0 {
+			//if squashableRange.tempPartial {
 			zlog.Info("deleting temp store", zap.Object("store", nextStore))
-			err = nextStore.DeleteStore(ctx, squashableRange.end)
+			err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				zlog.Warn("deleting partial file", zap.Error(err))
 			}
 		} else {
-			err = s.store.WriteState(ctx, squashableRange.end)
+			err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				return fmt.Errorf("writing state: %w", err)
 			}
@@ -114,11 +115,11 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 
 		s.ranges = s.ranges[1:]
 
-		if squashableRange.end == s.targetExclusiveBlock {
+		if squashableRange.ExclusiveEndBlock == s.targetExclusiveBlock {
 			s.targetReached = true
 		}
 
-		s.notifyWaiters(squashableRange.end)
+		s.notifyWaiters(squashableRange.ExclusiveEndBlock)
 	}
 
 	return nil

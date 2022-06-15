@@ -7,6 +7,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -73,13 +75,13 @@ func TestSquash(t *testing.T) {
 	s := testStateBuilder(store)
 	squashable := NewSquashable(s, 80_000, 10_000, notifierFunc)
 
-	require.NoError(t, squashable.squash(ctx, []*chunk{{20_000, 30_000, false}}))
+	require.NoError(t, squashable.squash(ctx, []*block.Range{{20_000, 30_000}}))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, []*chunk{{70_000, 80_000, false}}))
+	require.NoError(t, squashable.squash(ctx, []*block.Range{{70_000, 80_000}}))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, []*chunk{{10_000, 20_000, false}}))
+	require.NoError(t, squashable.squash(ctx, []*block.Range{{10_000, 20_000}}))
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 	require.Equal(t, 2, notificationsSent)

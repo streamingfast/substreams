@@ -42,9 +42,9 @@ func (s *Scheduler) Next() *Job {
 	return request
 }
 
-func (s *Scheduler) Callback(ctx context.Context, job *Job, partialsChunks chunks) error {
+func (s *Scheduler) Callback(ctx context.Context, job *Job, partialsRanges block.Ranges) error {
 
-	err := s.squasher.Squash(ctx, job.moduleName, partialsChunks)
+	err := s.squasher.Squash(ctx, job.moduleName, partialsRanges)
 	if err != nil {
 		return fmt.Errorf("squashing: %w", err)
 	}
@@ -96,28 +96,7 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Jo
 		return err
 	}
 
-	var partialsChunks chunks
-	for _, p := range partialsWritten {
-		partialsChunks = append(partialsChunks, &chunk{
-			start:       p.StartBlock,
-			end:         p.ExclusiveEndBlock,
-			// TODO(abourget): tant qu'à computer ça à chaque fois,
-			// autant le computer au moment où on devrait s'en servir,
-			// ce qui veut dire qu'on le ferait à un seul endroit,
-			// qu'on pourrait utiliser des `block.Range` normaux à la
-			// place de cet objet.
-			//
-			// Le seul risque: si la config de `storeSaveInterval` est
-			// différent entre l'orchestrateur et le backprocessing
-			// node, on pourrait considérer certain stores comme étant
-			// temporaire et les effacer. C'est plus ou moins un
-			// problème maintenant qu'on query le ObjectStore pour
-			// savoir ce qu'il y a effectivement.
-			tempPartial: p.ExclusiveEndBlock%job.moduleSaveInterval != 0,
-		})
-	}
-
-	if err = s.Callback(ctx, job, partialsChunks); err != nil {
+	if err = s.Callback(ctx, job, partialsWritten); err != nil {
 		return fmt.Errorf("calling back scheduler: %w", err)
 	}
 	return nil

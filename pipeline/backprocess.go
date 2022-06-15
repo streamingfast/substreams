@@ -41,7 +41,7 @@ func (p *Pipeline) backProcessStores(
 
 	splitWorks := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
-		splitWorks[mod.Name] = orchestrator.SplitWork(mod.Name, uint64(p.blockRangeSizeSubRequests), mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
+		splitWorks[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
 	}
 
 	progressMessages := splitWorks.ProgressMessages()
@@ -51,7 +51,7 @@ func (p *Pipeline) backProcessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, initialStoreMap, p.graph, requestPool)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, uint64(p.subreqSplitSize), initialStoreMap, p.graph, requestPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
@@ -61,7 +61,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc, p.blockRangeSizeSubRequests)
+	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc)
 	if err != nil {
 		return nil, fmt.Errorf("initializing scheduler: %w", err)
 	}

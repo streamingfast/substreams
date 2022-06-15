@@ -231,11 +231,8 @@ func (s *Store) Flush() {
 	s.lastOrdinal = 0
 }
 
-func (b *Store) Roll(lastBlock uint64) {
-	b.StoreInitialBlock = lastBlock
-}
-
-func (s *Store) Truncate() {
+func (s *Store) Roll(lastBlock uint64) {
+	s.StoreInitialBlock = lastBlock
 	s.KV = map[string][]byte{}
 }
 

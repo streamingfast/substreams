@@ -18,6 +18,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
 
 	storeSplit := uint64(10)
+	subreqSplit := uint64(100)
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
@@ -51,6 +52,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	s, err := NewOrderedStrategy(
 		ctx,
 		splitWorkMods,
+		subreqSplit,
 		stores, // INIT
 		graph,
 		pool,

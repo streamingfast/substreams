@@ -13,8 +13,6 @@ import (
 )
 
 type Scheduler struct {
-	blockRangeSizeSubRequests int
-
 	workerPool *WorkerPool
 	respFunc   substreams.ResponseFunc
 
@@ -22,13 +20,12 @@ type Scheduler struct {
 	requestsStream <-chan *Job
 }
 
-func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc) (*Scheduler, error) {
 	s := &Scheduler{
-		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
-		squasher:                  squasher,
-		requestsStream:            strategy.getRequestStream(ctx),
-		workerPool:                workerPool,
-		respFunc:                  respFunc,
+		squasher:       squasher,
+		requestsStream: strategy.getRequestStream(ctx),
+		workerPool:     workerPool,
+		respFunc:       respFunc,
 	}
 	return s, nil
 }

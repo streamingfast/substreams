@@ -9,20 +9,31 @@ type WorkPlan map[string]*WorkUnit
 
 func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p {
-		if unit.completedRange == nil {
+		if unit.initialStoreFile == nil {
 			continue
 		}
-		// TODO(abourget): also send the `partialsPresent` messages, along with the loadInitialStore
+
+		var more []*pbsubstreams.BlockRange
+		if unit.initialStoreFile != nil {
+			more = append(more, &pbsubstreams.BlockRange{
+				StartBlock: unit.initialStoreFile.StartBlock,
+				EndBlock:   unit.initialStoreFile.ExclusiveEndBlock,
+			})
+		}
+
+		for _, rng := range unit.initialProcessedPartials() {
+			more = append(more, &pbsubstreams.BlockRange{
+				StartBlock: rng.StartBlock,
+				EndBlock:   rng.ExclusiveEndBlock,
+			})
+		}
+
+		// TODO(abourget): also send the `partialsPresent` messages, along with the initialStoreFile
 		out = append(out, &pbsubstreams.ModuleProgress{
 			Name: storeName,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-					ProcessedRanges: []*pbsubstreams.BlockRange{
-						{
-							StartBlock: unit.completedRange.StartBlock,
-							EndBlock:   unit.completedRange.ExclusiveEndBlock,
-						},
-					},
+					ProcessedRanges: more,
 				},
 			},
 		})
@@ -33,14 +44,8 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 type WorkUnit struct {
 	modName string
 
-	// TODO(abourget): re-rename this to `loadInitialStore`,
-	// `partialsPresent` alongside `loadInitialStore` provide all the
-	// info for sending progress notifications. loadInitialStore has a
-	// single purpose: compute what's necessary to initialize the
-	// store to get started.
-	completedRange *block.Range // Send a Progress message, saying the store is already processed for this range
-
-	partialsMissing block.Ranges
+	initialStoreFile *block.Range // Points to a complete .kv file, to initialize the store upon getting started.
+	partialsMissing  block.Ranges
 
 	// TODO(abourget): To be fed into the Squasher, primed with those
 	// partials that already exist, also can be Merged() and sent to
@@ -48,18 +53,15 @@ type WorkUnit struct {
 	// already.  Please don't remove the comment until it is
 	// implemented (!)
 	partialsPresent block.Ranges
-
-	subRequestSplitSize uint64
-	RequestRanges       block.Ranges
 }
 
-func (w *WorkUnit) InitialProcessedPartials() block.Ranges {
+func (w *WorkUnit) initialProcessedPartials() block.Ranges {
 	//TODO(abourget): make sure we call this when the time comes to send Progress messages initially.
 	return w.partialsPresent.Merged()
 }
 
-func SplitWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *WorkUnit) {
-	work = &WorkUnit{modName: modName, subRequestSplitSize: subRequestSlipSize}
+func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *WorkUnit) {
+	work = &WorkUnit{modName: modName}
 
 	if incomingReqStartBlock <= modInitBlock {
 		return work
@@ -74,28 +76,15 @@ func SplitWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStar
 	backProcessStartBlock := modInitBlock
 	if storeLastComplete != 0 {
 		backProcessStartBlock = storeLastComplete
-		work.completedRange = block.NewRange(modInitBlock, storeLastComplete)
+		work.initialStoreFile = block.NewRange(modInitBlock, storeLastComplete)
 	}
 
 	if storeLastComplete == incomingReqStartBlock {
 		return
 	}
 
-	// TODO(abourget): move out again
-	minOf := func(a, b uint64) uint64 {
-		if a < b {
-			return a
-		}
-		return b
-	}
-
 	for ptr := backProcessStartBlock; ptr < incomingReqStartBlock; {
-		// FIXME(abourget): this ultra-simplified line, based on the storeSplit solved two issues:
-		// * always lining on a store boundary, or
-		// * on the incoming request boundary
-		// It is then queried against the SNAPSHOTS, those snapshots that are lined up against
-		// the STORE split size, and not the request's.
-		end := minOf(ptr-ptr%subRequestSlipSize+subRequestSlipSize, incomingReqStartBlock)
+		end := minOf(ptr-ptr%storeSaveInterval+storeSaveInterval, incomingReqStartBlock)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {
 			work.partialsMissing = append(work.partialsMissing, newPartial)
@@ -105,10 +94,12 @@ func SplitWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStar
 		ptr = end
 	}
 
-	// FIXME(abourget): this is why this was in a separate function, because the unit tests can
-	// figure out what stores are to be expected to be produced everywhere, without regards to how
-	// they would be batched for execution, or split at execution.
-	//
+	return work
+
+}
+func (w *WorkUnit) batchRequests(subreqSplit uint64) block.Ranges {
+	return w.partialsMissing.MergedBuckets(subreqSplit)
+
 	// Then, a SEPARATE function could batch the partial stores production into requests,
 	// and that ended up being a simple MergedBins() call, and that was already well tested
 	//
@@ -121,6 +112,11 @@ func SplitWork(modName string, subRequestSlipSize, modInitBlock, incomingReqStar
 	// orchestrator to satisfy its upstream request. This makes things
 	// much more reliable: you can restart and change the split sizes
 	// in the different backends without worries.
-	work.RequestRanges = work.partialsMissing.MergeRanges(work.subRequestSplitSize)
-	return work
+}
+
+func minOf(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
 }

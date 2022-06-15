@@ -36,20 +36,19 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 	squashables := map[string]*Squashable{}
 	for storeName, store := range stores {
 		workUnit := workPlan[storeName]
-		// FIXME(abourget): what if workUnit has nothing to do?
 
 		var squashable *Squashable
-		if workUnit.completedRange == nil {
+		if workUnit.initialStoreFile == nil {
 			squashable = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, notifier)
 		} else {
-			squish, err := store.LoadFrom(ctx, workUnit.completedRange)
+			squish, err := store.LoadFrom(ctx, workUnit.initialStoreFile)
 			if err != nil {
-				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.completedRange, err)
+				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.initialStoreFile, err)
 			}
-			squashable = NewSquashable(squish, reqStartBlock, workUnit.completedRange.ExclusiveEndBlock, notifier)
+			squashable = NewSquashable(squish, reqStartBlock, workUnit.initialStoreFile.ExclusiveEndBlock, notifier)
 		}
 
-		if len(workUnit.RequestRanges) == 0 {
+		if len(workUnit.partialsMissing) == 0 {
 			squashable.targetReached = true
 			squashable.notifyWaiters(reqStartBlock)
 		}

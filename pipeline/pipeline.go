@@ -53,8 +53,8 @@ type Pipeline struct {
 	moduleExecutors []ModuleExecutor
 	wasmOutputs     map[string][]byte
 
-	baseStateStore     dstore.Store
-	storesSaveInterval uint64
+	baseStateStore    dstore.Store
+	storeSaveInterval uint64
 
 	clock         *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
@@ -67,7 +67,7 @@ type Pipeline struct {
 	currentBlockRef bstream.BlockRef
 
 	outputCacheSaveBlockInterval uint64
-	blockRangeSizeSubRequests    int
+	subreqSplitSize              int
 	grpcClientFactory            func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
@@ -80,7 +80,7 @@ func New(
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
-	blockRangeSizeSubRequests int,
+	subreqSplitSize int,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -97,7 +97,7 @@ func New(
 		wasmExtensions:               wasmExtensions,
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
-		blockRangeSizeSubRequests:    blockRangeSizeSubRequests,
+		subreqSplitSize:              subreqSplitSize,
 
 		maxStoreSyncRangeSize: math.MaxUint64,
 	}
@@ -247,10 +247,16 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		//todo? should we only save store if in partial mode or in catchup?
 		// no need to save store if loaded from cache?
 		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
-		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-		isTemporaryStore := p.isOrchestrated && p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
+		// FIXME(abourget): handle skippable blocks, and compute boundary passing.
+		intervalReached := p.storeSaveInterval != 0 && p.clock.Number%p.storeSaveInterval == 0
+		reachedStopBlock := p.request.StopBlockNum != 0 && p.clock.Number == p.request.StopBlockNum
+		saveTemporaryStore := p.isOrchestrated && reachedStopBlock
 
-		if !isFirstRequestBlock && (intervalReached || isTemporaryStore) {
+		if !isFirstRequestBlock && (intervalReached || saveTemporaryStore) {
+			// FIXME(abourget): READ the NEXT FIXME below, because we're using the p.clock.Number
+			//
+			// Must EITHER BE the request.StopBlockNum OR a proper BOUNDARY of a store, NO MATTER
+			// what the p.clock.Number is.  Here, we're passing THE CLOCK NUMBER, scarrrryy:
 			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
 				return fmt.Errorf("saving stores: %w", err)
 			}
@@ -259,6 +265,10 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
 			// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
 			// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
+			//
+			// Would we use the StopBlockNum as a boundary? That's the
+			// expected boundary by our work units, and NOT the
+			// clock.Number, in case we skipped some.
 
 			if p.isOrchestrated {
 				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
@@ -280,6 +290,10 @@ func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc 
 		}
 
 		for _, executor := range p.moduleExecutors {
+			//FIXME(abourget): should we ever skip that work?
+			// if executor.ModuleInitialBlock < block.Number {
+			// 	continue ??
+			// }
 			executorName := executor.Name()
 			zlog.Debug("executing", zap.String("module_name", executorName))
 
@@ -575,14 +589,14 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) er
 		// array and assumes a single output module.  Perhaps that
 		// needs to be revised, or we ned to panic here if there are
 		// two leaf stores.
-		if builder.IsPartial() {
-			if p.IsOutputModule(builder.Name) {
-				r := block.NewRange(builder.StoreInitialBlock, lastBlock)
-				p.partialsWritten = append(p.partialsWritten, r)
-				zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
-			}
+		//
+		// FIXME(abourget): If the job starts at module start block,
+		// we want it to BECOME a partial after the FIRST kv being written.
+		if p.isOrchestrated && p.IsOutputModule(builder.Name) {
+			r := block.NewRange(builder.StoreInitialBlock, lastBlock)
+			p.partialsWritten = append(p.partialsWritten, r)
+			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
 			builder.Roll(lastBlock)
-			builder.Truncate()
 		}
 
 		zlog.Info("state written", zap.String("store_name", builder.Name))
@@ -596,7 +610,7 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 	for _, storeModule := range p.storeModules {
 		newStore, err := state.NewBuilder(
 			storeModule.Name,
-			p.storesSaveInterval,
+			p.storeSaveInterval,
 			storeModule.InitialBlock,
 			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,

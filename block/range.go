@@ -143,10 +143,7 @@ func (r Ranges) Merged() (out Ranges) {
 	return out
 }
 
-// TODO(abourget): rename this to `MergedBins(binSize uint64)`
-// ... that's what it does. Past tense as it is returning a new
-// object, it is not an action on the object.
-func (r Ranges) MergeRanges(chunk uint64) (out Ranges) {
+func (r Ranges) MergedBuckets(maxBucketSize uint64) (out Ranges) {
 	for i := 0; i < len(r); i++ {
 		currentRange := r[i]
 		isLast := i == len(r)-1
@@ -155,13 +152,13 @@ func (r Ranges) MergeRanges(chunk uint64) (out Ranges) {
 			break
 		}
 
-		if currentRange.Size() > chunk {
+		if currentRange.Size() > maxBucketSize {
 			out = append(out, currentRange)
 			continue
 		}
 
 		nextRange := r[i+1]
-		if currentRange.ExclusiveEndBlock != nextRange.StartBlock || nextRange.ExclusiveEndBlock-currentRange.StartBlock > chunk {
+		if currentRange.ExclusiveEndBlock != nextRange.StartBlock || nextRange.ExclusiveEndBlock-currentRange.StartBlock > maxBucketSize {
 			out = append(out, currentRange)
 			continue
 		}
@@ -172,7 +169,7 @@ func (r Ranges) MergeRanges(chunk uint64) (out Ranges) {
 		// from `currentRange` and the latest matching `nextRange`.
 		for j := i + 1; j < len(r); j++ {
 			nextNextRange := r[j]
-			if nextRange.ExclusiveEndBlock != nextNextRange.StartBlock || nextNextRange.ExclusiveEndBlock-currentRange.StartBlock > chunk {
+			if nextRange.ExclusiveEndBlock != nextNextRange.StartBlock || nextNextRange.ExclusiveEndBlock-currentRange.StartBlock > maxBucketSize {
 				break
 			}
 			i++

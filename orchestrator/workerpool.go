@@ -105,6 +105,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		case *pbsubstreams.Response_SnapshotComplete:
 			_ = r.SnapshotComplete
 		case *pbsubstreams.Response_Data:
+			// These are not returned by virtue of `returnOutputs`
 		}
 	}
 }

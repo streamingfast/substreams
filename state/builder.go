@@ -53,7 +53,7 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 		ModuleInitialBlock:   moduleInitialBlock,
 		storeInitialBlock:    moduleInitialBlock,
 	}
-	store.resetNextBoundary()
+	b.resetNextBoundary()
 
 	for _, opt := range opts {
 		opt(b)

@@ -372,9 +372,7 @@ func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bs
 		return nil
 	}
 
-	// TODO(abourget): we might want to send progress for the segment after batch execution
 	var progress []*pbsubstreams.ModuleProgress
-
 	for _, store := range p.backprocessingStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
 			Name: store.Name,
@@ -394,7 +392,6 @@ func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bs
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}
-
 	return nil
 }
 

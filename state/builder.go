@@ -23,10 +23,9 @@ type Store struct {
 	Store        dstore.Store
 	SaveInterval uint64
 
-	ModuleInitialBlock uint64
-	StoreInitialBlock  uint64 // block at which we initialized this store
-	//BlockRange     *block.Range
-	ProcessedBlock uint64
+	ModuleInitialBlock   uint64
+	storeInitialBlock    uint64 // block at which we initialized this store
+	nextExpectedBoundary uint64 // nextExpectedBoundary is used ONLY UPON WRITING store snapshots, reading boundaries are always explicitly passed.
 
 	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.
@@ -38,20 +37,6 @@ type Store struct {
 	lastOrdinal uint64
 }
 
-func (s *Store) IsPartial() bool {
-	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.StoreInitialBlock))
-	return s.ModuleInitialBlock != s.StoreInitialBlock
-}
-
-func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("name", s.Name)
-	enc.AddString("hash", s.ModuleHash)
-	enc.AddUint64("StoreInitialBlock", s.StoreInitialBlock)
-	enc.AddBool("partial", s.IsPartial())
-
-	return nil
-}
-
 func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Store, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -59,14 +44,15 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 	}
 
 	b := &Store{
-		Name:               name,
-		KV:                 make(map[string][]byte),
-		UpdatePolicy:       updatePolicy,
-		ValueType:          valueType,
-		Store:              subStore,
-		SaveInterval:       saveInterval,
-		ModuleInitialBlock: moduleInitialBlock,
-		StoreInitialBlock:  moduleInitialBlock,
+		Name:                 name,
+		KV:                   make(map[string][]byte),
+		UpdatePolicy:         updatePolicy,
+		ValueType:            valueType,
+		Store:                subStore,
+		SaveInterval:         saveInterval,
+		ModuleInitialBlock:   moduleInitialBlock,
+		storeInitialBlock:    moduleInitialBlock,
+		nextExpectedBoundary: moduleInitialBlock - moduleInitialBlock%saveInterval + saveInterval,
 	}
 
 	for _, opt := range opts {
@@ -79,18 +65,37 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 
 func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 	store := &Store{
-		Name:               s.Name,
-		Store:              s.Store,
-		SaveInterval:       s.SaveInterval,
-		ModuleInitialBlock: s.ModuleInitialBlock,
-		StoreInitialBlock:  newStoreStartBlock,
-		ModuleHash:         s.ModuleHash,
-		KV:                 map[string][]byte{},
-		UpdatePolicy:       s.UpdatePolicy,
-		ValueType:          s.ValueType,
+		Name:                 s.Name,
+		Store:                s.Store,
+		SaveInterval:         s.SaveInterval,
+		ModuleInitialBlock:   s.ModuleInitialBlock,
+		storeInitialBlock:    newStoreStartBlock,
+		nextExpectedBoundary: newStoreStartBlock - newStoreStartBlock%s.SaveInterval + s.SaveInterval,
+		ModuleHash:           s.ModuleHash,
+		KV:                   map[string][]byte{},
+		UpdatePolicy:         s.UpdatePolicy,
+		ValueType:            s.ValueType,
 	}
 	zlog.Info("store cloned", zap.Object("store", store))
 	return store
+}
+
+func (s *Store) StoreInitBlock() uint64 { return s.storeInitialBlock }
+func (s *Store) NextBoundary() uint64   { return s.nextExpectedBoundary }
+
+func (s *Store) IsPartial() bool {
+	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.storeInitialBlock))
+	return s.ModuleInitialBlock != s.storeInitialBlock
+}
+
+func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("name", s.Name)
+	enc.AddString("hash", s.ModuleHash)
+	enc.AddUint64("store_initial_block", s.storeInitialBlock)
+	enc.AddUint64("next_expected_boundary", s.nextExpectedBoundary)
+	enc.AddBool("partial", s.IsPartial())
+
+	return nil
 }
 
 func (s *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, error) {
@@ -106,9 +111,9 @@ func (s *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, 
 
 func (s *Store) storageFilename(exclusiveEndBlock uint64) string {
 	if s.IsPartial() {
-		return fmt.Sprintf("%010d-%010d.partial", exclusiveEndBlock, s.StoreInitialBlock)
+		return fmt.Sprintf("%010d-%010d.partial", exclusiveEndBlock, s.storeInitialBlock)
 	} else {
-		return fmt.Sprintf("%010d-%010d.kv", exclusiveEndBlock, s.StoreInitialBlock)
+		return fmt.Sprintf("%010d-%010d.kv", exclusiveEndBlock, s.storeInitialBlock)
 	}
 }
 
@@ -145,8 +150,11 @@ func (b *Store) loadState(ctx context.Context, stateFileName string) error {
 	return nil
 }
 
-func (s *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
-	zlog.Debug("writing state", zap.Object("builder", s), zap.Uint64("last_block", lastBlock))
+// WriteState is to be called ONLY when we just passed the
+// `nextExpectedBoundary` and processed nothing more after that
+// boundary.
+func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (err error) {
+	zlog.Debug("writing state", zap.Object("builder", s))
 
 	kv := stringMap(s.KV) // FOR READABILITY ON DISK
 
@@ -160,31 +168,21 @@ func (s *Store) WriteState(ctx context.Context, lastBlock uint64) (err error) {
 		zap.Bool("partial", s.IsPartial()),
 	)
 
-	if _, err = s.writeState(ctx, content, lastBlock); err != nil {
-		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.StoreInitialBlock, lastBlock, err)
+	if _, err = s.writeState(ctx, content, endBoundaryBlock); err != nil {
+		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.storeInitialBlock, s.nextExpectedBoundary, err)
 	}
 
 	return nil
 }
 
-func (s *Store) writeState(ctx context.Context, content []byte, lastBlock uint64) (string, error) {
-	filename := s.storageFilename(lastBlock)
-
+func (s *Store) writeState(ctx context.Context, content []byte, endBoundaryBlock uint64) (string, error) {
+	filename := s.storageFilename(endBoundaryBlock)
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		return s.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	})
 	if err != nil {
-		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.StoreInitialBlock, lastBlock, err)
+		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.storeInitialBlock, s.nextExpectedBoundary, err)
 	}
-
-	// FIXME(abourget): not needed when we don't use that state file anymore
-	// endsOnBoundary := lastBlock%s.SaveInterval == 0
-	// if !s.IsPartial() && endsOnBoundary {
-	// 	if err := s.writeInfoState(ctx, filename, lastBlock); err != nil {
-	// 		return filename, fmt.Errorf("writing info state: %w", err)
-	// 	}
-	// }
-
 	return filename, err
 }
 
@@ -225,8 +223,13 @@ func (s *Store) Flush() {
 }
 
 func (s *Store) Roll(lastBlock uint64) {
-	s.StoreInitialBlock = lastBlock
+	s.storeInitialBlock = lastBlock
 	s.KV = map[string][]byte{}
+	s.PushBoundary()
+}
+
+func (s *Store) PushBoundary() {
+	s.nextExpectedBoundary += s.SaveInterval
 }
 
 func (s *Store) bumpOrdinal(ord uint64) {

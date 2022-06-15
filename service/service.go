@@ -122,7 +122,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	_ = logger
 
 	if request.StartBlockNum < 0 {
-		// FIXME start block resolving is an art, it should be handled here
+		// TODO(abourget) start block resolving is an art, it should be handled here
 		zlog.Error("invalid negative startblock (not handled in substreams)", zap.Int64("start_block", request.StartBlockNum))
 		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
 	}
@@ -190,9 +190,13 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		StartBlockNum: request.StartBlockNum,
 		StopBlockNum:  request.StopBlockNum,
 		StartCursor:   request.StartCursor,
-		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE}, //FIXME, should we support whatever is supported by the `request` here?
-
-		// ...FIXME ?
+		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE},
+		// FIXME(abourget), right now, the pbsubstreams.Request has a
+		// ForkSteps that we IGNORE. Eventually, we will want to honor
+		// it, but ONLY when we are certain that our Pipeline supports
+		// reorgs navigation, which is not the case right now.
+		// FIXME(abourget): will we also honor the IrreversibilityCondition?
+		// perhaps on the day we actually support it in the Firehose :)
 	}
 
 	if err := pipe.Init(workerPool); err != nil {

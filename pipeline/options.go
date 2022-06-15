@@ -13,6 +13,9 @@ type PipelineOptioner interface {
 
 type Option func(p *Pipeline)
 
+// TODO(abourget):
+// OrchestratedExecution -> Subrequest
+// isOrchestrated -> isSubrequest
 func WithOrchestratedExecution() Option {
 	return func(p *Pipeline) {
 		p.isOrchestrated = true

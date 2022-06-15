@@ -88,17 +88,8 @@ func TestSquash(t *testing.T) {
 }
 
 func testStateBuilder(store dstore.Store) *state.Store {
-	return &state.Store{
-		Name:               "testBuilder",
-		SaveInterval:       10_000,
-		ModuleInitialBlock: 10_000,
-		StoreInitialBlock:  10_000,
-		Store:              store,
-		ModuleHash:         "abc",
-		KV:                 map[string][]byte{},
-		UpdatePolicy:       pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
-		ValueType:          state.OutputValueTypeString,
-	}
+	s, _ := state.NewBuilder("testBuilder", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
+	return s
 }
 
 // func TestConcurrentSquasherClose(t *testing.T) {

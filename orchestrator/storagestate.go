@@ -30,7 +30,7 @@ func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out
 
 		s := store
 		eg.Go(func() error {
-			snapshots, err := listSnapshots(ctx, s)
+			snapshots, err := listSnapshots(ctx, s.Store)
 			if err != nil {
 				return err
 			}

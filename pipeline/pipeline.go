@@ -146,35 +146,39 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	// Fetch the stores
 
 	if p.isOrchestrated {
+		zlog.Info("initializing and loading stores")
 		storeMap, err := p.buildStoreMap()
 		if err != nil {
 			return fmt.Errorf("building store map: %w", err)
 		}
 
+		// truncateLeaf()
 		totalOutputModules := len(p.request.OutputModules)
 		outputName := p.request.OutputModules[0]
 		backProcessingStore := storeMap[outputName]
 		lastStoreName := p.storeModules[len(p.storeModules)-1].Name
 		isLastStore := lastStoreName == backProcessingStore.Name
 
-		if totalOutputModules == 1 && backProcessingStore != nil && isLastStore {
+		if totalOutputModules != 1 || backProcessingStore == nil || !isLastStore {
 			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
-			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
-
-			backProcessingStore.StoreInitialBlock = p.requestedStartBlockNum
-			p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
-		} else {
-			zlog.Info("conditions for leaf store not met",
+			zlog.Warn("conditions for leaf store not met",
 				zap.String("module", outputName),
 				zap.Bool("is_last_store", isLastStore),
 				zap.Int("output_module_count", totalOutputModules))
+			return fmt.Errorf("invalid conditions to backprocess leaf store %q", outputName)
 		}
 
-		zlog.Info("initializing and loading stores")
+		zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
+
+		// FIXME(abourget):  we actually shouldn't be laoding the backProcessingStore here,
+		// because we want it clean, and we want to start producing a new partial with it.
 		if err = loadStores(ctx, storeMap, p.requestedStartBlockNum); err != nil {
 			return fmt.Errorf("loading stores: %w", err)
 		}
+
+		backProcessingStore.Roll(p.requestedStartBlockNum)
+		p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
 
 		p.storeMap = storeMap
 	} else {
@@ -299,12 +303,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		// expected boundary by our work units, and NOT the
 		// clock.Number, in case we skipped some.
 
-		if p.isOrchestrated {
-			// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
-			zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
-			if err := p.moduleOutputCache.Save(ctx); err != nil {
-				return fmt.Errorf("saving partial caches")
-			}
+		zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
+		if err := p.moduleOutputCache.Flush(ctx); err != nil {
+			return fmt.Errorf("saving partial caches")
 		}
 		return io.EOF
 	}
@@ -384,7 +385,7 @@ func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bs
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: store.StoreInitialBlock,
+							StartBlock: store.StoreInitBlock(),
 							EndBlock:   p.clock.Number,
 						},
 					},
@@ -625,33 +626,42 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) er
 	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!! The caller or this function
 	// should handle this, with a previous boundary that was passed, etc.. to support
 	// chains that skip blocks.
+
 	for _, builder := range p.storeMap {
-		// TODO: implement parallel writing and upload for the different stores involved.
-		err := builder.WriteState(ctx, lastBlock)
-		if err != nil {
-			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
-		}
+		// expectedNextBoundary + saveInterval
+		// loop through incremental boundaries
 
-		// FIXME(abourget): we'll need to add to `partialsWritten` if
-		// we're backprocessing and tasked to build the first complete
-		// store.  Also, it is implicit, if we are backprocessing,
-		// that the edge stores are to be processed BUT this assumes
-		// we are building a single store, and will not scale to
-		// multiple stores.  The `partialsWritten` array is a single
-		// array and assumes a single output module.  Perhaps that
-		// needs to be revised, or we ned to panic here if there are
-		// two leaf stores.
-		//
-		// FIXME(abourget): If the job starts at module start block,
-		// we want it to BECOME a partial after the FIRST kv being written.
-		if p.isOrchestrated && p.IsOutputModule(builder.Name) {
-			r := block.NewRange(builder.StoreInitialBlock, lastBlock)
-			p.partialsWritten = append(p.partialsWritten, r)
-			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
-			builder.Roll(lastBlock)
-		}
+		for builder.NextBoundary() < lastBlock {
 
-		zlog.Info("state written", zap.String("store_name", builder.Name))
+			// TODO: implement parallel writing and upload for the different stores involved.
+			err := builder.WriteState(ctx, builder.NextBoundary())
+			if err != nil {
+				return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
+			}
+
+			// FIXME(abourget): we'll need to add to `partialsWritten` if
+			// we're backprocessing and tasked to build the first complete
+			// store.  Also, it is implicit, if we are backprocessing,
+			// that the edge stores are to be processed BUT this assumes
+			// we are building a single store, and will not scale to
+			// multiple stores.  The `partialsWritten` array is a single
+			// array and assumes a single output module.  Perhaps that
+			// needs to be revised, or we ned to panic here if there are
+			// two leaf stores.
+			//
+			// FIXME(abourget): If the job starts at module start block,
+			// we want it to BECOME a partial after the FIRST kv being written.
+			if p.isOrchestrated && p.IsOutputModule(builder.Name) {
+				r := block.NewRange(builder.StoreInitBlock(), lastBlock)
+				p.partialsWritten = append(p.partialsWritten, r)
+				zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
+				builder.Roll(lastBlock)
+			} else {
+				builder.PushBoundary()
+			}
+
+			zlog.Info("state written", zap.String("store_name", builder.Name))
+		}
 	}
 
 	return nil
@@ -682,7 +692,7 @@ func loadStores(ctx context.Context, storeMap map[string]*state.Store, requested
 		if store.IsPartial() {
 			continue
 		}
-		if store.StoreInitialBlock == requestedStartBlock {
+		if store.StoreInitBlock() == requestedStartBlock {
 			continue
 		}
 

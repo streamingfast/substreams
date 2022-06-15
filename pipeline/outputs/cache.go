@@ -94,7 +94,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 	return nil
 }
 
-func (c *ModulesOutputCache) Save(ctx context.Context) error {
+func (c *ModulesOutputCache) Flush(ctx context.Context) error {
 	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
 		filename := moduleCache.currentFilename()

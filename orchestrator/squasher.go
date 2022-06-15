@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/streamingfast/substreams/block"
 
@@ -77,14 +76,6 @@ func (s *Squasher) Squash(ctx context.Context, moduleName string, partialsRanges
 }
 
 func (s *Squasher) StoresReady() (out map[string]*state.Store, err error) {
-	// FIXME(abourget): Before checking the state of all those squashables,
-	// we need to make sure all those Scheduler::Callback and Squash() calls
-	// have finished, and that those `merge()` operations have completed..
-	// otherwise here we can't loop the squashables and expect to have
-	// merged stores.
-	// LET'S CHECK THAT LATER
-	time.Sleep(100 * time.Millisecond) // And remove this!
-
 	out = map[string]*state.Store{}
 	var errs []string
 	for _, squashable := range s.squashables {

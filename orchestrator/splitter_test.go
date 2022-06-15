@@ -38,21 +38,20 @@ func TestSplitSomeWork(t *testing.T) {
 		snapshots    *Snapshots // store's Last block saved from the store's Info file
 		reqStart     uint64     // the request's absolute start block
 
-		expectInitLoad *block.Range // Used for LoadFrom()
-		expectMissing  block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
-		expectPresent  block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
-		// FIXME(abourget): make that a `StoreSplit` again
-		reqSlip        uint64
+		expectInitLoad    *block.Range // Used for LoadFrom()
+		expectMissing     block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
+		expectPresent     block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
+		storeSaveInterval uint64
 	}
 
-	splitTest := func(name string, reqSplit uint64, modInitBlock uint64, snapshotsSpec string, reqStart uint64, expectInitLoad, expectMissing, expectPresent string,
+	splitTest := func(name string, storeSaveInterval uint64, modInitBlock uint64, snapshotsSpec string, reqStart uint64, expectInitLoad, expectMissing, expectPresent string,
 	) splitTestCase {
 		c := splitTestCase{
-			name:         name,
-			reqSlip:      reqSplit,
-			snapshots:    parseSnapshotSpec(snapshotsSpec),
-			modInitBlock: modInitBlock,
-			reqStart:     reqStart,
+			name:              name,
+			storeSaveInterval: storeSaveInterval,
+			snapshots:         parseSnapshotSpec(snapshotsSpec),
+			modInitBlock:      modInitBlock,
+			reqStart:          reqStart,
 		}
 		c.expectInitLoad = block.ParseRange(expectInitLoad)
 		c.expectMissing = block.ParseRanges(expectMissing)
@@ -121,7 +120,7 @@ func TestSplitSomeWork(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			work := SplitWork("mod", tt.reqSlip, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			work := SplitWork("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			assert.Equal(t, tt.expectInitLoad, work.initialStoreFile)
 			assert.Equal(t,
 				tt.expectMissing.String(),

@@ -115,21 +115,21 @@ func TestGetOrdered(t *testing.T) {
 		moduleName:   "A",
 		requestRange: block.NewRange(100, 200),
 	}
-	_ = p.Add(ctx, 0, r0, waiter0)
+	_ = p.Add(ctx, 2, r0, waiter0)
 
 	waiter1 := NewWaiter(200)
 	r1 := &Job{
 		moduleName:   "A",
 		requestRange: block.NewRange(200, 300),
 	}
-	_ = p.Add(ctx, 0, r1, waiter1)
+	_ = p.Add(ctx, 1, r1, waiter1)
 
 	waiter2 := NewWaiter(100, &pbsubstreams.Module{Name: "A"})
 	r2 := &Job{
 		moduleName:   "B",
 		requestRange: block.NewRange(100, 200),
 	}
-	_ = p.Add(ctx, 0, r2, waiter2)
+	_ = p.Add(ctx, 2, r2, waiter2)
 
 	p.Start(ctx)
 
@@ -138,6 +138,10 @@ func TestGetOrdered(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "A", r.moduleName)
+	require.Equal(t, &block.Range{
+		StartBlock:        100,
+		ExclusiveEndBlock: 200,
+	}, r.requestRange)
 
 	// we notify that A is ready up to block 100, which will put the request for B to the front of the queue
 	p.Notify("A", 100)
@@ -153,12 +157,20 @@ func TestGetOrdered(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "B", r.moduleName)
+	require.Equal(t, &block.Range{
+		StartBlock:        100,
+		ExclusiveEndBlock: 200,
+	}, r.requestRange)
 
 	// assert that the remaining request is there
 	r, err = p.GetNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "A", r.moduleName)
+	require.Equal(t, &block.Range{
+		StartBlock:        200,
+		ExclusiveEndBlock: 300,
+	}, r.requestRange)
 
 	// asser the end of the stream
 	r, err = p.GetNext(ctx)

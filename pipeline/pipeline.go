@@ -301,19 +301,19 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(block, executor)
+		err = p.runExecutor(executor)
 		if err != nil {
 			return fmt.Errorf("running module executor: %w", err)
 		}
 	}
 
 	if shouldReturnProgress(p.isSubrequest) {
-		if err := p.returnModuleProgressOutputs(step, cursor, p.isSubrequest); err != nil {
+		if err := p.returnModuleProgressOutputs(); err != nil {
 			return err
 		}
 	}
 	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
-		if err := p.returnModuleDataOutputs(step, cursor, p.isSubrequest); err != nil {
+		if err := p.returnModuleDataOutputs(step, cursor); err != nil {
 			return err
 		}
 	}
@@ -326,7 +326,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
-func (p *Pipeline) runExecutor(block *bstream.Block, executor ModuleExecutor) error {
+func (p *Pipeline) runExecutor(executor ModuleExecutor) error {
 	//FIXME(abourget): should we ever skip that work?
 	// if executor.ModuleInitialBlock < block.Number {
 	// 	continue ??
@@ -373,14 +373,14 @@ func shouldReturnDataOutputs(blockNum, requestedStartBlockNum uint64, isSubReque
 }
 
 func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
-	if request.StopBlockNum <= 0 { //never stop
+	if request.StopBlockNum <= 0 {
 		return false
 	}
 
 	return clock.Number >= request.StopBlockNum
 }
 
-func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
+func (p *Pipeline) returnModuleProgressOutputs() error {
 	var progress []*pbsubstreams.ModuleProgress
 	for _, store := range p.backprocessingStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
@@ -404,7 +404,7 @@ func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bs
 	return nil
 }
 
-func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
+func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
 	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
 	out := &pbsubstreams.BlockScopedData{
 		Outputs: p.moduleOutputs,

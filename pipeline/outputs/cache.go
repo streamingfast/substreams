@@ -131,26 +131,26 @@ func (o *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
 	return !o.CurrentBlockRange.Contains(ref)
 }
 
-func (o *OutputCache) Set(block *bstream.Block, data []byte) error {
+func (o *OutputCache) Set(clock *pbsubstreams.Clock, data []byte) error {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
 	ci := &CacheItem{
-		BlockNum: block.Num(),
-		BlockID:  block.Id,
+		BlockNum: clock.Number,
+		BlockID:  clock.Id,
 		Payload:  data,
 	}
 
-	o.kv[block.Id] = ci
+	o.kv[clock.Id] = ci
 
 	return nil
 }
 
-func (o *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
+func (o *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool, error) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
-	cacheItem, found := o.kv[block.Id]
+	cacheItem, found := o.kv[clock.Id]
 
 	if !found {
 		return nil, false, nil

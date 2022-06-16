@@ -114,7 +114,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) IsOutputModule(name string) bool {
+func (p *Pipeline) isOutputModule(name string) bool {
 	_, found := p.outputModuleMap[name]
 	return found
 }
@@ -301,36 +301,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		//FIXME(abourget): should we ever skip that work?
-		// if executor.ModuleInitialBlock < block.Number {
-		// 	continue ??
-		// }
-		executorName := executor.Name()
-		zlog.Debug("executing", zap.String("module_name", executorName))
-
-		executionError := executor.run(p.wasmOutputs, p.clock, block)
-
-		if isOutput := p.outputModuleMap[executorName]; isOutput {
-			logs, truncated := executor.moduleLogs()
-			outputData := executor.moduleOutputData()
-			if len(logs) != 0 || outputData != nil {
-				p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-					Name:          executorName,
-					Data:          outputData,
-					Logs:          logs,
-					LogsTruncated: truncated,
-				})
-			}
+		err2 := p.runExecutor(block, executor)
+		if err2 != nil {
+			return err2
 		}
-
-		if executionError != nil {
-			if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
-				return fmt.Errorf("progress error: %w", returnErr)
-			}
-			return fmt.Errorf("exec error: %w", executionError)
-		}
-
-		executor.Reset()
 	}
 
 	if shouldReturnProgress(p.isSubrequest) {
@@ -349,6 +323,40 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
+	return nil
+}
+
+func (p *Pipeline) runExecutor(block *bstream.Block, executor ModuleExecutor) error {
+	//FIXME(abourget): should we ever skip that work?
+	// if executor.ModuleInitialBlock < block.Number {
+	// 	continue ??
+	// }
+	executorName := executor.Name()
+	zlog.Debug("executing", zap.String("module_name", executorName))
+
+	executionError := executor.run(p.wasmOutputs, p.clock)
+
+	if p.isOutputModule(executorName) {
+		logs, truncated := executor.moduleLogs()
+		outputData := executor.moduleOutputData()
+		if len(logs) != 0 || outputData != nil {
+			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name:          executorName,
+				Data:          outputData,
+				Logs:          logs,
+				LogsTruncated: truncated,
+			})
+		}
+	}
+
+	if executionError != nil {
+		if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
+			return fmt.Errorf("progress error: %w", returnErr)
+		}
+		return fmt.Errorf("exec error: %w", executionError)
+	}
+
+	executor.Reset()
 	return nil
 }
 
@@ -612,7 +620,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 		}
 		zlog.Info("state written", zap.String("store_name", builder.Name))
 
-		if p.isSubrequest && p.IsOutputModule(builder.Name) {
+		if p.isSubrequest && p.isOutputModule(builder.Name) {
 			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)
 			p.partialsWritten = append(p.partialsWritten, r)
 			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))

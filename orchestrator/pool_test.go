@@ -107,7 +107,6 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetOrdered(t *testing.T) {
-	t.Errorf("this test sometime failed. need to check a race condition...")
 	p := NewRequestPool()
 	ctx := context.Background()
 
@@ -142,7 +141,12 @@ func TestGetOrdered(t *testing.T) {
 
 	// we notify that A is ready up to block 100, which will put the request for B to the front of the queue
 	p.Notify("A", 100)
-	time.Sleep(100 * time.Microsecond) // give it a teeny bit of time for notification to get processed
+
+	// NOTE:
+	// if this test ever fails, it is almost certainly because some cpu race is happening here, and that the getNext below
+	// is getting called before the Notify call above is not done being processed.  we try to give it enough time, without slowing down
+	// the testing process too much.
+	time.Sleep(500 * time.Millisecond) // give it a teeny bit of time for notification to get processed.
 
 	// assert that the request for B got put ahead of the request for A
 	r, err = p.GetNext(ctx)

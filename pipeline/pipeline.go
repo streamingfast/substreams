@@ -333,11 +333,12 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		executor.Reset()
 	}
 
-	if blockNum >= p.requestedStartBlockNum {
+	if shouldReturnProgress(blockNum, p.requestedStartBlockNum, p.isOrchestrated) {
 		if err := p.returnModuleProgressOutputs(step, cursor, p.isOrchestrated); err != nil {
 			return err
 		}
-
+	}
+	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isOrchestrated) {
 		if err := p.returnModuleDataOutputs(step, cursor, p.isOrchestrated); err != nil {
 			return err
 		}
@@ -351,6 +352,18 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
+func shouldReturn(blockNum, requestedStartBlockNum uint64) bool {
+	return blockNum >= requestedStartBlockNum
+}
+
+func shouldReturnProgress(blockNum, requestedStartBlockNum uint64, isSubRequest bool) bool {
+	return shouldReturn(blockNum, requestedStartBlockNum) && !isSubRequest
+}
+
+func shouldReturnDataOutputs(blockNum, requestedStartBlockNum uint64, isSubRequest bool) bool {
+	return shouldReturn(blockNum, requestedStartBlockNum) && isSubRequest
+}
+
 func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
 	if request.StopBlockNum <= 0 { //never stop
 		return false
@@ -360,10 +373,6 @@ func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request
 }
 
 func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
-	if !isSubrequest {
-		return nil
-	}
-
 	var progress []*pbsubstreams.ModuleProgress
 	for _, store := range p.backprocessingStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
@@ -388,10 +397,6 @@ func (p *Pipeline) returnModuleProgressOutputs(step bstream.StepType, cursor *bs
 }
 
 func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor, isSubrequest bool) error {
-	if isSubrequest {
-		return nil
-	}
-
 	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
 	out := &pbsubstreams.BlockScopedData{
 		Outputs: p.moduleOutputs,

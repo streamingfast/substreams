@@ -301,9 +301,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		err2 := p.runExecutor(block, executor)
-		if err2 != nil {
-			return err2
+		err = p.runExecutor(block, executor)
+		if err != nil {
+			return fmt.Errorf("running module executor: %w", err)
 		}
 	}
 

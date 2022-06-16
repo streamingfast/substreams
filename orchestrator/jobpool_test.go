@@ -134,6 +134,7 @@ func TestGetOrdered(t *testing.T) {
 	p.Start(ctx)
 
 	// first request will be for A, since they have no dependencies and are ready right away.
+	// it will be for the [100,200) range since this job waiter has a higher reverseIdx
 	r, err := p.GetNext(ctx)
 	require.Nil(t, err)
 	require.NotNil(t, r)

@@ -55,7 +55,6 @@ func NewOrderedStrategy(
 				requestRange:       requestRange,
 			}
 
-			//req := createRequest(requestRange, store.Name, request.IrreversibilityCondition, request.Modules)
 			waiter := NewWaiter(requestRange.StartBlock, ancestorStoreModules...)
 			_ = pool.Add(ctx, rangeLen-idx, job, waiter)
 

@@ -26,7 +26,7 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Info("synchronizing stores")
 
-	requestPool := orchestrator.NewRequestPool()
+	jobPool := orchestrator.NewJobPool()
 
 	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
 	if err != nil {
@@ -45,12 +45,12 @@ func (p *Pipeline) backProcessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, workPlan, uint64(p.subrequestSplitSize), initialStoreMap, p.graph, requestPool)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, workPlan, uint64(p.subrequestSplitSize), initialStoreMap, p.graph, jobPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, requestPool)
+	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, jobPool)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
@@ -69,7 +69,7 @@ func (p *Pipeline) backProcessStores(
 
 	go scheduler.Launch(ctx, result)
 
-	requestCount := requestPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
+	requestCount := jobPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
 	for resultCount := 0; resultCount < requestCount; {
 		select {
 		case <-ctx.Done():

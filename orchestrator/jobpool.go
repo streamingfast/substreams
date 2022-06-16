@@ -11,20 +11,21 @@ import (
 	"go.uber.org/zap"
 )
 
-type requestWaiter struct {
+type jobWaiter struct {
 	ReverseIndex int // per module decrementing index
-	job          *Job
-	Waiter       Waiter
+
+	job    *Job
+	Waiter Waiter
 }
 
 type Notifier interface {
 	Notify(builder string, blockNum uint64)
 }
 
-type RequestPool struct {
-	readyRequestStream chan *requestWaiter
+type JobPool struct {
+	readyJobStream chan *jobWaiter
 
-	requestWaiters []*requestWaiter
+	jobWaiters []*jobWaiter
 
 	queueSend    chan *QueueItem
 	queueReceive chan *QueueItem
@@ -32,22 +33,22 @@ type RequestPool struct {
 	waiters      map[Waiter]struct{}
 	waitersMutex sync.RWMutex
 
-	totalRequests int
+	totalJobs int
 
 	start      sync.Once
 	readActive bool
 }
 
-func NewRequestPool() *RequestPool {
-	p := RequestPool{}
-	p.readyRequestStream = make(chan *requestWaiter, 5000)
+func NewJobPool() *JobPool {
+	p := JobPool{}
+	p.readyJobStream = make(chan *jobWaiter, 5000)
 	p.queueSend = make(chan *QueueItem, 5000)
 	p.queueReceive = make(chan *QueueItem)
 	p.waiters = map[Waiter]struct{}{}
 	return &p
 }
 
-func (p *RequestPool) State() string {
+func (p *JobPool) State() string {
 	p.waitersMutex.RLock()
 	defer p.waitersMutex.RUnlock()
 
@@ -61,7 +62,7 @@ func (p *RequestPool) State() string {
 	return strings.Join(waiters, ",")
 }
 
-func (p *RequestPool) Notify(builder string, blockNum uint64) {
+func (p *JobPool) Notify(builder string, blockNum uint64) {
 	p.waitersMutex.Lock()
 	defer p.waitersMutex.Unlock()
 
@@ -72,28 +73,28 @@ func (p *RequestPool) Notify(builder string, blockNum uint64) {
 	}
 }
 
-func (p *RequestPool) Add(ctx context.Context, reverseIdx int, job *Job, waiter Waiter) error {
+func (p *JobPool) Add(ctx context.Context, reverseIdx int, job *Job, waiter Waiter) error {
 	if p.readActive {
 		return fmt.Errorf("cannot add to pool once reading has begun")
 	}
 
-	rw := &requestWaiter{
+	rw := &jobWaiter{
 		ReverseIndex: reverseIdx,
 		job:          job,
 		Waiter:       waiter,
 	}
 
 	p.waitersMutex.Lock()
-	p.totalRequests++
+	p.totalJobs++
 	p.waiters[rw.Waiter] = struct{}{}
-	p.requestWaiters = append(p.requestWaiters, rw)
+	p.jobWaiters = append(p.jobWaiters, rw)
 	p.waitersMutex.Unlock()
 
 	return nil
 }
 
-func (p *RequestPool) Start(ctx context.Context) {
-	zlog.Debug("starting request pool")
+func (p *JobPool) Start(ctx context.Context) {
+	zlog.Debug("starting job pool")
 	p.start.Do(func() {
 		zlog.Debug("starting queue")
 		StartQueue(ctx, p.queueSend, p.queueReceive)
@@ -102,17 +103,17 @@ func (p *RequestPool) Start(ctx context.Context) {
 
 		wg := sync.WaitGroup{}
 
-		zlog.Debug("adding to waitgroup", zap.Int("waiters", len(p.requestWaiters)))
-		wg.Add(len(p.requestWaiters))
+		zlog.Debug("adding to waitgroup", zap.Int("waiters", len(p.jobWaiters)))
+		wg.Add(len(p.jobWaiters))
 
 		go func() {
 			wg.Wait()
 			zlog.Debug("done waiting for waitgroup")
-			close(p.readyRequestStream)
+			close(p.readyJobStream)
 		}()
 
-		for _, rw := range p.requestWaiters {
-			go func(item *requestWaiter) {
+		for _, rw := range p.jobWaiters {
+			go func(item *jobWaiter) {
 				defer wg.Done()
 
 				select {
@@ -122,8 +123,8 @@ func (p *RequestPool) Start(ctx context.Context) {
 					select {
 					case <-ctx.Done():
 						return
-					case p.readyRequestStream <- item:
-						zlog.Debug("sent to ready request stream")
+					case p.readyJobStream <- item:
+						zlog.Debug("sent to ready job stream")
 						p.waitersMutex.Lock()
 						delete(p.waiters, item.Waiter)
 						p.waitersMutex.Unlock()
@@ -141,7 +142,7 @@ func (p *RequestPool) Start(ctx context.Context) {
 				select {
 				case <-ctx.Done():
 					return
-				case waiter, ok := <-p.readyRequestStream:
+				case waiter, ok := <-p.readyJobStream:
 					if !ok {
 						return
 					}
@@ -159,7 +160,7 @@ func (p *RequestPool) Start(ctx context.Context) {
 	})
 }
 
-func (p *RequestPool) GetNext(ctx context.Context) (*Job, error) {
+func (p *JobPool) GetNext(ctx context.Context) (*Job, error) {
 	zlog.Debug("in GetNext")
 	select {
 	case <-ctx.Done():
@@ -173,6 +174,6 @@ func (p *RequestPool) GetNext(ctx context.Context) (*Job, error) {
 	}
 }
 
-func (p *RequestPool) Count() int {
-	return p.totalRequests
+func (p *JobPool) Count() int {
+	return p.totalJobs
 }

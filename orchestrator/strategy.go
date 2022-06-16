@@ -11,7 +11,7 @@ import (
 )
 
 type OrderedStrategy struct {
-	requestPool *RequestPool
+	requestPool *JobPool
 }
 
 func NewOrderedStrategy(
@@ -20,7 +20,7 @@ func NewOrderedStrategy(
 	subreqSplit uint64,
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
-	pool *RequestPool,
+	pool *JobPool,
 ) (*OrderedStrategy, error) {
 	for storeName, store := range stores {
 		select {

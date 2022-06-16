@@ -42,7 +42,7 @@ func (tw *TestWaiter) String() string {
 }
 
 func TestNotify(t *testing.T) {
-	p := NewRequestPool()
+	p := NewJobPool()
 	ctx := context.Background()
 
 	signalCounter := new(int)
@@ -56,7 +56,7 @@ func TestNotify(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	t.Skip("fixme")
-	p := NewRequestPool()
+	p := NewJobPool()
 	ctx := context.Background()
 
 	waiter0 := NewWaiter(200,
@@ -107,7 +107,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetOrdered(t *testing.T) {
-	p := NewRequestPool()
+	p := NewJobPool()
 	ctx := context.Background()
 
 	waiter0 := NewWaiter(100)

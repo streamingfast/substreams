@@ -47,7 +47,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		"K": &WorkUnit{modName: "K"},
 	}
 
-	pool := NewRequestPool()
+	pool := NewJobPool()
 	ctx := context.Background()
 	s, err := NewOrderedStrategy(
 		ctx,

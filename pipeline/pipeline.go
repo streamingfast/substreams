@@ -30,7 +30,7 @@ type Pipeline struct {
 
 	requestedStartBlockNum uint64 // rename to: requestStartBlock, SET UPON receipt of the request
 	maxStoreSyncRangeSize  uint64
-	isOrchestrated         bool
+	isSubrequest           bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -68,7 +68,7 @@ type Pipeline struct {
 	currentBlockRef bstream.BlockRef
 
 	outputCacheSaveBlockInterval uint64
-	subreqSplitSize              int
+	subrequestSplitSize          int
 	grpcClientFactory            func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
@@ -81,7 +81,7 @@ func New(
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
-	subreqSplitSize int,
+	subrequestSplitSize int,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
 
@@ -98,7 +98,7 @@ func New(
 		wasmExtensions:               wasmExtensions,
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
-		subreqSplitSize:              subreqSplitSize,
+		subrequestSplitSize:          subrequestSplitSize,
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
 	}
@@ -122,7 +122,7 @@ func (p *Pipeline) IsOutputModule(name string) bool {
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
 
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isOrchestrated), zap.Strings("outputs", p.request.OutputModules))
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
@@ -151,7 +151,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	}
 
 	// Fetch the stores
-	if p.isOrchestrated {
+	if p.isSubrequest {
 		// truncateLeaf()
 		totalOutputModules := len(p.request.OutputModules)
 		outputName := p.request.OutputModules[0]
@@ -221,7 +221,7 @@ func (p *Pipeline) bumpStoreSaveBoundary() {
 }
 func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 	nextBoundary := fromBlock - fromBlock%p.storeSaveInterval + p.storeSaveInterval
-	if p.isOrchestrated && p.request.StopBlockNum != 0 && p.request.StopBlockNum < nextBoundary {
+	if p.isSubrequest && p.request.StopBlockNum != 0 && p.request.StopBlockNum < nextBoundary {
 		return p.request.StopBlockNum
 	}
 	return nextBoundary
@@ -333,13 +333,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		executor.Reset()
 	}
 
-	if shouldReturnProgress(blockNum, p.requestedStartBlockNum, p.isOrchestrated) {
-		if err := p.returnModuleProgressOutputs(step, cursor, p.isOrchestrated); err != nil {
+	if shouldReturnProgress(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+		if err := p.returnModuleProgressOutputs(step, cursor, p.isSubrequest); err != nil {
 			return err
 		}
 	}
-	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isOrchestrated) {
-		if err := p.returnModuleDataOutputs(step, cursor, p.isOrchestrated); err != nil {
+	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+		if err := p.returnModuleDataOutputs(step, cursor, p.isSubrequest); err != nil {
 			return err
 		}
 	}
@@ -414,7 +414,7 @@ func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstrea
 
 //todo(colin): break this up into two
 func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
-	if p.isOrchestrated {
+	if p.isSubrequest {
 
 	} else {
 
@@ -622,7 +622,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 		}
 		zlog.Info("state written", zap.String("store_name", builder.Name))
 
-		if p.isOrchestrated && p.IsOutputModule(builder.Name) {
+		if p.isSubrequest && p.IsOutputModule(builder.Name) {
 			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)
 			p.partialsWritten = append(p.partialsWritten, r)
 			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))

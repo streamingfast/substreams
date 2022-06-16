@@ -70,7 +70,7 @@ func TestStoreSaveBoundaries(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := &Pipeline{
-				isOrchestrated:    test.isSubrequest,
+				isSubrequest:      test.isSubrequest,
 				storeSaveInterval: 10,
 				request: &pbsubstreams.Request{
 					StopBlockNum: test.reqStop,

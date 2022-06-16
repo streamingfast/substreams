@@ -18,7 +18,7 @@ type Option func(p *Pipeline)
 // isOrchestrated -> isSubrequest
 func WithOrchestratedExecution() Option {
 	return func(p *Pipeline) {
-		p.isOrchestrated = true
+		p.isSubrequest = true
 	}
 }
 

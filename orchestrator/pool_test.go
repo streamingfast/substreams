@@ -107,6 +107,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetOrdered(t *testing.T) {
+	t.Errorf("this test sometime failed. need to check a race condition...")
 	p := NewRequestPool()
 	ctx := context.Background()
 

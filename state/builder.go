@@ -96,6 +96,7 @@ func (s *Store) IsPartial() bool {
 func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", s.Name)
 	enc.AddString("hash", s.ModuleHash)
+	enc.AddUint64("module_initial_block", s.ModuleInitialBlock)
 	enc.AddUint64("store_initial_block", s.storeInitialBlock)
 	//enc.AddUint64("next_expected_boundary", s.nextExpectedBoundary)
 	enc.AddBool("partial", s.IsPartial())
@@ -168,11 +169,6 @@ func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (err er
 		return fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	zlog.Info("about to write state",
-		zap.String("store", s.Name),
-		zap.Bool("partial", s.IsPartial()),
-	)
-
 	if _, err = s.writeState(ctx, content, endBoundaryBlock); err != nil {
 		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.storeInitialBlock, endBoundaryBlock, err)
 	}
@@ -182,6 +178,12 @@ func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (err er
 
 func (s *Store) writeState(ctx context.Context, content []byte, endBoundaryBlock uint64) (string, error) {
 	filename := s.storageFilename(endBoundaryBlock)
+	zlog.Info("about to write state",
+		zap.String("store", s.Name),
+		zap.Bool("partial", s.IsPartial()),
+		zap.String("file_name", filename),
+	)
+
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		return s.Store.WriteObject(ctx, filename, bytes.NewReader(content))
 	})

@@ -214,17 +214,19 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 }
 
 func (p *Pipeline) initStoreSaveBoundary() {
-	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
+	p.nextStoreSaveBoundary = p.computeInitialStoreSaveBoundary(p.requestedStartBlockNum)
 }
-func (p *Pipeline) bumpStoreSaveBoundary() {
-	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
-}
-func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
+
+func (p *Pipeline) computeInitialStoreSaveBoundary(fromBlock uint64) uint64 {
 	nextBoundary := fromBlock - fromBlock%p.storeSaveInterval + p.storeSaveInterval
 	if p.isSubrequest && p.request.StopBlockNum != 0 && p.request.StopBlockNum < nextBoundary {
 		return p.request.StopBlockNum
 	}
 	return nextBoundary
+}
+
+func (p *Pipeline) bumpStoreSaveBoundary() {
+	p.nextStoreSaveBoundary = p.nextStoreSaveBoundary - p.nextStoreSaveBoundary%p.storeSaveInterval + p.storeSaveInterval
 }
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
@@ -268,11 +270,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	p.moduleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
-	for p.nextStoreSaveBoundary < blockNum {
+	for p.nextStoreSaveBoundary <= blockNum {
 		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
 			return fmt.Errorf("saving stores: %w", err)
 		}
-
 		p.bumpStoreSaveBoundary()
 	}
 
@@ -618,12 +619,12 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 		if err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
-		zlog.Info("state written", zap.String("store_name", builder.Name))
+		zlog.Info("state written", zap.String("store_name", builder.Name), zap.Object("store", builder))
 
 		if p.isSubrequest && p.isOutputModule(builder.Name) {
 			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)
 			p.partialsWritten = append(p.partialsWritten, r)
-			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten))
+			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
 			builder.Roll(boundaryBlock)
 		}
 	}

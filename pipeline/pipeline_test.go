@@ -77,7 +77,7 @@ func TestStoreSaveBoundaries(t *testing.T) {
 				},
 			}
 
-			res := p.computeNextStoreSaveBoundary(test.fromBlock)
+			res := p.computeInitialStoreSaveBoundary(test.fromBlock)
 
 			assert.Equal(t, int(test.expectNext), int(res))
 		})

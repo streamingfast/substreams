@@ -333,7 +333,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		executor.Reset()
 	}
 
-	if shouldReturnProgress(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+	if shouldReturnProgress(p.isSubrequest) {
 		if err := p.returnModuleProgressOutputs(step, cursor, p.isSubrequest); err != nil {
 			return err
 		}
@@ -356,12 +356,12 @@ func shouldReturn(blockNum, requestedStartBlockNum uint64) bool {
 	return blockNum >= requestedStartBlockNum
 }
 
-func shouldReturnProgress(blockNum, requestedStartBlockNum uint64, isSubRequest bool) bool {
-	return shouldReturn(blockNum, requestedStartBlockNum) && !isSubRequest
+func shouldReturnProgress(isSubRequest bool) bool {
+	return isSubRequest
 }
 
 func shouldReturnDataOutputs(blockNum, requestedStartBlockNum uint64, isSubRequest bool) bool {
-	return shouldReturn(blockNum, requestedStartBlockNum) && isSubRequest
+	return shouldReturn(blockNum, requestedStartBlockNum) && !isSubRequest
 }
 
 func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
@@ -409,16 +409,6 @@ func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstrea
 		return fmt.Errorf("calling return func: %w", err)
 	}
 
-	return nil
-}
-
-//todo(colin): break this up into two
-func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
-	if p.isSubrequest {
-
-	} else {
-
-	}
 	return nil
 }
 

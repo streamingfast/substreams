@@ -48,7 +48,6 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 }
 
 // Store the total balance of NFT tokens by address for the specific TRACKED_CONTRACT by holder
-/// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
 #[substreams::handlers::store]
 fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
     log::info!("NFT state builder");

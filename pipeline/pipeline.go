@@ -221,8 +221,9 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 func (p *Pipeline) initStoreSaveBoundary() {
 	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
 }
-func (p *Pipeline) bumpStoreSaveBoundary() {
+func (p *Pipeline) bumpStoreSaveBoundary() bool {
 	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
+	return p.request.StopBlockNum == p.nextStoreSaveBoundary
 }
 func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 	nextBoundary := fromBlock - fromBlock%p.storeSaveInterval + p.storeSaveInterval
@@ -273,25 +274,18 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	p.moduleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
+	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
 	for p.nextStoreSaveBoundary <= blockNum {
 		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
 			return fmt.Errorf("saving stores: %w", err)
 		}
 		p.bumpStoreSaveBoundary()
-		//FIXME: this is weird!
-		if p.nextStoreSaveBoundary == p.request.StopBlockNum {
+		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
 			break
 		}
 	}
 
-	if isStopBlockReached(p.clock, p.request) {
-		// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
-		// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
-		//
-		// Would we use the StopBlockNum as a boundary? That's the
-		// expected boundary by our work units, and NOT the
-		// clock.Number, in case we skipped some.
-
+	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
 		zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
 		if err := p.moduleOutputCache.Flush(ctx); err != nil {
 			return fmt.Errorf("saving partial caches")
@@ -380,12 +374,12 @@ func shouldReturnDataOutputs(blockNum, requestedStartBlockNum uint64, isSubReque
 	return shouldReturn(blockNum, requestedStartBlockNum) && !isSubRequest
 }
 
-func isStopBlockReached(clock *pbsubstreams.Clock, request *pbsubstreams.Request) bool {
-	if request.StopBlockNum <= 0 {
+func isStopBlockReached(currentBlock uint64, stopBlock uint64) bool {
+	if stopBlock == 0 {
 		return false
 	}
 
-	return clock.Number >= request.StopBlockNum
+	return currentBlock >= stopBlock
 }
 
 func (p *Pipeline) returnModuleProgressOutputs() error {

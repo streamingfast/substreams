@@ -83,3 +83,144 @@ func TestStoreSaveBoundaries(t *testing.T) {
 		})
 	}
 }
+
+func TestBump(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		isSubrequest bool
+		reqStart     uint64
+		reqStop      uint64
+		blockSkip    int // default 1
+		expectSaves  []int
+	}{
+		{
+			name:         "subreq, should flush because stop block",
+			isSubrequest: true,
+			reqStart:     80,
+			reqStop:      90,
+			expectSaves:  []int{90},
+		},
+		{
+			name:         "no subreq, should NOT flush because stop block",
+			isSubrequest: false,
+			reqStart:     80,
+			reqStop:      90,
+			expectSaves:  []int{90},
+		},
+		{
+			name:         "subreq, current on next boundary",
+			isSubrequest: true,
+			reqStart:     80,
+			reqStop:      95,
+			expectSaves:  []int{90, 95},
+		},
+		{
+			name:         "no subreq, current 5+ next boundary",
+			isSubrequest: false,
+			reqStart:     80,
+			reqStop:      95,
+			expectSaves:  []int{90},
+		},
+		{
+			name:         "subreq, reqStart off bounds, current one off bound",
+			isSubrequest: true,
+			reqStart:     85,
+			reqStop:      95,
+			expectSaves:  []int{90, 95},
+		},
+		{
+			name:         "no subreq, reqStart off bounds, current one off bound",
+			isSubrequest: false,
+			reqStart:     85,
+			reqStop:      95,
+			expectSaves:  []int{90},
+		},
+		// Block skips 2
+		{
+			name:         "skip 2, subreq, should flush because stop block",
+			isSubrequest: true,
+			reqStart:     80,
+			reqStop:      90,
+			blockSkip:    2,
+			expectSaves:  []int{90},
+		},
+		{
+			name:         "skip 2, no subreq, should NOT flush because stop block",
+			isSubrequest: false,
+			reqStart:     80,
+			reqStop:      90,
+			blockSkip:    2,
+			expectSaves:  []int{90},
+		},
+		{
+			name:         "skip 2, subreq, current on next boundary",
+			isSubrequest: true,
+			reqStart:     80,
+			reqStop:      95,
+			blockSkip:    2,
+			expectSaves:  []int{90, 95},
+		},
+		{
+			name:         "skip 2, no subreq, current 5+ next boundary",
+			isSubrequest: false,
+			reqStart:     80,
+			reqStop:      95,
+			blockSkip:    2,
+			expectSaves:  []int{90},
+		},
+		{
+			name:         "skip 3, subreq, reqStart off bounds, current one off bound",
+			isSubrequest: true,
+			reqStart:     85,
+			reqStop:      95,
+			blockSkip:    3,
+			expectSaves:  []int{90, 95},
+		},
+		{
+			name:         "skip 3, no subreq, reqStart off bounds, current one off bound",
+			isSubrequest: false,
+			reqStart:     85,
+			reqStop:      95,
+			blockSkip:    3,
+			expectSaves:  []int{90},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			p := &Pipeline{
+				isSubrequest:           test.isSubrequest,
+				storeSaveInterval:      10,
+				requestedStartBlockNum: test.reqStart,
+				request: &pbsubstreams.Request{
+					StopBlockNum: test.reqStop,
+				},
+			}
+
+			p.initStoreSaveBoundary()
+
+			blockSkip := test.blockSkip
+			if blockSkip == 0 {
+				blockSkip = 1
+			}
+
+			var res []int
+			for blockNum := test.reqStart; blockNum < test.reqStop+5; blockNum += uint64(blockSkip) {
+				//fmt.Println("Block", blockNum)
+				for p.nextStoreSaveBoundary <= uint64(blockNum) {
+					res = append(res, int(p.nextStoreSaveBoundary))
+					p.bumpStoreSaveBoundary()
+					if isStopBlockReached(uint64(blockNum), test.reqStop) {
+						break
+					}
+				}
+				if isStopBlockReached(uint64(blockNum), test.reqStop) {
+					break
+				}
+			}
+
+			assert.Equal(t, test.expectSaves, res)
+		})
+	}
+}

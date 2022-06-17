@@ -121,6 +121,10 @@ func TestSplitSomeWork(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			work := SplitWork("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			if len(tt.expectMissing) == 0 {
+				assert.Nil(t, work)
+				return
+			}
 			assert.Equal(t, tt.expectInitLoad, work.initialStoreFile)
 			assert.Equal(t,
 				tt.expectMissing.String(),

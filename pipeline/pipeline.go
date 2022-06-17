@@ -219,19 +219,17 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 }
 
 func (p *Pipeline) initStoreSaveBoundary() {
-	p.nextStoreSaveBoundary = p.computeInitialStoreSaveBoundary(p.requestedStartBlockNum)
+	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
 }
-
-func (p *Pipeline) computeInitialStoreSaveBoundary(fromBlock uint64) uint64 {
+func (p *Pipeline) bumpStoreSaveBoundary() {
+	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
+}
+func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 	nextBoundary := fromBlock - fromBlock%p.storeSaveInterval + p.storeSaveInterval
 	if p.isSubrequest && p.request.StopBlockNum != 0 && p.request.StopBlockNum < nextBoundary {
 		return p.request.StopBlockNum
 	}
 	return nextBoundary
-}
-
-func (p *Pipeline) bumpStoreSaveBoundary() {
-	p.nextStoreSaveBoundary = p.nextStoreSaveBoundary - p.nextStoreSaveBoundary%p.storeSaveInterval + p.storeSaveInterval
 }
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
@@ -280,6 +278,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			return fmt.Errorf("saving stores: %w", err)
 		}
 		p.bumpStoreSaveBoundary()
+		//FIXME: this is weird!
+		if p.nextStoreSaveBoundary == p.request.StopBlockNum {
+			break
+		}
 	}
 
 	if isStopBlockReached(p.clock, p.request) {

@@ -25,13 +25,6 @@ type Store struct {
 
 	ModuleInitialBlock uint64
 	storeInitialBlock  uint64 // block at which we initialized this store
-	// nextExpectedBoundary uint64 // nextExpectedBoundary is used ONLY UPON WRITING store snapshots, reading boundaries are always explicitly passed. The Squasher does NOT use this variable.
-
-	// // FIXME(abourget): rename `nextExpectedBoundary` to
-	// // `nextLiveBoundary`? This, in the end, is ONLY USED to write
-	// // snapshots while doing live processing, not in the Squasher,
-	// // which has its own boundary checker, and wants to handle bounds
-	// // that are off of its own local `saveInterval` configuration.
 
 	KV              map[string][]byte          // KV is the state, and assumes all Deltas were already applied to it.
 	Deltas          []*pbsubstreams.StoreDelta // Deltas are always deltas for the given block.

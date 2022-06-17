@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/stretchr/testify/require"
@@ -73,30 +74,21 @@ func TestSquash(t *testing.T) {
 	s := testStateBuilder(store)
 	squashable := NewSquashable(s, 80_000, 10_000, notifierFunc)
 
-	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 20_000, end: 30_000, chunks: []*chunk{{20_000, 30_000, false}}}))
+	require.NoError(t, squashable.squash(ctx, []*block.Range{{20_000, 30_000}}))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 70_000, end: 80_000, chunks: []*chunk{{70_000, 80_000, false}}}))
+	require.NoError(t, squashable.squash(ctx, []*block.Range{{70_000, 80_000}}))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, &reqChunk{start: 10_000, end: 20_000, chunks: []*chunk{{10_000, 20_000, false}}}))
+	require.NoError(t, squashable.squash(ctx, []*block.Range{{10_000, 20_000}}))
 
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 	require.Equal(t, 2, notificationsSent)
 }
 
 func testStateBuilder(store dstore.Store) *state.Store {
-	return &state.Store{
-		Name:               "testBuilder",
-		SaveInterval:       10_000,
-		ModuleInitialBlock: 10_000,
-		StoreInitialBlock:  10_000,
-		Store:              store,
-		ModuleHash:         "abc",
-		KV:                 map[string][]byte{},
-		UpdatePolicy:       pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
-		ValueType:          state.OutputValueTypeString,
-	}
+	s, _ := state.NewBuilder("test", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
+	return s
 }
 
 // func TestConcurrentSquasherClose(t *testing.T) {

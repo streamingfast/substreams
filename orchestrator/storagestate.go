@@ -11,12 +11,12 @@ import (
 
 type StorageState struct {
 	sync.Mutex
-	Snapshots map[string]*state.Snapshots
+	Snapshots map[string]*Snapshots
 }
 
 func NewStorageState() *StorageState {
 	return &StorageState{
-		Snapshots: map[string]*state.Snapshots{},
+		Snapshots: map[string]*Snapshots{},
 	}
 }
 
@@ -30,7 +30,7 @@ func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out
 
 		s := store
 		eg.Go(func() error {
-			snapshots, err := s.ListSnapshots(ctx)
+			snapshots, err := listSnapshots(ctx, s.Store)
 			if err != nil {
 				return err
 			}

@@ -6,8 +6,8 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *Store) GetFirst(key string) ([]byte, bool) {
-	for _, delta := range b.Deltas {
+func (s *Store) GetFirst(key string) ([]byte, bool) {
+	for _, delta := range s.Deltas {
 		if delta.Key == key {
 			switch delta.Operation {
 			case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
@@ -20,20 +20,20 @@ func (b *Store) GetFirst(key string) ([]byte, bool) {
 			}
 		}
 	}
-	return b.GetLast(key)
+	return s.GetLast(key)
 }
 
-func (b *Store) GetLast(key string) ([]byte, bool) {
-	val, found := b.KV[key]
+func (s *Store) GetLast(key string) ([]byte, bool) {
+	val, found := s.KV[key]
 	return val, found
 }
 
 // GetAt returns the key for the state that includes the processing of `ord`.
-func (b *Store) GetAt(ord uint64, key string) (out []byte, found bool) {
-	out, found = b.GetLast(key)
+func (s *Store) GetAt(ord uint64, key string) (out []byte, found bool) {
+	out, found = s.GetLast(key)
 
-	for i := len(b.Deltas) - 1; i >= 0; i-- {
-		delta := b.Deltas[i]
+	for i := len(s.Deltas) - 1; i >= 0; i-- {
+		delta := s.Deltas[i]
 		if delta.Ordinal <= ord {
 			break
 		}

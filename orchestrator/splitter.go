@@ -1,33 +1,52 @@
 package orchestrator
 
 import (
+	"context"
 	"fmt"
-	"strings"
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/state"
 )
 
-// FIXME(abourget): WorkPlan ?
+type WorkPlan map[string]*WorkUnit
 
-type SplitWorkModules map[string]*SplitWork
+func (p WorkPlan) SquashPartialsPresent(ctx context.Context, squasher *Squasher) error {
+	for _, w := range p {
+		err := squasher.Squash(ctx, w.modName, w.partialsPresent)
+		if err != nil {
+			return fmt.Errorf("squash partials present for module %s: %w", w.modName, err)
+		}
+	}
+	return nil
+}
 
-func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
-	for storeName, work := range mods {
-		if work.loadInitialStore == nil {
+func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+	for storeName, unit := range p {
+		if unit.initialStoreFile == nil {
 			continue
 		}
+
+		var more []*pbsubstreams.BlockRange
+		if unit.initialStoreFile != nil {
+			more = append(more, &pbsubstreams.BlockRange{
+				StartBlock: unit.initialStoreFile.StartBlock,
+				EndBlock:   unit.initialStoreFile.ExclusiveEndBlock,
+			})
+		}
+
+		for _, rng := range unit.initialProcessedPartials() {
+			more = append(more, &pbsubstreams.BlockRange{
+				StartBlock: rng.StartBlock,
+				EndBlock:   rng.ExclusiveEndBlock,
+			})
+		}
+
 		out = append(out, &pbsubstreams.ModuleProgress{
 			Name: storeName,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-					ProcessedRanges: []*pbsubstreams.BlockRange{
-						{
-							StartBlock: work.loadInitialStore.StartBlock,
-							EndBlock:   work.loadInitialStore.ExclusiveEndBlock,
-						},
-					},
+					ProcessedRanges: more,
 				},
 			},
 		})
@@ -35,153 +54,81 @@ func (mods SplitWorkModules) ProgressMessages() (out []*pbsubstreams.ModuleProgr
 	return
 }
 
-// FIXME(abourget): StoreWorkUnit ?
-type SplitWork struct {
-	modName              string
-	loadInitialStore     *block.Range // Send a Progress message, saying the store is already processed for this range
-	initialCoveredRanges block.Ranges
-	reqChunks            []*reqChunk // All jobs that needs to be scheduled
+type WorkUnit struct {
+	modName string
+
+	initialStoreFile *block.Range // Points to a complete .kv file, to initialize the store upon getting started.
+	partialsMissing  block.Ranges
+	partialsPresent  block.Ranges
 }
 
-func SplitSomeWork(modName string, storeSplit, subReqSplit, modInitBlock, incomingReqStartBlock uint64, snapshots *state.Snapshots) (work *SplitWork) {
-	// FIXME: Make sure `storeSplit` and `subReqSplit` are a multiple of one another.
-	// storeSplit must actually be a factor of subReqSplit
-	// panic otherwise, and bring that check higher up the chain
+func (w *WorkUnit) initialProcessedPartials() block.Ranges {
+	return w.partialsPresent.Merged()
+}
 
-	work = &SplitWork{modName: modName}
+func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) *WorkUnit {
+	work := &WorkUnit{modName: modName}
 
-	storeLastBlock := snapshots.LastBlock()
+	if incomingReqStartBlock <= modInitBlock {
+		return nil
+	}
 
-	if storeLastBlock != 0 && storeLastBlock < modInitBlock {
+	completeSnapshot := snapshots.LastCompleteSnapshotBefore(incomingReqStartBlock)
+
+	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock <= modInitBlock {
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
 	}
 
-	if incomingReqStartBlock <= modInitBlock {
-		return work
+	backProcessStartBlock := modInitBlock
+	if completeSnapshot != nil {
+		backProcessStartBlock = completeSnapshot.ExclusiveEndBlock
+		work.initialStoreFile = block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock)
 	}
 
-	subReqStartBlock := computeStoreExclusiveEndBlock(storeLastBlock, incomingReqStartBlock, storeSplit, modInitBlock)
-	if storeLastBlock != 0 && storeLastBlock != modInitBlock && subReqStartBlock != 0 {
-		work.loadInitialStore = block.NewRange(modInitBlock, subReqStartBlock)
+	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
+		return nil
 	}
 
-	if subReqStartBlock == incomingReqStartBlock {
-		return
-	}
-	if subReqStartBlock == 0 {
-		subReqStartBlock = modInitBlock
-	}
-
-	requestRanges := block.NewRange(subReqStartBlock, incomingReqStartBlock).Split(subReqSplit)
-
-	for _, reqRange := range requestRanges {
-		reqChunk := &reqChunk{start: reqRange.StartBlock, end: reqRange.ExclusiveEndBlock}
-		// Now do the SECOND split, for chunks for `storeSplit`
-		storeSplitRanges := reqRange.Split(storeSplit)
-		for _, storeSplitRange := range storeSplitRanges {
-			if storeSplitRange.StartBlock < modInitBlock {
-				panic(fmt.Sprintf("module %q: received a squash request for a start block %d prior to the module's initial block %d", modName, storeSplitRange.StartBlock, modInitBlock))
-			}
-
-			if snapshots.ContainsPartial(storeSplitRange) {
-				continue
-			}
-
-			// FIXME(abourget): check this one again
-			// if reqRange.ExclusiveEndBlock < s.store.StoreInitialBlock {
-			// 	// Otherwise, risks stalling the merging (as ranges are
-			// 	// sorted, and only the first is checked for contiguousness)
-			// 	continue
-			// }
-			addStoreChunk := &chunk{
-				start:       storeSplitRange.StartBlock,
-				end:         storeSplitRange.ExclusiveEndBlock,
-				tempPartial: storeSplitRange.ExclusiveEndBlock%storeSplit != 0,
-			}
-			reqChunk.chunks = append(reqChunk.chunks, addStoreChunk)
+	for ptr := backProcessStartBlock; ptr < incomingReqStartBlock; {
+		end := minOf(ptr-ptr%storeSaveInterval+storeSaveInterval, incomingReqStartBlock)
+		newPartial := block.NewRange(ptr, end)
+		if !snapshots.ContainsPartial(newPartial) {
+			work.partialsMissing = append(work.partialsMissing, newPartial)
+		} else {
+			work.partialsPresent = append(work.partialsPresent, newPartial)
 		}
-		work.reqChunks = append(work.reqChunks, reqChunk)
+		ptr = end
 	}
 
-	return
-}
-
-// computeStoreExclusiveEndBlock tells us WHERE we have a snapshot ready that can be queried in the conditions of this query.
-func computeStoreExclusiveEndBlock(lastSavedBlock, reqStartBlock, saveInterval, moduleInitialBlock uint64) uint64 {
-	previousBoundary := reqStartBlock - reqStartBlock%saveInterval
-	startBlockOnBoundary := reqStartBlock%saveInterval == 0
-
-	if reqStartBlock >= lastSavedBlock {
-		return lastSavedBlock
-	} else if previousBoundary < moduleInitialBlock {
-		return 0
-	} else if startBlockOnBoundary {
-		return reqStartBlock
-	}
-	return previousBoundary
-}
-
-type reqChunk struct {
-	start uint64
-	end   uint64 // exclusive end
-
-	chunks []*chunk // All partial stores that are expected to be produced by this subreq
-}
-
-func (c reqChunk) String() string {
-	var sc []string
-	for _, s := range c.chunks {
-		var add string
-		if s.tempPartial {
-			add = "TMP:"
-		}
-		sc = append(sc, fmt.Sprintf("%s%d-%d", add, s.start, s.end))
-	}
-	out := fmt.Sprintf("%d-%d", c.start, c.end)
-	if len(sc) != 0 {
-		out += " (" + strings.Join(sc, ", ") + ")"
-	}
-	out = strings.Replace(out, fmt.Sprintf(" (%d-%d)", c.start, c.end), "", 1)
-	return out
-}
-
-type chunk struct {
-	start       uint64
-	end         uint64 // exclusive end
-	tempPartial bool   // for off-of-bound stores (like ending in 1123, and not on 1000)
-}
-
-func (s chunk) String() string {
-	var add string
-	if s.tempPartial {
-		add = "TMP:"
-	}
-	return fmt.Sprintf("%s%d-%d", add, s.start, s.end)
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-type Splitter struct {
-	chunkSize uint64
-}
-
-func NewSplitter(chunkSize uint64) *Splitter {
-	// The splitter should accomodate and produce the outgoing subrequests necessary for the
-	// the incoming request to be satisfied, and for a squasher to know what to expect and do its
-	// squashing job, knowing what the subrequests should produce
-	return &Splitter{
-		chunkSize: chunkSize,
-	}
-}
-
-func (s *Splitter) Split(moduleInitialBlock uint64, lastSavedBlock uint64, blockRange *block.Range) []*block.Range {
-	if moduleInitialBlock > blockRange.StartBlock {
-		blockRange.StartBlock = moduleInitialBlock
+	zlog.Debug("no partials", zap.String("module_name", modName), zap.Int("partials_missing_length", len(work.partialsMissing)))
+	if len(work.partialsMissing) == 0 {
+		return nil
 	}
 
-	if lastSavedBlock > blockRange.StartBlock {
-		blockRange.StartBlock = lastSavedBlock
-	}
+	return work
 
-	return blockRange.Split(s.chunkSize)
+}
+func (w *WorkUnit) batchRequests(subreqSplitSize uint64) block.Ranges {
+	ranges := w.partialsMissing.MergedBuckets(subreqSplitSize)
+	return ranges
+
+	// Then, a SEPARATE function could batch the partial stores production into requests,
+	// and that ended up being a simple MergedBins() call, and that was already well tested
+	//
+	// The only concern of the Work Planner, was therefore to align
+	// individual _stores_, and not the requests really. It is even
+	// possible to think of an orchestrator that doesn't even have the
+	// same store split configuration as its backprocessing nodes, and
+	// provided the backprocess node respects the boundaries, and
+	// produces stuff, it will return the material needed by the
+	// orchestrator to satisfy its upstream request. This makes things
+	// much more reliable: you can restart and change the split sizes
+	// in the different backends without worries.
+}
+
+func minOf(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
 }

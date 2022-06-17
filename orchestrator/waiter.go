@@ -6,13 +6,15 @@ import (
 	"strings"
 	"sync"
 
+	"go.uber.org/zap"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Waiter interface {
 	Wait(ctx context.Context) <-chan interface{}
 	Signal(storeName string, blockNum uint64)
-	Order() int
+	Size() int
 	String() string
 }
 
@@ -54,9 +56,12 @@ type BlockWaiter struct {
 
 	setup sync.Once
 	done  chan interface{}
+
+	name     string
+	blockNum uint64
 }
 
-func NewWaiter(blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
+func NewWaiter(name string, blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
 	var items []*waiterItem
 
 	for _, store := range stores {
@@ -73,14 +78,18 @@ func NewWaiter(blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
 
 	return &BlockWaiter{
 		items: items,
+
+		name:     name,
+		blockNum: blockNum,
+
+		done: make(chan interface{}),
 	}
 }
 
 func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 	w.setup.Do(func() {
-		w.done = make(chan interface{})
 		if len(w.items) == 0 {
-			close(w.done)
+			// nothing to wait for.
 			return
 		}
 
@@ -89,21 +98,22 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 
 		go func() {
 			wg.Wait()
+			zlog.Debug("block waiter done waiting", zap.String("module", w.name), zap.Uint64("block_num", w.blockNum))
 			close(w.done)
 		}()
 
-		for _, waiter := range w.items {
-			go func(waiter *waiterItem) {
+		for _, item := range w.items {
+			go func(waiterItem *waiterItem) {
 				defer wg.Done()
 
 				select {
-				case <-waiter.Wait():
+				case <-waiterItem.Wait():
 					return
 				case <-ctx.Done():
 					return
 				}
 
-			}(waiter)
+			}(item)
 		}
 	})
 
@@ -111,26 +121,36 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 }
 
 func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
-	for _, waiter := range w.items {
-		if waiter.StoreName != storeName {
+	if len(w.items) == 0 {
+		zlog.Debug("block waiter done waiting (nothing to wait for)", zap.String("module", w.name), zap.Uint64("block_num", w.blockNum))
+		close(w.done)
+		return
+	}
+
+	if storeName == "" && blockNum == 0 { //ignore blank signal here
+		return
+	}
+
+	for _, waiterItem := range w.items {
+		if waiterItem.StoreName != storeName {
 			continue
 		}
 
-		if waiter.BlockNum > blockNum {
+		if waiterItem.BlockNum > blockNum {
 			continue
 		}
 
-		waiter.Close()
+		waiterItem.Close()
 	}
 }
 
-func (w *BlockWaiter) Order() int {
+func (w *BlockWaiter) Size() int {
 	return len(w.items)
 }
 
 func (w *BlockWaiter) String() string {
 	if w.items == nil {
-		return fmt.Sprintf("[%s] O(%d)", "nil", w.Order())
+		return fmt.Sprintf("[%s] O(%d)", "nil", w.Size())
 	}
 
 	var wis []string
@@ -138,5 +158,5 @@ func (w *BlockWaiter) String() string {
 		wis = append(wis, wi.String())
 	}
 
-	return fmt.Sprintf("[%s] O(%d)", strings.Join(wis, ","), w.Order())
+	return fmt.Sprintf("[%s] O(%d)", strings.Join(wis, ","), w.Size())
 }

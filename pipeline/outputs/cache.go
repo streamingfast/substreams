@@ -94,7 +94,7 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 	return nil
 }
 
-func (c *ModulesOutputCache) Save(ctx context.Context) error {
+func (c *ModulesOutputCache) Flush(ctx context.Context) error {
 	zlog.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
 		filename := moduleCache.currentFilename()
@@ -131,26 +131,26 @@ func (o *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
 	return !o.CurrentBlockRange.Contains(ref)
 }
 
-func (o *OutputCache) Set(block *bstream.Block, data []byte) error {
+func (o *OutputCache) Set(clock *pbsubstreams.Clock, data []byte) error {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
 	ci := &CacheItem{
-		BlockNum: block.Num(),
-		BlockID:  block.Id,
+		BlockNum: clock.Number,
+		BlockID:  clock.Id,
 		Payload:  data,
 	}
 
-	o.kv[block.Id] = ci
+	o.kv[clock.Id] = ci
 
 	return nil
 }
 
-func (o *OutputCache) Get(block *bstream.Block) ([]byte, bool, error) {
+func (o *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool, error) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
-	cacheItem, found := o.kv[block.Id]
+	cacheItem, found := o.kv[clock.Id]
 
 	if !found {
 		return nil, false, nil
@@ -171,10 +171,7 @@ func (o *OutputCache) Load(ctx context.Context, atBlock uint64) (foud bool, err 
 	}
 
 	if !found {
-		o.CurrentBlockRange = &block.Range{
-			StartBlock:        atBlock,
-			ExclusiveEndBlock: atBlock + o.saveBlockInterval,
-		}
+		o.CurrentBlockRange = block.NewRange(atBlock, atBlock+o.saveBlockInterval)
 
 		return found, nil
 	}
@@ -261,10 +258,7 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 
 	exclusiveEndBlock = biggestEndBlock
 
-	return &block.Range{
-		StartBlock:        prefixStartBlock,
-		ExclusiveEndBlock: exclusiveEndBlock,
-	}, true, nil
+	return block.NewRange(prefixStartBlock, exclusiveEndBlock), true, nil
 }
 
 func computeDBinFilename(startBlock, stopBlock uint64) string {

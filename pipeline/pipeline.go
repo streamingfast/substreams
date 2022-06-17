@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -29,7 +30,7 @@ type Pipeline struct {
 
 	requestedStartBlockNum uint64 // rename to: requestStartBlock, SET UPON receipt of the request
 	maxStoreSyncRangeSize  uint64
-	isBackprocessing       bool
+	isSubrequest           bool
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
@@ -38,22 +39,23 @@ type Pipeline struct {
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
 
-	context context.Context
-	request *pbsubstreams.Request
-	graph   *manifest.ModuleGraph
+	context  context.Context
+	request  *pbsubstreams.Request
+	graph    *manifest.ModuleGraph
+	respFunc func(resp *pbsubstreams.Response) error
 
 	modules              []*pbsubstreams.Module
-	outputModuleNames    []string
 	outputModuleMap      map[string]bool
 	storeModules         []*pbsubstreams.Module
 	storeMap             map[string]*state.Store
 	backprocessingStores []*state.Store
 
-	moduleExecutors []ModuleExecutor
-	wasmOutputs     map[string][]byte
+	moduleExecutors       []ModuleExecutor
+	wasmOutputs           map[string][]byte
+	nextStoreSaveBoundary uint64 // The next expected block at which we should flush stores (at save interval)
 
-	baseStateStore     dstore.Store
-	storesSaveInterval uint64
+	baseStateStore    dstore.Store
+	storeSaveInterval uint64
 
 	clock         *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
@@ -61,10 +63,12 @@ type Pipeline struct {
 
 	moduleOutputCache *outputs.ModulesOutputCache
 
+	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
+
 	currentBlockRef bstream.BlockRef
 
 	outputCacheSaveBlockInterval uint64
-	blockRangeSizeSubRequests    int
+	subrequestSplitSize          int
 	grpcClientFactory            func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
 }
 
@@ -77,7 +81,8 @@ func New(
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
 	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
-	blockRangeSizeSubRequests int,
+	subrequestSplitSize int,
+	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
 
 	pipe := &Pipeline{
@@ -88,15 +93,14 @@ func New(
 		storeMap:                     map[string]*state.Store{},
 		graph:                        graph,
 		baseStateStore:               baseStateStore,
-		outputModuleNames:            request.OutputModules,
 		outputModuleMap:              map[string]bool{},
 		blockType:                    blockType,
 		wasmExtensions:               wasmExtensions,
 		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
-		blockRangeSizeSubRequests:    blockRangeSizeSubRequests,
-
-		maxStoreSyncRangeSize: math.MaxUint64,
+		subrequestSplitSize:          subrequestSplitSize,
+		maxStoreSyncRangeSize:        math.MaxUint64,
+		respFunc:                     respFunc,
 	}
 
 	for _, name := range request.OutputModules {
@@ -110,252 +114,315 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) HandlerFactory(workerPool *orchestrator.WorkerPool, respFunc func(resp *pbsubstreams.Response) error) (out bstream.Handler, err error) {
+func (p *Pipeline) isOutputModule(name string) bool {
+	_, found := p.outputModuleMap[name]
+	return found
+}
+
+func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isBackprocessing), zap.Strings("outputs", p.request.OutputModules))
+
+	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
 	if err := p.build(); err != nil {
-		return nil, fmt.Errorf("building pipeline: %w", err)
+		return fmt.Errorf("building pipeline: %w", err)
 	}
 
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
 
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
-			return nil, fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
+			return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
 		}
 
 		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
 		_, err := p.moduleOutputCache.RegisterModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
 		if err != nil {
-			return nil, fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
 	}
 
+	zlog.Info("initializing and loading stores")
+	initialStoreMap, err := p.buildStoreMap()
+	zlog.Info("stores load", zap.Int("number_of_stores", len(initialStoreMap)))
+	if err != nil {
+		return fmt.Errorf("building store map: %w", err)
+	}
+
 	// Fetch the stores
-
-	if p.isBackprocessing {
-		storeMap, err := p.buildStoreMap()
-		if err != nil {
-			return nil, fmt.Errorf("building store map: %w", err)
-		}
-
-		totalOutputModules := len(p.outputModuleNames)
-		outputName := p.outputModuleNames[0]
-		backprocessingStore := storeMap[outputName]
+	if p.isSubrequest {
+		// truncateLeaf()
+		totalOutputModules := len(p.request.OutputModules)
+		outputName := p.request.OutputModules[0]
+		backProcessingStore := initialStoreMap[outputName]
 		lastStoreName := p.storeModules[len(p.storeModules)-1].Name
-		isLastStore := lastStoreName == backprocessingStore.Name
+		isLastStore := lastStoreName == backProcessingStore.Name
 
-		if totalOutputModules == 1 && backprocessingStore != nil && isLastStore {
+		if totalOutputModules != 1 || backProcessingStore == nil || !isLastStore {
 			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
-			zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
-			backprocessingStore.StoreInitialBlock = p.requestedStartBlockNum
-			p.backprocessingStores = append(p.backprocessingStores, backprocessingStore)
-		} else {
-			zlog.Info("conditions for leaf store not met",
+			zlog.Warn("conditions for leaf store not met",
 				zap.String("module", outputName),
 				zap.Bool("is_last_store", isLastStore),
 				zap.Int("output_module_count", totalOutputModules))
+			return fmt.Errorf("invalid conditions to backprocess leaf store %q", outputName)
 		}
 
-		zlog.Info("initializing and loading stores")
-		if err = loadStores(ctx, storeMap, p.requestedStartBlockNum); err != nil {
-			return nil, fmt.Errorf("loading stores: %w", err)
+		zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
+
+		backProcessingStore.Roll(p.requestedStartBlockNum)
+
+		if err = loadCompleteStores(ctx, initialStoreMap, p.requestedStartBlockNum); err != nil {
+			return fmt.Errorf("loading stores: %w", err)
 		}
 
-		p.storeMap = storeMap
+		p.storeMap = initialStoreMap
+		p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
 	} else {
-		newStores, err := p.backprocessStores(ctx, workerPool, respFunc)
+		backProcessedStores, err := p.backProcessStores(ctx, workerPool, initialStoreMap)
 		if err != nil {
-			return nil, fmt.Errorf("synchronizing stores: %w", err)
+			return fmt.Errorf("synchronizing stores: %w", err)
 		}
 
-		p.storeMap = newStores
+		for modName, store := range backProcessedStores {
+			initialStoreMap[modName] = store
+		}
+
+		p.storeMap = initialStoreMap
 		p.backprocessingStores = nil
 
 		if len(p.request.InitialStoreSnapshotForModules) != 0 {
 			zlog.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
-			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules, respFunc); err != nil {
-				return nil, fmt.Errorf("send initial snapshots: %w", err)
+			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules); err != nil {
+				return fmt.Errorf("send initial snapshots: %w", err)
 			}
 		}
 	}
 
+	p.initStoreSaveBoundary()
+
 	err = p.buildWASM(ctx, p.request, p.modules)
 	if err != nil {
-		return nil, fmt.Errorf("initiating module output caches: %w", err)
+		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
 	for _, cache := range p.moduleOutputCache.OutputCaches {
 		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
 		if _, err := cache.Load(ctx, atBlock); err != nil {
-			return nil, fmt.Errorf("loading outputs caches")
+			return fmt.Errorf("loading outputs caches")
 		}
 	}
 
-	return bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-				zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
-				zlog.Error(string(debug.Stack()))
-			}
-			if err != nil {
-				for _, hook := range p.postJobHooks {
-					if err := hook(ctx, p.clock); err != nil {
-						zlog.Warn("post job hook failed", zap.Error(err))
-					}
-				}
-			}
-		}()
-
-		// TODO(abourget): eventually, handle the `undo` signals.
-
-		p.clock = &pbsubstreams.Clock{
-			Number:    block.Num(),
-			Id:        block.Id,
-			Timestamp: timestamppb.New(block.Time()),
-		}
-
-		p.currentBlockRef = block.AsRef()
-
-		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-			return fmt.Errorf("updating module output cache: %w", err)
-		}
-
-		for _, hook := range p.preBlockHooks {
-			if err := hook(ctx, p.clock); err != nil {
-				return fmt.Errorf("pre block hook: %w", err)
-			}
-		}
-
-		p.moduleOutputs = nil
-		p.wasmOutputs = map[string][]byte{}
-
-		//todo? should we only save store if in partial mode or in catchup?
-		// no need to save store if loaded from cache?
-		isFirstRequestBlock := p.requestedStartBlockNum == p.clock.Number
-		intervalReached := p.storesSaveInterval != 0 && p.clock.Number%p.storesSaveInterval == 0
-		isTemporaryStore := p.isBackprocessing && p.clock.Number == p.request.StopBlockNum && p.request.StopBlockNum != 0
-
-		if !isFirstRequestBlock && (intervalReached || isTemporaryStore) {
-			if err := p.saveStoresSnapshots(ctx, p.clock.Number); err != nil {
-				return fmt.Errorf("saving stores: %w", err)
-			}
-		}
-
-		if p.clock.Number >= p.request.StopBlockNum && p.request.StopBlockNum != 0 {
-			// FIXME: HERE WE KNOW THAT we've gone OVER the ExclusiveEnd boundary,
-			// and we will trigger this EVEN if we have chains that SKIP BLOCKS.
-
-			if p.isBackprocessing {
-				// TODO: why wouldn't we do that when we're live?! Why only when orchestrated?
-				zlog.Debug("about to save cache output", zap.Uint64("clock", p.clock.Number), zap.Uint64("stop_block", p.request.StopBlockNum))
-				if err := p.moduleOutputCache.Save(ctx); err != nil {
-					return fmt.Errorf("saving partial caches")
-				}
-			}
-			return io.EOF
-		}
-
-		zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
-
-		cursor := obj.(bstream.Cursorable).Cursor()
-		step := obj.(bstream.Stepable).Step()
-
-		if err = p.assignSource(block); err != nil {
-			return fmt.Errorf("setting up sources: %w", err)
-		}
-
-		for _, executor := range p.moduleExecutors {
-			executorName := executor.Name()
-			zlog.Debug("executing", zap.String("module_name", executorName))
-
-			executionError := executor.run(p.wasmOutputs, p.clock, block)
-
-			if isOutput := p.outputModuleMap[executorName]; isOutput {
-				logs, truncated := executor.moduleLogs()
-				outputData := executor.moduleOutputData()
-				if len(logs) != 0 || outputData != nil {
-					p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-						Name:          executorName,
-						Data:          outputData,
-						Logs:          logs,
-						LogsTruncated: truncated,
-					})
-				}
-			}
-
-			if executionError != nil {
-				if returnErr := p.returnFailureProgress(executionError, executor, respFunc); returnErr != nil {
-					return fmt.Errorf("progress error: %w", returnErr)
-				}
-				return fmt.Errorf("exec error: %w", executionError)
-			}
-
-			executor.Reset()
-		}
-
-		if p.clock.Number >= p.requestedStartBlockNum {
-			if err := p.returnOutputs(step, cursor, respFunc); err != nil {
-				return err
-			}
-		}
-
-		for _, s := range p.storeMap {
-			s.Flush()
-		}
-
-		zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
-		return nil
-	}), nil
+	return nil
 }
 
-func (p *Pipeline) returnOutputs(step bstream.StepType, cursor *bstream.Cursor, respFunc substreams.ResponseFunc) error {
-	if p.isBackprocessing {
-		// TODO(abourget): we might want to send progress for the segment after batch execution
-		var progress []*pbsubstreams.ModuleProgress
+func (p *Pipeline) initStoreSaveBoundary() {
+	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
+}
+func (p *Pipeline) bumpStoreSaveBoundary() bool {
+	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
+	return p.request.StopBlockNum == p.nextStoreSaveBoundary
+}
+func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
+	nextBoundary := fromBlock - fromBlock%p.storeSaveInterval + p.storeSaveInterval
+	if p.isSubrequest && p.request.StopBlockNum != 0 && p.request.StopBlockNum < nextBoundary {
+		return p.request.StopBlockNum
+	}
+	return nextBoundary
+}
 
-		for _, store := range p.backprocessingStores {
-			progress = append(progress, &pbsubstreams.ModuleProgress{
-				Name: store.Name,
-				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-						ProcessedRanges: []*pbsubstreams.BlockRange{
-							{
-								StartBlock: store.StoreInitialBlock,
-								EndBlock:   p.clock.Number,
-							},
+func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
+	ctx := p.context
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+			zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
+			zlog.Error(string(debug.Stack()))
+		}
+		if err != nil {
+			for _, hook := range p.postJobHooks {
+				if err := hook(ctx, p.clock); err != nil {
+					zlog.Warn("post job hook failed", zap.Error(err))
+				}
+			}
+		}
+	}()
+
+	// TODO(abourget): eventually, handle the `undo` signals.
+
+	blockNum := block.Num()
+	p.clock = &pbsubstreams.Clock{
+		Number:    blockNum,
+		Id:        block.Id,
+		Timestamp: timestamppb.New(block.Time()),
+	}
+	p.currentBlockRef = block.AsRef()
+
+	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+		return fmt.Errorf("updating module output cache: %w", err)
+	}
+
+	for _, hook := range p.preBlockHooks {
+		if err := hook(ctx, p.clock); err != nil {
+			return fmt.Errorf("pre block hook: %w", err)
+		}
+	}
+
+	p.moduleOutputs = nil
+	p.wasmOutputs = map[string][]byte{}
+
+	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
+	for p.nextStoreSaveBoundary <= blockNum {
+		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
+			return fmt.Errorf("saving stores: %w", err)
+		}
+		p.bumpStoreSaveBoundary()
+		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
+			break
+		}
+	}
+
+	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
+		zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
+		if err := p.moduleOutputCache.Flush(ctx); err != nil {
+			return fmt.Errorf("saving partial caches")
+		}
+		return io.EOF
+	}
+
+	zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
+
+	cursor := obj.(bstream.Cursorable).Cursor()
+	step := obj.(bstream.Stepable).Step()
+
+	if err = p.assignSource(block); err != nil {
+		return fmt.Errorf("setting up sources: %w", err)
+	}
+
+	for _, executor := range p.moduleExecutors {
+		err = p.runExecutor(executor)
+		if err != nil {
+			return fmt.Errorf("running module executor: %w", err)
+		}
+	}
+
+	if shouldReturnProgress(p.isSubrequest) {
+		if err := p.returnModuleProgressOutputs(); err != nil {
+			return err
+		}
+	}
+	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+		if err := p.returnModuleDataOutputs(step, cursor); err != nil {
+			return err
+		}
+	}
+
+	for _, s := range p.storeMap {
+		s.Flush()
+	}
+
+	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
+	return nil
+}
+
+func (p *Pipeline) runExecutor(executor ModuleExecutor) error {
+	//FIXME(abourget): should we ever skip that work?
+	// if executor.ModuleInitialBlock < block.Number {
+	// 	continue ??
+	// }
+	executorName := executor.Name()
+	zlog.Debug("executing", zap.String("module_name", executorName))
+
+	executionError := executor.run(p.wasmOutputs, p.clock)
+
+	if p.isOutputModule(executorName) {
+		logs, truncated := executor.moduleLogs()
+		outputData := executor.moduleOutputData()
+		if len(logs) != 0 || outputData != nil {
+			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name:          executorName,
+				Data:          outputData,
+				Logs:          logs,
+				LogsTruncated: truncated,
+			})
+		}
+	}
+
+	if executionError != nil {
+		if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
+			return fmt.Errorf("progress error: %w", returnErr)
+		}
+		return fmt.Errorf("exec error: %w", executionError)
+	}
+
+	executor.Reset()
+	return nil
+}
+
+func shouldReturn(blockNum, requestedStartBlockNum uint64) bool {
+	return blockNum >= requestedStartBlockNum
+}
+
+func shouldReturnProgress(isSubRequest bool) bool {
+	return isSubRequest
+}
+
+func shouldReturnDataOutputs(blockNum, requestedStartBlockNum uint64, isSubRequest bool) bool {
+	return shouldReturn(blockNum, requestedStartBlockNum) && !isSubRequest
+}
+
+func isStopBlockReached(currentBlock uint64, stopBlock uint64) bool {
+	if stopBlock == 0 {
+		return false
+	}
+
+	return currentBlock >= stopBlock
+}
+
+func (p *Pipeline) returnModuleProgressOutputs() error {
+	var progress []*pbsubstreams.ModuleProgress
+	for _, store := range p.backprocessingStores {
+		progress = append(progress, &pbsubstreams.ModuleProgress{
+			Name: store.Name,
+			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
+				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+					ProcessedRanges: []*pbsubstreams.BlockRange{
+						{
+							StartBlock: store.StoreInitialBlock(),
+							EndBlock:   p.clock.Number,
 						},
 					},
 				},
-			})
-		}
+			},
+		})
+	}
 
-		if err := respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
-	} else {
-		zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-		out := &pbsubstreams.BlockScopedData{
-			Outputs: p.moduleOutputs,
-			Clock:   p.clock,
-			Step:    pbsubstreams.StepToProto(step),
-			Cursor:  cursor.ToOpaque(),
-		}
-
-		if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
-
+	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
 	}
 	return nil
 }
 
-func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor, respFunc substreams.ResponseFunc) error {
+func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
+	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+	out := &pbsubstreams.BlockScopedData{
+		Outputs: p.moduleOutputs,
+		Clock:   p.clock,
+		Step:    pbsubstreams.StepToProto(step),
+		Cursor:  cursor.ToOpaque(),
+	}
+
+	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
 	var out []*pbsubstreams.ModuleProgress
 
 	for _, moduleOutput := range p.moduleOutputs {
@@ -380,7 +447,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 		}
 	}
 
-	return respFunc(substreams.NewModulesProgressResponse(out))
+	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
 func (p *Pipeline) assignSource(block *bstream.Block) error {
@@ -422,13 +489,13 @@ func (p *Pipeline) validate() error {
 }
 
 func (p *Pipeline) buildModules() error {
-	modules, err := p.graph.ModulesDownTo(p.outputModuleNames)
+	modules, err := p.graph.ModulesDownTo(p.request.OutputModules)
 	if err != nil {
 		return fmt.Errorf("building execution graph: %w", err)
 	}
 	p.modules = modules
 
-	storeModules, err := p.graph.StoresDownTo(p.outputModuleNames)
+	storeModules, err := p.graph.StoresDownTo(p.request.OutputModules)
 	if err != nil {
 		return err
 	}
@@ -546,23 +613,22 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 	return nil
 }
 
-func (p *Pipeline) saveStoresSnapshots(ctx context.Context, lastBlock uint64) error {
-	// FIXME: lastBlock NEEDS to BE ALIGNED on boundaries!!
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) error {
 	for _, builder := range p.storeMap {
 		// TODO: implement parallel writing and upload for the different stores involved.
-		err := builder.WriteState(ctx, lastBlock)
+		err := builder.WriteState(ctx, boundaryBlock)
 		if err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
+		zlog.Info("state written", zap.String("store_name", builder.Name), zap.Object("store", builder))
 
-		if builder.IsPartial() {
-			builder.Truncate()
-			builder.Roll(lastBlock)
+		if p.isSubrequest && p.isOutputModule(builder.Name) {
+			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)
+			p.partialsWritten = append(p.partialsWritten, r)
+			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
+			builder.Roll(boundaryBlock)
 		}
-
-		zlog.Info("state written", zap.String("store_name", builder.Name))
 	}
-
 	return nil
 }
 
@@ -571,7 +637,7 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 	for _, storeModule := range p.storeModules {
 		newStore, err := state.NewBuilder(
 			storeModule.Name,
-			p.storesSaveInterval,
+			p.storeSaveInterval,
 			storeModule.InitialBlock,
 			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
 			storeModule.GetKindStore().UpdatePolicy,
@@ -586,12 +652,9 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 	return storeMap, nil
 }
 
-func loadStores(ctx context.Context, storeMap map[string]*state.Store, requestedStartBlock uint64) error {
+func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, requestedStartBlock uint64) error {
 	for _, store := range storeMap {
-		if store.IsPartial() {
-			continue
-		}
-		if store.StoreInitialBlock == requestedStartBlock {
+		if store.StoreInitialBlock() == requestedStartBlock {
 			continue
 		}
 
@@ -601,4 +664,8 @@ func loadStores(ctx context.Context, storeMap map[string]*state.Store, requested
 		}
 	}
 	return nil
+}
+
+func (p *Pipeline) PartialsWritten() block.Ranges {
+	return p.partialsWritten
 }

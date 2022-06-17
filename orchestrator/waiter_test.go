@@ -41,6 +41,7 @@ func TestBlockWaiter_Signal(t *testing.T) {
 		BlockNum:  100,
 		waitChan:  make(chan interface{}),
 	}
+
 	item2 := &waiterItem{
 		StoreName: "test_store_2",
 		BlockNum:  300,
@@ -53,7 +54,7 @@ func TestBlockWaiter_Signal(t *testing.T) {
 		done:  make(chan interface{}),
 	}
 
-	require.Equal(t, 2, waiter.Order())
+	require.Equal(t, 2, waiter.Size())
 
 	waiter.Signal("test_store_1", 50)
 	select {

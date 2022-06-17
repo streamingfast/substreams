@@ -5,30 +5,27 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams"
 	"go.uber.org/zap"
 )
 
 type Scheduler struct {
-	blockRangeSizeSubRequests int
-
 	workerPool *WorkerPool
 	respFunc   substreams.ResponseFunc
 
 	squasher       *Squasher
 	requestsStream <-chan *Job
-	requests       []*reqChunk
 }
 
-func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc, blockRangeSizeSubRequests int) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc) (*Scheduler, error) {
 	s := &Scheduler{
-		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
-		squasher:                  squasher,
-		requestsStream:            strategy.getRequestStream(ctx),
-		requests:                  []*reqChunk{},
-		workerPool:                workerPool,
-		respFunc:                  respFunc,
+		squasher:       squasher,
+		requestsStream: strategy.getRequestStream(ctx),
+		workerPool:     workerPool,
+		respFunc:       respFunc,
 	}
 	return s, nil
 }
@@ -42,8 +39,9 @@ func (s *Scheduler) Next() *Job {
 	return request
 }
 
-func (s *Scheduler) Callback(ctx context.Context, job *Job) error {
-	err := s.squasher.Squash(ctx, job.moduleName, job.reqChunk)
+func (s *Scheduler) Callback(ctx context.Context, job *Job, partialsRanges block.Ranges) error {
+
+	err := s.squasher.Squash(ctx, job.moduleName, partialsRanges)
 	if err != nil {
 		return fmt.Errorf("squashing: %w", err)
 	}
@@ -81,15 +79,21 @@ func (s *Scheduler) Launch(ctx context.Context, result chan error) {
 }
 
 func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job) error {
+	var partialsWritten []*block.Range
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		return jobWorker.Run(ctx, job, s.respFunc)
+		var err error
+		partialsWritten, err = jobWorker.Run(ctx, job, s.respFunc)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
 	s.workerPool.ReturnWorker(jobWorker)
 	if err != nil {
 		return err
 	}
 
-	if err = s.Callback(ctx, job); err != nil {
+	if err = s.Callback(ctx, job, partialsWritten); err != nil {
 		return fmt.Errorf("calling back scheduler: %w", err)
 	}
 	return nil

@@ -18,6 +18,7 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
 
 	storeSplit := uint64(10)
+	subreqSplit := uint64(100)
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
@@ -34,23 +35,24 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		stores[newStore.Name] = newStore
 	}
 
-	splitWorkMods := SplitWorkModules{
-		"A": &SplitWork{modName: "A"},
-		"B": &SplitWork{modName: "B"},
-		"C": &SplitWork{modName: "C"},
-		"D": &SplitWork{modName: "D"},
-		"E": &SplitWork{modName: "E"},
-		"F": &SplitWork{modName: "F"},
-		"G": &SplitWork{modName: "G"},
-		"H": &SplitWork{modName: "H"},
-		"K": &SplitWork{modName: "K"},
+	splitWorkMods := WorkPlan{
+		"A": &WorkUnit{modName: "A"},
+		"B": &WorkUnit{modName: "B"},
+		"C": &WorkUnit{modName: "C"},
+		"D": &WorkUnit{modName: "D"},
+		"E": &WorkUnit{modName: "E"},
+		"F": &WorkUnit{modName: "F"},
+		"G": &WorkUnit{modName: "G"},
+		"H": &WorkUnit{modName: "H"},
+		"K": &WorkUnit{modName: "K"},
 	}
 
-	pool := NewRequestPool()
+	pool := NewJobPool()
 	ctx := context.Background()
 	s, err := NewOrderedStrategy(
 		ctx,
 		splitWorkMods,
+		subreqSplit,
 		stores, // INIT
 		graph,
 		pool,
@@ -85,5 +87,5 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 }
 
 func jobstr(j *Job) string {
-	return fmt.Sprintf("%s %d-%d", j.moduleName, j.reqChunk.start, j.reqChunk.end)
+	return fmt.Sprintf("%s %d-%d", j.moduleName, j.requestRange.StartBlock, j.requestRange.ExclusiveEndBlock)
 }

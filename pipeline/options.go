@@ -13,15 +13,18 @@ type PipelineOptioner interface {
 
 type Option func(p *Pipeline)
 
+// TODO(abourget):
+// OrchestratedExecution -> Subrequest
+// isOrchestrated -> isSubrequest
 func WithOrchestratedExecution() Option {
 	return func(p *Pipeline) {
-		p.isBackprocessing = true
+		p.isSubrequest = true
 	}
 }
 
 func WithStoresSaveInterval(seconds uint64) Option {
 	return func(p *Pipeline) {
-		p.storesSaveInterval = seconds
+		p.storeSaveInterval = seconds
 	}
 }
 

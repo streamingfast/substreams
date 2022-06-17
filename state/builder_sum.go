@@ -5,9 +5,9 @@ import (
 	"strconv"
 )
 
-func (b *Store) SumBigInt(ord uint64, key string, value *big.Int) {
+func (s *Store) SumBigInt(ord uint64, key string, value *big.Int) {
 	sum := new(big.Int)
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -18,12 +18,12 @@ func (b *Store) SumBigInt(ord uint64, key string, value *big.Int) {
 			sum.Add(prev, value)
 		}
 	}
-	b.set(ord, key, []byte(sum.String()))
+	s.set(ord, key, []byte(sum.String()))
 }
 
-func (b *Store) SumInt64(ord uint64, key string, value int64) {
+func (s *Store) SumInt64(ord uint64, key string, value int64) {
 	var sum int64
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -34,12 +34,12 @@ func (b *Store) SumInt64(ord uint64, key string, value int64) {
 			sum = prev + value
 		}
 	}
-	b.set(ord, key, []byte(strconv.FormatInt(sum, 10)))
+	s.set(ord, key, []byte(strconv.FormatInt(sum, 10)))
 }
 
-func (b *Store) SumFloat64(ord uint64, key string, value float64) {
+func (s *Store) SumFloat64(ord uint64, key string, value float64) {
 	var sum float64
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -50,12 +50,12 @@ func (b *Store) SumFloat64(ord uint64, key string, value float64) {
 			sum = prev + value
 		}
 	}
-	b.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
+	s.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
 }
 
-func (b *Store) SumBigFloat(ord uint64, key string, value *big.Float) {
+func (s *Store) SumBigFloat(ord uint64, key string, value *big.Float) {
 	sum := new(big.Float)
-	val, found := b.GetAt(ord, key)
+	val, found := s.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -66,5 +66,5 @@ func (b *Store) SumBigFloat(ord uint64, key string, value *big.Float) {
 			sum.Add(prev, value)
 		}
 	}
-	b.set(ord, key, []byte(sum.Text('g', 100)))
+	s.set(ord, key, []byte(sum.Text('g', 100)))
 }

@@ -11,40 +11,57 @@ import (
 )
 
 type OrderedStrategy struct {
-	requestPool *RequestPool
+	requestPool *JobPool
 }
 
 func NewOrderedStrategy(
 	ctx context.Context,
-	splitWorks SplitWorkModules,
+	workPlan WorkPlan,
+	subrequestSplitSize uint64,
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
-	pool *RequestPool,
+	pool *JobPool,
 ) (*OrderedStrategy, error) {
-	for storeName, store := range stores {
-		workUnit := splitWorks[storeName]
-		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
+	for modName, workUnit := range workPlan {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			// do nothing
+		}
 
-		rangeLen := len(workUnit.reqChunks)
-		for idx, reqChunk := range workUnit.reqChunks {
-			// TODO(abourget): here we loop SplitWork.reqChunks, and grab the ancestor modules
+		store := stores[modName]
+
+		requests := workUnit.batchRequests(subrequestSplitSize)
+		rangeLen := len(requests)
+		for idx, requestRange := range requests {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				// do nothing
+			}
+			// TODO(abourget): here we loop WorkUnit.reqChunks, and grab the ancestor modules
 			// to setup the waiter.
-			// blockRange's start/end come from `reqChunk`
+			// blockRange's start/end come from `requestRange`
 			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)
 			if err != nil {
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
 			}
 
 			job := &Job{
-				moduleName: store.Name,
-				reqChunk:   reqChunk,
+				moduleName:         store.Name,
+				moduleSaveInterval: store.SaveInterval,
+				requestRange:       requestRange,
 			}
 
-			//req := createRequest(reqChunk, store.Name, request.IrreversibilityCondition, request.Modules)
-			waiter := NewWaiter(reqChunk.start, ancestorStoreModules...)
-			_ = pool.Add(ctx, rangeLen-idx, job, waiter)
+			waiter := NewWaiter(store.Name, requestRange.StartBlock, ancestorStoreModules...)
+			err = pool.Add(ctx, rangeLen-idx, job, waiter)
+			if err != nil {
+				return nil, fmt.Errorf("error adding job %s to pool: %w", job, err)
+			}
 
-			zlog.Info("request created", zap.String("module_name", store.Name), zap.Uint64("start_block", reqChunk.start), zap.Uint64("end_block", reqChunk.end))
+			zlog.Info("request created", zap.String("module_name", store.Name), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
 		}
 	}
 
@@ -61,7 +78,7 @@ func (s *OrderedStrategy) getRequestStream(ctx context.Context) <-chan *Job {
 		defer close(requestsStream)
 
 		for {
-			job, err := s.requestPool.getNext(ctx)
+			job, err := s.requestPool.GetNext(ctx)
 			if err == io.EOF {
 				zlog.Debug("EOF in getRequestStream")
 				return

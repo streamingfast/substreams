@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -121,9 +122,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	_ = logger
 
 	if request.StartBlockNum < 0 {
+		// TODO(abourget) start block resolving is an art, it should be handled here
+		zlog.Error("invalid negative startblock (not handled in substreams)", zap.Int64("start_block", request.StartBlockNum))
 		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
-		// FIXME we want logger too
-		// FIXME start block resolving is an art, it should be handled here
 	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {
@@ -174,18 +175,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
-
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, opts...)
-
-	firehoseReq := &pbfirehose.Request{
-		StartBlockNum: request.StartBlockNum,
-		StopBlockNum:  request.StopBlockNum,
-		StartCursor:   request.StartCursor,
-		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE}, //FIXME, should we support whatever is supported by the `request` here?
-
-		// ...FIXME ?
-	}
-
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			return NewErrSendBlock(err)
@@ -195,17 +184,38 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
 
-	handler, err := pipe.HandlerFactory(workerPool, responseHandler)
-	if err != nil {
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
+
+	firehoseReq := &pbfirehose.Request{
+		StartBlockNum: request.StartBlockNum,
+		StopBlockNum:  request.StopBlockNum,
+		StartCursor:   request.StartCursor,
+		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE},
+		// FIXME(abourget), right now, the pbsubstreams.Request has a
+		// ForkSteps that we IGNORE. Eventually, we will want to honor
+		// it, but ONLY when we are certain that our Pipeline supports
+		// reorgs navigation, which is not the case right now.
+		// FIXME(abourget): will we also honor the IrreversibilityCondition?
+		// perhaps on the day we actually support it in the Firehose :)
+	}
+
+	if err := pipe.Init(workerPool); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
-	st, err := s.streamFactory.New(ctx, handler, firehoseReq, zap.NewNop())
+	st, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 	if err := st.Run(ctx); err != nil {
 		if errors.Is(err, io.EOF) {
+			var d []string
+			for _, rng := range pipe.PartialsWritten() {
+				d = append(d, fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock))
+			}
+			partialsWritten := []string{strings.Join(d, ",")}
+			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
+			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
 			return nil
 		}
 

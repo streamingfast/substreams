@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
@@ -23,7 +22,7 @@ type ModuleExecutor interface {
 	// Reset the wasm instance, avoid propagating logs.
 	Reset()
 
-	run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error
+	run(vals map[string][]byte, clock *pbsubstreams.Clock) error
 
 	moduleLogs() (logs []string, truncated bool)
 	moduleOutputData() pbsubstreams.ModuleOutputData
@@ -71,8 +70,8 @@ func (e *StoreModuleExecutor) String() string {
 	return e.moduleName
 }
 
-func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error {
-	output, found, err := e.cache.Get(block)
+func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock) error {
+	output, found, err := e.cache.Get(clock)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
 	}
@@ -87,16 +86,16 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 	}
 
 	if len(e.mapperOutput) > 0 {
-		if err = e.cache.Set(block, e.mapperOutput); err != nil {
-			return fmt.Errorf("setting mapper output to cache at block %d: %w", block.Num(), err)
+		if err = e.cache.Set(clock, e.mapperOutput); err != nil {
+			return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
 		}
 	}
 
 	return nil
 }
 
-func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, block *bstream.Block) error {
-	output, found, err := e.cache.Get(block)
+func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock) error {
+	output, found, err := e.cache.Get(clock)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
 	}
@@ -107,7 +106,7 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 		if err != nil {
 			return fmt.Errorf("unmarshalling output deltas: %w", err)
 		}
-		e.outputStore.Deltas = deltas.Deltas //todo: unmarshall cached data as delta
+		e.outputStore.Deltas = deltas.Deltas
 		for _, delta := range deltas.Deltas {
 			e.outputStore.ApplyDelta(delta)
 		}
@@ -127,8 +126,8 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 	}
 
 	if len(data) > 0 {
-		if err = e.cache.Set(block, data); err != nil {
-			return fmt.Errorf("setting delta to cache at block %d: %w", block.Num(), err)
+		if err = e.cache.Set(clock, data); err != nil {
+			return fmt.Errorf("setting delta to cache at block %d: %w", clock.Number, err)
 		}
 	}
 

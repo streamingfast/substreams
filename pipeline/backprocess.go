@@ -10,15 +10,14 @@ import (
 	"go.uber.org/zap"
 )
 
-func (p *Pipeline) backprocessStores(
+func (p *Pipeline) backProcessStores(
 	ctx context.Context,
 	workerPool *orchestrator.WorkerPool,
-	respFunc substreams.ResponseFunc,
+	initialStoreMap map[string]*state.Store,
 ) (
 	map[string]*state.Store,
 	error,
 ) {
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
@@ -27,41 +26,45 @@ func (p *Pipeline) backprocessStores(
 
 	zlog.Info("synchronizing stores")
 
-	requestPool := orchestrator.NewRequestPool()
-
-	initialStoreMap, err := p.buildStoreMap()
-	if err != nil {
-		return nil, fmt.Errorf("build initial store map: %w", err)
-	}
+	jobPool := orchestrator.NewJobPool()
 
 	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	splitWorks := orchestrator.SplitWorkModules{}
+	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
-		splitWorks[mod.Name] = orchestrator.SplitSomeWork(mod.Name, p.storesSaveInterval, uint64(p.blockRangeSizeSubRequests), mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
+
+		snapshot := storageState.Snapshots[mod.Name]
+		if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
+			workPlan[mod.Name] = workUnit
+		}
 	}
 
-	progressMessages := splitWorks.ProgressMessages()
-	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
+	progressMessages := workPlan.ProgressMessages()
+	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, splitWorks, initialStoreMap, p.graph, requestPool)
+	strategy, err := orchestrator.NewOrderedStrategy(ctx, workPlan, uint64(p.subrequestSplitSize), initialStoreMap, p.graph, jobPool)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, splitWorks, initialStoreMap, upToBlock, requestPool)
+	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, jobPool)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, respFunc, p.blockRangeSizeSubRequests)
+	err = workPlan.SquashPartialsPresent(ctx, squasher)
+	if err != nil {
+		return nil, err
+	}
+
+	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, p.respFunc)
 	if err != nil {
 		return nil, fmt.Errorf("initializing scheduler: %w", err)
 	}
@@ -70,7 +73,7 @@ func (p *Pipeline) backprocessStores(
 
 	go scheduler.Launch(ctx, result)
 
-	requestCount := requestPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
+	requestCount := jobPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
 	for resultCount := 0; resultCount < requestCount; {
 		select {
 		case <-ctx.Done():
@@ -86,7 +89,7 @@ func (p *Pipeline) backprocessStores(
 
 	zlog.Info("store sync completed")
 
-	newStores, err := squasher.StoresReady()
+	newStores, err := squasher.ValidateStoresReady()
 	if err != nil {
 		return nil, fmt.Errorf("squasher incomplete: %w", err)
 	}

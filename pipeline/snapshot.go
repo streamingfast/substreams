@@ -7,7 +7,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (p *Pipeline) sendSnapshots(snapshotModules []string, respFunc func(resp *pbsubstreams.Response) error) error {
+func (p *Pipeline) sendSnapshots(snapshotModules []string) error {
 	for _, modName := range snapshotModules {
 		store, found := p.storeMap[modName]
 		if !found {
@@ -23,7 +23,7 @@ func (p *Pipeline) sendSnapshots(snapshotModules []string, respFunc func(resp *p
 				SentKeys:  count,
 				TotalKeys: total,
 			}
-			respFunc(substreams.NewSnapshotData(data))
+			p.respFunc(substreams.NewSnapshotData(data))
 		}
 
 		var count uint64
@@ -48,7 +48,7 @@ func (p *Pipeline) sendSnapshots(snapshotModules []string, respFunc func(resp *p
 		}
 	}
 
-	respFunc(substreams.NewSnapshotComplete())
+	p.respFunc(substreams.NewSnapshotComplete())
 
 	return nil
 }

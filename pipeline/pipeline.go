@@ -181,12 +181,16 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		p.storeMap = initialStoreMap
 		p.backprocessingStores = append(p.backprocessingStores, backProcessingStore)
 	} else {
-		newStores, err := p.backProcessStores(ctx, workerPool, initialStoreMap)
+		backProcessedStores, err := p.backProcessStores(ctx, workerPool, initialStoreMap)
 		if err != nil {
 			return fmt.Errorf("synchronizing stores: %w", err)
 		}
 
-		p.storeMap = newStores
+		for modName, store := range backProcessedStores {
+			initialStoreMap[modName] = store
+		}
+
+		p.storeMap = initialStoreMap
 		p.backprocessingStores = nil
 
 		if len(p.request.InitialStoreSnapshotForModules) != 0 {

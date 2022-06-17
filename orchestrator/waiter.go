@@ -81,15 +81,15 @@ func NewWaiter(name string, blockNum uint64, stores ...*pbsubstreams.Module) *Bl
 
 		name:     name,
 		blockNum: blockNum,
+
+		done: make(chan interface{}),
 	}
 }
 
 func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 	w.setup.Do(func() {
-		w.done = make(chan interface{})
 		if len(w.items) == 0 {
-			zlog.Debug("block waiter done waiting (nothing to wait for)", zap.String("module", w.name), zap.Uint64("block_num", w.blockNum))
-			close(w.done)
+			// nothing to wait for.
 			return
 		}
 
@@ -121,6 +121,16 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 }
 
 func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
+	if len(w.items) == 0 {
+		zlog.Debug("block waiter done waiting (nothing to wait for)", zap.String("module", w.name), zap.Uint64("block_num", w.blockNum))
+		close(w.done)
+		return
+	}
+
+	if storeName == "" && blockNum == 0 { //ignore blank signal here
+		return
+	}
+
 	for _, waiterItem := range w.items {
 		if waiterItem.StoreName != storeName {
 			continue

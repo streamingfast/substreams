@@ -112,7 +112,7 @@ func (p *JobPool) Start(ctx context.Context) {
 			close(p.readyJobStream)
 		}()
 
-		for _, rw := range p.jobWaiters {
+		for _, jw := range p.jobWaiters {
 			go func(item *jobWaiter) {
 				defer wg.Done()
 
@@ -130,8 +130,11 @@ func (p *JobPool) Start(ctx context.Context) {
 						p.waitersMutex.Unlock()
 					}
 				}
-			}(rw)
+			}(jw)
 		}
+
+		//this is a hack? kinda? wip wip ming ming
+		p.Notify("", 0)
 
 		go func() {
 			defer func() {

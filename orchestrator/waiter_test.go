@@ -41,6 +41,7 @@ func TestBlockWaiter_Signal(t *testing.T) {
 		BlockNum:  100,
 		waitChan:  make(chan interface{}),
 	}
+
 	item2 := &waiterItem{
 		StoreName: "test_store_2",
 		BlockNum:  300,

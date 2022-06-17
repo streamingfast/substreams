@@ -1,6 +1,8 @@
 package orchestrator
 
 import (
+	"fmt"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap/zapcore"
@@ -10,6 +12,10 @@ type Job struct {
 	requestRange       *block.Range
 	moduleName         string // target
 	moduleSaveInterval uint64
+}
+
+func (j *Job) String() string {
+	return fmt.Sprintf("job: module=%s range=%s", j.moduleName, j.requestRange)
 }
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {

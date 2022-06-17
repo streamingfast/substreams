@@ -41,8 +41,8 @@ type JobPool struct {
 
 func NewJobPool() *JobPool {
 	p := JobPool{}
-	p.readyJobStream = make(chan *jobWaiter, 5000)
-	p.queueSend = make(chan *QueueItem, 5000)
+	p.readyJobStream = make(chan *jobWaiter)
+	p.queueSend = make(chan *QueueItem)
 	p.queueReceive = make(chan *QueueItem)
 	p.waiters = map[Waiter]struct{}{}
 	return &p
@@ -103,12 +103,12 @@ func (p *JobPool) Start(ctx context.Context) {
 
 		wg := sync.WaitGroup{}
 
-		zlog.Debug("adding to waitgroup", zap.Int("waiters", len(p.jobWaiters)))
+		zlog.Debug("adding to wait group", zap.Int("waiters", len(p.jobWaiters)))
 		wg.Add(len(p.jobWaiters))
 
 		go func() {
 			wg.Wait()
-			zlog.Debug("done waiting for waitgroup")
+			zlog.Debug("done waiting for wait group. closing job stream")
 			close(p.readyJobStream)
 		}()
 
@@ -124,7 +124,7 @@ func (p *JobPool) Start(ctx context.Context) {
 					case <-ctx.Done():
 						return
 					case p.readyJobStream <- item:
-						zlog.Debug("sent to ready job stream")
+						zlog.Debug("sent to ready job stream", zap.Stringer("job", item.job))
 						p.waitersMutex.Lock()
 						delete(p.waiters, item.Waiter)
 						p.waitersMutex.Unlock()
@@ -136,7 +136,7 @@ func (p *JobPool) Start(ctx context.Context) {
 		go func() {
 			defer func() {
 				zlog.Debug("closing queue send")
-				close(p.queueSend) //finished sending items into queue once all
+				close(p.queueSend) //finished sending items into queue once all jobs come through on the readyJobStream
 			}()
 			for {
 				select {
@@ -146,14 +146,30 @@ func (p *JobPool) Start(ctx context.Context) {
 					if !ok {
 						return
 					}
+
 					// the number of stores a waiter was waiting for determines its priority in the queue.
 					// higher number of stores => higher priority.
-					zlog.Debug("sending in queue")
-					p.queueSend <- &QueueItem{
+					// adjusted with the "reverse index"
+					priority := waiter.Waiter.Size() + waiter.ReverseIndex
+
+					zlog.Debug("sending job in queue",
+						zap.Stringer("job", waiter.job),
+						zap.Int("priority", priority),
+					)
+
+					select {
+					case <-ctx.Done():
+						return
+					case p.queueSend <- &QueueItem{
 						job:      waiter.job,
-						Priority: waiter.Waiter.Size() + waiter.ReverseIndex,
+						Priority: priority,
+					}:
+						zlog.Debug("sent job in queue",
+							zap.Stringer("job", waiter.job),
+							zap.Int("priority", priority),
+						)
 					}
-					zlog.Debug("sent to queue")
+
 				}
 			}
 		}()

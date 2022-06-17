@@ -102,8 +102,9 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 	return work
 
 }
-func (w *WorkUnit) batchRequests(subreqSplit uint64) block.Ranges {
-	return w.partialsMissing.MergedBuckets(subreqSplit)
+func (w *WorkUnit) batchRequests(subreqSplitSize uint64) block.Ranges {
+	ranges := w.partialsMissing.MergedBuckets(subreqSplitSize)
+	return ranges
 
 	// Then, a SEPARATE function could batch the partial stores production into requests,
 	// and that ended up being a simple MergedBins() call, and that was already well tested

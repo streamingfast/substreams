@@ -17,7 +17,7 @@ type OrderedStrategy struct {
 func NewOrderedStrategy(
 	ctx context.Context,
 	workPlan WorkPlan,
-	subreqSplit uint64,
+	subrequestSplitSize uint64,
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 	pool *JobPool,
@@ -32,7 +32,7 @@ func NewOrderedStrategy(
 		workUnit := workPlan[storeName]
 		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
 
-		requests := workUnit.batchRequests(subreqSplit)
+		requests := workUnit.batchRequests(subrequestSplitSize)
 		rangeLen := len(requests)
 		for idx, requestRange := range requests {
 			select {
@@ -55,8 +55,11 @@ func NewOrderedStrategy(
 				requestRange:       requestRange,
 			}
 
-			waiter := NewWaiter(requestRange.StartBlock, ancestorStoreModules...)
-			_ = pool.Add(ctx, rangeLen-idx, job, waiter)
+			waiter := NewWaiter(store.Name, requestRange.StartBlock, ancestorStoreModules...)
+			err = pool.Add(ctx, rangeLen-idx, job, waiter)
+			if err != nil {
+				return nil, fmt.Errorf("error adding job %s to pool: %w", job, err)
+			}
 
 			zlog.Info("request created", zap.String("module_name", store.Name), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
 		}

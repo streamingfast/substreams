@@ -28,9 +28,8 @@ type Squasher struct {
 // target block, etc..
 func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*state.Store, reqStartBlock uint64, notifier Notifier) (*Squasher, error) {
 	squashables := map[string]*Squashable{}
-	for storeName, store := range stores {
-		workUnit := workPlan[storeName]
-
+	for modName, workUnit := range workPlan {
+		store := stores[modName]
 		var squashable *Squashable
 		if workUnit.initialStoreFile == nil {
 			squashable = NewSquashable(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, notifier)

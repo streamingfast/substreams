@@ -146,6 +146,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	zlog.Info("initializing and loading stores")
 	initialStoreMap, err := p.buildStoreMap()
+	zlog.Info("stores load", zap.Int("number_of_stores", len(initialStoreMap)))
 	if err != nil {
 		return fmt.Errorf("building store map: %w", err)
 	}

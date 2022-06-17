@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -65,11 +66,11 @@ func (w *WorkUnit) initialProcessedPartials() block.Ranges {
 	return w.partialsPresent.Merged()
 }
 
-func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) (work *WorkUnit) {
-	work = &WorkUnit{modName: modName}
+func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) *WorkUnit {
+	work := &WorkUnit{modName: modName}
 
 	if incomingReqStartBlock <= modInitBlock {
-		return work
+		return nil
 	}
 
 	completeSnapshot := snapshots.LastCompleteSnapshotBefore(incomingReqStartBlock)
@@ -85,7 +86,7 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 	}
 
 	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
-		return
+		return nil
 	}
 
 	for ptr := backProcessStartBlock; ptr < incomingReqStartBlock; {
@@ -97,6 +98,11 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 			work.partialsPresent = append(work.partialsPresent, newPartial)
 		}
 		ptr = end
+	}
+
+	zlog.Debug("no partials", zap.String("module_name", modName), zap.Int("partials_missing_length", len(work.partialsMissing)))
+	if len(work.partialsMissing) == 0 {
+		return nil
 	}
 
 	return work

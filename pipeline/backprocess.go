@@ -35,7 +35,13 @@ func (p *Pipeline) backProcessStores(
 
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
-		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), storageState.Snapshots[mod.Name])
+
+		if snapshot, found := storageState.Snapshots[mod.Name]; found {
+			zlog.Debug("found snapshot", zap.String("module_name", mod.Name), zap.Bool("snapshot_nil", snapshot == nil))
+			if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
+				workPlan[mod.Name] = workUnit
+			}
+		}
 	}
 
 	progressMessages := workPlan.ProgressMessages()

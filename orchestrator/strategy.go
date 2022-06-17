@@ -22,15 +22,15 @@ func NewOrderedStrategy(
 	graph *manifest.ModuleGraph,
 	pool *JobPool,
 ) (*OrderedStrategy, error) {
-	for storeName, store := range stores {
+	for modName, workUnit := range workPlan {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 			// do nothing
 		}
-		workUnit := workPlan[storeName]
-		zlog.Debug("new ordered strategy", zap.String("builder", store.Name))
+
+		store := stores[modName]
 
 		requests := workUnit.batchRequests(subrequestSplitSize)
 		rangeLen := len(requests)

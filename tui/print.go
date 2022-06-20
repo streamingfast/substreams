@@ -29,7 +29,7 @@ func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) er
 				msgDesc := ui.msgDescs[out.Name]
 				msgType := ui.msgTypes[out.Name]
 				cnt := ui.decodeDynamicMessage(msgType, msgDesc, output.Clock.Number, out.Name, data.MapOutput)
-				cnt = ui.prettyFormat(cnt)
+				cnt = ui.prettyFormat(cnt, true)
 				s = append(s, string(cnt))
 			}
 		case *pbsubstreams.ModuleOutput_StoreDeltas:
@@ -54,7 +54,7 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 	}
 	for _, delta := range deltas {
 		keyStr, _ := json.Marshal(delta.Key)
-		s = append(s, fmt.Sprintf("  %s (%d) KEY: %s\n", delta.Operation.String(), delta.Ordinal, ui.prettyFormat(keyStr)))
+		s = append(s, fmt.Sprintf("  %s (%d) KEY: %s\n", delta.Operation.String(), delta.Ordinal, ui.prettyFormat(keyStr, false)))
 
 		if len(delta.OldValue) == 0 {
 			if !initialSnapshot {
@@ -62,13 +62,13 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 			}
 		} else {
 			old := ui.decodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, delta.OldValue)
-			s = append(s, fmt.Sprintf("    OLD: %s\n", indent(ui.prettyFormat(old))))
+			s = append(s, fmt.Sprintf("    OLD: %s\n", indent(ui.prettyFormat(old, false))))
 		}
 		if len(delta.NewValue) == 0 {
 			s = append(s, "    NEW: (none)\n")
 		} else {
 			new := ui.decodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, delta.NewValue)
-			s = append(s, fmt.Sprintf("    NEW: %s\n", indent(ui.prettyFormat(new))))
+			s = append(s, fmt.Sprintf("    NEW: %s\n", indent(ui.prettyFormat(new, false))))
 		}
 	}
 	return
@@ -101,7 +101,7 @@ func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*p
 	if err != nil {
 		return fmt.Errorf("marshal wrap: %w", err)
 	}
-	fmt.Println(string(ui.prettyFormat(cnt)))
+	fmt.Println(string(ui.prettyFormat(cnt, false)))
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (ui *TUI) jsonBlockScopedData(output *pbsubstreams.BlockScopedData) error {
 				msgDesc := ui.msgDescs[out.Name]
 				msgType := ui.msgTypes[out.Name]
 				cnt := ui.decodeDynamicMessage(msgType, msgDesc, output.Clock.Number, out.Name, data.MapOutput)
-				cnt = ui.prettyFormat(cnt)
+				cnt = ui.prettyFormat(cnt, true)
 				fmt.Println(string(cnt))
 			}
 		case *pbsubstreams.ModuleOutput_StoreDeltas:
@@ -175,7 +175,7 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreams.InitialSnapshotData) error 
 		if err != nil {
 			return fmt.Errorf("marshal wrap: %w", err)
 		}
-		fmt.Println(string(ui.prettyFormat(cnt)))
+		fmt.Println(string(ui.prettyFormat(cnt, false)))
 	}
 	return nil
 }
@@ -281,9 +281,13 @@ func (ui *TUI) decodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDes
 	return decodeAsString(in)
 }
 
-func (ui *TUI) prettyFormat(cnt []byte) []byte {
+func (ui *TUI) prettyFormat(cnt []byte, isMapOutput bool) []byte {
 	if ui.prettyPrintOutput {
-		cnt = bytes.TrimRight(pretty.Pretty(cnt), "\n")
+		if isMapOutput {
+			cnt = pretty.Pretty(cnt)
+		} else {
+			cnt = bytes.TrimRight(pretty.Pretty(cnt), "\n")
+		}
 	}
 	if ui.isTerminal {
 		cnt = pretty.Color(cnt, pretty.TerminalStyle)

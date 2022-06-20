@@ -31,12 +31,7 @@ replace (
 require (
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
-	github.com/iancoleman/strcase v0.2.0
-	github.com/jmoiron/sqlx v1.3.4
-	github.com/jszwec/csvutil v1.6.0
-	github.com/lib/pq v1.10.5
 	github.com/mattn/go-isatty v0.0.14
-	github.com/test-go/testify v1.1.4
 	github.com/tidwall/pretty v1.2.0
 	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3

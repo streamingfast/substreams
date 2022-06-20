@@ -121,10 +121,10 @@ func (s *Store) Fetch(ctx context.Context, exclusiveEndBlock uint64) error {
 	return s.loadState(ctx, fileName)
 }
 
-func (b *Store) loadState(ctx context.Context, stateFileName string) error {
-	zlog.Debug("loading state from file", zap.String("module_name", b.Name), zap.String("file_name", stateFileName))
+func (s *Store) loadState(ctx context.Context, stateFileName string) error {
+	zlog.Debug("loading state from file", zap.String("module_name", s.Name), zap.String("file_name", stateFileName))
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		r, err := b.Store.OpenObject(ctx, stateFileName)
+		r, err := s.Store.OpenObject(ctx, stateFileName)
 		if err != nil {
 			return fmt.Errorf("openning file: %w", err)
 		}
@@ -138,14 +138,14 @@ func (b *Store) loadState(ctx context.Context, stateFileName string) error {
 		if err = json.Unmarshal(data, &kv); err != nil {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
-		b.KV = byteMap(kv)
+		s.KV = byteMap(kv)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("storage file %s: %w", stateFileName, err)
 	}
 
-	zlog.Debug("state loaded", zap.String("builder_name", b.Name), zap.String("file_name", stateFileName))
+	zlog.Debug("state loaded", zap.String("builder_name", s.Name), zap.String("file_name", stateFileName))
 	return nil
 }
 

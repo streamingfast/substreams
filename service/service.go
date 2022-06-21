@@ -205,7 +205,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			fmt.Println("sending cached module output: %w", err)
 		}
 
-		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum {
+		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum+1 {
 			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
 			return io.EOF // all done
 		}
@@ -238,6 +238,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
+	zlog.Info("creating firehose stream",
+		zap.Int64("start_block", firehoseReq.StartBlockNum),
+		zap.Uint64("end_block", firehoseReq.StopBlockNum),
+	)
 	st, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
@@ -303,13 +307,6 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 				break
 			}
 
-			cursor := &bstream.Cursor{
-				Step:      bstream.StepIrreversible,
-				Block:     bstream.NewBlockRef(item.BlockID, item.BlockNum),
-				LIB:       nil,
-				HeadBlock: bstream.NewBlockRef(item.BlockID, item.BlockNum),
-			}
-
 			var output pbsubstreams.ModuleOutputData
 			switch module.Kind.(type) {
 			case *pbsubstreams.Module_KindMap_:
@@ -346,7 +343,7 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 					Timestamp: item.Timestamp,
 				},
 				Step:   pbsubstreams.StepToProto(bstream.StepIrreversible),
-				Cursor: cursor.ToOpaque(),
+				Cursor: item.Cursor,
 			}
 
 			if err := responseFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
@@ -354,6 +351,7 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 			}
 			lastBlockSent = &item.BlockNum
 		}
+		lastBlockSent = &r.ExclusiveEndBlock
 	}
 
 	return

@@ -235,7 +235,7 @@ func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	ctx := p.context
-
+	zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -292,8 +292,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 		return io.EOF
 	}
-
-	zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
 
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()

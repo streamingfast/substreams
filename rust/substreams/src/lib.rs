@@ -16,29 +16,29 @@
 //! ```no_run
 //! use substreams::{errors::Error, store};
 //! # mod eth { pub type Block = (); }
-//! # mod proto { pub type Custom = (); }
+//! # mod pb { pub type Custom = (); } // holding all codegen'd protobuf structs
 //!
 //! /// Map handler that takes a source as input
 //! #[substreams::handlers::map]
-//! fn map_transfers(blk: eth::Block) -> Result<proto::Custom, Error> {
+//! fn map_transfers(blk: eth::Block) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //!
 //! /// Map handler that takes a source, and a store in get mode as inputs
 //! #[substreams::handlers::map]
-//! fn map_ownerships(blk: eth::Block, store: store::StoreGet) -> Result<proto::Custom, Error> {
+//! fn map_ownerships(blk: eth::Block, mythings: store::StoreGet) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //!
 //! /// Map handler that takes a source, another map, and a store in get mode as inputs
 //! #[substreams::handlers::map]
-//! fn map_mints(blk: eth::Block, mints: proto::Custom, store: store::StoreGet) -> Result<proto::Custom, Error> {
+//! fn map_mints(blk: eth::Block, mints: pb::Custom, mythings: store::StoreGet) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //!
 //! /// Map handler that takes a source, another map, and a store in delta mode as inputs
 //! #[substreams::handlers::map]
-//! fn map_db(blk: eth::Block, mints: proto::Custom, store_deltas: store::Deltas) -> Result<proto::Custom, Error> {
+//! fn map_db(blk: eth::Block, mints: pb::Custom, store_deltas: store::Deltas) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //! ```
@@ -51,20 +51,20 @@
 //!
 //! ```no_run
 //! use substreams::store;
-//! # mod proto { pub type Custom = (); }
+//! # mod pb { pub type Custom = (); }
 //!
 //! #[substreams::handlers::store]
-//! fn store_transfers(objects: proto::Custom, output: store::StoreAddInt64) {
+//! fn store_transfers(objects: pb::Custom, output: store::StoreAddInt64) {
 //!     // to something
 //! }
 //!
 //! #[substreams::handlers::store]
-//! fn store_ownerships(objects: proto::Custom, store: store::StoreGet, output: store::StoreAddInt64) {
+//! fn store_ownerships(objects: pb::Custom, store: store::StoreGet, output: store::StoreAddInt64) {
 //!     // to something
 //! }
 //!
 //! #[substreams::handlers::store]
-//! fn store_mints(objects: proto::Custom, store: store::StoreGet, another_store: store::StoreGet, store_deltas: store::Deltas, output: store::StoreAddInt64) {
+//! fn store_mints(objects: pb::Custom, store: store::StoreGet, another_store: store::StoreGet, store_deltas: store::Deltas, output: store::StoreAddInt64) {
 //!     // to something
 //! }
 //!```

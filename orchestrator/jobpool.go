@@ -73,7 +73,7 @@ func (p *JobPool) Notify(builder string, blockNum uint64) {
 		waiterSlice = append(waiterSlice, w)
 	}
 	sort.Slice(waiterSlice, func(i, j int) bool {
-		return waiterSlice[i].BlockNumber() < waiterSlice[j].BlockNumber()
+		return waiterSlice[i].BlockNumber() > waiterSlice[j].BlockNumber()
 	})
 
 	for waiter := range p.waiters {

@@ -92,10 +92,6 @@ func TestGetOrdered(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "A", r.moduleName)
-	require.Equal(t, &block.Range{
-		StartBlock:        100,
-		ExclusiveEndBlock: 200,
-	}, r.requestRange)
 
 	// we notify that A is ready up to block 100, which will put the request for B to the front of the queue
 	p.Notify("A", 100)
@@ -121,10 +117,6 @@ func TestGetOrdered(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, r)
 	require.Equal(t, "A", r.moduleName)
-	require.Equal(t, &block.Range{
-		StartBlock:        200,
-		ExclusiveEndBlock: 300,
-	}, r.requestRange)
 
 	// asser the end of the stream
 	r, err = p.GetNext(ctx)

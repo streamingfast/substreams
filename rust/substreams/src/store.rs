@@ -1,6 +1,6 @@
 //! Store Implementation for Substreams.
 //!
-//! This crate implements the different Stores that can be used in your Substreams
+//! This crate implements the different Stores which can be used in your Substreams
 //! handlers.
 //!
 

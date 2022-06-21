@@ -1,42 +1,42 @@
 //! A library for writing Substreams handlers.
 //!
-//! Substreams consts of a numbmbder of modules that provide struct and macros for
+//! Substreams consists of a number of modules which provide structs and macros for
 //! implementing Substreams handlers. The handlers are defined in your Manifest.
 //!Learn more about Substreams at <https://substreams.streamingfast.io>
 //!
 //! ## Handler Examples
 //!
-//! Below are a few `map` handler examples. The signature of then handler function is based
+//! Below are a few `map` handler examples. The signature of the handler function is based
 //! on the inputs and output defined in the `map` module definition in the Manifest. There
 //! are a few things to note:
 //! * Best practice is to name your `map` module function `map_<your_action>'
-//! * `map` module function should *always* return a Result
-//! * The Result should have an Error type set to `subtreams::error:Error`
+//! * `map` module function must *always* return a Result
+//! * The Result must have an Error type set to `substreams::error:Error`
 //!
 //! ```no_run
 //! use substreams::{errors::Error, store};
 //! # mod eth { pub type Block = (); }
 //! # mod pb { pub type Custom = (); } // holding all codegen'd protobuf structs
 //!
-//! /// Map handler that takes a source as input
+//! /// Map handler which takes a source as input
 //! #[substreams::handlers::map]
 //! fn map_transfers(blk: eth::Block) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //!
-//! /// Map handler that takes a source, and a store in get mode as inputs
+//! /// Map handler which takes a source, and a store in get mode as inputs
 //! #[substreams::handlers::map]
 //! fn map_ownerships(blk: eth::Block, mythings: store::StoreGet) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //!
-//! /// Map handler that takes a source, another map, and a store in get mode as inputs
+//! /// Map handler which takes a source, another map, and a store in get mode as inputs
 //! #[substreams::handlers::map]
 //! fn map_mints(blk: eth::Block, mints: pb::Custom, mythings: store::StoreGet) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
 //! }
 //!
-//! /// Map handler that takes a source, another map, and a store in delta mode as inputs
+//! /// Map handler which takes a source, another map, and a store in delta mode as inputs
 //! #[substreams::handlers::map]
 //! fn map_db(blk: eth::Block, mints: pb::Custom, store_deltas: store::Deltas) -> Result<pb::Custom, Error> {
 //!     unimplemented!("do something");
@@ -44,10 +44,10 @@
 //! ```
 //!
 //! Below are a few `store` handler examples. The signature of the handler function is based
-//! on the inputs defined in the `stopre` module definition in the Manifest. There
+//! on the inputs defined in the `store` module definition in the Manifest. There
 //! are a few things to note:
 //! * Best practice is to name your `map` module function `store_<your_action>'
-//! * `store` module function should *return nothing*
+//! * `store` module function must *return nothing*
 //!
 //! ```no_run
 //! use substreams::store;
@@ -84,7 +84,7 @@ pub use crate::hex::Hex;
 pub use hex_literal::hex;
 
 pub fn output<M: prost::Message>(msg: M) {
-    // Need to return the buffer and forget about it issue occured when trying to write large data
+    // Need to return the buffer and forget about it issue occurred when trying to write large data
     // wasm was "dropping" the data before we could write to it, which causes us to have garbage
     // value. By forgetting the data we can properly call external output function to write the
     // msg to heap.

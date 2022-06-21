@@ -1,12 +1,12 @@
 //! Log Implementation for Substreams
 //!
-//! This crates implements helpful logging functions that
-//! are used in your handlers
+//! This crate implements helpful logging functions which can be used
+//! in your handlers
 //!
 
 use crate::externs;
 
-/// Logs a message at INFO level on current substream's logger using interpolation of
+/// Logs a message at INFO level on the logger of the current substream using interpolation of
 /// runtime expressions.
 ///
 /// The behavior is exactly like [std::format::format!] built-in Rust formatting primitive.
@@ -43,7 +43,7 @@ macro_rules! log_info {
     }}
 }
 
-/// Logs a message at DEBUG level on current substream's logger using interpolation of
+/// Logs a message at DEBUG level on the logger of the current substream using interpolation of
 /// runtime expressions.
 ///
 /// The behavior is exactly like [std::format::format!] built-in Rust formatting primitive.

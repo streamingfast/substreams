@@ -1,7 +1,7 @@
 //! Protobuf helpers for Substreams.
 //!
-//! This crate offers a few protobuf helper functions that
-//! is used across Substreams
+//! This crate offers a few protobuf helper functions which
+//! are used across Substreams
 //!
 
 use prost::{DecodeError, EncodeError};

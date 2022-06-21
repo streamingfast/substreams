@@ -1,8 +1,8 @@
 //! Handler macros for Substreams.
 //!
-//! This create exports useful macros that you can utilize to develop
-//! Substreams handlers. Theses macros' goal is to significantly reduce boilerplate
-//! code and ensure that your handler are more readeable
+//! This create exports useful macros that you can use to develop
+//! Substreams handlers. The goal of these macros is to significantly reduce boilerplate
+//! code and ensure that your handler are more readable
 
 /// Marks function to setup substream map handler WASM boilerplate
 ///

@@ -31,8 +31,12 @@ func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func (r *Range) Contains(blockRef bstream.BlockRef) bool {
-	return blockRef.Num() >= r.StartBlock && blockRef.Num() < r.ExclusiveEndBlock
+func (r *Range) ContainsBlockRef(blockRef bstream.BlockRef) bool {
+	return r.Contains(blockRef.Num())
+}
+
+func (r *Range) Contains(blockNum uint64) bool {
+	return blockNum >= r.StartBlock && blockNum < r.ExclusiveEndBlock
 }
 
 func (r *Range) Next(size uint64) *Range {

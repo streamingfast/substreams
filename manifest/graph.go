@@ -113,7 +113,7 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph) (out uint64, err error
 			return false
 		}
 		if parentsInitialBlock != currentInitialBlock {
-			err =fmt.Errorf("cannot deterministically determine the initialBlock for module %q; multiple inputs have conflicting initial blocks defined or inherited", g.modules[moduleIndex].Name)
+			err = fmt.Errorf("cannot deterministically determine the initialBlock for module %q; multiple inputs have conflicting initial blocks defined or inherited", g.modules[moduleIndex].Name)
 			return true
 		}
 		return false
@@ -322,6 +322,13 @@ func (g *ModuleGraph) ModuleInitialBlock(moduleName string) (uint64, error) {
 		return g.modules[moduleIndex].GetInitialBlock(), nil
 	}
 	return 0, fmt.Errorf("could not find module %s in graph", moduleName)
+}
+
+func (g *ModuleGraph) Module(moduleName string) (*pbsubstreams.Module, error) {
+	if moduleIndex, found := g.moduleIndex[moduleName]; found {
+		return g.modules[moduleIndex], nil
+	}
+	return nil, fmt.Errorf("could not find module %s in graph", moduleName)
 }
 
 type ModuleMarshaler []*pbsubstreams.Module

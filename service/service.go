@@ -7,22 +7,27 @@ import (
 	"io"
 	"strings"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose"
 	firehoseServer "github.com/streamingfast/firehose/server"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
+	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Service struct {
@@ -182,6 +187,36 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
+	if len(request.OutputModules) == 1 {
+		moduleName := request.OutputModules[0]
+		module, err := graph.Module(moduleName)
+
+		zlog.Info("try to send module output from cached files", zap.String("module_name", moduleName))
+		if err != nil {
+			return fmt.Errorf("getting module %q from graph: %w", moduleName, err)
+		}
+
+		hash := manifest.HashModuleAsString(request.Modules, graph, module)
+		moduleCacheStore, err := s.baseStateStore.SubStore(fmt.Sprintf("%s/outputs", hash))
+		moduleOutputCache := outputs.NewOutputCache(moduleName, moduleCacheStore, s.outputCacheSaveBlockInterval)
+
+		lastBlockSent, err := sendCachedModuleOutput(ctx, uint64(request.StartBlockNum), request.StopBlockNum, module, moduleOutputCache, responseHandler)
+		if err != nil {
+			fmt.Println("sending cached module output: %w", err)
+		}
+
+		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum {
+			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
+			return io.EOF // all done
+		}
+
+		if lastBlockSent != nil {
+			zlog.Info("sent cached data", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
+			request.StartBlockNum = int64(*lastBlockSent + 1)
+		}
+
+	}
+
 	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
 
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
@@ -247,4 +282,79 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return status.Errorf(codes.Internal, "unexpected termination: %s", err)
 	}
 	return nil
+}
+
+func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, module *pbsubstreams.Module, cache *outputs.OutputCache, responseFunc func(resp *pbsubstreams.Response) error) (lastBlockSent *uint64, err error) {
+	cachedRanges, err := cache.ListContinuousCacheRanges(ctx, startBlock)
+	if err != nil {
+		return nil, fmt.Errorf("listing cached ranges: %w", err)
+	}
+
+	zlog.Info("found cached ranges", zap.Int("range_count", len(cachedRanges)))
+
+	for _, r := range cachedRanges {
+		err := cache.Load(ctx, r)
+		if err != nil {
+			return nil, fmt.Errorf("loading cache: %w", err)
+		}
+
+		for _, item := range cache.SortedCacheItems() {
+			if item.BlockNum >= stopBlock {
+				break
+			}
+
+			cursor := &bstream.Cursor{
+				Step:      bstream.StepIrreversible,
+				Block:     bstream.NewBlockRef(item.BlockID, item.BlockNum),
+				LIB:       nil,
+				HeadBlock: bstream.NewBlockRef(item.BlockID, item.BlockNum),
+			}
+
+			var output pbsubstreams.ModuleOutputData
+			switch module.Kind.(type) {
+			case *pbsubstreams.Module_KindMap_:
+				output = &pbsubstreams.ModuleOutput_MapOutput{
+					MapOutput: &anypb.Any{
+						TypeUrl: "type.googleapis.com/" + module.Output.Type,
+						Value:   item.Payload,
+					},
+				}
+			case *pbsubstreams.Module_KindStore_:
+				deltas := &pbsubstreams.StoreDeltas{}
+				err := proto.Unmarshal(item.Payload, deltas)
+				if err != nil {
+					return nil, fmt.Errorf("unmarshalling output deltas: %w", err)
+				}
+
+				output = &pbsubstreams.ModuleOutput_StoreDeltas{
+					StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: deltas.Deltas},
+				}
+			default:
+				panic(fmt.Sprintf("invalid module file %T", module.Kind))
+			}
+
+			out := &pbsubstreams.BlockScopedData{
+				Outputs: []*pbsubstreams.ModuleOutput{
+					{
+						Name: cache.ModuleName,
+						Data: output,
+					},
+				},
+				Clock: &pbsubstreams.Clock{
+					Id:        item.BlockID,
+					Number:    item.BlockNum,
+					Timestamp: item.Timestamp,
+				},
+				Step:   pbsubstreams.StepToProto(bstream.StepIrreversible),
+				Cursor: cursor.ToOpaque(),
+			}
+
+			if err := responseFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+				return nil, fmt.Errorf("calling return func: %w", err)
+			}
+			lastBlockSent = &item.BlockNum
+		}
+	}
+
+	return
 }

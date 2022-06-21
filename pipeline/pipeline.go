@@ -138,7 +138,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		}
 
 		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
-		_, err := p.moduleOutputCache.RegisterModule(ctx, module, hash, p.baseStateStore, p.requestedStartBlockNum)
+		_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
 		if err != nil {
 			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
@@ -210,7 +210,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	for _, cache := range p.moduleOutputCache.OutputCaches {
 		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
-		if _, err := cache.Load(ctx, atBlock); err != nil {
+		if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
 			return fmt.Errorf("loading outputs caches")
 		}
 	}
@@ -303,7 +303,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(executor)
+		err = p.runExecutor(executor, cursor.ToOpaque())
 		if err != nil {
 			return fmt.Errorf("running module executor: %w", err)
 		}
@@ -328,7 +328,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
-func (p *Pipeline) runExecutor(executor ModuleExecutor) error {
+func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 	//FIXME(abourget): should we ever skip that work?
 	// if executor.ModuleInitialBlock < block.Number {
 	// 	continue ??
@@ -336,7 +336,7 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor) error {
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(p.wasmOutputs, p.clock)
+	executionError := executor.run(p.wasmOutputs, p.clock, cursor)
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()

@@ -22,7 +22,7 @@ type ModuleExecutor interface {
 	// Reset the wasm instance, avoid propagating logs.
 	Reset()
 
-	run(vals map[string][]byte, clock *pbsubstreams.Clock) error
+	run(vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error
 
 	moduleLogs() (logs []string, truncated bool)
 	moduleOutputData() pbsubstreams.ModuleOutputData
@@ -70,7 +70,7 @@ func (e *StoreModuleExecutor) String() string {
 	return e.moduleName
 }
 
-func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock) error {
+func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
 	output, found, err := e.cache.Get(clock)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
@@ -86,7 +86,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 	}
 
 	if len(e.mapperOutput) > 0 {
-		if err = e.cache.Set(clock, e.mapperOutput); err != nil {
+		if err = e.cache.Set(clock, cursor, e.mapperOutput); err != nil {
 			return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
 		}
 	}
@@ -94,7 +94,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 	return nil
 }
 
-func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock) error {
+func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
 	output, found, err := e.cache.Get(clock)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
@@ -126,7 +126,7 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 	}
 
 	if len(data) > 0 {
-		if err = e.cache.Set(clock, data); err != nil {
+		if err = e.cache.Set(clock, cursor, data); err != nil {
 			return fmt.Errorf("setting delta to cache at block %d: %w", clock.Number, err)
 		}
 	}

@@ -3,9 +3,9 @@ package state
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/utils"
 )
 
 var stateFileRegex *regexp.Regexp
@@ -26,8 +26,8 @@ func ParseFileName(filename string) (*FileInfo, bool) {
 		return nil, false
 	}
 
-	end := uint64(mustAtoi(res[0][1]))
-	start := uint64(mustAtoi(res[0][2]))
+	end := uint64(utils.MustAtoi(res[0][1]))
+	start := uint64(utils.MustAtoi(res[0][2]))
 	partial := res[0][3] == "partial"
 
 	return &FileInfo{
@@ -51,12 +51,4 @@ func FullStateFileName(r *block.Range, moduleStartBlock uint64) string {
 
 func InfoFileName() string {
 	return "___store-metadata.json"
-}
-
-func mustAtoi(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
-	}
-	return i
 }

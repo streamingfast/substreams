@@ -55,7 +55,9 @@ type BlockWaiter struct {
 	items []*waiterItem
 
 	setup sync.Once
-	done  chan interface{}
+
+	closeOnce sync.Once
+	done      chan interface{}
 
 	name     string
 	blockNum uint64
@@ -99,7 +101,9 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 		go func() {
 			wg.Wait()
 			zlog.Debug("block waiter done waiting", zap.String("module", w.name), zap.Uint64("block_num", w.blockNum))
-			close(w.done)
+			w.closeOnce.Do(func() {
+				close(w.done)
+			})
 		}()
 
 		for _, item := range w.items {
@@ -123,7 +127,9 @@ func (w *BlockWaiter) Wait(ctx context.Context) <-chan interface{} {
 func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 	if len(w.items) == 0 {
 		zlog.Debug("block waiter done waiting (nothing to wait for)", zap.String("module", w.name), zap.Uint64("block_num", w.blockNum))
-		close(w.done)
+		w.closeOnce.Do(func() {
+			close(w.done)
+		})
 		return
 	}
 

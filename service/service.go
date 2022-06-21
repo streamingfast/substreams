@@ -207,7 +207,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum+1 {
 			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
-			return io.EOF // all done
+			return nil // all done
 		}
 
 		if lastBlockSent != nil {

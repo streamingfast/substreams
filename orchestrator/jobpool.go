@@ -41,7 +41,7 @@ type JobPool struct {
 
 func NewJobPool() *JobPool {
 	p := JobPool{}
-	p.readyJobStream = make(chan *jobWaiter)
+	p.readyJobStream = make(chan *jobWaiter, 2_000_000)
 	p.queueSend = make(chan *QueueItem)
 	p.queueReceive = make(chan *QueueItem)
 	p.waiters = map[Waiter]struct{}{}
@@ -73,10 +73,10 @@ func (p *JobPool) Notify(builder string, blockNum uint64) {
 		waiterSlice = append(waiterSlice, w)
 	}
 	sort.Slice(waiterSlice, func(i, j int) bool {
-		return waiterSlice[i].BlockNumber() > waiterSlice[j].BlockNumber()
+		return waiterSlice[i].BlockNumber() < waiterSlice[j].BlockNumber()
 	})
 
-	for waiter := range p.waiters {
+	for _, waiter := range waiterSlice {
 		waiter.Signal(builder, blockNum)
 	}
 }

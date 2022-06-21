@@ -187,7 +187,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	if len(request.OutputModules) == 1 {
+	if len(request.OutputModules) == 100000 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)
 
@@ -205,7 +205,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			fmt.Println("sending cached module output: %w", err)
 		}
 
-		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum+1 {
+		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum {
 			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
 			return nil // all done
 		}
@@ -351,7 +351,8 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 			}
 			lastBlockSent = &item.BlockNum
 		}
-		lastBlockSent = &r.ExclusiveEndBlock
+		x := r.ExclusiveEndBlock - 1
+		lastBlockSent = &x
 	}
 
 	return

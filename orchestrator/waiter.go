@@ -15,6 +15,7 @@ type Waiter interface {
 	Wait(ctx context.Context) <-chan interface{}
 	Signal(storeName string, blockNum uint64)
 	Size() int
+	BlockNumber() uint64
 	String() string
 }
 
@@ -152,6 +153,10 @@ func (w *BlockWaiter) Signal(storeName string, blockNum uint64) {
 
 func (w *BlockWaiter) Size() int {
 	return len(w.items)
+}
+
+func (w *BlockWaiter) BlockNumber() uint64 {
+	return w.blockNum
 }
 
 func (w *BlockWaiter) String() string {

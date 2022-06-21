@@ -68,6 +68,14 @@ func (p *JobPool) Notify(builder string, blockNum uint64) {
 
 	zlog.Debug("pool: notification received", zap.String("builder", builder), zap.Uint64("block number", blockNum))
 
+	waiterSlice := make([]Waiter, 0, len(p.waiters))
+	for w := range p.waiters {
+		waiterSlice = append(waiterSlice, w)
+	}
+	sort.Slice(waiterSlice, func(i, j int) bool {
+		return waiterSlice[i].BlockNumber() < waiterSlice[j].BlockNumber()
+	})
+
 	for waiter := range p.waiters {
 		waiter.Signal(builder, blockNum)
 	}

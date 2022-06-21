@@ -38,6 +38,10 @@ func (tw *TestWaiter) Size() int {
 	return 0
 }
 
+func (tw *TestWaiter) BlockNumber() uint64 {
+	return 0
+}
+
 func (tw *TestWaiter) String() string {
 	return ""
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -69,7 +68,7 @@ type Pipeline struct {
 
 	outputCacheSaveBlockInterval uint64
 	subrequestSplitSize          int
-	grpcClientFactory            func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
+	grpcClientFactory            substreams.GrpcClientFactory
 }
 
 func New(
@@ -80,7 +79,7 @@ func New(
 	baseStateStore dstore.Store,
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
-	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error),
+	grpcClientFactory substreams.GrpcClientFactory,
 	subrequestSplitSize int,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {

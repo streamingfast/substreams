@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -18,7 +17,7 @@ type WorkerPool struct {
 	workers chan *Worker
 }
 
-func NewWorkerPool(workerCount int, originalRequestModules *pbsubstreams.Modules, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)) *WorkerPool {
+func NewWorkerPool(workerCount int, originalRequestModules *pbsubstreams.Modules, grpcClientFactory substreams.GrpcClientFactory) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
@@ -42,7 +41,7 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
-	grpcClientFactory      func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
+	grpcClientFactory      substreams.GrpcClientFactory
 	originalRequestModules *pbsubstreams.Modules
 }
 
@@ -53,11 +52,12 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		zlog.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 	}()
 
-	grpcClient, grpcCallOpts, err := w.grpcClientFactory()
+	grpcClient, connClose, grpcCallOpts, err := w.grpcClientFactory(ctx)
 	if err != nil {
 		zlog.Error("getting grpc client", zap.Error(err))
 		return nil, fmt.Errorf("grpc client factory: %w", err)
 	}
+	defer connClose()
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
@@ -67,6 +67,9 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 	if err != nil {
 		return nil, fmt.Errorf("getting block stream: %w", err)
 	}
+	defer func() {
+		stream.CloseSend()
+	}()
 
 	for {
 		select {
@@ -86,7 +89,6 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 					zlog.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
-
 				return partialsWritten, nil
 			}
 			zlog.Warn("worker done on stream error", zap.Error(err))

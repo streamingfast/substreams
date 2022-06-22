@@ -46,7 +46,7 @@ type Service struct {
 
 	logger *zap.Logger
 
-	grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error)
+	grpcClientFactory substreams.GrpcClientFactory
 
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
@@ -96,7 +96,7 @@ func WithOutCacheSaveInterval(block uint64) Option {
 	}
 }
 
-func New(stateStore dstore.Store, blockType string, grpcClientFactory func() (pbsubstreams.StreamClient, []grpc.CallOption, error), parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
+func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams.GrpcClientFactory, parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
 	s := &Service{
 		baseStateStore:            stateStore,
 		blockType:                 blockType,
@@ -124,7 +124,6 @@ func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory 
 func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
 	ctx := streamSrv.Context()
 	logger := logging.Logger(ctx, s.logger)
-	_ = logger
 
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
@@ -242,11 +241,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		zap.Int64("start_block", firehoseReq.StartBlockNum),
 		zap.Uint64("end_block", firehoseReq.StopBlockNum),
 	)
-	st, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
+	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}
-	if err := st.Run(ctx); err != nil {
+	if err := blockStream.Run(ctx); err != nil {
 		if errors.Is(err, io.EOF) {
 			var d []string
 			for _, rng := range pipe.PartialsWritten() {
@@ -255,6 +254,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			partialsWritten := []string{strings.Join(d, ",")}
 			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
 			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
+
 			return nil
 		}
 

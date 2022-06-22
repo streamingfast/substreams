@@ -55,7 +55,7 @@ func NewOrderedStrategy(
 				requestRange:       requestRange,
 			}
 
-			waiter := NewWaiter(idx, store.Name, requestRange.StartBlock, ancestorStoreModules...)
+			waiter := NewWaiter(store.Name, requestRange.StartBlock, ancestorStoreModules...)
 			err = pool.Add(ctx, rangeLen-idx, job, waiter)
 			if err != nil {
 				return nil, fmt.Errorf("error adding job %s to pool: %w", job, err)

@@ -15,12 +15,12 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlainTextConnection bool) (pbsubstreams.StreamClient, []grpc.CallOption, error) {
+func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlainTextConnection bool) (pbsubstreams.StreamClient, func(), []grpc.CallOption, error) {
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""))
 	skipAuth := jwt == "" || usePlainTextConnection
 
 	if useInsecureTLSConnection && usePlainTextConnection {
-		return nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
+		return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
 	}
 
 	var dialOptions []grpc.DialOption
@@ -38,7 +38,7 @@ func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlai
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create external gRPC client")
+		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client")
 	}
 
 	var callOpts []grpc.CallOption
@@ -51,5 +51,10 @@ func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlai
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint))
 	client := pbsubstreams.NewStreamClient(conn)
 	zlog.Debug("client created")
-	return client, callOpts, nil
+	return client,
+		func() {
+			conn.Close()
+		},
+		callOpts,
+		nil
 }

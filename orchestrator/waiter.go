@@ -51,10 +51,9 @@ type BlockWaiter struct {
 
 	name     string
 	blockNum uint64
-	id       int
 }
 
-func NewWaiter(id int, name string, blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
+func NewWaiter(name string, blockNum uint64, stores ...*pbsubstreams.Module) *BlockWaiter {
 	var items []*waiterItem
 
 	for _, store := range stores {
@@ -70,7 +69,6 @@ func NewWaiter(id int, name string, blockNum uint64, stores ...*pbsubstreams.Mod
 	}
 
 	return &BlockWaiter{
-		id:    id,
 		items: items,
 
 		name:     name,
@@ -152,7 +150,7 @@ func (w *BlockWaiter) BlockNumber() uint64 {
 
 func (w *BlockWaiter) String() string {
 	if w.items == nil {
-		return fmt.Sprintf("id: %d [%s] O(%d)", w.id, "nil", w.Size())
+		return fmt.Sprintf("[%s] O(%d)", "nil", w.Size())
 	}
 
 	var wis []string
@@ -160,5 +158,5 @@ func (w *BlockWaiter) String() string {
 		wis = append(wis, wi.String())
 	}
 
-	return fmt.Sprintf("id: %d [%s] O(%d)", w.id, strings.Join(wis, ","), w.Size())
+	return fmt.Sprintf("[%s] O(%d)", strings.Join(wis, ","), w.Size())
 }

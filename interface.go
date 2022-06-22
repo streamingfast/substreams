@@ -7,4 +7,4 @@ import (
 	"google.golang.org/grpc"
 )
 
-type GrpcClientFactory func(context.Context) (streamClient pbsubstreams.StreamClient, connClose func(), opts []grpc.CallOption, err error)
+type GrpcClientFactory func(context.Context) (streamClient pbsubstreams.StreamClient, closeFunc func() error, opts []grpc.CallOption, err error)

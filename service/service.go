@@ -162,6 +162,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 	}
 
+	isSubrequest := false
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
 		zlog.Debug("extracting meta data", zap.Strings("partial_mode", partialMode))
@@ -172,6 +173,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 				return status.Error(codes.InvalidArgument, "substreams-partial-mode not enabled on this instance")
 			}
 
+			isSubrequest = true
 			opts = append(opts, pipeline.WithOrchestratedExecution())
 		}
 	}
@@ -186,7 +188,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	if len(request.OutputModules) == 1 {
+	if !isSubrequest && len(request.OutputModules) == 1 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)
 

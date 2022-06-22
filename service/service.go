@@ -186,7 +186,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	if len(request.OutputModules) == 100000 {
+	if len(request.OutputModules) == 1 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)
 

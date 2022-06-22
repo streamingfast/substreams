@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlainTextConnection bool) (pbsubstreams.StreamClient, func(), []grpc.CallOption, error) {
+func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlainTextConnection bool) (cli pbsubstreams.StreamClient, closeFunc func(), callOpts []grpc.CallOption, err error) {
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""))
 	skipAuth := jwt == "" || usePlainTextConnection
 
@@ -40,8 +40,10 @@ func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlai
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client")
 	}
+	closeFunc = func() {
+		conn.Close()
+	}
 
-	var callOpts []grpc.CallOption
 	if !skipAuth {
 		zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
 		creds := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
@@ -49,12 +51,7 @@ func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlai
 	}
 
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint))
-	client := pbsubstreams.NewStreamClient(conn)
+	cli = pbsubstreams.NewStreamClient(conn)
 	zlog.Debug("client created")
-	return client,
-		func() {
-			conn.Close()
-		},
-		callOpts,
-		nil
+	return
 }

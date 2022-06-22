@@ -63,21 +63,21 @@ func TestGetOrdered(t *testing.T) {
 	p := NewJobPool()
 	ctx := context.Background()
 
-	waiter0 := NewWaiter("A", 100)
+	waiter0 := NewWaiter(1, "A", 100)
 	r0 := &Job{
 		moduleName:   "A",
 		requestRange: block.NewRange(100, 200),
 	}
 	_ = p.Add(ctx, 2, r0, waiter0)
 
-	waiter1 := NewWaiter("A", 200)
+	waiter1 := NewWaiter(2, "A", 200)
 	r1 := &Job{
 		moduleName:   "A",
 		requestRange: block.NewRange(200, 300),
 	}
 	_ = p.Add(ctx, 1, r1, waiter1)
 
-	waiter2 := NewWaiter("B", 100, &pbsubstreams.Module{Name: "A"})
+	waiter2 := NewWaiter(3, "B", 100, &pbsubstreams.Module{Name: "A"})
 	r2 := &Job{
 		moduleName:   "B",
 		requestRange: block.NewRange(100, 200),
@@ -157,7 +157,7 @@ func TestWIP(t *testing.T) {
 	for _, store := range stores {
 		for ix, blockRange := range blockRanges {
 			ancestorStores := getAncestorStores(store)
-			waiter := NewWaiter(store, blockRange.StartBlock, ancestorStores...)
+			waiter := NewWaiter(ix, store, blockRange.StartBlock, ancestorStores...)
 			job := &Job{moduleName: store, moduleSaveInterval: 100, requestRange: blockRange}
 			p.Add(ctx, len(blockRanges)-ix, job, waiter)
 		}

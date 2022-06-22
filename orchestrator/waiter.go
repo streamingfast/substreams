@@ -38,7 +38,7 @@ func (wi *waiterItem) Wait() <-chan interface{} {
 }
 
 func (wi *waiterItem) String() string {
-	return fmt.Sprintf("waiter! (%d) (store:%s) (block:%d)", wi.StoreName, wi.BlockNum)
+	return fmt.Sprintf("waiter! (store:%s) (block:%d)", wi.StoreName, wi.BlockNum)
 }
 
 type BlockWaiter struct {

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
@@ -82,42 +83,65 @@ func (s *Squashable) mergeAvailablePartials(ctx context.Context) error {
 
 		zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 
+		start := time.Now()
+		loadPartialStart := time.Now()
 		nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.StartBlock, squashableRange.ExclusiveEndBlock))
 		if err != nil {
 			return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 		}
+		loadPartialDuration := time.Since(loadPartialStart)
 
 		zlog.Debug("next store loaded", zap.Object("store", nextStore))
 
+		mergeStart := time.Now()
 		err = s.store.Merge(nextStore)
 		if err != nil {
 			return fmt.Errorf("merging: %s", err)
 		}
+		mergeDuration := time.Since(mergeStart)
 
 		zlog.Debug("store merge", zap.Object("store", s.store))
 
 		s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 
-		zlog.Info("deleting temp store", zap.Object("store", nextStore))
+		zlog.Info("deleting store", zap.Object("store", nextStore))
+		deleteStart := time.Now()
+
 		err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 		if err != nil {
 			zlog.Warn("deleting partial file", zap.Error(err))
 		}
+		deleteDuration := time.Since(deleteStart)
 
+		writeStart := time.Now()
 		if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0 {
 			err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
 			if err != nil {
 				return fmt.Errorf("writing state: %w", err)
 			}
 		}
+		writeDuration := time.Since(writeStart)
 
 		s.ranges = s.ranges[1:]
 
 		if squashableRange.ExclusiveEndBlock == s.targetExclusiveBlock {
 			s.targetReached = true
 		}
-
+		notificationStart := time.Now()
 		s.notifyWaiters(squashableRange.ExclusiveEndBlock)
+		notificationDuration := time.Since(notificationStart)
+		totalDuration := time.Since(start)
+		zlog.Info(
+			"squashing completed",
+			zap.String("module_name", s.name),
+			zap.Stringer("squashable_range", squashableRange),
+			zap.Duration("load_partial_duration", loadPartialDuration),
+			zap.Duration("merge_duration", mergeDuration),
+			zap.Duration("delete_duration", deleteDuration),
+			zap.Duration("write_duration", writeDuration),
+			zap.Duration("notification_duration", notificationDuration),
+			zap.Duration("total_duration", totalDuration),
+		)
 	}
 
 	return nil

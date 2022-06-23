@@ -297,14 +297,15 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 	}
 
 	zlog.Info("found cached ranges", zap.Int("range_count", len(cachedRanges)))
-
 	for _, r := range cachedRanges {
+		//todo: check context
 		err := cache.Load(ctx, r)
 		if err != nil {
 			return nil, fmt.Errorf("loading cache: %w", err)
 		}
 
 		for _, item := range cache.SortedCacheItems() {
+			//todo: check context
 			if item.BlockNum >= stopBlock {
 				break
 			}

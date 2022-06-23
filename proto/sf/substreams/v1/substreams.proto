@@ -112,8 +112,9 @@ message ModuleProgress {
 }
 
 message BlockRange {
-  uint64 start_block = 1;
-  uint64 end_block = 2;
+  string host = 1;
+  uint64 start_block = 2;
+  uint64 end_block = 3;
 }
 
 message StoreDeltas {

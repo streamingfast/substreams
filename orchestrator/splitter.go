@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
@@ -21,7 +22,7 @@ func (p WorkPlan) SquashPartialsPresent(ctx context.Context, squasher *Squasher)
 	return nil
 }
 
-func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+func (p WorkPlan) ProgressMessages(hostname string) (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p {
 		if unit.initialStoreFile == nil {
 			continue
@@ -30,6 +31,7 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 		var more []*pbsubstreams.BlockRange
 		if unit.initialStoreFile != nil {
 			more = append(more, &pbsubstreams.BlockRange{
+				Host:       hostname,
 				StartBlock: unit.initialStoreFile.StartBlock,
 				EndBlock:   unit.initialStoreFile.ExclusiveEndBlock,
 			})
@@ -37,6 +39,7 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 
 		for _, rng := range unit.initialProcessedPartials() {
 			more = append(more, &pbsubstreams.BlockRange{
+				Host:       hostname,
 				StartBlock: rng.StartBlock,
 				EndBlock:   rng.ExclusiveEndBlock,
 			})

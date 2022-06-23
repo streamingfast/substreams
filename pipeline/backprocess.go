@@ -42,7 +42,7 @@ func (p *Pipeline) backProcessStores(
 		}
 	}
 
-	progressMessages := workPlan.ProgressMessages()
+	progressMessages := workPlan.ProgressMessages(p.hostname)
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}

@@ -4,10 +4,9 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/dgrpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -15,6 +14,10 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
+// FIXME(abourget): plz no closeFunc() in here? We embed in our own struct and pass that around?
+// Also, let's not have this being called from within the Firehose, let's pass the parameters down and let the `substreams` engine manage all those connections.
+// This will avoid us needing to go to all `sf-chain` implementations to tweak for something
+// that clearly belongs only inside Substreams.
 func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlainTextConnection bool) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""))
 	skipAuth := jwt == "" || usePlainTextConnection

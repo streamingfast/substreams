@@ -82,7 +82,6 @@ func listSnapshots(ctx context.Context, store dstore.Store) (out *Snapshots, err
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

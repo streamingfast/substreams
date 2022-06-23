@@ -47,14 +47,11 @@ type Worker struct {
 
 func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	start := time.Now()
-	zlog.Info("running job", zap.Object("job", job))
-	defer func() {
-		zlog.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)))
-	}()
 
+	jobLogger := zlog.With(zap.Object("job", job))
 	grpcClient, connClose, grpcCallOpts, err := w.grpcClientFactory(ctx)
 	if err != nil {
-		zlog.Error("getting grpc client", zap.Error(err))
+		jobLogger.Error("getting grpc client", zap.Error(err))
 		return nil, fmt.Errorf("grpc client factory: %w", err)
 	}
 	defer connClose()
@@ -65,16 +62,32 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
+		jobLogger.Error("getting block stream", zap.Error(err))
 		return nil, fmt.Errorf("getting block stream: %w", err)
 	}
 	defer func() {
 		stream.CloseSend()
 	}()
 
+	meta, err := stream.Header()
+	if err != nil {
+		jobLogger.Warn("error getting stream header", zap.Error(err))
+	}
+	remoteHostname := "unknown"
+	if hosts := meta.Get("hostname"); len(hosts) != 0 {
+		remoteHostname = hosts[0]
+		jobLogger = jobLogger.With(zap.String("remote_hostname", remoteHostname))
+	}
+
+	jobLogger.Info("running job", zap.Object("job", job))
+	defer func() {
+		jobLogger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
-			zlog.Warn("context cancel will waiting for stream data, worker is terminating")
+			jobLogger.Warn("context cancel will waiting for stream data, worker is terminating")
 			return nil, ctx.Err()
 		default:
 		}
@@ -82,16 +95,16 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		resp, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
-				zlog.Info("worker done", zap.Object("job", job))
+				jobLogger.Info("worker done", zap.Object("job", job))
 				trailers := stream.Trailer().Get("substreams-partials-written")
 				var partialsWritten []*block.Range
 				if len(trailers) != 0 {
-					zlog.Info("partial written", zap.String("trailer", trailers[0]))
+					jobLogger.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
 				return partialsWritten, nil
 			}
-			zlog.Warn("worker done on stream error", zap.Error(err))
+			jobLogger.Warn("worker done on stream error", zap.Error(err))
 			return nil, fmt.Errorf("receiving stream resp: %w", err)
 		}
 
@@ -99,7 +112,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		case *pbsubstreams.Response_Progress:
 			err := respFunc(resp)
 			if err != nil {
-				zlog.Warn("worker done on respFunc error", zap.Error(err))
+				jobLogger.Warn("worker done on respFunc error", zap.Error(err))
 				return nil, fmt.Errorf("sending progress: %w", err)
 			}
 		case *pbsubstreams.Response_SnapshotData:

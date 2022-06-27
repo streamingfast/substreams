@@ -12,3 +12,7 @@ There are also chain-specific `substreams-[network]` crates available:
 ### Third-party libraries
 
 You can pull in any third-party library that is able to compile to the `wasm32` target necessary for execution in Substreams services. **However**, many libraries try to compile kernel syscalls or other operations which are not available within the Substreams execution environment, and will therefore not compile as a `wasm32` target.
+
+Here's a list of libraries that can help you get off the ground for certain tasks:
+
+* [https://docs.rs/tiny-keccak](https://docs.rs/tiny-keccak)

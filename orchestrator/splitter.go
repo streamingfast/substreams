@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"context"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -12,9 +11,12 @@ import (
 
 type WorkPlan map[string]*WorkUnit
 
-func (p WorkPlan) SquashPartialsPresent(ctx context.Context, squasher *Squasher) error {
+func (p WorkPlan) SquashPartialsPresent(squasher *Squasher) error {
 	for _, w := range p {
-		err := squasher.Squash(ctx, w.modName, w.partialsPresent)
+		if w.partialsPresent.Len() == 0 {
+			continue
+		}
+		err := squasher.Squash(w.modName, w.partialsPresent)
 		if err != nil {
 			return fmt.Errorf("squash partials present for module %s: %w", w.modName, err)
 		}

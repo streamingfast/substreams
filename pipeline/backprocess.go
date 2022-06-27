@@ -61,7 +61,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
 
-	err = workPlan.SquashPartialsPresent(ctx, squasher)
+	err = workPlan.SquashPartialsPresent(squasher)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,8 @@ func (p *Pipeline) backProcessStores(
 		}
 	}
 
-	zlog.Info("store sync completed")
+	zlog.Info("all jobs completed, waiting for squasher to finish")
+	squasher.Shutdown(nil)
 
 	newStores, err := squasher.ValidateStoresReady()
 	if err != nil {

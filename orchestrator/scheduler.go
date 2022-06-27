@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +40,7 @@ func (s *Scheduler) Next() *Job {
 
 func (s *Scheduler) Callback(ctx context.Context, job *Job, partialsRanges block.Ranges) error {
 
-	err := s.squasher.Squash(ctx, job.moduleName, partialsRanges)
+	err := s.squasher.Squash(job.moduleName, partialsRanges)
 	if err != nil {
 		return fmt.Errorf("squashing: %w", err)
 	}

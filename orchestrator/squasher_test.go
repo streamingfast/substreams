@@ -33,13 +33,11 @@ func (n NotifierFunc) Notify(builder string, blockNum uint64) {
 // 	storageState.lastBlocks["store"] = 12
 // 	storageState.initialBlocks["store"] = 10
 // 	s := NewSquasher(ctx, storageState, map[string]*state.Store{"store": store}, 10, 7)
-// 	assert.Equal(t, 12, s.targetExclusiveBlock)
+// 	assert.Equal(t, 12, s.targetExclusiveEndBlock)
 
 // }
 
 func TestSquash(t *testing.T) {
-	ctx := context.Background()
-
 	writeCount := 0
 	var infoBytes []byte
 
@@ -72,16 +70,18 @@ func TestSquash(t *testing.T) {
 	})
 
 	s := testStateBuilder(store)
-	squashable := NewSquashable(s, 80_000, 10_000, notifierFunc)
+	squashable := NewStoreSquasher(s, 80_000, 10_000, notifierFunc)
+	go squashable.launch(context.Background())
 
-	require.NoError(t, squashable.squash(ctx, []*block.Range{{20_000, 30_000}}))
+	require.NoError(t, squashable.squash([]*block.Range{{20_000, 30_000}}))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, []*block.Range{{70_000, 80_000}}))
+	require.NoError(t, squashable.squash([]*block.Range{{70_000, 80_000}}))
 	require.Equal(t, 0, writeCount)
 
-	require.NoError(t, squashable.squash(ctx, []*block.Range{{10_000, 20_000}}))
+	require.NoError(t, squashable.squash([]*block.Range{{10_000, 20_000}}))
 
+	squashable.Shutdown(nil)
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
 	require.Equal(t, 2, notificationsSent)
 }
@@ -126,8 +126,8 @@ func testStateBuilder(store dstore.Store) *state.Store {
 
 // 	var s1 *Squasher
 // 	s1 = &Squasher{
-// 		squashables: map[string]*Squashable{
-// 			"testBuilder": &Squashable{
+// 		storeSquashers: map[string]*StoreSquasher{
+// 			"testBuilder": &StoreSquasher{
 // 				builder: testStateBuilder(store),
 // 				ranges:  []*block.Range{},
 // 			},
@@ -138,8 +138,8 @@ func testStateBuilder(store dstore.Store) *state.Store {
 
 // 	var s2 *Squasher
 // 	s2 = &Squasher{
-// 		squashables: map[string]*Squashable{
-// 			"testBuilder": &Squashable{
+// 		storeSquashers: map[string]*StoreSquasher{
+// 			"testBuilder": &StoreSquasher{
 // 				builder: testStateBuilder(store),
 // 				ranges:  []*block.Range{},
 // 			},

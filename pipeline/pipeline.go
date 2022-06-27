@@ -398,7 +398,6 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							Host:       p.hostname,
 							StartBlock: store.StoreInitialBlock(),
 							EndBlock:   p.clock.Number,
 						},

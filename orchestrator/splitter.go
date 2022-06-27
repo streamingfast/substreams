@@ -32,7 +32,6 @@ func (p WorkPlan) ProgressMessages(hostname string) (out []*pbsubstreams.ModuleP
 		if unit.initialStoreFile != nil {
 			more = append(more, &pbsubstreams.BlockRange{
 				// FIXME(abourget): we'll use opentelemetry tracing for that!
-				Host:       hostname,
 				StartBlock: unit.initialStoreFile.StartBlock,
 				EndBlock:   unit.initialStoreFile.ExclusiveEndBlock,
 			})
@@ -40,7 +39,6 @@ func (p WorkPlan) ProgressMessages(hostname string) (out []*pbsubstreams.ModuleP
 
 		for _, rng := range unit.initialProcessedPartials() {
 			more = append(more, &pbsubstreams.BlockRange{
-				Host:       hostname,
 				StartBlock: rng.StartBlock,
 				EndBlock:   rng.ExclusiveEndBlock,
 			})

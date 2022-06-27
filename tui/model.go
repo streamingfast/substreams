@@ -6,10 +6,9 @@ import (
 
 func newModel(ui *TUI) model {
 	return model{
-		Modules:        updatedRanges{},
-		ui:             ui,
-		screenWidth:    120,
-		UpdatesPerHost: map[string]int{},
+		Modules:     updatedRanges{},
+		ui:          ui,
+		screenWidth: 120,
 	}
 }
 
@@ -25,8 +24,6 @@ type model struct {
 	UpdatedSecond     int64
 	UpdatesPerSecond  int
 	UpdatesThisSecond int
-
-	UpdatesPerHost map[string]int
 
 	Request   *pbsubstreams.Request
 	Connected bool

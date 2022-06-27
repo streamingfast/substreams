@@ -59,9 +59,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			for _, v := range progMsg.ProcessedRanges.ProcessedRanges {
-				hostUpdates := m.UpdatesPerHost[v.Host]
-				m.UpdatesPerHost[v.Host] = hostUpdates + 1
-
 				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], &blockRange{
 					Start: v.StartBlock,
 					End:   v.EndBlock,

@@ -112,7 +112,6 @@ message ModuleProgress {
 }
 
 message BlockRange {
-  string host = 1;
   uint64 start_block = 2;
   uint64 end_block = 3;
 }

@@ -64,7 +64,7 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 	squasher.OnTerminating(func(err error) {
 		zlog.Info("squasher terminating", zap.Error(err))
 		for _, squashable := range storeSquashers {
-			zlog.Info("closing store squasher", zap.String("store", squashable.name))
+			zlog.Info("shutting down store squasher", zap.String("store", squashable.name))
 			squashable.Shutter.Shutdown(err)
 		}
 	})

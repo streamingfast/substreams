@@ -38,7 +38,7 @@ func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpec
 		targetExclusiveEndBlock: targetExclusiveBlock,
 		nextExpectedStartBlock:  nextExpectedStartBlock,
 		notifier:                notifier,
-		partialsChunks:          make(chan block.Ranges, 1000),
+		partialsChunks:          make(chan block.Ranges, 1000000),
 		waitForCompletion:       make(chan interface{}),
 	}
 	s.OnTerminating(func(err error) {
@@ -48,6 +48,8 @@ func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpec
 		}
 		zlog.Info("will terminate after partials chucks chan empty", zap.String("module", s.name))
 		close(s.partialsChunks)
+
+		zlog.Info("waiting completion", zap.String("module", s.name))
 		<-s.waitForCompletion
 		zlog.Info("partials chucks chan empty, terminating", zap.String("module", s.name))
 	})
@@ -60,7 +62,6 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 	}
 
 	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Stringer("req_chunk", partialsChunks))
-
 	s.partialsChunks <- partialsChunks
 	return nil
 }
@@ -71,24 +72,27 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 waitForPartials:
 	for {
 		select {
-		case <-ctx.Done():
-			return
 		case partialsChunks, ok := <-s.partialsChunks:
 			if !ok {
 				zlog.Info("squashing done, no more partial chuck to squash", zap.String("module_name", s.store.Name))
 				close(s.waitForCompletion)
 				return
 			}
+			zlog.Info("got partials chunks", zap.String("module_name", s.store.Name), zap.Stringer("partials_chunks", partialsChunks))
 			s.ranges = append(s.ranges, partialsChunks...)
 			sort.Slice(s.ranges, func(i, j int) bool {
 				return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
 			})
+
+		case <-ctx.Done():
+			zlog.Info("quitting on a close context", zap.String("module_name", s.store.Name))
+			return
 		}
 
 		for {
 			if len(s.ranges) == 0 {
 				zlog.Info("no more ranges to squash", zap.String("module_name", s.store.Name))
-				break waitForPartials
+				continue waitForPartials
 			}
 			squashableRange := s.ranges[0]
 			zlog.Info("testing first range", zap.String("module_name", s.store.Name), zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))

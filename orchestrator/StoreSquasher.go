@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/streamingfast/shutter"
@@ -191,14 +190,4 @@ func (s *StoreSquasher) String() string {
 		add = " (target reached)"
 	}
 	return fmt.Sprintf("%s%s: [%s]", s.name, add, s.ranges)
-}
-
-type Squashables []*StoreSquasher
-
-func (s Squashables) String() string {
-	var rs []string
-	for _, i := range s {
-		rs = append(rs, i.String())
-	}
-	return strings.Join(rs, ", ")
 }

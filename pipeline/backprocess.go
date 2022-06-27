@@ -35,10 +35,10 @@ func (p *Pipeline) backProcessStores(
 
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
-
-		snapshot := storageState.Snapshots[mod.Name]
-		if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
-			workPlan[mod.Name] = workUnit
+		if snapshot, ok := storageState.Snapshots[mod.Name]; ok {
+			if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
+				workPlan[mod.Name] = workUnit
+			}
 		}
 	}
 

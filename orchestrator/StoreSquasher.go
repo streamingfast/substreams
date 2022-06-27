@@ -57,7 +57,7 @@ func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpec
 
 func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 	if len(partialsChunks) == 0 {
-		panic("partialsChunks is empty")
+		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
 	}
 
 	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Stringer("req_chunk", partialsChunks))

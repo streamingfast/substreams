@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
 )
@@ -58,9 +58,10 @@ type Snapshot struct {
 	Path string
 }
 
-func listSnapshots(ctx context.Context, store dstore.Store) (out *Snapshots, err error) {
-	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		out = &Snapshots{}
+func listSnapshots(ctx context.Context, store dstore.Store) (*Snapshots, error) {
+	out := &Snapshots{}
+
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		if err := store.Walk(ctx, "", func(filename string) (err error) {
 			if filename == "___store-metadata.json" || strings.HasPrefix(filename, "__") {
 				return nil

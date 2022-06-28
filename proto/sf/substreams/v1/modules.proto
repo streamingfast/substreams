@@ -58,8 +58,9 @@ message Module {
       UPDATE_POLICY_MIN = 4;
       // Provides a store where you can `max_*()` keys, where two stores merge by leaving the maximum value.
       UPDATE_POLICY_MAX = 5;
+      // Provides a store where you can `append()` keys, where two stores merge by concatenating the bytes in order.
+      UPDATE_POLICY_APPEND = 6;
     }
-
   }
 
   message Input {

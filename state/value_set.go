@@ -17,6 +17,7 @@ func (s *Store) SetIfNotExists(ord uint64, key string, value string) {
 
 func (s *Store) SetBytes(ord uint64, key string, value []byte) {
 	s.set(ord, key, value)
+	bytes.
 }
 func (s *Store) Set(ord uint64, key string, value string) {
 	s.set(ord, key, []byte(value))

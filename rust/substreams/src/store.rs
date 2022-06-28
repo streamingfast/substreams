@@ -233,6 +233,22 @@ impl StoreMinBigFloat {
     }
 }
 
+/// StoreAppend is a struct representing a `store` with
+/// `updatePolicy` equal to `append`
+#[derive(StoreWriter)]
+pub struct StoreAppend {}
+impl StoreAppend {
+    /// Concatenates a given value at the end of the key's current value
+    pub fn append(&self, ord: u64, key: String, value: &String) {
+        state::append(ord as i64, key, &value.into_bytes());
+    }
+
+    /// Concatenates a given value at the end of the key's current value
+    pub fn append_bytes(&self, ord: u64, key: String, value: &Vec<u8>) {
+        state::append(ord as i64, key, value);
+    }
+}
+
 /// StoreGet is a struct representing a read only store `store`
 pub struct StoreGet {
     idx: u32,

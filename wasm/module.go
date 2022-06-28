@@ -310,6 +310,32 @@ func (m *Module) registerStateImports(imports *wasmer.ImportObject, store *wasme
 			return nil, nil
 		},
 	)
+	functions["append"] = wasmer.NewFunction(
+		store,
+		wasmer.NewFunctionType(
+			Params(wasmer.I64, wasmer.I32, wasmer.I32, wasmer.I32, wasmer.I32),
+			Returns(),
+		),
+		func(args []wasmer.Value) ([]wasmer.Value, error) {
+			if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND {
+				return nil, fmt.Errorf("invalid store operation: 'append' only valid for stores with updatePolicy == 'append'")
+			}
+			ord := args[0].I64()
+			key, err := m.CurrentInstance.heap.ReadString(args[1].I32(), args[2].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading string")
+			}
+
+			value, err := m.CurrentInstance.heap.ReadBytes(args[3].I32(), args[4].I32())
+			if err != nil {
+				return nil, fmt.Errorf("reading bytes: %w", err)
+			}
+
+			m.CurrentInstance.outputStore.Append(uint64(ord), key, value)
+
+			return nil, nil
+		},
+	)
 	functions["delete_prefix"] = wasmer.NewFunction(
 		store,
 		wasmer.NewFunctionType(

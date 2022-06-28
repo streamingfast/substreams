@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/streamingfast/bstream"
@@ -126,16 +125,16 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	ctx := streamSrv.Context()
 	logger := logging.Logger(ctx, s.logger)
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
-		hostname = "unknown"
-	}
-	md := metadata.New(map[string]string{"host": hostname})
-	err = streamSrv.SendHeader(md)
-	if err != nil {
-		logger.Warn("cannot send header metadata", zap.Error(err))
-	}
+	//hostname, err := os.Hostname()
+	//if err != nil {
+	//	logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+	//	hostname = "unknown"
+	//}
+	//md := metadata.New(map[string]string{"host": hostname})
+	//err = streamSrv.SendHeader(md)
+	//if err != nil {
+	//	logger.Warn("cannot send header metadata", zap.Error(err))
+	//}
 
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here

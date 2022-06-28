@@ -186,9 +186,10 @@ Possible values:
 
 * `set` (last key wins merge strategy)
 * `set_if_not_exists` (first key wins merge strategy)
-* `add` (sum the two keys)
-* `min` (min between two keys)
-* `max` (max between two keys)
+* `append` (concatenates two keys' values)
+* `add` (sum the two keys' values)
+* `min` (min between two keys' values)
+* `max` (max between two keys' values)
 
 ### `modules[].valueType`
 

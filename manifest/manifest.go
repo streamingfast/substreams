@@ -147,24 +147,26 @@ func validateStoreBuilder(module *Module) error {
 	}
 
 	combinations := []string{
-		"max:bigint",               // Exposes SetMaxBigInt
-		"max:int64",                // Exposes SetMaxInt64
-		"max:bigfloat",             // Exposes SetMaxBigFloat
-		"max:float64",              // Exposes SetMaxFloat64
-		"min:bigint",               // Exposes SetMinBigInt
-		"min:int64",                // Exposes SetMinInt64
-		"min:bigfloat",             // Exposes SetMinBigFloat
-		"min:float64",              // Exposes SetMinFloat64
-		"add:bigint",               // Exposes SumBigInt
-		"add:int64",                // Exposes SumInt64
-		"add:bigfloat",             // Exposes SumBigFloat
-		"add:float64",              // Exposes SubFloat64
-		"set:bytes",                // Exposes SetBytes
-		"set:string",               // Exposes SetString
-		"set:proto",                // Exposes SetBytes
-		"set_if_not_exists:bytes",  // Exposes SetBytesIfNotExists
-		"set_if_not_exists:string", // Exposes SetStringIfNotExists
-		"set_if_not_exists:proto",  // Exposes SetBytesIfNotExists
+		"max:bigint",
+		"max:int64",
+		"max:bigfloat",
+		"max:float64",
+		"min:bigint",
+		"min:int64",
+		"min:bigfloat",
+		"min:float64",
+		"add:bigint",
+		"add:int64",
+		"add:bigfloat",
+		"add:float64",
+		"set:bytes",
+		"set:string",
+		"set:proto",
+		"set_if_not_exists:bytes",
+		"set_if_not_exists:string",
+		"set_if_not_exists:proto",
+		"append:bytes",
+		"append:string",
 	}
 	found := false
 	var lastCombination string

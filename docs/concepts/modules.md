@@ -70,6 +70,7 @@ The second, `updatePolicy,` determines what methods are available in the runtime
 | `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up      |
 | `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept  |
 | `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept |
+| `append`            | `string`, `bytes`                        | Both keys are concatenated in order |
 
 All update policies provide the `delete_prefix` method.
 

@@ -275,6 +275,7 @@ const (
 	UpdatePolicyAdd            = "add"
 	UpdatePolicyMax            = "max"
 	UpdatePolicyMin            = "min"
+	UpdatePolicyAppend         = "append"
 )
 
 func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
@@ -298,6 +299,8 @@ func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX
 		case UpdatePolicyMin:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN
+		case UpdatePolicyAppend:
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND
 		default:
 			panic(fmt.Sprintf("invalid update policy %s", m.UpdatePolicy))
 		}

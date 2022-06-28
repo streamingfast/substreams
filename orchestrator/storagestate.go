@@ -25,7 +25,7 @@ func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out
 	eg := llerrgroup.New(10)
 	for storeName, store := range stores {
 		if eg.Stop() {
-			continue
+			break
 		}
 
 		objStore := store.Store

@@ -185,7 +185,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			}
 
 			isSubrequest = true
-			opts = append(opts, pipeline.WithOrchestratedExecution())
+			opts = append(opts, pipeline.WithSubrequestExecution())
 		}
 	}
 
@@ -224,6 +224,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 		if lastBlockSent != nil {
 			zlog.Info("sent cached data", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
+			// FIXME(abourget): +1 is always smelly, why wouldn't `sendCachedModuleOutput` return a cursor?
 			request.StartBlockNum = int64(*lastBlockSent + 1)
 		}
 

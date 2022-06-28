@@ -16,7 +16,7 @@ type Option func(p *Pipeline)
 // TODO(abourget):
 // OrchestratedExecution -> Subrequest
 // isOrchestrated -> isSubrequest
-func WithOrchestratedExecution() Option {
+func WithSubrequestExecution() Option {
 	return func(p *Pipeline) {
 		p.isSubrequest = true
 	}

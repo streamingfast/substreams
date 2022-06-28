@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -24,8 +25,13 @@ func (s *Store) Set(ord uint64, key string, value string) {
 }
 
 func (s *Store) set(ord uint64, key string, value []byte) {
+	// FIXME(abourget): these should return an error up the stack instead, would bubble up
+	// in the wasm/module.go and fail the query, with proper error propagation.
 	if strings.HasPrefix(key, "__!__") {
 		panic("key prefix __!__ is reserved for internal system use.")
+	}
+	if len(value) > 10*1024*1024 {
+		panic(fmt.Sprintf("key %q attempted to write %d bytes, capped at 10MiB", key, len(value)))
 	}
 	s.bumpOrdinal(ord)
 

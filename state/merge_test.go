@@ -73,6 +73,25 @@ func TestBuilder_Merge(t *testing.T) {
 			},
 		},
 		{
+			name:   "append",
+			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
+			latestKV: map[string][]byte{
+				"one": []byte("foo;"),
+				"two": []byte("bar;"),
+			},
+			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
+			prevKV: map[string][]byte{
+				"one":   []byte("baz;"),
+				"three": []byte("lol;"),
+			},
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("baz;foo;"),
+				"two":   []byte("bar;"),
+				"three": []byte("lol;"),
+			},
+		},
+		{
 			name:   "sum_int",
 			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{

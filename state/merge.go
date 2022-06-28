@@ -31,34 +31,46 @@ type mergeInfo struct {
 	ModuleStartBlock uint64                                     `json:"module_start_block,omitempty"`
 }
 
-func (s *Store) Merge(builder *Store) error {
+// Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
+func (s *Store) Merge(nextStore *Store) error {
 	//old merge data.  clear this.
 	s.clearMergeData()
-	builder.clearMergeData()
+	nextStore.clearMergeData()
 
-	if builder.UpdatePolicy != s.UpdatePolicy {
-		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", s.UpdatePolicy, builder.UpdatePolicy)
+	if nextStore.UpdatePolicy != s.UpdatePolicy {
+		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", s.UpdatePolicy, nextStore.UpdatePolicy)
 	}
 
-	if builder.ValueType != s.ValueType {
-		return fmt.Errorf("incompatible value types: cannot merge %q and %q", s.ValueType, builder.ValueType)
+	if nextStore.ValueType != s.ValueType {
+		return fmt.Errorf("incompatible value types: cannot merge %q and %q", s.ValueType, nextStore.ValueType)
 	}
 
-	for _, prefix := range builder.DeletedPrefixes {
-		s.DeletePrefix(builder.lastOrdinal, prefix)
+	for _, prefix := range nextStore.DeletedPrefixes {
+		s.DeletePrefix(nextStore.lastOrdinal, prefix)
 	}
 
 	intoValueTypeLower := strings.ToLower(s.ValueType)
 
 	switch s.UpdatePolicy {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET:
-		for k, v := range builder.KV {
+		for k, v := range nextStore.KV {
 			s.KV[k] = v
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
-		for k, v := range builder.KV {
+		for k, v := range nextStore.KV {
 			if _, found := s.KV[k]; !found {
 				s.KV[k] = v
+			}
+		}
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND:
+		for key, nextVal := range nextStore.KV {
+			if prevVal, found := s.KV[key]; found {
+				newVal := make([]byte, len(prevVal)+len(nextVal))
+				copy(newVal[0:], prevVal)
+				copy(newVal[len(prevVal):], nextVal)
+				s.KV[key] = newVal
+			} else {
+				s.KV[key] = nextVal
 			}
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD:
@@ -68,7 +80,7 @@ func (s *Store) Merge(builder *Store) error {
 			sum := func(a, b uint64) uint64 {
 				return a + b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v0b, fv0 := s.KV[k]
 				v0 := foundOrZeroUint64(v0b, fv0)
 				v1 := foundOrZeroUint64(v, true)
@@ -78,7 +90,7 @@ func (s *Store) Merge(builder *Store) error {
 			sum := func(a, b float64) float64 {
 				return a + b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v0b, fv0 := s.KV[k]
 				v0 := foundOrZeroFloat(v0b, fv0)
 				v1 := foundOrZeroFloat(v, true)
@@ -88,7 +100,7 @@ func (s *Store) Merge(builder *Store) error {
 			sum := func(a, b *big.Int) *big.Int {
 				return bi().Add(a, b)
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v0b, fv0 := s.KV[k]
 				v0 := foundOrZeroBigInt(v0b, fv0)
 				v1 := foundOrZeroBigInt(v, true)
@@ -98,7 +110,7 @@ func (s *Store) Merge(builder *Store) error {
 			sum := func(a, b *big.Float) *big.Float {
 				return bf().Add(a, b).SetPrec(100)
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v0b, fv0 := s.KV[k]
 				v0 := foundOrZeroBigFloat(v0b, fv0)
 				v1 := foundOrZeroBigFloat(v, true)
@@ -116,7 +128,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroUint64(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -134,7 +146,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return a
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroFloat(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -152,7 +164,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return a
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroBigInt(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -170,7 +182,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return a
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroBigFloat(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -182,7 +194,7 @@ func (s *Store) Merge(builder *Store) error {
 				s.KV[k] = []byte(bigFloatToStr(max(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %s", builder.UpdatePolicy, builder.ValueType)
+			return fmt.Errorf("update policy %q not supported for value type %s", nextStore.UpdatePolicy, nextStore.ValueType)
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch intoValueTypeLower {
@@ -193,7 +205,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroUint64(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -211,7 +223,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroFloat(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -229,7 +241,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroBigInt(v, true)
 				v, found := s.KV[k]
 				if !found {
@@ -247,7 +259,7 @@ func (s *Store) Merge(builder *Store) error {
 				}
 				return b
 			}
-			for k, v := range builder.KV {
+			for k, v := range nextStore.KV {
 				v1 := foundOrZeroBigFloat(v, true)
 				v, found := s.KV[k]
 				if !found {

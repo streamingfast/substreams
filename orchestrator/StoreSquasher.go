@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/abourget/llerrgroup"
-
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
@@ -91,7 +90,6 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		start := time.Now()
 		squashCount := 0
 		for {
-			squashCount++
 			if eg.Stop() {
 				break
 			}
@@ -112,6 +110,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			}
 
 			zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
+			squashCount++
 
 			nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.StartBlock, squashableRange.ExclusiveEndBlock))
 			if err != nil {
@@ -165,9 +164,11 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			return
 		}
 		totalDuration := time.Since(start)
-		avgDuration := totalDuration / time.Duration(squashCount)
+		avgDuration := time.Duration(0)
+		if squashCount > 0 {
+			avgDuration = totalDuration / time.Duration(squashCount)
+		}
 		zlog.Info("squashing done", zap.String("module_name", s.store.Name), zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
-
 	}
 }
 

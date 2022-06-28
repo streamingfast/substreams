@@ -6,6 +6,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/abourget/llerrgroup"
+
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/state"
@@ -67,8 +69,6 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 
 func (s *StoreSquasher) launch(ctx context.Context) {
 	zlog.Info("launching squasher", zap.String("module_name", s.store.Name))
-
-waitForPartials:
 	for {
 		select {
 		case partialsChunks, ok := <-s.partialsChunks:
@@ -82,16 +82,23 @@ waitForPartials:
 			sort.Slice(s.ranges, func(i, j int) bool {
 				return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
 			})
-
 		case <-ctx.Done():
 			zlog.Info("quitting on a close context", zap.String("module_name", s.store.Name))
 			return
 		}
 
+		eg := llerrgroup.New(250)
+		start := time.Now()
+		squashCount := 0
 		for {
+			squashCount++
+			if eg.Stop() {
+				break
+			}
+
 			if len(s.ranges) == 0 {
 				zlog.Info("no more ranges to squash", zap.String("module_name", s.store.Name))
-				continue waitForPartials
+				break
 			}
 			squashableRange := s.ranges[0]
 			zlog.Info("testing first range", zap.String("module_name", s.store.Name), zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))
@@ -101,77 +108,67 @@ waitForPartials:
 				return
 			}
 			if s.nextExpectedStartBlock != squashableRange.StartBlock {
-				continue waitForPartials
+				break
 			}
 
 			zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 
-			start := time.Now()
-			loadPartialStart := time.Now()
 			nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.StartBlock, squashableRange.ExclusiveEndBlock))
 			if err != nil {
 				s.Shutdown(fmt.Errorf("initializing next partial store %q: %w", s.name, err))
 				return
 			}
-			loadPartialDuration := time.Since(loadPartialStart)
 
 			zlog.Debug("next store loaded", zap.Object("store", nextStore))
 
-			mergeStart := time.Now()
 			err = s.store.Merge(nextStore)
 			if err != nil {
 				s.Shutdown(fmt.Errorf("merging: %s", err))
 				return
 			}
-			mergeDuration := time.Since(mergeStart)
 
 			zlog.Debug("store merge", zap.Object("store", s.store))
 
 			s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 
 			zlog.Info("deleting store", zap.Object("store", nextStore))
-			deleteStart := time.Now()
 
-			err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
-			if err != nil {
-				zlog.Warn("deleting partial file", zap.Error(err))
-			}
-			deleteDuration := time.Since(deleteStart)
-
-			writeStart := time.Now()
-			if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0 {
-				err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
+			eg.Go(func() error {
+				err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 				if err != nil {
-					s.Shutdown(fmt.Errorf("writing state: %w", err))
-					return
+					zlog.Warn("deleting partial file", zap.Error(err))
 				}
+				return nil
+			})
+
+			if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0 {
+				eg.Go(func() error {
+					err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
+					if err != nil {
+						return fmt.Errorf("writing state: %w", err)
+					}
+					return nil
+				})
 			}
-			writeDuration := time.Since(writeStart)
 
 			s.ranges = s.ranges[1:]
 
 			if squashableRange.ExclusiveEndBlock == s.targetExclusiveEndBlock {
 				s.targetExclusiveEndBlockReach = true
 			}
-			notificationStart := time.Now()
 			s.notifyWaiters(squashableRange.ExclusiveEndBlock)
-			notificationDuration := time.Since(notificationStart)
-			totalDuration := time.Since(start)
-			zlog.Info(
-				"squashing completed",
-				zap.String("module_name", s.name),
-				zap.Stringer("squashable_range", squashableRange),
-				zap.Duration("load_partial_duration", loadPartialDuration),
-				zap.Duration("merge_duration", mergeDuration),
-				zap.Duration("delete_duration", deleteDuration),
-				zap.Duration("write_duration", writeDuration),
-				zap.Duration("notification_duration", notificationDuration),
-				zap.Duration("total_duration", totalDuration),
-			)
 		}
-	}
+		zlog.Info("waiting for eg to finish", zap.String("module_name", s.store.Name))
+		if err := eg.Wait(); err != nil {
+			// eg.Wait() will block until everything is done, and return the first error.
+			s.Shutdown(err)
+			return
+		}
+		totalDuration := time.Since(start)
+		avgDuration := totalDuration / time.Duration(squashCount)
+		zlog.Info("squashing done", zap.String("module_name", s.store.Name), zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
 
-	return
+	}
 }
 
 func (s *StoreSquasher) notifyWaiters(lastSquashedBlock uint64) {

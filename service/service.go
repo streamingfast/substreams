@@ -13,7 +13,7 @@ import (
 	"github.com/streamingfast/firehose"
 	firehoseServer "github.com/streamingfast/firehose/server"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -235,10 +235,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
-		StartBlockNum: request.StartBlockNum,
-		StopBlockNum:  request.StopBlockNum,
-		StartCursor:   request.StartCursor,
-		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE},
+		StartBlockNum:     request.StartBlockNum,
+		StopBlockNum:      request.StopBlockNum,
+		Cursor:            request.StartCursor,
+		NoReorgNavigation: true,
 		// FIXME(abourget), right now, the pbsubstreams.Request has a
 		// ForkSteps that we IGNORE. Eventually, we will want to honor
 		// it, but ONLY when we are certain that our Pipeline supports

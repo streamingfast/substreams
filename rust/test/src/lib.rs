@@ -279,6 +279,42 @@ extern "C" fn test_make_it_crash(data_ptr: *mut u8, data_len: usize) {
     };
 }
 
+#[substreams::handlers::store]
+extern "C" fn test_append_empty_string_on_same_key(s: store::StoreAppend) {
+    s.append(1, "key".to_string(), &"string1".to_string());
+    s.append(1, "key".to_string(), &"".to_string());
+}
+
+#[substreams::handlers::store]
+extern "C" fn test_append_string_on_same_key(s: store::StoreAppend) {
+    s.append(1, "key".to_string(), &"string1".to_string());
+    s.append(1, "key".to_string(), &"string2".to_string());
+}
+
+#[substreams::handlers::store]
+extern "C" fn test_append_string_on_different_key(s: store::StoreAppend) {
+    s.append(1, "key".to_string(), &"string1".to_string());
+    s.append(1, "key1".to_string(), &"string2".to_string());
+}
+
+#[substreams::handlers::store]
+extern "C" fn test_append_empty_bytes_on_same_key(s: store::StoreAppend) {
+    s.append_bytes(1, "key".to_string(), &"string1".as_bytes().to_vec());
+    s.append_bytes(1, "key".to_string(), &vec![]);
+}
+
+#[substreams::handlers::store]
+extern "C" fn test_append_bytes_on_same_key(s: store::StoreAppend) {
+    s.append_bytes(1, "key".to_string(), &"string1".as_bytes().to_vec());
+    s.append_bytes(1, "key".to_string(), &"string2".as_bytes().to_vec());
+}
+
+#[substreams::handlers::store]
+extern "C" fn test_append_bytes_on_different_key(s: store::StoreAppend) {
+    s.append_bytes(1, "key".to_string(), &"string1".as_bytes().to_vec());
+    s.append_bytes(1, "key1".to_string(), &"string2".as_bytes().to_vec());
+}
+
 // #[no_mangle]
 // extern "C" fn test_memory_leak() {
 //     substreams::memory::alloc(10485760); // allocate 1MB on each call

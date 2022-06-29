@@ -184,6 +184,72 @@ func TestRustScript(t *testing.T) {
 				require.False(t, found, "key_to_delete")
 			},
 		},
+		{
+			wasmFile:     "testing_substreams.wasm",
+			functionName: "test_append_empty_string_on_same_key",
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "some object", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Store) {
+				value, found := builder.GetLast("key")
+				require.True(t, found, "")
+				require.Equal(t, "string1", string(value))
+			},
+		},
+		{
+			wasmFile:     "testing_substreams.wasm",
+			functionName: "test_append_string_on_same_key",
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "some object", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Store) {
+				value, found := builder.GetLast("key")
+				require.True(t, found, "")
+				require.Equal(t, "string1string2", string(value))
+			},
+		},
+		{
+			wasmFile:     "testing_substreams.wasm",
+			functionName: "test_append_string_on_different_key",
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "some object", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Store) {
+				value, found := builder.GetLast("key")
+				require.True(t, found, "")
+				require.Equal(t, "string1", string(value))
+				value, found = builder.GetLast("key1")
+				require.True(t, found, "")
+				require.Equal(t, "string2", string(value))
+			},
+		},
+		{
+			wasmFile:     "testing_substreams.wasm",
+			functionName: "test_append_empty_bytes_on_same_key",
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "some object", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Store) {
+				value, found := builder.GetLast("key")
+				require.True(t, found, "")
+				require.Equal(t, "string1", string(value))
+			},
+		},
+		{
+			wasmFile:     "testing_substreams.wasm",
+			functionName: "test_append_bytes_on_same_key",
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "some object", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Store) {
+				value, found := builder.GetLast("key")
+				require.True(t, found, "")
+				require.Equal(t, "string1string2", string(value))
+			},
+		},
+		{
+			wasmFile:     "testing_substreams.wasm",
+			functionName: "test_append_bytes_on_different_key",
+			builder:      mustNewBuilder(t, "builder.name.1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, "some object", nil),
+			assert: func(t *testing.T, module *wasm.Module, instance *wasm.Instance, builder *state.Store) {
+				value, found := builder.GetLast("key")
+				require.True(t, found, "")
+				require.Equal(t, "string1", string(value))
+				value, found = builder.GetLast("key1")
+				require.True(t, found, "")
+				require.Equal(t, "string2", string(value))
+			},
+		},
 	}
 
 	for _, c := range cases {

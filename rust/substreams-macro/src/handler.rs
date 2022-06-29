@@ -158,6 +158,7 @@ fn parse_input_type(ty: &syn::Type) -> Result<Input, errors::SubstreamMacroError
             Ok(input)
         }
         _ => {
+            // fixme(@julien): return the type which is considered an error
             Err(errors::SubstreamMacroError::UnknownInputType("asdfasd".to_owned()))
         }
     }

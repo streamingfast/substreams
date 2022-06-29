@@ -240,7 +240,7 @@ pub struct StoreAppend {}
 impl StoreAppend {
     /// Concatenates a given value at the end of the key's current value
     pub fn append(&self, ord: u64, key: String, value: &String) {
-        state::append(ord as i64, key, &value.into_bytes());
+        state::append(ord as i64, key, &value.as_bytes().to_vec());
     }
 
     /// Concatenates a given value at the end of the key's current value

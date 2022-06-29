@@ -118,10 +118,10 @@ func (s *Store) storageFilename(exclusiveEndBlock uint64) string {
 
 func (s *Store) Fetch(ctx context.Context, exclusiveEndBlock uint64) error {
 	fileName := s.storageFilename(exclusiveEndBlock)
-	return s.loadState(ctx, fileName)
+	return s.load(ctx, fileName)
 }
 
-func (s *Store) loadState(ctx context.Context, stateFileName string) error {
+func (s *Store) load(ctx context.Context, stateFileName string) error {
 	zlog.Debug("loading state from file", zap.String("module_name", s.Name), zap.String("file_name", stateFileName))
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		r, err := s.Store.OpenObject(ctx, stateFileName)
@@ -152,24 +152,16 @@ func (s *Store) loadState(ctx context.Context, stateFileName string) error {
 // WriteState is to be called ONLY when we just passed the
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
-func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (err error) {
+func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (*storeWriter, error) {
 	zlog.Debug("writing state", zap.Object("builder", s))
 
 	kv := stringMap(s.KV) // FOR READABILITY ON DISK
 
 	content, err := json.MarshalIndent(kv, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal kv state: %w", err)
+		return nil, fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	if _, err = s.writeState(ctx, content, endBoundaryBlock); err != nil {
-		return fmt.Errorf("writing %s kv for range %d-%d: %w", s.Name, s.storeInitialBlock, endBoundaryBlock, err)
-	}
-
-	return nil
-}
-
-func (s *Store) writeState(ctx context.Context, content []byte, endBoundaryBlock uint64) (string, error) {
 	filename := s.storageFilename(endBoundaryBlock)
 	zlog.Info("about to write state",
 		zap.String("store", s.Name),
@@ -177,21 +169,59 @@ func (s *Store) writeState(ctx context.Context, content []byte, endBoundaryBlock
 		zap.String("file_name", filename),
 	)
 
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		return s.Store.WriteObject(ctx, filename, bytes.NewReader(content))
-	})
-	if err != nil {
-		return filename, fmt.Errorf("writing state %s for range %d-%d: %w", s.Name, s.storeInitialBlock, endBoundaryBlock, err)
+	sw := &storeWriter{
+		objStore:     s.Store,
+		filename:     filename,
+		content:      content,
+		initialBlock: s.storeInitialBlock,
+		endBoundary:  endBoundaryBlock,
+		moduleName:   s.Name,
+		ctx:          ctx,
 	}
-	return filename, err
+
+	return sw, nil
 }
 
-func (s *Store) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) error {
-	filename := s.storageFilename(exclusiveEndBlock)
-	zlog.Debug("deleting store file", zap.String("file_name", filename))
+type storeWriter struct {
+	objStore     dstore.Store
+	filename     string
+	content      []byte
+	initialBlock uint64
+	endBoundary  uint64
+	moduleName   string
+	ctx          context.Context
+}
 
-	if err := s.Store.DeleteObject(ctx, filename); err != nil {
-		return fmt.Errorf("deleting store file %q: %w", filename, err)
+func (w *storeWriter) Write() error {
+	err := derr.RetryContext(w.ctx, 3, func(ctx context.Context) error {
+		return w.objStore.WriteObject(ctx, w.filename, bytes.NewReader(w.content))
+	})
+	if err != nil {
+		return fmt.Errorf("writing state %s for range %d-%d: %w", w.moduleName, w.initialBlock, w.endBoundary, err)
+	}
+	return nil
+}
+
+func (s *Store) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) *storeDeleter {
+	filename := s.storageFilename(exclusiveEndBlock)
+
+	return &storeDeleter{
+		objStore: s.Store,
+		filename: filename,
+		ctx:      ctx,
+	}
+}
+
+type storeDeleter struct {
+	objStore dstore.Store
+	filename string
+	ctx      context.Context
+}
+
+func (d *storeDeleter) Delete() error {
+	zlog.Debug("deleting store file", zap.String("file_name", d.filename))
+	if err := d.objStore.DeleteObject(d.ctx, d.filename); err != nil {
+		zlog.Warn("deleting partial file", zap.String("filename", d.filename), zap.Error(err))
 	}
 	return nil
 }

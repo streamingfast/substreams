@@ -38,7 +38,7 @@ func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpec
 		targetExclusiveEndBlock: targetExclusiveBlock,
 		nextExpectedStartBlock:  nextExpectedStartBlock,
 		notifier:                notifier,
-		partialsChunks:          make(chan block.Ranges, 1000000),
+		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
 		waitForCompletion:       make(chan interface{}),
 	}
 	s.OnTerminating(func(err error) {
@@ -132,22 +132,16 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 
 			zlog.Info("deleting store", zap.Object("store", nextStore))
 
-			eg.Go(func() error {
-				err = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
-				if err != nil {
-					zlog.Warn("deleting partial file", zap.Error(err))
-				}
-				return nil
-			})
+			storeDeleter := nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+			eg.Go(storeDeleter.Delete)
 
 			if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0 {
-				eg.Go(func() error {
-					err = s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
-					if err != nil {
-						return fmt.Errorf("writing state: %w", err)
-					}
-					return nil
-				})
+				storeWriter, err := s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
+				if err != nil {
+					s.Shutdown(fmt.Errorf("store writer marshaling: %w", err))
+					return
+				}
+				eg.Go(storeWriter.Write)
 			}
 
 			s.ranges = s.ranges[1:]

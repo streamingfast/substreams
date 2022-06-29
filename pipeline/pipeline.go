@@ -622,12 +622,14 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) error {
 	for _, builder := range p.storeMap {
-		// TODO: implement parallel writing and upload for the different stores involved.
-		err := builder.WriteState(ctx, boundaryBlock)
+		stateWriter, err := builder.WriteState(ctx, boundaryBlock)
 		if err != nil {
+			return fmt.Errorf("store writer %q: %w", builder.Name, err)
+		}
+		if err := stateWriter.Write(); err != nil {
 			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
 		}
-		zlog.Info("state written", zap.String("store_name", builder.Name), zap.Object("store", builder))
+		zlog.Info("store written", zap.String("store_name", builder.Name), zap.Object("store", builder))
 
 		if p.isSubrequest && p.isOutputModule(builder.Name) {
 			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)

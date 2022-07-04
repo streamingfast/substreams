@@ -60,6 +60,7 @@ type Pipeline struct {
 	clock         *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	logs          []string
+	forkHandler   *ForkHandler
 
 	moduleOutputCache *outputs.ModulesOutputCache
 
@@ -267,6 +268,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 	p.currentBlockRef = block.AsRef()
 
+	cursor := obj.(bstream.Cursorable).Cursor()
+	step := obj.(bstream.Stepable).Step()
+
 	// if obj.Step() == UNDO {
 	//  loop ALL the STORES that we have in `map[obj.BlockID]outputs`, and Apply the in REVERSE
 	//  PUSH OUT the outputs as a step UNDO without executing, until we are back to the
@@ -279,9 +283,29 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	// }
 	// TODO(abourget): eventually, handle the `undo` signals.
 	// if obj.Step() == IRREVERSIBLE  || STALLED {
-	//    if obj.Step() == IRREVESRIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
+	//    if obj.Step() == IRREVERSIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
 	//    delete(map[blockID], outputs)
-    // }
+	// }
+
+	if step == bstream.StepUndo {
+		if err = p.forkHandler.revertOutputs(p.modules); err != nil {
+			return fmt.Errorf("reverting outputs: %w", err)
+		}
+	}
+
+	if step == bstream.StepNew && p.forkHandler.reversibleOutputs != nil {
+		// send cached values from p.forHandler.reversibleOutputs
+		return nil
+	}
+
+	if step == bstream.StepIrreversible || step == bstream.StepStalled {
+		if step == bstream.StepIrreversible {
+			if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+				return fmt.Errorf("updating module output cache on irreversible step: %w", err)
+			}
+		}
+		p.forkHandler.handleIrreversibility(block.Number)
+	}
 
 	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 		return fmt.Errorf("updating module output cache: %w", err)
@@ -314,9 +338,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 		return io.EOF
 	}
-
-	cursor := obj.(bstream.Cursorable).Cursor()
-	step := obj.(bstream.Stepable).Step()
 
 	if err = p.assignSource(block); err != nil {
 		return fmt.Errorf("setting up sources: %w", err)

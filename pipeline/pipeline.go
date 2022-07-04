@@ -259,8 +259,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}()
 
-	// TODO(abourget): eventually, handle the `undo` signals.
-
 	blockNum := block.Num()
 	p.clock = &pbsubstreams.Clock{
 		Number:    blockNum,
@@ -268,6 +266,22 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		Timestamp: timestamppb.New(block.Time()),
 	}
 	p.currentBlockRef = block.AsRef()
+
+	// if obj.Step() == UNDO {
+	//  loop ALL the STORES that we have in `map[obj.BlockID]outputs`, and Apply the in REVERSE
+	//  PUSH OUT the outputs as a step UNDO without executing, until we are back to the
+	//  fork point.
+	//  return nil
+	// }
+	// if obj.Step() == NEW && map[blockID] != nil {
+	//   SEnd all the cached stuff from map[obj.BlockID]outputs
+	//   return nil
+	// }
+	// TODO(abourget): eventually, handle the `undo` signals.
+	// if obj.Step() == IRREVERSIBLE  || STALLED {
+	//    if obj.Step() == IRREVESRIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
+	//    delete(map[blockID], outputs)
+    // }
 
 	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 		return fmt.Errorf("updating module output cache: %w", err)
@@ -314,6 +328,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			return fmt.Errorf("running module executor: %w", err)
 		}
 	}
+
+	// Snapshot all outputs, in case we undo
+	// map[block_id]outputs
 
 	if shouldReturnProgress(p.isSubrequest) {
 		if err := p.returnModuleProgressOutputs(); err != nil {

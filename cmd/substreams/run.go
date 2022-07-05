@@ -90,7 +90,17 @@ func runRun(cmd *cobra.Command, args []string) error {
 		OutputModules: outputStreamNames,
 	}
 	if mustGetBool(cmd, "initial-snapshots") {
-		req.InitialStoreSnapshotForModules = req.OutputModules
+		for _, modName := range req.OutputModules {
+			for _, v := range pkg.Modules.Modules {
+				if modName != v.Name {
+					continue
+				}
+
+				if _, isStore := v.Kind.(*pbsubstreams.Module_KindStore_); isStore {
+					req.InitialStoreSnapshotForModules = append(req.InitialStoreSnapshotForModules, modName)
+				}
+			}
+		}
 	}
 
 	if err := pbsubstreams.ValidateRequest(req); err != nil {

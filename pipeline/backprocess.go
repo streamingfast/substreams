@@ -31,16 +31,18 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
+	zlog.Info("storage state found", zap.Stringer("storage state", storageState))
+
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
 		snapshot, ok := storageState.Snapshots[mod.Name]
 		if !ok {
 			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
 		}
-		if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
-			workPlan[mod.Name] = workUnit
-		}
+		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot)
 	}
+
+	zlog.Info("work plan ready", zap.Stringer("work_plan", workPlan))
 
 	progressMessages := workPlan.ProgressMessages(p.hostname)
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {

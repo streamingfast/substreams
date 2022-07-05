@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/abourget/llerrgroup"
@@ -18,6 +19,14 @@ func NewStorageState() *StorageState {
 	return &StorageState{
 		Snapshots: map[string]*Snapshots{},
 	}
+}
+
+func (s *StorageState) String() string {
+	var out []string
+	for k, v := range s.Snapshots {
+		out = append(out, fmt.Sprintf("store=%s (%s)", k, v))
+	}
+	return strings.Join(out, ", ")
 }
 
 func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out *StorageState, err error) {

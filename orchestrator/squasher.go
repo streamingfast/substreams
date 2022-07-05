@@ -34,17 +34,17 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 		store := stores[modName]
 		var storeSquasher *StoreSquasher
 		if workUnit.initialStoreFile == nil {
+			zlog.Info("setting up initial store", zap.String("store", store.Name), zap.Object("initial_store_fiel", workUnit.initialStoreFile))
 			storeSquasher = NewStoreSquasher(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, jobsPlanner)
 		} else {
+			zlog.Info("loading initial store", zap.String("store", store.Name), zap.Object("initial_store_fiel", workUnit.initialStoreFile))
 			squish, err := store.LoadFrom(ctx, workUnit.initialStoreFile)
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.initialStoreFile, err)
 			}
-			storeSquasher = NewStoreSquasher(squish, reqStartBlock, store.ModuleInitialBlock, jobsPlanner)
+			storeSquasher = NewStoreSquasher(squish, reqStartBlock, workUnit.initialStoreFile.ExclusiveEndBlock, jobsPlanner)
 
-			if err := storeSquasher.squash(block.Ranges{workUnit.initialStoreFile}); err != nil {
-				return nil, fmt.Errorf("initial store file squash: %w", err)
-			}
+			jobsPlanner.SignalCompletionUpUntil(modName, workUnit.initialStoreFile.ExclusiveEndBlock)
 		}
 
 		if len(workUnit.partialsMissing) == 0 {

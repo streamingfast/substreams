@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
+func TestNewJobsPlanner(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
 
 	storeSplit := uint64(10)
@@ -47,36 +47,26 @@ func TestNewOrderedStrategy_GetNextRequest(t *testing.T) {
 		"K": &WorkUnit{modName: "K"},
 	}
 
-	pool := NewJobPool()
 	ctx := context.Background()
-	s, err := NewOrderedStrategy(
+	s, err := NewJobsPlanner(
 		ctx,
 		splitWorkMods,
 		subreqSplit,
 		stores, // INIT
 		graph,
-		pool,
 	)
 	require.NoError(t, err)
 
-	//simulate squasher squashing the data and notifying the pool
-	go func() {
-		time.Sleep(1 * time.Second)
-		pool.Notify("E", 10)
-
-		time.Sleep(1 * time.Second)
-		pool.Notify("E", 20)
-		time.Sleep(1 * time.Second)
-		pool.Notify("B", 20)
-	}()
+	s.SignalCompletionUpUntil("E", 10)
+	s.SignalCompletionUpUntil("E", 20)
+	s.SignalCompletionUpUntil("B", 20)
 
 	var allRequests []string
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	reqChan := s.getRequestStream(ctx)
-	for req := range reqChan {
+	for req := range s.AvailableJobs {
 		fmt.Println(jobstr(req))
 		allRequests = append(allRequests, jobstr(req))
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,13 +65,10 @@ func TestSquash(t *testing.T) {
 		return nil, fmt.Errorf("file %q not mocked", name)
 	}
 
-	notificationsSent := 0
-	notifierFunc := NotifierFunc(func() {
-		notificationsSent++
-	})
+	planner := &JobsPlanner{AvailableJobs: make(chan *Job, 100)}
 
 	s := testStateBuilder(store)
-	squashable := NewStoreSquasher(s, 80_000, 10_000, notifierFunc)
+	squashable := NewStoreSquasher(s, 80_000, 10_000, planner)
 	go squashable.launch(context.Background())
 
 	require.NoError(t, squashable.squash([]*block.Range{{20_000, 30_000}}))
@@ -83,7 +81,7 @@ func TestSquash(t *testing.T) {
 
 	squashable.Shutdown(nil)
 	require.Equal(t, 2, writeCount) //both [10_000,20_000) and [20_000,30_000) will be merged and written
-	require.Equal(t, 2, notificationsSent)
+	assert.True(t, planner.completed)
 }
 
 func testStateBuilder(store dstore.Store) *state.Store {

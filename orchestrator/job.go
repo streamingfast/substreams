@@ -9,20 +9,18 @@ import (
 )
 
 type Job struct {
-	requestRange       *block.Range
-	moduleName         string // target
-	moduleSaveInterval uint64
-	priority           int
-	scheduled          bool
+	requestRange *block.Range
+	moduleName   string // target
+	priority     int
+	scheduled    bool
 
 	deps jobDependencies
 }
 
-func NewJob(storeName string, saveInterval uint64, requestRange *block.Range, ancestorStoreModules []*pbsubstreams.Module, totalJobs, myJobIndex int) *Job {
+func NewJob(storeName string, requestRange *block.Range, ancestorStoreModules []*pbsubstreams.Module, totalJobs, myJobIndex int) *Job {
 	j := &Job{
-		moduleName:         storeName,
-		moduleSaveInterval: saveInterval,
-		requestRange:       requestRange,
+		moduleName:   storeName,
+		requestRange: requestRange,
 	}
 	j.defineDependencies(ancestorStoreModules)
 	j.priority = len(j.deps) + totalJobs - myJobIndex
@@ -105,7 +103,6 @@ func (j *Job) String() string {
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module_name", j.moduleName)
-	enc.AddUint64("module_save_interval", j.moduleSaveInterval)
 	enc.AddUint64("start_block", j.requestRange.StartBlock)
 	enc.AddUint64("end_block", j.requestRange.ExclusiveEndBlock)
 	enc.AddArray("deps", j.deps)

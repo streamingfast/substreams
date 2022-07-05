@@ -56,7 +56,7 @@ func NewJobsPlanner(
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
 			}
 
-			job := NewJob(store.Name, store.SaveInterval, requestRange, ancestorStoreModules, rangeLen, idx)
+			job := NewJob(store.Name, requestRange, ancestorStoreModules, rangeLen, idx)
 			planner.jobs = append(planner.jobs, job)
 
 			zlog.Info("job planned", zap.String("module_name", store.Name), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
@@ -94,6 +94,7 @@ func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64)
 }
 
 func (p *JobsPlanner) dispatch() {
+	zlog.Debug("calling jobs planner dispatch", zap.Object("planner", p))
 	if p.completed {
 		return
 	}

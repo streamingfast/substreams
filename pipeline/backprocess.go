@@ -26,8 +26,6 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Info("synchronizing stores")
 
-	jobPool := orchestrator.NewJobPool()
-
 	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
@@ -35,10 +33,12 @@ func (p *Pipeline) backProcessStores(
 
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
-		if snapshot, ok := storageState.Snapshots[mod.Name]; ok {
-			if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
-				workPlan[mod.Name] = workUnit
-			}
+		snapshot, ok := storageState.Snapshots[mod.Name]
+		if !ok {
+			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
+		}
+		if workUnit := orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot); workUnit != nil {
+			workPlan[mod.Name] = workUnit
 		}
 	}
 
@@ -49,12 +49,14 @@ func (p *Pipeline) backProcessStores(
 
 	upToBlock := uint64(p.request.StartBlockNum)
 
-	strategy, err := orchestrator.NewOrderedStrategy(ctx, workPlan, uint64(p.subrequestSplitSize), initialStoreMap, p.graph, jobPool)
+	jobsPlanner, err := orchestrator.NewJobsPlanner(ctx, workPlan, uint64(p.subrequestSplitSize), initialStoreMap, p.graph)
 	if err != nil {
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, jobPool)
+	zlog.Debug("launching squasher")
+
+	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, jobsPlanner)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
@@ -64,17 +66,19 @@ func (p *Pipeline) backProcessStores(
 		return nil, err
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, strategy, squasher, workerPool, p.respFunc)
+	scheduler, err := orchestrator.NewScheduler(ctx, jobsPlanner.AvailableJobs, squasher, workerPool, p.respFunc)
 	if err != nil {
 		return nil, fmt.Errorf("initializing scheduler: %w", err)
 	}
 
 	result := make(chan error)
 
+	zlog.Debug("launching scheduler")
+
 	go scheduler.Launch(ctx, result)
 
-	requestCount := jobPool.Count() // Is this expected to be the TOTAL number of requests we've seen?
-	for resultCount := 0; resultCount < requestCount; {
+	jobCount := jobsPlanner.JobCount()
+	for resultCount := 0; resultCount < jobCount; {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -83,7 +87,7 @@ func (p *Pipeline) backProcessStores(
 			if err != nil {
 				return nil, fmt.Errorf("from worker: %w", err)
 			}
-			zlog.Debug("received result", zap.Int("result_count", resultCount), zap.Int("request_count", requestCount), zap.Error(err))
+			zlog.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount), zap.Error(err))
 		}
 	}
 

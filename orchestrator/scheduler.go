@@ -15,42 +15,25 @@ type Scheduler struct {
 	workerPool *WorkerPool
 	respFunc   substreams.ResponseFunc
 
-	squasher       *Squasher
-	requestsStream <-chan *Job
+	squasher      *Squasher
+	availableJobs <-chan *Job
 }
 
-func NewScheduler(ctx context.Context, strategy *OrderedStrategy, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc) (*Scheduler, error) {
+func NewScheduler(ctx context.Context, availableJobs chan *Job, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc) (*Scheduler, error) {
 	s := &Scheduler{
-		squasher:       squasher,
-		requestsStream: strategy.getRequestStream(ctx),
-		workerPool:     workerPool,
-		respFunc:       respFunc,
+		squasher:      squasher,
+		availableJobs: availableJobs,
+		workerPool:    workerPool,
+		respFunc:      respFunc,
 	}
 	return s, nil
 }
 
-func (s *Scheduler) Next() *Job {
-	zlog.Debug("getting a next job from scheduler", zap.Int("buffered_requests", len(s.requestsStream)))
-	request, ok := <-s.requestsStream
-	if !ok {
-		return nil
-	}
-	return request
-}
-
-func (s *Scheduler) Callback(ctx context.Context, job *Job, partialsRanges block.Ranges) error {
-
-	err := s.squasher.Squash(job.moduleName, partialsRanges)
-	if err != nil {
-		return fmt.Errorf("squashing: %w", err)
-	}
-	return nil
-}
-
 func (s *Scheduler) Launch(ctx context.Context, result chan error) {
 	for {
-		job := s.Next()
-		if job == nil {
+		zlog.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.availableJobs)))
+		job, ok := <-s.availableJobs
+		if !ok {
 			zlog.Debug("no more job in scheduler, or context cancelled")
 			break
 		}
@@ -92,9 +75,8 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Jo
 		return err
 	}
 
-	if err = s.Callback(ctx, job, partialsWritten); err != nil {
-		return fmt.Errorf("calling back scheduler: %w", err)
+	if err = s.squasher.Squash(job.moduleName, partialsWritten); err != nil {
+		return fmt.Errorf("squashing: %w", err)
 	}
 	return nil
-
 }

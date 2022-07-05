@@ -199,7 +199,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	if !isSubrequest && len(request.OutputModules) == 1 {
+	if !isSubrequest && len(request.OutputModules) == 1 && len(request.InitialStoreSnapshotForModules) == 0 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)
 

@@ -18,8 +18,6 @@ type Squasher struct {
 	storeSquashers       map[string]*StoreSquasher
 	storeSaveInterval    uint64
 	targetExclusiveBlock uint64
-
-	notifier Notifier
 }
 
 // NewSquasher receives stores, initializes them and fetches them from
@@ -30,24 +28,27 @@ type Squasher struct {
 // synchronizes around the actual data: the state of storages
 // present, the requests needed to fill in those stores up to the
 // target block, etc..
-func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*state.Store, reqStartBlock uint64, notifier Notifier) (*Squasher, error) {
+func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*state.Store, reqStartBlock uint64, jobsPlanner *JobsPlanner) (*Squasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
 	for modName, workUnit := range workPlan {
 		store := stores[modName]
 		var storeSquasher *StoreSquasher
 		if workUnit.initialStoreFile == nil {
-			storeSquasher = NewStoreSquasher(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, notifier)
+			storeSquasher = NewStoreSquasher(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, jobsPlanner)
 		} else {
 			squish, err := store.LoadFrom(ctx, workUnit.initialStoreFile)
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.initialStoreFile, err)
 			}
-			storeSquasher = NewStoreSquasher(squish, reqStartBlock, workUnit.initialStoreFile.ExclusiveEndBlock, notifier)
+			storeSquasher = NewStoreSquasher(squish, reqStartBlock, store.ModuleInitialBlock, jobsPlanner)
+
+			if err := storeSquasher.squash(block.Ranges{workUnit.initialStoreFile}); err != nil {
+				return nil, fmt.Errorf("initial store file squash: %w", err)
+			}
 		}
 
 		if len(workUnit.partialsMissing) == 0 {
 			storeSquasher.targetExclusiveEndBlockReach = true
-			storeSquasher.notifyWaiters(reqStartBlock)
 		}
 
 		go storeSquasher.launch(ctx)
@@ -58,7 +59,6 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 		Shutter:              shutter.New(),
 		storeSquashers:       storeSquashers,
 		targetExclusiveBlock: reqStartBlock,
-		notifier:             notifier,
 	}
 
 	squasher.OnTerminating(func(err error) {

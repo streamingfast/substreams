@@ -23,21 +23,21 @@ type StoreSquasher struct {
 	targetExclusiveEndBlock uint64
 	nextExpectedStartBlock  uint64
 
-	notifier Notifier
+	jobsPlanner *JobsPlanner
 
 	targetExclusiveEndBlockReach bool
 	partialsChunks               chan block.Ranges
 	waitForCompletion            chan interface{}
 }
 
-func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpectedStartBlock uint64, notifier Notifier) *StoreSquasher {
+func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpectedStartBlock uint64, jobsPlanner *JobsPlanner) *StoreSquasher {
 	s := &StoreSquasher{
 		Shutter:                 shutter.New(),
 		name:                    initialStore.Name,
 		store:                   initialStore,
 		targetExclusiveEndBlock: targetExclusiveBlock,
 		nextExpectedStartBlock:  nextExpectedStartBlock,
-		notifier:                notifier,
+		jobsPlanner:             jobsPlanner,
 		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
 		waitForCompletion:       make(chan interface{}),
 	}
@@ -70,9 +70,13 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 	zlog.Info("launching squasher", zap.String("module_name", s.store.Name))
 	for {
 		select {
+		case <-ctx.Done():
+			zlog.Info("quitting on a close context", zap.String("module_name", s.store.Name))
+			return
+
 		case partialsChunks, ok := <-s.partialsChunks:
 			if !ok {
-				zlog.Info("squashing done, no more partial chuck to squash", zap.String("module_name", s.store.Name))
+				zlog.Info("squashing done, no more partial chunks to squash", zap.String("module_name", s.store.Name))
 				close(s.waitForCompletion)
 				return
 			}
@@ -81,9 +85,6 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			sort.Slice(s.ranges, func(i, j int) bool {
 				return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
 			})
-		case <-ctx.Done():
-			zlog.Info("quitting on a close context", zap.String("module_name", s.store.Name))
-			return
 		}
 
 		eg := llerrgroup.New(250)
@@ -149,7 +150,8 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			if squashableRange.ExclusiveEndBlock == s.targetExclusiveEndBlock {
 				s.targetExclusiveEndBlockReach = true
 			}
-			s.notifyWaiters(squashableRange.ExclusiveEndBlock)
+			zlog.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
+			s.jobsPlanner.SignalCompletionUpUntil(s.name, squashableRange.ExclusiveEndBlock)
 		}
 		zlog.Info("waiting for eg to finish", zap.String("module_name", s.store.Name))
 		if err := eg.Wait(); err != nil {
@@ -163,12 +165,6 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			avgDuration = totalDuration / time.Duration(squashCount)
 		}
 		zlog.Info("squashing done", zap.String("module_name", s.store.Name), zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
-	}
-}
-
-func (s *StoreSquasher) notifyWaiters(lastSquashedBlock uint64) {
-	if s.notifier != nil {
-		s.notifier.Notify(s.store.Name, lastSquashedBlock)
 	}
 }
 

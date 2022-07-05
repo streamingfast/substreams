@@ -25,9 +25,12 @@ func (r *Range) String() string {
 }
 
 func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddUint64("start_block", r.StartBlock)
-	enc.AddUint64("end_block", r.ExclusiveEndBlock)
-
+	if r == nil {
+		enc.AddBool("nil", true)
+	} else {
+		enc.AddUint64("start_block", r.StartBlock)
+		enc.AddUint64("end_block", r.ExclusiveEndBlock)
+	}
 	return nil
 }
 

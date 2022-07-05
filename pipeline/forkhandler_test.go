@@ -2,50 +2,109 @@ package pipeline
 
 import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func Test_ForkHandler(t *testing.T) {
+	reversibleOutputs := map[uint64][]*pbsubstreams.ModuleOutput{
+		10: {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		20: {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		30: {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		40: {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		50: {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+	}
+
+	reversibleModules := map[string][]*pbsubstreams.Module{
+		"10": {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		"20": {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		"30": {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		"40": {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+		"50": {
+			{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		},
+	}
+
 	tests := []struct {
 		name              string
 		reversibleOutputs map[string][]*pbsubstreams.Module
-		blockNumber       uint64
+		blockNumbers      []uint64
+		expectedOutputs   map[uint64][]*pbsubstreams.ModuleOutput
 	}{
 		{
-			name: "delete outputs",
-			reversibleOutputs: map[string][]*pbsubstreams.Module{
-				"10": {
-					{
-						Name: "module_1",
-					},
-					{
-						Name: "module_2",
-					},
-					{
-						Name: "module_3",
-					},
+			name:              "reverse outputs for block 20",
+			reversibleOutputs: reversibleModules,
+			blockNumbers:      []uint64{20},
+			expectedOutputs: map[uint64][]*pbsubstreams.ModuleOutput{
+				10: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
-				"20": {
-					{
-						Name: "module_1",
-					},
-					{
-						Name: "module_2",
-					},
-					{
-						Name: "module_3",
-					},
+				30: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+				},
+				40: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+				},
+				50: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
 			},
-			blockNumber: 10,
+		},
+		{
+			name:              "reverse outputs for block 20 and 30",
+			reversibleOutputs: reversibleModules,
+			blockNumbers:      []uint64{20, 30},
+			expectedOutputs: map[uint64][]*pbsubstreams.ModuleOutput{
+				10: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+				},
+				40: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+				},
+				50: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+				},
+			},
+		},
+		{
+			name:              "reverse outputs for block 20, 30, 40 and 50",
+			reversibleOutputs: reversibleModules,
+			blockNumbers:      []uint64{20, 30, 40, 50},
+			expectedOutputs: map[uint64][]*pbsubstreams.ModuleOutput{
+				10: {
+					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+				},
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := &ForkHandler{
-				reversibleOutputs: test.reversibleOutputs,
+			forkHandler := &ForkHandler{
+				reversibleOutputs: reversibleOutputs,
 			}
+			for _, blockNum := range test.blockNumbers {
+				forkHandler.handleIrreversibility(blockNum)
+			}
+			require.Equal(t, test.expectedOutputs, forkHandler.reversibleOutputs)
 		})
 	}
 }

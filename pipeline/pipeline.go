@@ -288,12 +288,12 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	// }
 
 	if step == bstream.StepUndo {
-		if err = p.forkHandler.revertOutputs(p.modules); err != nil {
+		if err = p.forkHandler.revertOutputs(blockNum); err != nil {
 			return fmt.Errorf("reverting outputs: %w", err)
 		}
 	}
 
-	if step == bstream.StepNew && p.forkHandler.reversibleOutputs != nil {
+	if step == bstream.StepNew && p.forkHandler.reversibleOutputs[blockNum] != nil {
 		// send cached values from p.forHandler.reversibleOutputs
 		return nil
 	}

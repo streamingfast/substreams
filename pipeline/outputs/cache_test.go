@@ -56,3 +56,67 @@ func TestOutputCache_listContinuousCacheRanges(t *testing.T) {
 		})
 	}
 }
+
+func TestOutputCache_Delete(t *testing.T) {
+	testCases := []struct {
+		name         string
+		kv           outputKV
+		keysToDelete []string
+		expectedKv   outputKV
+	}{
+		{
+			name: "delete one block id from output cache",
+			kv: map[string]*CacheItem{
+				"1": {
+					BlockNum: 1,
+				},
+				"2": {
+					BlockNum: 2,
+				},
+			},
+			keysToDelete: []string{"2"},
+			expectedKv: map[string]*CacheItem{
+				"1": {
+					BlockNum: 1,
+				},
+			},
+		},
+		{
+			name: "delete two block ids from output cache",
+			kv: map[string]*CacheItem{
+				"1": {
+					BlockNum: 1,
+				},
+				"2": {
+					BlockNum: 2,
+				},
+				"3": {
+					BlockNum: 3,
+				},
+				"4": {
+					BlockNum: 4,
+				},
+			},
+			keysToDelete: []string{"1", "2"},
+			expectedKv: map[string]*CacheItem{
+				"3": {
+					BlockNum: 3,
+				},
+				"4": {
+					BlockNum: 4,
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			outputCache := NewOutputCache("module1", nil, 10)
+			outputCache.kv = test.kv
+			for _, key := range test.keysToDelete {
+				outputCache.Delete(key)
+			}
+			require.Equal(t, test.expectedKv, outputCache.kv)
+		})
+	}
+}

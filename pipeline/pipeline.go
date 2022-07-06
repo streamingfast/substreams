@@ -288,27 +288,22 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	// }
 
 	if step == bstream.StepUndo {
-		if err = p.forkHandler.revertOutputs(blockNum); err != nil {
+		if err = p.forkHandler.revertOutputs(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
 			return fmt.Errorf("reverting outputs: %w", err)
 		}
-	}
-
-	if step == bstream.StepNew && p.forkHandler.reversibleOutputs[blockNum] != nil {
-		// send cached values from p.forHandler.reversibleOutputs
 		return nil
 	}
 
-	if step == bstream.StepIrreversible || step == bstream.StepStalled {
-		if step == bstream.StepIrreversible {
-			if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-				return fmt.Errorf("updating module output cache on irreversible step: %w", err)
-			}
+	if step == bstream.StepIrreversible {
+		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+			return fmt.Errorf("updating module output cache on irreversible step: %w", err)
 		}
-		p.forkHandler.handleIrreversibility(block.Number)
 	}
 
-	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-		return fmt.Errorf("updating module output cache: %w", err)
+	if step == bstream.StepIrreversible || step == bstream.StepStalled {
+		p.forkHandler.handleIrreversibility(block.Number)
+		// todo: should we send the output??
+		return nil
 	}
 
 	for _, hook := range p.preBlockHooks {
@@ -318,6 +313,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	p.moduleOutputs = nil
+	p.forkHandler.reversibleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
 	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
@@ -359,7 +355,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
-		if err := p.returnModuleDataOutputs(step, cursor); err != nil {
+		if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
 			return err
 		}
 	}
@@ -370,6 +366,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
+}
+
+func (p *Pipeline) PartialsWritten() block.Ranges {
+	return p.partialsWritten
 }
 
 func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
@@ -386,12 +386,14 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 		logs, truncated := executor.moduleLogs()
 		outputData := executor.moduleOutputData()
 		if len(logs) != 0 || outputData != nil {
-			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+			moduleOutput := &pbsubstreams.ModuleOutput{
 				Name:          executorName,
 				Data:          outputData,
 				Logs:          logs,
 				LogsTruncated: truncated,
-			})
+			}
+			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
+			p.forkHandler.addModuleOutput(moduleOutput, p.clock.Number)
 		}
 	}
 
@@ -448,22 +450,6 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}
-	return nil
-}
-
-func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
-	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-	out := &pbsubstreams.BlockScopedData{
-		Outputs: p.moduleOutputs,
-		Clock:   p.clock,
-		Step:    pbsubstreams.StepToProto(step),
-		Cursor:  cursor.ToOpaque(),
-	}
-
-	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-		return fmt.Errorf("calling return func: %w", err)
-	}
-
 	return nil
 }
 
@@ -713,6 +699,17 @@ func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, r
 	return nil
 }
 
-func (p *Pipeline) PartialsWritten() block.Ranges {
-	return p.partialsWritten
+func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
+	out := &pbsubstreams.BlockScopedData{
+		Outputs: moduleOutputs,
+		Clock:   clock,
+		Step:    pbsubstreams.StepToProto(step),
+		Cursor:  cursor.ToOpaque(),
+	}
+
+	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
 }

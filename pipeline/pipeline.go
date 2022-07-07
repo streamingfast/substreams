@@ -318,7 +318,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	p.moduleOutputs = nil
-	p.forkHandler.reversibleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
 	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)

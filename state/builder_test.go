@@ -66,7 +66,6 @@ func TestApplyDelta(t *testing.T) {
 					Key:       "k2",
 					NewValue:  []byte("v2"),
 				},
-
 				{
 					Operation: pbsubstreams.StoreDelta_DELETE,
 					Key:       "k1",

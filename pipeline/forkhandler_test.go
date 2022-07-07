@@ -147,7 +147,7 @@ func Test_ReverseDeltas(t *testing.T) {
 			expectedKV: map[string][]byte{},
 		},
 		{
-			name: "reverse multiple deltas",
+			name: "reverse a delta when multiple deltas were applied",
 			storeMap: map[string]*state.Store{
 				"module_1": {
 					Name: "module_1",
@@ -183,7 +183,65 @@ func Test_ReverseDeltas(t *testing.T) {
 				"key_1": {99},
 			},
 		},
-		{},
+		{
+			name: "reverse multiple deltas",
+			storeMap: map[string]*state.Store{
+				"module_1": {
+					Name: "module_1",
+					Deltas: []*pbsubstreams.StoreDelta{
+						{
+							Operation: pbsubstreams.StoreDelta_CREATE,
+							Key:       "key_1",
+							NewValue:  []byte{99},
+						},
+						{
+							Operation: pbsubstreams.StoreDelta_CREATE,
+							Key:       "key_2",
+							NewValue:  []byte{100},
+						},
+						{
+							Operation: pbsubstreams.StoreDelta_UPDATE,
+							Key:       "key_1",
+							OldValue:  []byte{99},
+							NewValue:  []byte{100},
+						},
+						{
+							Operation: pbsubstreams.StoreDelta_DELETE,
+							Key:       "key_1",
+							OldValue:  []byte{100},
+						},
+						{
+							Operation: pbsubstreams.StoreDelta_UPDATE,
+							Key:       "key_2",
+							OldValue:  []byte{100},
+							NewValue:  []byte{150},
+						},
+					},
+					KV: map[string][]byte{
+						"key_2": {150},
+					},
+				},
+			},
+			deltaGetter: &TestStoreDeltas{
+				deltas: []*pbsubstreams.StoreDelta{
+					{
+						Operation: pbsubstreams.StoreDelta_DELETE,
+						Key:       "key_1",
+						OldValue:  []byte{100},
+					},
+					{
+						Operation: pbsubstreams.StoreDelta_UPDATE,
+						Key:       "key_2",
+						OldValue:  []byte{100},
+						NewValue:  []byte{150},
+					},
+				},
+			},
+			expectedKV: map[string][]byte{
+				"key_1": {100},
+				"key_2": {100},
+			},
+		},
 	}
 
 	for _, test := range testCases {

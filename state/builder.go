@@ -248,12 +248,10 @@ func (s *Store) ApplyDeltaReverse(deltas []*pbsubstreams.StoreDelta) {
 	for i := len(deltas) - 1; i >= 0; i-- {
 		delta := deltas[i]
 		switch delta.Operation {
-		case pbsubstreams.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_UPDATE, pbsubstreams.StoreDelta_DELETE:
 			s.KV[delta.Key] = delta.OldValue
 		case pbsubstreams.StoreDelta_CREATE:
 			delete(s.KV, delta.Key)
-		case pbsubstreams.StoreDelta_DELETE:
-			s.KV[delta.Key] = delta.OldValue
 		}
 	}
 }

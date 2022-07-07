@@ -26,6 +26,10 @@ func (s *Snapshots) Sort() {
 	})
 }
 
+func (s *Snapshots) String() string {
+	return fmt.Sprintf("completes=%s, partials=%s", s.Completes, s.Partials)
+}
+
 func (s *Snapshots) LastCompletedBlock() uint64 {
 	if len(s.Completes) == 0 {
 		return 0

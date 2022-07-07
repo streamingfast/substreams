@@ -48,6 +48,7 @@ func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, mod
 		UpdatePolicy:       updatePolicy,
 		ValueType:          valueType,
 		Store:              subStore,
+		ModuleHash:         moduleHash,
 		SaveInterval:       saveInterval,
 		ModuleInitialBlock: moduleInitialBlock,
 		storeInitialBlock:  moduleInitialBlock,
@@ -82,7 +83,7 @@ func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 func (s *Store) StoreInitialBlock() uint64 { return s.storeInitialBlock }
 
 func (s *Store) IsPartial() bool {
-	zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.storeInitialBlock))
+	//zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.storeInitialBlock))
 	return s.ModuleInitialBlock != s.storeInitialBlock
 }
 

@@ -24,7 +24,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
-			fmt.Println("Quitting...")
+			fmt.Println("Interrupting UI, hit Ctrl+C to kill...")
 			m.ui.Cancel()
 			// TODO: trigger downstream shutdown of the blocks processing
 			return m, tea.Quit

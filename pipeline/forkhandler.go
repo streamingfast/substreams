@@ -27,7 +27,7 @@ func (f *ForkHandler) revertOutputs(
 			if outputCache, ok := moduleOutputCache.OutputCaches[moduleOutput.Name]; ok {
 				outputCache.Delete(clock.Id)
 			}
-			reverseDeltas(storeMap, moduleOutput)
+			reverseDeltas(storeMap, moduleOutput.Name, moduleOutput.GetStoreDeltas())
 		}
 	}
 	return nil
@@ -41,8 +41,12 @@ func (f *ForkHandler) addModuleOutput(moduleOutput *pbsubstreams.ModuleOutput, b
 	f.reversibleOutputs[blockNum] = append(f.reversibleOutputs[blockNum], moduleOutput)
 }
 
-func reverseDeltas(storeMap map[string]*state.Store, moduleOutput *pbsubstreams.ModuleOutput) {
-	if store, allRight := storeMap[moduleOutput.Name]; allRight {
-		store.ApplyDeltaReverse(moduleOutput.GetStoreDeltas().GetDeltas())
+type DeltaGetter interface {
+	GetDeltas() []*pbsubstreams.StoreDelta
+}
+
+func reverseDeltas(storeMap map[string]*state.Store, name string, deltaGetter DeltaGetter) {
+	if store, found := storeMap[name]; found {
+		store.ApplyDeltaReverse(deltaGetter.GetDeltas())
 	}
 }

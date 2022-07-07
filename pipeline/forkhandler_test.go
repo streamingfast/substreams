@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/state"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -108,4 +109,97 @@ func Test_HandleIrreversibility(t *testing.T) {
 			require.Equal(t, test.expectedOutputs, forkHandler.reversibleOutputs)
 		})
 	}
+}
+
+func Test_ReverseDeltas(t *testing.T) {
+	testCases := []struct {
+		name        string
+		storeMap    map[string]*state.Store
+		deltaGetter *TestStoreDeltas
+		expectedKV  map[string][]byte
+	}{
+		{
+			name: "reverse one delta",
+			storeMap: map[string]*state.Store{
+				"module_1": {
+					Name: "module_1",
+					Deltas: []*pbsubstreams.StoreDelta{
+						{
+							Operation: pbsubstreams.StoreDelta_CREATE,
+							Key:       "key_1",
+							NewValue:  []byte{99},
+						},
+					},
+					KV: map[string][]byte{
+						"key_1": {99},
+					},
+				},
+			},
+			deltaGetter: &TestStoreDeltas{
+				deltas: []*pbsubstreams.StoreDelta{
+					{
+						Operation: pbsubstreams.StoreDelta_CREATE,
+						Key:       "key_1",
+						NewValue:  []byte{99},
+					},
+				},
+			},
+			expectedKV: map[string][]byte{},
+		},
+		{
+			name: "reverse multiple deltas",
+			storeMap: map[string]*state.Store{
+				"module_1": {
+					Name: "module_1",
+					Deltas: []*pbsubstreams.StoreDelta{
+						{
+							Operation: pbsubstreams.StoreDelta_CREATE,
+							Key:       "key_1",
+							NewValue:  []byte{99},
+						},
+						{
+							Operation: pbsubstreams.StoreDelta_UPDATE,
+							Key:       "key_1",
+							OldValue:  []byte{99},
+							NewValue:  []byte{100},
+						},
+					},
+					KV: map[string][]byte{
+						"key_1": {100},
+					},
+				},
+			},
+			deltaGetter: &TestStoreDeltas{
+				deltas: []*pbsubstreams.StoreDelta{
+					{
+						Operation: pbsubstreams.StoreDelta_UPDATE,
+						Key:       "key_1",
+						OldValue:  []byte{99},
+						NewValue:  []byte{100},
+					},
+				},
+			},
+			expectedKV: map[string][]byte{
+				"key_1": {99},
+			},
+		},
+		{},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			for _, module := range test.storeMap {
+				reverseDeltas(test.storeMap, module.Name, test.deltaGetter)
+			}
+			require.Equal(t, test.expectedKV, test.storeMap["module_1"].KV)
+		})
+	}
+}
+
+type TestStoreDeltas struct {
+	deltas []*pbsubstreams.StoreDelta
+}
+
+func (t *TestStoreDeltas) GetDeltas() []*pbsubstreams.StoreDelta {
+	return t.deltas
 }

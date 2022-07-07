@@ -244,7 +244,7 @@ func (s *Store) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 func (s *Store) ApplyDeltaReverse(deltas []*pbsubstreams.StoreDelta) {
-	for i := len(deltas); i > 0; i-- {
+	for i := len(deltas) - 1; i >= 0; i-- {
 		delta := deltas[i]
 		switch delta.Operation {
 		case pbsubstreams.StoreDelta_UPDATE:

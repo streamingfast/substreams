@@ -107,18 +107,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validate request: %w", err)
 	}
 
-	/*
-		                           | Lowest block                                        | Requested block
-		                           | 5,364,534                                           | 55,453,453
-		   ------------------------|-----------------------------------------------------|-------------
-			   pairs               | XXXXXXXXXXXXXXXXXXXx       XXX              XXXXXXX |
-			   reserves            | XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     |
-			   reserves            |            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     |
-			-----------------------|-----------------------------------------------------|
-
-
-	*/
-
 	ui := tui.New(req, pkg, outputStreamNames)
 	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)

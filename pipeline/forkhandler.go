@@ -12,7 +12,13 @@ type ForkHandler struct {
 	reversibleOutputs map[uint64][]*pbsubstreams.ModuleOutput
 }
 
-func (f *ForkHandler) revertOutputs(
+func NewForkHandle() *ForkHandler {
+	return &ForkHandler{
+		reversibleOutputs: make(map[uint64][]*pbsubstreams.ModuleOutput),
+	}
+}
+
+func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 	moduleOutputCache *outputs.ModulesOutputCache,
@@ -33,7 +39,7 @@ func (f *ForkHandler) revertOutputs(
 	return nil
 }
 
-func (f *ForkHandler) handleIrreversibility(blockNumber uint64) {
+func (f *ForkHandler) handleIrreversible(blockNumber uint64) {
 	delete(f.reversibleOutputs, blockNumber)
 }
 

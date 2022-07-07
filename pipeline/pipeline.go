@@ -110,6 +110,7 @@ func New(
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
 		hostname:                     hostname,
+		forkHandler:                  NewForkHandle(),
 	}
 
 	for _, name := range request.OutputModules {
@@ -288,7 +289,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	// }
 
 	if step == bstream.StepUndo {
-		if err = p.forkHandler.revertOutputs(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
+		if err = p.forkHandler.handleUndo(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
 			return fmt.Errorf("reverting outputs: %w", err)
 		}
 		return nil
@@ -300,9 +301,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	if step == bstream.StepIrreversible || step == bstream.StepStalled {
-		p.forkHandler.handleIrreversibility(block.Number)
+	if step == bstream.StepIrreversible {
 		// todo: should we send the output??
+		p.forkHandler.handleIrreversible(block.Number)
+	}
+
+	if step == bstream.StepStalled {
+		p.forkHandler.handleIrreversible(block.Number)
 		return nil
 	}
 
@@ -354,7 +359,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			return err
 		}
 	}
+
 	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+		zlog.Debug("will return module outputs")
 		if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
 			return err
 		}
@@ -700,6 +707,7 @@ func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, r
 }
 
 func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
+	zlog.Debug("returning module outputs to client", zap.Int("module_output_count", len(moduleOutputs)))
 	out := &pbsubstreams.BlockScopedData{
 		Outputs: moduleOutputs,
 		Clock:   clock,

@@ -104,7 +104,7 @@ func Test_HandleIrreversibility(t *testing.T) {
 				reversibleOutputs: reversibleOutputs,
 			}
 			for _, blockNum := range test.blockNumbers {
-				forkHandler.handleIrreversibility(blockNum)
+				forkHandler.handleIrreversible(blockNum)
 			}
 			require.Equal(t, test.expectedOutputs, forkHandler.reversibleOutputs)
 		})

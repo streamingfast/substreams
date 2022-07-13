@@ -6,16 +6,16 @@ require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jhump/protoreflect v1.12.0
-	github.com/spf13/cobra v1.3.0
+	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20220629203020-42f6dd770c50
+	github.com/streamingfast/bstream v0.0.2-0.20220713194026-e4696dc8aab1
 	github.com/streamingfast/cli v0.0.3
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
-	github.com/streamingfast/firehose v0.1.1-0.20220629203325-f7498b95673d
+	github.com/streamingfast/firehose v0.1.1-0.20220713194831-09ab25b3887c
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
-	github.com/streamingfast/pbgo v0.0.6-0.20220629184423-cfd0608e0cf4
+	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e
 	github.com/stretchr/testify v1.7.1
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.21.0

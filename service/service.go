@@ -235,10 +235,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
-		StartBlockNum:     request.StartBlockNum,
-		StopBlockNum:      request.StopBlockNum,
-		Cursor:            request.StartCursor,
-		NoReorgNavigation: true,
+		StartBlockNum:   request.StartBlockNum,
+		StopBlockNum:    request.StopBlockNum,
+		Cursor:          request.StartCursor,
+		FinalBlocksOnly: true,
 		// FIXME(abourget), right now, the pbsubstreams.Request has a
 		// ForkSteps that we IGNORE. Eventually, we will want to honor
 		// it, but ONLY when we are certain that our Pipeline supports

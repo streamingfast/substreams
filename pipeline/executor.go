@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -22,7 +23,7 @@ type ModuleExecutor interface {
 	// Reset the wasm instance, avoid propagating logs.
 	Reset()
 
-	run(vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error
+	run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error
 
 	moduleLogs() (logs []string, truncated bool)
 	moduleOutputData() pbsubstreams.ModuleOutputData
@@ -70,7 +71,7 @@ func (e *StoreModuleExecutor) String() string {
 	return e.moduleName
 }
 
-func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
+func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
 	output, found, err := e.cache.Get(clock)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
@@ -81,7 +82,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 		return nil
 	}
 
-	if err = e.wasmMapCall(vals, clock); err != nil {
+	if err = e.wasmMapCall(ctx, vals, clock); err != nil {
 		return err
 	}
 
@@ -94,7 +95,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 	return nil
 }
 
-func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
+func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
 	output, found, err := e.cache.Get(clock)
 	if err != nil {
 		zlog.Warn("failed to get output from cache", zap.Error(err))
@@ -113,7 +114,7 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 		return nil
 	}
 
-	if err = e.wasmStoreCall(vals, clock); err != nil {
+	if err = e.wasmStoreCall(ctx, vals, clock); err != nil {
 		return err
 	}
 
@@ -134,9 +135,9 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 	return nil
 }
 
-func (e *MapperModuleExecutor) wasmMapCall(vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
+func (e *MapperModuleExecutor) wasmMapCall(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
 	var vm *wasm.Instance
-	if vm, err = e.wasmCall(vals, clock); err != nil {
+	if vm, err = e.wasmCall(ctx, vals, clock); err != nil {
 		return err
 	}
 
@@ -154,15 +155,15 @@ func (e *MapperModuleExecutor) wasmMapCall(vals map[string][]byte, clock *pbsubs
 	return nil
 }
 
-func (e *StoreModuleExecutor) wasmStoreCall(vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
-	if _, err := e.wasmCall(vals, clock); err != nil {
+func (e *StoreModuleExecutor) wasmStoreCall(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
+	if _, err := e.wasmCall(ctx, vals, clock); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Clock) (instance *wasm.Instance, err error) {
+func (e *BaseExecutor) wasmCall(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock) (instance *wasm.Instance, err error) {
 	hasInput := false
 	for _, input := range e.wasmInputs {
 		switch input.Type {
@@ -188,11 +189,11 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
 	//  state store in read mode)
 	if hasInput {
-		instance, err = e.wasmModule.NewInstance(clock, e.entrypoint, e.wasmInputs)
+		instance, err = e.wasmModule.NewInstance(ctx, clock, e.entrypoint, e.wasmInputs)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
-		if err = instance.Execute(); err != nil {
+		if err = instance.Execute(ctx); err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
 	}

@@ -35,6 +35,7 @@ func TestExtensionCalls(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.functionName, func(t *testing.T) {
+			ctx := context.Background()
 			wasmFilePath := test_wasm_path(t, c.wasmFile)
 
 			file, err := os.Open(wasmFilePath)
@@ -47,10 +48,10 @@ func TestExtensionCalls(t *testing.T) {
 			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(&pbsubstreams.Clock{}, c.functionName, nil)
+			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, c.functionName, nil)
 			require.NoError(t, err)
 
-			err = instance.Execute()
+			err = instance.Execute(ctx)
 			if c.expectError != nil {
 				assert.Equal(t, c.expectError.Error(), err.Error())
 			} else {

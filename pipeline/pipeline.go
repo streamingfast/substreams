@@ -281,7 +281,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	// if obj.Step() == IRREVERSIBLE  || STALLED {
 	//    if obj.Step() == IRREVESRIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
 	//    delete(map[blockID], outputs)
-    // }
+	// }
 
 	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 		return fmt.Errorf("updating module output cache: %w", err)
@@ -323,7 +323,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(executor, cursor.ToOpaque())
+		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
 		if err != nil {
 			return fmt.Errorf("running module executor: %w", err)
 		}
@@ -351,7 +351,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
-func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
+func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cursor string) error {
 	//FIXME(abourget): should we ever skip that work?
 	// if executor.ModuleInitialBlock < block.Number {
 	// 	continue ??
@@ -359,7 +359,7 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(p.wasmOutputs, p.clock, cursor)
+	executionError := executor.run(ctx, p.wasmOutputs, p.clock, cursor)
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()

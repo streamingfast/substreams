@@ -101,7 +101,7 @@ pub fn delete_prefix(ord: i64, prefix: &String){
         )
     }
 }
-pub fn add_bigint(ord: i64, key: String, value: &BigInt) {
+pub fn add_bigint(ord: i64, key: String, value: &BigInt)  {
     let data = value.to_string();
     unsafe {
         externs::state::add_bigint(

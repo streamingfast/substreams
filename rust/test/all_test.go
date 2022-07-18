@@ -254,6 +254,7 @@ func TestRustScript(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.functionName, func(t *testing.T) {
+			ctx := context.Background()
 			wasmFilePath := test_wasm_path(t, c.wasmFile)
 			file, err := os.Open(wasmFilePath)
 			require.NoError(t, err)
@@ -266,10 +267,10 @@ func TestRustScript(t *testing.T) {
 			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(&pbsubstreams.Clock{}, c.functionName, nil)
+			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, c.functionName, nil)
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
-			err = instance.Execute()
+			err = instance.Execute(ctx)
 			require.NoError(t, err)
 			c.assert(t, module, instance, c.builder)
 		})
@@ -277,15 +278,14 @@ func TestRustScript(t *testing.T) {
 }
 
 func Test_MakeItCrash(t *testing.T) {
-	t.Skip()
-	file, err := os.Open("./pkg/testing_substreams_bg.wasm")
+	//t.Skip()
+
+	file, err := os.Open(test_wasm_path(t, "testing_substreams.wasm"))
 	require.NoError(t, err)
 	byteCode, err := ioutil.ReadAll(file)
 	require.NoError(t, err)
 
-	//done := make(chan interface{})
-
-	//mutex := sync.Mutex{}
+	ctx := context.Background()
 	wg := sync.WaitGroup{}
 	data := make([]byte, (1024*1024)*1)
 	runtime := wasm.NewRuntime(nil)
@@ -300,12 +300,15 @@ func Test_MakeItCrash(t *testing.T) {
 				//fmt.Print(id, "-")
 				//runtime.LockOSThread()
 
-				instance, err := module.NewInstance(&pbsubstreams.Clock{}, "test_make_it_crash", nil)
+				instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, "test_make_it_crash", nil)
+				require.NoError(t, err)
 				time.Sleep(10 * time.Millisecond)
-				ptr, err := instance.Heap().Write(data)
+				mem := module.Memory()
+				heap := instance.Heap()
+				ptr, err := heap.Write(ctx, mem, data)
 
 				require.NoError(t, err)
-				err = instance.ExecuteWithArgs(ptr, int32(len(data)))
+				err = instance.ExecuteWithArgs(ctx, uint64(ptr), uint64(len(data)))
 
 				//mutex.Unlock()
 

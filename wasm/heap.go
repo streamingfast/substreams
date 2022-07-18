@@ -10,13 +10,13 @@ import (
 type Heap struct {
 	//memory    api.Memory
 	allocator api.Function
-	free      api.Function
+	dealloc   api.Function
 }
 
-func NewHeap(allocator, free api.Function) *Heap {
+func NewHeap(allocator, dealloc api.Function) *Heap {
 	return &Heap{
 		allocator: allocator,
-		free:      free,
+		dealloc:   dealloc,
 	}
 }
 
@@ -31,7 +31,7 @@ func (h *Heap) Write(ctx context.Context, memory api.Memory, bytes []byte) (uint
 
 	// This pointer is managed by TinyGo, but TinyGo is unaware of external usage.
 	// So, we have to free it when finished defer h.free.Call(ctx, ptr)
-	defer h.free.Call(ctx, ptr)
+	defer h.dealloc.Call(ctx, ptr)
 
 	return h.WriteAtPtr(ctx, memory, bytes, uint32(ptr))
 }

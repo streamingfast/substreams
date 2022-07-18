@@ -278,7 +278,7 @@ func TestRustScript(t *testing.T) {
 }
 
 func Test_MakeItCrash(t *testing.T) {
-	//t.Skip()
+	t.Skip()
 
 	file, err := os.Open(test_wasm_path(t, "testing_substreams.wasm"))
 	require.NoError(t, err)

@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 
 	"github.com/dustin/go-humanize"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -27,7 +30,7 @@ type Module struct {
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string) (*Module, error) {
 	zeroRuntime := wazero.NewRuntime()
-	defer zeroRuntime.Close(ctx)
+	//defer zeroRuntime.Close(ctx)
 
 	m := &Module{
 		runtime:     r,
@@ -49,6 +52,10 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 		if err != nil {
 			return nil, fmt.Errorf("instantiating %s externs: %w", namespace, err)
 		}
+	}
+
+	if _, err := wasi_snapshot_preview1.Instantiate(ctx, zeroRuntime); err != nil {
+		log.Panicln(err)
 	}
 
 	zeroModule, err := zeroRuntime.InstantiateModuleFromBinary(ctx, wasmCode)
@@ -99,10 +106,14 @@ func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, fun
 		clock:        clock,
 	}
 
-	alloc := m.zeroModule.ExportedFunction("malloc")
-	free := m.zeroModule.ExportedFunction("free")
+	alloc := m.zeroModule.ExportedFunction("alloc")
+	dealloc := m.zeroModule.ExportedFunction("dealloc")
 
-	m.CurrentInstance.heap = NewHeap(alloc, free)
+	if alloc == nil || dealloc == nil {
+		panic("missing malloc or free")
+	}
+
+	m.CurrentInstance.heap = NewHeap(alloc, dealloc)
 	m.CurrentInstance.entrypoint = m.zeroModule.ExportedFunction(functionName)
 	if m.CurrentInstance.entrypoint == nil {
 		return nil, fmt.Errorf("failed to get exported function %q", functionName)

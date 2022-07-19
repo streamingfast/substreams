@@ -299,7 +299,7 @@ func (m *Module) getFirst(ctx context.Context, apiModule api.Module, storeIndex 
 	return 1
 }
 
-func (m *Module) getLast(ctx context.Context, apiModule api.Module, storeIndex uint32, ord uint64, keyPtr, keyLength, outputPtr uint32) uint32 {
+func (m *Module) getLast(ctx context.Context, apiModule api.Module, storeIndex uint32, keyPtr, keyLength, outputPtr uint32) uint32 {
 	if int(storeIndex)+1 > len(m.CurrentInstance.inputStores) {
 		returnStateError(fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
 	}

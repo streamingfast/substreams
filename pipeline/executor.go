@@ -196,6 +196,10 @@ func (e *BaseExecutor) wasmCall(ctx context.Context, vals map[string][]byte, clo
 		if err = instance.Execute(ctx); err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
+		err = instance.Heap().Clear(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("block %d: module %q: wasm heap clear failed: %w", clock.Number, e.moduleName, err)
+		}
 	}
 	return
 }

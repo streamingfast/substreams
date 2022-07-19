@@ -97,7 +97,6 @@ func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, fun
 		functionName: functionName,
 		clock:        clock,
 	}
-
 	alloc := m.zeroModule.ExportedFunction("alloc")
 	dealloc := m.zeroModule.ExportedFunction("dealloc")
 
@@ -183,6 +182,7 @@ func (m *Module) newImports(ctx context.Context) error {
 			if err != nil {
 				returnError("env", fmt.Errorf("reading bytes: %w", err))
 			}
+			copy(m.CurrentInstance.returnValue, message)
 			m.CurrentInstance.returnValue = message
 		},
 	).

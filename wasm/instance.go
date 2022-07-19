@@ -5,12 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/sys"
-
-	"github.com/tetratelabs/wazero/api"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 type Instance struct {

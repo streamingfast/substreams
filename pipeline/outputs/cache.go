@@ -144,12 +144,15 @@ func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	cp := make([]byte, len(data))
+	copy(cp, data)
+
 	ci := &CacheItem{
 		BlockNum:  clock.Number,
 		BlockID:   clock.Id,
 		Timestamp: clock.Timestamp,
 		Cursor:    cursor,
-		Payload:   data,
+		Payload:   cp,
 	}
 
 	c.kv[clock.Id] = ci

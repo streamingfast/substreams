@@ -37,7 +37,7 @@ require (
 	google.golang.org/grpc v1.44.0
 )
 
-replace github.com/tetratelabs/wazero => github.com/dranikpg/wazero v0.0.0-20220720053801-b4685928286f
+//replace github.com/tetratelabs/wazero => github.com/dranikpg/wazero v0.0.0-20220720053801-b4685928286f
 
 require (
 	cloud.google.com/go v0.100.2 // indirect

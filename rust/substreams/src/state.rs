@@ -6,7 +6,7 @@ use bigdecimal::BigDecimal;
 pub fn get_at(store_idx: u32, ord: i64, key: &String) -> Option<Vec<u8>> {
     unsafe {
         let key_bytes = key.as_bytes();
-        let output_ptr = memory::alloc(8);
+        let output_ptr = memory::allocate(8);
         let found = externs::state::get_at(
             store_idx,
             ord,
@@ -24,7 +24,7 @@ pub fn get_at(store_idx: u32, ord: i64, key: &String) -> Option<Vec<u8>> {
 pub fn get_last(store_idx: u32, key: &String) -> Option<Vec<u8>> {
     unsafe {
         let key_bytes = key.as_bytes();
-        let output_ptr = memory::alloc(8);
+        let output_ptr = memory::allocate(8);
         let found = externs::state::get_last(
             store_idx,
             key_bytes.as_ptr(),
@@ -42,7 +42,7 @@ pub fn get_last(store_idx: u32, key: &String) -> Option<Vec<u8>> {
 pub fn get_first(store_idx: u32, key: &String) -> Option<Vec<u8>> {
     unsafe {
         let key_bytes = key.as_bytes();
-        let output_ptr = memory::alloc(8);
+        let output_ptr = memory::allocate(8);
         let found = externs::state::get_first(
             store_idx,
             key_bytes.as_ptr(),

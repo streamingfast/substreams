@@ -45,10 +45,10 @@ func TestExtensionCalls(t *testing.T) {
 			rpcProv := &testWasmExtension{}
 			runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
 
-			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
+			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, c.functionName, nil)
+			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
 			require.NoError(t, err)
 
 			err = instance.Execute(ctx)

@@ -264,10 +264,10 @@ func TestRustScript(t *testing.T) {
 			rpcProv := &testWasmExtension{}
 			runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
 
-			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
+			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, c.functionName, nil)
+			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
 			err = instance.Execute(ctx)
@@ -277,6 +277,30 @@ func TestRustScript(t *testing.T) {
 	}
 }
 
+func Test_Recursion(t *testing.T) {
+	ctx := context.Background()
+	wasmFilePath := test_wasm_path(t, "testing_substreams.wasm")
+	file, err := os.Open(wasmFilePath)
+	require.NoError(t, err)
+	byteCode, err := ioutil.ReadAll(file)
+	require.NoError(t, err)
+
+	rpcProv := &testWasmExtension{}
+	runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
+
+	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", "test_recursion")
+	require.NoError(t, err)
+
+	instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
+	require.NoError(t, err)
+	err = instance.ExecuteWithArgs(ctx, 2040)
+	require.NoError(t, err)
+
+	for _, log := range instance.Logs {
+		fmt.Println("log:", log)
+	}
+
+}
 func Test_MakeItCrash(t *testing.T) {
 	t.Skip()
 
@@ -289,7 +313,7 @@ func Test_MakeItCrash(t *testing.T) {
 	wg := sync.WaitGroup{}
 	data := make([]byte, (1024*1024)*1)
 	runtime := wasm.NewRuntime(nil)
-	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "test_make_it_crash")
+	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "test_make_it_crash", "test_make_it_crash")
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
 		fmt.Println("iteration:", i)
@@ -300,12 +324,12 @@ func Test_MakeItCrash(t *testing.T) {
 				//fmt.Print(id, "-")
 				//runtime.LockOSThread()
 
-				instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, "test_make_it_crash", nil)
+				instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
 				require.NoError(t, err)
 				time.Sleep(10 * time.Millisecond)
 				mem := module.Memory()
-				heap := instance.Heap()
-				ptr, err := heap.Write(ctx, mem, data)
+				heap := instance.Module.Heap
+				ptr, err := heap.Write(ctx, mem, data, "test")
 
 				require.NoError(t, err)
 				err = instance.ExecuteWithArgs(ctx, uint64(ptr), uint64(len(data)))

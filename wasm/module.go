@@ -23,10 +23,13 @@ type Module struct {
 	CurrentInstance *Instance
 	zeroRuntime     wazero.Runtime
 	zeroModule      api.Module
+	Heap            *Heap
+	entrypoint      api.Function
 }
 
-func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string) (*Module, error) {
-	zeroRuntime := wazero.NewRuntime()
+func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
+	//zeroRuntime := wazero.NewRuntime()
+	zeroRuntime := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler())
 
 	m := &Module{
 		runtime:     r,
@@ -56,6 +59,19 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 	}
 	m.zeroModule = zeroModule
 
+	alloc := m.zeroModule.ExportedFunction("allocate")
+	dealloc := m.zeroModule.ExportedFunction("deallocate")
+
+	if alloc == nil || dealloc == nil {
+		panic("missing malloc or free")
+	}
+	m.Heap = NewHeap(alloc, dealloc)
+
+	m.entrypoint = m.zeroModule.ExportedFunction(entrypoint)
+	if m.entrypoint == nil {
+		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
+	}
+
 	return m, nil
 }
 
@@ -66,7 +82,7 @@ func (m *Module) Memory() api.Memory {
 func (m *Module) newExtensionFunction(request *pbsubstreams.Request, namespace, name string, f WASMExtension) interface{} {
 	return func(ctx context.Context, apiModule api.Module, ptr, length, outputPtr uint32) {
 
-		heap := m.CurrentInstance.Heap()
+		heap := m.Heap
 
 		data, err := heap.ReadBytes(ctx, apiModule.Memory(), ptr, length)
 		if err != nil {
@@ -84,37 +100,24 @@ func (m *Module) newExtensionFunction(request *pbsubstreams.Request, namespace, 
 			panic(fmt.Errorf("running wasm extension has been stop upstream in the call stack: %w", ctx.Err()))
 		}
 
-		err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, out)
+		err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, out, name)
 		if err != nil {
 			panic(fmt.Errorf("write output to heap %w", err))
 		}
 	}
 }
 
-func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, functionName string, inputs []*Input) (*Instance, error) {
+func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
 	m.CurrentInstance = &Instance{
-		moduleName:   m.name,
-		functionName: functionName,
-		clock:        clock,
-	}
-	alloc := m.zeroModule.ExportedFunction("alloc")
-	dealloc := m.zeroModule.ExportedFunction("dealloc")
-
-	if alloc == nil || dealloc == nil {
-		panic("missing malloc or free")
-	}
-
-	m.CurrentInstance.heap = NewHeap(alloc, dealloc)
-	m.CurrentInstance.entrypoint = m.zeroModule.ExportedFunction(functionName)
-	if m.CurrentInstance.entrypoint == nil {
-		return nil, fmt.Errorf("failed to get exported function %q", functionName)
+		Module: m,
+		clock:  clock,
 	}
 
 	var args []uint64
 	for _, input := range inputs {
 		switch input.Type {
 		case InputSource:
-			ptr, err := m.CurrentInstance.heap.Write(ctx, m.zeroModule.Memory(), input.StreamData)
+			ptr, err := m.Heap.Write(ctx, m.zeroModule.Memory(), input.StreamData, input.Name)
 			if err != nil {
 				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
 			}
@@ -127,7 +130,7 @@ func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, fun
 				if err != nil {
 					return nil, fmt.Errorf("marshaling store deltas: %w", err)
 				}
-				ptr, err := m.CurrentInstance.heap.Write(ctx, m.zeroModule.Memory(), cnt)
+				ptr, err := m.Heap.Write(ctx, m.zeroModule.Memory(), cnt, input.Name)
 				if err != nil {
 					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
 				}
@@ -161,14 +164,14 @@ func (m *Module) newImports(ctx context.Context) error {
 	_, err = m.zeroRuntime.NewModuleBuilder("env").
 		ExportFunction("register_panic",
 			func(ctx context.Context, apiModule api.Module, msgPtr, msgLength uint32, filenamePtr, filenameLength uint32, lineNumber, columnNumber uint32) {
-				message, err := m.CurrentInstance.Heap().ReadString(ctx, apiModule.Memory(), msgPtr, msgLength)
+				message, err := m.Heap.ReadString(ctx, apiModule.Memory(), msgPtr, msgLength)
 				if err != nil {
 					panic(fmt.Errorf("read message argument: %w", err))
 				}
 
 				var filename string
 				if filenamePtr != 0 {
-					filename, err = m.CurrentInstance.Heap().ReadString(ctx, apiModule.Memory(), msgPtr, msgLength)
+					filename, err = m.Heap.ReadString(ctx, apiModule.Memory(), msgPtr, msgLength)
 					if err != nil {
 						panic(fmt.Errorf("read filename argument: %w", err))
 					}
@@ -178,12 +181,13 @@ func (m *Module) newImports(ctx context.Context) error {
 			},
 		).ExportFunction("output",
 		func(ctx context.Context, apiModule api.Module, ptr, length uint32) {
-			message, err := m.CurrentInstance.heap.ReadBytes(ctx, apiModule.Memory(), ptr, length)
+			message, err := m.Heap.ReadBytes(ctx, apiModule.Memory(), ptr, length)
 			if err != nil {
 				returnError("env", fmt.Errorf("reading bytes: %w", err))
 			}
+
+			m.CurrentInstance.returnValue = make([]byte, length)
 			copy(m.CurrentInstance.returnValue, message)
-			m.CurrentInstance.returnValue = message
 		},
 	).
 		Instantiate(ctx, m.zeroRuntime)
@@ -207,7 +211,7 @@ func (m *Module) registerLoggerImports(ctx context.Context) error {
 					panic(fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length))))
 				}
 
-				message, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), ptr, length)
+				message, err := m.Heap.ReadString(ctx, apiModule.Memory(), ptr, length)
 				if err != nil {
 					panic(fmt.Errorf("reading string: %w", err))
 				}

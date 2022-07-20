@@ -20,11 +20,11 @@ func (m *Module) set(ctx context.Context, apiModule api.Module, ord uint64, keyP
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_SET {
 		returnStateErrorString("invalid store operation: 'set' only valid for stores with updatePolicy == 'replace'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
-	value, err := m.CurrentInstance.heap.ReadBytes(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadBytes(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -36,11 +36,11 @@ func (m *Module) setIfNotExists(ctx context.Context, apiModule api.Module, ord u
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS {
 		returnStateErrorString("invalid store operation: 'set_if_not_exists' only valid for stores with updatePolicy == 'ignore'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
-	value, err := m.CurrentInstance.heap.ReadBytes(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadBytes(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -53,12 +53,12 @@ func (m *Module) append(ctx context.Context, apiModule api.Module, ord uint64, k
 		returnStateErrorString("invalid store operation: 'append' only valid for stores with updatePolicy == 'append'")
 	}
 
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
 
-	value, err := m.CurrentInstance.heap.ReadBytes(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadBytes(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -66,7 +66,7 @@ func (m *Module) append(ctx context.Context, apiModule api.Module, ord uint64, k
 }
 
 func (m *Module) deletePrefix(ctx context.Context, apiModule api.Module, ord uint64, keyPtr, keyLength uint32) {
-	prefix, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	prefix, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading prefix: %w", err))
 	}
@@ -77,11 +77,11 @@ func (m *Module) addBigInt(ctx context.Context, apiModule api.Module, ord uint64
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "bigint" {
 		returnErrorString("state", "invalid store operation: 'add_bigint' only valid for stores with updatePolicy == 'add' and valueType == 'bigint'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
-	value, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -97,12 +97,12 @@ func (m *Module) addBigFloat(ctx context.Context, apiModule api.Module, ord uint
 		returnErrorString("state", "invalid store operation: 'add_bigfloat' only valid for stores with updatePolicy == 'add' and valueType == 'bigfloat'")
 	}
 
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 
 	}
-	value, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -119,7 +119,7 @@ func (m *Module) addInt64(ctx context.Context, apiModule api.Module, ord uint64,
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "int64" {
 		returnStateErrorString("invalid store operation: 'add_int64' only valid for stores with updatePolicy == 'add' and valueType == 'int64'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -131,7 +131,7 @@ func (m *Module) addFloat64(ctx context.Context, apiModule api.Module, ord uint6
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "float64" {
 		returnStateErrorString("invalid store operation: 'add_float64' only valid for stores with updatePolicy == 'add' and valueType == 'float64'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -144,7 +144,7 @@ func (m *Module) setMinInt64(ctx context.Context, apiModule api.Module, ord uint
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "int64" {
 		returnStateErrorString("invalid store operation: 'set_min_int64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -157,11 +157,11 @@ func (m *Module) setMinBigint(ctx context.Context, apiModule api.Module, ord uin
 		returnStateErrorString("invalid store operation: 'set_min_bigint' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
 	}
 
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
-	value, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -174,7 +174,7 @@ func (m *Module) setMinfloat64(ctx context.Context, apiModule api.Module, ord ui
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "float" {
 		returnStateErrorString("invalid store operation: 'set_min_float' only valid for stores with updatePolicy == 'min' and valueType == 'float'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -187,11 +187,11 @@ func (m *Module) setMinBigfloat(ctx context.Context, apiModule api.Module, ord u
 		returnStateErrorString("invalid store operation: 'set_min_bigfloat' only valid for stores with updatePolicy == 'min' and valueType == 'bigfloat'")
 	}
 
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
-	value, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -204,7 +204,7 @@ func (m *Module) setMaxInt64(ctx context.Context, apiModule api.Module, ord uint
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "int64" {
 		returnStateErrorString("invalid store operation: 'set_max_int64' only valid for stores with updatePolicy == 'max' and valueType == 'int64'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -216,12 +216,12 @@ func (m *Module) setMaxBigint(ctx context.Context, apiModule api.Module, ord uin
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "bigint" {
 		returnStateErrorString("invalid store operation: 'set_max_bigint' only valid for stores with updatePolicy == 'max' and valueType == 'bigint'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 
 	}
-	value, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -234,7 +234,7 @@ func (m *Module) setMaxFloat64(ctx context.Context, apiModule api.Module, ord ui
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "float" {
 		returnStateErrorString("invalid store operation: 'set_max_float' only valid for stores with updatePolicy == 'max' and valueType == 'float'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -246,11 +246,11 @@ func (m *Module) setMaxBigfloat(ctx context.Context, apiModule api.Module, ord u
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "bigint" {
 		returnStateErrorString("invalid store operation: 'set_max_bigfloat' only valid for stores with updatePolicy == 'max' and valueType == 'bigfloat'")
 	}
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
-	value, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
+	value, err := m.Heap.ReadString(ctx, apiModule.Memory(), valPtr, valLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading bytes: %w", err))
 	}
@@ -263,7 +263,7 @@ func (m *Module) getAt(ctx context.Context, apiModule api.Module, storeIndex uin
 		returnStateError(fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
 	}
 	readStore := m.CurrentInstance.inputStores[storeIndex]
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -272,7 +272,7 @@ func (m *Module) getAt(ctx context.Context, apiModule api.Module, storeIndex uin
 		return 0
 	}
 
-	err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, value)
+	err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, value, key)
 	if err != nil {
 		returnStateError(fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err))
 	}
@@ -284,7 +284,7 @@ func (m *Module) getFirst(ctx context.Context, apiModule api.Module, storeIndex 
 		returnStateError(fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
 	}
 	readStore := m.CurrentInstance.inputStores[storeIndex]
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -292,7 +292,7 @@ func (m *Module) getFirst(ctx context.Context, apiModule api.Module, storeIndex 
 	if !found {
 		return 0
 	}
-	err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, value)
+	err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, value, key)
 	if err != nil {
 		returnStateError(fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err))
 	}
@@ -306,7 +306,7 @@ func (m *Module) getLast(ctx context.Context, apiModule api.Module, storeIndex u
 
 	readStore := m.CurrentInstance.inputStores[storeIndex]
 
-	key, err := m.CurrentInstance.heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
+	key, err := m.Heap.ReadString(ctx, apiModule.Memory(), keyPtr, keyLength)
 	if err != nil {
 		returnStateError(fmt.Errorf("reading string: %w", err))
 	}
@@ -314,7 +314,7 @@ func (m *Module) getLast(ctx context.Context, apiModule api.Module, storeIndex u
 	if !found {
 		return 0
 	}
-	err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, value)
+	err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, value, key)
 	if err != nil {
 		returnStateError(fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err))
 

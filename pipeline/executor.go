@@ -189,14 +189,14 @@ func (e *BaseExecutor) wasmCall(ctx context.Context, vals map[string][]byte, clo
 	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
 	//  state store in read mode)
 	if hasInput {
-		instance, err = e.wasmModule.NewInstance(ctx, clock, e.entrypoint, e.wasmInputs)
+		instance, err = e.wasmModule.NewInstance(ctx, clock, e.wasmInputs)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
 		if err = instance.Execute(ctx); err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
-		err = instance.Heap().Clear(ctx)
+		err = instance.Module.Heap.Clear(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm heap clear failed: %w", clock.Number, e.moduleName, err)
 		}

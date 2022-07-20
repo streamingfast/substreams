@@ -576,7 +576,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		modName := module.Name // to ensure it's enclosed
 		entrypoint := module.BinaryEntrypoint
 		code := p.request.Modules.Binaries[module.BinaryIndex]
-		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name)
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name, entrypoint)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}

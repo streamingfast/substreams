@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-substreams = { path = "../substreams" }
+substreams = { path = "/Users/cbillett/devel/sf/substreams/rust/substreams" }
 num-bigint = "0.4"
 bigdecimal = "0.3"
 prost = { version = "0.10.1" }

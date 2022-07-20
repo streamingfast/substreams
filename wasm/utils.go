@@ -2,17 +2,7 @@ package wasm
 
 import (
 	"fmt"
-
-	"github.com/wasmerio/wasmer-go/wasmer"
 )
-
-func Params(kinds ...wasmer.ValueKind) []*wasmer.ValueType {
-	return wasmer.NewValueTypes(kinds...)
-}
-
-func Returns(kinds ...wasmer.ValueKind) []*wasmer.ValueType {
-	return wasmer.NewValueTypes(kinds...)
-}
 
 type PanicError struct {
 	message      string

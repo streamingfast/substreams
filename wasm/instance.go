@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -12,15 +13,12 @@ import (
 )
 
 type Instance struct {
-	//memory       *wasmer.Memory
-	heap *Heap
 	//store        *wasmer.Store
 	inputStores  []state.Reader
 	outputStore  *state.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 
-	valueType  string
-	entrypoint api.Function
+	valueType string
 
 	clock *pbsubstreams.Clock
 
@@ -32,14 +30,15 @@ type Instance struct {
 
 	Logs          []string
 	LogsByteCount uint64
-}
-
-func (i *Instance) Heap() *Heap {
-	return i.heap
+	Module        *Module
 }
 
 func (i *Instance) Execute(ctx context.Context) (err error) {
-	if _, err = i.entrypoint.Call(ctx, i.args...); err != nil {
+	start := time.Now()
+	defer func() {
+		HeapStatsInstance.addDuration("execution", time.Since(start))
+	}()
+	if _, err = i.Module.entrypoint.Call(ctx, i.args...); err != nil {
 		if extern, ok := err.(*sys.ExitError); ok {
 			if extern.ExitCode() == 0 {
 				return nil
@@ -56,7 +55,7 @@ func (i *Instance) Execute(ctx context.Context) (err error) {
 }
 
 func (i *Instance) ExecuteWithArgs(ctx context.Context, args ...uint64) (err error) {
-	if _, err = i.entrypoint.Call(ctx, args...); err != nil {
+	if _, err = i.Module.entrypoint.Call(ctx, args...); err != nil {
 		if extern, ok := err.(*sys.ExitError); ok {
 			if extern.ExitCode() == 0 {
 				return nil
@@ -71,9 +70,8 @@ func (i *Instance) ExecuteWithArgs(ctx context.Context, args ...uint64) (err err
 	return nil
 }
 
-func (i *Instance) WriteOutputToHeap(ctx context.Context, memory api.Memory, outputPtr uint32, value []byte) error {
-
-	valuePtr, err := i.heap.Write(ctx, memory, value)
+func (i *Instance) WriteOutputToHeap(ctx context.Context, memory api.Memory, outputPtr uint32, value []byte, from string) error {
+	valuePtr, err := i.Module.Heap.WriteAndTrack(ctx, memory, value, false, from+":WriteOutputToHeap1")
 	if err != nil {
 		return fmt.Errorf("writting value to heap: %w", err)
 	}
@@ -81,7 +79,7 @@ func (i *Instance) WriteOutputToHeap(ctx context.Context, memory api.Memory, out
 	binary.LittleEndian.PutUint32(returnValue[0:4], valuePtr)
 	binary.LittleEndian.PutUint32(returnValue[4:], uint32(len(value)))
 
-	_, err = i.heap.WriteAtPtr(ctx, memory, returnValue, outputPtr)
+	_, err = i.Module.Heap.WriteAtPtr(ctx, memory, returnValue, outputPtr, from+":WriteOutputToHeap2")
 	if err != nil {
 		return fmt.Errorf("writing response at valuePtr %d: %w", valuePtr, err)
 	}

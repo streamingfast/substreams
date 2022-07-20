@@ -268,7 +268,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			partialsWritten := []string{strings.Join(d, ",")}
 			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
 			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
-
+			wasm.HeapStatsInstance.Print()
 			return nil
 		}
 

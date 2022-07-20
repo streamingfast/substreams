@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"time"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
@@ -34,10 +33,6 @@ type Instance struct {
 }
 
 func (i *Instance) Execute(ctx context.Context) (err error) {
-	start := time.Now()
-	defer func() {
-		HeapStatsInstance.addDuration("execution", time.Since(start))
-	}()
 	if _, err = i.Module.entrypoint.Call(ctx, i.args...); err != nil {
 		if extern, ok := err.(*sys.ExitError); ok {
 			if extern.ExitCode() == 0 {

@@ -32,6 +32,11 @@ func (s *Store) set(ord uint64, key string, value []byte) {
 	if len(value) > 10*1024*1024 {
 		panic(fmt.Sprintf("key %q attempted to write %d bytes, capped at 10MiB", key, len(value)))
 	}
+
+	if len(key) == 0 {
+		panic(fmt.Sprintf("invalid key"))
+	}
+
 	s.bumpOrdinal(ord)
 
 	val, found := s.GetLast(key)

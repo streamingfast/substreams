@@ -1,0 +1,7 @@
+FROM ubuntu:20.04
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+      apt-get -y install -y ca-certificates libssl1.1
+
+ADD ./substreams /app/substreams
+ENTRYPOINT /app/substreams

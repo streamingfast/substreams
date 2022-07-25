@@ -2,8 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
-
-	"go.uber.org/zap"
+	"strings"
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -58,6 +57,14 @@ func (p WorkPlan) ProgressMessages(hostname string) (out []*pbsubstreams.ModuleP
 	return
 }
 
+func (p WorkPlan) String() string {
+	var out []string
+	for k, v := range p {
+		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.initialStoreFile, v.partialsMissing, v.partialsPresent))
+	}
+	return strings.Join(out, ";")
+}
+
 type WorkUnit struct {
 	modName string
 
@@ -74,7 +81,7 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 	work := &WorkUnit{modName: modName}
 
 	if incomingReqStartBlock <= modInitBlock {
-		return nil
+		return work
 	}
 
 	completeSnapshot := snapshots.LastCompleteSnapshotBefore(incomingReqStartBlock)
@@ -87,10 +94,10 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 	if completeSnapshot != nil {
 		backProcessStartBlock = completeSnapshot.ExclusiveEndBlock
 		work.initialStoreFile = block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock)
-	}
 
-	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
-		return nil
+		if completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
+			return work
+		}
 	}
 
 	for ptr := backProcessStartBlock; ptr < incomingReqStartBlock; {
@@ -102,11 +109,6 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 			work.partialsPresent = append(work.partialsPresent, newPartial)
 		}
 		ptr = end
-	}
-
-	zlog.Debug("no partials", zap.String("module_name", modName), zap.Int("partials_missing_length", len(work.partialsMissing)))
-	if len(work.partialsMissing) == 0 {
-		return nil
 	}
 
 	return work

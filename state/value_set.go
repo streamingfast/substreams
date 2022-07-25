@@ -1,7 +1,6 @@
 package state
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -39,10 +38,6 @@ func (s *Store) set(ord uint64, key string, value []byte) {
 
 	var delta *pbsubstreams.StoreDelta
 	if found {
-		//Uncomment when finished debugging:
-		if bytes.Compare(value, val) == 0 {
-			return
-		}
 		delta = &pbsubstreams.StoreDelta{
 			Operation: pbsubstreams.StoreDelta_UPDATE,
 			Ordinal:   ord,

@@ -16,9 +16,9 @@ import (
 
 func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
-	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token (JWT)")
-	runCmd.Flags().Int64P("start-block", "s", -1, "Start block for blockchain firehose. Defaults to -1, which means the initialBlock of the first module you are streaming")
-	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block for blockchain firehose")
+	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	runCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
+	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
 
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -90,24 +90,22 @@ func runRun(cmd *cobra.Command, args []string) error {
 		OutputModules: outputStreamNames,
 	}
 	if mustGetBool(cmd, "initial-snapshots") {
-		req.InitialStoreSnapshotForModules = req.OutputModules
+		for _, modName := range req.OutputModules {
+			for _, v := range pkg.Modules.Modules {
+				if modName != v.Name {
+					continue
+				}
+
+				if _, isStore := v.Kind.(*pbsubstreams.Module_KindStore_); isStore {
+					req.InitialStoreSnapshotForModules = append(req.InitialStoreSnapshotForModules, modName)
+				}
+			}
+		}
 	}
 
 	if err := pbsubstreams.ValidateRequest(req); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
-
-	/*
-		                           | Lowest block                                        | Requested block
-		                           | 5,364,534                                           | 55,453,453
-		   ------------------------|-----------------------------------------------------|-------------
-			   pairs               | XXXXXXXXXXXXXXXXXXXx       XXX              XXXXXXX |
-			   reserves            | XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     |
-			   reserves            |            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX     |
-			-----------------------|-----------------------------------------------------|
-
-
-	*/
 
 	ui := tui.New(req, pkg, outputStreamNames)
 	if err := ui.Init(outputMode); err != nil {

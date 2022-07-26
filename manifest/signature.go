@@ -47,6 +47,9 @@ func HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, grap
 		buf.Write(sig)
 	}
 
+	buf.WriteString("entrypoint")
+	buf.WriteString(module.Name)
+
 	h := sha1.New()
 	h.Write(buf.Bytes())
 

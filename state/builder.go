@@ -135,11 +135,11 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 		}
 		defer r.Close()
 
-		kv := map[string]string{}
+		kv := map[string][]byte{}
 		if err = json.Unmarshal(data, &kv); err != nil {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
-		s.KV = byteMap(kv)
+		//s.KV = byteMap(kv)
 		return nil
 	})
 	if err != nil {
@@ -156,9 +156,9 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (*storeWriter, error) {
 	zlog.Debug("writing state", zap.Object("builder", s))
 
-	kv := stringMap(s.KV) // FOR READABILITY ON DISK
+	//kv := stringMap(s.KV) // FOR READABILITY ON DISK
 
-	content, err := json.MarshalIndent(kv, "", "  ")
+	content, err := json.MarshalIndent(s.KV, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal kv state: %w", err)
 	}

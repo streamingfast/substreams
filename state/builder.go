@@ -94,6 +94,7 @@ func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddUint64("store_initial_block", s.storeInitialBlock)
 	//enc.AddUint64("next_expected_boundary", s.nextExpectedBoundary)
 	enc.AddBool("partial", s.IsPartial())
+	enc.AddInt("key_count", len(s.KV))
 
 	return nil
 }
@@ -139,7 +140,9 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 		if err = json.Unmarshal(data, &kv); err != nil {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
-		//s.KV = byteMap(kv)
+		s.KV = kv
+
+		zlog.Debug("unmarshalling kv", zap.String("file_name", stateFileName), zap.Object("store", s))
 		return nil
 	})
 	if err != nil {

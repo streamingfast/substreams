@@ -8,6 +8,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 **New updatePolicy `append`**, allows one to build a store that concatenates values and supports parallelism.  This affects the server, the manifest format (additive only), the substreams crate and the generated code therein.
 
+### Rust API
+
+- Store APIs methods now accept `key` of type `AsRef<str>` which means for example that both `String` an `&str` are accepted as inputs in:
+
+  - `StoreSet::set`
+  - `StoreSet::set_many`
+  - `StoreSet::set_if_not_exists`
+  - `StoreSet::set_if_not_exists_many`
+  - `StoreAddInt64::add`
+  - `StoreAddInt64::add_many`
+  - `StoreAddFloat64::add`
+  - `StoreAddFloat64::add_many`
+  - `StoreAddBigFloat::add`
+  - `StoreAddBigFloat::add_many`
+  - `StoreAddBigInt::add`
+  - `StoreAddBigInt::add_many`
+  - `StoreMaxInt64::max`
+  - `StoreMaxFloat64::max`
+  - `StoreMaxBigInt::max`
+  - `StoreMaxBigFloat::max`
+  - `StoreMinInt64::min`
+  - `StoreMinFloat64::min`
+  - `StoreMinBigInt::min`
+  - `StoreMinBigFloat::min`
+  - `StoreAppend::append`
+  - `StoreAppend::append_bytes`
+  - `StoreGet::get_at`
+  - `StoreGet::get_last`
+  - `StoreGet::get_first`
+
+- Low-level state methods now accept `key` of type `AsRef<str>` which means for example that both `String` an `&str` are accepted as inputs in:
+
+  - `state::get_at`
+  - `state::get_last`
+  - `state::get_first`
+  - `state::set`
+  - `state::set_if_not_exists`
+  - `state::append`
+  - `state::delete_prefix`
+  - `state::add_bigint`
+  - `state::add_int64`
+  - `state::add_float64`
+  - `state::add_bigfloat`
+  - `state::set_min_int64`
+  - `state::set_min_bigint`
+  - `state::set_min_float64`
+  - `state::set_min_bigfloat`
+  - `state::set_max_int64`
+  - `state::set_max_bigint`
+  - `state::set_max_float64`
+  - `state::set_max_bigfloat`
+
 ### CLI
 
 * Changed the output modes: `module-*` modes are gone and become the

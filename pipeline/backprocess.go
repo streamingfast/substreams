@@ -77,7 +77,7 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Debug("launching scheduler")
 
-	go scheduler.Launch(ctx, result)
+	go scheduler.Launch(ctx, p.request.Modules, result)
 
 	jobCount := jobsPlanner.JobCount()
 	for resultCount := 0; resultCount < jobCount; {

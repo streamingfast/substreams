@@ -48,6 +48,8 @@ type Service struct {
 
 	grpcClientFactory substreams.GrpcClientFactory
 
+	workerPool *orchestrator.WorkerPool
+
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
 }
@@ -103,6 +105,7 @@ func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams
 		grpcClientFactory:         grpcClientFactory,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
+		workerPool:                orchestrator.NewWorkerPool(parallelSubRequests, grpcClientFactory),
 	}
 
 	for _, opt := range opts {
@@ -230,8 +233,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	}
 
-	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
-
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
@@ -247,7 +248,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// perhaps on the day we actually support it in the Firehose :)
 	}
 
-	if err := pipe.Init(workerPool); err != nil {
+	if err := pipe.Init(s.workerPool); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 

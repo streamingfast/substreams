@@ -2,7 +2,9 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"io"
 	"time"
 
@@ -14,21 +16,77 @@ import (
 )
 
 type WorkerPool struct {
-	workers chan *Worker
+	workers  chan *Worker
+	JobStats map[*Job]*JobStat
 }
 
-func NewWorkerPool(workerCount int, originalRequestModules *pbsubstreams.Modules, grpcClientFactory substreams.GrpcClientFactory) *WorkerPool {
+type JobStat struct {
+	ModuleName string
+	StartAt    time.Time
+
+	RequestRange *block.Range
+
+	CurrentBlock   uint64
+	RemainingBlock uint64
+	BlockCount     uint64
+	BlockSec       float64
+
+	RemoteHost string
+}
+
+func (j *JobStat) update(currentBlock uint64) {
+	j.CurrentBlock = currentBlock
+	j.RemainingBlock = j.RequestRange.ExclusiveEndBlock - j.CurrentBlock
+	j.BlockSec = float64(j.BlockCount) / time.Since(j.StartAt).Seconds()
+	j.BlockCount = j.CurrentBlock - j.RequestRange.StartBlock
+}
+
+func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("remote_host", j.RemoteHost)
+	enc.AddString("module_name", j.ModuleName)
+	err := enc.AddObject("request_range", j.RequestRange)
+	if err != nil {
+		return err
+	}
+	enc.AddTime("start_at", j.StartAt)
+	enc.AddUint64("current_block", j.CurrentBlock)
+	enc.AddUint64("block_count", j.BlockCount)
+	enc.AddUint64("remaining_blocks", j.RemainingBlock)
+	enc.AddFloat64("block_secs", float64(j.BlockCount)/time.Since(j.StartAt).Seconds())
+	return nil
+}
+
+func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFactory) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
 		workers <- &Worker{
-			originalRequestModules: originalRequestModules,
-			grpcClientFactory:      grpcClientFactory,
+			grpcClientFactory: grpcClientFactory,
 		}
 	}
-	return &WorkerPool{
-		workers: workers,
+	workerPool := &WorkerPool{
+		workers:  workers,
+		JobStats: map[*Job]*JobStat{},
 	}
+
+	go func() {
+		for {
+			select {
+			case <-time.After(time.Second * 5):
+				var jobStats []*JobStat
+				for _, value := range workerPool.JobStats {
+					jobStats = append(jobStats, value)
+				}
+
+				content, err := json.Marshal(jobStats)
+				if err != nil {
+					zlog.Warn("failed to marshall job statistics", zap.Error(err))
+				}
+				fmt.Println("job statistics", string(content))
+			}
+		}
+	}()
+	return workerPool
 }
 
 func (p *WorkerPool) Borrow() *Worker {
@@ -45,7 +103,7 @@ type Worker struct {
 	originalRequestModules *pbsubstreams.Modules
 }
 
-func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	start := time.Now()
 
 	jobLogger := zlog.With(zap.Object("job", job))
@@ -58,7 +116,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
-	request := job.createRequest(w.originalRequestModules)
+	request := job.createRequest(requestModules)
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
@@ -79,9 +137,20 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 		jobLogger = jobLogger.With(zap.String("remote_hostname", remoteHostname))
 	}
 
+	jobStat := &JobStat{
+		ModuleName:   job.moduleName,
+		RequestRange: job.requestRange,
+		StartAt:      time.Now(),
+		CurrentBlock: job.requestRange.StartBlock,
+		RemoteHost:   remoteHostname,
+	}
+	jobStats[job] = jobStat
+	fmt.Println("added job", jobStats)
+
 	jobLogger.Info("running job", zap.Object("job", job))
 	defer func() {
-		jobLogger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+		jobLogger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)), zap.Object("job_stat", jobStat))
+		delete(jobStats, job)
 	}()
 
 	for {
@@ -115,6 +184,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 				jobLogger.Warn("worker done on respFunc error", zap.Error(err))
 				return nil, fmt.Errorf("sending progress: %w", err)
 			}
+			jobStat.update(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges[len(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges)-1].EndBlock)
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData
 		case *pbsubstreams.Response_SnapshotComplete:

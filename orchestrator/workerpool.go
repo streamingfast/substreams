@@ -203,7 +203,8 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 				jobLogger.Warn("worker done on respFunc error", zap.Error(err))
 				return nil, fmt.Errorf("sending progress: %w", err)
 			}
-			jobStat.update(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges[len(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges)-1].EndBlock)
+			// fixme: why is range nil?
+			//jobStat.update(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges[len(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges)-1].EndBlock)
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData
 		case *pbsubstreams.Response_SnapshotComplete:

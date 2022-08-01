@@ -110,7 +110,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, functionName string, inp
 	if err != nil {
 		return nil, fmt.Errorf("getting module memory: %w", err)
 	}
-
+	zlog.Info("got module memory", zap.Int("size", memory.Size()))
 	alloc, err := vmInstance.Exports.GetFunction("alloc")
 	if err != nil {
 		return nil, fmt.Errorf("getting alloc function: %w", err)

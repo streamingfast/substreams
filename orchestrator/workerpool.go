@@ -35,6 +35,11 @@ type JobStat struct {
 	RemoteHost string
 }
 
+type WorkerStats struct {
+	JobStats       []*JobStat
+	CountPerModule map[string]uint64
+}
+
 func (j *JobStat) update(currentBlock uint64) {
 	j.CurrentBlock = currentBlock
 	j.RemainingBlock = j.RequestRange.ExclusiveEndBlock - j.CurrentBlock
@@ -59,12 +64,14 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 
 func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFactory) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
+
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
 		workers <- &Worker{
 			grpcClientFactory: grpcClientFactory,
 		}
 	}
+
 	workerPool := &WorkerPool{
 		workers:  workers,
 		JobStats: map[*Job]*JobStat{},
@@ -75,15 +82,28 @@ func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFacto
 			select {
 			case <-time.After(time.Second * 5):
 				var jobStats []*JobStat
+				countPerModule := map[string]uint64{}
+				fmt.Println("workerPool jobStats: ", len(workerPool.JobStats))
 				for _, value := range workerPool.JobStats {
+					if count, ok := countPerModule[value.ModuleName]; ok {
+						count++
+						countPerModule[value.ModuleName] = count
+					} else {
+						countPerModule[value.ModuleName] = 1
+					}
 					jobStats = append(jobStats, value)
 				}
 
-				content, err := json.Marshal(jobStats)
+				workerStats := &WorkerStats{
+					JobStats:       jobStats,
+					CountPerModule: countPerModule,
+				}
+
+				content, err := json.Marshal(workerStats)
 				if err != nil {
 					zlog.Warn("failed to marshall job statistics", zap.Error(err))
 				}
-				fmt.Println("job statistics", string(content))
+				fmt.Println("worker statistics", string(content))
 			}
 		}
 	}()
@@ -100,8 +120,7 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
-	grpcClientFactory      substreams.GrpcClientFactory
-	originalRequestModules *pbsubstreams.Modules
+	grpcClientFactory substreams.GrpcClientFactory
 }
 
 func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {

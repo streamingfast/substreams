@@ -44,7 +44,7 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Info("work plan ready", zap.Stringer("work_plan", workPlan))
 
-	progressMessages := workPlan.ProgressMessages(p.hostname)
+	progressMessages := workPlan.ProgressMessages()
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}

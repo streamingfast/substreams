@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"io"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
@@ -132,7 +133,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 		jobLogger.Warn("error getting stream header", zap.Error(err))
 	}
 	remoteHostname := "unknown"
-	if hosts := meta.Get("hostname"); len(hosts) != 0 {
+	if hosts := meta.Get("host"); len(hosts) != 0 {
 		remoteHostname = hosts[0]
 		jobLogger = jobLogger.With(zap.String("remote_hostname", remoteHostname))
 	}
@@ -145,7 +146,6 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 		RemoteHost:   remoteHostname,
 	}
 	jobStats[job] = jobStat
-	fmt.Println("added job", jobStats)
 
 	jobLogger.Info("running job", zap.Object("job", job))
 	defer func() {

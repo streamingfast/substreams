@@ -31,7 +31,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	zlog.Info("storage state found", zap.Stringer("storage state", storageState))
+	zlog.Info("storage state found")
 
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {

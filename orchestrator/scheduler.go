@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"time"
 
 	"github.com/streamingfast/derr"
@@ -29,7 +30,7 @@ func NewScheduler(ctx context.Context, availableJobs chan *Job, squasher *Squash
 	return s, nil
 }
 
-func (s *Scheduler) Launch(ctx context.Context, result chan error) {
+func (s *Scheduler) Launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
 	for {
 		zlog.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.availableJobs)))
 		job, ok := <-s.availableJobs
@@ -53,18 +54,18 @@ func (s *Scheduler) Launch(ctx context.Context, result chan error) {
 
 		go func() {
 			select {
-			case result <- s.runSingleJob(ctx, jobWorker, job):
+			case result <- s.runSingleJob(ctx, jobWorker, job, requestModules):
 			case <-ctx.Done():
 			}
 		}()
 	}
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job) error {
+func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job, requestModules *pbsubstreams.Modules) error {
 	var partialsWritten []*block.Range
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		var err error
-		partialsWritten, err = jobWorker.Run(ctx, job, s.respFunc)
+		partialsWritten, err = jobWorker.Run(ctx, job, s.workerPool.JobStats, requestModules, s.respFunc)
 		if err != nil {
 			return err
 		}

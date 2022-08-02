@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"math/big"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ type mergeInfo struct {
 
 // Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
 func (s *Store) Merge(nextStore *Store) error {
+	zlog.Debug("merging store", zap.Object("current_store", s), zap.Object("next_store", nextStore))
 	//old merge data.  clear this.
 	s.clearMergeData()
 	nextStore.clearMergeData()

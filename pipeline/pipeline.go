@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"runtime/debug"
 	"strings"
 
@@ -70,7 +69,6 @@ type Pipeline struct {
 	outputCacheSaveBlockInterval uint64
 	subrequestSplitSize          int
 	grpcClientFactory            substreams.GrpcClientFactory
-	hostname                     string
 }
 
 func New(
@@ -85,12 +83,6 @@ func New(
 	subrequestSplitSize int,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		zlog.Warn("cannot find local hostname, using 'unknown'")
-		hostname = "unknown"
-	}
 
 	pipe := &Pipeline{
 		context: ctx,
@@ -108,7 +100,6 @@ func New(
 		subrequestSplitSize:          subrequestSplitSize,
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
-		hostname:                     hostname,
 	}
 
 	for _, name := range request.OutputModules {

@@ -31,7 +31,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	zlog.Info("storage state found", zap.Stringer("storage state", storageState))
+	zlog.Info("storage state found")
 
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
@@ -44,7 +44,7 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Info("work plan ready", zap.Stringer("work_plan", workPlan))
 
-	progressMessages := workPlan.ProgressMessages(p.hostname)
+	progressMessages := workPlan.ProgressMessages()
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return nil, fmt.Errorf("sending progress: %w", err)
 	}
@@ -77,7 +77,7 @@ func (p *Pipeline) backProcessStores(
 
 	zlog.Debug("launching scheduler")
 
-	go scheduler.Launch(ctx, result)
+	go scheduler.Launch(ctx, p.request.Modules, result)
 
 	jobCount := jobsPlanner.JobCount()
 	for resultCount := 0; resultCount < jobCount; {

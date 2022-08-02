@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/streamingfast/bstream"
@@ -47,6 +48,8 @@ type Service struct {
 	logger *zap.Logger
 
 	grpcClientFactory substreams.GrpcClientFactory
+
+	workerPool *orchestrator.WorkerPool
 
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
@@ -103,6 +106,7 @@ func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams
 		grpcClientFactory:         grpcClientFactory,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
+		workerPool:                orchestrator.NewWorkerPool(parallelSubRequests, grpcClientFactory),
 	}
 
 	for _, opt := range opts {
@@ -125,16 +129,16 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	ctx := streamSrv.Context()
 	logger := logging.Logger(ctx, s.logger)
 
-	//hostname, err := os.Hostname()
-	//if err != nil {
-	//	logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
-	//	hostname = "unknown"
-	//}
-	//md := metadata.New(map[string]string{"host": hostname})
-	//err = streamSrv.SendHeader(md)
-	//if err != nil {
-	//	logger.Warn("cannot send header metadata", zap.Error(err))
-	//}
+	hostname, err := os.Hostname()
+	if err != nil {
+		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+		hostname = "unknown host"
+	}
+	md := metadata.New(map[string]string{"host": hostname})
+	err = streamSrv.SetHeader(md)
+	if err != nil {
+		logger.Warn("cannot send header metadata", zap.Error(err))
+	}
 
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
@@ -230,8 +234,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	}
 
-	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
-
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
@@ -247,7 +249,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// perhaps on the day we actually support it in the Firehose :)
 	}
 
-	if err := pipe.Init(workerPool); err != nil {
+	if err := pipe.Init(s.workerPool); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 

@@ -31,14 +31,11 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/streamingfast/shutter v1.5.0
-	github.com/tetratelabs/wazero v0.0.0-20220717235148-0d76b11d664f
 	github.com/tidwall/pretty v1.2.0
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	google.golang.org/grpc v1.44.0
 )
-
-//replace github.com/tetratelabs/wazero => github.com/dranikpg/wazero v0.0.0-20220720053801-b4685928286f
 
 require (
 	cloud.google.com/go v0.100.2 // indirect

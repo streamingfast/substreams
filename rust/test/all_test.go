@@ -277,7 +277,6 @@ func TestRustScript(t *testing.T) {
 }
 
 func Test_Recursion(t *testing.T) {
-	ctx := context.Background()
 	wasmFilePath := test_wasm_path(t, "testing_substreams.wasm")
 	file, err := os.Open(wasmFilePath)
 	require.NoError(t, err)
@@ -292,7 +291,7 @@ func Test_Recursion(t *testing.T) {
 
 	instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 	require.NoError(t, err)
-	err = instance.ExecuteWithArgs(ctx, 2040)
+	err = instance.ExecuteWithArgs(2040)
 	require.NoError(t, err)
 
 	for _, log := range instance.Logs {

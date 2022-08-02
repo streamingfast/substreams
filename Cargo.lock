@@ -327,7 +327,24 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "substreams-macro",
+ "substreams-macro 0.0.12",
+ "thiserror",
+ "wee_alloc",
+]
+
+[[package]]
+name = "substreams"
+version = "0.0.12"
+source = "git+https://github.com/streamingfast/substreams?branch=feature/wasmtime#7f889d63ce49bcd662d476fdf1db6fc20dc61869"
+dependencies = [
+ "bigdecimal",
+ "hex",
+ "hex-literal",
+ "num-bigint",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "substreams-macro 0.0.12 (git+https://github.com/streamingfast/substreams?branch=feature/wasmtime)",
  "thiserror",
  "wee_alloc",
 ]
@@ -335,6 +352,17 @@ dependencies = [
 [[package]]
 name = "substreams-macro"
 version = "0.0.12"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "thiserror",
+]
+
+[[package]]
+name = "substreams-macro"
+version = "0.0.12"
+source = "git+https://github.com/streamingfast/substreams?branch=feature/wasmtime#7f889d63ce49bcd662d476fdf1db6fc20dc61869"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -378,7 +406,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "substreams",
+ "substreams 0.0.12 (git+https://github.com/streamingfast/substreams?branch=feature/wasmtime)",
 ]
 
 [[package]]

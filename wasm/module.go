@@ -18,13 +18,15 @@ type Module struct {
 
 	name string
 
-	wasmCode        []byte
-	CurrentInstance *Instance
-	entrypoint      string
-	wasmtimeEngine  *wasmtime.Engine
-	wasmTimeStore   *wasmtime.Store
-	wasmTimeModule  *wasmtime.Module
-	wasmTimeLinker  *wasmtime.Linker
+	wasmCode         []byte
+	CurrentInstance  *Instance
+	entrypoint       string
+	wasmtimeInstance *wasmtime.Instance
+	wasmtimeEngine   *wasmtime.Engine
+	wasmTimeStore    *wasmtime.Store
+	wasmTimeModule   *wasmtime.Module
+	wasmTimeLinker   *wasmtime.Linker
+	Heap             *Heap
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
@@ -58,32 +60,34 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 		}
 	}
 
-	return m, nil
-}
-
-func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
-	//instance, err := wasmtime.NewInstance(m.wasmTimeStore, m.wasmTimeModule, []wasmtime.AsExtern{})
 	instance, err := m.wasmTimeLinker.Instantiate(m.wasmTimeStore, m.wasmTimeModule)
 	if err != nil {
 		return nil, fmt.Errorf("creating new instance: %w", err)
 	}
 	memory := instance.GetExport(m.wasmTimeStore, "memory").Memory()
 
-	alloc := instance.GetExport(m.wasmTimeStore, "allocate").Func()
-	dealloc := instance.GetExport(m.wasmTimeStore, "deallocate").Func()
+	zlog.Info("got memory", zap.Uint64("size", uint64(memory.DataSize(m.wasmTimeStore))))
+
+	alloc := instance.GetExport(m.wasmTimeStore, "alloc").Func()
+	dealloc := instance.GetExport(m.wasmTimeStore, "dealloc").Func()
 
 	if alloc == nil || dealloc == nil {
 		panic("missing malloc or free")
 	}
 	heap := NewHeap(memory, alloc, dealloc, m.wasmTimeStore)
+	m.Heap = heap
+	m.wasmtimeInstance = instance
+	return m, nil
+}
 
-	entrypoint := instance.GetExport(m.wasmTimeStore, m.entrypoint).Func()
+func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
+
+	entrypoint := m.wasmtimeInstance.GetExport(m.wasmTimeStore, m.entrypoint).Func()
 	if entrypoint == nil {
 		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
 	}
 
 	m.CurrentInstance = &Instance{
-		Heap:       heap,
 		Module:     m,
 		clock:      clock,
 		entrypoint: entrypoint,
@@ -93,7 +97,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Insta
 	for _, input := range inputs {
 		switch input.Type {
 		case InputSource:
-			ptr, err := m.CurrentInstance.Heap.Write(input.StreamData, input.Name)
+			ptr, err := m.Heap.Write(input.StreamData, input.Name)
 			if err != nil {
 				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
 			}
@@ -106,7 +110,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Insta
 				if err != nil {
 					return nil, fmt.Errorf("marshaling store deltas: %w", err)
 				}
-				ptr, err := m.CurrentInstance.Heap.Write(cnt, input.Name)
+				ptr, err := m.Heap.Write(cnt, input.Name)
 				if err != nil {
 					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
 				}
@@ -129,7 +133,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Insta
 
 func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams.Request, namespace, name string, f WASMExtension) interface{} {
 	return func(ptr, length, outputPtr int32) {
-		heap := m.CurrentInstance.Heap
+		heap := m.Heap
 
 		data := heap.ReadBytes(ptr, length)
 
@@ -165,11 +169,11 @@ func (m *Module) newImports(ctx context.Context) error {
 
 	if err = linker.FuncWrap("env", "register_panic",
 		func(msgPtr, msgLength int32, filenamePtr, filenameLength int32, lineNumber, columnNumber int32, caller *wasmtime.Caller) {
-			message := m.CurrentInstance.Heap.ReadString(msgPtr, msgLength)
+			message := m.Heap.ReadString(msgPtr, msgLength)
 
 			var filename string
 			if filenamePtr != 0 {
-				filename = m.CurrentInstance.Heap.ReadString(msgPtr, msgLength)
+				filename = m.Heap.ReadString(msgPtr, msgLength)
 			}
 
 			m.CurrentInstance.panicError = &PanicError{message, filename, int(lineNumber), int(columnNumber)}
@@ -180,7 +184,7 @@ func (m *Module) newImports(ctx context.Context) error {
 
 	if err = linker.FuncWrap("env", "output",
 		func(ptr, length int32) {
-			message := m.CurrentInstance.Heap.ReadBytes(ptr, length)
+			message := m.Heap.ReadBytes(ptr, length)
 			m.CurrentInstance.returnValue = make([]byte, length)
 			copy(m.CurrentInstance.returnValue, message)
 		},
@@ -203,7 +207,7 @@ func (m *Module) registerLoggerImports(linker *wasmtime.Linker) error {
 				panic(fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length))))
 			}
 
-			message := m.CurrentInstance.Heap.ReadString(ptr, length)
+			message := m.Heap.ReadString(ptr, length)
 			if tracer.Enabled() {
 				zlog.Debug(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
 			}

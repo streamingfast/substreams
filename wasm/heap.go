@@ -34,7 +34,7 @@ func (h *Heap) Write(bytes []byte, from string) (int32, error) {
 
 func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, error) {
 	size := len(bytes)
-	results, err := h.allocator.Call(h.store, uint64(size))
+	results, err := h.allocator.Call(h.store, int32(size))
 	if err != nil {
 		return 0, fmt.Errorf("allocating memory for size %d:%w", size, err)
 	}
@@ -56,7 +56,7 @@ func (h *Heap) Clear() error {
 		return h.allocations[i].ptr < h.allocations[j].ptr
 	})
 	for _, a := range h.allocations {
-		if _, err := h.dealloc.Call(h.store, a.ptr, uint64(a.length)); err != nil {
+		if _, err := h.dealloc.Call(h.store, a.ptr, int32(a.length)); err != nil {
 			return fmt.Errorf("deallocating memory at ptr %d: %w", a.ptr, err)
 		}
 	}

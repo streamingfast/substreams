@@ -237,7 +237,7 @@ extern "C" {
 
 pub fn do_myimport(input: Vec<u8>) -> Vec<u8> {
     unsafe {
-        let response_ptr = substreams::memory::allocate(8);
+        let response_ptr = substreams::memory::alloc(8);
         myimport(input.as_ptr(), input.len() as u32, response_ptr);
         return substreams::memory::get_output_data(response_ptr);
     }

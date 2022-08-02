@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/bytecodealliance/wasmtime-go"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/tetratelabs/wazero/sys"
@@ -29,7 +28,6 @@ type Instance struct {
 	Logs          []string
 	LogsByteCount uint64
 	Module        *Module
-	Heap          *Heap
 	entrypoint    *wasmtime.Func
 }
 
@@ -67,7 +65,7 @@ func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
 }
 
 func (i *Instance) WriteOutputToHeap(outputPtr int32, value []byte, from string) error {
-	valuePtr, err := i.Heap.WriteAndTrack(value, false, from+":WriteOutputToHeap1")
+	valuePtr, err := i.Module.Heap.WriteAndTrack(value, false, from+":WriteOutputToHeap1")
 	if err != nil {
 		return fmt.Errorf("writting value to heap: %w", err)
 	}
@@ -75,7 +73,7 @@ func (i *Instance) WriteOutputToHeap(outputPtr int32, value []byte, from string)
 	binary.LittleEndian.PutUint32(returnValue[0:4], uint32(valuePtr))
 	binary.LittleEndian.PutUint32(returnValue[4:], uint32(len(value)))
 
-	_, err = i.Heap.WriteAtPtr(returnValue, outputPtr, from+":WriteOutputToHeap2")
+	_, err = i.Module.Heap.WriteAtPtr(returnValue, outputPtr, from+":WriteOutputToHeap2")
 	if err != nil {
 		return fmt.Errorf("writing response at valuePtr %d: %w", valuePtr, err)
 	}

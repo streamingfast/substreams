@@ -1,8 +1,6 @@
 extern crate wee_alloc;
 use std::convert::TryInto;
 use std::slice;
-use std::mem::{forget, MaybeUninit};
-use crate::log;
 
 /// Set the global allocator to the WebAssembly optimized one.
 // #[global_allocator]
@@ -10,7 +8,7 @@ use crate::log;
 
 
 #[no_mangle]
-pub fn allocate(size: usize) -> *mut u8 {
+pub fn alloc(size: usize) -> *mut u8 {
     // let vec: Vec<MaybeUninit<u8>> = Vec::with_capacity(size);
     // let ptr = Box::into_raw(vec.into_boxed_slice()) as *mut u8;
     // log::println(format!("allocate {} {}", ptr as u32, size));
@@ -33,7 +31,7 @@ pub fn allocate(size: usize) -> *mut u8 {
 
 /// Retakes the pointer which allows its memory to be freed.
 #[no_mangle]
-pub unsafe fn deallocate(ptr: *mut u8, size: usize) {
+pub unsafe fn dealloc(ptr: *mut u8, size: usize) {
     // let _ = Vec::from_raw_parts(ptr, 0, size);
 
     let data = Vec::from_raw_parts(ptr, size, size);

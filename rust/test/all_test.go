@@ -323,7 +323,7 @@ func Test_MakeItCrash(t *testing.T) {
 				instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 				require.NoError(t, err)
 				time.Sleep(10 * time.Millisecond)
-				ptr, err := instance.Heap.Write(data, "test")
+				ptr, err := module.Heap.Write(data, "test")
 
 				require.NoError(t, err)
 				err = instance.ExecuteWithArgs(ctx, uint64(ptr), uint64(len(data)))

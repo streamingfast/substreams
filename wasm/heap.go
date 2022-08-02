@@ -28,6 +28,7 @@ func NewHeap(memory *wasmtime.Memory, allocator, dealloc *wasmtime.Func, store *
 		store:     store,
 	}
 }
+
 func (h *Heap) Write(bytes []byte, from string) (int32, error) {
 	return h.WriteAndTrack(bytes, true, from)
 }
@@ -45,6 +46,7 @@ func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, erro
 	}
 	return h.WriteAtPtr(bytes, ptr, from)
 }
+
 func (h *Heap) WriteAtPtr(bytes []byte, ptr int32, from string) (int32, error) {
 	data := h.memory.UnsafeData(h.store)
 	copy(data[ptr:], bytes)

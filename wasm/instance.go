@@ -3,11 +3,9 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/bytecodealliance/wasmtime-go"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
-	"github.com/tetratelabs/wazero/sys"
 )
 
 type Instance struct {
@@ -32,12 +30,7 @@ type Instance struct {
 }
 
 func (i *Instance) Execute() (err error) {
-	if _, err = i.entrypoint.Call(i.Module.wasmTimeStore, i.args...); err != nil {
-		if extern, ok := err.(*sys.ExitError); ok {
-			if extern.ExitCode() == 0 {
-				return nil
-			}
-		}
+	if _, err = i.entrypoint.Call(i.Module.wasmStore, i.args...); err != nil {
 		if i.panicError != nil {
 			fmt.Println("Panic error:", i.panicError)
 			return i.panicError
@@ -49,13 +42,7 @@ func (i *Instance) Execute() (err error) {
 }
 
 func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
-	if _, err = i.entrypoint.Call(i.Module.wasmTimeStore, args...); err != nil {
-		if extern, ok := err.(*sys.ExitError); ok {
-			if extern.ExitCode() == 0 {
-				return nil
-			}
-		}
-
+	if _, err = i.entrypoint.Call(i.Module.wasmStore, args...); err != nil {
 		if i.panicError != nil {
 			return i.panicError
 		}

@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/dustin/go-humanize"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/tetratelabs/wazero/sys"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -18,15 +16,15 @@ type Module struct {
 
 	name string
 
-	wasmCode         []byte
-	CurrentInstance  *Instance
-	entrypoint       string
-	wasmtimeInstance *wasmtime.Instance
-	wasmtimeEngine   *wasmtime.Engine
-	wasmTimeStore    *wasmtime.Store
-	wasmTimeModule   *wasmtime.Module
-	wasmTimeLinker   *wasmtime.Linker
-	Heap             *Heap
+	wasmCode        []byte
+	CurrentInstance *Instance
+	entrypoint      string
+	wasmInstance    *wasmtime.Instance
+	wasmEngine      *wasmtime.Engine
+	wasmStore       *wasmtime.Store
+	wasmModule      *wasmtime.Module
+	wasmLinker      *wasmtime.Linker
+	Heap            *Heap
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
@@ -39,16 +37,16 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 	}
 
 	m := &Module{
-		runtime:        r,
-		wasmtimeEngine: engine,
-		wasmTimeLinker: linker,
-		wasmTimeStore:  store,
-		wasmTimeModule: module,
-		name:           name,
-		wasmCode:       wasmCode,
-		entrypoint:     entrypoint,
+		runtime:    r,
+		wasmEngine: engine,
+		wasmLinker: linker,
+		wasmStore:  store,
+		wasmModule: module,
+		name:       name,
+		wasmCode:   wasmCode,
+		entrypoint: entrypoint,
 	}
-	if err := m.newImports(ctx); err != nil {
+	if err := m.newImports(); err != nil {
 		return nil, fmt.Errorf("instantiating imports: %w", err)
 	}
 	for namespace, imports := range r.extensions {
@@ -60,29 +58,28 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 		}
 	}
 
-	instance, err := m.wasmTimeLinker.Instantiate(m.wasmTimeStore, m.wasmTimeModule)
+	instance, err := m.wasmLinker.Instantiate(m.wasmStore, m.wasmModule)
 	if err != nil {
 		return nil, fmt.Errorf("creating new instance: %w", err)
 	}
-	memory := instance.GetExport(m.wasmTimeStore, "memory").Memory()
+	memory := instance.GetExport(m.wasmStore, "memory").Memory()
 
-	zlog.Info("got memory", zap.Uint64("size", uint64(memory.DataSize(m.wasmTimeStore))))
+	zlog.Info("got memory", zap.Uint64("size", uint64(memory.DataSize(m.wasmStore))))
 
-	alloc := instance.GetExport(m.wasmTimeStore, "alloc").Func()
-	dealloc := instance.GetExport(m.wasmTimeStore, "dealloc").Func()
-
+	alloc := instance.GetExport(m.wasmStore, "alloc").Func()
+	dealloc := instance.GetExport(m.wasmStore, "dealloc").Func()
 	if alloc == nil || dealloc == nil {
 		panic("missing malloc or free")
 	}
-	heap := NewHeap(memory, alloc, dealloc, m.wasmTimeStore)
+
+	heap := NewHeap(memory, alloc, dealloc, m.wasmStore)
 	m.Heap = heap
-	m.wasmtimeInstance = instance
+	m.wasmInstance = instance
 	return m, nil
 }
 
 func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
-
-	entrypoint := m.wasmtimeInstance.GetExport(m.wasmTimeStore, m.entrypoint).Func()
+	entrypoint := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint).Func()
 	if entrypoint == nil {
 		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
 	}
@@ -101,8 +98,8 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Insta
 			if err != nil {
 				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
 			}
-			len := int32(len(input.StreamData))
-			args = append(args, ptr, len)
+			length := int32(len(input.StreamData))
+			args = append(args, ptr, length)
 		case InputStore:
 			if input.Deltas {
 				//todo: this maybe sub optimal when deltas are extrated from zeroModule output cache
@@ -155,8 +152,8 @@ func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams
 	}
 }
 
-func (m *Module) newImports(ctx context.Context) error {
-	linker := m.wasmTimeLinker
+func (m *Module) newImports() error {
+	linker := m.wasmLinker
 
 	err := m.registerLoggerImports(linker)
 	if err != nil {
@@ -228,19 +225,17 @@ func (m *Module) registerLoggerImports(linker *wasmtime.Linker) error {
 }
 
 type externError struct {
-	*sys.ExitError
 	cause error
 }
 
 func newExternError(moduleName string, cause error) *externError {
 	return &externError{
-		ExitError: sys.NewExitError(moduleName, 1),
-		cause:     cause,
+		cause: cause,
 	}
 }
 
 func (e externError) Error() string {
-	return e.ExitError.Error() + ": " + e.cause.Error()
+	return e.cause.Error()
 }
 
 func returnErrorString(moduleName, cause string) {

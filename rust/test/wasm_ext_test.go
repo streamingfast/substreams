@@ -28,7 +28,7 @@ func TestExtensionCalls(t *testing.T) {
 		//{ // bring back later
 		//	wasmFile:     "testing_substreams.wasm",
 		//	functionName: "test_wasm_extension_fail",
-		//	expectError:  errors.New("executing entrypoint \"test_wasm_extension_fail\": running wasm extension \"myext::myimport\": expected hello (recovered by wazero)\nwasm stack trace:\n\tmyext.myimport(i32,i32,i32)\n\t._ZN18testing_substreams11do_myimport17hedb8a0f8ca1d7d8cE(i32,i32)\n\t.test_wasm_extension_fail()"),
+		//	expectError:  errors.New("executing entrypoint \"test_wasm_extension_fail\": running wasm extension \"myext::myimport\": expected hello (recovered by wasmtime)\nwasm stack trace:\n\tmyext.myimport(i32,i32,i32)\n\t._ZN18testing_substreams11do_myimport17hedb8a0f8ca1d7d8cE(i32,i32)\n\t.test_wasm_extension_fail()"),
 		//	expectLogs:   []string{"first"},
 		//},
 	}

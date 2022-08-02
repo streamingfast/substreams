@@ -291,14 +291,14 @@ func Test_Recursion(t *testing.T) {
 
 	instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 	require.NoError(t, err)
-	err = instance.ExecuteWithArgs(2040)
+	err = instance.ExecuteWithArgs(8076)
 	require.NoError(t, err)
 
 	for _, log := range instance.Logs {
 		fmt.Println("log:", log)
 	}
-
 }
+
 func Test_MakeItCrash(t *testing.T) {
 	t.Skip()
 

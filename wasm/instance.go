@@ -1,18 +1,17 @@
 package wasm
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 
+	"github.com/bytecodealliance/wasmtime-go"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 type Instance struct {
-	//store        *wasmer.Store
 	inputStores  []state.Reader
 	outputStore  *state.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
@@ -21,7 +20,7 @@ type Instance struct {
 
 	clock *pbsubstreams.Clock
 
-	args         []uint64 // to the `entrypoint` function
+	args         []interface{} // to the `entrypoint` function
 	returnValue  []byte
 	panicError   *PanicError
 	functionName string
@@ -30,10 +29,12 @@ type Instance struct {
 	Logs          []string
 	LogsByteCount uint64
 	Module        *Module
+	Heap          *Heap
+	entrypoint    *wasmtime.Func
 }
 
-func (i *Instance) Execute(ctx context.Context) (err error) {
-	if _, err = i.Module.entrypoint.Call(ctx, i.args...); err != nil {
+func (i *Instance) Execute() (err error) {
+	if _, err = i.entrypoint.Call(i.Module.wasmTimeStore, i.args...); err != nil {
 		if extern, ok := err.(*sys.ExitError); ok {
 			if extern.ExitCode() == 0 {
 				return nil
@@ -49,8 +50,8 @@ func (i *Instance) Execute(ctx context.Context) (err error) {
 	return nil
 }
 
-func (i *Instance) ExecuteWithArgs(ctx context.Context, args ...uint64) (err error) {
-	if _, err = i.Module.entrypoint.Call(ctx, args...); err != nil {
+func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
+	if _, err = i.entrypoint.Call(i.Module.wasmTimeStore, args...); err != nil {
 		if extern, ok := err.(*sys.ExitError); ok {
 			if extern.ExitCode() == 0 {
 				return nil
@@ -65,16 +66,16 @@ func (i *Instance) ExecuteWithArgs(ctx context.Context, args ...uint64) (err err
 	return nil
 }
 
-func (i *Instance) WriteOutputToHeap(ctx context.Context, memory api.Memory, outputPtr uint32, value []byte, from string) error {
-	valuePtr, err := i.Module.Heap.WriteAndTrack(ctx, memory, value, false, from+":WriteOutputToHeap1")
+func (i *Instance) WriteOutputToHeap(outputPtr int32, value []byte, from string) error {
+	valuePtr, err := i.Heap.WriteAndTrack(value, false, from+":WriteOutputToHeap1")
 	if err != nil {
 		return fmt.Errorf("writting value to heap: %w", err)
 	}
 	returnValue := make([]byte, 8)
-	binary.LittleEndian.PutUint32(returnValue[0:4], valuePtr)
+	binary.LittleEndian.PutUint32(returnValue[0:4], uint32(valuePtr))
 	binary.LittleEndian.PutUint32(returnValue[4:], uint32(len(value)))
 
-	_, err = i.Module.Heap.WriteAtPtr(ctx, memory, returnValue, outputPtr, from+":WriteOutputToHeap2")
+	_, err = i.Heap.WriteAtPtr(returnValue, outputPtr, from+":WriteOutputToHeap2")
 	if err != nil {
 		return fmt.Errorf("writing response at valuePtr %d: %w", valuePtr, err)
 	}

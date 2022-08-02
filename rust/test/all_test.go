@@ -254,7 +254,6 @@ func TestRustScript(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.functionName, func(t *testing.T) {
-			ctx := context.Background()
 			wasmFilePath := test_wasm_path(t, c.wasmFile)
 			file, err := os.Open(wasmFilePath)
 			require.NoError(t, err)
@@ -267,10 +266,10 @@ func TestRustScript(t *testing.T) {
 			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
+			instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
-			err = instance.Execute(ctx)
+			err = instance.Execute()
 			require.NoError(t, err)
 			c.assert(t, module, instance, c.builder)
 		})
@@ -291,7 +290,7 @@ func Test_Recursion(t *testing.T) {
 	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", "test_recursion")
 	require.NoError(t, err)
 
-	instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
+	instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 	require.NoError(t, err)
 	err = instance.ExecuteWithArgs(ctx, 2040)
 	require.NoError(t, err)
@@ -321,20 +320,13 @@ func Test_MakeItCrash(t *testing.T) {
 		for j := 0; j < 100; j++ {
 			wg.Add(1)
 			go func(id int) {
-				//fmt.Print(id, "-")
-				//runtime.LockOSThread()
-
-				instance, err := module.NewInstance(ctx, &pbsubstreams.Clock{}, nil)
+				instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 				require.NoError(t, err)
 				time.Sleep(10 * time.Millisecond)
-				mem := module.Memory()
-				heap := instance.Module.Heap
-				ptr, err := heap.Write(ctx, mem, data, "test")
+				ptr, err := instance.Heap.Write(data, "test")
 
 				require.NoError(t, err)
 				err = instance.ExecuteWithArgs(ctx, uint64(ptr), uint64(len(data)))
-
-				//mutex.Unlock()
 
 				require.NoError(t, err)
 				require.Equal(t, len(data), len(instance.Output()))

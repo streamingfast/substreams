@@ -1,60 +1,62 @@
 package wasm
 
 import (
-	"context"
 	"fmt"
 	"sort"
 
-	"github.com/tetratelabs/wazero/api"
+	"github.com/bytecodealliance/wasmtime-go"
 )
 
 type allocation struct {
-	ptr    uint32
+	ptr    int32
 	length int
 }
 
 type Heap struct {
 	allocations []*allocation
-	allocator   api.Function
-	dealloc     api.Function
+	memory      *wasmtime.Memory
+	allocator   *wasmtime.Func
+	dealloc     *wasmtime.Func
+	store       *wasmtime.Store
 }
 
-func NewHeap(allocator, dealloc api.Function) *Heap {
+func NewHeap(memory *wasmtime.Memory, allocator, dealloc *wasmtime.Func, store *wasmtime.Store) *Heap {
 	return &Heap{
+		memory:    memory,
 		allocator: allocator,
 		dealloc:   dealloc,
+		store:     store,
 	}
 }
-func (h *Heap) Write(ctx context.Context, memory api.Memory, bytes []byte, from string) (uint32, error) {
-	return h.WriteAndTrack(ctx, memory, bytes, true, from)
+func (h *Heap) Write(bytes []byte, from string) (int32, error) {
+	return h.WriteAndTrack(bytes, true, from)
 }
 
-func (h *Heap) WriteAndTrack(ctx context.Context, memory api.Memory, bytes []byte, track bool, from string) (uint32, error) {
+func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, error) {
 	size := len(bytes)
-	results, err := h.allocator.Call(ctx, uint64(size))
+	results, err := h.allocator.Call(h.store, uint64(size))
 	if err != nil {
 		return 0, fmt.Errorf("allocating memory for size %d:%w", size, err)
 	}
 
-	ptr := results[0]
+	ptr := results.(int32)
 	if track {
-		h.allocations = append(h.allocations, &allocation{ptr: uint32(ptr), length: len(bytes)})
+		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: len(bytes)})
 	}
-	return h.WriteAtPtr(ctx, memory, bytes, uint32(ptr), from)
+	return h.WriteAtPtr(bytes, ptr, from)
 }
-func (h *Heap) WriteAtPtr(ctx context.Context, memory api.Memory, bytes []byte, ptr uint32, from string) (uint32, error) {
-	if !memory.Write(ctx, ptr, bytes) {
-		return 0, fmt.Errorf("failed writing to memory at ptr %d", ptr)
-	}
+func (h *Heap) WriteAtPtr(bytes []byte, ptr int32, from string) (int32, error) {
+	data := h.memory.UnsafeData(h.store)
+	copy(data[ptr:], bytes)
 	return ptr, nil
 }
 
-func (h *Heap) Clear(ctx context.Context) error {
+func (h *Heap) Clear() error {
 	sort.Slice(h.allocations, func(i, j int) bool {
 		return h.allocations[i].ptr < h.allocations[j].ptr
 	})
 	for _, a := range h.allocations {
-		if _, err := h.dealloc.Call(ctx, uint64(a.ptr), uint64(a.length)); err != nil {
+		if _, err := h.dealloc.Call(h.store, a.ptr, uint64(a.length)); err != nil {
 			return fmt.Errorf("deallocating memory at ptr %d: %w", a.ptr, err)
 		}
 	}
@@ -62,23 +64,14 @@ func (h *Heap) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (h *Heap) ReadString(ctx context.Context, memory api.Memory, ptr uint32, length uint32) (string, error) {
-	data, err := h.ReadBytes(ctx, memory, ptr, length)
-	if err != nil {
-		return "", fmt.Errorf("reading bytes from memory at ptr %d: %w", ptr, err)
-	}
-	return string(data), nil
+func (h *Heap) ReadString(ptr int32, length int32) string {
+	data := h.ReadBytes(ptr, length)
+	return string(data)
 }
 
-func (h *Heap) ReadBytes(ctx context.Context, memory api.Memory, ptr uint32, length uint32) ([]byte, error) {
-	data, ok := memory.Read(ctx, ptr, length)
-	if !ok {
-		return nil, fmt.Errorf("failed reading bytes from memory at ptr %d", ptr)
-	}
-
-	out := make([]byte, length)
-	copy(out, data)
-	return data, nil
+func (h *Heap) ReadBytes(ptr int32, length int32) []byte {
+	data := h.memory.UnsafeData(h.store)
+	return data[ptr : ptr+length]
 }
 
 //func (h *Heap) PrintMem() {

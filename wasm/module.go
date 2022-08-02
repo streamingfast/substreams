@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/dustin/go-humanize"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/sys"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -21,108 +20,85 @@ type Module struct {
 
 	wasmCode        []byte
 	CurrentInstance *Instance
-	zeroRuntime     wazero.Runtime
-	zeroModule      api.Module
-	Heap            *Heap
-	entrypoint      api.Function
+	entrypoint      string
+	wasmtimeEngine  *wasmtime.Engine
+	wasmTimeStore   *wasmtime.Store
+	wasmTimeModule  *wasmtime.Module
+	wasmTimeLinker  *wasmtime.Linker
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
-	//zeroRuntime := wazero.NewRuntime()
-	zeroRuntime := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler())
+	engine := wasmtime.NewEngine()
+	linker := wasmtime.NewLinker(engine)
+	store := wasmtime.NewStore(engine)
+	module, err := wasmtime.NewModule(store.Engine, wasmCode)
+	if err != nil {
+		return nil, fmt.Errorf("creating new module: %w", err)
+	}
 
 	m := &Module{
-		runtime:     r,
-		zeroRuntime: zeroRuntime,
-		name:        name,
-		wasmCode:    wasmCode,
+		runtime:        r,
+		wasmtimeEngine: engine,
+		wasmTimeLinker: linker,
+		wasmTimeStore:  store,
+		wasmTimeModule: module,
+		name:           name,
+		wasmCode:       wasmCode,
+		entrypoint:     entrypoint,
 	}
 	if err := m.newImports(ctx); err != nil {
 		return nil, fmt.Errorf("instantiating imports: %w", err)
 	}
 	for namespace, imports := range r.extensions {
-		externs := map[string]interface{}{}
 		for importName, f := range imports {
-			externs[importName] = m.newExtensionFunction(request, namespace, importName, f)
+			f := m.newExtensionFunction(ctx, request, namespace, importName, f)
+			if err := linker.FuncWrap(namespace, importName, f); err != nil {
+				return nil, fmt.Errorf("instantiating extension import, [%s@%s]: %w", namespace, name, err)
+			}
 		}
-		//
-		_, err := m.zeroRuntime.NewModuleBuilder(namespace).
-			ExportFunctions(externs).Instantiate(ctx, m.zeroRuntime)
-		if err != nil {
-			return nil, fmt.Errorf("instantiating %s externs: %w", namespace, err)
-		}
-	}
-
-	zeroModule, err := zeroRuntime.InstantiateModuleFromBinary(ctx, wasmCode)
-	if err != nil {
-		return nil, fmt.Errorf("instantiate zeroModule: %w", err)
-	}
-	m.zeroModule = zeroModule
-
-	alloc := m.zeroModule.ExportedFunction("allocate")
-	dealloc := m.zeroModule.ExportedFunction("deallocate")
-
-	if alloc == nil || dealloc == nil {
-		panic("missing malloc or free")
-	}
-	m.Heap = NewHeap(alloc, dealloc)
-
-	m.entrypoint = m.zeroModule.ExportedFunction(entrypoint)
-	if m.entrypoint == nil {
-		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
 	}
 
 	return m, nil
 }
 
-func (m *Module) Memory() api.Memory {
-	return m.zeroModule.Memory()
-}
-
-func (m *Module) newExtensionFunction(request *pbsubstreams.Request, namespace, name string, f WASMExtension) interface{} {
-	return func(ctx context.Context, apiModule api.Module, ptr, length, outputPtr uint32) {
-
-		heap := m.Heap
-
-		data, err := heap.ReadBytes(ctx, apiModule.Memory(), ptr, length)
-		if err != nil {
-			panic(fmt.Errorf("read extension argument: %w", err))
-		}
-
-		out, err := f(ctx, request, m.CurrentInstance.clock, data)
-		if err != nil {
-			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
-		}
-
-		// It's unclear if WASMExtension implementor will correctly handle the context canceled case, as a safety
-		// measure, we check if the context was canceled without being handled correctly and stop here.
-		if ctx.Err() == context.Canceled {
-			panic(fmt.Errorf("running wasm extension has been stop upstream in the call stack: %w", ctx.Err()))
-		}
-
-		err = m.CurrentInstance.WriteOutputToHeap(ctx, apiModule.Memory(), outputPtr, out, name)
-		if err != nil {
-			panic(fmt.Errorf("write output to heap %w", err))
-		}
+func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
+	//instance, err := wasmtime.NewInstance(m.wasmTimeStore, m.wasmTimeModule, []wasmtime.AsExtern{})
+	instance, err := m.wasmTimeLinker.Instantiate(m.wasmTimeStore, m.wasmTimeModule)
+	if err != nil {
+		return nil, fmt.Errorf("creating new instance: %w", err)
 	}
-}
+	memory := instance.GetExport(m.wasmTimeStore, "memory").Memory()
 
-func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
+	alloc := instance.GetExport(m.wasmTimeStore, "allocate").Func()
+	dealloc := instance.GetExport(m.wasmTimeStore, "deallocate").Func()
+
+	if alloc == nil || dealloc == nil {
+		panic("missing malloc or free")
+	}
+	heap := NewHeap(memory, alloc, dealloc, m.wasmTimeStore)
+
+	entrypoint := instance.GetExport(m.wasmTimeStore, m.entrypoint).Func()
+	if entrypoint == nil {
+		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
+	}
+
 	m.CurrentInstance = &Instance{
-		Module: m,
-		clock:  clock,
+		Heap:       heap,
+		Module:     m,
+		clock:      clock,
+		entrypoint: entrypoint,
 	}
 
-	var args []uint64
+	var args []interface{}
 	for _, input := range inputs {
 		switch input.Type {
 		case InputSource:
-			ptr, err := m.Heap.Write(ctx, m.zeroModule.Memory(), input.StreamData, input.Name)
+			ptr, err := m.CurrentInstance.Heap.Write(input.StreamData, input.Name)
 			if err != nil {
 				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
 			}
-			len := uint64(len(input.StreamData))
-			args = append(args, uint64(ptr), len)
+			len := int32(len(input.StreamData))
+			args = append(args, ptr, len)
 		case InputStore:
 			if input.Deltas {
 				//todo: this maybe sub optimal when deltas are extrated from zeroModule output cache
@@ -130,15 +106,15 @@ func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, inp
 				if err != nil {
 					return nil, fmt.Errorf("marshaling store deltas: %w", err)
 				}
-				ptr, err := m.Heap.Write(ctx, m.zeroModule.Memory(), cnt, input.Name)
+				ptr, err := m.CurrentInstance.Heap.Write(cnt, input.Name)
 				if err != nil {
 					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
 				}
 
-				args = append(args, uint64(ptr), uint64(len(cnt)))
+				args = append(args, ptr, int32(len(cnt)))
 			} else {
 				m.CurrentInstance.inputStores = append(m.CurrentInstance.inputStores, input.Store)
-				args = append(args, uint64(len(m.CurrentInstance.inputStores)-1))
+				args = append(args, int32(len(m.CurrentInstance.inputStores)-1))
 			}
 		case OutputStore:
 			m.CurrentInstance.outputStore = input.Store
@@ -151,87 +127,98 @@ func (m *Module) NewInstance(ctx context.Context, clock *pbsubstreams.Clock, inp
 	return m.CurrentInstance, nil
 }
 
+func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams.Request, namespace, name string, f WASMExtension) interface{} {
+	return func(ptr, length, outputPtr int32) {
+		heap := m.CurrentInstance.Heap
+
+		data := heap.ReadBytes(ptr, length)
+
+		out, err := f(ctx, request, m.CurrentInstance.clock, data)
+		if err != nil {
+			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
+		}
+
+		// It's unclear if WASMExtension implementor will correctly handle the context canceled case, as a safety
+		// measure, we check if the context was canceled without being handled correctly and stop here.
+		if ctx.Err() == context.Canceled {
+			panic(fmt.Errorf("running wasm extension has been stop upstream in the call stack: %w", ctx.Err()))
+		}
+
+		err = m.CurrentInstance.WriteOutputToHeap(outputPtr, out, name)
+		if err != nil {
+			panic(fmt.Errorf("write output to heap %w", err))
+		}
+	}
+}
+
 func (m *Module) newImports(ctx context.Context) error {
-	err := m.registerLoggerImports(ctx)
+	linker := m.wasmTimeLinker
+
+	err := m.registerLoggerImports(linker)
 	if err != nil {
 		return fmt.Errorf("registering logger imports: %w", err)
 	}
-	err = m.registerStateImports(ctx)
+	err = m.registerStateImports(linker)
 	if err != nil {
 		return fmt.Errorf("registering state imports: %w", err)
 	}
 
-	_, err = m.zeroRuntime.NewModuleBuilder("env").
-		ExportFunction("register_panic",
-			func(ctx context.Context, apiModule api.Module, msgPtr, msgLength uint32, filenamePtr, filenameLength uint32, lineNumber, columnNumber uint32) {
-				message, err := m.Heap.ReadString(ctx, apiModule.Memory(), msgPtr, msgLength)
-				if err != nil {
-					panic(fmt.Errorf("read message argument: %w", err))
-				}
+	if err = linker.FuncWrap("env", "register_panic",
+		func(msgPtr, msgLength int32, filenamePtr, filenameLength int32, lineNumber, columnNumber int32, caller *wasmtime.Caller) {
+			message := m.CurrentInstance.Heap.ReadString(msgPtr, msgLength)
 
-				var filename string
-				if filenamePtr != 0 {
-					filename, err = m.Heap.ReadString(ctx, apiModule.Memory(), msgPtr, msgLength)
-					if err != nil {
-						panic(fmt.Errorf("read filename argument: %w", err))
-					}
-				}
-
-				m.CurrentInstance.panicError = &PanicError{message, filename, int(lineNumber), int(columnNumber)}
-			},
-		).ExportFunction("output",
-		func(ctx context.Context, apiModule api.Module, ptr, length uint32) {
-			message, err := m.Heap.ReadBytes(ctx, apiModule.Memory(), ptr, length)
-			if err != nil {
-				returnError("env", fmt.Errorf("reading bytes: %w", err))
+			var filename string
+			if filenamePtr != 0 {
+				filename = m.CurrentInstance.Heap.ReadString(msgPtr, msgLength)
 			}
 
+			m.CurrentInstance.panicError = &PanicError{message, filename, int(lineNumber), int(columnNumber)}
+		},
+	); err != nil {
+		return fmt.Errorf("registering panic import: %w", err)
+	}
+
+	if err = linker.FuncWrap("env", "output",
+		func(ptr, length int32) {
+			message := m.CurrentInstance.Heap.ReadBytes(ptr, length)
 			m.CurrentInstance.returnValue = make([]byte, length)
 			copy(m.CurrentInstance.returnValue, message)
 		},
-	).
-		Instantiate(ctx, m.zeroRuntime)
-
-	if err != nil {
-		return fmt.Errorf("instantiating env zeroModule: %w", err)
+	); err != nil {
+		return fmt.Errorf("registering output import: %w", err)
 	}
+
 	return nil
 }
 
-func (m *Module) registerLoggerImports(ctx context.Context) error {
-	_, err := m.zeroRuntime.NewModuleBuilder("logger").
-		ExportFunction("println",
-			func(ctx context.Context, apiModule api.Module, ptr uint32, length uint32) {
-				if m.CurrentInstance.ReachedLogsMaxByteCount() {
-					// Early exit, we don't even need to collect the message as we would not store it anyway
-					return
-				}
-
-				if length > maxLogByteCount {
-					panic(fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length))))
-				}
-
-				message, err := m.Heap.ReadString(ctx, apiModule.Memory(), ptr, length)
-				if err != nil {
-					panic(fmt.Errorf("reading string: %w", err))
-				}
-
-				if tracer.Enabled() {
-					zlog.Debug(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
-				}
-
-				// len(<string>) in Go count number of bytes and not characters, so we are good here
-				m.CurrentInstance.LogsByteCount += uint64(len(message))
-
-				if !m.CurrentInstance.ReachedLogsMaxByteCount() {
-					m.CurrentInstance.Logs = append(m.CurrentInstance.Logs, message)
-				}
-
+func (m *Module) registerLoggerImports(linker *wasmtime.Linker) error {
+	if err := linker.FuncWrap("logger", "println",
+		func(ptr int32, length int32) {
+			if m.CurrentInstance.ReachedLogsMaxByteCount() {
+				// Early exit, we don't even need to collect the message as we would not store it anyway
 				return
-			},
-		).Instantiate(ctx, m.zeroRuntime)
-	if err != nil {
-		return fmt.Errorf("instantiating env zeroModule: %w", err)
+			}
+
+			if length > maxLogByteCount {
+				panic(fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length))))
+			}
+
+			message := m.CurrentInstance.Heap.ReadString(ptr, length)
+			if tracer.Enabled() {
+				zlog.Debug(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
+			}
+
+			// len(<string>) in Go count number of bytes and not characters, so we are good here
+			m.CurrentInstance.LogsByteCount += uint64(len(message))
+
+			if !m.CurrentInstance.ReachedLogsMaxByteCount() {
+				m.CurrentInstance.Logs = append(m.CurrentInstance.Logs, message)
+			}
+
+			return
+		},
+	); err != nil {
+		return fmt.Errorf("registering println import: %w", err)
 	}
 	return nil
 }
@@ -259,7 +246,7 @@ func returnError(moduleName string, cause error) {
 	panic(newExternError(moduleName, cause))
 }
 
-func (m *Module) registerStateImports(ctx context.Context) error {
+func (m *Module) registerStateImports(linker *wasmtime.Linker) error {
 	functions := map[string]interface{}{}
 	functions["set"] = m.set
 	functions["set_if_not_exists"] = m.setIfNotExists
@@ -281,10 +268,11 @@ func (m *Module) registerStateImports(ctx context.Context) error {
 	functions["get_first"] = m.getFirst
 	functions["get_last"] = m.getLast
 
-	_, err := m.zeroRuntime.NewModuleBuilder("state").ExportFunctions(functions).Instantiate(ctx, m.zeroRuntime)
-
-	if err != nil {
-		return fmt.Errorf("instantiating state zeroModule: %w", err)
+	for n, f := range functions {
+		if err := linker.FuncWrap("state", n, f); err != nil {
+			return fmt.Errorf("registering %s import: %w", n, err)
+		}
 	}
+
 	return nil
 }

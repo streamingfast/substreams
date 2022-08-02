@@ -110,7 +110,13 @@ func (w *Worker) Run(ctx context.Context, job *Job, respFunc substreams.Response
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreams.Response_Progress:
-			err := respFunc(resp)
+
+			for _, progress := range resp.GetProgress().Modules {
+				if f := progress.GetFailed(); f != nil {
+					return nil, fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
+				}
+			}
+
 			if err != nil {
 				jobLogger.Warn("worker done on respFunc error", zap.Error(err))
 				return nil, fmt.Errorf("sending progress: %w", err)

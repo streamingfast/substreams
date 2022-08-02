@@ -211,6 +211,8 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 				}
 			}
 
+			jobStat.update(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges[len(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges)-1].EndBlock)
+
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData
 		case *pbsubstreams.Response_SnapshotComplete:

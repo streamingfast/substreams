@@ -1,6 +1,6 @@
 [package]
 name = "substreams-macro"
-version = "0.0.15"
+version = "0.0.16"
 edition = "2018"
 description = "Substream's proc macros."
 authors = ["StreamingFast Contributors <team@streamingfast.io>"]

@@ -147,6 +147,20 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 	}
 
+	/*
+		this entire `if` is not good, the ctx is from the StreamServer so there
+		is no substreams-partial-mode, we actually set the partialModeEnabled
+		on the service when substreams-partial-mode-enabled is set to true
+
+			if s.partialModeEnabled {
+				opts = append(opts, pipeline.WithPartialModeEnabled(true))
+			}
+	*/
+
+	if s.partialModeEnabled {
+		opts = append(opts, pipeline.WithPartialModeEnabled(true))
+	}
+
 	isSubrequest := false
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")

@@ -22,7 +22,7 @@ type ModuleExecutor interface {
 	// Reset the wasm instance, avoid propagating logs.
 	Reset()
 
-	run(vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, cursor string) error
+	run(vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error
 
 	moduleLogs() (logs []string, truncated bool)
 	moduleOutputData() pbsubstreams.ModuleOutputData
@@ -70,8 +70,8 @@ func (e *StoreModuleExecutor) String() string {
 	return e.moduleName
 }
 
-func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, cursor string) error {
-	if cacheEnabled {
+func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
+	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
 		output, found, err := e.cache.Get(clock)
 		if err != nil {
 			zlog.Warn("failed to get output from cache", zap.Error(err))
@@ -86,7 +86,7 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 		return err
 	}
 
-	if cacheEnabled {
+	if cacheEnabled || partialModeEnabled { // always set cache when you are in partialMode
 		if err := e.cache.Set(clock, cursor, e.mapperOutput); err != nil {
 			return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
 		}
@@ -95,8 +95,8 @@ func (e *MapperModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.C
 	return nil
 }
 
-func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, cursor string) error {
-	if cacheEnabled {
+func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
+	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
 		output, found, err := e.cache.Get(clock)
 		if err != nil {
 			zlog.Warn("failed to get output from cache", zap.Error(err))
@@ -120,7 +120,7 @@ func (e *StoreModuleExecutor) run(vals map[string][]byte, clock *pbsubstreams.Cl
 		return err
 	}
 
-	if cacheEnabled {
+	if cacheEnabled || partialModeEnabled { // always set cache when you are in partialMode
 		deltas := &pbsubstreams.StoreDeltas{
 			Deltas: e.outputStore.Deltas,
 		}

@@ -57,3 +57,9 @@ func WithCacheEnabled(cacheEnabled bool) Option {
 		p.cacheEnabled = cacheEnabled
 	}
 }
+
+func WithPartialModeEnabled(partialModeEnabled bool) Option {
+	return func(p *Pipeline) {
+		p.partialModeEnabled = partialModeEnabled
+	}
+}

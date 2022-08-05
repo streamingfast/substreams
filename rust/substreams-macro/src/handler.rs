@@ -9,16 +9,6 @@ use crate::config::{ModuleType, FinalConfiguration};
 pub fn main(_args: TokenStream, item: TokenStream, module_type: ModuleType) -> TokenStream {
     let original = item.clone();
 
-    // let config_result = AttributeArgs::parse_terminated.parse(args)
-    //     .and_then(|args| build_config(args));
-    //
-    // let final_config = match config_result {
-    //     Ok(f) => f,
-    //     Err(e) => {
-    //         return token_stream_with_error(original, e)
-    //     }
-    // };
-
     let final_config = FinalConfiguration { module_type };
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
@@ -48,7 +38,7 @@ pub fn main(_args: TokenStream, item: TokenStream, module_type: ModuleType) -> T
                         let argument_type = &*pat_type.ty;
                         let input_res = parse_input_type(argument_type);
                         if input_res.is_err() {
-                            return token_stream_with_error(original, syn::Error::new(pat_type.span(), format!("foo {:?}",input_res.err())));
+                            return token_stream_with_error(original, syn::Error::new(pat_type.span(), format!("failed to parse input {:?}",input_res.err())));
                         }
                         let input_obj = input_res.unwrap();
 
@@ -158,8 +148,7 @@ fn parse_input_type(ty: &syn::Type) -> Result<Input, errors::SubstreamMacroError
             Ok(input)
         }
         _ => {
-            // fixme(@julien): return the type which is considered an error
-            Err(errors::SubstreamMacroError::UnknownInputType("asdfasd".to_owned()))
+            Err(errors::SubstreamMacroError::UnknownInputType("unable to parse input type".to_owned()))
         }
     }
 }
@@ -221,7 +210,7 @@ fn build_map_handler(input: syn::ItemFn, collected_args: Vec<proc_macro2::TokenS
             #lambda
             let result = func();
             if result.is_err() {
-                panic!(result.err().unwrap())
+                panic!("{:?}", result.err().unwrap())
             }
             substreams::output(result.unwrap());
         }

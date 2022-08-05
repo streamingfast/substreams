@@ -83,7 +83,7 @@ func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFacto
 			case <-time.After(time.Second * 5):
 				var jobStats []*JobStat
 				countPerModule := map[string]uint64{}
-				fmt.Println("workerPool jobStats: ", len(workerPool.JobStats))
+				zlog.Info("work pool job stats", zap.Int("job_count", len(workerPool.JobStats)))
 				for _, value := range workerPool.JobStats {
 					if count, ok := countPerModule[value.ModuleName]; ok {
 						count++

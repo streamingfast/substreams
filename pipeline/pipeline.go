@@ -69,6 +69,8 @@ type Pipeline struct {
 	outputCacheSaveBlockInterval uint64
 	subrequestSplitSize          int
 	grpcClientFactory            substreams.GrpcClientFactory
+
+	cacheEnabled bool
 }
 
 func New(
@@ -129,17 +131,19 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
 
-	for _, module := range p.modules {
-		isOutput := p.outputModuleMap[module.Name]
+	if p.cacheEnabled {
+		for _, module := range p.modules {
+			isOutput := p.outputModuleMap[module.Name]
 
-		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
-			return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
-		}
+			if isOutput && p.requestedStartBlockNum < module.InitialBlock {
+				return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
+			}
 
-		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
-		_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
-		if err != nil {
-			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+			hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
+			_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
+			if err != nil {
+				return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+			}
 		}
 	}
 
@@ -207,10 +211,12 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
-	for _, cache := range p.moduleOutputCache.OutputCaches {
-		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
-		if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
-			return fmt.Errorf("loading outputs caches")
+	if p.cacheEnabled {
+		for _, cache := range p.moduleOutputCache.OutputCaches {
+			atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
+			if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
+				return fmt.Errorf("loading outputs caches")
+			}
 		}
 	}
 
@@ -274,8 +280,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	//    delete(map[blockID], outputs)
 	// }
 
-	if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-		return fmt.Errorf("updating module output cache: %w", err)
+	if p.cacheEnabled {
+		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+			return fmt.Errorf("updating module output cache: %w", err)
+		}
 	}
 
 	for _, hook := range p.preBlockHooks {
@@ -299,11 +307,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
-		zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
-		if err := p.moduleOutputCache.Flush(ctx); err != nil {
-			return fmt.Errorf("saving partial caches")
+		if p.cacheEnabled {
+			zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
+			if err := p.moduleOutputCache.Flush(ctx); err != nil {
+				return fmt.Errorf("saving partial caches")
+			}
+			return io.EOF
 		}
-		return io.EOF
 	}
 
 	cursor := obj.(bstream.Cursorable).Cursor()
@@ -350,7 +360,7 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(p.wasmOutputs, p.clock, cursor)
+	executionError := executor.run(p.wasmOutputs, p.clock, p.cacheEnabled, cursor)
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()
@@ -576,16 +586,21 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		case *pbsubstreams.Module_KindMap_:
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
+			baseExecutor := BaseExecutor{
+				moduleName: module.Name,
+				wasmModule: wasmModule,
+				entrypoint: entrypoint,
+				wasmInputs: inputs,
+				isOutput:   isOutput,
+			}
+
+			if p.cacheEnabled {
+				baseExecutor.cache = p.moduleOutputCache.OutputCaches[module.Name]
+			}
+
 			executor := &MapperModuleExecutor{
-				BaseExecutor: BaseExecutor{
-					moduleName: module.Name,
-					wasmModule: wasmModule,
-					entrypoint: entrypoint,
-					wasmInputs: inputs,
-					isOutput:   isOutput,
-					cache:      p.moduleOutputCache.OutputCaches[module.Name],
-				},
-				outputType: outType,
+				BaseExecutor: baseExecutor,
+				outputType:   outType,
 			}
 
 			p.moduleExecutors = append(p.moduleExecutors, executor)
@@ -606,16 +621,21 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				ValueType:    valueType,
 			})
 
+			baseExecutor := BaseExecutor{
+				moduleName: modName,
+				isOutput:   isOutput,
+				wasmModule: wasmModule,
+				entrypoint: entrypoint,
+				wasmInputs: inputs,
+			}
+
+			if p.cacheEnabled {
+				baseExecutor.cache = p.moduleOutputCache.OutputCaches[module.Name]
+			}
+
 			s := &StoreModuleExecutor{
-				BaseExecutor: BaseExecutor{
-					moduleName: modName,
-					isOutput:   isOutput,
-					wasmModule: wasmModule,
-					entrypoint: entrypoint,
-					wasmInputs: inputs,
-					cache:      p.moduleOutputCache.OutputCaches[module.Name],
-				},
-				outputStore: outputStore,
+				BaseExecutor: baseExecutor,
+				outputStore:  outputStore,
 			}
 
 			p.moduleExecutors = append(p.moduleExecutors, s)

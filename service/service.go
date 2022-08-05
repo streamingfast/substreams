@@ -53,6 +53,8 @@ type Service struct {
 
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
+
+	cacheEnabled bool
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -65,38 +67,6 @@ func (s *Service) BlockType() string {
 
 func (s *Service) WasmExtensions() []wasm.WASMExtensioner {
 	return s.wasmExtensions
-}
-
-type Option func(*Service)
-
-func WithWASMExtension(ext wasm.WASMExtensioner) Option {
-	return func(s *Service) {
-		s.wasmExtensions = append(s.wasmExtensions, ext)
-	}
-}
-
-func WithPipelineOptions(f pipeline.PipelineOptioner) Option {
-	return func(s *Service) {
-		s.pipelineOptions = append(s.pipelineOptions, f)
-	}
-}
-
-func WithPartialMode() Option {
-	return func(s *Service) {
-		s.partialModeEnabled = true
-	}
-}
-
-func WithStoresSaveInterval(block uint64) Option {
-	return func(s *Service) {
-		s.storesSaveInterval = block
-	}
-}
-
-func WithOutCacheSaveInterval(block uint64) Option {
-	return func(s *Service) {
-		s.outputCacheSaveBlockInterval = block
-	}
 }
 
 func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams.GrpcClientFactory, parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
@@ -196,6 +166,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
+
+	if s.cacheEnabled {
+		opts = append(opts, pipeline.WithCacheEnabled(true))
+	}
+
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			return NewErrSendBlock(err)
@@ -203,6 +178,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
+	// TODO: check p.cacheEnabled here also if we make this condition back to true
 	if false && !isSubrequest && len(request.OutputModules) == 1 && len(request.InitialStoreSnapshotForModules) == 0 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)

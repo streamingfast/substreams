@@ -110,7 +110,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, functionName string, inp
 	if err != nil {
 		return nil, fmt.Errorf("getting module memory: %w", err)
 	}
-	zlog.Info("got module memory", zap.Uint("size", memory.DataSize()))
+
 	alloc, err := vmInstance.Exports.GetFunction("alloc")
 	if err != nil {
 		return nil, fmt.Errorf("getting alloc function: %w", err)
@@ -666,7 +666,7 @@ func (m *Module) registerStateImports(imports *wasmer.ImportObject, store *wasme
 				wasmer.I64, /* ordinal */
 				wasmer.I32, /* key offset */
 				wasmer.I32, /* key length */
-				wasmer.I32 /* return pointer */),
+				wasmer.I32  /* return pointer */),
 			Returns(wasmer.I32),
 		),
 		func(args []wasmer.Value) ([]wasmer.Value, error) {

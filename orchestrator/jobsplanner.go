@@ -67,7 +67,7 @@ func NewJobsPlanner(
 	planner.AvailableJobs = make(chan *Job, len(planner.jobs))
 	planner.dispatch()
 
-	zlog.Info("jobs planner ready", zap.Object("planner", planner))
+	zlog.Info("jobs planner ready")
 
 	return planner, nil
 }

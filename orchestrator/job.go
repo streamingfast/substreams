@@ -105,6 +105,6 @@ func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module_name", j.moduleName)
 	enc.AddUint64("start_block", j.requestRange.StartBlock)
 	enc.AddUint64("end_block", j.requestRange.ExclusiveEndBlock)
-	enc.AddArray("deps", j.deps)
+	//enc.AddArray("deps", j.deps)
 	return nil
 }

@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -33,11 +32,6 @@ type JobStat struct {
 	BlockSec       float64
 
 	RemoteHost string
-}
-
-type WorkerStats struct {
-	JobStats       []*JobStat
-	CountPerModule map[string]uint64
 }
 
 func (j *JobStat) update(currentBlock uint64) {
@@ -94,16 +88,7 @@ func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFacto
 					jobStats = append(jobStats, value)
 				}
 
-				workerStats := &WorkerStats{
-					JobStats:       jobStats,
-					CountPerModule: countPerModule,
-				}
-
-				content, err := json.Marshal(workerStats)
-				if err != nil {
-					zlog.Warn("failed to marshall job statistics", zap.Error(err))
-				}
-				fmt.Println("worker statistics", string(content))
+				zlog.Debug("worker statistic", zap.Reflect("job_stats", jobStats), zap.Reflect("count_by_module", countPerModule))
 			}
 		}
 	}()

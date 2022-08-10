@@ -87,7 +87,7 @@ func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFacto
 					jobStats = append(jobStats, value)
 				}
 
-				zlog.Debug("worker statistic", zap.Reflect("job_stats", jobStats), zap.Reflect("count_by_module", countPerModule))
+				zlog.Info("worker statistic", zap.Reflect("job_stats", jobStats), zap.Reflect("count_by_module", countPerModule))
 			}
 		}
 	}()

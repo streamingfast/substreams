@@ -492,8 +492,6 @@ github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An
 github.com/spf13/viper v1.7.0/go.mod h1:8WkrPz2fc9jxqZNCJI/76HCieCp4Q8HaLFoCha5qpdg=
 github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 h1:fGJnUx0shX9Y312QOlz+/+yLquihXRhNqctJ26jtZZM=
 github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680/go.mod h1:iISPGAstbUsPgyC3auLLi7PYUTi9lHv5z0COam0OPOY=
-github.com/streamingfast/bstream v0.0.2-0.20220802184829-1af251c95389 h1:OKaNxiZaD422Zt67tgtwyLd9nyAlJSL0efWHvJLu47M=
-github.com/streamingfast/bstream v0.0.2-0.20220802184829-1af251c95389/go.mod h1:dMhUgTdaY+3F+weWsiLo5bNkoUxZbAhdwtCauYDLjEQ=
 github.com/streamingfast/bstream v0.0.2-0.20220810182344-114d9f8705b2 h1:pjDMoH7tVAY8Ja2QSaEwtrEf+dOTcPZ++/4EJ4dsLrE=
 github.com/streamingfast/bstream v0.0.2-0.20220810182344-114d9f8705b2/go.mod h1:dMhUgTdaY+3F+weWsiLo5bNkoUxZbAhdwtCauYDLjEQ=
 github.com/streamingfast/cli v0.0.3 h1:L1tANHTFZUOTDDExlNmtOUXAiPJ1Xb65kFFscrAtDcY=
@@ -517,8 +515,6 @@ github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648 h1:xpy3HNXe
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a/go.mod h1:bqiYZaX6L/MoXNfFQeAdau6g9HLA3yKHkX8KzStt58Q=
-github.com/streamingfast/firehose v0.1.1-0.20220804184723-a790c529fe15 h1:j/AELjGx05XH2JOrvDOm0AWH0joLXvwVRXwX7hUufjk=
-github.com/streamingfast/firehose v0.1.1-0.20220804184723-a790c529fe15/go.mod h1:OGb8noKOMRrx3kOqZCfSVowr9lVyaUtvovDDH0Rl470=
 github.com/streamingfast/firehose v0.1.1-0.20220810182727-6f3191de9804 h1:zKKMqfigTHRJyDXo4ixlnzBJd/DaLgBhISJT0P8Ii6o=
 github.com/streamingfast/firehose v0.1.1-0.20220810182727-6f3191de9804/go.mod h1:L31zyyw1r7uYyPwoaVHsKXB2Jd9MO3rDIPNtfoZ+jSM=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873 h1:8+TXT26c2p6f8JMg0w4JQ8t4fAbfMmR11zLN4KFVRC8=

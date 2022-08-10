@@ -7,12 +7,11 @@ import (
 	"io"
 	"time"
 
-	"go.uber.org/zap/zapcore"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc/metadata"
 )
 

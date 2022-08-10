@@ -3,9 +3,11 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/bytecodealliance/wasmtime-go"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
+	"go.uber.org/zap"
 )
 
 type Instance struct {
@@ -37,6 +39,9 @@ func (i *Instance) Execute() (err error) {
 		}
 		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)
 	}
+	f, e := i.Module.wasmStore.FuelConsumed()
+	fmt.Println(f, e)
+	zlog.Debug("fuel consumed", zap.Uint64("fuel", f), zap.Bool("enabled", e))
 
 	return nil
 }
@@ -48,6 +53,9 @@ func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
 		}
 		return fmt.Errorf("executing with args entrypoint %q: %w", i.functionName, err)
 	}
+	f, e := i.Module.wasmStore.FuelConsumed()
+	fmt.Println(f, e)
+	zlog.Debug("fuel consumed", zap.Uint64("fuel", f), zap.Bool("enabled", e))
 	return nil
 }
 

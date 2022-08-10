@@ -194,8 +194,13 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 					return nil, fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
 				}
 			}
-
-			jobStat.update(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges[len(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges)-1].EndBlock)
+			if len(resp.GetProgress().Modules) > 0 {
+				module := resp.GetProgress().Modules[0]
+				if rangeCount := len(module.GetProcessedRanges().ProcessedRanges); rangeCount > 0 {
+					endBlock := module.GetProcessedRanges().ProcessedRanges[rangeCount-1].EndBlock
+					jobStat.update(endBlock)
+				}
+			}
 
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData

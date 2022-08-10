@@ -291,7 +291,7 @@ func Test_Recursion(t *testing.T) {
 
 	instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 	require.NoError(t, err)
-	err = instance.ExecuteWithArgs(5000)
+	err = instance.ExecuteWithArgs(9000)
 	//err = instance.ExecuteWithArgs(3)
 	require.NoError(t, err)
 

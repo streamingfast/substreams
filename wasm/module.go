@@ -29,12 +29,9 @@ type Module struct {
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
-	config := wasmtime.NewConfig()
-	config.SetConsumeFuel(true)
-	engine := wasmtime.NewEngineWithConfig(config)
+	engine := wasmtime.NewEngine()
 	linker := wasmtime.NewLinker(engine)
 	store := wasmtime.NewStore(engine)
-	err := store.AddFuel(10000000)
 	module, err := wasmtime.NewModule(store.Engine, wasmCode)
 	if err != nil {
 		return nil, fmt.Errorf("creating new module: %w", err)

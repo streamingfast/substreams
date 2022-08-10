@@ -14,7 +14,7 @@ import (
 	"github.com/streamingfast/firehose"
 	firehoseServer "github.com/streamingfast/firehose/server"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -53,6 +53,8 @@ type Service struct {
 
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
+
+	cacheEnabled bool
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -65,38 +67,6 @@ func (s *Service) BlockType() string {
 
 func (s *Service) WasmExtensions() []wasm.WASMExtensioner {
 	return s.wasmExtensions
-}
-
-type Option func(*Service)
-
-func WithWASMExtension(ext wasm.WASMExtensioner) Option {
-	return func(s *Service) {
-		s.wasmExtensions = append(s.wasmExtensions, ext)
-	}
-}
-
-func WithPipelineOptions(f pipeline.PipelineOptioner) Option {
-	return func(s *Service) {
-		s.pipelineOptions = append(s.pipelineOptions, f)
-	}
-}
-
-func WithPartialMode() Option {
-	return func(s *Service) {
-		s.partialModeEnabled = true
-	}
-}
-
-func WithStoresSaveInterval(block uint64) Option {
-	return func(s *Service) {
-		s.storesSaveInterval = block
-	}
-}
-
-func WithOutCacheSaveInterval(block uint64) Option {
-	return func(s *Service) {
-		s.outputCacheSaveBlockInterval = block
-	}
 }
 
 func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams.GrpcClientFactory, parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
@@ -177,6 +147,20 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 	}
 
+	/*
+		this entire `if` is not good, the ctx is from the StreamServer so there
+		is no substreams-partial-mode, we actually set the partialModeEnabled
+		on the service when substreams-partial-mode-enabled is set to true
+
+			if s.partialModeEnabled {
+				opts = append(opts, pipeline.WithPartialModeEnabled(true))
+			}
+	*/
+
+	if s.partialModeEnabled {
+		opts = append(opts, pipeline.WithPartialModeEnabled(true))
+	}
+
 	isSubrequest := false
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
@@ -196,6 +180,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
+
+	if s.cacheEnabled {
+		opts = append(opts, pipeline.WithCacheEnabled(true))
+	}
+
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			return NewErrSendBlock(err)
@@ -203,6 +192,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
+	// TODO: check p.cacheEnabled here also if we make this condition back to true
 	if false && !isSubrequest && len(request.OutputModules) == 1 && len(request.InitialStoreSnapshotForModules) == 0 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)
@@ -237,10 +227,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
-		StartBlockNum: request.StartBlockNum,
-		StopBlockNum:  request.StopBlockNum,
-		StartCursor:   request.StartCursor,
-		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE},
+		StartBlockNum:   request.StartBlockNum,
+		StopBlockNum:    request.StopBlockNum,
+		Cursor:          request.StartCursor,
+		FinalBlocksOnly: true,
 		// FIXME(abourget), right now, the pbsubstreams.Request has a
 		// ForkSteps that we IGNORE. Eventually, we will want to honor
 		// it, but ONLY when we are certain that our Pipeline supports

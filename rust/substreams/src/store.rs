@@ -19,14 +19,14 @@ pub type Deltas = Vec<pb::substreams::StoreDelta>;
 pub struct StoreSet {}
 impl StoreSet {
     /// Set a given key to a given value, if the key existed before, it will be replaced.
-    pub fn set(&self, ord: u64, key: String, value: &Vec<u8>) {
+    pub fn set<K: AsRef<str>>(&self, ord: u64, key: K, value: &Vec<u8>) {
         state::set(ord as i64, key, value);
     }
 
     /// Set many keys to a given values, if the key existed before, it will be replaced.
-    pub fn set_many(&self, ord: u64, keys: &Vec<String>, value: &Vec<u8>) {
+    pub fn set_many<K: AsRef<str>>(&self, ord: u64, keys: &Vec<K>, value: &Vec<u8>) {
         for key in keys {
-            state::set(ord as i64, key.to_string(), value);
+            state::set(ord as i64, key, value);
         }
     }
 }
@@ -37,14 +37,14 @@ impl StoreSet {
 pub struct StoreSetIfNotExists {}
 impl StoreSetIfNotExists {
     /// Set a given key to a given value, if the key existed before, it will be ignored and not set.
-    pub fn set_if_not_exists(&self, ord: u64, key: String, value: &Vec<u8>) {
+    pub fn set_if_not_exists<K: AsRef<str>>(&self, ord: u64, key: K, value: &Vec<u8>) {
         state::set_if_not_exists(ord as i64, key, value);
     }
 
     /// Set given keys to given values, if the key existed before, it will be ignored and not set.
-    pub fn set_if_not_exists_many(&self, ord: u64, keys: &Vec<String>, value: &Vec<u8>) {
+    pub fn set_if_not_exists_many<K: AsRef<str>>(&self, ord: u64, keys: &Vec<K>, value: &Vec<u8>) {
         for key in keys {
-            state::set_if_not_exists(ord as i64, key.to_string(), value);
+            state::set_if_not_exists(ord as i64, key, value);
         }
     }
 }
@@ -56,15 +56,15 @@ pub struct StoreAddInt64 {}
 impl StoreAddInt64 {
     /// Will add the value to the already present value at the key (or default to
     /// zero if the key was not set)
-    pub fn add(&self, ord: u64, key: String, value: i64) {
+    pub fn add<K: AsRef<str>>(&self, ord: u64, key: K, value: i64) {
         state::add_int64(ord as i64, key, value);
     }
 
     /// Will add the value to the already present value of the keys (or default to
     /// zero if the key was not set)
-    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: i64) {
+    pub fn add_many<K: AsRef<str>>(&self, ord: u64, keys: &Vec<K>, value: i64) {
         for key in keys {
-            state::add_int64(ord as i64, key.to_string(), value);
+            state::add_int64(ord as i64, key, value);
         }
     }
 }
@@ -76,15 +76,15 @@ pub struct StoreAddFloat64 {}
 impl StoreAddFloat64 {
     /// Will add the value to the already present value at the key (or default to
     /// zero if the key was not set)
-    pub fn add(&self, ord: u64, key: String, value: f64) {
+    pub fn add<K: AsRef<str>>(&self, ord: u64, key: K, value: f64) {
         state::add_float64(ord as i64, key, value);
     }
 
     /// Will add the value to the already present value of the keys (or default to
     /// zero if the key was not set)
-    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: f64) {
+    pub fn add_many<K: AsRef<str>>(&self, ord: u64, keys: &Vec<K>, value: f64) {
         for key in keys {
-            state::add_float64(ord as i64, key.to_string(), value);
+            state::add_float64(ord as i64, key, value);
         }
     }
 }
@@ -96,15 +96,15 @@ pub struct StoreAddBigFloat {}
 impl StoreAddBigFloat {
     /// Will add the value to the already present value at the key (or default to
     /// zero if the key was not set)
-    pub fn add(&self, ord: u64, key: String, value: &BigDecimal) {
+    pub fn add<K: AsRef<str>>(&self, ord: u64, key: K, value: &BigDecimal) {
         state::add_bigfloat(ord as i64, key, value);
     }
 
     /// Will add the value to the already present value of the keys (or default to
     /// zero if the key was not set)
-    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: &BigDecimal) {
+    pub fn add_many<K: AsRef<str>>(&self, ord: u64, keys: &Vec<K>, value: &BigDecimal) {
         for key in keys {
-            state::add_bigfloat(ord as i64, key.to_string(), value);
+            state::add_bigfloat(ord as i64, key, value);
         }
     }
 }
@@ -116,15 +116,15 @@ pub struct StoreAddBigInt {}
 impl StoreAddBigInt {
     /// Will add the value to the already present value of the keys (or default to
     /// zero if the key was not set)
-    pub fn add(&self, ord: u64, key: String, value: &BigInt) {
+    pub fn add<K: AsRef<str>>(&self, ord: u64, key: K, value: &BigInt) {
         state::add_bigint(ord as i64, key, value);
     }
 
     /// Will add the value to the already present value of the keys (or default to
     /// zero if the key was not set)
-    pub fn add_many(&self, ord: u64, keys: &Vec<String>, value: &BigInt) {
+    pub fn add_many<K: AsRef<str>>(&self, ord: u64, keys: &Vec<K>, value: &BigInt) {
         for key in keys {
-            state::add_bigint(ord as i64, key.to_string(), value);
+            state::add_bigint(ord as i64, key, value);
         }
     }
 }
@@ -137,7 +137,7 @@ impl StoreMaxInt64 {
     /// max will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn max(&self, ord: u64, key: String, value: i64) {
+    pub fn max<K: AsRef<str>>(&self, ord: u64, key: K, value: i64) {
         state::set_max_int64(ord as i64, key, value);
     }
 }
@@ -150,7 +150,7 @@ impl StoreMaxBigInt {
     /// Will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn max(&self, ord: u64, key: String, value: &BigInt) {
+    pub fn max<K: AsRef<str>>(&self, ord: u64, key: K, value: &BigInt) {
         state::set_max_bigint(ord as i64, key, value);
     }
 }
@@ -163,7 +163,7 @@ impl StoreMaxFloat64 {
     /// Will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn max(&self, ord: u64, key: String, value: f64) {
+    pub fn max<K: AsRef<str>>(&self, ord: u64, key: K, value: f64) {
         state::set_max_float64(ord as i64, key, value);
     }
 }
@@ -176,7 +176,7 @@ impl StoreMaxBigFloat {
     /// Will set the provided key in the store only if the value received in
     /// parameter is bigger than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn max(&self, ord: u64, key: String, value: &BigDecimal) {
+    pub fn max<K: AsRef<str>>(&self, ord: u64, key: K, value: &BigDecimal) {
         state::set_max_bigfloat(ord as i64, key, value);
     }
 }
@@ -189,7 +189,7 @@ impl StoreMinInt64 {
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn min(&self, ord: u64, key: String, value: i64) {
+    pub fn min<K: AsRef<str>>(&self, ord: u64, key: K, value: i64) {
         state::set_min_int64(ord as i64, key, value);
     }
 }
@@ -202,7 +202,7 @@ impl StoreMinBigInt {
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn min(&self, ord: u64, key: String, value: &BigInt) {
+    pub fn min<K: AsRef<str>>(&self, ord: u64, key: K, value: &BigInt) {
         state::set_min_bigint(ord as i64, key, value);
     }
 }
@@ -215,7 +215,7 @@ impl StoreMinFloat64 {
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn min(&self, ord: u64, key: String, value: f64) {
+    pub fn min<K: AsRef<str>>(&self, ord: u64, key: K, value: f64) {
         state::set_min_float64(ord as i64, key, value);
     }
 }
@@ -228,7 +228,7 @@ impl StoreMinBigFloat {
     /// Will set the provided key in the store only if the value received in
     /// parameter is smaller than the one already present in the store, with
     /// a default of the zero value when the key is absent.
-    pub fn min(&self, ord: u64, key: String, value: &BigDecimal) {
+    pub fn min<K: AsRef<str>>(&self, ord: u64, key: K, value: &BigDecimal) {
         state::set_min_bigfloat(ord as i64, key, value);
     }
 }
@@ -239,12 +239,12 @@ impl StoreMinBigFloat {
 pub struct StoreAppend {}
 impl StoreAppend {
     /// Concatenates a given value at the end of the key's current value
-    pub fn append(&self, ord: u64, key: String, value: &String) {
+    pub fn append<K: AsRef<str>>(&self, ord: u64, key: K, value: &String) {
         state::append(ord as i64, key, &value.as_bytes().to_vec());
     }
 
     /// Concatenates a given value at the end of the key's current value
-    pub fn append_bytes(&self, ord: u64, key: String, value: &Vec<u8>) {
+    pub fn append_bytes<K: AsRef<str>>(&self, ord: u64, key: K, value: &Vec<u8>) {
         state::append(ord as i64, key, value);
     }
 }
@@ -265,7 +265,7 @@ impl StoreGet {
     /// the output section of the manifest. The ordinal is used here
     /// to go query a key that might have changed mid-block by
     /// the store module that built it.
-    pub fn get_at(&self, ord: u64, key: &String) -> Option<Vec<u8>> {
+    pub fn get_at<K: AsRef<str>>(&self, ord: u64, key: K) -> Option<Vec<u8>> {
         return state::get_at(self.idx, ord as i64, key);
     }
 
@@ -273,7 +273,7 @@ impl StoreGet {
     /// the store as of the beginning of the block being processed, before any changes
     /// were applied within the current block. Tt does not need to rewind any changes
     /// in the middle of the block.
-    pub fn get_last(&self, key: &String) -> Option<Vec<u8>> {
+    pub fn get_last<K: AsRef<str>>(&self, key: K) -> Option<Vec<u8>> {
         return state::get_last(self.idx, key);
     }
 
@@ -281,7 +281,7 @@ impl StoreGet {
     /// the store as of the beginning of the block being processed, before any changes
     /// were applied within the current block. However, it needs to unwind any keys that
     /// would have changed mid-block, so will be slightly less performant.
-    pub fn get_first(&self, key: &String) -> Option<Vec<u8>> {
+    pub fn get_first<K: AsRef<str>>(&self, key: K) -> Option<Vec<u8>> {
         return state::get_first(self.idx, key);
     }
 }

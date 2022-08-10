@@ -247,7 +247,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		zap.Int64("start_block", firehoseReq.StartBlockNum),
 		zap.Uint64("end_block", firehoseReq.StopBlockNum),
 	)
-	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
+	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, false, zap.NewNop())
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}

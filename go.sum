@@ -494,6 +494,8 @@ github.com/streamingfast/bstream v0.0.2-0.20220713194026-e4696dc8aab1 h1:IS3Z9O3
 github.com/streamingfast/bstream v0.0.2-0.20220713194026-e4696dc8aab1/go.mod h1:dMhUgTdaY+3F+weWsiLo5bNkoUxZbAhdwtCauYDLjEQ=
 github.com/streamingfast/bstream v0.0.2-0.20220802184829-1af251c95389 h1:OKaNxiZaD422Zt67tgtwyLd9nyAlJSL0efWHvJLu47M=
 github.com/streamingfast/bstream v0.0.2-0.20220802184829-1af251c95389/go.mod h1:dMhUgTdaY+3F+weWsiLo5bNkoUxZbAhdwtCauYDLjEQ=
+github.com/streamingfast/bstream v0.0.2-0.20220810182344-114d9f8705b2 h1:pjDMoH7tVAY8Ja2QSaEwtrEf+dOTcPZ++/4EJ4dsLrE=
+github.com/streamingfast/bstream v0.0.2-0.20220810182344-114d9f8705b2/go.mod h1:dMhUgTdaY+3F+weWsiLo5bNkoUxZbAhdwtCauYDLjEQ=
 github.com/streamingfast/cli v0.0.3 h1:L1tANHTFZUOTDDExlNmtOUXAiPJ1Xb65kFFscrAtDcY=
 github.com/streamingfast/cli v0.0.3/go.mod h1:0+crhXhsHDBwb1EWceYcFM5Z3zp6gXsxNxkl+rTMZj0=
 github.com/streamingfast/dauth v0.0.0-20210812020920-1c83ba29add1/go.mod h1:FIYpVqt+ICVuNBoOH3ZIicIctpVoCq3393+RpfXsPEM=
@@ -519,6 +521,8 @@ github.com/streamingfast/firehose v0.1.1-0.20220713194831-09ab25b3887c h1:uxKpLr
 github.com/streamingfast/firehose v0.1.1-0.20220713194831-09ab25b3887c/go.mod h1:qWu096wGdJOHWKGsFHjQSE89FMYnFCMWBxx1583z1sk=
 github.com/streamingfast/firehose v0.1.1-0.20220804184723-a790c529fe15 h1:j/AELjGx05XH2JOrvDOm0AWH0joLXvwVRXwX7hUufjk=
 github.com/streamingfast/firehose v0.1.1-0.20220804184723-a790c529fe15/go.mod h1:OGb8noKOMRrx3kOqZCfSVowr9lVyaUtvovDDH0Rl470=
+github.com/streamingfast/firehose v0.1.1-0.20220810182727-6f3191de9804 h1:zKKMqfigTHRJyDXo4ixlnzBJd/DaLgBhISJT0P8Ii6o=
+github.com/streamingfast/firehose v0.1.1-0.20220810182727-6f3191de9804/go.mod h1:L31zyyw1r7uYyPwoaVHsKXB2Jd9MO3rDIPNtfoZ+jSM=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873 h1:8+TXT26c2p6f8JMg0w4JQ8t4fAbfMmR11zLN4KFVRC8=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873/go.mod h1:M7l9klD6EPgXwPOrhzQrLLKZHZSNTt4nm+GDRFNbQdc=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=

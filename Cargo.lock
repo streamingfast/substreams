@@ -318,23 +318,6 @@ dependencies = [
 
 [[package]]
 name = "substreams"
-version = "0.0.12"
-source = "git+https://github.com/streamingfast/substreams?branch=feature/wasmtime#43599e7c1a95d1bb55062fd9f7f630750415a4c1"
-dependencies = [
- "bigdecimal",
- "hex",
- "hex-literal",
- "num-bigint",
- "prost",
- "prost-build",
- "prost-types",
- "substreams-macro 0.0.12",
- "thiserror",
- "wee_alloc",
-]
-
-[[package]]
-name = "substreams"
 version = "0.0.17"
 dependencies = [
  "bigdecimal",
@@ -344,20 +327,9 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "substreams-macro 0.0.17",
+ "substreams-macro",
  "thiserror",
  "wee_alloc",
-]
-
-[[package]]
-name = "substreams-macro"
-version = "0.0.12"
-source = "git+https://github.com/streamingfast/substreams?branch=feature/wasmtime#43599e7c1a95d1bb55062fd9f7f630750415a4c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "thiserror",
 ]
 
 [[package]]
@@ -397,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "testing-substreams"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "bigdecimal",
  "hex",
@@ -406,7 +378,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "substreams 0.0.12",
+ "substreams",
 ]
 
 [[package]]

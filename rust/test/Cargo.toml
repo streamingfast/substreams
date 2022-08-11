@@ -1,6 +1,6 @@
 [package]
 name = "testing-substreams"
-version = "0.0.16"
+version = "0.0.17"
 description = "Testing substreams base library"
 edition = "2018"
 publish = false
@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-substreams = { git = "https://github.com/streamingfast/substreams", branch = "feature/wasmtime" }
+substreams = { path = "../substreams" }
 num-bigint = "0.4"
 bigdecimal = "0.3"
 prost = { version = "0.10.1" }

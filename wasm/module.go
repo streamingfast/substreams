@@ -171,7 +171,7 @@ func (m *Module) newImports() error {
 
 			var filename string
 			if filenamePtr != 0 {
-				filename = m.Heap.ReadString(msgPtr, msgLength)
+				filename = m.Heap.ReadString(filenamePtr, filenameLength)
 			}
 
 			m.CurrentInstance.panicError = &PanicError{message, filename, int(lineNumber), int(columnNumber)}
@@ -212,7 +212,6 @@ func (m *Module) registerLoggerImports(linker *wasmtime.Linker) error {
 
 			// len(<string>) in Go count number of bytes and not characters, so we are good here
 			m.CurrentInstance.LogsByteCount += uint64(len(message))
-
 			if !m.CurrentInstance.ReachedLogsMaxByteCount() {
 				m.CurrentInstance.Logs = append(m.CurrentInstance.Logs, message)
 			}

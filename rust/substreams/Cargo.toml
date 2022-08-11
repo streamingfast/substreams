@@ -1,6 +1,6 @@
 [package]
 name = "substreams"
-version = "0.0.17"
+version = "0.0.18"
 description = "Substreams SDK - A streaming data engine for The Graph - by StreamingFast"
 edition = "2018"
 homepage = "https://substreams.streamingfast.io/"

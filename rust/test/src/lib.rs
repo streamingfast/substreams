@@ -4,6 +4,7 @@ use hex_literal::hex;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use pb::{erc721, eth};
 use std::convert::TryInto;
+
 use substreams::{
     errors::Error,
     log, store,
@@ -231,7 +232,7 @@ fn test_set_max_bigfloat(s: StoreMaxBigFloat) {
 // wasm extension tests
 #[link(wasm_import_module = "myext")]
 extern "C" {
-    pub fn myimport(rpc_call_offset: *const u8, rpc_call_len: u32, rpc_response_ptr: *const u8);
+    pub fn myimport(rpc_call_offset: *const u8, rpc_call_len: u32, rpc_response_ptr: *mut u8);
 }
 
 pub fn do_myimport(input: Vec<u8>) -> Vec<u8> {
@@ -319,3 +320,18 @@ extern "C" fn test_append_bytes_on_different_key(s: store::StoreAppend) {
 // extern "C" fn test_memory_leak() {
 //     substreams::memory::alloc(10485760); // allocate 1MB on each call
 // }
+
+
+#[no_mangle]
+extern "C" fn test_recursion(count: u32) {
+    recurse(count, 0)
+}
+
+fn recurse(count: u32, current: u32) {
+    if current == count {
+        return
+    }
+    let c = current +1;
+    log::println(format!("recursion count: {}", c));
+    recurse(count, c)
+}

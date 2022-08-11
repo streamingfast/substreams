@@ -327,7 +327,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(executor, cursor.ToOpaque())
+		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
 		if err != nil {
 			return fmt.Errorf("running module executor: %w", err)
 		}
@@ -355,7 +355,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return nil
 }
 
-func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
+func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cursor string) error {
 	//FIXME(abourget): should we ever skip that work?
 	// if executor.ModuleInitialBlock < block.Number {
 	// 	continue ??
@@ -363,7 +363,7 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
+	executionError := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()
@@ -580,7 +580,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		modName := module.Name // to ensure it's enclosed
 		entrypoint := module.BinaryEntrypoint
 		code := p.request.Modules.Binaries[module.BinaryIndex]
-		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name)
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name, entrypoint)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}

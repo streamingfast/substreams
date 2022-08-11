@@ -110,7 +110,7 @@ pub fn delete_prefix<K: AsRef<str>>(ord: i64, prefix: K) {
     unsafe { externs::state::delete_prefix(ord, prefix.as_ptr(), prefix.len() as u32) }
 }
 
-pub fn add_bigint<K: AsRef<str>>(ord: i64, key: K, value: &BigInt) {
+pub fn add_bigint<K: AsRef<str>>(ord: i64, key: K, value: &BigInt)  {
     let key = key.as_ref();
     let data = value.to_string();
 

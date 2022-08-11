@@ -23,18 +23,15 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
-replace (
-	github.com/wasmerio/wasmer-go v1.0.4 => github.com/streamingfast/wasmer-go v1.0.5-0.20220512181019-cd8b01df1543
-	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
-)
+replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 
 require (
+	github.com/bytecodealliance/wasmtime-go v0.39.0
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/streamingfast/shutter v1.5.0
 	github.com/tidwall/pretty v1.2.0
-	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	google.golang.org/grpc v1.44.0

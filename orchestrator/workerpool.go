@@ -6,12 +6,11 @@ import (
 	"io"
 	"time"
 
-	"go.uber.org/zap/zapcore"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -88,7 +87,7 @@ func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFacto
 					jobStats = append(jobStats, value)
 				}
 
-				zlog.Debug("worker statistic", zap.Reflect("job_stats", jobStats), zap.Reflect("count_by_module", countPerModule))
+				zlog.Info("worker statistic", zap.Reflect("job_stats", jobStats), zap.Reflect("count_by_module", countPerModule))
 			}
 		}
 	}()
@@ -183,13 +182,26 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreams.Response_Progress:
+
 			err := respFunc(resp)
 			if err != nil {
 				jobLogger.Warn("worker done on respFunc error", zap.Error(err))
 				return nil, fmt.Errorf("sending progress: %w", err)
 			}
-			// fixme: why is range nil?
-			//jobStat.update(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges[len(resp.GetProgress().Modules[0].GetProcessedRanges().ProcessedRanges)-1].EndBlock)
+
+			for _, progress := range resp.GetProgress().Modules {
+				if f := progress.GetFailed(); f != nil {
+					return nil, fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
+				}
+			}
+			if len(resp.GetProgress().Modules) > 0 {
+				module := resp.GetProgress().Modules[0]
+				if rangeCount := len(module.GetProcessedRanges().ProcessedRanges); rangeCount > 0 {
+					endBlock := module.GetProcessedRanges().ProcessedRanges[rangeCount-1].EndBlock
+					jobStat.update(endBlock)
+				}
+			}
+
 		case *pbsubstreams.Response_SnapshotData:
 			_ = r.SnapshotData
 		case *pbsubstreams.Response_SnapshotComplete:

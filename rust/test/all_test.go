@@ -277,6 +277,7 @@ func TestRustScript(t *testing.T) {
 }
 
 func Test_Recursion(t *testing.T) {
+	t.Skip()
 	wasmFilePath := test_wasm_path(t, "testing_substreams.wasm")
 	file, err := os.Open(wasmFilePath)
 	require.NoError(t, err)

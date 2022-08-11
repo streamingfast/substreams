@@ -116,6 +116,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
 	}
 
+	if request.Modules == nil {
+		return status.Error(codes.InvalidArgument, "no modules found in request")
+	}
+
 	if err := manifest.ValidateModules(request.Modules); err != nil {
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("modules validation failed: %s", err))
 	}

@@ -329,7 +329,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	for _, executor := range p.moduleExecutors {
 		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
 		if err != nil {
-			return fmt.Errorf("running module executor: %w", err)
+			if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
+				return fmt.Errorf("progress error: %w", returnErr)
+			}
+			return nil
 		}
 	}
 
@@ -363,7 +366,10 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
+	err := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
+	if err != nil {
+		return fmt.Errorf("running module: %w", err)
+	}
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()
@@ -376,13 +382,6 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 				LogsTruncated: truncated,
 			})
 		}
-	}
-
-	if executionError != nil {
-		if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
-			return fmt.Errorf("progress error: %w", returnErr)
-		}
-		return fmt.Errorf("exec error: %w", executionError)
 	}
 
 	executor.Reset()

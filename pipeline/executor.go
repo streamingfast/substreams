@@ -196,6 +196,8 @@ func (e *BaseExecutor) wasmCall(ctx context.Context, vals map[string][]byte, clo
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
 		if err = instance.Execute(); err != nil {
+			//todo: create a ErrorStruct containing the error message and the stacktrace
+			//todo: implements error func and format all the information(error message, logs, stacktrace)
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
 		}
 		err = instance.Module.Heap.Clear()

@@ -99,15 +99,17 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	ctx := streamSrv.Context()
 	logger := logging.Logger(ctx, s.logger)
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
-		hostname = "unknown host"
-	}
-	md := metadata.New(map[string]string{"host": hostname})
-	err = streamSrv.SetHeader(md)
-	if err != nil {
-		logger.Warn("cannot send header metadata", zap.Error(err))
+	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+			hostname = "unknown host"
+		}
+		md := metadata.New(map[string]string{"host": hostname})
+		err = streamSrv.SetHeader(md)
+		if err != nil {
+			logger.Warn("cannot send header metadata", zap.Error(err))
+		}
 	}
 
 	if request.StartBlockNum < 0 {

@@ -85,7 +85,7 @@ func TestSquash(t *testing.T) {
 }
 
 func testStateBuilder(store dstore.Store) *state.Store {
-	s, _ := state.NewBuilder("test", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
+	s, _ := state.NewStore("test", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
 	return s
 }
 

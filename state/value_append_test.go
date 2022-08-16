@@ -8,7 +8,7 @@ import (
 )
 
 func TestValueAppend(t *testing.T) {
-	s := mustNewBuilder(t, "b", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	s := mustNewStore(t, "b", 0, "hash", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 
 	s.Append(0, "key", []byte{0x00, 0x01, 0x02})
 	s.Append(1, "key", []byte{0x03, 0x04, 0x05})

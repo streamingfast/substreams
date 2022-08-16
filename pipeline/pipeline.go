@@ -675,7 +675,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error) {
 	storeMap = map[string]*state.Store{}
 	for _, storeModule := range p.storeModules {
-		newStore, err := state.NewBuilder(
+		newStore, err := state.NewStore(
 			storeModule.Name,
 			p.storeSaveInterval,
 			storeModule.InitialBlock,

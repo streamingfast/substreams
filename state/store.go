@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type BuilderOption func(b *Store)
+type StoreOption func(b *Store)
 
 type Store struct {
 	Name         string
@@ -36,7 +36,7 @@ type Store struct {
 	lastOrdinal uint64
 }
 
-func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Store, error) {
+func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...StoreOption) (*Store, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)

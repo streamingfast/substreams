@@ -30,7 +30,7 @@ func TestNewJobsPlanner(t *testing.T) {
 	stores := map[string]*state.Store{}
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-		newStore, err := state.NewBuilder(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
+		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
 		require.NoError(t, err)
 		stores[newStore.Name] = newStore
 	}

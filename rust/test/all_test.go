@@ -341,12 +341,12 @@ func Test_MakeItCrash(t *testing.T) {
 	}
 }
 
-func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...state.BuilderOption) *state.Store {
+func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...state.StoreOption) *state.Store {
 	t.Helper()
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}
-	builder, err := state.NewBuilder(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	builder, err := state.NewStore(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)
 	}

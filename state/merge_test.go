@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBuilder_Merge(t *testing.T) {
+func TestStore_Merge(t *testing.T) {
 	tests := []struct {
 		name            string
 		latest          *Store

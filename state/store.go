@@ -149,7 +149,7 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 		return fmt.Errorf("storage file %s: %w", stateFileName, err)
 	}
 
-	zlog.Debug("state loaded", zap.String("builder_name", s.Name), zap.String("file_name", stateFileName))
+	zlog.Debug("state loaded", zap.String("store_name", s.Name), zap.String("file_name", stateFileName))
 	return nil
 }
 
@@ -157,7 +157,7 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
 func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (*storeWriter, error) {
-	zlog.Debug("writing state", zap.Object("builder", s))
+	zlog.Debug("writing state", zap.Object("store", s))
 
 	//kv := stringMap(s.KV) // FOR READABILITY ON DISK
 

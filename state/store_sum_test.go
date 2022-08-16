@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func initTestBuilder(key string, value []byte) *Store {
+func initTestStore(key string, value []byte) *Store {
 	b, err := NewStore("b", 100, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil))
 	if err != nil {
 		panic(err)
@@ -21,7 +21,7 @@ func initTestBuilder(key string, value []byte) *Store {
 	return b
 }
 
-func TestBuilderSumBigInt(t *testing.T) {
+func TestStoreSumBigInt(t *testing.T) {
 	tests := []struct {
 		name          string
 		key           string
@@ -47,7 +47,7 @@ func TestBuilderSumBigInt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestBuilder(test.key, test.existingValue)
+			b := initTestStore(test.key, test.existingValue)
 
 			b.SumBigInt(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
@@ -62,7 +62,7 @@ func TestBuilderSumBigInt(t *testing.T) {
 	}
 }
 
-func TestBuilderSumInt64(t *testing.T) {
+func TestStoreSumInt64(t *testing.T) {
 	tests := []struct {
 		name          string
 		key           string
@@ -88,7 +88,7 @@ func TestBuilderSumInt64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestBuilder(test.key, test.existingValue)
+			b := initTestStore(test.key, test.existingValue)
 
 			b.SumInt64(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
@@ -104,7 +104,7 @@ func TestBuilderSumInt64(t *testing.T) {
 	}
 }
 
-func TestBuilderSumFloat64(t *testing.T) {
+func TestStoreSumFloat64(t *testing.T) {
 	tests := []struct {
 		name          string
 		key           string
@@ -130,7 +130,7 @@ func TestBuilderSumFloat64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestBuilder(test.key, test.existingValue)
+			b := initTestStore(test.key, test.existingValue)
 
 			b.SumFloat64(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
@@ -146,7 +146,7 @@ func TestBuilderSumFloat64(t *testing.T) {
 	}
 }
 
-func TestBuilderSumBigFloat(t *testing.T) {
+func TestStoreSumBigFloat(t *testing.T) {
 	tests := []struct {
 		name          string
 		key           string
@@ -172,7 +172,7 @@ func TestBuilderSumBigFloat(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestBuilder(test.key, test.existingValue)
+			b := initTestStore(test.key, test.existingValue)
 
 			b.SumBigFloat(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)

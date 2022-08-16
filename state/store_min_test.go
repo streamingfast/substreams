@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBuilderSetMinBigInt(t *testing.T) {
+func TestStoreSetMinBigInt(t *testing.T) {
 	tests := []struct {
 		name          string
-		builder       *Store
+		store         *Store
 		key           string
 		existingValue *big.Int
 		value         *big.Int
@@ -21,7 +21,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(3),
 			value:         big.NewInt(4),
@@ -29,7 +29,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(5),
 			value:         big.NewInt(4),
@@ -37,7 +37,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewInt(4),
@@ -45,7 +45,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Store, key string, value *big.Int) {
+	initTestStore := func(b *Store, key string, value *big.Int) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(value.String())
@@ -54,10 +54,10 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			initTestBuilder(test.builder, test.key, test.existingValue)
+			initTestStore(test.store, test.key, test.existingValue)
 
-			test.builder.SetMinBigInt(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			test.store.SetMinBigInt(0, test.key, test.value)
+			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -69,7 +69,7 @@ func TestBuilderSetMinBigInt(t *testing.T) {
 	}
 }
 
-func TestBuilderSetMinInt64(t *testing.T) {
+func TestStoreSetMinInt64(t *testing.T) {
 	int64ptr := func(i int64) *int64 {
 		var p *int64
 		p = new(int64)
@@ -79,7 +79,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		builder       *Store
+		store         *Store
 		key           string
 		existingValue *int64
 		value         int64
@@ -87,7 +87,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(3),
 			value:         4,
@@ -95,7 +95,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(5),
 			value:         4,
@@ -103,7 +103,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4,
@@ -111,7 +111,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Store, key string, value *int64) {
+	initTestStore := func(b *Store, key string, value *int64) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(fmt.Sprintf("%d", *value))
@@ -120,10 +120,10 @@ func TestBuilderSetMinInt64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			initTestBuilder(test.builder, test.key, test.existingValue)
+			initTestStore(test.store, test.key, test.existingValue)
 
-			test.builder.SetMinInt64(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			test.store.SetMinInt64(0, test.key, test.value)
+			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -136,7 +136,7 @@ func TestBuilderSetMinInt64(t *testing.T) {
 	}
 }
 
-func TestBuilderSetMinFloat64(t *testing.T) {
+func TestStoreSetMinFloat64(t *testing.T) {
 	float64ptr := func(i float64) *float64 {
 		var p *float64
 		p = new(float64)
@@ -146,7 +146,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		builder       *Store
+		store         *Store
 		key           string
 		existingValue *float64
 		value         float64
@@ -154,7 +154,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(3.0),
 			value:         4.0,
@@ -162,7 +162,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(5.0),
 			value:         4.0,
@@ -170,7 +170,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4.0,
@@ -178,7 +178,7 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Store, key string, value *float64) {
+	initTestStore := func(b *Store, key string, value *float64) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(strconv.FormatFloat(*value, 'g', 100, 64))
@@ -187,10 +187,10 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			initTestBuilder(test.builder, test.key, test.existingValue)
+			initTestStore(test.store, test.key, test.existingValue)
 
-			test.builder.SetMinFloat64(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			test.store.SetMinFloat64(0, test.key, test.value)
+			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
 			}
@@ -203,10 +203,10 @@ func TestBuilderSetMinFloat64(t *testing.T) {
 	}
 }
 
-func TestBuilderSetMinBigFloat(t *testing.T) {
+func TestStoreSetMinBigFloat(t *testing.T) {
 	tests := []struct {
 		name          string
-		builder       *Store
+		store         *Store
 		key           string
 		existingValue *big.Float
 		value         *big.Float
@@ -214,7 +214,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(3),
 			value:         big.NewFloat(4),
@@ -222,7 +222,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(5),
 			value:         big.NewFloat(4),
@@ -230,7 +230,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			builder:       mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:         mustNewStore(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewFloat(4),
@@ -238,7 +238,7 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 		},
 	}
 
-	initTestBuilder := func(b *Store, key string, value *big.Float) {
+	initTestStore := func(b *Store, key string, value *big.Float) {
 		b.KV = map[string][]byte{}
 		if value != nil {
 			b.KV[key] = []byte(value.Text('g', -1))
@@ -247,10 +247,10 @@ func TestBuilderSetMinBigFloat(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			initTestBuilder(test.builder, test.key, test.existingValue)
+			initTestStore(test.store, test.key, test.existingValue)
 
-			test.builder.SetMinBigFloat(0, test.key, test.value)
-			actual, found := test.builder.GetAt(0, test.key)
+			test.store.SetMinBigFloat(0, test.key, test.value)
+			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
 			}

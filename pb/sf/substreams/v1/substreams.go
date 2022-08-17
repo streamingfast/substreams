@@ -6,16 +6,21 @@ import (
 	"github.com/streamingfast/bstream"
 )
 
-func StepToProto(step bstream.StepType) ForkStep {
-	switch step {
-	case bstream.StepNew:
-		return ForkStep_STEP_NEW
-	case bstream.StepUndo:
-		return ForkStep_STEP_UNDO
-	case bstream.StepIrreversible:
-		return ForkStep_STEP_IRREVERSIBLE
+func StepToProto(step bstream.StepType, finalBlocksOnly bool) (out ForkStep, skip bool) {
+	if finalBlocksOnly {
+		if step.Matches(bstream.StepIrreversible) {
+			return ForkStep_STEP_IRREVERSIBLE, false
+		}
+		return ForkStep_STEP_UNKNOWN, true
 	}
-	return ForkStep_STEP_UNKNOWN
+
+	if step.Matches(bstream.StepNew) {
+		return ForkStep_STEP_NEW, false
+	}
+	if step.Matches(bstream.StepUndo) {
+		return ForkStep_STEP_UNDO, false
+	}
+	return ForkStep_STEP_UNKNOWN, true // simply skip irreversible or stalled here
 }
 
 type ModuleOutputData interface {

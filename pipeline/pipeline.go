@@ -436,10 +436,15 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 
 func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
 	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+	protoStep, skip := pbsubstreams.StepToProto(step, true) //FIXME stepd irreversible only
+	if skip {
+		return nil
+	}
+
 	out := &pbsubstreams.BlockScopedData{
 		Outputs: p.moduleOutputs,
 		Clock:   p.clock,
-		Step:    pbsubstreams.StepToProto(step),
+		Step:    protoStep,
 		Cursor:  cursor.ToOpaque(),
 	}
 

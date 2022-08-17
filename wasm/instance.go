@@ -24,10 +24,11 @@ type Instance struct {
 	functionName string
 	moduleName   string
 
-	Logs          []string
-	LogsByteCount uint64
-	Module        *Module
-	entrypoint    *wasmtime.Func
+	Logs           []string
+	LogsByteCount  uint64
+	ExecutionStack []string
+	Module         *Module
+	entrypoint     *wasmtime.Func
 }
 
 func (i *Instance) Execute() (err error) {
@@ -83,4 +84,8 @@ const maxLogByteCount = 128 * 1024 // 128 KiB
 
 func (i *Instance) ReachedLogsMaxByteCount() bool {
 	return i.LogsByteCount >= maxLogByteCount
+}
+
+func (i *Instance) PushExecutionStack(event string) {
+	i.ExecutionStack = append(i.ExecutionStack, event)
 }

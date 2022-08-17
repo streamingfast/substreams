@@ -214,6 +214,7 @@ func (m *Module) registerLoggerImports(linker *wasmtime.Linker) error {
 			m.CurrentInstance.LogsByteCount += uint64(len(message))
 			if !m.CurrentInstance.ReachedLogsMaxByteCount() {
 				m.CurrentInstance.Logs = append(m.CurrentInstance.Logs, message)
+				m.CurrentInstance.PushExecutionStack(fmt.Sprintf("log: %s", message))
 			}
 
 			return

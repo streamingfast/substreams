@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -12,6 +13,28 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+type ErrorExecutor struct {
+	message    string
+	stackTrace []string
+}
+
+func (e *ErrorExecutor) Error() string {
+	b := bytes.NewBuffer(nil)
+
+	b.WriteString(e.message)
+
+	if len(e.stackTrace) > 0 {
+		// stack trace section will also contain the logs of the execution
+		b.WriteString("\n----- stack trace -----\n")
+		for _, stackTraceLine := range e.stackTrace {
+			b.WriteString(stackTraceLine)
+			b.WriteString("\n")
+		}
+	}
+
+	return b.String()
+}
 
 type ModuleExecutor interface {
 	// Name returns the name of the module as defined in the manifest.
@@ -27,6 +50,7 @@ type ModuleExecutor interface {
 
 	moduleLogs() (logs []string, truncated bool)
 	moduleOutputData() pbsubstreams.ModuleOutputData
+	getCurrentExecutionStack() []string
 }
 
 type BaseExecutor struct {
@@ -195,8 +219,13 @@ func (e *BaseExecutor) wasmCall(ctx context.Context, vals map[string][]byte, clo
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
+
 		if err = instance.Execute(); err != nil {
-			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %w", clock.Number, e.moduleName, err)
+			errExecutor := ErrorExecutor{
+				message:    err.Error(),
+				stackTrace: instance.ExecutionStack,
+			}
+			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %v", clock.Number, e.moduleName, errExecutor.Error())
 		}
 		err = instance.Module.Heap.Clear()
 		if err != nil {
@@ -220,6 +249,10 @@ func (e *StoreModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
 		}
 	}
 	return nil
+}
+
+func (e *StoreModuleExecutor) getCurrentExecutionStack() []string {
+	return e.wasmModule.CurrentInstance.ExecutionStack
 }
 
 // func (e *StoreModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
@@ -267,6 +300,10 @@ func (e *MapperModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData 
 		}
 	}
 	return nil
+}
+
+func (e *MapperModuleExecutor) getCurrentExecutionStack() []string {
+	return e.wasmModule.CurrentInstance.ExecutionStack
 }
 
 // func (e *MapperModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {

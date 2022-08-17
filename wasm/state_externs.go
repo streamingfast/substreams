@@ -22,6 +22,7 @@ func (m *Module) set(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	value := m.Heap.ReadBytes(valPtr, valLength)
 
 	m.CurrentInstance.outputStore.SetBytes(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.set  %q", m.name, key))
 }
 
 func (m *Module) setIfNotExists(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -32,6 +33,7 @@ func (m *Module) setIfNotExists(ord int64, keyPtr, keyLength, valPtr, valLength 
 	value := m.Heap.ReadBytes(valPtr, valLength)
 
 	m.CurrentInstance.outputStore.SetBytesIfNotExists(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setIfNotExists  %q", m.name, key))
 }
 
 func (m *Module) append(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -40,14 +42,16 @@ func (m *Module) append(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	}
 
 	key := m.Heap.ReadString(keyPtr, keyLength)
-
 	value := m.Heap.ReadBytes(valPtr, valLength)
+
 	m.CurrentInstance.outputStore.Append(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.append  %q", m.name, key))
 }
 
 func (m *Module) deletePrefix(ord int64, keyPtr, keyLength int32) {
 	prefix := m.Heap.ReadString(keyPtr, keyLength)
 	m.CurrentInstance.outputStore.DeletePrefix(uint64(ord), prefix)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.deletePrefix  %s ", m.name, prefix))
 }
 
 func (m *Module) addBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -59,6 +63,7 @@ func (m *Module) addBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32
 
 	toAdd, _ := new(big.Int).SetString(value, 10)
 	m.CurrentInstance.outputStore.SumBigInt(uint64(ord), key, toAdd)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addBigInt  %q", m.name, key))
 
 	return
 }
@@ -77,6 +82,7 @@ func (m *Module) addBigFloat(ord int64, keyPtr, keyLength, valPtr, valLength int
 	}
 
 	m.CurrentInstance.outputStore.SumBigFloat(uint64(ord), key, toAdd)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addBigFloat  %q", m.name, key))
 }
 
 func (m *Module) addInt64(ord int64, keyPtr, keyLength int32, value int64) {
@@ -86,6 +92,8 @@ func (m *Module) addInt64(ord int64, keyPtr, keyLength int32, value int64) {
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SumInt64(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addInt64  %q", m.name, key))
+
 }
 
 func (m *Module) addFloat64(ord int64, keyPtr, keyLength int32, value float64) {
@@ -95,7 +103,7 @@ func (m *Module) addFloat64(ord int64, keyPtr, keyLength int32, value float64) {
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SumFloat64(uint64(ord), key, value)
-
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addFloat64 %q", m.name, key))
 }
 
 func (m *Module) setMinInt64(ord int64, keyPtr, keyLength int32, value int64) {
@@ -105,6 +113,7 @@ func (m *Module) setMinInt64(ord int64, keyPtr, keyLength int32, value int64) {
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SetMinInt64(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinInt64 %q", m.name, key))
 }
 
 func (m *Module) setMinBigint(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -117,6 +126,7 @@ func (m *Module) setMinBigint(ord int64, keyPtr, keyLength, valPtr, valLength in
 
 	toSet, _ := new(big.Int).SetString(value, 10)
 	m.CurrentInstance.outputStore.SetMinBigInt(uint64(ord), key, toSet)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinBigint %q", m.name, key))
 }
 
 func (m *Module) setMinfloat64(ord int64, keyPtr, keyLength int32, value float64) {
@@ -126,6 +136,7 @@ func (m *Module) setMinfloat64(ord int64, keyPtr, keyLength int32, value float64
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SetMinFloat64(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinfloat64 %q", m.name, key))
 }
 
 func (m *Module) setMinBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -141,6 +152,7 @@ func (m *Module) setMinBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength 
 		returnStateError(fmt.Errorf("parsing bigfloat: %w", err))
 	}
 	m.CurrentInstance.outputStore.SetMinBigFloat(uint64(ord), key, toSet)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinBigfloat %q", m.name, key))
 }
 
 func (m *Module) setMaxInt64(ord int64, keyPtr, keyLength int32, value int64) {
@@ -150,6 +162,7 @@ func (m *Module) setMaxInt64(ord int64, keyPtr, keyLength int32, value int64) {
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SetMaxInt64(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxInt64 %q", m.name, key))
 }
 
 func (m *Module) setMaxBigint(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -161,6 +174,7 @@ func (m *Module) setMaxBigint(ord int64, keyPtr, keyLength, valPtr, valLength in
 
 	toSet, _ := new(big.Int).SetString(value, 10)
 	m.CurrentInstance.outputStore.SetMaxBigInt(uint64(ord), key, toSet)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxBigInt %q", m.name, key))
 }
 
 func (m *Module) setMaxFloat64(ord int64, keyPtr, keyLength int32, value float64) {
@@ -170,6 +184,7 @@ func (m *Module) setMaxFloat64(ord int64, keyPtr, keyLength int32, value float64
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SetMaxFloat64(uint64(ord), key, value)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxFloat64 %q", m.name, key))
 }
 
 func (m *Module) setMaxBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -184,6 +199,7 @@ func (m *Module) setMaxBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength 
 		returnStateError(fmt.Errorf("parsing bigfloat: %w", err))
 	}
 	m.CurrentInstance.outputStore.SetMaxBigFloat(uint64(ord), key, toSet)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxBigfloat %q", m.name, key))
 }
 
 func (m *Module) getAt(storeIndex int32, ord int64, keyPtr, keyLength, outputPtr int32) int32 {
@@ -193,6 +209,7 @@ func (m *Module) getAt(storeIndex int32, ord int64, keyPtr, keyLength, outputPtr
 	readStore := m.CurrentInstance.inputStores[storeIndex]
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value, found := readStore.GetAt(uint64(ord), key)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.getAt %q: found:%t", m.name, key, found))
 	if !found {
 		return 0
 	}
@@ -211,6 +228,7 @@ func (m *Module) getFirst(storeIndex int32, keyPtr, keyLength, outputPtr int32) 
 	readStore := m.CurrentInstance.inputStores[storeIndex]
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value, found := readStore.GetFirst(key)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.getFirst %q: found:%t", m.name, key, found))
 	if !found {
 		return 0
 	}
@@ -230,6 +248,7 @@ func (m *Module) getLast(storeIndex int32, keyPtr, keyLength, outputPtr int32) i
 
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value, found := readStore.GetLast(key)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.getLast %q: found:%t", m.name, key, found))
 	if !found {
 		return 0
 	}

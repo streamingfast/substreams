@@ -295,9 +295,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	p.moduleOutputs = nil
-	p.wasmOutputs = map[string][]byte{}
-
 	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
 	for p.nextStoreSaveBoundary <= blockNum {
 		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
@@ -329,7 +326,11 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	for _, executor := range p.moduleExecutors {
 		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
 		if err != nil {
-			return fmt.Errorf("running module executor: %w", err)
+			if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
+				return fmt.Errorf("progress error: %w", returnErr)
+			}
+
+			return io.EOF
 		}
 	}
 
@@ -351,6 +352,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		s.Flush()
 	}
 
+	p.moduleOutputs = nil
+	p.wasmOutputs = map[string][]byte{}
+
 	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
 }
@@ -363,7 +367,20 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
+	err := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
+	if err != nil {
+		logs, truncated := executor.moduleLogs()
+		outputData := executor.moduleOutputData()
+		if len(logs) != 0 || outputData != nil {
+			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name:          executorName,
+				Data:          outputData,
+				Logs:          logs,
+				LogsTruncated: truncated,
+			})
+		}
+		return fmt.Errorf("running module: %w", err)
+	}
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()
@@ -376,13 +393,6 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 				LogsTruncated: truncated,
 			})
 		}
-	}
-
-	if executionError != nil {
-		if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
-			return fmt.Errorf("progress error: %w", returnErr)
-		}
-		return fmt.Errorf("exec error: %w", executionError)
 	}
 
 	executor.Reset()
@@ -464,7 +474,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 			reason = err.Error()
 		}
 
-		// FIXME(abourget): eventually, would we also return the data for each of
+		//FIXME(abourget): eventually, would we also return the data for each of
 		// the modules that produced some?
 		if len(moduleOutput.Logs) != 0 || len(reason) != 0 {
 			out = append(out, &pbsubstreams.ModuleProgress{
@@ -472,7 +482,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 				Type: &pbsubstreams.ModuleProgress_Failed_{
 					Failed: &pbsubstreams.ModuleProgress_Failed{
 						Reason:        reason,
-						Logs:          moduleOutput.Logs,
+						Logs:          failedExecutor.getCurrentExecutionStack(),
 						LogsTruncated: moduleOutput.LogsTruncated,
 					},
 				},
@@ -480,6 +490,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 		}
 	}
 
+	zlog.Debug("return failed progress", zap.Int("progress_len", len(out)))
 	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 

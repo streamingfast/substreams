@@ -3,12 +3,11 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"time"
 
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
 )
 
@@ -63,21 +62,33 @@ func (s *Scheduler) Launch(ctx context.Context, requestModules *pbsubstreams.Mod
 
 func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job, requestModules *pbsubstreams.Modules) error {
 	var partialsWritten []*block.Range
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		var err error
+	var err error
+
+out:
+	for i := 0; uint64(i) < 3; i++ {
 		partialsWritten, err = jobWorker.Run(ctx, job, s.workerPool.JobStats, requestModules, s.respFunc)
-		if err != nil {
-			return err
+
+		switch err.(type) {
+		case *RetryableErr:
+			zlog.Debug("retryable error")
+			continue
+		default:
+			zlog.Debug("not a retryable error")
+			break out
 		}
-		return nil
-	})
-	s.workerPool.ReturnWorker(jobWorker)
-	if err != nil {
-		return err
 	}
 
-	if err = s.squasher.Squash(job.moduleName, partialsWritten); err != nil {
-		return fmt.Errorf("squashing: %w", err)
+	if err != nil {
+		zlog.Error("error after worker", zap.Error(err))
+		return err
 	}
+	s.workerPool.ReturnWorker(jobWorker)
+
+	if partialsWritten != nil {
+		if err := s.squasher.Squash(job.moduleName, partialsWritten); err != nil {
+			return fmt.Errorf("squashing: %w", err)
+		}
+	}
+
 	return nil
 }

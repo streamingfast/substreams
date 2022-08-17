@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose"
@@ -354,7 +353,7 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 					Number:    item.BlockNum,
 					Timestamp: item.Timestamp,
 				},
-				Step:   pbsubstreams.StepToProto(bstream.StepIrreversible),
+				Step:   pbsubstreams.ForkStep_STEP_IRREVERSIBLE,
 				Cursor: item.Cursor,
 			}
 

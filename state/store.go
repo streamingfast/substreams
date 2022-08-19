@@ -140,7 +140,7 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 		if err = json.Unmarshal(data, &kv); err != nil {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
-		//s.KV = kv
+		s.KV = kv
 
 		zlog.Debug("unmarshalling kv", zap.String("file_name", stateFileName), zap.Object("store", s))
 		return nil

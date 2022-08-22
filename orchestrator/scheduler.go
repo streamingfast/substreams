@@ -85,7 +85,7 @@ out:
 	s.workerPool.ReturnWorker(jobWorker)
 
 	if partialsWritten != nil {
-		if err := s.squasher.Squash(job.moduleName, partialsWritten); err != nil {
+		if err := s.squasher.Squash(job.ModuleName, partialsWritten); err != nil {
 			return fmt.Errorf("squashing: %w", err)
 		}
 	}

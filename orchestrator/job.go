@@ -9,8 +9,8 @@ import (
 )
 
 type Job struct {
+	ModuleName   string // target
 	requestRange *block.Range
-	moduleName   string // target
 	priority     int
 	scheduled    bool
 
@@ -19,7 +19,7 @@ type Job struct {
 
 func NewJob(storeName string, requestRange *block.Range, ancestorStoreModules []*pbsubstreams.Module, totalJobs, myJobIndex int) *Job {
 	j := &Job{
-		moduleName:   storeName,
+		ModuleName:   storeName,
 		requestRange: requestRange,
 	}
 	j.defineDependencies(ancestorStoreModules)
@@ -28,14 +28,10 @@ func NewJob(storeName string, requestRange *block.Range, ancestorStoreModules []
 }
 
 func (j *Job) defineDependencies(stores []*pbsubstreams.Module) {
-	blockNum := j.requestRange.StartBlock
 	for _, store := range stores {
-		if blockNum <= store.InitialBlock {
-			continue
-		}
-
 		j.deps = append(j.deps, &jobDependency{
 			storeName: store.Name,
+			resolved:  false,
 		})
 	}
 }
@@ -64,7 +60,7 @@ func (j *Job) createRequest(originalModules *pbsubstreams.Modules) *pbsubstreams
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
 		Modules:       originalModules,
-		OutputModules: []string{j.moduleName},
+		OutputModules: []string{j.ModuleName},
 	}
 }
 
@@ -98,11 +94,11 @@ func (d *jobDependency) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 func (j *Job) String() string {
-	return fmt.Sprintf("job: module=%s range=%s", j.moduleName, j.requestRange)
+	return fmt.Sprintf("job: module=%s range=%s", j.ModuleName, j.requestRange)
 }
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("module_name", j.moduleName)
+	enc.AddString("module_name", j.ModuleName)
 	enc.AddUint64("start_block", j.requestRange.StartBlock)
 	enc.AddUint64("end_block", j.requestRange.ExclusiveEndBlock)
 	//enc.AddArray("deps", j.deps)

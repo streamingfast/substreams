@@ -150,7 +150,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 	}
 
 	jobStat := &JobStat{
-		ModuleName:   job.moduleName,
+		ModuleName:   job.ModuleName,
 		RequestRange: job.requestRange,
 		StartAt:      time.Now(),
 		CurrentBlock: job.requestRange.StartBlock,

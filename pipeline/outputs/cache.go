@@ -47,7 +47,7 @@ type OutputCache struct {
 }
 
 func (c *OutputCache) currentFilename() string {
-	return computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
+	return ComputeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
 }
 
 type ModulesOutputCache struct {
@@ -160,17 +160,30 @@ func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte)
 	return nil
 }
 
-func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool, error) {
+func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	cacheItem, found := c.kv[clock.Id]
 
 	if !found {
-		return nil, false, nil
+		return nil, false
 	}
 
-	return cacheItem.Payload, found, nil
+	return cacheItem.Payload, found
+}
+
+func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for _, value := range c.kv {
+		if value.BlockNum == blockNumber {
+			return value.Payload, true
+		}
+	}
+
+	return nil, false
 }
 
 func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
@@ -182,6 +195,8 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 	if err != nil {
 		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
 	}
+
+	zlog.Debug("block range found", zap.Object("block_range", blockRange))
 
 	if !found {
 		blockRange = block.NewRange(atBlock, atBlock+c.saveBlockInterval)
@@ -200,7 +215,7 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 	zlog.Debug("loading cache", zap.String("module_name", c.ModuleName), zap.Object("range", blockRange))
 	c.kv = make(outputKV)
 
-	filename := computeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
+	filename := ComputeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
 	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", blockRange))
 
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -354,7 +369,7 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 	return block.NewRange(prefixStartBlock, exclusiveEndBlock), true, nil
 }
 
-func computeDBinFilename(startBlock, stopBlock uint64) string {
+func ComputeDBinFilename(startBlock, stopBlock uint64) string {
 	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
 }
 

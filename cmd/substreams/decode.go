@@ -10,15 +10,20 @@ import (
 	"strings"
 )
 
+// todo: split this on 2 commands: for store and mapper output
 var decodeCmd = &cobra.Command{
-	Use:          "decode <manifest_file> <protobuf_definition> <protobuf_bytes>",
+	Use:          "decode <manifest_file> <protobuf_definition> <output_url> <block_number>",
 	Short:        "Decode base 64 encoded bytes to protobuf data structure",
 	RunE:         runDecode,
 	Args:         cobra.ExactArgs(3),
 	SilenceUsage: true,
 }
 
+//todo:
+// add block number, gcp link and decode base64 field is payload
+
 func init() {
+	decodeCmd.Flags().Uint("save-interval", 1000)
 	rootCmd.AddCommand(decodeCmd)
 }
 

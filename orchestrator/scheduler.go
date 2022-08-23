@@ -82,7 +82,6 @@ out:
 	s.workerPool.ReturnWorker(jobWorker)
 
 	if err != nil {
-		zlog.Error("error after worker", zap.Error(err))
 		return err
 	}
 

@@ -143,7 +143,6 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
-		jobLogger.Error("getting block stream", zap.Error(err))
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
 	}
 	defer func() {

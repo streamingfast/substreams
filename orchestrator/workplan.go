@@ -23,7 +23,7 @@ func (p WorkPlan) SquashPartialsPresent(squasher *Squasher) error {
 	return nil
 }
 
-func (p WorkPlan) ProgressMessages(hostname string) (out []*pbsubstreams.ModuleProgress) {
+func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p {
 		if unit.initialStoreFile == nil {
 			continue

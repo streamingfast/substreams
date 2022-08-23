@@ -263,10 +263,10 @@ func TestRustScript(t *testing.T) {
 			rpcProv := &testWasmExtension{}
 			runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
 
-			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, c.functionName)
+			module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", c.functionName)
 			require.NoError(t, err)
 
-			instance, err := module.NewInstance(&pbsubstreams.Clock{}, c.functionName, nil)
+			instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
 			require.NoError(t, err)
 			instance.SetOutputStore(c.builder)
 			err = instance.Execute()
@@ -276,20 +276,44 @@ func TestRustScript(t *testing.T) {
 	}
 }
 
-func Test_MakeItCrash(t *testing.T) {
+func Test_Recursion(t *testing.T) {
 	t.Skip()
-	file, err := os.Open("./pkg/testing_substreams_bg.wasm")
+	wasmFilePath := test_wasm_path(t, "testing_substreams.wasm")
+	file, err := os.Open(wasmFilePath)
 	require.NoError(t, err)
 	byteCode, err := ioutil.ReadAll(file)
 	require.NoError(t, err)
 
-	//done := make(chan interface{})
+	rpcProv := &testWasmExtension{}
+	runtime := wasm.NewRuntime([]wasm.WASMExtensioner{rpcProv})
 
-	//mutex := sync.Mutex{}
+	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "module.1", "test_recursion")
+	require.NoError(t, err)
+
+	instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
+	require.NoError(t, err)
+	err = instance.ExecuteWithArgs(9000)
+	//err = instance.ExecuteWithArgs(3)
+	require.NoError(t, err)
+
+	for _, log := range instance.Logs {
+		fmt.Println("log:", log)
+	}
+}
+
+func Test_MakeItCrash(t *testing.T) {
+	t.Skip()
+
+	file, err := os.Open(test_wasm_path(t, "testing_substreams.wasm"))
+	require.NoError(t, err)
+	byteCode, err := ioutil.ReadAll(file)
+	require.NoError(t, err)
+
+	ctx := context.Background()
 	wg := sync.WaitGroup{}
 	data := make([]byte, (1024*1024)*1)
 	runtime := wasm.NewRuntime(nil)
-	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "test_make_it_crash")
+	module, err := runtime.NewModule(context.Background(), &pbsubstreams.Request{}, byteCode, "test_make_it_crash", "test_make_it_crash")
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
 		fmt.Println("iteration:", i)
@@ -297,17 +321,13 @@ func Test_MakeItCrash(t *testing.T) {
 		for j := 0; j < 100; j++ {
 			wg.Add(1)
 			go func(id int) {
-				//fmt.Print(id, "-")
-				//runtime.LockOSThread()
-
-				instance, err := module.NewInstance(&pbsubstreams.Clock{}, "test_make_it_crash", nil)
+				instance, err := module.NewInstance(&pbsubstreams.Clock{}, nil)
+				require.NoError(t, err)
 				time.Sleep(10 * time.Millisecond)
-				ptr, err := instance.Heap().Write(data)
+				ptr, err := module.Heap.Write(data, "test")
 
 				require.NoError(t, err)
-				err = instance.ExecuteWithArgs(ptr, int32(len(data)))
-
-				//mutex.Unlock()
+				err = instance.ExecuteWithArgs(ctx, uint64(ptr), uint64(len(data)))
 
 				require.NoError(t, err)
 				require.Equal(t, len(data), len(instance.Output()))
@@ -321,12 +341,12 @@ func Test_MakeItCrash(t *testing.T) {
 	}
 }
 
-func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...state.BuilderOption) *state.Store {
+func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...state.StoreOption) *state.Store {
 	t.Helper()
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}
-	builder, err := state.NewBuilder(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	builder, err := state.NewStore(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
 	if err != nil {
 		panic(err)
 	}

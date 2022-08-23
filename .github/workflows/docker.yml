@@ -1,60 +1,43 @@
----
 name: Build docker image
 
 on:
   push:
     tags:
-      - "v*"
+      - "[a-z0-9]+-v*"
     branches:
-      - "master"
-      - "develop"
-      - "release/v*"
+      - develop
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
+  build-and-push-image:
     runs-on: ubuntu-20.04
-
     permissions:
       contents: read
       packages: write
 
-    strategy:
-      matrix:
-        go-version: [1.18.x]
-
-    outputs:
-      tags: ${{ steps.meta.outputs.tags }}
-
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Go
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.18.x
 
-      - uses: actions/cache@v3
-        id: cache-go
+      - uses: actions/cache@v2
         with:
           path: |
-            ~/.cache/go-build
             ~/go/pkg/mod
+            ~/.cache/go-build
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Branch name
-        id: extract_branch
-        shell: bash
-        run: |
-          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-          echo "##[set-output name=release_train;]$(echo ${GITHUB_REF#refs/heads/release/})"
-
-      - name: Build
-        run: go build -v -ldflags "-X main.version=${{ github.event.ref }} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%MZ)" -o ./substreams ./cmd/substreams
+      - name: Build Binary
+        run: go build -v -o ./substreams ./cmd/substreams
 
       - name: Log in to the Container registry
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
@@ -70,8 +53,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
-            type=sha,prefix=,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/v') }}
-            type=raw,enable=${{ github.ref == 'refs/heads/master' }},value=master
+            type=sha,prefix=,enable=${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dockerbuild' || startsWith(github.ref, 'refs/heads/release/v') }}
             type=raw,enable=${{ github.ref == 'refs/heads/develop' }},value=develop
             type=raw,enable=${{ startsWith(github.ref, 'refs/heads/release/v') }},value=${{ steps.extract_branch.outputs.release_train }}
           flavor: |
@@ -81,19 +63,8 @@ jobs:
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
+          file: ./Dockerfile.github
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          # org.opencontainers.image.version will match the tag name
           labels: ${{ steps.meta.outputs.labels }}
-
-  slack-notifications:
-    needs: [build]
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Slack notification
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        uses: Ilshidur/action-slack@2.0.2
-        with:
-          args: |
-            :done: *${{ github.repository }}* Success building docker image from ${{ github.ref_type }} _${{ github.ref_name }}_ (${{ github.actor }}) :sparkling_heart: ```${{ join(needs.build.outputs.tags, ' ') }}```
-

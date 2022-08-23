@@ -5,15 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose"
 	firehoseServer "github.com/streamingfast/firehose/server"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -48,8 +48,12 @@ type Service struct {
 
 	grpcClientFactory substreams.GrpcClientFactory
 
+	workerPool *orchestrator.WorkerPool
+
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
+
+	cacheEnabled bool
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -64,38 +68,6 @@ func (s *Service) WasmExtensions() []wasm.WASMExtensioner {
 	return s.wasmExtensions
 }
 
-type Option func(*Service)
-
-func WithWASMExtension(ext wasm.WASMExtensioner) Option {
-	return func(s *Service) {
-		s.wasmExtensions = append(s.wasmExtensions, ext)
-	}
-}
-
-func WithPipelineOptions(f pipeline.PipelineOptioner) Option {
-	return func(s *Service) {
-		s.pipelineOptions = append(s.pipelineOptions, f)
-	}
-}
-
-func WithPartialMode() Option {
-	return func(s *Service) {
-		s.partialModeEnabled = true
-	}
-}
-
-func WithStoresSaveInterval(block uint64) Option {
-	return func(s *Service) {
-		s.storesSaveInterval = block
-	}
-}
-
-func WithOutCacheSaveInterval(block uint64) Option {
-	return func(s *Service) {
-		s.outputCacheSaveBlockInterval = block
-	}
-}
-
 func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams.GrpcClientFactory, parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
 	s := &Service{
 		baseStateStore:            stateStore,
@@ -103,6 +75,7 @@ func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams
 		grpcClientFactory:         grpcClientFactory,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
+		workerPool:                orchestrator.NewWorkerPool(parallelSubRequests, grpcClientFactory),
 	}
 
 	for _, opt := range opts {
@@ -125,21 +98,27 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	ctx := streamSrv.Context()
 	logger := logging.Logger(ctx, s.logger)
 
-	//hostname, err := os.Hostname()
-	//if err != nil {
-	//	logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
-	//	hostname = "unknown"
-	//}
-	//md := metadata.New(map[string]string{"host": hostname})
-	//err = streamSrv.SendHeader(md)
-	//if err != nil {
-	//	logger.Warn("cannot send header metadata", zap.Error(err))
-	//}
+	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+			hostname = "unknown host"
+		}
+		md := metadata.New(map[string]string{"host": hostname})
+		err = streamSrv.SetHeader(md)
+		if err != nil {
+			logger.Warn("cannot send header metadata", zap.Error(err))
+		}
+	}
 
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
 		zlog.Error("invalid negative startblock (not handled in substreams)", zap.Int64("start_block", request.StartBlockNum))
 		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
+	}
+
+	if request.Modules == nil {
+		return status.Error(codes.InvalidArgument, "no modules found in request")
 	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {
@@ -173,6 +152,20 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 	}
 
+	/*
+		this entire `if` is not good, the ctx is from the StreamServer so there
+		is no substreams-partial-mode, we actually set the partialModeEnabled
+		on the service when substreams-partial-mode-enabled is set to true
+
+			if s.partialModeEnabled {
+				opts = append(opts, pipeline.WithPartialModeEnabled(true))
+			}
+	*/
+
+	if s.partialModeEnabled {
+		opts = append(opts, pipeline.WithPartialModeEnabled(true))
+	}
+
 	isSubrequest := false
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
@@ -192,6 +185,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
 	}
+
+	if s.cacheEnabled {
+		opts = append(opts, pipeline.WithCacheEnabled(true))
+	}
+
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			return NewErrSendBlock(err)
@@ -199,6 +197,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
+	// TODO: check p.cacheEnabled here also if we make this condition back to true
 	if false && !isSubrequest && len(request.OutputModules) == 1 && len(request.InitialStoreSnapshotForModules) == 0 {
 		moduleName := request.OutputModules[0]
 		module, err := graph.Module(moduleName)
@@ -230,15 +229,13 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	}
 
-	workerPool := orchestrator.NewWorkerPool(s.parallelSubRequests, request.Modules, s.grpcClientFactory)
-
 	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
-		StartBlockNum: request.StartBlockNum,
-		StopBlockNum:  request.StopBlockNum,
-		StartCursor:   request.StartCursor,
-		ForkSteps:     []pbfirehose.ForkStep{pbfirehose.ForkStep_STEP_IRREVERSIBLE},
+		StartBlockNum:   request.StartBlockNum,
+		StopBlockNum:    request.StopBlockNum,
+		Cursor:          request.StartCursor,
+		FinalBlocksOnly: true,
 		// FIXME(abourget), right now, the pbsubstreams.Request has a
 		// ForkSteps that we IGNORE. Eventually, we will want to honor
 		// it, but ONLY when we are certain that our Pipeline supports
@@ -247,7 +244,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// perhaps on the day we actually support it in the Firehose :)
 	}
 
-	if err := pipe.Init(workerPool); err != nil {
+	if err := pipe.Init(s.workerPool); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
@@ -255,7 +252,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		zap.Int64("start_block", firehoseReq.StartBlockNum),
 		zap.Uint64("end_block", firehoseReq.StopBlockNum),
 	)
-	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, zap.NewNop())
+	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, false, zap.NewNop())
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}
@@ -268,7 +265,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			partialsWritten := []string{strings.Join(d, ",")}
 			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
 			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
-
 			return nil
 		}
 
@@ -357,7 +353,7 @@ func sendCachedModuleOutput(ctx context.Context, startBlock, stopBlock uint64, m
 					Number:    item.BlockNum,
 					Timestamp: item.Timestamp,
 				},
-				Step:   pbsubstreams.StepToProto(bstream.StepIrreversible),
+				Step:   pbsubstreams.ForkStep_STEP_IRREVERSIBLE,
 				Cursor: item.Cursor,
 			}
 

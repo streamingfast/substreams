@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"runtime/debug"
 	"strings"
 
@@ -71,7 +70,9 @@ type Pipeline struct {
 	outputCacheSaveBlockInterval uint64
 	subrequestSplitSize          int
 	grpcClientFactory            substreams.GrpcClientFactory
-	hostname                     string
+
+	cacheEnabled       bool
+	partialModeEnabled bool
 }
 
 func New(
@@ -86,12 +87,6 @@ func New(
 	subrequestSplitSize int,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		zlog.Warn("cannot find local hostname, using 'unknown'")
-		hostname = "unknown"
-	}
 
 	pipe := &Pipeline{
 		context: ctx,
@@ -140,17 +135,19 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
 
-	for _, module := range p.modules {
-		isOutput := p.outputModuleMap[module.Name]
+	if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
+		for _, module := range p.modules {
+			isOutput := p.outputModuleMap[module.Name]
 
-		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
-			return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
-		}
+			if isOutput && p.requestedStartBlockNum < module.InitialBlock {
+				return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
+			}
 
-		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
-		_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
-		if err != nil {
-			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+			hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
+			_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
+			if err != nil {
+				return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
+			}
 		}
 	}
 
@@ -162,7 +159,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	}
 
 	// Fetch the stores
-	if p.isSubrequest {
+	if p.isSubrequest { // this is actually never gone in because of the wrong `if` statement in service.go
 		// truncateLeaf()
 		totalOutputModules := len(p.request.OutputModules)
 		outputName := p.request.OutputModules[0]
@@ -209,6 +206,8 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 				return fmt.Errorf("send initial snapshots: %w", err)
 			}
 		}
+
+		p.partialModeEnabled = false
 	}
 
 	p.initStoreSaveBoundary()
@@ -218,10 +217,12 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
-	for _, cache := range p.moduleOutputCache.OutputCaches {
-		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
-		if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
-			return fmt.Errorf("loading outputs caches")
+	if p.cacheEnabled || p.partialModeEnabled { // always load cache when you are in partialMode
+		for _, cache := range p.moduleOutputCache.OutputCaches {
+			atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
+			if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
+				return fmt.Errorf("loading outputs caches")
+			}
 		}
 	}
 
@@ -296,8 +297,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	if step == bstream.StepIrreversible {
-		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-			return fmt.Errorf("updating module output cache on irreversible step: %w", err)
+		if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
+			if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+				return fmt.Errorf("updating module output cache: %w", err)
+			}
 		}
 	}
 
@@ -317,9 +320,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	p.moduleOutputs = nil
-	p.wasmOutputs = map[string][]byte{}
-
 	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
 	for p.nextStoreSaveBoundary <= blockNum {
 		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
@@ -332,11 +332,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
-		zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
-		if err := p.moduleOutputCache.Flush(ctx); err != nil {
-			return fmt.Errorf("saving partial caches")
+		if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
+			zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
+			if err := p.moduleOutputCache.Flush(ctx); err != nil {
+				return fmt.Errorf("saving partial caches")
+			}
+			return io.EOF
 		}
-		return io.EOF
 	}
 
 	if err = p.assignSource(block); err != nil {
@@ -344,9 +346,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(executor, cursor.ToOpaque())
+		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
 		if err != nil {
-			return fmt.Errorf("running module executor: %w", err)
+			if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
+				return fmt.Errorf("progress error: %w", returnErr)
+			}
+
+			return io.EOF
 		}
 	}
 
@@ -370,6 +376,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		s.Flush()
 	}
 
+	p.moduleOutputs = nil
+	p.wasmOutputs = map[string][]byte{}
+
 	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
 }
@@ -378,7 +387,7 @@ func (p *Pipeline) PartialsWritten() block.Ranges {
 	return p.partialsWritten
 }
 
-func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
+func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cursor string) error {
 	//FIXME(abourget): should we ever skip that work?
 	// if executor.ModuleInitialBlock < block.Number {
 	// 	continue ??
@@ -386,7 +395,20 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 	executorName := executor.Name()
 	zlog.Debug("executing", zap.String("module_name", executorName))
 
-	executionError := executor.run(p.wasmOutputs, p.clock, cursor)
+	err := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
+	if err != nil {
+		logs, truncated := executor.moduleLogs()
+		outputData := executor.moduleOutputData()
+		if len(logs) != 0 || outputData != nil {
+			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+				Name:          executorName,
+				Data:          outputData,
+				Logs:          logs,
+				LogsTruncated: truncated,
+			})
+		}
+		return fmt.Errorf("running module: %w", err)
+	}
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()
@@ -401,13 +423,6 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, cursor string) error {
 			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
 			p.forkHandler.addModuleOutput(moduleOutput, p.clock.Number)
 		}
-	}
-
-	if executionError != nil {
-		if returnErr := p.returnFailureProgress(executionError, executor); returnErr != nil {
-			return fmt.Errorf("progress error: %w", returnErr)
-		}
-		return fmt.Errorf("exec error: %w", executionError)
 	}
 
 	executor.Reset()
@@ -459,6 +474,27 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 	return nil
 }
 
+//func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
+//	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+//	protoStep, skip := pbsubstreams.StepToProto(step, true) //FIXME stepd irreversible only
+//	if skip {
+//		return nil
+//	}
+//
+//	out := &pbsubstreams.BlockScopedData{
+//		Outputs: p.moduleOutputs,
+//		Clock:   p.clock,
+//		Step:    protoStep,
+//		Cursor:  cursor.ToOpaque(),
+//	}
+//
+//	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+//		return fmt.Errorf("calling return func: %w", err)
+//	}
+//
+//	return nil
+//}
+
 func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
 	var out []*pbsubstreams.ModuleProgress
 
@@ -468,7 +504,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 			reason = err.Error()
 		}
 
-		// FIXME(abourget): eventually, would we also return the data for each of
+		//FIXME(abourget): eventually, would we also return the data for each of
 		// the modules that produced some?
 		if len(moduleOutput.Logs) != 0 || len(reason) != 0 {
 			out = append(out, &pbsubstreams.ModuleProgress{
@@ -476,7 +512,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 				Type: &pbsubstreams.ModuleProgress_Failed_{
 					Failed: &pbsubstreams.ModuleProgress_Failed{
 						Reason:        reason,
-						Logs:          moduleOutput.Logs,
+						Logs:          failedExecutor.getCurrentExecutionStack(),
 						LogsTruncated: moduleOutput.LogsTruncated,
 					},
 				},
@@ -484,6 +520,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 		}
 	}
 
+	zlog.Debug("return failed progress", zap.Int("progress_len", len(out)))
 	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
@@ -589,7 +626,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		modName := module.Name // to ensure it's enclosed
 		entrypoint := module.BinaryEntrypoint
 		code := p.request.Modules.Binaries[module.BinaryIndex]
-		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name)
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name, entrypoint)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
@@ -598,16 +635,21 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 		case *pbsubstreams.Module_KindMap_:
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
+			baseExecutor := BaseExecutor{
+				moduleName: module.Name,
+				wasmModule: wasmModule,
+				entrypoint: entrypoint,
+				wasmInputs: inputs,
+				isOutput:   isOutput,
+			}
+
+			if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
+				baseExecutor.cache = p.moduleOutputCache.OutputCaches[module.Name]
+			}
+
 			executor := &MapperModuleExecutor{
-				BaseExecutor: BaseExecutor{
-					moduleName: module.Name,
-					wasmModule: wasmModule,
-					entrypoint: entrypoint,
-					wasmInputs: inputs,
-					isOutput:   isOutput,
-					cache:      p.moduleOutputCache.OutputCaches[module.Name],
-				},
-				outputType: outType,
+				BaseExecutor: baseExecutor,
+				outputType:   outType,
 			}
 
 			p.moduleExecutors = append(p.moduleExecutors, executor)
@@ -628,16 +670,21 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 				ValueType:    valueType,
 			})
 
+			baseExecutor := BaseExecutor{
+				moduleName: modName,
+				isOutput:   isOutput,
+				wasmModule: wasmModule,
+				entrypoint: entrypoint,
+				wasmInputs: inputs,
+			}
+
+			if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
+				baseExecutor.cache = p.moduleOutputCache.OutputCaches[module.Name]
+			}
+
 			s := &StoreModuleExecutor{
-				BaseExecutor: BaseExecutor{
-					moduleName: modName,
-					isOutput:   isOutput,
-					wasmModule: wasmModule,
-					entrypoint: entrypoint,
-					wasmInputs: inputs,
-					cache:      p.moduleOutputCache.OutputCaches[module.Name],
-				},
-				outputStore: outputStore,
+				BaseExecutor: baseExecutor,
+				outputStore:  outputStore,
 			}
 
 			p.moduleExecutors = append(p.moduleExecutors, s)
@@ -674,7 +721,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error) {
 	storeMap = map[string]*state.Store{}
 	for _, storeModule := range p.storeModules {
-		newStore, err := state.NewBuilder(
+		newStore, err := state.NewStore(
 			storeModule.Name,
 			p.storeSaveInterval,
 			storeModule.InitialBlock,

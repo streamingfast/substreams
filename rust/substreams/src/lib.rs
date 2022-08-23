@@ -68,6 +68,8 @@
 //!     // to something
 //! }
 //!```
+extern crate core;
+
 pub mod errors;
 mod externs;
 pub mod handlers;

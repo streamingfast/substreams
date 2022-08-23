@@ -42,7 +42,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run Tests
-        run: |
-          go generate ./...
-          go test ./...
+        run: ./bin/test.sh
 
+      - name: Build
+        run: go build ./...

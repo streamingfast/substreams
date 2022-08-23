@@ -6,16 +6,16 @@ require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jhump/protoreflect v1.12.0
-	github.com/spf13/cobra v1.3.0
+	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20220622120622-82cc2635749d
+	github.com/streamingfast/bstream v0.0.2-0.20220810182344-114d9f8705b2
 	github.com/streamingfast/cli v0.0.3
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
-	github.com/streamingfast/firehose v0.1.1-0.20220601134123-59f857d9b75e
+	github.com/streamingfast/firehose v0.1.1-0.20220810182727-6f3191de9804
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
-	github.com/streamingfast/pbgo v0.0.6-0.20220428192744-f80aee7d4688
+	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e
 	github.com/stretchr/testify v1.7.1
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.21.0
@@ -23,18 +23,16 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
-replace (
-	github.com/wasmerio/wasmer-go v1.0.4 => github.com/streamingfast/wasmer-go v1.0.5-0.20220512181019-cd8b01df1543
-	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
-)
+replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 
 require (
+	github.com/bytecodealliance/wasmtime-go v0.39.0
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
 	github.com/mattn/go-isatty v0.0.14
-	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2
+	github.com/streamingfast/shutter v1.5.0
+	github.com/test-go/testify v1.1.4
 	github.com/tidwall/pretty v1.2.0
-	github.com/wasmerio/wasmer-go v1.0.4
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	google.golang.org/grpc v1.44.0
@@ -62,7 +60,7 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/go-cmp v0.5.7 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
@@ -103,7 +101,6 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447 // indirect
 	github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
-	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect

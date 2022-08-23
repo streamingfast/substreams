@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBuilder_Merge(t *testing.T) {
+func TestStore_Merge(t *testing.T) {
 	tests := []struct {
 		name            string
 		latest          *Store
@@ -20,28 +20,28 @@ func TestBuilder_Merge(t *testing.T) {
 	}{
 		{
 			name:          "incompatible merge strategies",
-			latest:        mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
+			latest:        mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
 			latestKV:      map[string][]byte{},
-			prev:          mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
+			prev:          mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
 			prevKV:        map[string][]byte{},
 			expectedError: true,
 		},
 		{
 			name:          "incompatible value types",
-			latest:        mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
+			latest:        mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
 			latestKV:      map[string][]byte{},
-			prev:          mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeBigFloat, nil),
+			prev:          mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeBigFloat, nil),
 			prevKV:        map[string][]byte{},
 			expectedError: true,
 		},
 		{
 			name:   "replace (latest wins)",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("foo"),
 				"two": []byte("bar"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("baz"),
 				"three": []byte("lol"),
@@ -55,12 +55,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "ignore (previous wins)",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("foo"),
 				"two": []byte("bar"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("baz"),
 				"three": []byte("lol"),
@@ -74,12 +74,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "append",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("foo;"),
 				"two": []byte("bar;"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("baz;"),
 				"three": []byte("lol;"),
@@ -93,12 +93,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_int",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("1"),
 				"three": []byte("3"),
@@ -112,12 +112,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_big_int",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigInt, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigInt, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigInt, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigInt, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("1"),
 				"three": []byte("3"),
@@ -131,12 +131,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_int",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeInt64, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeInt64, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeInt64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -150,12 +150,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_big_int",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigInt, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigInt, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigInt, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigInt, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -169,12 +169,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_int",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeInt64, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeInt64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeInt64, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeInt64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -188,12 +188,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_big_int",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigInt, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigInt, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigInt, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigInt, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
@@ -207,12 +207,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_float",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeFloat64, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeFloat64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeFloat64, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeFloat64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("10.1"),
 				"three": []byte("30.1"),
@@ -226,12 +226,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "sum_big_float",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigFloat, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigFloat, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigFloat, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigFloat, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("10.1"),
 				"three": []byte("30.1"),
@@ -245,12 +245,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_float",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeFloat64, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeFloat64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeFloat64, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeFloat64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -264,12 +264,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "min_big_float",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigFloat, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigFloat, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigFloat, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigFloat, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -283,12 +283,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_float",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeFloat64, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeFloat64, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeFloat64, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeFloat64, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -302,12 +302,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "max_big_float",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigFloat, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigFloat, nil),
 			latestKV: map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
 			},
-			prev: mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigFloat, nil),
+			prev: mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigFloat, nil),
 			prevKV: map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
@@ -321,12 +321,12 @@ func TestBuilder_Merge(t *testing.T) {
 		},
 		{
 			name:   "delete key prefixes",
-			latest: mustNewBuilder(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
+			latest: mustNewStore(t, "b1", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
 			latestKV: map[string][]byte{
 				"t:1": []byte("bar"),
 			},
 			deletedPrefixes: []string{"p:"},
-			prev:            mustNewBuilder(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
+			prev:            mustNewStore(t, "b2", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, nil),
 			prevKV: map[string][]byte{
 				"t:1": []byte("baz"),
 				"p:3": []byte("lol"),

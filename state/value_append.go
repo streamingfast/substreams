@@ -4,7 +4,8 @@ func (s *Store) Append(ord uint64, key string, value []byte) {
 	var newVal []byte
 	oldVal, found := s.GetAt(ord, key)
 	if !found {
-		newVal = value
+		newVal = make([]byte, len(value))
+		copy(newVal[0:], value)
 	} else {
 		newVal = make([]byte, len(oldVal)+len(value))
 		copy(newVal[0:], oldVal)

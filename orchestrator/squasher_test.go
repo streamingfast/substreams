@@ -17,7 +17,7 @@ import (
 
 type NotifierFunc func()
 
-func (n NotifierFunc) Notify(builder string, blockNum uint64) {
+func (n NotifierFunc) Notify(store string, blockNum uint64) {
 	n()
 }
 
@@ -28,7 +28,7 @@ func (n NotifierFunc) Notify(builder string, blockNum uint64) {
 // 		return io.NopCloser(bytes.NewReader([]byte("{}"))), nil
 // 	}
 
-// 	store := testStateBuilder(fileStore)
+// 	store := testStateStore(fileStore)
 // 	storageState := NewStorageState()
 
 // 	storageState.lastBlocks["store"] = 12
@@ -67,7 +67,7 @@ func TestSquash(t *testing.T) {
 
 	planner := &JobsPlanner{AvailableJobs: make(chan *Job, 100)}
 
-	s := testStateBuilder(store)
+	s := testStateStore(store)
 	squashable := NewStoreSquasher(s, 80_000, 10_000, planner)
 	go squashable.launch(context.Background())
 
@@ -84,8 +84,8 @@ func TestSquash(t *testing.T) {
 	assert.True(t, planner.completed)
 }
 
-func testStateBuilder(store dstore.Store) *state.Store {
-	s, _ := state.NewBuilder("test", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
+func testStateStore(store dstore.Store) *state.Store {
+	s, _ := state.NewStore("test", 10_000, 10_000, "abc", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, state.OutputValueTypeString, store)
 	return s
 }
 
@@ -126,7 +126,7 @@ func testStateBuilder(store dstore.Store) *state.Store {
 // 	s1 = &Squasher{
 // 		storeSquashers: map[string]*StoreSquasher{
 // 			"testBuilder": &StoreSquasher{
-// 				builder: testStateBuilder(store),
+// 				builder: testStateStore(store),
 // 				ranges:  []*block.Range{},
 // 			},
 // 		},
@@ -138,7 +138,7 @@ func testStateBuilder(store dstore.Store) *state.Store {
 // 	s2 = &Squasher{
 // 		storeSquashers: map[string]*StoreSquasher{
 // 			"testBuilder": &StoreSquasher{
-// 				builder: testStateBuilder(store),
+// 				builder: testStateStore(store),
 // 				ranges:  []*block.Range{},
 // 			},
 // 		},

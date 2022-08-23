@@ -98,30 +98,21 @@ func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) 
 	}
 	return
 }
-
-//func (m *Manifest) loadWASMCode() error {
-//	for _, s := range m.Modules {
-//		if s.Code.File != "" {
-//			s.Code.File = path.Join(m.Workdir, s.Code.File)
-//			cnt, err := ioutil.ReadFile(s.Code.File)
-//			if err != nil {
-//				return fmt.Errorf("reading file source code %q: %w", s.Code.File, err)
-//			}
-//			if len(cnt) == 0 {
-//				return fmt.Errorf("reference wasm file %q empty", s.Code.File)
-//			}
-//			s.Code.Content = cnt
-//		}
-//	}
-//	return nil
-//}
-
+func (i *Input) isMap() bool {
+	return i.Map != "" && i.Store == "" && i.Source == ""
+}
+func (i *Input) isStore() bool {
+	return i.Store != "" && i.Map == "" && i.Source == ""
+}
+func (i *Input) isSource() bool {
+	return i.Source != "" && i.Map == "" && i.Store == ""
+}
 func (i *Input) parse() error {
-	if i.Map != "" && i.Store == "" && i.Source == "" {
+	if i.isMap() {
 		i.Name = fmt.Sprintf("map:%s", i.Map)
 		return nil
 	}
-	if i.Store != "" && i.Map == "" && i.Source == "" {
+	if i.isStore() {
 		i.Name = fmt.Sprintf("store:%s", i.Store)
 		if i.Mode == "" {
 			i.Mode = "get"
@@ -131,11 +122,11 @@ func (i *Input) parse() error {
 		}
 		return nil
 	}
-	if i.Source != "" && i.Map == "" && i.Store == "" {
+	if i.isSource() {
 		i.Name = fmt.Sprintf("source:%s", i.Source)
 		return nil
 	}
-	return fmt.Errorf("one, and only one of 'map', 'store' or 'source' must be specified")
+	return fmt.Errorf("input has an unknown type. Expect one, and only one of 'map', 'store' or 'source'")
 }
 
 func validateStoreBuilder(module *Module) error {

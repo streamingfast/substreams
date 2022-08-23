@@ -271,10 +271,9 @@ func loadManifestFile(inputPath string) (*Manifest, error) {
 		default:
 			return nil, fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
 		}
-
-		for _, input := range s.Inputs {
+		for idx, input := range s.Inputs {
 			if err := input.parse(); err != nil {
-				return nil, fmt.Errorf("module %q: %w", s.Name, err)
+				return nil, fmt.Errorf("module %q: invalid input [%d]: %w", s.Name, idx, err)
 			}
 		}
 	}

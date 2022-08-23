@@ -75,14 +75,14 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 }
 
 func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*pbsubstreams.StoreDelta) error {
-	wrap := deltasWrap{
+	wrap := DeltasWrap{
 		Module:   modName,
 		BlockNum: blockNum,
 	}
 	msgDesc := ui.msgDescs[modName]
 	msgType := ui.msgTypes[modName]
 	for _, delta := range deltas {
-		subwrap := deltaWrap{
+		subwrap := DeltaWrap{
 			Operation: delta.Operation.String(),
 			Ordinal:   delta.Ordinal,
 			Key:       delta.Key,
@@ -153,11 +153,11 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreams.InitialSnapshotData) error 
 	msgType := ui.msgTypes[modName]
 	length := len(output.Deltas.Deltas)
 	for idx, delta := range output.Deltas.Deltas {
-		wrap := snapshotDeltaWrap{
+		wrap := SnapshotDeltaWrap{
 			Module:   modName,
 			Progress: fmt.Sprintf("%.2f %%", float64(int(output.SentKeys)-length+idx+1)/float64(output.TotalKeys)*100),
 		}
-		subwrap := deltaWrap{
+		subwrap := DeltaWrap{
 			Operation: delta.Operation.String(),
 			Ordinal:   delta.Ordinal,
 			Key:       delta.Key,
@@ -217,7 +217,7 @@ func (ui *TUI) formatPostDataProgress(msg *pbsubstreams.Response_Progress) {
 func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescriptor, blockNum uint64, modName string, anyin *anypb.Any) []byte {
 	in := anyin.GetValue()
 	if msgDesc == nil {
-		cnt, _ := json.Marshal(&unknownWrap{
+		cnt, _ := json.Marshal(&UnknownWrap{
 			Module:      modName,
 			UnknownType: string(anyin.MessageName()),
 			String:      string(decodeAsString(in)),
@@ -227,7 +227,7 @@ func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescrip
 	}
 	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 	if err := dynMsg.Unmarshal(in); err != nil {
-		cnt, _ := json.Marshal(&errorWrap{
+		cnt, _ := json.Marshal(&ErrorWrap{
 			Module: modName,
 			Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgType, err.Error()),
 			String: string(decodeAsString(in)),
@@ -238,7 +238,7 @@ func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescrip
 
 	cnt, err := msgDescToJSON(msgType, blockNum, modName, dynMsg, true)
 	if err != nil {
-		cnt, _ := json.Marshal(&errorWrap{
+		cnt, _ := json.Marshal(&ErrorWrap{
 			Module: modName,
 			Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgType, err),
 			String: string(decodeAsString(in)),
@@ -258,7 +258,7 @@ func (ui *TUI) decodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDes
 	if msgDesc != nil {
 		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 		if err := dynMsg.Unmarshal(in); err != nil {
-			cnt, _ := json.Marshal(&errorWrap{
+			cnt, _ := json.Marshal(&ErrorWrap{
 				Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgDesc.GetFullyQualifiedName(), err.Error()),
 				String: string(decodeAsString(in)),
 				Bytes:  in,
@@ -267,7 +267,7 @@ func (ui *TUI) decodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDes
 		}
 		cnt, err := msgDescToJSON(msgType, blockNum, modName, dynMsg, false)
 		if err != nil {
-			cnt, _ := json.Marshal(&errorWrap{
+			cnt, _ := json.Marshal(&ErrorWrap{
 				Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
 				String: string(decodeAsString(in)),
 				Bytes:  in,
@@ -303,7 +303,7 @@ func msgDescToJSON(msgType string, blockNum uint64, mod string, dynMsg *dynamic.
 
 	if wrap {
 		// FIXME: don't module wrap when we're in terminal mode and decorated output?
-		cnt, err = json.Marshal(moduleWrap{
+		cnt, err = json.Marshal(ModuleWrap{
 			Module:   mod,
 			BlockNum: blockNum,
 			Type:     msgType,
@@ -317,19 +317,19 @@ func msgDescToJSON(msgType string, blockNum uint64, mod string, dynMsg *dynamic.
 	return
 }
 
-type deltasWrap struct {
+type DeltasWrap struct {
 	Module   string      `json:"@module"`
 	BlockNum uint64      `json:"@block,omitempty"`
-	Deltas   []deltaWrap `json:"@deltas"`
+	Deltas   []DeltaWrap `json:"@deltas"`
 }
 
-type snapshotDeltaWrap struct {
+type SnapshotDeltaWrap struct {
 	Module   string    `json:"@module"`
 	Progress string    `json:"@progress"`
-	Delta    deltaWrap `json:"@delta"`
+	Delta    DeltaWrap `json:"@delta"`
 }
 
-type deltaWrap struct {
+type DeltaWrap struct {
 	Operation string          `json:"op"`
 	Ordinal   uint64          `json:"ordinal"`
 	Key       string          `json:"key"`
@@ -337,21 +337,21 @@ type deltaWrap struct {
 	NewValue  json.RawMessage `json:"new"`
 }
 
-type unknownWrap struct {
+type UnknownWrap struct {
 	Module      string `json:"@module"`
 	UnknownType string `json:"@unknown"`
 	String      string `json:"@str"`
 	Bytes       []byte `json:"@bytes"`
 }
 
-type errorWrap struct {
+type ErrorWrap struct {
 	Module string `json:"@module,omitempty"`
 	Error  string `json:"@error"`
 	String string `json:"@str"`
 	Bytes  []byte `json:"@bytes"`
 }
 
-type moduleWrap struct {
+type ModuleWrap struct {
 	Module   string          `json:"@module"`
 	BlockNum uint64          `json:"@block"`
 	Type     string          `json:"@type"`

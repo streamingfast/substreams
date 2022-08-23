@@ -6,27 +6,26 @@ import (
 
 func newModel(ui *TUI) model {
 	return model{
-		Modules:     updatedRanges{},
-		ui:          ui,
-		screenWidth: 120,
+		Modules: updatedRanges{},
+		ui:      ui,
 	}
 }
 
 type model struct {
 	ui *TUI
 
-	screenWidth int
+	Modules updatedRanges
+	BarMode bool
+	BarSize uint64
 
-	Modules           updatedRanges
-	BarMode           bool
-	DebugSetting      bool
 	Updates           int
 	UpdatedSecond     int64
 	UpdatesPerSecond  int
 	UpdatesThisSecond int
 
-	Request   *pbsubstreams.Request
-	Connected bool
+	Request     *pbsubstreams.Request
+	TargetBlock uint64
+	Connected   bool
 
 	Failures    int
 	LastFailure *pbsubstreams.ModuleProgress_Failed

@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type BuilderOption func(b *Store)
+type StoreOption func(b *Store)
 
 type Store struct {
 	Name         string
@@ -36,7 +36,7 @@ type Store struct {
 	lastOrdinal uint64
 }
 
-func NewBuilder(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...BuilderOption) (*Store, error) {
+func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...StoreOption) (*Store, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -94,6 +94,7 @@ func (s *Store) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddUint64("store_initial_block", s.storeInitialBlock)
 	//enc.AddUint64("next_expected_boundary", s.nextExpectedBoundary)
 	enc.AddBool("partial", s.IsPartial())
+	enc.AddInt("key_count", len(s.KV))
 
 	return nil
 }
@@ -135,18 +136,20 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 		}
 		defer r.Close()
 
-		kv := map[string]string{}
+		kv := map[string][]byte{}
 		if err = json.Unmarshal(data, &kv); err != nil {
 			return fmt.Errorf("unmarshal data: %w", err)
 		}
-		s.KV = byteMap(kv)
+		s.KV = kv
+
+		zlog.Debug("unmarshalling kv", zap.String("file_name", stateFileName), zap.Object("store", s))
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("storage file %s: %w", stateFileName, err)
 	}
 
-	zlog.Debug("state loaded", zap.String("builder_name", s.Name), zap.String("file_name", stateFileName))
+	zlog.Debug("state loaded", zap.String("store_name", s.Name), zap.String("file_name", stateFileName))
 	return nil
 }
 
@@ -154,11 +157,11 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
 func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (*storeWriter, error) {
-	zlog.Debug("writing state", zap.Object("builder", s))
+	zlog.Debug("writing state", zap.Object("store", s))
 
-	kv := stringMap(s.KV) // FOR READABILITY ON DISK
+	//kv := stringMap(s.KV) // FOR READABILITY ON DISK
 
-	content, err := json.MarshalIndent(kv, "", "  ")
+	content, err := json.MarshalIndent(s.KV, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal kv state: %w", err)
 	}

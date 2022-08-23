@@ -235,7 +235,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		StartBlockNum:   request.StartBlockNum,
 		StopBlockNum:    request.StopBlockNum,
 		Cursor:          request.StartCursor,
-		FinalBlocksOnly: true,
+		FinalBlocksOnly: false,
 		// FIXME(abourget), right now, the pbsubstreams.Request has a
 		// ForkSteps that we IGNORE. Eventually, we will want to honor
 		// it, but ONLY when we are certain that our Pipeline supports

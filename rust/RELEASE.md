@@ -12,7 +12,7 @@
 - Ensure that `cargo login` has been done in your terminal
 - Commit everything with message `Preparing release of ${version}`.
 - `./bin/release.sh -f v${version}`
-- Git push everything (`git push origin develop v${version}`)
+- If everything goes well, `crates.io` will be update and Git should be in a synced state (the release script does a `git push` of the branch and the tag).
 - Go to https://github.com/streamingfast/substreams/releases/tag/v${version} and update the release notes, use content of section `## [v${version}]` in [docs/release-notes/change-log.md](../docs/release-notes/change-log.md), edit GitHub release and paste content before commits listing, keep both:
 
   ```
@@ -26,4 +26,4 @@
   ```
 
 - Update the [docs/release-notes/change-log.md](../docs/release-notes/change-log.md) adding `## Unreleased` header on top of latest released section.
-- - Commit everything with message `Preparing next unreleased version`.
+- Commit everything with message `Preparing next unreleased version`.

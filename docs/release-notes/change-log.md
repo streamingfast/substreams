@@ -63,6 +63,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `state::set_max_float64`
   - `state::set_max_bigfloat`
 
+- Bumped `prost` (and related dependencies) to `^0.11.0`
+
 ### CLI
 
 * Environment variables are now accepted in manifest's `imports` list.

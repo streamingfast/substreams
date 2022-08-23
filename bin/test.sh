@@ -16,10 +16,6 @@ main() {
 
   set -e
 
-  pushd types &> /dev/null
-    go test ./... "$@"
-  popd&> /dev/null
-
   go test ./... "$@"
 }
 

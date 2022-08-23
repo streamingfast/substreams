@@ -104,7 +104,6 @@ func New(
 		subrequestSplitSize:          subrequestSplitSize,
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
-		hostname:                     hostname,
 		forkHandler:                  NewForkHandle(),
 	}
 
@@ -754,10 +753,11 @@ func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, r
 
 func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
 	zlog.Debug("returning module outputs to client", zap.Int("module_output_count", len(moduleOutputs)))
+	protoStep, _ := pbsubstreams.StepToProto(step, false)
 	out := &pbsubstreams.BlockScopedData{
 		Outputs: moduleOutputs,
 		Clock:   clock,
-		Step:    pbsubstreams.StepToProto(step),
+		Step:    protoStep,
 		Cursor:  cursor.ToOpaque(),
 	}
 

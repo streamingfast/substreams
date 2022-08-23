@@ -3,6 +3,8 @@ package state
 import (
 	"testing"
 
+	"github.com/streamingfast/dstore"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -208,43 +210,56 @@ func TestApplyDeltaReverse(t *testing.T) {
 	}
 }
 func TestStateBuilder(t *testing.T) {
-	s := mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	builder := mustNewBuilder(t, "b", 0, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 
-	s.Set(0, "1", "val1")
-	s.Set(1, "1", "val2")
-	s.Set(3, "1", "val3")
-	s.Flush()
-	s.Set(0, "1", "val4")
-	s.Set(1, "1", "val5")
-	s.Set(3, "1", "val6")
-	s.Del(4, "1")
-	s.Set(5, "1", "val7")
+	builder.Set(0, "1", "val1")
+	builder.Set(1, "1", "val2")
+	builder.Set(3, "1", "val3")
+	builder.Flush()
+	builder.Set(0, "1", "val4")
+	builder.Set(1, "1", "val5")
+	builder.Set(3, "1", "val6")
+	builder.Del(4, "1")
+	builder.Set(5, "1", "val7")
 
-	val, found := s.GetFirst("1")
+	val, found := builder.GetFirst("1")
 	assert.Equal(t, "val3", string(val))
 	assert.True(t, found)
 
-	val, found = s.GetAt(0, "1")
+	val, found = builder.GetAt(0, "1")
 	assert.Equal(t, "val4", string(val))
 	assert.True(t, found)
 
-	val, found = s.GetAt(1, "1")
+	val, found = builder.GetAt(1, "1")
 	assert.Equal(t, "val5", string(val))
 	assert.True(t, found)
 
-	val, found = s.GetAt(3, "1")
+	val, found = builder.GetAt(3, "1")
 	assert.Equal(t, "val6", string(val))
 	assert.True(t, found)
 
-	val, found = s.GetAt(4, "1")
+	val, found = builder.GetAt(4, "1")
 	assert.Nil(t, val)
 	assert.False(t, found)
 
-	val, found = s.GetAt(5, "1")
+	val, found = builder.GetAt(5, "1")
 	assert.Equal(t, "val7", string(val))
 	assert.True(t, found)
 
-	val, found = s.GetLast("1")
+	val, found = builder.GetLast("1")
 	assert.Equal(t, "val7", string(val))
 	assert.True(t, found)
+}
+
+func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...StoreOption) *Store {
+	t.Helper()
+	if store == nil {
+		store = dstore.NewMockStore(nil)
+	}
+	builder, err := NewStore(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return builder
 }

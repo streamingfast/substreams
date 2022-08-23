@@ -1,6 +1,9 @@
 package manifest
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,12 +15,22 @@ import (
 )
 
 func TestReader_Read(t *testing.T) {
+
 	systemProtoDefs := readSystemProtoDescriptors(t)
 	absolutePathToDep2, err := filepath.Abs("testdata/dep2.yaml")
 	require.NoError(t, err)
 
 	absolutePathToProto2, err := filepath.Abs("testdata/proto2")
 	require.NoError(t, err)
+
+	spkg1Content, err := os.ReadFile("testdata/spkg1/spkg1-v0.0.0.spkg")
+	require.NoError(t, err)
+
+	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// FIXME: Handle more "spkgX" path if required
+		w.Write(spkg1Content)
+	}))
+	defer remoteServer.Close()
 
 	tests := []struct {
 		name      string
@@ -55,6 +68,28 @@ func TestReader_Read(t *testing.T) {
 					},
 					{
 						Name:    "dep1",
+						Version: "v0.0.0",
+					},
+				},
+			},
+			require.NoError,
+		},
+		{
+			"testdata/imports_http_url.yaml",
+			map[string]string{
+				"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: append(systemProtoDefs),
+				Modules:    &pbsubstreams.Modules{},
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "test",
+						Version: "v0.0.0",
+					},
+					{
+						Name:    "spkg1",
 						Version: "v0.0.0",
 					},
 				},

@@ -41,8 +41,10 @@ type Manifest struct {
 	Workdir string       `yaml:"-"`
 }
 
+var httpSchemePrefixRegex = regexp.MustCompile("^https?://")
+
 func (m *Manifest) resolvePath(path string) string {
-	if m.Workdir == "" || filepath.IsAbs(path) {
+	if m.Workdir == "" || filepath.IsAbs(path) || httpSchemePrefixRegex.MatchString(path) {
 		return path
 	}
 

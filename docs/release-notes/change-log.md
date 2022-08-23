@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Fixed error when importing `http/https` `.spkg` files in `imports` section.
 
 ## [0.0.19](https://github.com/streamingfast/substreams/releases/tag/v0.0.19)
 

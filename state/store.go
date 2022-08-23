@@ -15,8 +15,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type StoreOption func(b *Store)
-
 type Store struct {
 	Name         string
 	ModuleHash   string
@@ -36,7 +34,7 @@ type Store struct {
 	lastOrdinal uint64
 }
 
-func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...StoreOption) (*Store, error) {
+func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (*Store, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -54,10 +52,6 @@ func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, modul
 		storeInitialBlock:  moduleInitialBlock,
 	}
 	//b.resetNextBoundary()
-
-	for _, opt := range opts {
-		opt(b)
-	}
 
 	zlog.Info("store created", zap.Object("store", b))
 	return b, nil

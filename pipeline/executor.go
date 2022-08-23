@@ -9,7 +9,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -97,10 +96,7 @@ func (e *StoreModuleExecutor) String() string {
 
 func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
 	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
-		output, found, err := e.cache.Get(clock)
-		if err != nil {
-			zlog.Warn("failed to get output from cache", zap.Error(err))
-		}
+		output, found := e.cache.Get(clock)
 		if found {
 			e.mapperOutput = output
 			return nil
@@ -122,10 +118,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, 
 
 func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
 	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
-		output, found, err := e.cache.Get(clock)
-		if err != nil {
-			zlog.Warn("failed to get output from cache", zap.Error(err))
-		}
+		output, found := e.cache.Get(clock)
 
 		if found {
 			deltas := &pbsubstreams.StoreDeltas{}

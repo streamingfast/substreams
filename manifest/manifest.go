@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -38,6 +39,14 @@ type Manifest struct {
 
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
+}
+
+func (m *Manifest) resolvePath(path string) string {
+	if m.Workdir == "" || filepath.IsAbs(path) {
+		return path
+	}
+
+	return filepath.Join(m.Workdir, path)
 }
 
 type PackageMeta struct {

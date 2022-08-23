@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package sf.substreams.test2;
+
+message Empty {
+
+}

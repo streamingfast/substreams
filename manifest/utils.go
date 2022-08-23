@@ -6,6 +6,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// mapSlice represents a map in the form of a list of key/value pairs (key/value
+// pair of `[2]string` where index 0 is the key and index 1 is the value).
 type mapSlice [][2]string
 
 func (s *mapSlice) UnmarshalYAML(n *yaml.Node) error {

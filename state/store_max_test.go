@@ -266,13 +266,13 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 	}
 }
 
-func mustNewStore(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...StoreOption) *Store {
+func mustNewStore(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) *Store {
 	t.Helper()
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}
 
-	stateStore, err := NewStore(name, 10_000, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	stateStore, err := NewStore(name, 10_000, moduleStartBlock, moduleHash, updatePolicy, valueType, store)
 	if err != nil {
 		panic(err)
 	}

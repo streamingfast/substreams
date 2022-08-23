@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+
+## [0.0.19](https://github.com/streamingfast/substreams/releases/tag/v0.0.19)
+
 **New updatePolicy `append`**, allows one to build a store that concatenates values and supports parallelism.  This affects the server, the manifest format (additive only), the substreams crate and the generated code therein.
 
 ### Rust API
@@ -60,7 +63,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `state::set_max_float64`
   - `state::set_max_bigfloat`
 
+- Bumped `prost` (and related dependencies) to `^0.11.0`
+
 ### CLI
+
+* Environment variables are now accepted in manifest's `imports` list.
+
+* Environment variables are now accepted in manifest's `protobuf.importPaths` list.
+
+* Fixed relative path not resolved correctly against manifest's location in `imports` list.
 
 * Changed the output modes: `module-*` modes are gone and become the
   format for `jsonl` and `json`. This means all printed outputs are

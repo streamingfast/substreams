@@ -3,9 +3,10 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"time"
 
 	"github.com/streamingfast/substreams"
 	"go.uber.org/zap"
@@ -78,11 +79,12 @@ out:
 		}
 	}
 
+	s.workerPool.ReturnWorker(jobWorker)
+
 	if err != nil {
 		zlog.Error("error after worker", zap.Error(err))
 		return err
 	}
-	s.workerPool.ReturnWorker(jobWorker)
 
 	if partialsWritten != nil {
 		if err := s.squasher.Squash(job.ModuleName, partialsWritten); err != nil {

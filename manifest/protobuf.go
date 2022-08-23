@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -25,7 +24,7 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 
 	var importPaths []string
 	for _, imp := range manif.Protobuf.ImportPaths {
-		importPaths = append(importPaths, filepath.Join(manif.Workdir, imp))
+		importPaths = append(importPaths, manif.resolvePath(imp))
 	}
 	// User-specified protos
 	parser := protoparse.Parser{

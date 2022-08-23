@@ -70,28 +70,39 @@ func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFacto
 		JobStats: map[*Job]*JobStat{},
 	}
 
+	// FIXME: Not tied to any lifecycle of the owning element (`Service`), this is not the
+	// end of the world because `WorkerPool` is expected to live forever. But it would still
+	// be great to have it refactored (the `Service`) to be tied to the running application
+	// and have the `Service` close the `WorkerPool` which in turn would close the periodic
+	// stats logger.
+	workerPool.StartPeriodicLogger()
+
+	return workerPool
+}
+
+func (p *WorkerPool) StartPeriodicLogger() {
 	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+
 		for {
 			select {
-			case <-time.After(time.Second * 5):
-				var jobStats []*JobStat
+			case <-ticker.C:
+				jobStats := make([]*JobStat, 0, len(p.JobStats))
 				countPerModule := map[string]uint64{}
-				zlog.Info("work pool job stats", zap.Int("job_count", len(workerPool.JobStats)))
-				for _, value := range workerPool.JobStats {
-					if count, ok := countPerModule[value.ModuleName]; ok {
-						count++
-						countPerModule[value.ModuleName] = count
-					} else {
-						countPerModule[value.ModuleName] = 1
-					}
+
+				for _, value := range p.JobStats {
 					jobStats = append(jobStats, value)
+					countPerModule[value.ModuleName] = countPerModule[value.ModuleName] + 1
 				}
 
-				zlog.Info("worker statistic", zap.Reflect("job_stats", jobStats), zap.Reflect("count_by_module", countPerModule))
+				zlog.Debug("worker pool statistics",
+					zap.Int("job_count", len(p.JobStats)),
+					zap.Reflect("job_stats", jobStats),
+					zap.Reflect("count_by_module", countPerModule),
+				)
 			}
 		}
 	}()
-	return workerPool
 }
 
 func (p *WorkerPool) Borrow() *Worker {

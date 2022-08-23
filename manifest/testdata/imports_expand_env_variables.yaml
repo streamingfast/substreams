@@ -1,0 +1,8 @@
+specVersion: v0.1.0
+package:
+  name: test
+  version: v0.0.0
+
+imports:
+  dep1: "${RELATIVE_PATH_TO_DEP1}"
+  dep2: "${ABSOLUTE_PATH_TO_DEP2}"

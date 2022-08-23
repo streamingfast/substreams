@@ -1,0 +1,12 @@
+specVersion: v0.1.0
+package:
+  name: test
+  version: v0.0.0
+
+protobuf:
+  files:
+    - sf/substreams/test1.proto
+    - sf/substreams/test2.proto
+  importPaths:
+    - ${RELATIVE_PATH_TO_PROTO1}
+    - ${ABSOLUTE_PATH_TO_PROTO2}

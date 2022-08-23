@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,7 @@ func NewReader(input string, opts ...Options) *Reader {
 	for _, opt := range opts {
 		r = opt(r)
 	}
+
 	return r
 }
 
@@ -252,6 +254,16 @@ func loadManifestFile(inputPath string) (*Manifest, error) {
 		return nil, fmt.Errorf("invalid 'specVersion', must be v0.1.0")
 	}
 
+	// Allow environment variables in `imports` element
+	for i, moduleImport := range m.Imports {
+		m.Imports[i][1] = os.ExpandEnv(moduleImport[1])
+	}
+
+	// Allow environment variables in `protobuf.importPaths` element
+	for i := range m.Protobuf.ImportPaths {
+		m.Protobuf.ImportPaths[i] = os.ExpandEnv(m.Protobuf.ImportPaths[i])
+	}
+
 	// TODO: put some limits on the NUMBER of modules (max 50 ?)
 	// TODO: put a limit on the SIZE of the WASM payload (max 10MB per binary?)
 
@@ -284,7 +296,7 @@ func loadManifestFile(inputPath string) (*Manifest, error) {
 func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
-		importPath := kv[1]
+		importPath := manif.resolvePath(kv[1])
 
 		subpkgReader := NewReader(importPath)
 		subpkg, err := subpkgReader.Read()

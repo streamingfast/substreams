@@ -318,7 +318,7 @@ dependencies = [
 
 [[package]]
 name = "substreams"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "bigdecimal",
  "hex",
@@ -334,7 +334,7 @@ dependencies = [
 
 [[package]]
 name = "substreams-macro"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "testing-substreams"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "bigdecimal",
  "hex",

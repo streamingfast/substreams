@@ -125,7 +125,7 @@ func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uin
 }
 
 func (c *OutputCache) currentFilename() string {
-	return computeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
+	return ComputeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
 }
 
 func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
@@ -176,8 +176,8 @@ func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 }
 
 func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	for _, value := range c.kv {
 		if value.BlockNum == blockNumber {

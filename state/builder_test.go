@@ -251,12 +251,12 @@ func TestStateBuilder(t *testing.T) {
 	assert.True(t, found)
 }
 
-func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, opts ...StoreOption) *Store {
+func mustNewBuilder(t *testing.T, name string, moduleStartBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) *Store {
 	t.Helper()
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}
-	builder, err := NewStore(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store, opts...)
+	builder, err := NewStore(name, 100, moduleStartBlock, moduleHash, updatePolicy, valueType, store)
 	if err != nil {
 		panic(err)
 	}

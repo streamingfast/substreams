@@ -90,6 +90,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		eg := llerrgroup.New(250)
 		start := time.Now()
 		squashCount := 0
+		var lastExclusiveEndBlock uint64
 		for {
 			if eg.Stop() {
 				break
@@ -151,7 +152,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 				s.targetExclusiveEndBlockReach = true
 			}
 			zlog.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
-			s.jobsPlanner.SignalCompletionUpUntil(s.name, squashableRange.ExclusiveEndBlock)
+			lastExclusiveEndBlock = squashableRange.ExclusiveEndBlock
 		}
 		zlog.Info("waiting for eg to finish", zap.String("module_name", s.store.Name))
 		if err := eg.Wait(); err != nil {
@@ -159,6 +160,11 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			s.Shutdown(err)
 			return
 		}
+
+		if lastExclusiveEndBlock != 0 {
+			s.jobsPlanner.SignalCompletionUpUntil(s.name, lastExclusiveEndBlock)
+		}
+
 		totalDuration := time.Since(start)
 		avgDuration := time.Duration(0)
 		if squashCount > 0 {

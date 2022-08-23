@@ -179,7 +179,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 		select {
 		case <-ctx.Done():
 			jobLogger.Warn("context cancel will waiting for stream data, worker is terminating")
-			return nil, &RetryableErr{cause: ctx.Err()}
+			return nil, ctx.Err()
 		default:
 		}
 

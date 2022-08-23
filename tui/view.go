@@ -13,7 +13,7 @@ var viewTpl = `
 {{- if not .Connected }}Connecting...{{ else -}}
 Connected - Progress messages received: {{ .Updates }} ({{ .UpdatesPerSecond }}/sec)
 {{ with .Request }}Backprocessing history up to requested target block {{ $.TargetBlock }}:{{- end}}
-(hit 'm' to switch mode: {{ .BarMode }} {{ .BarSize }})
+(hit 'm' to switch mode)
 {{ range $key, $value := .Modules }}
 {{ if $.BarMode }}
   {{- pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ barmode $value $ }}

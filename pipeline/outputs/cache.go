@@ -28,28 +28,6 @@ func init() {
 	cacheFilenameRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
 }
 
-type CacheItem struct {
-	BlockNum  uint64                 `json:"block_num"`
-	BlockID   string                 `json:"block_id"`
-	Payload   []byte                 `json:"payload"`
-	Timestamp *timestamppb.Timestamp `json:"timestamp"`
-	Cursor    string                 `json:"cursor"`
-}
-type outputKV map[string]*CacheItem
-type OutputCache struct {
-	lock sync.RWMutex
-
-	ModuleName        string
-	CurrentBlockRange *block.Range
-	kv                outputKV
-	Store             dstore.Store
-	saveBlockInterval uint64
-}
-
-func (c *OutputCache) currentFilename() string {
-	return ComputeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
-}
-
 type ModulesOutputCache struct {
 	OutputCaches      map[string]*OutputCache
 	SaveBlockInterval uint64
@@ -118,12 +96,36 @@ func (c *ModulesOutputCache) Flush(ctx context.Context) error {
 	return nil
 }
 
+type CacheItem struct {
+	BlockNum  uint64                 `json:"block_num"`
+	BlockID   string                 `json:"block_id"`
+	Payload   []byte                 `json:"payload"`
+	Timestamp *timestamppb.Timestamp `json:"timestamp"`
+	Cursor    string                 `json:"cursor"`
+}
+
+type outputKV map[string]*CacheItem
+
+type OutputCache struct {
+	sync.RWMutex
+
+	ModuleName        string
+	CurrentBlockRange *block.Range
+	kv                outputKV
+	Store             dstore.Store
+	saveBlockInterval uint64
+}
+
 func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64) *OutputCache {
 	return &OutputCache{
 		ModuleName:        moduleName,
 		Store:             store,
 		saveBlockInterval: saveBlockInterval,
 	}
+}
+
+func (c *OutputCache) currentFilename() string {
+	return ComputeDBinFilename(c.CurrentBlockRange.StartBlock, c.CurrentBlockRange.ExclusiveEndBlock)
 }
 
 func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
@@ -141,8 +143,8 @@ func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
 }
 
 func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	cp := make([]byte, len(data))
 	copy(cp, data)
@@ -161,8 +163,8 @@ func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte)
 }
 
 func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	cacheItem, found := c.kv[clock.Id]
 
@@ -174,8 +176,8 @@ func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 }
 
 func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	for _, value := range c.kv {
 		if value.BlockNum == blockNumber {
@@ -275,25 +277,6 @@ func (c *OutputCache) ListContinuousCacheRanges(ctx context.Context, from uint64
 	return out, nil
 }
 
-func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {
-	cachedRangeCount := len(cachedRanges)
-	var out block.Ranges
-	for i, r := range cachedRanges {
-		if r.StartBlock < from {
-			continue
-		}
-		out = append(out, r)
-		if cachedRangeCount > i+1 {
-			next := cachedRanges[i+1]
-			if next.StartBlock != r.ExclusiveEndBlock { //continuous seq broken
-				break
-			}
-		}
-	}
-
-	return out
-}
-
 func (c *OutputCache) ListCacheRanges(ctx context.Context) (block.Ranges, error) {
 	var out block.Ranges
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -317,6 +300,32 @@ func (c *OutputCache) ListCacheRanges(ctx context.Context) (block.Ranges, error)
 	})
 
 	return out, nil
+}
+
+func (c *OutputCache) Delete(blockID string) {
+	c.Lock()
+	defer c.Unlock()
+
+	delete(c.kv, blockID)
+}
+
+func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {
+	cachedRangeCount := len(cachedRanges)
+	var out block.Ranges
+	for i, r := range cachedRanges {
+		if r.StartBlock < from {
+			continue
+		}
+		out = append(out, r)
+		if cachedRangeCount > i+1 {
+			next := cachedRanges[i+1]
+			if next.StartBlock != r.ExclusiveEndBlock { //continuous seq broken
+				break
+			}
+		}
+	}
+
+	return out
 }
 
 func fileNameToRange(filename string) (*block.Range, error) {

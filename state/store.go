@@ -225,8 +225,7 @@ func (d *storeDeleter) Delete() error {
 }
 
 func (s *Store) ApplyDelta(delta *pbsubstreams.StoreDelta) {
-	// Keys need to have at least one character, and mustn't start with 0xFF
-	// 0xFF is reserved for internal use.
+	// Keys need to have at least one character, and mustn't start with 0xFF is reserved for internal use.
 	if len(delta.Key) == 0 {
 		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", s.Name))
 	}
@@ -239,6 +238,18 @@ func (s *Store) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 		s.KV[delta.Key] = delta.NewValue
 	case pbsubstreams.StoreDelta_DELETE:
 		delete(s.KV, delta.Key)
+	}
+}
+
+func (s *Store) ApplyDeltaReverse(deltas []*pbsubstreams.StoreDelta) {
+	for i := len(deltas) - 1; i >= 0; i-- {
+		delta := deltas[i]
+		switch delta.Operation {
+		case pbsubstreams.StoreDelta_UPDATE, pbsubstreams.StoreDelta_DELETE:
+			s.KV[delta.Key] = delta.OldValue
+		case pbsubstreams.StoreDelta_CREATE:
+			delete(s.KV, delta.Key)
+		}
 	}
 }
 

@@ -59,6 +59,7 @@ type Pipeline struct {
 	clock         *pbsubstreams.Clock
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	logs          []string
+	forkHandler   *ForkHandler
 
 	moduleOutputCache *outputs.ModulesOutputCache
 
@@ -103,6 +104,7 @@ func New(
 		subrequestSplitSize:          subrequestSplitSize,
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
+		forkHandler:                  NewForkHandle(),
 	}
 
 	for _, name := range request.OutputModules {
@@ -267,6 +269,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 	p.currentBlockRef = block.AsRef()
 
+	cursor := obj.(bstream.Cursorable).Cursor()
+	step := obj.(bstream.Stepable).Step()
+
 	// if obj.Step() == UNDO {
 	//  loop ALL the STORES that we have in `map[obj.BlockID]outputs`, and Apply the in REVERSE
 	//  PUSH OUT the outputs as a step UNDO without executing, until we are back to the
@@ -279,14 +284,33 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	// }
 	// TODO(abourget): eventually, handle the `undo` signals.
 	// if obj.Step() == IRREVERSIBLE  || STALLED {
-	//    if obj.Step() == IRREVESRIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
+	//    if obj.Step() == IRREVERSIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
 	//    delete(map[blockID], outputs)
 	// }
 
-	if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
-		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
-			return fmt.Errorf("updating module output cache: %w", err)
+	if step == bstream.StepUndo {
+		if err = p.forkHandler.handleUndo(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
+			return fmt.Errorf("reverting outputs: %w", err)
 		}
+		return nil
+	}
+
+	if step == bstream.StepIrreversible {
+		if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
+			if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
+				return fmt.Errorf("updating module output cache: %w", err)
+			}
+		}
+	}
+
+	if step == bstream.StepIrreversible {
+		// todo: should we send the output??
+		p.forkHandler.handleIrreversible(block.Number)
+	}
+
+	if step == bstream.StepStalled {
+		p.forkHandler.handleIrreversible(block.Number)
+		return nil
 	}
 
 	for _, hook := range p.preBlockHooks {
@@ -316,9 +340,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	cursor := obj.(bstream.Cursorable).Cursor()
-	step := obj.(bstream.Stepable).Step()
-
 	if err = p.assignSource(block); err != nil {
 		return fmt.Errorf("setting up sources: %w", err)
 	}
@@ -342,8 +363,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			return err
 		}
 	}
+
 	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
-		if err := p.returnModuleDataOutputs(step, cursor); err != nil {
+		zlog.Debug("will return module outputs")
+		if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
 			return err
 		}
 	}
@@ -357,6 +380,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
+}
+
+func (p *Pipeline) PartialsWritten() block.Ranges {
+	return p.partialsWritten
 }
 
 func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cursor string) error {
@@ -386,12 +413,14 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 		logs, truncated := executor.moduleLogs()
 		outputData := executor.moduleOutputData()
 		if len(logs) != 0 || outputData != nil {
-			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
+			moduleOutput := &pbsubstreams.ModuleOutput{
 				Name:          executorName,
 				Data:          outputData,
 				Logs:          logs,
 				LogsTruncated: truncated,
-			})
+			}
+			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
+			p.forkHandler.addModuleOutput(moduleOutput, p.clock.Number)
 		}
 	}
 
@@ -444,26 +473,26 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 	return nil
 }
 
-func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
-	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-	protoStep, skip := pbsubstreams.StepToProto(step, true) //FIXME stepd irreversible only
-	if skip {
-		return nil
-	}
-
-	out := &pbsubstreams.BlockScopedData{
-		Outputs: p.moduleOutputs,
-		Clock:   p.clock,
-		Step:    protoStep,
-		Cursor:  cursor.ToOpaque(),
-	}
-
-	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-		return fmt.Errorf("calling return func: %w", err)
-	}
-
-	return nil
-}
+//func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
+//	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
+//	protoStep, skip := pbsubstreams.StepToProto(step, true) //FIXME stepd irreversible only
+//	if skip {
+//		return nil
+//	}
+//
+//	out := &pbsubstreams.BlockScopedData{
+//		Outputs: p.moduleOutputs,
+//		Clock:   p.clock,
+//		Step:    protoStep,
+//		Cursor:  cursor.ToOpaque(),
+//	}
+//
+//	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+//		return fmt.Errorf("calling return func: %w", err)
+//	}
+//
+//	return nil
+//}
 
 func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
 	var out []*pbsubstreams.ModuleProgress
@@ -722,6 +751,19 @@ func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, r
 	return nil
 }
 
-func (p *Pipeline) PartialsWritten() block.Ranges {
-	return p.partialsWritten
+func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
+	zlog.Debug("returning module outputs to client", zap.Int("module_output_count", len(moduleOutputs)))
+	protoStep, _ := pbsubstreams.StepToProto(step, false)
+	out := &pbsubstreams.BlockScopedData{
+		Outputs: moduleOutputs,
+		Clock:   clock,
+		Step:    protoStep,
+		Cursor:  cursor.ToOpaque(),
+	}
+
+	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
 }

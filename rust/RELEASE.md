@@ -10,9 +10,8 @@
 - Update the [docs/release-notes/change-log.md](../docs/release-notes/change-log.md) to update the `## Unreleased` header to become `## [${version}](https://github.com/streamingfast/substreams/releases/tag/v${version})`
 - Ensure that Keybase is running and your are logged in
 - Ensure that `cargo login` has been done in your terminal
-- Perform a dry-run mode of the release `./bin/release.sh v${version}` and fix any mistakes (if any)
 - Commit everything with message `Preparing release of ${version}`.
-- `./bin/release.sh v${version}` (Add `-f` before `v${version}` to doing the real non-dry mode)
+- `./bin/release.sh -f v${version}`
 - Git push everything (`git push origin develop v${version}`)
 - Go to https://github.com/streamingfast/substreams/releases/tag/v${version} and update the release notes, use content of section `## [v${version}]` in [docs/release-notes/change-log.md](../docs/release-notes/change-log.md), edit GitHub release and paste content before commits listing, keep both:
 

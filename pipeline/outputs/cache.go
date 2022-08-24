@@ -39,7 +39,7 @@ func NewModuleOutputCache(saveBlockInterval uint64, logger *zap.Logger) *Modules
 	moduleOutputCache := &ModulesOutputCache{
 		OutputCaches:      make(map[string]*OutputCache),
 		SaveBlockInterval: saveBlockInterval,
-		logger:            logger.Named("outputs"),
+		logger:            logger.Named("out"),
 	}
 
 	return moduleOutputCache

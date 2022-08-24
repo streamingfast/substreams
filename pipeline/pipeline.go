@@ -78,7 +78,7 @@ type Pipeline struct {
 	logger             *zap.Logger
 }
 
-var _zlog, _ = logging.PackageLogger("pipeline", "github.com/streamingfast/substreams/pipeline")
+var _zlog, _ = logging.PackageLogger("pipe", "github.com/streamingfast/substreams/pipeline")
 
 func New(
 	ctx context.Context,

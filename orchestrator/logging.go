@@ -8,5 +8,5 @@ import (
 var zlog *zap.Logger
 
 func init() {
-	zlog, _ = logging.PackageLogger("pipeline", "github.com/streamingfast/substreams/orchestrator")
+	zlog, _ = logging.PackageLogger("orchestrator", "github.com/streamingfast/substreams/orchestrator")
 }

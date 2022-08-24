@@ -36,9 +36,6 @@ type Store struct {
 }
 
 func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, logger *zap.Logger) (*Store, error) {
-	if logger == nil {
-		panic("logger is nil")
-	}
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -54,7 +51,7 @@ func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, modul
 		SaveInterval:       saveInterval,
 		ModuleInitialBlock: moduleInitialBlock,
 		storeInitialBlock:  moduleInitialBlock,
-		logger:             logger,
+		logger:             logger.Named("store"),
 	}
 
 	return b, nil

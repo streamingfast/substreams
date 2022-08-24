@@ -8,6 +8,8 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/streamingfast/logging"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
@@ -89,6 +91,7 @@ func New(
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
 
+	var zlog, _ = logging.PackageLogger("pipeline", "github.com/streamingfast/substreams/pipeline")
 	pipe := &Pipeline{
 		context: ctx,
 		request: request,
@@ -127,7 +130,7 @@ func (p *Pipeline) isOutputModule(name string) bool {
 
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
-	p.logger = zlog.With(zap.Strings("outputs", p.request.OutputModules), zap.Bool("sub_request", p.isSubrequest))
+	p.logger = p.logger.With(zap.Strings("outputs", p.request.OutputModules), zap.Bool("sub_request", p.isSubrequest))
 
 	p.logger.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
@@ -252,8 +255,8 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
-			zlog.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
-			zlog.Error(string(debug.Stack()))
+			p.logger.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
+			p.logger.Error(string(debug.Stack()))
 		}
 		if err != nil {
 			for _, hook := range p.postJobHooks {
@@ -725,7 +728,6 @@ func loadCompleteStores(ctx context.Context, storeMap map[string]*state.Store, r
 }
 
 func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
-	zlog.Debug("returning module outputs to client", zap.Int("module_output_count", len(moduleOutputs)))
 	protoStep, _ := pbsubstreams.StepToProto(step, false)
 	out := &pbsubstreams.BlockScopedData{
 		Outputs: moduleOutputs,

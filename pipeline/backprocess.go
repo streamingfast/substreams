@@ -18,20 +18,21 @@ func (p *Pipeline) backProcessStores(
 	map[string]*state.Store,
 	error,
 ) {
+	logger := p.logger.Named("back_process")
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		zlog.Debug("back processing canceling ctx", zap.Error(ctx.Err()))
+		logger.Debug("back processing canceling ctx", zap.Error(ctx.Err()))
 	}()
 
-	zlog.Info("synchronizing stores")
+	logger.Info("synchronizing stores")
 
 	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	zlog.Info("storage state found")
+	logger.Info("storage state found")
 
 	workPlan := orchestrator.WorkPlan{}
 	for _, mod := range p.storeModules {
@@ -42,7 +43,7 @@ func (p *Pipeline) backProcessStores(
 		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot)
 	}
 
-	zlog.Info("work plan ready", zap.Stringer("work_plan", workPlan))
+	logger.Info("work plan ready", zap.Stringer("work_plan", workPlan))
 
 	progressMessages := workPlan.ProgressMessages()
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
@@ -56,7 +57,7 @@ func (p *Pipeline) backProcessStores(
 		return nil, fmt.Errorf("creating strategy: %w", err)
 	}
 
-	zlog.Debug("launching squasher")
+	logger.Debug("launching squasher")
 
 	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, jobsPlanner)
 	if err != nil {
@@ -75,7 +76,7 @@ func (p *Pipeline) backProcessStores(
 
 	result := make(chan error)
 
-	zlog.Debug("launching scheduler")
+	logger.Debug("launching scheduler")
 
 	go scheduler.Launch(ctx, p.request.Modules, result)
 
@@ -89,11 +90,11 @@ func (p *Pipeline) backProcessStores(
 			if err != nil {
 				return nil, fmt.Errorf("from worker: %w", err)
 			}
-			zlog.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount), zap.Error(err))
+			logger.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount), zap.Error(err))
 		}
 	}
 
-	zlog.Info("all jobs completed, waiting for squasher to finish")
+	logger.Info("all jobs completed, waiting for squasher to finish")
 	squasher.Shutdown(nil)
 
 	newStores, err := squasher.ValidateStoresReady()

@@ -3,9 +3,10 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/block"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/substreams/block"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
@@ -31,7 +32,7 @@ func TestNewJobsPlanner(t *testing.T) {
 	stores := map[string]*state.Store{}
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
+		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
 		require.NoError(t, err)
 		stores[newStore.Name] = newStore
 	}
@@ -110,7 +111,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	stores := map[string]*state.Store{}
 	for _, mod := range storeModules {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
+		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
 		require.NoError(t, err)
 		stores[newStore.Name] = newStore
 	}

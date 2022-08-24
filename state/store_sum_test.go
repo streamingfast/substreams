@@ -11,7 +11,7 @@ import (
 )
 
 func initTestStore(key string, value []byte) *Store {
-	b, err := NewStore("b", 100, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil))
+	b, err := NewStore("b", 100, 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil), zlog)
 	if err != nil {
 		panic(err)
 	}

@@ -272,7 +272,7 @@ func mustNewStore(t *testing.T, name string, moduleStartBlock uint64, moduleHash
 		store = dstore.NewMockStore(nil)
 	}
 
-	stateStore, err := NewStore(name, 10_000, moduleStartBlock, moduleHash, updatePolicy, valueType, store)
+	stateStore, err := NewStore(name, 10_000, moduleStartBlock, moduleHash, updatePolicy, valueType, store, zlog)
 	if err != nil {
 		panic(err)
 	}

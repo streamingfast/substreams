@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
@@ -11,8 +14,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
-	"strconv"
-	"strings"
 )
 
 var decodeOutputsCmd = &cobra.Command{
@@ -187,7 +188,7 @@ func runDecodeStore(cmd *cobra.Command, args []string) error {
 	}
 	hash = "2d5d4eca48116399e881cabf533226fefda50f9e"
 
-	moduleStore, err := state.NewStore(moduleName, saveInterval, pbModule.InitialBlock, hash, pbModule.GetKindStore().GetUpdatePolicy(), pbModule.GetKindStore().GetValueType(), store)
+	moduleStore, err := state.NewStore(moduleName, saveInterval, pbModule.InitialBlock, hash, pbModule.GetKindStore().GetUpdatePolicy(), pbModule.GetKindStore().GetValueType(), store, zlog)
 	if err != nil {
 		return fmt.Errorf("initializing store for module %q: %w", moduleName, err)
 	}

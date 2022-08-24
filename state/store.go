@@ -32,9 +32,13 @@ type Store struct {
 	ValueType    string
 
 	lastOrdinal uint64
+	logger      *zap.Logger
 }
 
-func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (*Store, error) {
+func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, logger *zap.Logger) (*Store, error) {
+	if logger == nil {
+		panic("logger is nil")
+	}
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -50,10 +54,9 @@ func NewStore(name string, saveInterval uint64, moduleInitialBlock uint64, modul
 		SaveInterval:       saveInterval,
 		ModuleInitialBlock: moduleInitialBlock,
 		storeInitialBlock:  moduleInitialBlock,
+		logger:             logger,
 	}
-	//b.resetNextBoundary()
 
-	zlog.Info("store created", zap.Object("store", b))
 	return b, nil
 }
 
@@ -68,16 +71,17 @@ func (s *Store) CloneStructure(newStoreStartBlock uint64) *Store {
 		KV:                 map[string][]byte{},
 		UpdatePolicy:       s.UpdatePolicy,
 		ValueType:          s.ValueType,
+		logger:             s.logger,
 	}
 	//store.resetNextBoundary()
-	zlog.Info("store cloned", zap.Object("store", store))
+	s.logger.Info("store cloned", zap.Object("store", store))
 	return store
 }
 
 func (s *Store) StoreInitialBlock() uint64 { return s.storeInitialBlock }
 
 func (s *Store) IsPartial() bool {
-	//zlog.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.storeInitialBlock))
+	//s.logger.Debug("module and store initial blocks", zap.Uint64("module_initial_block", s.ModuleInitialBlock), zap.Uint64("store_initial_block", s.storeInitialBlock))
 	return s.ModuleInitialBlock != s.storeInitialBlock
 }
 
@@ -100,7 +104,7 @@ func (s *Store) LoadFrom(ctx context.Context, blockRange *block.Range) (*Store, 
 		return nil, err
 	}
 
-	zlog.Info("store loaded from", zap.Object("store", newStore))
+	s.logger.Info("store loaded from", zap.Object("store", newStore))
 	return newStore, nil
 }
 
@@ -118,7 +122,7 @@ func (s *Store) Fetch(ctx context.Context, exclusiveEndBlock uint64) error {
 }
 
 func (s *Store) load(ctx context.Context, stateFileName string) error {
-	zlog.Debug("loading state from file", zap.String("module_name", s.Name), zap.String("file_name", stateFileName))
+	s.logger.Debug("loading state from file", zap.String("module_name", s.Name), zap.String("file_name", stateFileName))
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		r, err := s.Store.OpenObject(ctx, stateFileName)
 		if err != nil {
@@ -136,14 +140,14 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 		}
 		s.KV = kv
 
-		zlog.Debug("unmarshalling kv", zap.String("file_name", stateFileName), zap.Object("store", s))
+		s.logger.Debug("unmarshalling kv", zap.String("file_name", stateFileName), zap.Object("store", s))
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("storage file %s: %w", stateFileName, err)
 	}
 
-	zlog.Debug("state loaded", zap.String("store_name", s.Name), zap.String("file_name", stateFileName))
+	s.logger.Debug("state loaded", zap.String("store_name", s.Name), zap.String("file_name", stateFileName))
 	return nil
 }
 
@@ -151,7 +155,7 @@ func (s *Store) load(ctx context.Context, stateFileName string) error {
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
 func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (*storeWriter, error) {
-	zlog.Debug("writing state", zap.Object("store", s))
+	s.logger.Debug("writing state", zap.Object("store", s))
 
 	//kv := stringMap(s.KV) // FOR READABILITY ON DISK
 
@@ -161,7 +165,7 @@ func (s *Store) WriteState(ctx context.Context, endBoundaryBlock uint64) (*store
 	}
 
 	filename := s.storageFilename(endBoundaryBlock)
-	zlog.Info("about to write state",
+	s.logger.Info("about to write state",
 		zap.String("store", s.Name),
 		zap.Bool("partial", s.IsPartial()),
 		zap.String("file_name", filename),
@@ -255,7 +259,7 @@ func (s *Store) ApplyDeltaReverse(deltas []*pbsubstreams.StoreDelta) {
 
 func (s *Store) Flush() {
 	if tracer.Enabled() {
-		zlog.Debug("flushing store", zap.String("name", s.Name), zap.Int("delta_count", len(s.Deltas)), zap.Int("entry_count", len(s.KV)))
+		s.logger.Debug("flushing store", zap.String("name", s.Name), zap.Int("delta_count", len(s.Deltas)), zap.Int("entry_count", len(s.KV)))
 	}
 	s.Deltas = nil
 	s.lastOrdinal = 0

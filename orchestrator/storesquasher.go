@@ -137,7 +137,11 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			storeDeleter := nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 			eg.Go(storeDeleter.Delete)
 
-			if squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0 {
+			isSaveIntervalReached := squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0
+			isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == s.store.ModuleInitialBlock
+			isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.store.SaveInterval == 0
+			zlog.Info("should write store?", zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock), zap.Uint64("save_interval", nextStore.SaveInterval), zap.Bool("is_save_interval_reached", isSaveIntervalReached), zap.Bool("is_first_kv_for_module", isFirstKvForModule), zap.Bool("is_completed_kv", isCompletedKv))
+			if isFirstKvForModule || isCompletedKv {
 				storeWriter, err := s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
 				if err != nil {
 					s.Shutdown(fmt.Errorf("store writer marshaling: %w", err))

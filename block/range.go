@@ -98,6 +98,10 @@ func (r *Range) Split(chunkSize uint64) []*Range {
 	return res
 }
 
+func (r *Range) Len() uint64 {
+	return r.ExclusiveEndBlock - r.StartBlock
+}
+
 type Ranges []*Range
 
 func (r Ranges) String() string {

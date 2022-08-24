@@ -65,8 +65,6 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 	}
 	memory := instance.GetExport(m.wasmStore, "memory").Memory()
 
-	zlog.Info("got memory", zap.Uint64("size", uint64(memory.DataSize(m.wasmStore))))
-
 	alloc := instance.GetExport(m.wasmStore, "alloc").Func()
 	dealloc := instance.GetExport(m.wasmStore, "dealloc").Func()
 	if alloc == nil || dealloc == nil {

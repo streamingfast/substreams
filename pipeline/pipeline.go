@@ -73,6 +73,7 @@ type Pipeline struct {
 
 	cacheEnabled       bool
 	partialModeEnabled bool
+	logger             *zap.Logger
 }
 
 func New(
@@ -105,6 +106,7 @@ func New(
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
 		forkHandler:                  NewForkHandle(),
+		logger:                       zlog,
 	}
 
 	for _, name := range request.OutputModules {
@@ -125,8 +127,9 @@ func (p *Pipeline) isOutputModule(name string) bool {
 
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
+	p.logger = zlog.With(zap.Strings("outputs", p.request.OutputModules), zap.Bool("sub_request", p.isSubrequest))
 
-	zlog.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
+	p.logger.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
 	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
 
@@ -150,9 +153,9 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		}
 	}
 
-	zlog.Info("initializing and loading stores")
+	p.logger.Info("initializing and loading stores")
 	initialStoreMap, err := p.buildStoreMap()
-	zlog.Info("stores load", zap.Int("number_of_stores", len(initialStoreMap)))
+	p.logger.Info("stores load", zap.Int("number_of_stores", len(initialStoreMap)))
 	if err != nil {
 		return fmt.Errorf("building store map: %w", err)
 	}
@@ -169,14 +172,14 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		if totalOutputModules != 1 || backProcessingStore == nil || !isLastStore {
 			// totalOutputModels is a temporary restrictions, for when the orchestrator
 			// will be able to run two leaf stores from the same job
-			zlog.Warn("conditions for leaf store not met",
+			p.logger.Warn("conditions for leaf store not met",
 				zap.String("module", outputName),
 				zap.Bool("is_last_store", isLastStore),
 				zap.Int("output_module_count", totalOutputModules))
 			return fmt.Errorf("invalid conditions to backprocess leaf store %q", outputName)
 		}
 
-		zlog.Info("marking leaf store for partial processing", zap.String("module", outputName))
+		p.logger.Info("marking leaf store for partial processing", zap.String("module", outputName))
 
 		backProcessingStore.Roll(p.requestedStartBlockNum)
 
@@ -200,7 +203,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		p.backprocessingStores = nil
 
 		if len(p.request.InitialStoreSnapshotForModules) != 0 {
-			zlog.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
+			p.logger.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
 			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules); err != nil {
 				return fmt.Errorf("send initial snapshots: %w", err)
 			}
@@ -245,7 +248,7 @@ func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	ctx := p.context
-	zlog.Debug("processing block", zap.Uint64("block_num", block.Number))
+	p.logger.Debug("processing block", zap.Uint64("block_num", block.Number))
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
@@ -255,7 +258,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		if err != nil {
 			for _, hook := range p.postJobHooks {
 				if err := hook(ctx, p.clock); err != nil {
-					zlog.Warn("post job hook failed", zap.Error(err))
+					p.logger.Warn("post job hook failed", zap.Error(err))
 				}
 			}
 		}
@@ -271,22 +274,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
-
-	// if obj.Step() == UNDO {
-	//  loop ALL the STORES that we have in `map[obj.BlockID]outputs`, and Apply the in REVERSE
-	//  PUSH OUT the outputs as a step UNDO without executing, until we are back to the
-	//  fork point.
-	//  return nil
-	// }
-	// if obj.Step() == NEW && map[blockID] != nil {
-	//   SEnd all the cached stuff from map[obj.BlockID]outputs
-	//   return nil
-	// }
-	// TODO(abourget): eventually, handle the `undo` signals.
-	// if obj.Step() == IRREVERSIBLE  || STALLED {
-	//    if obj.Step() == IRREVERSIBLE { p.moduleOutputCache.Update(ctx, map[blockID]) }
-	//    delete(map[blockID], outputs)
-	// }
 
 	if step == bstream.StepUndo {
 		if err = p.forkHandler.handleUndo(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
@@ -321,6 +308,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
 	for p.nextStoreSaveBoundary <= blockNum {
+		p.logger.Debug("saving stores on boundary", zap.Uint64("block_num", p.nextStoreSaveBoundary))
 		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
 			return fmt.Errorf("saving stores: %w", err)
 		}
@@ -332,7 +320,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
 		if p.cacheEnabled || p.partialModeEnabled { // always load/save/update cache when you are in partialMode
-			zlog.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
+			p.logger.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
 			if err := p.moduleOutputCache.Flush(ctx); err != nil {
 				return fmt.Errorf("saving partial caches")
 			}
@@ -365,7 +353,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
-		zlog.Debug("will return module outputs")
+		p.logger.Debug("will return module outputs")
 		if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
 			return err
 		}
@@ -378,7 +366,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	p.moduleOutputs = nil
 	p.wasmOutputs = map[string][]byte{}
 
-	zlog.Debug("block processed", zap.Uint64("block_num", block.Number))
+	p.logger.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
 }
 
@@ -392,7 +380,7 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 	// 	continue ??
 	// }
 	executorName := executor.Name()
-	zlog.Debug("executing", zap.String("module_name", executorName))
+	p.logger.Debug("executing", zap.String("module_name", executorName))
 
 	err := executor.run(ctx, p.wasmOutputs, p.clock, p.cacheEnabled, p.partialModeEnabled, cursor)
 	if err != nil {
@@ -473,27 +461,6 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 	return nil
 }
 
-//func (p *Pipeline) returnModuleDataOutputs(step bstream.StepType, cursor *bstream.Cursor) error {
-//	zlog.Debug("got modules outputs", zap.Int("module_output_count", len(p.moduleOutputs)))
-//	protoStep, skip := pbsubstreams.StepToProto(step, true) //FIXME stepd irreversible only
-//	if skip {
-//		return nil
-//	}
-//
-//	out := &pbsubstreams.BlockScopedData{
-//		Outputs: p.moduleOutputs,
-//		Clock:   p.clock,
-//		Step:    protoStep,
-//		Cursor:  cursor.ToOpaque(),
-//	}
-//
-//	if err := p.respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
-//		return fmt.Errorf("calling return func: %w", err)
-//	}
-//
-//	return nil
-//}
-
 func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
 	var out []*pbsubstreams.ModuleProgress
 
@@ -519,7 +486,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 		}
 	}
 
-	zlog.Debug("return failed progress", zap.Int("progress_len", len(out)))
+	p.logger.Debug("return failed progress", zap.Int("progress_len", len(out)))
 	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
@@ -697,21 +664,26 @@ func (p *Pipeline) buildWASM(ctx context.Context, request *pbsubstreams.Request,
 }
 
 func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) error {
-	for _, builder := range p.storeMap {
-		stateWriter, err := builder.WriteState(ctx, boundaryBlock)
+	for _, store := range p.storeMap {
+		if p.isSubrequest && !p.isOutputModule(store.Name) {
+			// skip saving snapshot for non-output stores in sub request
+			continue
+		}
+
+		stateWriter, err := store.WriteState(ctx, boundaryBlock)
 		if err != nil {
-			return fmt.Errorf("store writer %q: %w", builder.Name, err)
+			return fmt.Errorf("store writer %q: %w", store.Name, err)
 		}
 		if err := stateWriter.Write(); err != nil {
-			return fmt.Errorf("writing store '%s' state: %w", builder.Name, err)
+			return fmt.Errorf("writing store '%s' state: %w", store.Name, err)
 		}
-		zlog.Info("store written", zap.String("store_name", builder.Name), zap.Object("store", builder))
+		p.logger.Info("store written", zap.String("store_name", store.Name), zap.Object("store", store))
 
-		if p.isSubrequest && p.isOutputModule(builder.Name) {
-			r := block.NewRange(builder.StoreInitialBlock(), boundaryBlock)
+		if p.isSubrequest && p.isOutputModule(store.Name) {
+			r := block.NewRange(store.StoreInitialBlock(), boundaryBlock)
 			p.partialsWritten = append(p.partialsWritten, r)
-			zlog.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
-			builder.Roll(boundaryBlock)
+			p.logger.Debug("adding partials written", zap.Object("range", r), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
+			store.Roll(boundaryBlock)
 		}
 	}
 	return nil
@@ -728,6 +700,7 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			p.baseStateStore,
+			p.logger,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("creating builder %s: %w", storeModule.Name, err)

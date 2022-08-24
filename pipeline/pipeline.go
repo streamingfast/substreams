@@ -78,6 +78,8 @@ type Pipeline struct {
 	logger             *zap.Logger
 }
 
+var _zlog, _ = logging.PackageLogger("pipeline", "github.com/streamingfast/substreams/pipeline")
+
 func New(
 	ctx context.Context,
 	request *pbsubstreams.Request,
@@ -91,7 +93,6 @@ func New(
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
 
-	var zlog, _ = logging.PackageLogger("pipeline", "github.com/streamingfast/substreams/pipeline")
 	pipe := &Pipeline{
 		context: ctx,
 		request: request,
@@ -109,7 +110,7 @@ func New(
 		maxStoreSyncRangeSize:        math.MaxUint64,
 		respFunc:                     respFunc,
 		forkHandler:                  NewForkHandle(),
-		logger:                       zlog,
+		logger:                       _zlog,
 	}
 
 	for _, name := range request.OutputModules {
@@ -134,7 +135,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	p.logger.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
-	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval)
+	p.moduleOutputCache = outputs.NewModuleOutputCache(p.outputCacheSaveBlockInterval, p.logger)
 
 	if err := p.build(); err != nil {
 		return fmt.Errorf("building pipeline: %w", err)

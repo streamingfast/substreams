@@ -31,20 +31,22 @@ func init() {
 type ModulesOutputCache struct {
 	OutputCaches      map[string]*OutputCache
 	SaveBlockInterval uint64
+	logger            *zap.Logger
 }
 
-func NewModuleOutputCache(saveBlockInterval uint64) *ModulesOutputCache {
-	zlog.Debug("creating cache with modules")
+func NewModuleOutputCache(saveBlockInterval uint64, logger *zap.Logger) *ModulesOutputCache {
+
 	moduleOutputCache := &ModulesOutputCache{
 		OutputCaches:      make(map[string]*OutputCache),
 		SaveBlockInterval: saveBlockInterval,
+		logger:            logger.Named("outputs"),
 	}
 
 	return moduleOutputCache
 }
 
 func (c *ModulesOutputCache) RegisterModule(module *pbsubstreams.Module, hash string, baseCacheStore dstore.Store) (*OutputCache, error) {
-	zlog.Debug("registering modules", zap.String("module_name", module.Name))
+	c.logger.Debug("registering modules", zap.String("module_name", module.Name))
 
 	if cache, found := c.OutputCaches[module.Name]; found {
 		return cache, nil
@@ -55,7 +57,7 @@ func (c *ModulesOutputCache) RegisterModule(module *pbsubstreams.Module, hash st
 		return nil, fmt.Errorf("creating substore for module %q: %w", module.Name, err)
 	}
 
-	cache := NewOutputCache(module.Name, moduleStore, c.SaveBlockInterval)
+	cache := NewOutputCache(module.Name, moduleStore, c.SaveBlockInterval, c.logger)
 
 	c.OutputCaches[module.Name] = cache
 
@@ -65,7 +67,7 @@ func (c *ModulesOutputCache) RegisterModule(module *pbsubstreams.Module, hash st
 func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockRef) error {
 	for _, moduleCache := range c.OutputCaches {
 		if moduleCache.IsOutOfRange(blockRef) {
-			zlog.Debug("updating cache", zap.Stringer("block_ref", blockRef))
+			c.logger.Debug("updating cache", zap.Stringer("block_ref", blockRef))
 
 			previousFilename := moduleCache.currentFilename()
 			if err := moduleCache.save(ctx, previousFilename); err != nil {
@@ -82,10 +84,10 @@ func (c *ModulesOutputCache) Update(ctx context.Context, blockRef bstream.BlockR
 }
 
 func (c *ModulesOutputCache) Flush(ctx context.Context) error {
-	zlog.Info("Saving caches")
+	c.logger.Info("Saving caches")
 	for _, moduleCache := range c.OutputCaches {
 		filename := moduleCache.currentFilename()
-		zlog.Debug("saving cache for current block range", zap.String("module_name", moduleCache.ModuleName),
+		c.logger.Debug("saving cache for current block range", zap.String("module_name", moduleCache.ModuleName),
 			zap.Uint64("start_block", moduleCache.CurrentBlockRange.StartBlock),
 			zap.Uint64("end_block", moduleCache.CurrentBlockRange.ExclusiveEndBlock))
 
@@ -114,13 +116,15 @@ type OutputCache struct {
 	kv                outputKV
 	Store             dstore.Store
 	saveBlockInterval uint64
+	logger            *zap.Logger
 }
 
-func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64) *OutputCache {
+func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *OutputCache {
 	return &OutputCache{
 		ModuleName:        moduleName,
 		Store:             store,
 		saveBlockInterval: saveBlockInterval,
+		logger:            logger.Named("cache"),
 	}
 }
 
@@ -189,7 +193,7 @@ func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 }
 
 func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
-	zlog.Info("loading cache at block", zap.String("module_name", c.ModuleName), zap.Uint64("at_block_num", atBlock))
+	c.logger.Info("loading cache at block", zap.String("module_name", c.ModuleName), zap.Uint64("at_block_num", atBlock))
 
 	c.kv = make(outputKV)
 
@@ -198,7 +202,7 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
 	}
 
-	zlog.Debug("block range found", zap.Object("block_range", blockRange))
+	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
 
 	if !found {
 		blockRange = block.NewRange(atBlock, atBlock+c.saveBlockInterval)
@@ -214,11 +218,11 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 
 }
 func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
-	zlog.Debug("loading cache", zap.String("module_name", c.ModuleName), zap.Object("range", blockRange))
+	c.logger.Debug("loading cache", zap.String("module_name", c.ModuleName), zap.Object("range", blockRange))
 	c.kv = make(outputKV)
 
 	filename := ComputeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
-	zlog.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", blockRange))
+	c.logger.Debug("loading outputs data", zap.String("file_name", filename), zap.String("cache_module_name", c.ModuleName), zap.Object("block_range", blockRange))
 
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		objectReader, err := c.Store.OpenObject(ctx, filename)
@@ -237,12 +241,12 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 	}
 
 	c.CurrentBlockRange = blockRange
-	zlog.Debug("outputs data loaded", zap.String("module_name", c.ModuleName), zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.CurrentBlockRange))
+	c.logger.Debug("outputs data loaded", zap.String("module_name", c.ModuleName), zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.CurrentBlockRange))
 	return nil
 }
 
 func (c *OutputCache) save(ctx context.Context, filename string) error {
-	zlog.Info("saving cache", zap.String("module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange), zap.String("filename", filename))
+	c.logger.Info("saving cache", zap.String("module_name", c.ModuleName), zap.Stringer("block_range", c.CurrentBlockRange), zap.String("filename", filename))
 
 	buffer := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buffer).Encode(c.kv)
@@ -257,7 +261,7 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 			return c.Store.WriteObject(ctx, filename, reader)
 		})
 		if err != nil {
-			zlog.Warn("failed writing output cache", zap.Error(err))
+			c.logger.Warn("failed writing output cache", zap.Error(err))
 		}
 	}()
 

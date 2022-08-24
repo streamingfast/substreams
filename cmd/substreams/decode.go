@@ -100,7 +100,7 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("can't find substore for hash %q: %w", hash, err)
 	}
 
-	outputCache := outputs.NewOutputCache(moduleName, moduleStore, saveInterval)
+	outputCache := outputs.NewOutputCache(moduleName, moduleStore, saveInterval, zlog)
 	found, err := outputCache.LoadAtBlock(cmd.Context(), startBlock)
 	if err != nil {
 		return fmt.Errorf("loading cache: %w", err)

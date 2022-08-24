@@ -209,7 +209,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 		hash := manifest.HashModuleAsString(request.Modules, graph, module)
 		moduleCacheStore, err := s.baseStateStore.SubStore(fmt.Sprintf("%s/outputs", hash))
-		moduleOutputCache := outputs.NewOutputCache(moduleName, moduleCacheStore, s.outputCacheSaveBlockInterval)
+		moduleOutputCache := outputs.NewOutputCache(moduleName, moduleCacheStore, s.outputCacheSaveBlockInterval, zlog)
 
 		lastBlockSent, err := sendCachedModuleOutput(ctx, uint64(request.StartBlockNum), request.StopBlockNum, module, moduleOutputCache, responseHandler)
 		if err != nil {

@@ -3,6 +3,8 @@ package outputs
 import (
 	"testing"
 
+	"github.com/streamingfast/logging"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/stretchr/testify/require"
 )
@@ -108,10 +110,10 @@ func TestOutputCache_Delete(t *testing.T) {
 			},
 		},
 	}
-
+	var zlog, _ = logging.PackageLogger("test", "github.com/streamingfast/substreams/pipeline")
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			outputCache := NewOutputCache("module1", nil, 10)
+			outputCache := NewOutputCache("module1", nil, 10, zlog)
 			outputCache.kv = test.kv
 			for _, key := range test.keysToDelete {
 				outputCache.Delete(key)

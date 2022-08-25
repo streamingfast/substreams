@@ -14,11 +14,37 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// FIXME(abourget): plz no closeFunc() in here? We embed in our own struct and pass that around?
-// Also, let's not have this being called from within the Firehose, let's pass the parameters down and let the `substreams` engine manage all those connections.
-// This will avoid us needing to go to all `sf-chain` implementations to tweak for something
-// that clearly belongs only inside Substreams.
-func NewSubstreamsClient(endpoint, jwt string, useInsecureTLSConnection, usePlainTextConnection bool) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+var config *SubstreamsClientConfig
+
+type SubstreamsClientConfig struct {
+	endpoint  string
+	jwt       string
+	insecure  bool
+	plaintext bool
+}
+
+func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plaintext bool) *SubstreamsClientConfig {
+	return &SubstreamsClientConfig{
+		endpoint:  endpoint,
+		jwt:       jwt,
+		insecure:  insecure,
+		plaintext: plaintext,
+	}
+}
+
+func SetConfig(substreamsClientConfig *SubstreamsClientConfig) {
+	config = substreamsClientConfig
+}
+
+func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+	if config == nil {
+		panic("substreams client config not set")
+	}
+	endpoint := config.endpoint
+	jwt := config.jwt
+	usePlainTextConnection := config.plaintext
+	useInsecureTLSConnection := config.insecure
+
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""))
 	skipAuth := jwt == "" || usePlainTextConnection
 

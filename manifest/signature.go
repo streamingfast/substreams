@@ -75,13 +75,10 @@ func inputName(input *pbsubstreams.Module_Input) string {
 func inputValue(input *pbsubstreams.Module_Input) string {
 	switch input.Input.(type) {
 	case *pbsubstreams.Module_Input_Store_:
-		fmt.Println("Module_Input_Store_", input.GetStore().ModuleName)
 		return input.GetStore().ModuleName
 	case *pbsubstreams.Module_Input_Source_:
-		fmt.Println("Module_Input_Source_", input.GetSource().Type)
 		return input.GetSource().Type
 	case *pbsubstreams.Module_Input_Map_:
-		fmt.Println("Module_Input_Map_", input.GetMap().ModuleName)
 		return input.GetMap().ModuleName
 	default:
 		panic(fmt.Sprintf("invalid input %T", input.Input))

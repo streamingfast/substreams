@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/client"
 	"io"
 	"os"
 	"strings"
@@ -46,8 +47,6 @@ type Service struct {
 
 	logger *zap.Logger
 
-	grpcClientFactory substreams.GrpcClientFactory
-
 	workerPool *orchestrator.WorkerPool
 
 	parallelSubRequests       int
@@ -68,15 +67,24 @@ func (s *Service) WasmExtensions() []wasm.WASMExtensioner {
 	return s.wasmExtensions
 }
 
-func New(stateStore dstore.Store, blockType string, grpcClientFactory substreams.GrpcClientFactory, parallelSubRequests int, blockRangeSizeSubRequests int, opts ...Option) *Service {
+func New(
+	stateStore dstore.Store,
+	blockType string,
+	parallelSubRequests int,
+	blockRangeSizeSubRequests int,
+	substreamsClientConfig *client.SubstreamsClientConfig,
+	opts ...Option,
+) *Service {
 	s := &Service{
 		baseStateStore:            stateStore,
 		blockType:                 blockType,
-		grpcClientFactory:         grpcClientFactory,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
-		workerPool:                orchestrator.NewWorkerPool(parallelSubRequests, grpcClientFactory),
 	}
+
+	client.SetConfig(substreamsClientConfig)
+
+	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests)
 
 	for _, opt := range opts {
 		opt(s)
@@ -229,7 +237,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	}
 
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.grpcClientFactory, s.blockRangeSizeSubRequests, responseHandler, opts...)
+	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum:   request.StartBlockNum,

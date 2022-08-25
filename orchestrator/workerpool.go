@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/client"
 	"io"
 	"time"
 
@@ -55,14 +56,12 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func NewWorkerPool(workerCount int, grpcClientFactory substreams.GrpcClientFactory) *WorkerPool {
+func NewWorkerPool(workerCount int) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
-		workers <- &Worker{
-			grpcClientFactory: grpcClientFactory,
-		}
+		workers <- &Worker{}
 	}
 
 	workerPool := &WorkerPool{
@@ -115,7 +114,6 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
-	grpcClientFactory substreams.GrpcClientFactory
 }
 
 type RetryableErr struct {
@@ -130,7 +128,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 	start := time.Now()
 
 	jobLogger := zlog.With(zap.Object("job", job))
-	grpcClient, connClose, grpcCallOpts, err := w.grpcClientFactory(ctx)
+	grpcClient, connClose, grpcCallOpts, err := client.NewSubstreamsClient()
 	if err != nil {
 		jobLogger.Error("getting grpc client", zap.Error(err))
 		return nil, &RetryableErr{cause: fmt.Errorf("grpc client factory: %w", err)}

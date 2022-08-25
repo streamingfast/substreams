@@ -71,7 +71,6 @@ type Pipeline struct {
 
 	outputCacheSaveBlockInterval uint64
 	subrequestSplitSize          int
-	grpcClientFactory            substreams.GrpcClientFactory
 
 	cacheEnabled       bool
 	partialModeEnabled bool
@@ -88,7 +87,6 @@ func New(
 	baseStateStore dstore.Store,
 	outputCacheSaveBlockInterval uint64,
 	wasmExtensions []wasm.WASMExtensioner,
-	grpcClientFactory substreams.GrpcClientFactory,
 	subrequestSplitSize int,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option) *Pipeline {
@@ -104,7 +102,6 @@ func New(
 		outputModuleMap:              map[string]bool{},
 		blockType:                    blockType,
 		wasmExtensions:               wasmExtensions,
-		grpcClientFactory:            grpcClientFactory,
 		outputCacheSaveBlockInterval: outputCacheSaveBlockInterval,
 		subrequestSplitSize:          subrequestSplitSize,
 		maxStoreSyncRangeSize:        math.MaxUint64,

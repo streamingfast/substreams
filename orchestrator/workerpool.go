@@ -3,13 +3,18 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/client"
 	"io"
 	"time"
+
+	"github.com/streamingfast/substreams/client"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc/metadata"
@@ -58,10 +63,12 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 
 func NewWorkerPool(workerCount int) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
-
+	tracer := otel.GetTracerProvider().Tracer("worker")
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
-		workers <- &Worker{}
+		workers <- &Worker{
+			tracer: tracer,
+		}
 	}
 
 	workerPool := &WorkerPool{
@@ -114,6 +121,7 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
+	tracer ttrace.Tracer
 }
 
 type RetryableErr struct {
@@ -125,11 +133,17 @@ func (r *RetryableErr) Error() string {
 }
 
 func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+	ctx, span := w.tracer.Start(ctx, "running_job")
+	span.SetAttributes(attribute.String("module_name", job.ModuleName))
+	span.SetAttributes(attribute.Int64("start_block", int64(job.requestRange.StartBlock)))
+	span.SetAttributes(attribute.Int64("stop_block", int64(job.requestRange.ExclusiveEndBlock)))
+	defer span.End()
 	start := time.Now()
 
 	jobLogger := zlog.With(zap.Object("job", job))
 	grpcClient, connClose, grpcCallOpts, err := client.NewSubstreamsClient()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		jobLogger.Error("getting grpc client", zap.Error(err))
 		return nil, &RetryableErr{cause: fmt.Errorf("grpc client factory: %w", err)}
 	}
@@ -141,6 +155,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
 	}
 	defer func() {
@@ -149,6 +164,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 
 	meta, err := stream.Header()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		jobLogger.Warn("error getting stream header", zap.Error(err))
 	}
 	remoteHostname := "unknown"
@@ -156,6 +172,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 		remoteHostname = hosts[0]
 		jobLogger = jobLogger.With(zap.String("remote_hostname", remoteHostname))
 	}
+	span.SetAttributes(attribute.String("remote_hostname", remoteHostname))
 
 	jobStat := &JobStat{
 		ModuleName:   job.ModuleName,
@@ -175,8 +192,13 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 	for {
 		select {
 		case <-ctx.Done():
-			jobLogger.Warn("context cancel will waiting for stream data, worker is terminating")
-			return nil, ctx.Err()
+			err := ctx.Err()
+			if err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return nil, err
+			}
+			span.SetStatus(codes.Ok, "context cancelled")
+			return nil, nil
 		default:
 		}
 
@@ -186,14 +208,15 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 			case *pbsubstreams.Response_Progress:
 				err := respFunc(resp)
 				if err != nil {
-					jobLogger.Warn("worker done on respFunc error", zap.Error(err))
+					span.SetStatus(codes.Error, err.Error())
 					return nil, &RetryableErr{cause: fmt.Errorf("sending progress: %w", err)}
 				}
 
 				for _, progress := range resp.GetProgress().Modules {
 					if f := progress.GetFailed(); f != nil {
-						zlog.Debug("failed execution of substreams", zap.String("reason", f.Reason))
-						return nil, fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
+						err := fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
+						span.SetStatus(codes.Error, err.Error())
+						return nil, err
 					}
 				}
 
@@ -223,9 +246,10 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 					jobLogger.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
+				span.SetStatus(codes.Ok, "done")
 				return partialsWritten, nil
 			}
-			jobLogger.Warn("worker done on stream error", zap.Error(err))
+			span.SetStatus(codes.Error, err.Error())
 			return nil, &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)}
 		}
 	}

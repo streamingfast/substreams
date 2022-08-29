@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/dgrpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -63,6 +64,8 @@ func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() erro
 		zlog.Debug("setting insecure tls connection option")
 		dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
 	}
+	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
+	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)

@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/client"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/streamingfast/substreams/client"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -22,6 +23,10 @@ import (
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	otelcode "go.opentelemetry.io/otel/codes"
+	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -53,6 +58,7 @@ type Service struct {
 	blockRangeSizeSubRequests int
 
 	cacheEnabled bool
+	tracer       ttrace.Tracer
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -75,11 +81,13 @@ func New(
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
 ) *Service {
+	tracer := otel.GetTracerProvider().Tracer("service")
 	s := &Service{
 		baseStateStore:            stateStore,
 		blockType:                 blockType,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
+		tracer:                    tracer,
 	}
 
 	client.SetConfig(substreamsClientConfig)
@@ -103,49 +111,62 @@ func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory 
 }
 
 func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
-	ctx := streamSrv.Context()
+	ctx, span := s.tracer.Start(streamSrv.Context(), "substream_request")
+	span.SetAttributes(attribute.StringSlice("module_outputs", request.OutputModules))
+	defer span.End()
+
 	logger := logging.Logger(ctx, s.logger)
 
-	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
-			hostname = "unknown host"
-		}
-		md := metadata.New(map[string]string{"host": hostname})
-		err = streamSrv.SetHeader(md)
-		if err != nil {
-			logger.Warn("cannot send header metadata", zap.Error(err))
-		}
+	hostname, err := os.Hostname()
+	if err != nil {
+		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+		hostname = "unknown host"
 	}
+	md := metadata.New(map[string]string{"host": hostname})
+	err = streamSrv.SetHeader(md)
+	if err != nil {
+		logger.Warn("cannot send header metadata", zap.Error(err))
+	}
+	span.SetAttributes(attribute.String("hostname", hostname))
 
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
-		zlog.Error("invalid negative startblock (not handled in substreams)", zap.Int64("start_block", request.StartBlockNum))
-		return fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
+		err := fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
+		span.SetStatus(otelcode.Error, err.Error())
+		return err
 	}
 
 	if request.Modules == nil {
-		return status.Error(codes.InvalidArgument, "no modules found in request")
+		err := status.Error(codes.InvalidArgument, "no modules found in request")
+		span.SetStatus(otelcode.Error, err.Error())
+		return err
 	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("modules validation failed: %s", err))
+		err := status.Error(codes.InvalidArgument, fmt.Sprintf("modules validation failed: %s", err))
+		span.SetStatus(otelcode.Error, err.Error())
+		return err
 	}
 
 	if err := pbsubstreams.ValidateRequest(request); err != nil {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("validate request: %s", err))
+		err := status.Error(codes.InvalidArgument, fmt.Sprintf("validate request: %s", err))
+		span.SetStatus(otelcode.Error, err.Error())
+		return err
 	}
 
 	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
 	if err != nil {
-		return fmt.Errorf("creating module graph %w", err)
+		err := fmt.Errorf("creating module graph %w", err)
+		span.SetStatus(otelcode.Error, err.Error())
+		return err
 	}
 
 	sources := graph.GetSources()
 	for _, source := range sources {
 		if source != s.blockType && source != "sf.substreams.v1.Clock" {
-			return fmt.Errorf(`input source %q not supported, only %q and "sf.substreams.v1.Clock" are valid`, source, s.blockType)
+			err := fmt.Errorf(`input source %q not supported, only %q and "sf.substreams.v1.Clock" are valid`, source, s.blockType)
+			span.SetStatus(otelcode.Error, err.Error())
+			return err
 		}
 	}
 
@@ -189,6 +210,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			opts = append(opts, pipeline.WithSubrequestExecution())
 		}
 	}
+	span.SetAttributes(attribute.Bool("sub_request", isSubrequest))
 
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
@@ -200,6 +222,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
+			span.SetStatus(otelcode.Error, err.Error())
 			return NewErrSendBlock(err)
 		}
 		return nil
@@ -212,6 +235,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 		zlog.Info("try to send module output from cached files", zap.String("module_name", moduleName))
 		if err != nil {
+			span.SetStatus(otelcode.Error, err.Error())
 			return fmt.Errorf("getting module %q from graph: %w", moduleName, err)
 		}
 
@@ -226,6 +250,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum {
 			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
+			span.SetStatus(otelcode.Ok, "")
 			return nil // all done
 		}
 
@@ -236,8 +261,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 
 	}
-
-	pipe := pipeline.New(ctx, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
+	pipeTracer := otel.GetTracerProvider().Tracer("pipeline")
+	pipe := pipeline.New(ctx, pipeTracer, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum:   request.StartBlockNum,
@@ -249,10 +274,11 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// it, but ONLY when we are certain that our Pipeline supports
 		// reorgs navigation, which is not the case right now.
 		// FIXME(abourget): will we also honor the IrreversibilityCondition?
-		// perhaps on the day we actually support it in the Firehose :)
+		// perhaps on the day we actually support it in the Firehose :)x
 	}
 
 	if err := pipe.Init(s.workerPool); err != nil {
+		span.SetStatus(otelcode.Error, err.Error())
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
@@ -262,6 +288,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	)
 	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, false, zap.NewNop())
 	if err != nil {
+		span.SetStatus(otelcode.Error, err.Error())
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 	if err := blockStream.Run(ctx); err != nil {
@@ -273,36 +300,44 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			partialsWritten := []string{strings.Join(d, ",")}
 			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
 			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
+			span.SetStatus(otelcode.Ok, "")
 			return nil
 		}
 
 		if errors.Is(err, stream.ErrStopBlockReached) {
 			logger.Info("stream of blocks reached end block")
+			span.SetStatus(otelcode.Ok, "")
 			return nil
 		}
 
 		if errors.Is(err, context.Canceled) {
+			span.SetStatus(otelcode.Error, err.Error())
 			return status.Error(codes.Canceled, "source canceled")
 		}
 
 		if errors.Is(err, context.DeadlineExceeded) {
+			span.SetStatus(otelcode.Error, err.Error())
 			return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
 		}
 
 		var errInvalidArg *stream.ErrInvalidArg
 		if errors.As(err, &errInvalidArg) {
+			span.SetStatus(otelcode.Error, err.Error())
 			return status.Error(codes.InvalidArgument, errInvalidArg.Error())
 		}
 
 		var errSendBlock *ErrSendBlock
 		if errors.As(err, &errSendBlock) {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(errSendBlock.inner))
+			span.SetStatus(otelcode.Error, err.Error())
 			return status.Error(codes.Unavailable, errSendBlock.inner.Error())
 		}
 
 		logger.Info("unexpected stream of blocks termination", zap.Error(err))
+		span.SetStatus(otelcode.Error, err.Error())
 		return status.Errorf(codes.Internal, "unexpected termination: %s", err)
 	}
+	span.SetStatus(otelcode.Ok, "")
 	return nil
 }
 

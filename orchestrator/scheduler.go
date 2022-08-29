@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-
-	"github.com/streamingfast/substreams"
+	"go.opentelemetry.io/otel"
+	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -18,19 +19,24 @@ type Scheduler struct {
 
 	squasher      *Squasher
 	availableJobs <-chan *Job
+	tracer        ttrace.Tracer
 }
 
 func NewScheduler(ctx context.Context, availableJobs chan *Job, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc) (*Scheduler, error) {
+	tracer := otel.GetTracerProvider().Tracer("scheduler")
 	s := &Scheduler{
 		squasher:      squasher,
 		availableJobs: availableJobs,
 		workerPool:    workerPool,
 		respFunc:      respFunc,
+		tracer:        tracer,
 	}
 	return s, nil
 }
 
 func (s *Scheduler) Launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
+	ctx, span := s.tracer.Start(ctx, "running_schedule")
+	defer span.End()
 	for {
 		zlog.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.availableJobs)))
 		job, ok := <-s.availableJobs

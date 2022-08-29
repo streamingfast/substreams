@@ -8,6 +8,8 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/state"
+	"go.opentelemetry.io/otel"
+	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -18,6 +20,7 @@ type JobsPlanner struct {
 	jobs          jobList // all jobs, completed or not
 	AvailableJobs chan *Job
 	completed     bool
+	tracer        ttrace.Tracer
 }
 
 func NewJobsPlanner(
@@ -27,7 +30,12 @@ func NewJobsPlanner(
 	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 ) (*JobsPlanner, error) {
-	planner := &JobsPlanner{}
+	planner := &JobsPlanner{
+		tracer: otel.GetTracerProvider().Tracer("executor"),
+	}
+
+	ctx, span := planner.tracer.Start(ctx, "job_planning")
+	defer span.End()
 
 	for modName, workUnit := range workPlan {
 		select {

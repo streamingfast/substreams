@@ -9,6 +9,9 @@ import (
 	"github.com/streamingfast/substreams/pipeline/outputs"
 	"github.com/streamingfast/substreams/state"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	ttrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -59,6 +62,7 @@ type BaseExecutor struct {
 	cache      *outputs.OutputCache
 	isOutput   bool // whether output is enabled for this module
 	entrypoint string
+	tracer     ttrace.Tracer
 }
 
 var _ ModuleExecutor = (*MapperModuleExecutor)(nil)
@@ -95,15 +99,21 @@ func (e *StoreModuleExecutor) String() string {
 }
 
 func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
+	ctx, span := e.tracer.Start(ctx, "exec_map")
+	span.SetAttributes(attribute.String("module", e.moduleName))
+	defer span.End()
+
 	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
 		output, found := e.cache.Get(clock)
 		if found {
 			e.mapperOutput = output
+			span.SetStatus(codes.Ok, "cache_hit")
 			return nil
 		}
 	}
 
 	if err := e.wasmMapCall(ctx, vals, clock); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 
@@ -112,11 +122,15 @@ func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, 
 			return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
 		}
 	}
-
+	span.SetStatus(codes.Ok, "module_executed")
 	return nil
 }
 
 func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
+	ctx, span := e.tracer.Start(ctx, "exec_store")
+	span.SetAttributes(attribute.String("module", e.moduleName))
+	defer span.End()
+
 	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
 		output, found := e.cache.Get(clock)
 
@@ -124,12 +138,14 @@ func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, c
 			deltas := &pbsubstreams.StoreDeltas{}
 			err := proto.Unmarshal(output, deltas)
 			if err != nil {
+				span.SetStatus(codes.Error, err.Error())
 				return fmt.Errorf("unmarshalling output deltas: %w", err)
 			}
 			e.outputStore.Deltas = deltas.Deltas
 			for _, delta := range deltas.Deltas {
 				e.outputStore.ApplyDelta(delta)
 			}
+			span.SetStatus(codes.Ok, "cache_hit")
 			return nil
 		}
 	}
@@ -144,12 +160,15 @@ func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, c
 		}
 		data, err := proto.Marshal(deltas)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("caching: marshalling delta: %w", err)
 		}
 		if err = e.cache.Set(clock, cursor, data); err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("setting delta to cache at block %d: %w", clock.Number, err)
 		}
 	}
+	span.SetStatus(codes.Ok, "module_executed")
 
 	return nil
 }

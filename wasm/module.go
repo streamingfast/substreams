@@ -205,7 +205,7 @@ func (m *Module) registerLoggerImports(linker *wasmtime.Linker) error {
 
 			message := m.Heap.ReadString(ptr, length)
 			if tracer.Enabled() {
-				zlog.Debug(message, zap.String("function_name", m.CurrentInstance.functionName), zap.String("wasm_file", m.CurrentInstance.moduleName))
+				zlog.Debug(message, zap.String("module_name", m.CurrentInstance.Module.name), zap.String("wasm_file", m.CurrentInstance.Module.name))
 			}
 
 			// len(<string>) in Go count number of bytes and not characters, so we are good here

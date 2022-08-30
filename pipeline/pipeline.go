@@ -379,10 +379,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	for _, executor := range p.moduleExecutors {
 		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
 		if err != nil {
-			if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
-				return fmt.Errorf("progress error: %w", returnErr)
-			}
-			return io.EOF
+			//if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
+			//	return fmt.Errorf("progress error: %w", returnErr)
+			//}
+			return err
 		}
 	}
 	execSpan.End()

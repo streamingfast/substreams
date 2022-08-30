@@ -511,20 +511,28 @@ func (p *Pipeline) returnModuleProgressOutputs() error {
 func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
 	var out []*pbsubstreams.ModuleProgress
 
+	failedProgress := &pbsubstreams.ModuleProgress{
+		Name: failedExecutor.Name(),
+		Type: &pbsubstreams.ModuleProgress_Failed_{
+			Failed: &pbsubstreams.ModuleProgress_Failed{
+				Reason: err.Error(),
+				Logs:   failedExecutor.getCurrentExecutionStack(),
+			},
+		},
+	}
+	out = append(out, failedProgress)
+
 	for _, moduleOutput := range p.moduleOutputs {
-		var reason string
 		if moduleOutput.Name == failedExecutor.Name() {
-			reason = err.Error()
+			failedProgress.GetFailed().LogsTruncated = moduleOutput.GetLogsTruncated()
 		}
 
-		//FIXME(abourget): eventually, would we also return the data for each of
-		// the modules that produced some?
-		if len(moduleOutput.Logs) != 0 || len(reason) != 0 {
+		if len(moduleOutput.Logs) != 0 {
 			out = append(out, &pbsubstreams.ModuleProgress{
 				Name: moduleOutput.Name,
 				Type: &pbsubstreams.ModuleProgress_Failed_{
 					Failed: &pbsubstreams.ModuleProgress_Failed{
-						Reason:        reason,
+						Reason:        fmt.Sprintf("Failed to execute %s: %s", failedExecutor.Name(), err.Error()),
 						Logs:          failedExecutor.getCurrentExecutionStack(),
 						LogsTruncated: moduleOutput.LogsTruncated,
 					},

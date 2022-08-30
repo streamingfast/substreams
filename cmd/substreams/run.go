@@ -125,6 +125,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	for {
 		resp, err := cli.Recv()
+		if resp != nil {
+			if err := ui.IncomingMessage(resp); err != nil {
+				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
+			}
+		}
 		if err != nil {
 			if err == io.EOF {
 				ui.Cancel()
@@ -132,10 +137,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 			return err
-		}
-
-		if err := ui.IncomingMessage(resp); err != nil {
-			fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 		}
 	}
 }

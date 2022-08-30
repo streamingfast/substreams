@@ -110,7 +110,7 @@ func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory 
 }
 
 func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
-	ctx, span := s.tracer.Start(streamSrv.Context(), "substream_request")
+	ctx, span := s.tracer.Start(streamSrv.Context(), "substreams_request")
 	span.SetAttributes(attribute.StringSlice("module_outputs", request.OutputModules))
 	defer span.End()
 

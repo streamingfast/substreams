@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
+
+	_ "google.golang.org/grpc/xds"
 )
 
 var config *SubstreamsClientConfig

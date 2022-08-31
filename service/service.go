@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 
+	"google.golang.org/grpc/xds"
+
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose"
@@ -27,7 +29,6 @@ import (
 	otelcode "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -104,7 +105,7 @@ func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory 
 	s.streamFactory = streamFactory
 	s.firehoseServer = firehoseServer
 	s.logger = logger
-	firehoseServer.Server.RegisterService(func(gs *grpc.Server) {
+	firehoseServer.Server.RegisterService(func(gs *xds.GRPCServer) {
 		pbsubstreams.RegisterStreamServer(gs, s)
 	})
 }

@@ -34,11 +34,7 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 	}
 }
 
-func SetConfig(substreamsClientConfig *SubstreamsClientConfig) {
-	config = substreamsClientConfig
-}
-
-func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 	if config == nil {
 		panic("substreams client config not set")
 	}

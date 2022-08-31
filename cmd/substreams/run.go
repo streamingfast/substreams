@@ -66,14 +66,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 		startBlock = int64(sb)
 	}
 
-	client.SetConfig(client.NewSubstreamsClientConfig(
+	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
 		readAPIToken(cmd, "substreams-api-token-envvar"),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
-	))
+	)
 
-	ssClient, connClose, callOpts, err := client.NewSubstreamsClient()
+	ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}

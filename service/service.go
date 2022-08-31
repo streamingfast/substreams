@@ -89,9 +89,7 @@ func New(
 		tracer:                    tracer,
 	}
 
-	client.SetConfig(substreamsClientConfig)
-
-	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests)
+	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, substreamsClientConfig)
 
 	for _, opt := range opts {
 		opt(s)

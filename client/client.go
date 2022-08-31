@@ -1,8 +1,8 @@
 package client
 
 import (
+	"crypto/tls"
 	"fmt"
-	"log"
 
 	"github.com/streamingfast/dgrpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -10,11 +10,10 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
-
-	xdscreds "google.golang.org/grpc/credentials/xds"
-	_ "google.golang.org/grpc/xds"
+	//_ "google.golang.org/grpc/xds"
 )
 
 var config *SubstreamsClientConfig
@@ -46,31 +45,31 @@ func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() erro
 	endpoint := config.endpoint
 	jwt := config.jwt
 	usePlainTextConnection := config.plaintext
-	//useInsecureTLSConnection := config.insecure
+	useInsecureTLSConnection := config.insecure
 
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""))
 	skipAuth := jwt == "" || usePlainTextConnection
 
-	//if useInsecureTLSConnection && usePlainTextConnection {
-	//	return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
-	//}
-	var dialOptions []grpc.DialOption
-	//switch {
-	//case usePlainTextConnection:
-	//	zlog.Debug("setting plain text option")
-	//	skipAuth = true
-	//	dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	//
-	//case useInsecureTLSConnection:
-	//	zlog.Debug("setting insecure tls connection option")
-	//	dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
-	//}
-	log.Println("Using xDS credentials...")
-	creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+	if useInsecureTLSConnection && usePlainTextConnection {
+		return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
 	}
-	dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
+	var dialOptions []grpc.DialOption
+	switch {
+	case usePlainTextConnection:
+		zlog.Debug("setting plain text option")
+		skipAuth = true
+		dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+
+	case useInsecureTLSConnection:
+		zlog.Debug("setting insecure tls connection option")
+		dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
+	}
+	//log.Println("Using xDS credentials...")
+	//creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+	//if err != nil {
+	//	return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+	//}
+	//dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
 	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
 

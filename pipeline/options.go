@@ -51,15 +51,3 @@ func WithSyncBlockRangeRestriction(maxRangeSize uint64) Option {
 		p.maxStoreSyncRangeSize = maxRangeSize
 	}
 }
-
-func WithCacheEnabled(cacheEnabled bool) Option {
-	return func(p *Pipeline) {
-		p.cacheEnabled = cacheEnabled
-	}
-}
-
-func WithPartialModeEnabled(partialModeEnabled bool) Option {
-	return func(p *Pipeline) {
-		p.partialModeEnabled = partialModeEnabled
-	}
-}

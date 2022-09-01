@@ -56,8 +56,7 @@ type Service struct {
 	parallelSubRequests       int
 	blockRangeSizeSubRequests int
 
-	cacheEnabled bool
-	tracer       ttrace.Tracer
+	tracer ttrace.Tracer
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -180,17 +179,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	/*
 		this entire `if` is not good, the ctx is from the StreamServer so there
-		is no substreams-partial-mode, we actually set the partialModeEnabled
-		on the service when substreams-partial-mode-enabled is set to true
-
-			if s.partialModeEnabled {
-				opts = append(opts, pipeline.WithPartialModeEnabled(true))
-			}
+		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
 	*/
-
-	if s.partialModeEnabled {
-		opts = append(opts, pipeline.WithPartialModeEnabled(true))
-	}
 
 	isSubrequest := false
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
@@ -211,10 +201,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	if s.storesSaveInterval != 0 {
 		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
-	}
-
-	if s.cacheEnabled {
-		opts = append(opts, pipeline.WithCacheEnabled(true))
 	}
 
 	responseHandler := func(resp *pbsubstreams.Response) error {

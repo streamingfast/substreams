@@ -73,7 +73,7 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Jo
 
 out:
 	for i := 0; uint64(i) < 3; i++ {
-		partialsWritten, err = jobWorker.Run(ctx, job, s.workerPool.JobStats, requestModules, s.respFunc)
+		partialsWritten, err = jobWorker.Run(ctx, job, s.workerPool.jobStats, requestModules, s.respFunc)
 
 		switch err.(type) {
 		case *RetryableErr:

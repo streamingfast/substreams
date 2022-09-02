@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"google.golang.org/grpc/xds"
+	"google.golang.org/grpc"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -32,6 +32,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	//"google.golang.org/grpc/xds"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -102,7 +104,7 @@ func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory 
 	s.streamFactory = streamFactory
 	s.firehoseServer = firehoseServer
 	s.logger = logger
-	firehoseServer.Server.RegisterService(func(gs *xds.GRPCServer) {
+	firehoseServer.Server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreams.RegisterStreamServer(gs, s)
 	})
 }

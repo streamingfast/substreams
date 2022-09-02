@@ -53,7 +53,6 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 	var dialOptions []grpc.DialOption
 	if bootStrapFilename != "" {
 		log.Println("Using xDS credentials...")
-		skipAuth = true
 		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)

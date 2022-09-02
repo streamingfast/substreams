@@ -61,13 +61,14 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func NewWorkerPool(workerCount int) *WorkerPool {
+func NewWorkerPool(workerCount int, substreamsClientConfig *client.SubstreamsClientConfig) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	tracer := otel.GetTracerProvider().Tracer("worker")
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
 		workers <- &Worker{
-			tracer: tracer,
+			substreamsClientConfig: substreamsClientConfig,
+			tracer:                 tracer,
 		}
 	}
 
@@ -121,7 +122,8 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
-	tracer ttrace.Tracer
+	substreamsClientConfig *client.SubstreamsClientConfig
+	tracer                 ttrace.Tracer
 }
 
 type RetryableErr struct {
@@ -141,7 +143,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 	start := time.Now()
 
 	jobLogger := zlog.With(zap.Object("job", job))
-	grpcClient, connClose, grpcCallOpts, err := client.NewSubstreamsClient()
+	grpcClient, connClose, grpcCallOpts, err := client.NewSubstreamsClient(w.substreamsClientConfig)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		jobLogger.Error("getting grpc client", zap.Error(err))

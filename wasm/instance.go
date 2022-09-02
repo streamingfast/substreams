@@ -18,11 +18,9 @@ type Instance struct {
 
 	clock *pbsubstreams.Clock
 
-	args         []interface{} // to the `entrypoint` function
-	returnValue  []byte
-	panicError   *PanicError
-	functionName string
-	moduleName   string
+	args        []interface{} // to the `entrypoint` function
+	returnValue []byte
+	panicError  *PanicError
 
 	Logs           []string
 	LogsByteCount  uint64
@@ -36,7 +34,7 @@ func (i *Instance) Execute() (err error) {
 		if i.panicError != nil {
 			return i.panicError
 		}
-		return fmt.Errorf("executing entrypoint %q: %w", i.functionName, err)
+		return fmt.Errorf("executing module %q: %w", i.Module.name, err)
 	}
 	return nil
 }
@@ -46,7 +44,7 @@ func (i *Instance) ExecuteWithArgs(args ...interface{}) (err error) {
 		if i.panicError != nil {
 			return i.panicError
 		}
-		return fmt.Errorf("executing with args entrypoint %q: %w", i.functionName, err)
+		return fmt.Errorf("executing module with args %q: %w", i.Module.name, err)
 	}
 	return nil
 }

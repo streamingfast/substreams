@@ -77,6 +77,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %v", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
 			}
 			m.LastFailure = progMsg.Failed
+			m.ui.Cancel()
 			return m, nil
 		}
 	default:

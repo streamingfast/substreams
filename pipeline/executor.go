@@ -48,7 +48,7 @@ type ModuleExecutor interface {
 	// Reset the wasm instance, avoid propagating logs.
 	Reset()
 
-	run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error
+	run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error
 
 	moduleLogs() (logs []string, truncated bool)
 	moduleOutputData() pbsubstreams.ModuleOutputData
@@ -98,18 +98,16 @@ func (e *StoreModuleExecutor) String() string {
 	return e.moduleName
 }
 
-func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
+func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
 	ctx, span := e.tracer.Start(ctx, "exec_map")
 	span.SetAttributes(attribute.String("module", e.moduleName))
 	defer span.End()
 
-	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
-		output, found := e.cache.Get(clock)
-		if found {
-			e.mapperOutput = output
-			span.SetStatus(codes.Ok, "cache_hit")
-			return nil
-		}
+	output, found := e.cache.Get(clock)
+	if found {
+		e.mapperOutput = output
+		span.SetStatus(codes.Ok, "cache_hit")
+		return nil
 	}
 
 	if err := e.wasmMapCall(ctx, vals, clock); err != nil {
@@ -117,57 +115,53 @@ func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, 
 		return err
 	}
 
-	if cacheEnabled || partialModeEnabled { // always set cache when you are in partialMode
-		if err := e.cache.Set(clock, cursor, e.mapperOutput); err != nil {
-			return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
-		}
+	if err := e.cache.Set(clock, cursor, e.mapperOutput); err != nil {
+		return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
 	}
+
 	span.SetStatus(codes.Ok, "module_executed")
 	return nil
 }
 
-func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cacheEnabled bool, partialModeEnabled bool, cursor string) error {
+func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
 	ctx, span := e.tracer.Start(ctx, "exec_store")
 	span.SetAttributes(attribute.String("module", e.moduleName))
 	defer span.End()
 
-	if cacheEnabled || partialModeEnabled { // always get cache when you are in partialMode
-		output, found := e.cache.Get(clock)
+	output, found := e.cache.Get(clock)
 
-		if found {
-			deltas := &pbsubstreams.StoreDeltas{}
-			err := proto.Unmarshal(output, deltas)
-			if err != nil {
-				span.SetStatus(codes.Error, err.Error())
-				return fmt.Errorf("unmarshalling output deltas: %w", err)
-			}
-			e.outputStore.Deltas = deltas.Deltas
-			for _, delta := range deltas.Deltas {
-				e.outputStore.ApplyDelta(delta)
-			}
-			span.SetStatus(codes.Ok, "cache_hit")
-			return nil
+	if found {
+		deltas := &pbsubstreams.StoreDeltas{}
+		err := proto.Unmarshal(output, deltas)
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			return fmt.Errorf("unmarshalling output deltas: %w", err)
 		}
+		e.outputStore.Deltas = deltas.Deltas
+		for _, delta := range deltas.Deltas {
+			e.outputStore.ApplyDelta(delta)
+		}
+		span.SetStatus(codes.Ok, "cache_hit")
+		return nil
 	}
 
 	if err := e.wasmStoreCall(ctx, vals, clock); err != nil {
 		return err
 	}
 
-	if cacheEnabled || partialModeEnabled { // always set cache when you are in partialMode
-		deltas := &pbsubstreams.StoreDeltas{
-			Deltas: e.outputStore.Deltas,
-		}
-		data, err := proto.Marshal(deltas)
-		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("caching: marshalling delta: %w", err)
-		}
-		if err = e.cache.Set(clock, cursor, data); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("setting delta to cache at block %d: %w", clock.Number, err)
-		}
+	deltas := &pbsubstreams.StoreDeltas{
+		Deltas: e.outputStore.Deltas,
 	}
+	data, err := proto.Marshal(deltas)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return fmt.Errorf("caching: marshalling delta: %w", err)
+	}
+	if err = e.cache.Set(clock, cursor, data); err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return fmt.Errorf("setting delta to cache at block %d: %w", clock.Number, err)
+	}
+
 	span.SetStatus(codes.Ok, "module_executed")
 
 	return nil

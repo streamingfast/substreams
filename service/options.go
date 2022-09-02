@@ -36,9 +36,3 @@ func WithOutCacheSaveInterval(block uint64) Option {
 		s.outputCacheSaveBlockInterval = block
 	}
 }
-
-func WithCacheEnabled(cacheEnabled bool) Option {
-	return func(s *Service) {
-		s.cacheEnabled = cacheEnabled
-	}
-}

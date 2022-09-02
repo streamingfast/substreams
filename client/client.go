@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
-
 	_ "google.golang.org/grpc/xds"
 )
 
@@ -35,11 +34,7 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 	}
 }
 
-func SetConfig(substreamsClientConfig *SubstreamsClientConfig) {
-	config = substreamsClientConfig
-}
-
-func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 	if config == nil {
 		panic("substreams client config not set")
 	}
@@ -54,7 +49,6 @@ func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() erro
 	if useInsecureTLSConnection && usePlainTextConnection {
 		return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
 	}
-
 	var dialOptions []grpc.DialOption
 	switch {
 	case usePlainTextConnection:
@@ -66,13 +60,19 @@ func NewSubstreamsClient() (cli pbsubstreams.StreamClient, closeFunc func() erro
 		zlog.Debug("setting insecure tls connection option")
 		dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
 	}
+	//log.Println("Using xDS credentials...")
+	//creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+	//if err != nil {
+	//	return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+	//}
+	//dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
 	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client")
+		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}
 	closeFunc = conn.Close
 

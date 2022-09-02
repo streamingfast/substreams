@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams"
@@ -19,9 +20,53 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+type JobStats struct {
+	sync.Mutex
+	stats map[*Job]*JobStat
+}
+
+func (s *JobStats) Set(job *Job, stat *JobStat) {
+	s.Lock()
+	defer s.Unlock()
+	s.stats[job] = stat
+}
+
+func (s *JobStats) Delete(job *Job) {
+	s.Lock()
+	defer s.Unlock()
+	delete(s.stats, job)
+}
+
+func (s *JobStats) StartPeriodicLogger() {
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+
+		for {
+			select {
+			case <-ticker.C:
+				s.Lock()
+				jobStats := make([]*JobStat, 0, len(s.stats))
+				countPerModule := map[string]uint64{}
+
+				for _, value := range s.stats {
+					jobStats = append(jobStats, value)
+					countPerModule[value.ModuleName] = countPerModule[value.ModuleName] + 1
+				}
+
+				zlog.Debug("worker pool statistics",
+					zap.Int("job_count", len(s.stats)),
+					zap.Reflect("job_stats", jobStats),
+					zap.Reflect("count_by_module", countPerModule),
+				)
+				s.Unlock()
+			}
+		}
+	}()
+}
+
 type WorkerPool struct {
 	workers  chan *Worker
-	JobStats map[*Job]*JobStat
+	jobStats *JobStats
 }
 
 type JobStat struct {
@@ -73,8 +118,10 @@ func NewWorkerPool(workerCount int, grpcClient pbsubstreams.StreamClient, callOp
 	}
 
 	workerPool := &WorkerPool{
-		workers:  workers,
-		JobStats: map[*Job]*JobStat{},
+		workers: workers,
+		jobStats: &JobStats{
+			stats: make(map[*Job]*JobStat),
+		},
 	}
 
 	// FIXME: Not tied to any lifecycle of the owning element (`Service`), this is not the
@@ -82,34 +129,9 @@ func NewWorkerPool(workerCount int, grpcClient pbsubstreams.StreamClient, callOp
 	// be great to have it refactored (the `Service`) to be tied to the running application
 	// and have the `Service` close the `WorkerPool` which in turn would close the periodic
 	// stats logger.
-	workerPool.StartPeriodicLogger()
+	workerPool.jobStats.StartPeriodicLogger()
 
 	return workerPool
-}
-
-func (p *WorkerPool) StartPeriodicLogger() {
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-
-		for {
-			select {
-			case <-ticker.C:
-				jobStats := make([]*JobStat, 0, len(p.JobStats))
-				countPerModule := map[string]uint64{}
-
-				for _, value := range p.JobStats {
-					jobStats = append(jobStats, value)
-					countPerModule[value.ModuleName] = countPerModule[value.ModuleName] + 1
-				}
-
-				zlog.Debug("worker pool statistics",
-					zap.Int("job_count", len(p.JobStats)),
-					zap.Reflect("job_stats", jobStats),
-					zap.Reflect("count_by_module", countPerModule),
-				)
-			}
-		}
-	}()
 }
 
 func (p *WorkerPool) Borrow() *Worker {
@@ -135,7 +157,7 @@ func (r *RetryableErr) Error() string {
 	return r.cause.Error()
 }
 
-func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+func (w *Worker) Run(ctx context.Context, job *Job, jobStats *JobStats, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	ctx, span := w.tracer.Start(ctx, "running_job")
 	span.SetAttributes(attribute.String("module_name", job.ModuleName))
 	span.SetAttributes(attribute.Int64("start_block", int64(job.requestRange.StartBlock)))
@@ -177,12 +199,13 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 		CurrentBlock: job.requestRange.StartBlock,
 		RemoteHost:   remoteHostname,
 	}
-	jobStats[job] = jobStat
+
+	jobStats.Set(job, jobStat)
 
 	jobLogger.Info("running job", zap.Object("job", job))
 	defer func() {
 		jobLogger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)), zap.Object("job_stat", jobStat))
-		delete(jobStats, job)
+		jobStats.Delete(job)
 	}()
 
 	for {

@@ -13,7 +13,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dgrpc v0.0.0-20220831131747-b22300844f58
 	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
-	github.com/streamingfast/firehose v0.1.1-0.20220831133913-a19a3104c370
+	github.com/streamingfast/firehose v0.1.1-0.20220901200305-b62a22fe0bff
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e
 	github.com/stretchr/testify v1.8.0

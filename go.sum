@@ -575,8 +575,8 @@ github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648 h1:xpy3HNXe
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a/go.mod h1:bqiYZaX6L/MoXNfFQeAdau6g9HLA3yKHkX8KzStt58Q=
-github.com/streamingfast/firehose v0.1.1-0.20220831133913-a19a3104c370 h1:SJYgpEC1KfJMhtPgWrEuAfJPSP/yLETPay75Qr+FXJ8=
-github.com/streamingfast/firehose v0.1.1-0.20220831133913-a19a3104c370/go.mod h1:Nrq2DCSvWyWiVqk6XY+KMrDBuYx8W/6U2YGD+gInglQ=
+github.com/streamingfast/firehose v0.1.1-0.20220901200305-b62a22fe0bff h1:G6Ugmv5I5/Q1oFcTNd0zORQSp/Yr52Nr1pVav6BLh7Q=
+github.com/streamingfast/firehose v0.1.1-0.20220901200305-b62a22fe0bff/go.mod h1:Nrq2DCSvWyWiVqk6XY+KMrDBuYx8W/6U2YGD+gInglQ=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873 h1:8+TXT26c2p6f8JMg0w4JQ8t4fAbfMmR11zLN4KFVRC8=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873/go.mod h1:M7l9klD6EPgXwPOrhzQrLLKZHZSNTt4nm+GDRFNbQdc=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=

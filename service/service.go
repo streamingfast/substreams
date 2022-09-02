@@ -78,7 +78,7 @@ func New(
 	blockRangeSizeSubRequests int,
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
-) *Service {
+) (*Service, error) {
 	tracer := otel.GetTracerProvider().Tracer("service")
 	s := &Service{
 		baseStateStore:            stateStore,
@@ -88,13 +88,18 @@ func New(
 		tracer:                    tracer,
 	}
 
-	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, substreamsClientConfig)
+	grpcClient, _, grpcCallOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+	}
+
+	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, grpcClient, grpcCallOpts)
 
 	for _, opt := range opts {
 		opt(s)
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory *firehose.StreamFactory, logger *zap.Logger) {

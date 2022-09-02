@@ -6,8 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/streamingfast/substreams/client"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -17,6 +15,7 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -61,14 +60,15 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func NewWorkerPool(workerCount int, substreamsClientConfig *client.SubstreamsClientConfig) *WorkerPool {
+func NewWorkerPool(workerCount int, grpcClient pbsubstreams.StreamClient, callOpts []grpc.CallOption) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	tracer := otel.GetTracerProvider().Tracer("worker")
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
 		workers <- &Worker{
-			substreamsClientConfig: substreamsClientConfig,
-			tracer:                 tracer,
+			grpcClient: grpcClient,
+			callOpts:   callOpts,
+			tracer:     tracer,
 		}
 	}
 
@@ -122,8 +122,9 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
-	substreamsClientConfig *client.SubstreamsClientConfig
-	tracer                 ttrace.Tracer
+	grpcClient pbsubstreams.StreamClient
+	callOpts   []grpc.CallOption
+	tracer     ttrace.Tracer
 }
 
 type RetryableErr struct {
@@ -143,19 +144,12 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats map[*Job]*JobStat, 
 	start := time.Now()
 
 	jobLogger := zlog.With(zap.Object("job", job))
-	grpcClient, connClose, grpcCallOpts, err := client.NewSubstreamsClient(w.substreamsClientConfig)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		jobLogger.Error("getting grpc client", zap.Error(err))
-		return nil, &RetryableErr{cause: fmt.Errorf("grpc client factory: %w", err)}
-	}
-	defer connClose()
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
 	request := job.createRequest(requestModules)
 
-	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
+	stream, err := w.grpcClient.Blocks(ctx, request, w.callOpts...)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}

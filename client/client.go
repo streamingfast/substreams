@@ -19,8 +19,6 @@ import (
 	_ "google.golang.org/grpc/xds"
 )
 
-var config *SubstreamsClientConfig
-
 type SubstreamsClientConfig struct {
 	endpoint  string
 	jwt       string

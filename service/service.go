@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/logging"
 	"io"
+	"os"
 	"strings"
+
+	"github.com/streamingfast/logging"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -116,18 +118,19 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	defer span.End()
 
 	logger := logging.Logger(ctx, s.logger)
-	//hostname, err := os.Hostname()
-	//if err != nil {
-	//	logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
-	//	hostname = "unknown host"
-	//}
-	//md := metadata.New(map[string]string{"host": hostname})
-	//err = streamSrv.SetHeader(md)
-	//if err != nil {
-	//	logger.Warn("cannot send header metadata", zap.Error(err))
-	//}
-	//span.SetAttributes(attribute.String("hostname", hostname))
-
+	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+			hostname = "unknown host"
+		}
+		md := metadata.New(map[string]string{"host": hostname})
+		err = streamSrv.SetHeader(md)
+		if err != nil {
+			logger.Warn("cannot send header metadata", zap.Error(err))
+		}
+		span.SetAttributes(attribute.String("hostname", hostname))
+	}
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
 		err := fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)

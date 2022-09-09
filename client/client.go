@@ -61,29 +61,30 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 	} else {
 
 		bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
-	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
+		zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
 
-	var dialOptions []grpc.DialOption
-	if bootStrapFilename != "" {
-		log.Println("Using xDS credentials...")
-		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
-		}
-		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
-	} else {
-		if useInsecureTLSConnection && usePlainTextConnection {
-			return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
-		}
-		switch {
-		case usePlainTextConnection:
-			zlog.Debug("setting plain text option")
+		var dialOptions []grpc.DialOption
+		if bootStrapFilename != "" {
+			log.Println("Using xDS credentials...")
+			creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+			}
+			dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
+		} else {
+			if useInsecureTLSConnection && usePlainTextConnection {
+				return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
+			}
+			switch {
+			case usePlainTextConnection:
+				zlog.Debug("setting plain text option")
 
-			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+				dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
-		case useInsecureTLSConnection:
-			zlog.Debug("setting insecure tls connection option")
-			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
+			case useInsecureTLSConnection:
+				zlog.Debug("setting insecure tls connection option")
+				dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
+			}
 		}
 	}
 

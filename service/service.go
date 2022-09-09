@@ -8,12 +8,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/streamingfast/logging"
-	"google.golang.org/grpc"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose"
 	firehoseServer "github.com/streamingfast/firehose/server"
+	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
@@ -28,11 +27,10 @@ import (
 	otelcode "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
-	//"google.golang.org/grpc/xds"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

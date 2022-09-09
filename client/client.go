@@ -44,10 +44,23 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 	usePlainTextConnection := config.plaintext
 	useInsecureTLSConnection := config.insecure
 
-	zlog.Debug("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""))
-	skipAuth := jwt == "" || usePlainTextConnection
+	zlog.Info("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""), zap.Bool("plaintext", usePlainTextConnection), zap.Bool("insecure", useInsecureTLSConnection))
 
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
+	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
+
+	var dialOptions []grpc.DialOption
+	skipAuth := jwt == "" || usePlainTextConnection
+	if bootStrapFilename != "" {
+		log.Println("Using xDS credentials...")
+		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+		}
+		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
+	} else {
+
+		bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
 
 	var dialOptions []grpc.DialOption
@@ -65,7 +78,7 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 		switch {
 		case usePlainTextConnection:
 			zlog.Debug("setting plain text option")
-			skipAuth = true
+
 			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 		case useInsecureTLSConnection:

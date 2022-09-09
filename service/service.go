@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/streamingfast/logging"
-
+	"google.golang.org/grpc"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose"
@@ -28,10 +28,11 @@ import (
 	otelcode "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	//"google.golang.org/grpc/xds"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -107,7 +108,7 @@ func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory 
 	s.streamFactory = streamFactory
 	s.firehoseServer = firehoseServer
 	s.logger = logger
-	firehoseServer.Server.RegisterService(func(gs *grpc.Server) {
+	firehoseServer.Server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreams.RegisterStreamServer(gs, s)
 	})
 }

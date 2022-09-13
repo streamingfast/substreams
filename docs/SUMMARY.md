@@ -1,6 +1,6 @@
 # Table of contents
 
-* [Substreams](README.md)
+* [🛠 Substreams](README.md)
 
 ## Concept & Fundamentals
 

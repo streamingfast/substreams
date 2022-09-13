@@ -22,7 +22,7 @@ Modules can also take in multiple inputs, like this `counters` store:
 Two modules feed into a `store` which keeps track of multiple counters.
 {% endembed %}
 
-All of the modules are executed as a DAG, each time a new Block is processed.
+All of the modules are executed as a directed acrylic graph (DAG), each time a new Block is processed.
 
 The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution.
 
@@ -63,13 +63,13 @@ The first, `valueType`, instructs the Substreams runtime of the data that will b
 
 The second, `updatePolicy,` determines what methods are available in the runtime, as well as the merging strategy for identical keys found in two contiguous stores produced by parallel processing:
 
-| Method              | Supported Value Types                    | Merge strategy\*          |
-| ------------------- | ---------------------------------------- | ------------------------- |
-| `set`               | `bytes`, `string`, `proto:...`           | The last key wins         |
-| `set_if_not_exists` | `bytes`, `string`, `proto:...`           | The first key wins        |
-| `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up      |
-| `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept  |
-| `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept |
+| Method              | Supported Value Types                    | Merge strategy\*                    |
+| ------------------- | ---------------------------------------- | ----------------------------------- |
+| `set`               | `bytes`, `string`, `proto:...`           | The last key wins                   |
+| `set_if_not_exists` | `bytes`, `string`, `proto:...`           | The first key wins                  |
+| `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up                |
+| `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept            |
+| `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept           |
 | `append`            | `string`, `bytes`                        | Both keys are concatenated in order |
 
 All update policies provide the `delete_prefix` method.

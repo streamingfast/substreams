@@ -4,6 +4,9 @@ members = [
     "rust/substreams-macro",
     "rust/test"
 ]
+exclude = [
+    "pipeline/test_data/simple_substream"
+]
 
 [profile.release]
 lto = true

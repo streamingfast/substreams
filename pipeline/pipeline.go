@@ -556,7 +556,7 @@ func (p *Pipeline) build() error {
 		return fmt.Errorf("validate: %w", err)
 	}
 	if err := p.buildModules(); err != nil {
-		return fmt.Errorf("build modules graph: %w", err)
+		return fmt.Errorf("build modules moduleGraph: %w", err)
 	}
 	return nil
 }
@@ -574,7 +574,7 @@ func (p *Pipeline) validate() error {
 func (p *Pipeline) buildModules() error {
 	modules, err := p.graph.ModulesDownTo(p.request.OutputModules)
 	if err != nil {
-		return fmt.Errorf("building execution graph: %w", err)
+		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	p.modules = modules
 

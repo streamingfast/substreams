@@ -53,7 +53,7 @@ func (j *Job) readyForDispatch() bool {
 	return true
 }
 
-func (j *Job) createRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
+func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
 		StartBlockNum: int64(j.requestRange.StartBlock),
 		StopBlockNum:  j.requestRange.ExclusiveEndBlock,

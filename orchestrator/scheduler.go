@@ -67,13 +67,13 @@ func (s *Scheduler) Launch(ctx context.Context, requestModules *pbsubstreams.Mod
 	}
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, jobWorker *Worker, job *Job, requestModules *pbsubstreams.Modules) error {
+func (s *Scheduler) runSingleJob(ctx context.Context, worker Worker, job *Job, requestModules *pbsubstreams.Modules) error {
 	var partialsWritten []*block.Range
 	var err error
 
 out:
 	for i := 0; uint64(i) < 3; i++ {
-		partialsWritten, err = jobWorker.Run(ctx, job, s.workerPool.jobStats, requestModules, s.respFunc)
+		partialsWritten, err = worker.Run(ctx, job, requestModules, s.respFunc)
 
 		switch err.(type) {
 		case *RetryableErr:
@@ -85,7 +85,7 @@ out:
 		}
 	}
 
-	s.workerPool.ReturnWorker(jobWorker)
+	s.workerPool.ReturnWorker(worker)
 
 	if err != nil {
 		return err

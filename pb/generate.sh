@@ -29,6 +29,7 @@ function main() {
   pushd "$ROOT/pb" > /dev/null
 
   generate "sf/substreams/v1/substreams.proto"
+  generate "sf/substreams/v1/test/test.proto"
   generate "sf/substreams/v1/clock.proto"
   generate "sf/substreams/v1/modules.proto"
   generate "sf/substreams/v1/package.proto"
@@ -39,6 +40,7 @@ function main() {
   pushd "$ROOT/rust" > /dev/null
 
   generate_rust "sf/substreams/v1/substreams.proto" "substreams/src/pb/"
+  generate_rust "sf/substreams/v1/test/test.proto" "substreams/src/pb/"
 
   popd >/dev/null
 
@@ -81,7 +83,11 @@ function generate_system() {
   fi
 
   protoc -I$PROTO \
-    "$PROTO/sf/substreams/v1/"* \
+    "$PROTO/sf/substreams/v1/clock.proto" \
+    "$PROTO/sf/substreams/v1/modules.proto" \
+    "$PROTO/sf/substreams/v1/package.proto" \
+    "$PROTO/sf/substreams/v1/substreams.proto" \
+    "$PROTO/sf/substreams/v1/test/test.proto" \
     "$PROTO/google/protobuf/any.proto" \
     "$PROTO/google/protobuf/descriptor.proto" \
     "$PROTO/google/protobuf/timestamp.proto" \

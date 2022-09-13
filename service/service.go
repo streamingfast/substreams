@@ -93,7 +93,9 @@ func New(
 		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
 	}
 
-	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, grpcClient, grpcCallOpts)
+	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func(tracer ttrace.Tracer) orchestrator.Worker {
+		return orchestrator.NewRemoteWorker(grpcClient, grpcCallOpts, tracer)
+	})
 
 	for _, opt := range opts {
 		opt(s)

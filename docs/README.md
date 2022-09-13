@@ -1,32 +1,47 @@
+---
+description: StreamingFast Substreams documentation
+---
+
 # Substreams
 
-> Developer Preview
+### Substreams Documentation
 
-Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
+#### Welcome to StreamingFast Substreams
 
-It enables you to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.
+This documentation exists as a means to help people understand and operate Substreams created by StreamingFast.
 
-It has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 
-Substreams is the successor of [https://github.com/streamingfast/sparkle](https://github.com/streamingfast/sparkle). This iteration enables greater composability, provides similar powers of parallelization, and is a much simpler model to work with.
+### Developer Preview
 
-## Getting Started
+Substreams is a powerful blockchain indexing technology developed for [The Graph](https://thegraph.com/) Network.
 
-[Install the CLI](getting-started/installing-the-cli.md) and then run [run your first stream](getting-started/your-first-stream.md).
+_**Substreams**_:&#x20;
 
-## Resources
+* enables blockchain developers to write Rust modules that compose data streams alongside the community,
+* provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion,
+* has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling,
+* is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). This iteration of the application enables greater composability, provides similar powers of parallelization, and is a much simpler model to work with.
 
-* Checkout our [Getting Started Guide](developer-guide/overview.md)
-* Take a look at the [Substreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
-* Take a look at the [Substreams Playground](https://github.com/streamingfast/substreams-playground) repository for more learnings and examples
+### Getting Started
 
-## Community
+[Install the CLI](getting-started/installing-the-cli.md) and then [run your first stream](getting-started/your-first-stream.md).
 
-Need any help? Reach out!
+### Resources
+
+* [Getting Started Guide](developer-guide/overview.md)
+* Sample [Substreams Template](https://github.com/streamingfast/substreams-template) repository
+* Additional examples available in the [Substreams Playground](https://github.com/streamingfast/substreams-playground)&#x20;
+
+### Community
+
+_**Need help? Reach out!**_
+
+Connect with the StreamingFast team on Discord!
 
 * [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
 
-## License
+### License
 
 [Apache 2.0](../LICENSE/)

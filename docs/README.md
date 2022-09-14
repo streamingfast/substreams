@@ -2,11 +2,15 @@
 description: StreamingFast Substreams documentation
 ---
 
-# Substreams
+# 🔀 Substreams
 
 ### Substreams Documentation
 
 #### Welcome to StreamingFast Substreams
+
+{% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
+Learn about Substreams from StreamingFast's Alex.
+{% endembed %}
 
 This documentation exists as a means to help people understand and operate Substreams created by StreamingFast.
 

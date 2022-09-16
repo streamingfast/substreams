@@ -14,6 +14,8 @@ Susbstreams can be scaled horizontally resulting in a massive reduction of proce
 
 Substreams introduces a handful of new concepts to The Graph ecosystem. Substreams was inspired by traditional large-scale data systems, _fused_ with the novelties of blockchain.
 
+Diving into further detail for specific Substreams capabilities, limitations, and features.
+
 #### _Substreams **is:**_
 
 * a streaming-first system based on gRPC, protobuf, and StreamingFast Firehose,

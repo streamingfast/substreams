@@ -6,32 +6,33 @@ description: StreamingFast Substreams documentation
 
 ### Substreams Documentation
 
-#### Welcome to StreamingFast Substreams
+#### Introducing StreamingFast Substreams
+
+For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substresms users gain an understanding to provide a deeper context.
 
 {% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
 Learn about Substreams from StreamingFast's Alex.
 {% endembed %}
 
-This documentation exists as a means to help people understand and operate Substreams created by StreamingFast.
+### Substreams visual representation
 
-Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
+Substreams has two perspectives as illustrated in the high-level visual diagram. Essentially the developer of an end-user application will design and create a data refinement strategy.&#x20;
 
-<img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
+The Substreams engine will use the data refinement strategy to isolate a very specific data set. Substreams receives data from StreamingFast Firehose in the form of streams.&#x20;
 
-### Developer _Preview_
+The streamed data is passed from Firehose through Substreams, then refined, and finally routed to wherever the developer desires, from relational databases to flat files, or even straight into an application.&#x20;
 
-Substreams is a powerful blockchain indexing technology developed for [The Graph](https://thegraph.com/) Network.
+<img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="StreamingFast Substreams high-level visual diagram" class="gitbook-drawing">
 
-_**Substreams**_:&#x20;
+**Substreams in Detail**&#x20;
 
-* enables blockchain developers to write Rust modules that compose data streams alongside the community,
-* provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion,
-* has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling,
-* is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). This iteration of the application enables greater composability, provides similar powers of parallelization, and is a much simpler model to work with.
+Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community,
 
-### Getting Started
+Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion,
 
-[Install the CLI](getting-started/installing-the-cli.md) and then [run your first stream](getting-started/your-first-stream.md).
+Substreams has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling,
+
+Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). The current Substreams iteration enables greater composability, provides similar powers of parallelization, and is also a _much_ simpler model to work with.
 
 ### Resources
 
@@ -43,11 +44,15 @@ _**Substreams**_:&#x20;
 
 _**Need help? Reach out!**_
 
+Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
+
 Connect with the StreamingFast team on Discord!
 
 * [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
+* [StreamingFast on Twitter](https://twitter.com/streamingfastio)
+* [StreamingFast on YouTube](https://www.youtube.com/c/streamingfast)
 
 ### License
 
-[Apache 2.0](../LICENSE/)
+Substreams is currently licensed under [Apache 2.0](../LICENSE/).

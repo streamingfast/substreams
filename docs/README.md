@@ -8,7 +8,7 @@ description: StreamingFast Substreams documentation
 
 #### Introducing StreamingFast Substreams
 
-For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substresms users gain an understanding to provide a deeper context.
+For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substreams users gain an understanding to provide a deeper context.
 
 {% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
 Learn about Substreams from StreamingFast's Alex.

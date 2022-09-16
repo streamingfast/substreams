@@ -16,7 +16,9 @@ Learn about Substreams from StreamingFast's Alex.
 
 ### Substreams visual representation
 
-Substreams has two perspectives as illustrated in the high-level visual diagram. Essentially the developer of an end-user application will design and create a data refinement strategy.&#x20;
+Substreams has two perspectives as illustrated in the high-level visual diagram. One perspective is the architecture of and Substreams engine itself. The other perspective is from that of an end-user developer. &#x20;
+
+Essentially the developer of an end-user application will design and create a data refinement strategy.&#x20;
 
 The Substreams engine will use the data refinement strategy to isolate a very specific data set. Substreams receives data from StreamingFast Firehose in the form of streams.&#x20;
 

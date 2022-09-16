@@ -4,9 +4,11 @@ description: Definition of StreamingFast Substreams
 
 # Definition
 
+### What is Substreams?
+
 Substreams introduces a handful of new concepts to The Graph ecosystem. Substreams was inspired by traditional large-scale data systems, _fused_ with the novelties of blockchain.
 
-_Substreams **is:**_
+#### _Substreams **is:**_
 
 * a streaming-first system based on gRPC, protobuf, and StreamingFast Firehose,
 * a highly cacheable and parallelizable remote code execution framework,&#x20;
@@ -14,7 +16,7 @@ _Substreams **is:**_
 * enables the community to build higher-order modules with great ease,
 * deterministic (being fed by deterministic blockchain data).
 
-_Substreams is **NOT:**_
+#### _Substreams is **NOT:**_
 
 * a relational database,
 * REST service,

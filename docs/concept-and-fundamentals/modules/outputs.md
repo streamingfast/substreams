@@ -1,6 +1,8 @@
 # Outputs
 
-A `map` module can define one output, which is the protobuf data type it announces it will produce.&#x20;
+### Module Data Outputs
+
+A `map` module can define one output, which is the protobuf data type it announces it will produce.
 
 A `store` modules cannot define an output
 

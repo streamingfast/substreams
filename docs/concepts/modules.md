@@ -1,5 +1,7 @@
 # Modules
 
+### What are Modules?
+
 Modules are small pieces of code, running in a WebAssembly virtual machine, amidst the stream of blocks arriving from a blockchain node. They can also process the network's history out of flat files, backed by the Firehose. See the [Firehose documentation](http://firehose.streamingfast.io/) for more details.
 
 Modules may have one or more inputs (from multiple modules, be they `map`s or `store`s, and/or from the blockchain's data source in the form of a _Block_ or a _Clock_).

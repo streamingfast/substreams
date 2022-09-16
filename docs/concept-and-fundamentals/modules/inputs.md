@@ -1,5 +1,7 @@
 # Inputs
 
+### Module Data Inputs
+
 A `map` and `store` module can define one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
 
 ### `Source`
@@ -30,7 +32,7 @@ Read more about maps [here](../../concepts/modules.md#the-map-module-type).
 
 ### `Store`
 
-An _Input_ of type `store` is the state of another store. &#x20;
+An _Input_ of type `store` is the state of another store.
 
 Example:
 

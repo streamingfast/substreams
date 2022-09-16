@@ -1,4 +1,10 @@
+---
+description: StreamingFast Substreams comparison to other products
+---
+
 # Comparison
+
+### Substreams vs Other Streaming Engines
 
 Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
 

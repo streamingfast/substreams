@@ -28,11 +28,11 @@ The streamed data is passed from Firehose through Substreams, then refined, and 
 
 **Substreams in Detail**&#x20;
 
-Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community,
+Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community.
 
-Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion,
+Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion.
 
-Substreams has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling,
+Substreams has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
 Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). The current Substreams iteration enables greater composability, provides similar powers of parallelization, and is also a _much_ simpler model to work with.
 

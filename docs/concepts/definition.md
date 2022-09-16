@@ -10,7 +10,7 @@ Substreams is an exceptionally powerful processing engine that consumes streams 
 
 Substreams can be used to populate any kind of data store and also employs extremely powerful parallelization techniques to process huge blockchain histories.
 
-Susbstreams can be scaled horizontally resulting in a massive reduction of processing time, and ultimately cost, through the addition of multiple machines.
+Substreams can be scaled horizontally resulting in a massive reduction of processing time, and ultimately cost, through the addition of multiple machines.
 
 Substreams introduces a handful of new concepts to The Graph ecosystem. Substreams was inspired by traditional large-scale data systems, _fused_ with the novelties of blockchain.
 

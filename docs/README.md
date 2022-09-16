@@ -16,6 +16,8 @@ This documentation exists as a means to help people understand and operate Subst
 
 Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 
+<img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
+
 ### Developer _Preview_
 
 Substreams is a powerful blockchain indexing technology developed for [The Graph](https://thegraph.com/) Network.

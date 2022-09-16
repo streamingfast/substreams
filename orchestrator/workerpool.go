@@ -173,6 +173,9 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats *JobStats, requestM
 
 	stream, err := w.grpcClient.Blocks(ctx, request, w.callOpts...)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, err
+		}
 		span.SetStatus(codes.Error, err.Error())
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
 	}

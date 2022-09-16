@@ -279,7 +279,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			p.logger.Error(string(debug.Stack()))
 			span.SetStatus(codes.Error, err.Error())
 		}
-		if err == io.EOF || err == nil { //graceful completion
+		if err != nil {
 			for _, hook := range p.postJobHooks {
 				if err := hook(ctx, p.clock); err != nil {
 					p.logger.Warn("post job hook failed", zap.Error(err))

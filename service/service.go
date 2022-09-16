@@ -131,6 +131,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	}
 	span.SetAttributes(attribute.String("hostname", hostname))
 
+	logger.Info("serving blocks")
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
 		err := fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)

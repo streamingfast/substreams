@@ -1,0 +1,38 @@
+specVersion: v0.1.0
+package:
+  name: "substreams_test"
+  version: v0.1.0
+
+protobuf:
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: /Users/cbillett/devel/sf/substreams/pipeline/test_data/simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
+
+modules:
+  - name: map_test
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:sf.substreams.v1.test.MapResult
+
+  - name: store_map_result
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: proto:sf.substreams.v1.test.MapResult
+    inputs:
+      - map: map_test
+
+  - name: store_add_int64
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - map: map_test

@@ -22,12 +22,6 @@ func WithSubrequestExecution() Option {
 	}
 }
 
-func WithStoresSaveInterval(seconds uint64) Option {
-	return func(p *Pipeline) {
-		p.storeSaveInterval = seconds
-	}
-}
-
 func WithPreBlockHook(f substreams.BlockHook) Option {
 	return func(p *Pipeline) {
 		p.preBlockHooks = append(p.preBlockHooks, f)

@@ -207,10 +207,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	}
 	span.SetAttributes(attribute.Bool("sub_request", isSubrequest))
 
-	if s.storesSaveInterval != 0 {
-		opts = append(opts, pipeline.WithStoresSaveInterval(s.storesSaveInterval))
-	}
-
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			span.SetStatus(otelcode.Error, err.Error())
@@ -252,8 +248,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 
 	}
+
 	pipeTracer := otel.GetTracerProvider().Tracer("pipeline")
-	pipe := pipeline.New(ctx, pipeTracer, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
+	pipe := pipeline.New(ctx, pipeTracer, request, graph, s.blockType, s.baseStateStore, s.storesSaveInterval, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
 
 	firehoseReq := &pbfirehose.Request{
 		StartBlockNum:   request.StartBlockNum,

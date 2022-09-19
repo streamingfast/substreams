@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package sf.substreams.v1.test.v1;
+package sf.substreams.v1.test;
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1/test/;pbsubstreamstest";
 
 message Block {

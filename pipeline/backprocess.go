@@ -23,12 +23,6 @@ func (p *Pipeline) backProcessStores(
 	defer span.End()
 
 	logger := p.logger.Named("back_process")
-	ctx, cancel := context.WithCancel(ctx)
-	defer func() {
-		cancel()
-		logger.Debug("back processing canceling ctx", zap.Error(ctx.Err()))
-	}()
-
 	logger.Info("synchronizing stores")
 
 	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)

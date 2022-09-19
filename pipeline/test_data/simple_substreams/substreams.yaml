@@ -15,7 +15,7 @@ binaries:
 modules:
   - name: map_test
     kind: map
-    initialBlock: 1
+    initialBlock: 10
     inputs:
       - source: sf.substreams.v1.test.Block
     output:
@@ -23,7 +23,7 @@ modules:
 
   - name: store_map_result
     kind: store
-    initialBlock: 1
+    initialBlock: 10
     updatePolicy: set
     valueType: proto:sf.substreams.v1.test.MapResult
     inputs:
@@ -31,7 +31,7 @@ modules:
 
   - name: store_add_int64
     kind: store
-    initialBlock: 1
+    initialBlock: 10
     updatePolicy: add
     valueType: int64
     inputs:

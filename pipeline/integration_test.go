@@ -12,7 +12,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -185,7 +184,7 @@ type TestMapOutput struct {
 }
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string) (moduleOutputs []string) {
-	_, _ = logging.ApplicationLogger("test", "test")
+	//_, _ = logging.ApplicationLogger("test", "test")
 
 	err := os.RemoveAll("/tmp/test.store")
 	require.NoError(t, err)
@@ -284,15 +283,15 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	moduleOutputs := runTest(t, 1, 3, []string{"map_test"})
+	moduleOutputs := runTest(t, 10, 12, []string{"map_test"})
 	require.Equal(t, []string{
-		`{"name":"map_test","result":{"block_number":1,"block_hash":"block-1"}}`,
-		`{"name":"map_test","result":{"block_number":2,"block_hash":"block-2"}}`,
+		`{"name":"map_test","result":{"block_number":10,"block_hash":"block-10"}}`,
+		`{"name":"map_test","result":{"block_number":11,"block_hash":"block-11"}}`,
 	}, moduleOutputs)
 }
 
 func Test_store_add_int64(t *testing.T) {
-	moduleOutputs := runTest(t, 1, 4, []string{"store_add_int64"})
+	moduleOutputs := runTest(t, 10, 13, []string{"store_add_int64"})
 	require.Equal(t, []string{
 		`{"name":"store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
 		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
@@ -301,18 +300,34 @@ func Test_store_add_int64(t *testing.T) {
 }
 
 func Test_store_map_result(t *testing.T) {
-	moduleOutputs := runTest(t, 1, 3, []string{"store_map_result"})
+	moduleOutputs := runTest(t, 10, 12, []string{"store_map_result"})
 	require.Equal(t, []string{
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":1,"block_hash":"block-1"}}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":2,"block_hash":"block-2"}}]}`,
+		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
+		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
 	}, moduleOutputs)
 }
 
 func Test_MultipleModule(t *testing.T) {
-	moduleOutputs := runTest(t, 1, 3, []string{"store_map_result"})
+	moduleOutputs := runTest(t, 10, 12, []string{"map_test", "store_add_int64", "store_map_result"})
 	require.Equal(t, []string{
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":1,"block_hash":"block-1"}}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":2,"block_hash":"block-2"}}]}`,
+		`{"name":"map_test","result":{"block_number":10,"block_hash":"block-10"}}`,
+		`{"name":"store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
+		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
+		`{"name":"map_test","result":{"block_number":11,"block_hash":"block-11"}}`,
+		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
+		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
+	}, moduleOutputs)
+}
+
+func Test_MultipleModule_Batch(t *testing.T) {
+	moduleOutputs := runTest(t, 110, 112, []string{"map_test", "store_add_int64", "store_map_result"})
+	require.Equal(t, []string{
+		`{"name":"map_test","result":{"block_number":110,"block_hash":"block-110"}}`,
+		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"90","new":"91"}]}`,
+		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
+		`{"name":"map_test","result":{"block_number":111,"block_hash":"block-111"}}`,
+		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"91","new":"92"}]}`,
+		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
 }
 

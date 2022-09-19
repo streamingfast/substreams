@@ -10,15 +10,17 @@ Substreams is an exceptionally powerful processing engine that consumes streams 
 
 Substreams can be used to populate any kind of data store and also employs extremely powerful parallelization techniques to process huge blockchain histories.
 
-A notable comparison for subgraph developers is: subgraphs require one or more smart contract addresses to collect data to query. Substreams don’t require _ANY_ contract addresses and the _**entire chain** with history_ is available to query.
-
 Substreams can be scaled horizontally resulting in a massive reduction of processing time, and ultimately cost, through the addition of multiple machines.
 
 Communities can combine Substreams data refinement strategies to form compounding levels of data richness and availability.
 
 Substreams brings a handful of new concepts to the wider ecosystem surrounding The Graph and its Subgraphs.&#x20;
 
+A notable comparison for subgraph developers is: subgraphs require one or more smart contract addresses to collect data to query. Substreams don’t require _ANY_ contract addresses and the _**entire chain** with history_ is available to query.
+
 Substreams was inspired by traditional large-scale data systems now _fused_ with the novelties of blockchain.
+
+Substreams are defined in modules written in the Rust programming language and utilize Google Protocol Buffer technology.
 
 More detailed aspects of what Substreams is, and can do, in contrast to what it's not, and can't do, is helpful to gain an even deeper context of the product.
 

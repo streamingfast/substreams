@@ -10,6 +10,8 @@ Substreams is an exceptionally powerful processing engine that consumes streams 
 
 Substreams can be used to populate any kind of data store and also employs extremely powerful parallelization techniques to process huge blockchain histories.
 
+A notable comparison for subgraph developers is: subgraphs require one or more smart contract addresses to collect data to query. Substreams don’t require _ANY_ contract addresses and the _**entire chain** with history_ is available to query.
+
 Substreams can be scaled horizontally resulting in a massive reduction of processing time, and ultimately cost, through the addition of multiple machines.
 
 Communities can combine Substreams data refinement strategies to form compounding levels of data richness and availability.

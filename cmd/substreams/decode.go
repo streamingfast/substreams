@@ -89,8 +89,6 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	hash = "6f6559bc7955c183aedd5fb3da1df3a0a32d5888"
-
 	if hash == "" {
 		return fmt.Errorf("module name not found %q", moduleName)
 	}
@@ -186,7 +184,6 @@ func runDecodeStore(cmd *cobra.Command, args []string) error {
 	if hash == "" {
 		return fmt.Errorf("module name not found %q", moduleName)
 	}
-	hash = "2d5d4eca48116399e881cabf533226fefda50f9e"
 
 	moduleStore, err := state.NewStore(moduleName, saveInterval, pbModule.InitialBlock, hash, pbModule.GetKindStore().GetUpdatePolicy(), pbModule.GetKindStore().GetValueType(), store, zlog)
 	if err != nil {

@@ -4,7 +4,11 @@ description: StreamingFast Substreams documentation
 
 # 🔀 Substreams
 
-### Substreams Documentation
+### Where to Start
+
+First, read through the [basic concepts](concept-and-fundamentals/basic-concepts.md) and study the [visual diagram. ](concept-and-fundamentals/visual-diagram.md)Then, learn even more about Substreams in the [definition](concept-and-fundamentals/definition.md) and [comparison](concepts/comparison.md) documentation.&#x20;
+
+Take a moment to explore [modules](concepts/modules.md) before moving on to the [Getting Started Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 
 #### Introducing StreamingFast Substreams
 
@@ -13,36 +17,6 @@ For a detailed walk-through of Substreams check out the video, created by Stream
 {% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
 Learn about Substreams from StreamingFast's Alex.
 {% endembed %}
-
-### Substreams visual representation
-
-Substreams has two perspectives as illustrated in the high-level visual diagram seen blelow. One perspective is the architecture of and Substreams engine itself. The other perspective is from that of an end-user developer. &#x20;
-
-Essentially the developer of an end-user application will design and create a data refinement strategy.&#x20;
-
-The Substreams engine will use the data refinement strategy to isolate a very specific data set. Substreams receives data from StreamingFast Firehose in the form of streams.&#x20;
-
-The streamed data is passed from Firehose through Substreams, then refined, and finally routed to wherever the developer desires, from relational databases to subgraphs, or even straight into an application.&#x20;
-
-<img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="StreamingFast Substreams high-level visual diagram" class="gitbook-drawing">
-
-**Substreams in Detail**&#x20;
-
-Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
-
-Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion. These powerful parallelization techniques enable efficient processing of enormous blockchain histories.
-
-Substreams is horizontally scalable presenting the opportunity to reduce processing time simply by adding more computing power, or machines.
-
-Substreams has all the benefits of Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
-
-Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). The current Substreams iteration enables greater composability, provides similar powers of parallelization. Basically, Substreams is a _much_ simpler model to work with.
-
-### Resources
-
-* [Getting Started Guide](developer-guide/overview.md)
-* Sample [Substreams Template](https://github.com/streamingfast/substreams-template) repository
-* Additional examples available in the [Substreams Playground](https://github.com/streamingfast/substreams-playground)&#x20;
 
 ### Community
 

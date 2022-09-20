@@ -50,3 +50,15 @@ The _word_ Substreams refers to:
 The Substreams _engine_ is completely agnostic of underlying blockchain protocols and works solely on data extracted from nodes using the Firehose.&#x20;
 
 Different protocols have different chain-specific extensions, such as Ethereum, which expose `eth_calls`.
+
+**Substreams in More Detail**&#x20;
+
+Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
+
+Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion. These powerful parallelization techniques enable efficient processing of enormous blockchain histories.
+
+Substreams is horizontally scalable presenting the opportunity to reduce processing time simply by adding more computing power, or machines.
+
+Substreams has all the benefits of Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+
+Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). The current Substreams iteration enables greater composability, provides similar powers of parallelization. Basically, Substreams is a _much_ simpler model to work with.

@@ -4,8 +4,9 @@
 
 ## Concept & Fundamentals
 
-* [Definition](concept-and-fundamentals/definition/README.md)
-  * [Basic Concepts](concept-and-fundamentals/definition/basic-concepts.md)
+* [Basic Concepts](concept-and-fundamentals/basic-concepts.md)
+* [Visual Diagram](concept-and-fundamentals/visual-diagram.md)
+* [Definition](concept-and-fundamentals/definition.md)
 * [Comparison](concepts/comparison.md)
 * [Modules](concepts/modules.md)
   * [Inputs](concept-and-fundamentals/modules/inputs.md)

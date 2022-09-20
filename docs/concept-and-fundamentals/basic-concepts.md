@@ -15,3 +15,7 @@ Searching through the linear transaction data in the ledgers hasn’t historical
 A revolutionary approach to data extraction from blockchain nodes, called Firehose, provides massive levels of previously unseen data availability to Substreams. Requests can be made for single blocks at any point in the blockchain ledger. The data inside each block is fully searchable down to the transaction event level. Substreams processes many blocks at once, in parallel, enabling developers to instantly isolate and locate any data in full blockchain ledgers without the need for linear processing.
 
 The Rust programming language is used by the developer to define data of interest available in the blockchain. Substreams can route data to a myriad of stores including file systems, relational databases, and even straight into an application’s user interface.
+
+### Takeaway
+
+Substreams - Instantly locate any data, in any blockchain.

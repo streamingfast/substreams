@@ -2,7 +2,7 @@
 description: Get streaming with StreamingFast Substreams
 ---
 
-# Get Streaming
+# Start Streaming
 
 ### Authentication
 
@@ -15,16 +15,12 @@ _Note, make sure the Substreams CLI has_ [_been installed_](installing-the-cli.m
 Once the StreamingFast authentication token has been attained and the Substreams CLI has been installed it's time to run Substreams.
 
 ```bash
-substreams run -e api-dev.streamingfast.io:443 \
-   https://github.com/streamingfast/substreams-template/releases/download/v0.1.0/substreams-template-v0.1.0.spkg \
-   map_transfers \
-   --start-block 12292922 \
-   --stop-block +1
+substreams run -e api-dev.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
 
 Breaking down the elements of the command above.
 
-* `The substreams` command is running the Substreams CLI tool.
+* The `substreams` command is running the Substreams CLI tool.
 * The data provider for Substreams is located at the address.\
   `-e api-dev.streamingfast.io:443`
 * The Substreams package being run is also passed to the `substreams` command. `https://github.com/../substreams-template-v0.5.0.spkg.` \

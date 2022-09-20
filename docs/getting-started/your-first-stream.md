@@ -44,3 +44,7 @@ Start mapping at the specific block 12292922 by using passing the flag and block
 `--start-block 12292922`
 
 Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
+
+#### Next steps
+
+At this point, the Substreams CLI is installed and should be functioning correctly. Simple data was sent back to the terminal to provide an idea of what is now possible. The [Developer Guide](broken-reference) provides an in-depth look at Substreams and how to target specific blockchain data.

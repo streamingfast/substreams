@@ -21,11 +21,11 @@
 
 * [Overview](developer-guide/overview.md)
 * [Installing Dependencies](developer-guide/installation-requirements.md)
-* [Creating your Manifest](developer-guide/creating-your-manifest.md)
+* [Creating a Manifest](developer-guide/creating-your-manifest.md)
 * [Creating Protobuf Schemas](developer-guide/creating-protobuf-schemas.md)
 * [Setting Up Handlers](developer-guide/setting-up-handlers.md)
 * [Writing Module Handlers](developer-guide/writing-module-handlers.md)
-* [Running Your Substreams](developer-guide/running-substreams.md)
+* [Running Substreams](developer-guide/running-substreams.md)
 
 ## Reference & Specs
 

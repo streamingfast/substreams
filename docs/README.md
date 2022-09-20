@@ -6,9 +6,11 @@ description: StreamingFast Substreams documentation
 
 ### Where to Start
 
-First, read through the [basic concepts](concept-and-fundamentals/basic-concepts.md) and study the [visual diagram. ](concept-and-fundamentals/visual-diagram.md)Then, learn even more about Substreams in the [definition](concept-and-fundamentals/definition.md) and [comparison](concepts/comparison.md) documentation.&#x20;
+First, read through the [basic concepts](concept-and-fundamentals/basic-concepts.md) and study the [visual diagram. ](concept-and-fundamentals/visual-diagram.md)Next, review the [definition](concepts/definition.md) and [comparison](concepts/comparison.md) documentation.&#x20;
 
-Take a moment to explore [modules](concepts/modules.md) before moving on to the [Getting Started Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
+For developers looking to work with and create Substreams [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md).
+
+Take a moment to learn about [modules](concepts/modules.md) before moving on to the [Developer Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 
 #### Introducing StreamingFast Substreams
 

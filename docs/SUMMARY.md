@@ -6,7 +6,7 @@
 
 * [Basic Concepts](concept-and-fundamentals/basic-concepts.md)
 * [Visual Diagram](concept-and-fundamentals/visual-diagram.md)
-* [Definition](concept-and-fundamentals/definition.md)
+* [Definition](concepts/definition.md)
 * [Comparison](concepts/comparison.md)
 * [Modules](concepts/modules.md)
   * [Inputs](concept-and-fundamentals/modules/inputs.md)
@@ -15,7 +15,7 @@
 ## Getting Started
 
 * [Installing the CLI](getting-started/installing-the-cli.md)
-* [Get Streaming](getting-started/your-first-stream.md)
+* [Start Streaming](getting-started/your-first-stream.md)
 
 ## Developer Guide
 

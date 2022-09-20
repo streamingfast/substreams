@@ -18,6 +18,8 @@ Once the StreamingFast authentication token has been attained and the Substreams
 substreams run -e api-dev.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
 
+### Explanation
+
 #### Substreams Run
 
 First, start the Substreams CLI tool passing it a `run` command.
@@ -45,6 +47,6 @@ Start mapping at the specific block 12292922 by using passing the flag and block
 
 Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
 
-#### Next steps
+### Next steps
 
 At this point, the Substreams CLI is installed and should be functioning correctly. Simple data was sent back to the terminal to provide an idea of what is now possible. The [Developer Guide](broken-reference) provides an in-depth look at Substreams and how to target specific blockchain data.

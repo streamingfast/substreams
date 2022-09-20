@@ -29,11 +29,3 @@ Breaking down the elements of the command above.
 * Start mapping at the specific block 12292922 by using passing the flag and block number. \
   `--start-block 12292922`
 * Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
-
-{% hint style="info" %}
-**Packages & Manifest**
-
-The example above runs a Substreams based on a published `.spkg` file (a.k.a [Package](../reference-and-specs/packages.md)). You can also run a Substreams by pointing it directly to a .yaml file (a.k.a [Manifest](../reference-and-specs/manifests.md)).
-
-You can think of Packages as published Substreams that can be used to start streaming data immediately.
-{% endhint %}

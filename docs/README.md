@@ -12,7 +12,7 @@ For developers looking to work with and create Substreams [install the CLI tool]
 
 Take a moment to learn about [modules](concepts/modules.md) before moving on to the [Developer Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 
-#### Introducing StreamingFast Substreams
+#### Introduction Video
 
 For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substreams users gain an understanding to provide a deeper context.
 

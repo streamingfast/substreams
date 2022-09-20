@@ -6,7 +6,7 @@ description: StreamingFast Substreams CLI installation
 
 ### CLI Installation
 
-The Substreams CLI allows you to interact with Substreams endpoints, stream data in real-time, and package custom, hand rolled Substreams modules.
+The Substreams CLI allows you to interact with Substreams endpoints, stream data in real time, and package custom, hand-rolled Substreams modules.
 
 #### Install with Homebrew
 
@@ -40,7 +40,7 @@ Run Substreams passing it the version flag to ensure the CLI is working as expec
 
 ```bash
 substreams --version
-substreams version 0.0.12 (Commit 7b30088, Built 2022-06-03T18:32:00Z)
+substreams version 0.0.20 (Commit dae1548, Built 2022-08-23T18:35:46Z)
 ```
 
 _Note,_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._

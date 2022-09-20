@@ -26,18 +26,18 @@ crate-type = ["cdylib"]
 [target.wasm32-unknown-unknown.dependencies]
 ethabi = "17.0"
 hex-literal = "0.3.4"
-prost = "0.10.1"
+prost = { version = "0.11.0" }
 # Use latest from https://crates.io/crates/substreams
-substreams = "0.0.12"
+substreams = { version = "0.0.20" }
 # Use latest from https://crates.io/crates/substreams-ethereum
-substreams-ethereum = "0.1.2"
+substreams-ethereum = { version = "0.2.1" }
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 getrandom = { version = "0.2", features = ["custom"] }
 
 [build-dependencies]
 anyhow = "1"
-substreams-ethereum = "0.1.0"
+substreams-ethereum = { version = "0.2.1" }
 
 [profile.release]
 lto = true

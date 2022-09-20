@@ -11,8 +11,6 @@ A Substreams manifest mainly defines a list of [modules](../concepts/modules.md)
 
 For our manifest we will use:
 
-{% github_embed "https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml" %}{% endgithub_embed %}
-
 {% code title="substreams.yaml" %}
 ```yaml
 specVersion: v0.1.0
@@ -39,7 +37,7 @@ modules:
     kind: map
     initialBlock: 12287507
     inputs:
-      - source: sf.ethereum.type.v1.Block
+      - source: sf.ethereum.type.v2.Block
     output:
       type: proto:eth.erc721.v1.Transfers
 
@@ -50,6 +48,7 @@ modules:
     valueType: int64
     inputs:
       - map: block_to_transfers
+
 ```
 {% endcode %}
 
@@ -65,7 +64,7 @@ Furthermore, the manifest lists two modules: `block_to_transfers` and `nft_state
 
 The `block_to_transfers` map module will take an Ethereum block as an input and will extract all ERC721 Transfers related to our contract into an object. The inputs of the module are:
 
-* An Ethereum block, with the `Protobuf` definition of [`sf.ethereum.type.v1.Block`](https://github.com/streamingfast/sf-ethereum/blob/develop/proto/sf/ethereum/type/v1/type.proto). This Ethereum block definition is one we will provide. The block definition is chain specific and must be versioned, so if you are building a Substreams on NEAR you will use the StreamingFast NEAR block definition.
+* An Ethereum block, with the `Protobuf` definition of [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto). This Ethereum block definition is one we will provide. The block definition is chain specific and must be versioned, so if you are building a Substreams on NEAR you will use the StreamingFast NEAR block definition.
 
 The outputs of the module are:
 

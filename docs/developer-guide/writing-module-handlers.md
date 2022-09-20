@@ -9,12 +9,10 @@ mod pb;
 use hex_literal::hex;
 use pb::erc721;
 use substreams::{log, store, Hex};
-use substreams_ethereum::{pb::eth::v1 as eth, NULL_ADDRESS};
+use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS, Event};
 
 // Bored Ape Yacht Club Contract
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
-
-substreams_ethereum::init!();
 
 /// Extracts transfer events from the contract
 #[substreams::handlers::map]
@@ -32,7 +30,7 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
                 return None;
             }
 
-            let transfer = abi::erc721::events::Transfer::must_decode(log);
+            let transfer = abi::erc721::events::Transfer::match_and_decode(log).unwrap();
 
             Some(erc721::Transfer {
                 trx_hash: trx.hash.clone(),
@@ -69,7 +67,6 @@ fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 fn generate_key(holder: &Vec<u8>) -> String {
     return format!("total:{}:{}", Hex(holder), Hex(TRACKED_CONTRACT));
 }
-
 ```
 {% endcode %}
 
@@ -83,38 +80,35 @@ mod pb;
 use hex_literal::hex;
 use pb::erc721;
 use substreams::{log, store, Hex};
-use substreams_ethereum::{pb::eth::v1 as eth, NULL_ADDRESS};
+use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS, Event};
 ...
 ```
 
-We then store the contract that we're tracking as a `constant`, and initiate our Ethereum Substreams
+We then store the contract that we're tracking as a `constant`
 
 ```rust
 ...
 
 // Bored Ape Yacht Club Contract
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
-
-substreams_ethereum::init!();
-
 ...
 ```
 
-We then define our first `map` module. As a reminder, here is the module definition in the Manifiest that we created:
+We then define our first `map` module. As a reminder, here is the module definition in the Manifest that we created:
 
 ```yaml
   - name: block_to_transfers
     kind: map
     initialBlock: 12287507
     inputs:
-      - source: sf.ethereum.type.v1.Block
+      - source: sf.ethereum.type.v2.Block
     output:
       type: proto:eth.erc721.v1.Transfers
 ```
 
 Notice the: `name: block_to_transfers`. This name should correspond to our handler function name.
 
-Second, we have defined one input and one output. The input has a type of `sf.ethereum.type.v1.Block` which is a standard Ethereum block provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` which is our custom `Protobuf` definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
+Second, we have defined one input and one output. The input has a type of `sf.ethereum.type.v2.Block` which is a standard Ethereum block provided by the `substreams-ethereum` crate. The output has a type of `proto:eth.erc721.v1.Transfers` which is our custom `Protobuf` definition and is provided by the generated Rust code we did in the prior steps. This yields the following function signature:
 
 ```rust
 ...
@@ -162,7 +156,7 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
             }
             
             // decode the event and store it
-            let transfer = abi::erc721::events::Transfer::must_decode(log);
+            let transfer = abi::erc721::events::Transfer::match_and_decode(log).unwrap();
             Some(erc721::Transfer {
                 trx_hash: trx.hash.clone(),
                 from: transfer.from,

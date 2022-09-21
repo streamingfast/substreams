@@ -50,11 +50,13 @@ For macOS users simply use Homebrew to install Buf.
 brew install bufbuild/buf/buf
 ```
 
-### `cmake` and `build-essential`
+### CMake Installation
 
 Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.&#x20;
 
 Visit the [Installing CMake page](https://cmake.org/install/) for further information on `cmake`.
+
+### Build Essential Installation
 
 Find additional information for `build-essential` on the [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
 

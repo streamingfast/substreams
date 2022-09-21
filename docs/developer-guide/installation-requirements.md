@@ -44,6 +44,12 @@ Buf invokes `protoc` and makes working with Substreams easier. Substreams packag
 
 Visit the [Buf website](https://buf.build/) for additional information and Buf [installation instructions](https://docs.buf.build/installation).
 
+For macOS users simply use Homebrew to install Buf.
+
+```bash
+brew install bufbuild/buf/buf
+```
+
 ### `cmake` and `build-essential`
 
 Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.&#x20;

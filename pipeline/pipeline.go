@@ -153,6 +153,13 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	ctx, span := p.tracer.Start(ctx, "pipeline_init")
 	defer span.End()
+	defer func() {
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
+	}()
 
 	p.logger.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
@@ -170,14 +177,12 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
 			err := fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
-			span.SetStatus(codes.Error, err.Error())
 			return err
 		}
 
 		hash := p.moduleHashes.Get(module.Name)
 		_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
 	}
@@ -186,7 +191,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	initialStoreMap, err := p.buildStoreMap()
 	p.logger.Info("stores load", zap.Int("number_of_stores", len(initialStoreMap)))
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("building store map: %w", err)
 	}
 
@@ -207,7 +211,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 				zap.Bool("is_last_store", isLastStore),
 				zap.Int("output_module_count", totalOutputModules))
 			err := fmt.Errorf("invalid conditions to backprocess leaf store %q", outputName)
-			span.SetStatus(codes.Error, err.Error())
 			return err
 		}
 
@@ -216,7 +219,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		backProcessingStore.Roll(p.requestedStartBlockNum)
 
 		if err = loadCompleteStores(ctx, initialStoreMap, p.requestedStartBlockNum); err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("loading stores: %w", err)
 		}
 
@@ -225,7 +227,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	} else {
 		backProcessedStores, err := p.backProcessStores(ctx, workerPool, initialStoreMap)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("synchronizing stores: %w", err)
 		}
 
@@ -239,7 +240,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		if len(p.request.InitialStoreSnapshotForModules) != 0 {
 			p.logger.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
 			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules); err != nil {
-				span.SetStatus(codes.Error, err.Error())
 				return fmt.Errorf("send initial snapshots: %w", err)
 			}
 		}
@@ -249,19 +249,16 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	err = p.buildWASM(ctx, p.request, p.modules)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
 	for _, cache := range p.moduleOutputCache.OutputCaches {
 		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
 		if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("loading outputs caches")
 		}
 	}
 
-	span.SetStatus(codes.Ok, "")
 	return nil
 }
 

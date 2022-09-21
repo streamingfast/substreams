@@ -61,6 +61,10 @@ apt install cmake build-essential
 
 Once `cmake` and `build-essential` are properly installed, the `protoc-gen-prost` crate can be used to generate protobuf files.
 
+```
+cargo install protoc-gen-prost
+```
+
 ### Cloud-based Gitpod Installation
 
 {% hint style="success" %}
@@ -79,7 +83,3 @@ To use Gitpod with Substreams:
    1. `make build` will rebuild the substream. Run this whenever changes have been made.
    2. `make stream` will run the stream for a few blocks. As you make changes to your substream, you'll want to change this command to use your own substream modules and a block range more suitable to the data your indexing. Simply edit `Makefile` to do this.
 {% endhint %}
-
-```
-cargo install protoc-gen-prost
-```

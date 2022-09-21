@@ -6,7 +6,7 @@ description: StreamingFast Substreams dependency installation
 
 ### Dependencies Overview
 
-Working with Substreams requires a few additional applications and tools including:
+Working with Substreams requires a few additional applications and tools.
 
 * Substreams CLI
 * Rust
@@ -17,26 +17,11 @@ Working with Substreams requires a few additional applications and tools includi
 
 Instructions and links are provided below to assist with the installation of the required dependencies.
 
-{% hint style="success" %}
-**Develop in the cloud with Gitpod**
-
-[Gitpod](https://www.gitpod.io/) can be used in place of a local installation on a developer's machine.
-
-To use Gitpod with Substreams:
-
-1. First, [copy this repository](https://github.com/streamingfast/substreams-template/generate)
-2. Grab a StreamingFast key from [https://app.dfuse.io/](https://app.dfuse.io/)
-3. Create a [Gitpod](https://gitpod.io/) account
-4. Configure a `STREAMINGFAST_KEY` variable in your [Gitpod account settings](https://gitpod.io/variables)
-5. Open the repository copied in step 1 as a [Gitpod workspace](https://gitpod.io/workspaces).
-6. The substream template comes with a `Makefile` that makes building and running the substream easy:
-   1. `make build` will rebuild the substream. Run this whenever changes have been made.
-   2. `make stream` will run the stream for a few blocks. As you make changes to your substream, you'll want to change this command to use your own substream modules and a block range more suitable to the data your indexing. Simply edit `Makefile` to do this.
-{% endhint %}
+Substreams can be installed locally or in the cloud using Gitpod. Gitpod [installation instructions](installation-requirements.md#cloud-based-gitpod-installation) for Substreams are available at the bottom of this page. Continue reading for local installation instructions.
 
 ### CLI Installation
 
-The Substreams CLI is required. Follow the steps outlined in the [installation page](../getting-started/installing-the-cli.md) for further information before proceeding.
+The Substreams CLI is required. Follow the steps outlined on the [installation page](../getting-started/installing-the-cli.md) for further information before proceeding.
 
 ### Rust Installation
 
@@ -75,6 +60,25 @@ apt install cmake build-essential
 ### `protoc-gen-prost`
 
 Once `cmake` and `build-essential` are properly installed, the `protoc-gen-prost` crate can be used to generate protobuf files.
+
+### Cloud-based Gitpod Installation
+
+{% hint style="success" %}
+**Develop in the cloud with Gitpod**
+
+[Gitpod](https://www.gitpod.io/) can be used in place of a local installation on a developer's machine.
+
+To use Gitpod with Substreams:
+
+1. First, [copy this repository](https://github.com/streamingfast/substreams-template/generate)
+2. Grab a StreamingFast key from [https://app.dfuse.io/](https://app.dfuse.io/)
+3. Create a [Gitpod](https://gitpod.io/) account
+4. Configure a `STREAMINGFAST_KEY` variable in your [Gitpod account settings](https://gitpod.io/variables)
+5. Open the repository copied in step 1 as a [Gitpod workspace](https://gitpod.io/workspaces).
+6. The substream template comes with a `Makefile` that makes building and running the substream easy:
+   1. `make build` will rebuild the substream. Run this whenever changes have been made.
+   2. `make stream` will run the stream for a few blocks. As you make changes to your substream, you'll want to change this command to use your own substream modules and a block range more suitable to the data your indexing. Simply edit `Makefile` to do this.
+{% endhint %}
 
 ```
 cargo install protoc-gen-prost

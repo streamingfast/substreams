@@ -12,3 +12,5 @@ Here are the reference Protobuf Definitions for each of the supported protocols:
 | Aptos    | `aptos.extractor.v1.Block`  | [v1/extractor.proto](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto) | <p>Testnet: coming<br>Mainnet: when launch <span data-gb-custom-inline data-tag="emoji" data-code="1f604">😄</span></p>                                                                                                                                    |          |
 
 \*\* Unless otherwise noted, those endpoints are [authenticated](authentication.md).
+
+Also see the [Firehose Documentation on Schemas](https://firehose.streamingfast.io/references/protobuf-schemas) for everything that could be made available through Substreams.

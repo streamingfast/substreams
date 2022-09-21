@@ -80,16 +80,20 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
+	hashes := manifest.NewModuleHashes()
+
 	var hash string
 	var protoDefinition string
+	var found bool
 	for _, module := range pkg.Modules.Modules {
 		if module.Name == moduleName {
-			hash = manifest.HashModuleAsString(pkg.Modules, moduleGraph, module)
+			found = true
+			hashes.HashModule(pkg.Modules, module, moduleGraph)
+			hash = hashes.Get(module.Name)
 			protoDefinition = module.Output.GetType()
 		}
 	}
-
-	if hash == "" {
+	if !found {
 		return fmt.Errorf("module name not found %q", moduleName)
 	}
 
@@ -99,7 +103,7 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 	}
 
 	outputCache := outputs.NewOutputCache(moduleName, moduleStore, saveInterval, zlog)
-	found, err := outputCache.LoadAtBlock(cmd.Context(), startBlock)
+	found, err = outputCache.LoadAtBlock(cmd.Context(), startBlock)
 	if err != nil {
 		return fmt.Errorf("loading cache: %w", err)
 	}
@@ -170,18 +174,22 @@ func runDecodeStore(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
+	hashes := manifest.NewModuleHashes()
+
 	var hash string
 	var protoDefinition string
+	var found bool
 	var pbModule *pbsubstreams.Module
 	for _, module := range pkg.Modules.Modules {
 		if module.Name == moduleName {
-			hash = manifest.HashModuleAsString(pkg.Modules, moduleGraph, module)
+			found = true
+			hashes.HashModule(pkg.Modules, module, moduleGraph)
+			hash = hashes.Get(module.Name)
 			protoDefinition = module.GetKindStore().GetValueType()
 			pbModule = module
 		}
 	}
-
-	if hash == "" {
+	if !found {
 		return fmt.Errorf("module name not found %q", moduleName)
 	}
 

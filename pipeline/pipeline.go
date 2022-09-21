@@ -43,10 +43,11 @@ type Pipeline struct {
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
 
-	context  context.Context
-	request  *pbsubstreams.Request
-	graph    *manifest.ModuleGraph
-	respFunc func(resp *pbsubstreams.Response) error
+	context      context.Context
+	request      *pbsubstreams.Request
+	graph        *manifest.ModuleGraph
+	moduleHashes *manifest.ModuleHashes
+	respFunc     func(resp *pbsubstreams.Response) error
 
 	modules              []*pbsubstreams.Module
 	outputModuleMap      map[string]bool
@@ -134,6 +135,17 @@ func GetTraceID(ctx context.Context) (out ttrace.TraceID) {
 	span := ttrace.SpanFromContext(ctx)
 	return span.SpanContext().TraceID()
 }
+
+func (p *Pipeline) computeModuleHashes() {
+	p.moduleHashes = manifest.NewModuleHashes()
+
+	for _, module := range p.modules {
+		if p.outputModuleMap[module.Name] {
+			p.moduleHashes.HashModule(p.request.Modules, module, p.graph)
+		}
+	}
+}
+
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
 	traceID := GetTraceID(ctx)
@@ -151,6 +163,8 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
 
+	p.computeModuleHashes()
+
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
 
@@ -160,7 +174,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 			return err
 		}
 
-		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
+		hash := p.moduleHashes.Get(module.Name)
 		_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
 		if err != nil {
 			span.SetStatus(codes.Error, err.Error())
@@ -748,7 +762,7 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 			storeModule.Name,
 			p.storeSaveInterval,
 			storeModule.InitialBlock,
-			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
+			p.moduleHashes.Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			p.baseStateStore,

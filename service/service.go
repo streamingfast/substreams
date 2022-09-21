@@ -218,39 +218,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	// TODO: check p.cacheEnabled here also if we make this condition back to true
-	if false && !isSubrequest && len(request.OutputModules) == 1 && len(request.InitialStoreSnapshotForModules) == 0 {
-		moduleName := request.OutputModules[0]
-		module, err := graph.Module(moduleName)
-
-		zlog.Info("try to send module output from cached files", zap.String("module_name", moduleName))
-		if err != nil {
-			span.SetStatus(otelcode.Error, err.Error())
-			return fmt.Errorf("getting module %q from graph: %w", moduleName, err)
-		}
-
-		hash := manifest.HashModuleAsString(request.Modules, graph, module)
-		moduleCacheStore, err := s.baseStateStore.SubStore(fmt.Sprintf("%s/outputs", hash))
-		moduleOutputCache := outputs.NewOutputCache(moduleName, moduleCacheStore, s.outputCacheSaveBlockInterval, zlog)
-
-		lastBlockSent, err := sendCachedModuleOutput(ctx, uint64(request.StartBlockNum), request.StopBlockNum, module, moduleOutputCache, responseHandler)
-		if err != nil {
-			fmt.Println("sending cached module output: %w", err)
-		}
-
-		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum {
-			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
-			span.SetStatus(otelcode.Ok, "")
-			return nil // all done
-		}
-
-		if lastBlockSent != nil {
-			zlog.Info("sent cached data", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
-			// FIXME(abourget): +1 is always smelly, why wouldn't `sendCachedModuleOutput` return a cursor?
-			request.StartBlockNum = int64(*lastBlockSent + 1)
-		}
-
-	}
 	pipeTracer := otel.GetTracerProvider().Tracer("pipeline")
 	pipe := pipeline.New(ctx, pipeTracer, request, graph, s.blockType, s.baseStateStore, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
 

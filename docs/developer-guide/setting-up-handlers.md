@@ -7,10 +7,8 @@ description: StreamingFast Substreams module handlers
 Now that we generated our `Protobuf` Rust code, let's initiate our Rust project and generate some code to set us up to write our handlers:
 
 ```bash
-# This is to create a barebones rust project
-cargo init
-# Since we are building a library we need to rename the newly generated main.rs
-mv ./src/main.rs ./src/lib.rs
+# This is to create a barebones rust library
+cargo init --lib
 ```
 
 Let's edit the newly created `Cargo.toml` file to look like this:

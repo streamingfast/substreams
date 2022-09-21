@@ -6,15 +6,17 @@ description: StreamingFast Substreams CLI installation
 
 ### CLI Installation
 
-The Substreams CLI allows you to interact with Substreams endpoints, stream data in real time, and package custom, hand-rolled Substreams modules.
+The Substreams command line interface (CLI) is the main means of interacting with and using the product.
 
-#### Install with Homebrew
+The CLI allows you to connect to Substreams endpoints, stream data in real time, and package custom Substreams modules.
+
+#### Homebrew Installation
 
 ```
 brew install streamingfast/tap/substreams
 ```
 
-#### Install Pre-compiled Binary
+#### Pre-compiled Binary Installation
 
 ```bash
 # Use correct binary for your platform
@@ -26,7 +28,7 @@ curl -L  $LINK  | tar zxf -
 Check [https://github.com/streamingfast/substreams/releases](https://github.com/streamingfast/substreams/releases) and use the latest release available
 {% endhint %}
 
-#### Install From Source
+#### Substreams Source Installation
 
 ```bash
 git clone git@github.com:streamingfast/substreams
@@ -34,7 +36,7 @@ cd substreams
 go install -v ./cmd/substreams
 ```
 
-### Validation
+### CLI Install Validation
 
 Run Substreams passing it the version flag to ensure the CLI is working as expected.
 

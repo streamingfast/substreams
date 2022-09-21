@@ -6,7 +6,7 @@ description: StreamingFast Substreams manifest creation
 
 ### Manifest Overview
 
-A Substreams manifest primarily defines a list of [modules](../concepts/modules.md). Module definitions will generally contain a kind; either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module).&#x20;
+A Substreams manifest primarily defines a list of [modules](../concepts/modules.md). Module definitions will generally contain a kind of either `map` or `store`.&#x20;
 
 The manifest will link to the Rust code that implements the business logic of the module, also known as the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
 

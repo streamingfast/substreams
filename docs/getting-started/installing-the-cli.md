@@ -42,7 +42,7 @@ Run Substreams passing it the version flag to ensure the CLI is working as expec
 
 ```bash
 substreams --version
-substreams version 0.0.20 (Commit dae1548, Built 2022-08-23T18:35:46Z)
+substreams version dev
 ```
 
 _Note,_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._

@@ -10,7 +10,7 @@ Substreams is ready to use after downloading, installing, and configuring the [r
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-After a successful build, run Substreams is started with the following command.
+After a successful build Substreams can be started with the following command.
 
 ```
 substreams run -e api-dev.streamingfast.io:443 \

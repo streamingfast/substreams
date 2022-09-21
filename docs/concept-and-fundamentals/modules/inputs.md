@@ -8,11 +8,15 @@ A `map` and `store` module can define one or multiple inputs. The possible input
 
 An _Input_ of type `source` represent a chain-specific, firehose-provisioned protobuf object.
 
-For example, for Substreams on Ethereum you would specify `sf.ethereum.type.v1.Block.`
+{% hint style="info" %}
+See the list of [supported Protocols here](../../reference-and-specs/protocols.md) and their corresponding message type.
+{% endhint %}
+
+For example, for Substreams on Ethereum you would specify `sf.ethereum.type.v2.Block.`
 
 ```yaml
   inputs:
-    - source: sf.ethereum.type.v1.Block
+    - source: sf.ethereum.type.v2.Block
 ```
 
 Another `source` type available on any chains is the `sf.substreams.v1.Clock` object, representing the block number, a block ID and a block timestamp.

@@ -31,7 +31,7 @@ package:
 
 ### `package.name`
 
-This field is used to identify your package, and is used to infer the filename when you  `substreams pack substreams.yaml` your package.
+This field is used to identify your package, and is used to infer the filename when you `substreams pack substreams.yaml` your package.
 
 * `name` must match this regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`, meaning:
 * 64 characters maximum
@@ -133,7 +133,7 @@ Examples:
     initialBlock: 5000000
     binary: default  # Implicit
     inputs:
-      - source: sf.ethereum.type.v1.Block
+      - source: sf.ethereum.type.v2.Block
       - store: myimport:prices
     output:
       type: proto:my.types.v1.Events
@@ -143,7 +143,7 @@ Examples:
     updatePolicy: add
     valueType: int64
     inputs:
-      - source: sf.ethereum.type.v1.Block
+      - source: sf.ethereum.type.v2.Block
       - map: events_extractor
 ```
 
@@ -218,7 +218,7 @@ Example:
 
 ```yaml
 inputs:
-    - source: sf.ethereum.type.v1.Block
+    - source: sf.ethereum.type.v2.Block
     - store: my_store
       mode: deltas
     - store: my_store # defaults to mode: get

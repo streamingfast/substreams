@@ -1,3 +1,7 @@
+---
+description: StreamingFast Substreams module outputs
+---
+
 # Outputs
 
 ### Module Data Outputs

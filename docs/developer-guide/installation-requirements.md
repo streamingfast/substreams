@@ -27,7 +27,7 @@ The Substreams CLI is required. Follow the steps outlined on the [installation p
 
 ### Rust Installation
 
-Substreams is written in the [Rust programming language](https://www.rust-lang.org/). Working with Substreams requires a working Rust installation.&#x20;
+Substreams is written in the [Rust programming language](https://www.rust-lang.org/). Working with Substreams requires a working Rust installation.
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of simplicity using `curl` from the terminal is the quickest and easiest.
 
@@ -38,7 +38,7 @@ source $HOME/.cargo/env # to configure your current shell
 
 ### Buf Installation
 
-Buf simplifies the generation of typed structures in any language.&#x20;
+Buf simplifies the generation of typed structures in any language.
 
 Buf invokes `protoc` and makes working with Substreams easier. Substreams packages are compatible with [Buf images](https://docs.buf.build/reference/images).
 
@@ -50,13 +50,13 @@ For macOS users simply use Homebrew to install Buf.
 brew install bufbuild/buf/buf
 ```
 
-### CMake Installation
+If the machine is set up is running macOS feel free to continue to create a manifest. Linux users have a few additional dependencies.
 
-Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.&#x20;
+### Linux Specific Tools Installation
+
+Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.
 
 Visit the [Installing CMake page](https://cmake.org/install/) for further information on `cmake`.
-
-### Build Essential Installation
 
 Find additional information for `build-essential` on the [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
 

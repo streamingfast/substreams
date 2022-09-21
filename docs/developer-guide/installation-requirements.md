@@ -50,7 +50,7 @@ For macOS users simply use Homebrew to install Buf.
 brew install bufbuild/buf/buf
 ```
 
-If the machine is set up is running macOS feel free to continue to create a manifest. Linux users have a few additional dependencies.
+If the machine is set up is running macOS feel free to continue to [install `protoc-gen-prost`](installation-requirements.md#protoc-gen-prost). Linux users have a few additional dependencies left to install.
 
 ### Linux Specific Tools Installation
 

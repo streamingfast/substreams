@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/cli v0.0.3
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dgrpc v0.0.0-20220909121013-162e9305bbfc
-	github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648
+	github.com/streamingfast/dstore v0.1.1-0.20220921155016-7a52fdb3fe5f
 	github.com/streamingfast/firehose v0.1.1-0.20220909121738-2f3bc007ea2b
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e

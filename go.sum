@@ -582,6 +582,8 @@ github.com/streamingfast/dmetrics v0.0.0-20220811180000-3e513057d17c h1:ln4WzAU3
 github.com/streamingfast/dmetrics v0.0.0-20220811180000-3e513057d17c/go.mod h1:fWoyaD76fE7mXZfkfcAfNeU/Hv/y6yJ/RgEcInQLwSw=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648 h1:xpy3HNXeUHaZexf42duj7NeOmXcGfDMJXlZaj3CX18Y=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
+github.com/streamingfast/dstore v0.1.1-0.20220921155016-7a52fdb3fe5f h1:3nO7RSBgMO8ZnjtKvmL+9u2P43B+VwUNWYGnadZduWA=
+github.com/streamingfast/dstore v0.1.1-0.20220921155016-7a52fdb3fe5f/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a/go.mod h1:bqiYZaX6L/MoXNfFQeAdau6g9HLA3yKHkX8KzStt58Q=
 github.com/streamingfast/firehose v0.1.1-0.20220909121738-2f3bc007ea2b h1:JaCuiQHc8UcSCoHP8aREaORlPDUVRM4QlZ+zgkerHEs=

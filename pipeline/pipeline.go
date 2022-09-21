@@ -309,6 +309,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	if step == bstream.StepIrreversible {
+		// FIXME: what about bstream.StepNewIrreversible ??
 		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("updating module output cache: %w", err)

@@ -1,6 +1,12 @@
 # Protocols
 
-Here are the reference Protobuf Definitions for each of the supported protocols:
+Here are the reference Protobuf Definitions for each of the supported protocols.
+
+{% hint style="warning" %}
+Each endpoint only serves Substreams that source from the corresponding _Block Message Name_ in its [`source:` field](manifests.md#modules-.inputs).
+
+For example, it is not possible to stream an `sf.near.type.v1.Block` from an Ethereum endpoint.
+{% endhint %}
 
 | Protocol | Block Message Name          | Protobuf Def File                                                                                                                     | Endpoints\*\*                                                                                                                                                                                                                                              | Examples |
 | -------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |

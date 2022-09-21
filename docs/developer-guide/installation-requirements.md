@@ -17,6 +17,8 @@ Working with Substreams requires a few additional applications and tools.
 
 Instructions and links are provided below to assist with the installation of the required dependencies.
 
+#### Gitpod Substreams Installations
+
 Substreams can be installed locally or in the cloud using Gitpod. Gitpod [installation instructions](installation-requirements.md#cloud-based-gitpod-installation) for Substreams are available at the bottom of this page. Continue reading for local installation instructions.
 
 ### CLI Installation

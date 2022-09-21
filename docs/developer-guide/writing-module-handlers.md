@@ -1,4 +1,8 @@
-# Writing Module Handlers
+---
+description: StreamingFast Substreams module handler creation
+---
+
+# Module Handler Creation
 
 Now that we have our ABI and `Protobuf` Rust code generated, let's write our handler code in `src/lib.rs` as such:
 

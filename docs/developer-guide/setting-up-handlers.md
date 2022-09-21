@@ -1,4 +1,8 @@
-# Setting Up Handlers
+---
+description: StreamingFast Substreams module handlers
+---
+
+# Module Handlers
 
 Now that we generated our `Protobuf` Rust code, let's initiate our Rust project and generate some code to set us up to write our handlers:
 

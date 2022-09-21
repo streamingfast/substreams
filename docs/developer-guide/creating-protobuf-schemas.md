@@ -1,4 +1,8 @@
-# Creating Protobuf Schemas
+---
+description: StreamingFast Substreams protobuf schemas
+---
+
+# Protobuf Schemas
 
 Now that our manifest has been written, it is time to create your custom Protobuf definition, the one we'll use as an input/output in your manifest file.
 

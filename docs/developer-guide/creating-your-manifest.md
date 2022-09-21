@@ -1,13 +1,16 @@
-# Creating your Manifest
+---
+description: StreamingFast Substreams manifest creation
+---
 
-Firstly, create and step into your directory:
+# Manifest Creation
 
-```bash
-mkdir substreams_example
-cd substreams_example
-```
+### Substreams Manifest Overview
 
-A Substreams manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module). It will also have a link to the Rust code that implements the business logic of the module, we call this the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
+A Substreams manifest mainly defines a list of [modules](../concepts/modules.md). A module definition will generally contain a kind, either [`map`](../concepts/modules.md#a-map-module) or [`store`](../concepts/modules.md#a-store-module).&#x20;
+
+The manifest will also have a link to the Rust code that implements the business logic of the module, known as the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
+
+### Manifest YAML Creation
 
 For our manifest we will use:
 

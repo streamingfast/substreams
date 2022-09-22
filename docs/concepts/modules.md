@@ -1,32 +1,38 @@
+---
+description: StreamingFast Substreams modules
+---
+
 # Modules
 
 ### What are Modules?
 
 Modules are small pieces of code, running in a WebAssembly virtual machine, amidst the stream of blocks arriving from a blockchain node. They can also process the network's history out of flat files, backed by the Firehose. See the [Firehose documentation](http://firehose.streamingfast.io/) for more details.
 
-Modules may have one or more inputs (from multiple modules, be they `map`s or `store`s, and/or from the blockchain's data source in the form of a _Block_ or a _Clock_).
+Modules may have one or more inputs. The inputs can be  `map, store` or in the form of a `Block` or `Clock` received from the blockchain's data source.
 
 {% hint style="info" %}
-Multiple inputs are made possible because blockchains are clocked, and they allow synchronization between multiple execution streams, opening up great performance improvements, even over your comparable traditional streaming engine.
+Multiple inputs are made possible because blockchains are clocked, and they allow synchronization between multiple execution streams, opening up great performance improvements, even over comparable traditional streaming engines.
 {% endhint %}
 
-Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes coming out.
+Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes being sent out of the module.
 
-Modules can form a graph of modules, taking each other's output as the next module's input, like so:
+Modules can form a graph of modules, taking each other's output as the next module's input.
+
+The `transfer_map` module extracts all transfers in each `Block`, and `transfer_count` as a `store` module and could even track how many transfers have occurred.
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kM0KwjAQhF8l7NkWvEbwIPUJ9NYUWZKtLTZJ2WwEEd_dCAr-4GFhd_h2GOYKNjoCDUfGeVD7ZmWCUqmvSQZiyr6Wy0z1eVlvpmhPbYqZLen_RKeqaq2EMaSe-OBxfhi-320Z_aF8_diYgxC3SSKT_tE7WIAn9ji6kvv6sDdQsngyoMvqqMc8iQETbgXNs0OhrRuLG-gep0QLwCxxdwkWtHCmF9SMWGrwT-p2B02rZZY" %}
-The `transfer_map` module could extract all transfers in each Block, and `transfer_count` - a`store` module - could keep track of how many transfers occurred.
+Substreams modules data interaction
 {% endembed %}
 
-Modules can also take in multiple inputs, like this `counters` store:
+Modules can also take in multiple inputs as seen in the `counters` store example diagram below. Two modules feed into a `store` effectively tracking multiple `counters`.
 
 {% embed url="https://mermaid.ink/svg/pako:eNqdkE1qAzEMha9itE4GsnWgi5KcINmNh6LamozJeGxsuSGE3L1KW1PIptCdnnjv088NbHQEGk4Z06SOu61ZlHqfoz33JdZsSasydsQTZaqh42ui7mPTvT4cg1qvX1TA9HbxPLmMF5zLv_KOUiyev8JPvF60fm5-J22sC1MufeGYZVDTQ8M07C-jdf4AwAoC5YDeyWtuD5wBOSGQAS2loxHrzAbMchdrTQ6Z9s4LBfQo-9EKsHI8XBcLmnOlZtp5lE-HH9f9EylZic0" %}
-Two modules feed into a `store` which keeps track of multiple counters.
+Modules with multiple inputs diagram
 {% endembed %}
 
-All of the modules are executed as a directed acrylic graph (DAG), each time a new Block is processed.
+All of the modules are executed as a directed acrylic graph (DAG), each time a new `Block` is processed.
 
-The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution.
+_Note, The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution._
 
 ## Module Types
 
@@ -34,24 +40,26 @@ There are two types of modules, a `map` module, and a `store` module.
 
 ### The `map` module type
 
-A `map` module takes bytes in, and outputs bytes. In the [manifest](../reference-and-specs/manifests.md), you would declare the protobuf types to help users decode the streams, and help generate some code to get you off the ground faster.
+A `map` module takes in bytes and also outputs them. In the Substreams manifest, you would declare the protobuf types to help users decode the streams and generate code used to work with Substreams.
 
-### The `store` module type
+### `store` Modules
 
-A `store` module is different from a `map` in that it is a _stateful_ module. It holds and builds a simple and fast _key/value_ store.
+Modules of the store type are stateful, meaning they track and save state information in the form of a simple and fast key-value data store.
 
-#### Writing
+### Writing Stores
 
-A `kind: store` module's code is able to write to the key/value store, but in order to ensure parallelization is always possible and deterministic, it _cannot read_ any of its values.
+Store modules write to the key value stores however to ensure successful and proper parallelization they are not permitted to read any of its own data or values.
 
-A store can also declare its data type, in which case different methods become available to mutate its keys.
+If stores declare their own data types methods become exposed that are able to mutate the store's keys.
 
-Two important properties exist on the `store`:
+Two important properties exist on the `store.`
 
-1. The `valueType`
-2. The `updatePolicy`
+* `valueType`
+* `updatePolicy`
 
-The first, `valueType`, instructs the Substreams runtime of the data that will be stored in the stores:
+#### `valueType`
+
+The `valueType` property instructs the Substreams runtime of the data that will be saved to the `stores`.
 
 | Value                          | Description                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------- |
@@ -63,7 +71,11 @@ The first, `valueType`, instructs the Substreams runtime of the data that will b
 | `bigint`                       | A string-serialized integer, with precision of any depth                         |
 | `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits      |
 
-The second, `updatePolicy,` determines what methods are available in the runtime, as well as the merging strategy for identical keys found in two contiguous stores produced by parallel processing:
+#### `updatePolicy`
+
+The `updatePolicy` property determines what methods are available in the runtime.&#x20;
+
+The `updatePolicy` also defines the merging strategy for identical keys found in two contiguous stores produced through parallel processing.
 
 | Method              | Supported Value Types                    | Merge strategy\*                    |
 | ------------------- | ---------------------------------------- | ----------------------------------- |
@@ -77,42 +89,50 @@ The second, `updatePolicy,` determines what methods are available in the runtime
 All update policies provide the `delete_prefix` method.
 
 {% hint style="info" %}
-The **merge strategy** is applied when, while doing parallel processing, a module has built two _partial_ stores store with keys for a segment A (say blocks 0-1000) and a contiguous segment B (say blocks 1000-2000), and is ready to merge those two _partial_ stores to make it a _complete_ store.
+The **merge strategy** is applied during parallel processing. A module has built two _partial_ stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two _partial_ stores to make it a _complete_ store.
 
-The _complete_ store should be exactly as it would be if processing had been done linearly, processing from block 0 up to 2000.
+The _complete_ store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly.
 {% endhint %}
 
 {% hint style="warning" %}
-To preserve the parallelization capabilities of the system, you can never _read_ what you have written, nor read from a store that you are currently writing to.
+To preserve the parallelization capabilities of the system, Substreams can never _read_ what it has written, nor read from a store that is currently being written to.
 
 To read from a store, create a downstream module with one of its inputs pointing to the store's output.
 {% endhint %}
 
 #### Ordinals
 
-You will see `ordinal` or `ord` in different methods of the store APIs.
+Ordinals allow a key/value store to have multiple versions of a key within a single block. The store APIs contain different methods of `ordinal` or `ord`.
 
-Ordinals allow a key/value store to have multiple versions of a key within a single block. For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B and between B and D. That is why you will need to set an ordinal each time you set a key.
+The price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B and between B and D.&#x20;
+
+Oridinals must be set each time a key is set.
 
 {% hint style="warning" %}
-You can only set keys in increasing _ordinal_ order, or with an _ordinal_ equal to the previous.
+Keys can only be set in increasing _ordinal_ order, or with an _ordinal_ equal to the previous.
 {% endhint %}
 
-If you want to have a single key per block, and you don't care about ordering in your store, you can safely use an _ordinal_ value of `0`.
+For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value; the numeric 0.
 
-#### Reading
+### Reading Stores
 
-When declaring a `store` as an input to a module, you can consume its data in one of two modes:
+When declaring a `store` as an input to a module data can be consumed in one of two modes.
 
-1. `get`
-2. `deltas`
+* `get`
+* `deltas`
 
-The first mode - `get` - provides your module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first` (see the [modules API docs](../reference-and-specs/rust-api.md)) from your module's Rust code. Lookups are local, in-memory, and very fast.
+#### `get`
+
+`Get` provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first.` _Note, lookups are local, in-memory, and very fast._
 
 {% hint style="info" %}
-The fastest is `get_last` as it queries the store directly. `get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key you are querying was mutated in this block. `get_at` will unwind deltas up to a certain ordinal, so you can get values for keys that were set midway through a block.
+The fastest is `get_last` as it queries the store directly. `get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+
+`get_at` will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
 {% endhint %}
 
-The second mode - `deltas` - provides your module with all the _changes_ that occurred in the source `store` module. See the [protobuf model here](../../proto/sf/substreams/v1/substreams.proto#L110). You are then free to pick up on updates, creates, and deletes of the different keys that were mutated during that block.
+#### `deltas`
 
-When a store is set as an input to your module, you can only _read_ from it, not write back to it.
+`Deltas` provide the module with all the _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys that were mutated during that block become available.
+
+When a store is set as an input to your module, it is read-only and cannot be modified, updated, or mutated in any way.

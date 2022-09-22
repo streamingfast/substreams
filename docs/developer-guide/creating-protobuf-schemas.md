@@ -45,7 +45,7 @@ message Transfer {
 {% endcode %}
 
 {% hint style="success" %}
-Use a fully qualified path for protobuf files to reduce the risk of conflicts when other community members build their own [_Substreams Package_](../reference-and-specs/packages.md#dependencies)_s._
+Use a fully qualified path for protobuf files to reduce the risk of conflicts when other community members build their own [_Substreams Packages_](../reference-and-specs/packages.md#dependencies)_._
 {% endhint %}
 
 Next, generate the associated Rust code for the protobuf.

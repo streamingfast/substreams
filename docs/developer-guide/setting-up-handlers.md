@@ -61,7 +61,7 @@ To build the Rust dynamic system library, after the `package`, specify the follo
 crate-type = ["cdylib"]
 ```
 
-The next definition in the TMOL file is for `dependencies`.&#x20;
+The next definition in the TOML file is for `dependencies`.&#x20;
 
 Handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` using `[target.wasm32-unknown-unknown.dependencies]`.
 

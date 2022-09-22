@@ -18,7 +18,7 @@ Multiple inputs are made possible because blockchains are clocked. Blockchains a
 
 Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes being sent from the module.
 
-Modules can be formed into a graph. Data from one module is used as the input for the subsequent module.
+Modules can be formed into a graph. Data that is output from one module is used as the input for the subsequent module.
 
 In the diagram shown below the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_count` store module tracks the number of transfers that have occurred.
 

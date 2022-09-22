@@ -4,14 +4,14 @@ description: StreamingFast Substreams module handlers
 
 # Module Handlers
 
-Now that we generated our `Protobuf` Rust code, let's initiate our Rust project and generate some code to set us up to write our handlers:
+To begin creating the custom module handlers initialize a new Rust project.
 
 ```bash
 # This is to create a barebones rust library
 cargo init --lib
 ```
 
-Let's edit the newly created `Cargo.toml` file to look like this:
+Update the generated `Cargo.toml` file to match the following.
 
 {% code title="Cargo.toml" %}
 ```rust
@@ -48,11 +48,11 @@ strip = "debuginfo"
 ```
 {% endcode %}
 
-Let's go through the important changes. Our Rust code will be compiled in [`wasm`](https://webassembly.org/). Think of `wasm` code as a binary instruction format that can be run in a virtual machine. When your Rust code is compiled, it will generate a `.so` file.
+The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
-**Let's break down our `Cargo.toml` file**
+**Cargo.toml Breakdown**
 
-Since we are building a Rust dynamic system library, after the `package`, we first need to specify:
+To build the Rust dynamic system library, after the `package`, specify the following.
 
 ```rust
 ...
@@ -61,14 +61,27 @@ Since we are building a Rust dynamic system library, after the `package`, we fir
 crate-type = ["cdylib"]
 ```
 
-We then need to specify our `dependencies`. We specify explicitly the `wasm32-unknown-unknown` (using `[target.wasm32-unknown-unknown.dependencies]`) target since our handlers compile down to a WASM module:
+The next definition in the TMOL file is for `dependencies`.&#x20;
 
-* `ethabi`: This crate will be used to decode events from your ABI, required for `substreams-ethereum` ABI functionalities.
-* `hex-literal`: This crate will be used to define bytes from hexadecimal string literal at compile time.
-* `substreams`: This crate offers all the basic building blocks for your handlers.
-* `substreams-ethereum`: This crate offers all the Ethereum constructs (blocks, transactions, eth) as well as useful `ABI` decoding capabilities.
+Handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` using `[target.wasm32-unknown-unknown.dependencies]`.
 
-Since we are building our code into `wasm,` we need to configure Rust to target the correct architecture. Add this file at the root of your Substreams directory
+#### `ethabi`
+
+The `ethabi` crate will be used to decode events from the Application binary interface (ABI) and is required for `substreams-ethereum` ABI functionality.
+
+#### `hex-literal`
+
+The `hex-literal` crate will be used to define bytes from hexadecimal string literal at compile time.
+
+#### `substreams`
+
+The `substreams` crate offers all the basic building blocks for the handlers.
+
+#### `substreams-ethereum`
+
+The `substreams-ethereum` crate offers all the Ethereum constructs including blocks, transactions, eth, and useful `ABI` decoding capabilities.
+
+Beacuse code is being built with WASM output it's necessary to configure Rust to target the correct architecture. Create and add a rust-toolchain.toml file at the root of the Substreams directory.
 
 {% code title="rust-toolchain.toml" %}
 ```toml
@@ -79,7 +92,7 @@ targets = [ "wasm32-unknown-unknown" ]
 ```
 {% endcode %}
 
-We can now build our code
+The code can now be built.
 
 ```rust
 cargo build --target wasm32-unknown-unknown --release
@@ -88,7 +101,11 @@ cargo build --target wasm32-unknown-unknown --release
 {% hint style="info" %}
 **Rust Build Target**
 
-Notice that when we run `cargo build` we specify the `target` to be `wasm32-unknown-unknown.` This is important, since the goal is to generate compiled `wasm` code. You can avoid having to manually specify `--target wasm32-unknown-unknown` for each `cargo` command by creating a file named `config.toml` under folder `.cargo` at the root of your project with the following content:
+Notice when `cargo build` is run the `target` is `wasm32-unknown-unknown.` This specification is important, since the goal is to generate compiled WASM code.&#x20;
+
+To avoid manually specifying `target wasm32-unknown-unknown` for each `cargo` command create a file named `config.toml` in the `.cargo` directory at the root of the Substreams project.&#x20;
+
+Use the following content for the file.
 
 {% code title=".cargo/config.toml" %}
 ```toml
@@ -104,11 +121,11 @@ With this config file, `cargo build` is now equivalent to `cargo build --target 
 
 In order to make it easy and type-safe to work with smart contracts, the `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contract's ABI.
 
-We will first insert our contract ABI json file in our projects under an `abi` folder.
+Insert the contract ABI JSON file in the Substreams project in an `abi` directory.
 
 {% file src="../.gitbook/assets/erc721.json" %}
 
-Now that we have an ABI in our project, let's add a Rust build script.
+Next, add a Rust build script.
 
 {% hint style="info" %}
 **Rust Build Script**
@@ -118,7 +135,7 @@ Just before a package is built, Cargo will compile a build script into an execut
 Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it just before building the package.
 {% endhint %}
 
-We will create a `build.rs` file in the root of our Substreams project:
+Create a `build.rs` file in the root of the Substreams project using the following code.
 
 {% code title="build.rs" %}
 ```rust
@@ -135,13 +152,13 @@ fn main() -> Result<(), anyhow::Error> {
 ```
 {% endcode %}
 
-We will run the build script by building the project
+Run the build script to generate the ABI directory and files.
 
 ```bash
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-You should now have a generated ABI folder `src/abi.` Next, we will create a `mod.rs` file in that folder to export the generated Rust code
+Next, create a `mod.rs` file in that directory to export the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
 ```rust
@@ -149,4 +166,4 @@ pub mod erc721;
 ```
 {% endcode %}
 
-We can now write our Rust handlers!
+The next step in the Substreams setup process is to write the actual module handlers themselves.

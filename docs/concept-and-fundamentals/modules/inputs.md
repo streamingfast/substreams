@@ -6,7 +6,7 @@ description: StreamingFast Substreams module inputs
 
 ### Module Data Inputs
 
-Modules come in two varieties: `map` and `store` and can defined one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
+Modules come in two varieties: `map` and `store` and can define one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
 
 ### `Source`
 

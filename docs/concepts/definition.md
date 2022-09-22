@@ -16,7 +16,7 @@ Communities can combine Substreams data refinement strategies to form compoundin
 
 Substreams brings a handful of new concepts to the wider ecosystem surrounding The Graph and its subgraphs.&#x20;
 
-A notable comparison for subgraph developers is subgraphs require one or more smart contract addresses to collect data to query. Substreams don’t require _ANY_ contract addresses and the _**entire chain** with history_ is available to query.
+Subgraphs require one or more smart contract addresses to collect data to query. Substreams don’t require _ANY_ contract addresses and the _**entire chain** with history_ is available to query.
 
 Substreams was inspired by traditional large-scale data systems now _fused_ with the novelties of blockchain.
 

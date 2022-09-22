@@ -36,7 +36,7 @@ Example:
     - map: my_map
 ```
 
-Find additional information about maps [here](../../concepts/modules.md#the-map-module-type).
+Find additional information about `maps` in the [modules documentation](../../concepts/modules.md#the-map-module-type).
 
 ### `Store`
 
@@ -51,7 +51,7 @@ An Input of type `store` is the state of another store.
 
 ### Module Inputs Modes
 
-There are two possible modes that can be defined.
+There are two possible modes that can be defined for modules.
 
 #### `get`
 
@@ -68,4 +68,4 @@ Here are some constraints on stores:
 * A `store` cannot depend on itself!
 {% endhint %}
 
-Find additional information about stores [here](../../concepts/modules.md#the-store-module-type).
+Find additional information about `stores` in the [modules documentation](../../concepts/modules.md#the-store-module-type).

@@ -6,14 +6,6 @@ description: StreamingFast Substreams chains and endpoints
 
 Protobuf definitions and public endpoints are provided for each of the supported protocols and chains below.
 
-{% hint style="info" %}
-Each endpoint only serves Substreams that source from the corresponding _Block Message Name_ in its [`source:` field](manifests.md#modules-.inputs).
-
-For example, it is not possible to stream an `sf.near.type.v1.Block` from an Ethereum endpoint.
-{% endhint %}
-
-_Note, endpoints need to be_ [_authenticated_](authentication.md)_, unless indicated otherwise._
-
 ### Ethereum
 
 #### Protobuf definition
@@ -83,3 +75,11 @@ Mainnet: mainnet.arweave.streamingfast.io:443
 Testnet: testnet.aptos.streamingfast.io:443
 
 Also see the [Firehose _s_chemas documentation](https://firehose.streamingfast.io/references/protobuf-schemas) for what could be made available through Substreams.
+
+{% hint style="info" %}
+Each endpoint only serves Substreams that source from the corresponding _Block Message Name_ in its [`source:` field](manifests.md#modules-.inputs).
+
+For example, it is not possible to stream an `sf.near.type.v1.Block` from an Ethereum endpoint.
+{% endhint %}
+
+_Note, endpoints need to be_ [_authenticated_](authentication.md)_, unless indicated otherwise._

@@ -10,13 +10,13 @@ Packages allow developers to begin streaming immediately!
 
 The standard file extension for a Substreams package is `.spkg`.
 
-Substreams packages are protobuf-serialized files. See the [example model](../../proto/sf/substreams/v1/package.proto) in the official Github repository for an example.
+Substreams packages are protobuf-serialized files. See the [model](../../proto/sf/substreams/v1/package.proto) in the official Github repository for an example.
 
-The Substreams packages conform to both [https://buf.build](https://buf.build) [Images](https://docs.buf.build/reference/images) and the standard protobuf FileDescriptorSet. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
+The Substreams packages conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
 
 ### Creating packages
 
-Packages are created using the `substreams pack` command and passing the Substreams manifest file.
+Packages are created using the `substreams pack` command, passing the Substreams manifest file.
 
 ```
 substreams pack ./substreams.yaml

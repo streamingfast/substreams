@@ -4,17 +4,25 @@ description: StreamingFast Substreams authentication reference
 
 # Authentication
 
+### How to Get Authenticated
+
 A StreamingFast authentication token is required for connecting to the Substreams server.
 
 An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will grant access to the StreamingFast infrastructure.
 
-First, get a StreamingFast API key. The API key is required for obtaining a token.&#x20;
+### Obtain API key
 
-Sign up at [https://app.dfuse.io/](https://app.dfuse.io/) to get an authentication key. The StreamingFast team is generally available on [Discord](https://discord.gg/jZwqxJAvRs) and can assist with API keys there as well.
+The API key is required for obtaining an authentication token. Register for authentication key at [app.dfuse.io](https://app.dfuse.io/).&#x20;
 
 _Note, StreamingFast was previously known as **** dfuse._
 
-After obtaining the API key the following command is used to request the authentication token.
+The StreamingFast team is generally available on [Discord](https://discord.gg/jZwqxJAvRs) and can assist with API key __ generation there as well.
+
+### Request Authentication Token
+
+An authentication token must be requested after successfully obtaining the API key
+
+Issue the following command to request the authentication token using the StreamingFast API key.
 
 ```bash
 curl https://auth.dfuse.io/v1/auth/issue -s \
@@ -22,7 +30,9 @@ curl https://auth.dfuse.io/v1/auth/issue -s \
     '{"api_key":"'$SF_API_KEY'"}' | jq -r .token
 ```
 
-After obtaining the token it should be set as an ENV variable through the terminal using the following command. _Note, be sure to surround the token in quotes as seen in the code below._&#x20;
+### Set Environment Variable
+
+The token should be set as an ENV variable through the terminal using the following command. _Note, be sure to surround the token in quotes as seen in the code below._&#x20;
 
 ```
 export SUBSTREAMS_API_TOKEN="your_token"
@@ -35,6 +45,8 @@ By default the `substreams run` command will check the `SUBSTREAMS_API_TOKEN` en
 
 You can change the default behavior of the `substreams run` command and specify your own ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar`
 {% endhint %}
+
+### Environment Variable Script
 
 The following `bash` function can be run from the command line to obtain a token. The following function can be placed in the `.bashrc` file, located in the computer's home directory.&#x20;
 

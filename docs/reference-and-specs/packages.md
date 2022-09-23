@@ -14,7 +14,7 @@ Substreams packages are protobuf-serialized files. See the [model](../../proto/s
 
 The Substreams packages conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
 
-### Creating packages
+### Creating Packages
 
 Packages are created using the `substreams pack` command, passing the Substreams manifest file.
 
@@ -30,6 +30,4 @@ _**Note, local protobuf filenames take precedence over the imported package's pr
 
 To avoid conflicts it's important to use unique `.proto` filenames. It's also important to use namespaces with fully qualified paths. These efforts help avoid potential naming collisions.
 
-### Where to find them
-
-See the [Substreams Playground](https://github.com/streamingfast/substreams-playground) for examples.
+See the [Substreams Playground](https://github.com/streamingfast/substreams-playground) for package examples.

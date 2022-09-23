@@ -1,29 +1,33 @@
+---
+description: StreamingFast Substreams packages reference
+---
+
 # Packages
 
 A Substreams _package_ is a **single file** containing all dependencies, `Protobuf` definitions (as FileDescriptors), compiled WASM code, and the modules tree specifications. They allow you to start streaming right away!
 
-Their conventional extension is `.spkg`.
+The standard file extension for a Substreams package is `.spkg`.
 
-They are protobuf-serialized files that use this [model](../../proto/sf/substreams/v1/package.proto).
+Substreams packages are protobuf-serialized files. See the [example model](../../proto/sf/substreams/v1/package.proto) in the official Github repository for an example.
 
-You will notice that they conform to both [https://buf.build](https://buf.build) [Images](https://docs.buf.build/reference/images) and standard `Protobuf` FileDescriptorSet, meaning they can be used with multiple code generation tools as a source of schema definitions.
+The Substreams packages conform to both [https://buf.build](https://buf.build) [Images](https://docs.buf.build/reference/images) and the standard protobuf FileDescriptorSet. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
 
 ### Creating packages
 
-You can create a package by running:
+Packages are created using the `substreams pack` command and passing the Substreams manifest file.
 
 ```
 substreams pack ./substreams.yaml
 ```
 
-from a Substreams [manifest](manifests.md).
-
 ### Dependencies
 
-When `imports` is defined in a new `substreams.yaml`, it can load modules and `Protobuf` definitions from other Substreams packages.
+When `imports` is defined in a new `substreams.yaml`, it can load modules and protobuf definitions from _other_ Substreams packages.
 
-When doing so, **local protobuf filenames will take precedence over the imported package's proto files**. Make sure, therefore, that you use different `.proto` filenames than the ones you import, to avoid conflicts. Namespacing using fully qualified paths is recommended.
+_**Note, local protobuf filenames take precedence over the imported package's proto files in this situation**._&#x20;
+
+To avoid conflicts it's important to use unique `.proto` filenames. It's also important to use namespaces with fully qualified paths. These efforts help avoid potential naming collisions.
 
 ### Where to find them
 
-There is currently no single point of reference for Substreams modules. See [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground) for now.
+See the [Substreams Playground](https://github.com/streamingfast/substreams-playground) for examples.

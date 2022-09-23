@@ -4,11 +4,11 @@ description: StreamingFast Substreams manifest reference
 
 # Manifests
 
-The Substreams Manifest, `substreams.yaml`, defines the modules composing the Substreams. The manifest is used, among other things, to define the dependencies between your module's inputs and outputs.
+The Substreams Manifest, `substreams.yaml`, defines the modules composing the Substreams. The manifest is primarily used to define the dependencies between the inputs and outputs of modules.
 
 Below is a reference guide of _all_ fields used in Substreams manifest YAML files.
 
-### `specVersion`
+### Specification Version
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -16,9 +16,9 @@ Excerpt pulled from the example Substreams manifest.
 specVersion: v0.1.0
 ```
 
-Simply use `v0.1.0` for the `specVersion` property.
+Simply use `v0.1.0` for the `specVersion` field.
 
-### `package`
+### Package
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -33,7 +33,7 @@ package:
     This is more detailed docs for this package.
 ```
 
-#### `package.name`
+#### Package Name
 
 The `package.name` field is used to identify the package. It is also used to infer the filename when the `pack` command is run (_with `substreams.yaml` used as an flag_) for the Substreams package.
 
@@ -42,19 +42,19 @@ The `package.name` field is used to identify the package. It is also used to inf
   * Separate words with `_`
   * Starts with `a-z` or `A-Z` and can contain numbers thereafter
 
-#### `package.version`
+#### Package Version
 
 The `package.version` field identifies the package revision. Note, `package.version` _must_ respect [Semantic Versioning version 2.0](https://semver.org/)
 
-#### `package.url`
+#### Package URL
 
 The `package.url` field helps users discover the source of the package.
 
-#### `package.doc`
+#### Package Doc
 
 The `package.doc` field holds the documentation string of the package. The first line is a short description. Longer documentation follows a blank line.
 
-### `imports`
+### Imports
 
 The `imports` section imports modules with their WASM code, all of their (compiled) protobuf definitions and modules definition. The imported modules can be referred to by the _key_ later in the `modules` section.
 
@@ -71,7 +71,7 @@ The _value_ should be a pointer to either a YAML manifest for Substreams Modules
 
 The filename can be an absolute, relative (to the location of the `.yaml` file), or remote path as long as it starts with `http://` or `https://`.
 
-### `protobuf`
+### Protobuf
 
 The `protobuf` section points to the definitions used by the modules.
 
@@ -96,9 +96,9 @@ They are packaged with the modules to help clients decode the incoming streams, 
 
 Refer to [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
-### `binaries`
+### Binaries
 
-The `binaries` property specifies the binary code to use when executing modules.&#x20;
+The `binaries` field specifies the binary code to use when executing modules.&#x20;
 
 The field `modules[].binary` has a default value of `default`.&#x20;
 
@@ -130,7 +130,7 @@ The path pointing to a local compiled [WASM module](https://webassembly.github.i
 
 This file will be picked up and packaged into an `.spkg` when invoking the Substreams `pack` and `run` commands.
 
-### `modules`
+### Modules
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -156,7 +156,7 @@ Excerpt pulled from the example Substreams manifest.
 
 #### `modules[].name`
 
-The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. These are the same rules used for the `package.name` property.
+The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply for the `package.name` field.
 
 It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Each package should have a unique name.
 
@@ -165,7 +165,7 @@ This `name` also corresponds to the **Rust function name** that will be invoked 
 {% endhint %}
 
 {% hint style="success" %}
-When importing another package, all module names will be prefixed with the package's name and a colon. This ensures that there will be no name clashes across multiple imported packages and nearly names can be safely used.
+When importing another package, all module names will be prefixed with the package's name and a colon. This ensures that there will be no name clashes across multiple imported packages and nearly any names can be safely used.
 {% endhint %}
 
 #### `modules[].initialBlock`
@@ -183,7 +183,7 @@ There are two module types associated with `modules[].kind` as indicated below.
 * `map`
 * `store`
 
-`modules[].updatePolicy`
+#### `modules[].updatePolicy`
 
 Valid only for `kind: store`.
 

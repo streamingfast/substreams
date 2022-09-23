@@ -71,7 +71,7 @@ Ordinals _must be set_ each time a key is set and keys can _only be set in incre
 
 For instances that require only a single key per block and ordering in the store isn't important the ordinal can simply use a zero value.
 
-### Store Modules
+### Store Modes
 
 Data can be consumed in one of two modes when declaring a `store` as an input to a module.
 

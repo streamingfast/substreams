@@ -4,13 +4,7 @@ description: Running StreamingFast Substreams for the first time
 
 # Running Substreams
 
-Substreams is ready to use after downloading, installing, and configuring the [required dependencies](installation-requirements.md). The very last step is to run the Substreams build.
-
-```
-cargo build --target wasm32-unknown-unknown --release
-```
-
-After a successful build Substreams can be started with the following command.
+After a successful build Substreams can be started with the following command, explained in greater detail below.
 
 ```
 substreams run -e api-dev.streamingfast.io:443 \

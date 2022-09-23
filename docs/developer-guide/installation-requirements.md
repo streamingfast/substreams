@@ -40,7 +40,9 @@ source $HOME/.cargo/env # to configure your current shell
 
 Buf simplifies the generation of typed structures in any language.
 
-Buf invokes `protoc` and makes working with Substreams easier. Substreams packages are compatible with [Buf images](https://docs.buf.build/reference/images).
+Buf invokes `protoc` and simplifies the process of working with Substreams.&#x20;
+
+_Note, Substreams packages are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
 
 Visit the [Buf website](https://buf.build/) for additional information and Buf [installation instructions](https://docs.buf.build/installation).
 

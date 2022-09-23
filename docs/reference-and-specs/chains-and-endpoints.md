@@ -9,7 +9,7 @@ For example, it is not possible to stream an `sf.near.type.v1.Block` from an Eth
 {% endhint %}
 
 {% hint style="info" %}
-Unless otherwise noted, those endpoints are [authenticated](authentication.md).
+Unless otherwise noted, those endpoints need to be [authenticated](authentication.md).
 {% endhint %}
 
 | Protocol     | Reference                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |

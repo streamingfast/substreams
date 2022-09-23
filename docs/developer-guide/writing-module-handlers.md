@@ -196,27 +196,55 @@ fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 }
 ```
 
-The `store` will always take itself as its own **last input**. In this example the `store` module has an `updatePolicy: add` and a `valueType: int64` this yields a writable store of type `StoreAddInt64`.
+_Note, the `store` will always receive itself as its own last input._&#x20;
+
+In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
 
 {% hint style="info" %}
 **Store Types**
 
-The last parameter of a `store` module function should always be the writable store itself.&#x20;
+The last parameter of a `store` module function should always be the writable store _itself_.&#x20;
 
 The type of the writable store is based on the `store` module `updatePolicy` and `valueType`.&#x20;
 {% endhint %}
 
-The goal of the `store` in this example is to track a holder's current NFT count for the given contract. This can be achieved by analyzing the transfers.
+The goal of the `store` in this example is to track a holder's current NFT count for the contract supplied. This tracking is achieved through the analyzation of transfers.
 
-* if the transfer's `from` address field is the null address (`0x0000000000000000000000000000000000000000`) and the `to` address field is not the null address the `to` address field is minting a token the count should be incremented.
-* if the transfer's `from` address field is not the null address and the `to` address field is the null address, we know the `from` address field is burning a token, and the count should be decremented.
-* If the `from` address field and the `to` address field is not a null address, the count should be decremented of the `from` address and increment the count of the `to` address for a basic transfers.
+**Transfer in Detail**
 
-When writing to a store, there are three concepts to consider:
+If the transfer's `from` address field contains the null address (`0x0000000000000000000000000000000000000000`), and the `to` address field is not the null address, the `to` address field is minting a token, so the count should be incremented.
 
-1. `ordinal`: this represents the order in which your `store` operations will be applied. Consider the following: your `store` handler will be called once per `block`- during that execution it may call the `add` operation multiple times, for multiple reasons (found a relevant event, saw a call that triggered a method call). Since a blockchain execution model is linear and deterministic, we need to make sure we can apply your `add` operations linearly and deterministically. By having to specify an ordinal, we can guarantee the order of execution. In other words, given one execution of your `store` handler for given inputs (in this example a list of transfers), your code should emit the same number of `add` calls with the same ordinal values.
-2. `key`: Since our stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database), we need to take care in crafting the key, to ensure that it is unique and flexible. In our example, if the `generate_key` function would simply return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders. If the `generate_key` function would return a key that is only the holder's address, though it would be unique amongst holders, we would run into issues if we wanted to track multiple contracts.
-3. `value`: The value we are storing, the type is dependant on the store type we are using.
+If the transfer's `from` address field is not the null address, _and_ the `to` address field is the null address, the `from` address field is burning a token, so the count should be decremented.
+
+If the `from` address field and the `to` address field is not a null address, the count should be decremented of the `from` address, and increment the count of the `to` address for basic transfers.
+
+### Store Concepts
+
+When writing to a store, there are three concepts to consider that include `ordinal`, `key` and `value`. Additional information for each is provided below.
+
+#### Ordinal
+
+Ordinal represents the order in which the `store` operations will be applied.&#x20;
+
+The `store` handler will be called once per `block.`&#x20;
+
+During execution it may call the `add` operation multiple times, for multiple reasons such as the finding a relevant event, seeing a call that triggered a method call, etc.&#x20;
+
+Since a blockchain execution model is linear and deterministic, we need to make sure we can apply `add` operations linearly and deterministically.&#x20;
+
+When an ordinal is specified the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in this example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
+
+#### Key
+
+Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.&#x20;
+
+In the example, if the `generate_key` function would simply return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders.&#x20;
+
+If the `generate_key` function returned a key containing only the holder's address it would be unique amongst holders. Issues would be encountered however when attempting to track multiple contracts.
+
+#### Value
+
+The value being stored. The type is dependent on the store type being used.
 
 ```rust
 /// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
@@ -247,8 +275,14 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 ### Summary
 
-We have created both of our handler functions, one for extracting transfers that are of interest to us, and a second to store the token count per recipient. At this point you should be able to build your Substreams.
+Both handler functions have been written.&#x20;
+
+One handler function for extracting transfers that are of interest, and a second to store the token count per recipient.&#x20;
+
+Build Substreams to continue the setup process.&#x20;
 
 ```
 cargo build --target wasm32-unknown-unknown --release
 ```
+
+The next step is to run Substreams with all of the changes made and code that's been generated.

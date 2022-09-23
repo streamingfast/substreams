@@ -4,7 +4,9 @@ description: StreamingFast Substreams packages reference
 
 # Packages
 
-A Substreams _package_ is a **single file** containing all dependencies, `Protobuf` definitions (as FileDescriptors), compiled WASM code, and the modules tree specifications. They allow you to start streaming right away!
+A Substreams _package_ is a **single file** containing all dependencies, `Protobuf` definitions (as FileDescriptors), compiled WASM code, and the modules tree specifications.&#x20;
+
+Packages allow developers to begin streaming immediately!
 
 The standard file extension for a Substreams package is `.spkg`.
 

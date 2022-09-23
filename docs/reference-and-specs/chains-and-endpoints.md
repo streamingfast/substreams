@@ -4,7 +4,7 @@ description: StreamingFast Substreams chains and endpoints
 
 # Chains & Endpoints
 
-Protobuf definitions and public endpoints are provided for each of the supported protocols and chains below.
+Protobuf definitions and public endpoints are provided for each of the supported protocols and chains below. _Note, endpoints need to be_ [_authenticated_](authentication.md)_, unless indicated otherwise._
 
 ### Ethereum
 
@@ -58,7 +58,7 @@ _None available at this time._
 
 #### Protobuf definition
 
-[`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)
+[`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)``
 
 #### Endpoints
 
@@ -68,7 +68,7 @@ Mainnet: mainnet.arweave.streamingfast.io:443
 
 #### Protobuf definition
 
-[`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto)
+``[`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto)``
 
 #### Endpoints
 
@@ -76,10 +76,8 @@ Testnet: testnet.aptos.streamingfast.io:443
 
 Also see the [Firehose _s_chemas documentation](https://firehose.streamingfast.io/references/protobuf-schemas) for what could be made available through Substreams.
 
-{% hint style="info" %}
+### Block Versioning
+
 Each endpoint only serves Substreams that source from the corresponding _Block Message Name_ in its [`source:` field](manifests.md#modules-.inputs).
 
 For example, it is not possible to stream an `sf.near.type.v1.Block` from an Ethereum endpoint.
-{% endhint %}
-
-_Note, endpoints need to be_ [_authenticated_](authentication.md)_, unless indicated otherwise._

@@ -2,7 +2,7 @@
 description: StreamingFast Substreams dependency installation
 ---
 
-# Installing Dependencies
+# Dependency Installation
 
 ### Dependencies Overview
 
@@ -44,13 +44,15 @@ Buf invokes `protoc` and makes working with Substreams easier. Substreams packag
 
 Visit the [Buf website](https://buf.build/) for additional information and Buf [installation instructions](https://docs.buf.build/installation).
 
-For macOS users simply use Homebrew to install Buf.
+macOS users can simply install Buf with Homebrew.
 
 ```bash
 brew install bufbuild/buf/buf
 ```
 
-If the machine is set up is running macOS feel free to continue to [install `protoc-gen-prost`](installation-requirements.md#protoc-gen-prost). Linux users have a few additional dependencies left to install.
+macOS users can continue to [install `protoc-gen-prost`](installation-requirements.md#protoc-gen-prost).&#x20;
+
+Linux users have a few additional dependencies to install.
 
 ### Linux Specific Tools Installation
 

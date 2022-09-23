@@ -6,18 +6,18 @@ description: StreamingFast Substreams developer guide overview
 
 ### Developer Guide
 
-This guide explains the process of building a Substream that tracks the ERC721 holder count for a given contract.
+The Substreams Developer Guide explains the process of building a Substream that tracks the ERC721 holder count for a given contract.
 
 The Substreams developer guide is broken down into the following sections.
 
-[Installation](installation-requirements.md): Install all the dependencies and set up the environment to create the first Substream.
+Install the dependencies and set up the environment to work with Substreams in [Dependency Installation](installation-requirements.md).
 
-[Creating a Manifest](creating-your-manifest.md): Setup the first `substreams.yaml` which provides a high-level overview of the project.
+Create the manifest needed for defining locations and files required for running Substreams in [Manifest Creation](creating-your-manifest.md).
 
-[Creating Protobuf Schemas](creating-protobuf-schemas.md): Write the first Protobuf schema that will be used in the handlers.
+Write the protobuf schemas that will be used in conjunction with the module handlers in [Protobuf Schemas](creating-protobuf-schemas.md).
 
-[Writing Module Handlers](writing-module-handlers.md): Write the first module handler.
+Write the module handlers in [Writing Module Handlers](writing-module-handlers.md).
 
-[Running Substreams](running-substreams.md): Run the newly written Substreams
+Run the newly written Substreams in [Running Substreams](running-substreams.md).
 
-The accompanying [Substreams template repository](https://github.com/streamingfast/substreams-template) is located on Github.&#x20;
+Find the accompanying Substreams template source code[ ](https://github.com/streamingfast/substreams-template)conveniently located its [official Github repository](https://github.com/streamingfast/substreams-template).&#x20;

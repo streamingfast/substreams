@@ -30,7 +30,7 @@
 
 ## Reference & Specs
 
-* [Protocols](reference-and-specs/protocols.md)
+* [Chains & Endpoints](reference-and-specs/chains-and-endpoints.md)
 * [Manifests](reference-and-specs/manifests.md)
 * [Packages](reference-and-specs/packages.md)
 * [Using the CLI](reference-and-specs/using-the-cli.md)

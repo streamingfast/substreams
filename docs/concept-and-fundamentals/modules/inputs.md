@@ -13,7 +13,7 @@ Modules come in two varieties: `map` and `store` and can define one or multiple 
 An Input of type `source` represents a chain-specific, firehose-provisioned protobuf object.
 
 {% hint style="info" %}
-See the list of [supported Protocols here](../../reference-and-specs/protocols.md) and their corresponding message type.
+See the list of [supported Protocols here](../../reference-and-specs/chains-and-endpoints.md) and their corresponding message type.
 {% endhint %}
 
 For example, Substreams on Ethereum would specify `sf.ethereum.type.v2.Block.`

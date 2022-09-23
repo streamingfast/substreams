@@ -48,7 +48,7 @@ To ensure successful and proper parallelization store modules are not permitted 
 
 Stores that declare their own data types will have methods exposed that are able to mutate the store's keys.
 
-The two important properties that exist stores are `valueType,`and `updatePolicy`.
+The two important store properties are `valueType,`and `updatePolicy`.
 
 #### `valueType` Property
 
@@ -88,44 +88,41 @@ The _complete_ store will be represented as if processing had been done linearly
 {% endhint %}
 
 {% hint style="warning" %}
-To preserve the parallelization capabilities of the system, Substreams can never _read_ what it has written, nor read from a store that is currently being written to.
+To preserve the parallelization capabilities of the system Substreams can never _read_ what it has written or read from a store that is currently being written.
 
-To read from a store, create a downstream module with one of its inputs pointing to the store's output.
+To read from a store a downstream module is created with one of its inputs pointing to the store module's output.
 {% endhint %}
 
 #### Ordinals
 
 Ordinals allow a key/value store to have multiple versions of a key within a single block. The store APIs contain different methods of `ordinal` or `ord`.
 
-The price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B and between B and D.&#x20;
+For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
-Oridinals must be set each time a key is set.
+Ordinals _must be set_ each time a key is set and keys can _only be set in increasing ordinal order_, or with an ordinal equal to the previous.
 
-{% hint style="warning" %}
-Keys can only be set in increasing _ordinal_ order, or with an _ordinal_ equal to the previous.
-{% endhint %}
-
-For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value; the numeric 0.
+For instances that require only a single key per block and ordering in the store isn't important the ordinal can simply use a zero value.
 
 ### Store Modules
 
-When declaring a `store` as an input to a module data can be consumed in one of two modes.
+Data can be consumed in one of two modes when declaring a `store` as an input to a module.
 
-* `get`
-* `deltas`
+#### `get Mode`
 
-#### `get`
+Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed; readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
 
-`Get` provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed, readily queried by methods such as `get_at`, `get_last` and `get_first.` _Note, lookups are local, in-memory, and very fast._
+_Note, lookups are local, in-memory, and extremely fast._
 
 {% hint style="info" %}
-The fastest is `get_last` as it queries the store directly. `get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+`get_last` is the fastest because it queries the store directly.&#x20;
+
+`get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
 
 `get_at` will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
 {% endhint %}
 
-#### `deltas`
+#### `deltas Mode`
 
-`Deltas` provide the module with all the _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys that were mutated during that block become available.
+Deltas mode provides the module with _all_ _the_ _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys mutated during that specific block become available.
 
-When a store is set as an input to your module, it is read-only and cannot be modified, updated, or mutated in any way.
+_Note, when a store is set as an input to the module, it is read-only and cannot be modified, updated, or mutated in any way._

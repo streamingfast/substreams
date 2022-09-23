@@ -9,6 +9,7 @@
 * [Definition](concepts/definition.md)
 * [Comparison](concepts/comparison.md)
 * [Modules](concepts/modules.md)
+  * [Module Types](concept-and-fundamentals/modules/module-types.md)
   * [Inputs](concept-and-fundamentals/modules/inputs.md)
   * [Outputs](concept-and-fundamentals/modules/outputs.md)
 

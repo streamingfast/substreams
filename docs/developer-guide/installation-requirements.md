@@ -23,7 +23,7 @@ Substreams can be installed locally or in the cloud using Gitpod. Gitpod [instal
 
 ### CLI Installation
 
-The Substreams CLI is required. Follow the steps outlined on the [installation page](../getting-started/installing-the-cli.md) for further information before proceeding.
+The CLI is essentially the user interface for working with Substreams and is required.  Follow the steps outlined on the [installation page](../getting-started/installing-the-cli.md) for further information before proceeding.
 
 ### Rust Installation
 

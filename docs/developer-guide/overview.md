@@ -16,4 +16,4 @@ The Substreams developer guide is broken down into the following sections.
 * [Writing Module Handlers](writing-module-handlers.md)
 * [Running Substreams](running-substreams.md)
 
-Find the accompanying Substreams template source code[ ](https://github.com/streamingfast/substreams-template)conveniently located its [official Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+Find the accompanying Substreams template source code[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Github repository](https://github.com/streamingfast/substreams-template).&#x20;

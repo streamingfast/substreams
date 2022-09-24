@@ -12,7 +12,7 @@ An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will g
 
 ### Obtain API key
 
-The API key is required for obtaining an authentication token. Register for an authentication key at [app.dfuse.io](https://app.dfuse.io/).&#x20;
+The API key is required for obtaining an authentication token. Register for authentication key at [app.dfuse.io](https://app.dfuse.io/).&#x20;
 
 _Note, StreamingFast was previously known as **** dfuse._
 
@@ -20,9 +20,9 @@ The StreamingFast team is generally available on [Discord](https://discord.gg/jZ
 
 ### Request Authentication Token
 
-An authentication token must be requested after successfully obtaining the API key.
+An authentication token must be requested after successfully obtaining the API key
 
-Use the following command to request the authentication token using the StreamingFast API key.
+Issue the following command to request the authentication token using the StreamingFast API key.
 
 ```bash
 curl https://auth.dfuse.io/v1/auth/issue -s \

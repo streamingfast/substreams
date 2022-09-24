@@ -20,9 +20,9 @@ The StreamingFast team is generally available on [Discord](https://discord.gg/jZ
 
 ### Request Authentication Token
 
-An authentication token must be requested after successfully obtaining the API key
+An authentication token must be requested after successfully obtaining the API key.
 
-Issue the following command to request the authentication token using the StreamingFast API key.
+Use the following command to request the authentication token using the StreamingFast API key.
 
 ```bash
 curl https://auth.dfuse.io/v1/auth/issue -s \

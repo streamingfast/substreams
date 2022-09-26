@@ -32,6 +32,6 @@ Modules can also take in multiple inputs as seen in the `counters` store example
 Modules with multiple inputs diagram
 {% endembed %}
 
-All of the modules are executed as a directed acyclic graph (DAG) each time a new `Block` is processed.
+All of the modules are executed as a directed acrylic graph (DAG) each time a new `Block` is processed.
 
 _Note, The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution._

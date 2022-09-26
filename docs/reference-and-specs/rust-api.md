@@ -22,3 +22,5 @@ Any third-party library capable of compiling `wasm32` can be used for execution 
 Many libraries compile kernel `syscalls`, or other operations, which are not available within the Substreams execution environment and will not successfully compile to `wasm32` targets.
 
 The [`tiny_keccak` crate](https://docs.rs/tiny-keccak) is full of useful tools to assist developers working with Substreams and WASM.
+
+tiny\_keccak is an implementation of Keccak derived functions specified in FIPS-202, SP800-185 and KangarooTwelve.

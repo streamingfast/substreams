@@ -6,7 +6,7 @@ description: Definition of StreamingFast Substreams
 
 ### What is Substreams?
 
-Substreams is an exceptionally powerful processing engine that consumes streams of rich blockchain data that can be refined and shaped for painless digestion by end-user applications, such as decentralized exchanges.
+Substreams is an exceptionally powerful processing engine capable of consuming streams of rich blockchain data. Substreams refines and shapes the data for painless digestion by end-user applications, such as decentralized exchanges.
 
 ### Benefits of Substreams
 

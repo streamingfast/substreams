@@ -22,6 +22,8 @@ Substreams was inspired by traditional large-scale data systems now _fused_ with
 
 Substreams are defined in modules written in the Rust programming language and utilize Google Protocol Buffer technology.
 
+Substreams results in reduced reliance on archive nodes!
+
 More detailed aspects of what Substreams is, and can do, in contrast to what it's not, and can't do, is helpful to gain an even deeper context of the product.
 
 #### _Substreams **is:**_

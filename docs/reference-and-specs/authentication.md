@@ -39,9 +39,11 @@ export SUBSTREAMS_API_TOKEN="your_token"
 By default the `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token.
 
 {% hint style="info" %}
-**Authentication Token Env Flag**
+_Note:_
 
-You can change the default behavior of the `substreams run` command and specify your own ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar`
+_**Authentication Token Env Flag**_
+
+_The default behavior of the `substreams run` command can use a custom ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar.`_
 {% endhint %}
 
 ### Environment Variable Script

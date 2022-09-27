@@ -1,14 +1,22 @@
+---
+description: StreamingFast Substreams command line interface (CLI)
+---
+
 # Using the CLI
 
-Here are the commands you can invoke with the Substreams command-line tool.
+The Substreams command line interface (CLI) is the user interface and central access point for working with Substreams.
+
+The Substreams CLI exposes many commands to developers enabling a range of functionality.&#x20;
+
+Each command is explained in further detail.
 
 {% hint style="info" %}
-In the commands below, any time a package is specified, you can use either a local `substreams.yaml` file, a local `.spkg` or a remote `.spkg` url.
+_Note: any time a package is specified, you can use either a local `substreams.yaml` file, a local `.spkg` or a remote `.spkg` url._
 {% endhint %}
 
 ### **`run`**
 
-The `run` command allows you connect to a Substreams endpoint and start processing data.
+The `run` command connects to a Substreams endpoint and begins processing data.
 
 ```
 substreams run -e api-dev.streamingfast.io:443 \
@@ -17,10 +25,10 @@ substreams run -e api-dev.streamingfast.io:443 \
    module_name
 ```
 
-Let's break down everything happening above.
+#### Run Command Breakdown
 
 * `-e api-dev.streamingfast.io:443` is the endpoint of the provider running our Substreams
-* `-t +1`  (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
+* `-t +1` (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
@@ -65,9 +73,9 @@ Successfully wrote "your-package-v0.1.0.spkg".
 
 ### `info`
 
-This command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
+The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
 
-Example:
+For example:
 
 ```bash
 $ substreams info ./substreams.yaml
@@ -91,18 +99,17 @@ Kind: store
 Value Type: proto:solana.spl.v1.TokenTransfers
 Update Policy: UPDATE_POLICY_SET
 Hash: 11fd70768029bebce3741b051c15191d099d2436
-
 ```
 
 ### `graph`
 
-This command prints out a graph of the package in the _mermaid-js_ format.
+The `graph` command prints out a visual graph of the package in the _mermaid-js_ format.
 
 {% hint style="info" %}
-See [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor
+_Note: see_ [_https://mermaid.live/_](https://mermaid.live/) _for a live mermaid-js editor._
 {% endhint %}
 
-Example:
+For example:
 
 ````bash
 $ substreams graph ./substreams.yaml                         [±master ●●]
@@ -117,7 +124,7 @@ graph TD;
 ```
 ````
 
-This produces a graph like:
+Producing a graph like:
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
 Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to edit mode.
@@ -125,9 +132,7 @@ Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to 
 
 ### `inspect`
 
-This command goes deep into the file structure of a package (`yaml` or `spkg`). Used mostly for debugging or for the curious ;)
-
-Example:
+This command goes deep into the file structure of a package (`yaml` or `spkg`). The `inspect` command is used mostly for debugging, _or for the curious ;)_
 
 ```
 $ substreams inspect ./substreams.yaml | less

@@ -13,10 +13,10 @@ Modules come in two varieties: `map` and `store` and can define one or multiple 
 An Input of type `source` represents a chain-specific, firehose-provisioned protobuf object.
 
 {% hint style="info" %}
-See the list of [supported Protocols here](../../reference-and-specs/chains-and-endpoints.md) and their corresponding message type.
+Note: Find the supported protocols and their corresponding message types in the [Chains & Inputs documentation](../../reference-and-specs/chains-and-endpoints.md).
 {% endhint %}
 
-For example, Substreams on Ethereum would specify `sf.ethereum.type.v2.Block.`
+To illustrate, Substreams on Ethereum would specify `sf.ethereum.type.v2.Block.`
 
 ```yaml
   inputs:
@@ -28,8 +28,6 @@ Another `source` type available on any chains is the `sf.substreams.v1.Clock` ob
 #### `Map`
 
 An Input of type `map` represents the output of another `map` module. The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module. _Note, map modules cannot depend on themselves._
-
-Example:
 
 ```yaml
   inputs:
@@ -62,10 +60,10 @@ Get mode provides a key/value store that is guaranteed to be synced up to the bl
 Delta mode provides a protobuf object containing all the changes that occurred in the `store` module in the same block.
 
 {% hint style="warning" %}
-Here are some constraints on stores:
+Constraints for stores:
 
 * Stores received as `inputs` are read-only.
 * A `store` cannot depend on itself!
 {% endhint %}
 
-Find additional information about `stores` in the [modules documentation](../../concepts/modules.md#the-store-module-type).
+Find additional information for `stores` in the main [Modules documentation](../../concepts/modules.md#the-store-module-type).

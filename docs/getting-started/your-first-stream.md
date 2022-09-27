@@ -20,7 +20,9 @@ Once the StreamingFast authentication token has been attained and the Substreams
 substreams run -e api-dev.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
 
-A full explanation for the Substreams run command is provided in the Using the CLI documentation.
+{% hint style="info" %}
+Note: A full explanation for the Substreams run command is provided in the [Using the CLI documentation](../reference-and-specs/using-the-cli.md).
+{% endhint %}
 
 ### Explanation
 

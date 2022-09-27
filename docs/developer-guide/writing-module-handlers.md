@@ -4,7 +4,7 @@ description: StreamingFast Substreams module handler creation
 
 # Module Handler Creation
 
-After the ABI and `Protobuf` Rust code generated the handler code needs to be written. The code should be saved into the `src` directory and use the filename `lib.rs.`
+After the ABI and `Protobuf` Rust code has been generated the handler code needs to be written. The code should be saved into the `src` directory and use the filename `lib.rs.`
 
 {% code title="src/lib.rs" %}
 ```rust

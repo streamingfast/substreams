@@ -125,11 +125,11 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 {% hint style="info" %}
 _Note:_
 
-**Rust Macros**
+_**Rust Macros**_
 
-Notice the `#[substreams::handlers::map]` above the function, this is a [rust macro](https://doc.rust-lang.org/book/ch19-06-macros.html) that is provided by the `substreams` crate. This macro decorates our handler function as a `map`. There is also a macro used to decorate the handler of kind `store`:
+_Notice the #\[substreams::handlers::map] above the function, this is a rust macro that is provided by the substreams crate. This macro decorates our handler function as a map. There is also a macro used to decorate the handler of kind store:_
 
-`#[substreams::handlers::store]`
+_#\[substreams::handlers::store]_
 {% endhint %}
 
 The goal of the `map` being built is to extract `ERC721` transfers from a given block.&#x20;
@@ -186,7 +186,9 @@ Now define the `store` module. As a reminder, here is the module definition from
       - map: block_to_transfers
 ```
 
-Notice `name: nft_state,` it will also correspond to the handler function name.
+{% hint style="info" %}
+_Note: `name: nft_state` will also correspond to the handler function name._
+{% endhint %}
 
 One input had been defined. The input corresponds to the output of the `block_to_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code. Resulting in the following function signature.
 
@@ -198,7 +200,9 @@ fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 }
 ```
 
+{% hint style="info" %}
 _Note, the `store` will always receive itself as its own last input._&#x20;
+{% endhint %}
 
 In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
 
@@ -232,9 +236,9 @@ Ordinal represents the order in which the `store` operations will be applied.&#x
 
 The `store` handler will be called once per `block.`&#x20;
 
-During execution it may call the `add` operation multiple times, for multiple reasons such as the finding a relevant event, seeing a call that triggered a method call, etc.&#x20;
+During execution, the `add` operation may be called multiple times, for multiple reasons, such as finding a relevant event or seeing a call that triggered a method call.&#x20;
 
-Since a blockchain execution model is linear and deterministic, we need to make sure we can apply `add` operations linearly and deterministically.&#x20;
+Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 
 When an ordinal is specified the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in this example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
 
@@ -289,4 +293,4 @@ Build Substreams to continue the setup process.&#x20;
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-The next step is to run Substreams with all of the changes made and code that's been generated.
+The next step is to run Substreams with all of the changes made using the code that's been generated.

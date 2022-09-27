@@ -6,12 +6,10 @@ description: StreamingFast Substreams command line interface (CLI)
 
 The Substreams command line interface (CLI) is the user interface and central access point for working with Substreams.
 
-The Substreams CLI exposes many commands to developers enabling a range of functionality.&#x20;
-
-Each command is explained in further detail.
+The Substreams CLI exposes many commands to developers enabling a range of functionality. Each command is explained in further detail.
 
 {% hint style="info" %}
-_Note: any time a package is specified, you can use either a local `substreams.yaml` file, a local `.spkg` or a remote `.spkg` url._
+_Note: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL._
 {% endhint %}
 
 ### **`run`**
@@ -34,7 +32,7 @@ substreams run -e api-dev.streamingfast.io:443 \
 
 Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
 
-Here is the example of an output of the `gravatar_updates` starting at block 6200807:
+Example output of `gravatar_updates` starting at block 6200807.
 
 ```
 $ substreams run -e api-dev.streamingfast.io:443 \
@@ -63,8 +61,6 @@ Notice the `-o` (or `--output`), that can alter the output format. The options a
 
 The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file.
 
-Use:
-
 ```bash
 $ substreams pack ./substreams.yaml
 ...
@@ -74,8 +70,6 @@ Successfully wrote "your-package-v0.1.0.spkg".
 ### `info`
 
 The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
-
-For example:
 
 ```bash
 $ substreams info ./substreams.yaml
@@ -109,8 +103,6 @@ The `graph` command prints out a visual graph of the package in the _mermaid-js_
 _Note: see_ [_https://mermaid.live/_](https://mermaid.live/) _for a live mermaid-js editor._
 {% endhint %}
 
-For example:
-
 ````bash
 $ substreams graph ./substreams.yaml                         [±master ●●]
 Mermaid graph:
@@ -124,7 +116,7 @@ graph TD;
 ```
 ````
 
-Producing a graph like:
+The code will  a graphic similar to&#x20;
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
 Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to edit mode.

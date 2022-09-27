@@ -4,7 +4,7 @@ description: StreamingFast Substreams authentication reference
 
 # Authentication
 
-### How to Get Authenticated
+### Substreams Authentication
 
 A StreamingFast authentication token is required for connecting to the Substreams server.
 

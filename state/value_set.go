@@ -67,20 +67,24 @@ func (s *Store) set(ord uint64, key string, value []byte) {
 }
 
 func (s *Store) setIfNotExists(ord uint64, key string, value []byte) {
-	s.bumpOrdinal(ord)
-
 	_, found := s.GetLast(key)
 	if found {
 		return
 	}
+
+	s.bumpOrdinal(ord)
+
+	cpValue := make([]byte, len(value))
+	copy(cpValue, value)
 
 	delta := &pbsubstreams.StoreDelta{
 		Operation: pbsubstreams.StoreDelta_CREATE,
 		Ordinal:   ord,
 		Key:       key,
 		OldValue:  nil,
-		NewValue:  value,
+		NewValue:  cpValue,
 	}
+
 	s.ApplyDelta(delta)
 	s.Deltas = append(s.Deltas, delta)
 }

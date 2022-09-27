@@ -60,7 +60,7 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 	saveInterval := mustGetUint64(cmd, "save-interval")
 	startBlock := outputs.ComputeStartBlock(blockNumber, saveInterval)
 
-	store, _, err := dstore.NewStoreFromURL(storeUrl)
+	store, err := dstore.NewSimpleStore(storeUrl)
 	if err != nil {
 		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
 	}
@@ -154,7 +154,7 @@ func runDecodeStore(cmd *cobra.Command, args []string) error {
 	saveInterval := mustGetUint64(cmd, "save-interval")
 	startBlock := outputs.ComputeStartBlock(blockNumber, saveInterval)
 
-	store, _, err := dstore.NewStoreFromURL(storeUrl)
+	store, err := dstore.NewSimpleStore(storeUrl)
 	if err != nil {
 		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
 	}

@@ -76,6 +76,8 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 ### **Module Handler Breakdown**
 
+Each logical section of the `lib.rs` file is outlined and described in greater detail below.
+
 Import the necessary modules.
 
 ```rust

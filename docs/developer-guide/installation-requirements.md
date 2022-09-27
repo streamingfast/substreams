@@ -27,7 +27,7 @@ The CLI is essentially the user interface for working with Substreams and is req
 
 ### Rust Installation
 
-Substreams is written in the [Rust programming language](https://www.rust-lang.org/). Working with Substreams requires a working Rust installation.
+Substreams modules are written in the [Rust programming language](https://www.rust-lang.org/). Working with Substreams requires a working Rust installation.
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of simplicity using `curl` from the terminal is the quickest and easiest.
 
@@ -44,7 +44,7 @@ Buf invokes `protoc` and simplifies the process of working with Substreams. Visi
 
 _Note, Substreams packages are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
 
-macOS users can simply install Buf with Homebrew.
+macOS users can simply install Buf using Homebrew.
 
 ```bash
 brew install bufbuild/buf/buf
@@ -71,7 +71,7 @@ apt install cmake build-essential
 
 ### `protoc-gen-prost`
 
-Once `cmake` and `build-essential` are properly installed, the `protoc-gen-prost` crate can be used to generate protobuf files.
+The `protoc-gen-prost` crate is used to generate protobuf files. Install `protoc-gen-prost` using `cargo` with the following command.
 
 ```
 cargo install protoc-gen-prost

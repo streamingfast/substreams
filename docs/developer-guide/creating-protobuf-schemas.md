@@ -8,7 +8,9 @@ description: StreamingFast Substreams protobuf schemas
 
 After creating the Substreams manifest a custom protobuf needs to be defined in the manifest file. The protobuf is used for defining input and output.
 
-Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data. They are like XML, but smaller, faster, and simpler. Find additional information regarding Protocol Buffers on the Google website.
+{% hint style="success" %}
+_Tip: Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data. They are like XML, but smaller, faster, and simpler. Find additional information regarding Protocol Buffers on the_ [_Google website_](https://developers.google.com/protocol-buffers)_._
+{% endhint %}
 
 #### Google Protobuf Documentation
 

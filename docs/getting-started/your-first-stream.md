@@ -6,9 +6,11 @@ description: Get streaming with StreamingFast Substreams
 
 ### Authentication
 
-Follow [these steps](../reference-and-specs/authentication.md) to obtain a StreamingFast authentication token. The token is required to connect to the Substreams server.
+A StreamingFast authentication token is required to connect to the Substreams server. Additional information is provided for [obtaining an authentication token](../reference-and-specs/authentication.md) in the references section of the documentation.
 
-_Note, make sure the Substreams CLI has_ [_been installed_](installing-the-cli.md) _before proceeding._
+{% hint style="warning" %}
+_Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to continue._
+{% endhint %}
 
 ### Run First Substream
 
@@ -18,15 +20,17 @@ Once the StreamingFast authentication token has been attained and the Substreams
 substreams run -e api-dev.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
 
+A full explanation for the Substreams run command is provided in the Using the CLI documentation.
+
 ### Explanation
 
 #### Substreams Run
 
-First, start the Substreams CLI tool passing it a `run` command.
+First, start the Substreams CLI tool using the `run` command.
 
-#### Firehose URI
+#### Endpoint
 
-The server address is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
+The endpoint is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
 `-e api-dev.streamingfast.io:443`
 
 #### Substreams Package

@@ -16,13 +16,13 @@ Take a moment to learn about [modules](concepts/modules.md) before moving on to 
 
 For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substreams users gain an understanding to provide a deeper context.
 
-{% hint style="warning" %}
-The code examples in this video are slightly outdated, please refer to the [Developer Guide](broken-reference) and to the [Reference](broken-reference) section for the latest design.
-{% endhint %}
-
 {% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
 Learn about Substreams from StreamingFast's Alex.
 {% endembed %}
+
+{% hint style="warning" %}
+Code examples in the Introduction video are slightly outdated. Please refer to the [Developer Guide](broken-reference) and [Reference](broken-reference) section of the documentation for updated information.
+{% endhint %}
 
 ### Community
 

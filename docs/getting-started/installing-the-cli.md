@@ -25,7 +25,7 @@ curl -L  $LINK  | tar zxf -
 ```
 
 {% hint style="warning" %}
-Check the [official Github repository](https://github.com/streamingfast/substreams/releases) to get the latest release available.&#x20;
+Important: Check the [official Github repository](https://github.com/streamingfast/substreams/releases) to get the latest CLI release available.&#x20;
 {% endhint %}
 
 #### Substreams Source Installation
@@ -45,4 +45,6 @@ substreams --version
 substreams version dev
 ```
 
-_Note,_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._
+{% hint style="info" %}
+_Note:_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._
+{% endhint %}

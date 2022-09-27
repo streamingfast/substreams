@@ -42,7 +42,9 @@ Buf simplifies the generation of typed structures in any language.
 
 Buf invokes `protoc` and simplifies the process of working with Substreams. Visit the [Buf website](https://buf.build/) for additional information and [installation instructions](https://docs.buf.build/installation).
 
-_Note, Substreams packages are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
+{% hint style="info" %}
+_Note: Substreams packages are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
+{% endhint %}
 
 macOS users can simply install Buf using Homebrew.
 
@@ -58,7 +60,11 @@ Linux users have a few additional dependencies to install.
 
 Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.
 
+#### CMake
+
 Visit the [Installing CMake page](https://cmake.org/install/) for further information on `cmake`.
+
+#### Build Essential
 
 Find additional information for `build-essential` on the [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
 

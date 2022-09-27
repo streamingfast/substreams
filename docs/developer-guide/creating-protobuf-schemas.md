@@ -10,15 +10,18 @@ After creating the Substreams manifest a custom protobuf needs to be defined in 
 
 {% hint style="success" %}
 _Tip: Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data. They are like XML, but smaller, faster, and simpler. Find additional information regarding Protocol Buffers on the_ [_Google website_](https://developers.google.com/protocol-buffers)_._
-{% endhint %}
 
-#### Google Protobuf Documentation
+__\
+__**Google Protobuf Documentation**
 
 [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
+
+####
 
 #### Google Protobuf Tutorial
 
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
+{% endhint %}
 
 ### Protofuf Definition
 

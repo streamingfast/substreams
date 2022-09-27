@@ -50,7 +50,7 @@ strip = "debuginfo"
 
 The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
-**Cargo.toml Breakdown**
+### **Cargo.toml Breakdown**
 
 To build the Rust dynamic system library, after the `package`, specify the following.
 

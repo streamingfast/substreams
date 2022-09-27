@@ -37,7 +37,7 @@
 * [Authentication](reference-and-specs/authentication.md)
 * [Rust APIs](reference-and-specs/rust-api.md)
 * [Advanced](advanced/README.md)
-  * [Running the Substreams service locally](advanced/running-locally.md)
+  * [Running Substreams locally](advanced/running-locally.md)
 
 ## Release notes
 

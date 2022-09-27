@@ -1,26 +1,36 @@
-# Running the Substreams service locally
+---
+description: Running the StreamingFast Substreams service locally
+---
 
-You can run the Substreams service locally this way:
+# Running Substreams locally
 
-### Get a release
+It's possible to run Substreams locally by running StreamingFast Firehose on the same machine.
 
-For Ethereum, grab a release of [the Ethereum Firehose](https://github.com/streamingfast/sf-ethereum), get a [Docker release](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum), or build from source, until you can run `sfeth`.
+### Download Firehose
+
+Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).&#x20;
+
+The full source code is available in the official [Firehose GitHub repository](https://github.com/streamingfast/firehose-ethereum).&#x20;
+
+Firehose can be built from source or installed using a [Firehose Docker release](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum).
 
 ### Get some data
 
-&#x20;Get some merged blocks to play with locally:
+The following code will instruct Firehose to generate merged blocks files to use with Substreams.
 
 ```bash
 # Downloads 2.6GB of data
-sfeth tools download-from-firehose \
+fireeth tools download-from-firehose \
   api-dev.streamingfast.io:443 \
   6810000 6820000 \
   ./localblocks
 # You can skip this one:
-sfeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
+fireeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
 
 ### Write a config file
+
+Use the following for the Firehose configuration file. Additional information is available in the [Firehose documentation](https://firehose.streamingfast.io/).&#x20;
 
 {% code title="config.yaml" %}
 ```yaml
@@ -38,24 +48,23 @@ start:
     substreams-rpc-endpoints: "$MY_SUBSTREAMS_RPC_ENDPOINT" # If using eth_calls
     substreams-sub-request-block-range-size: 100
     substreams-stores-save-interval: 100
-
 ```
 {% endcode %}
 
 ### Run the `firehose`
 
-Now run the Substreams-enabled `firehose` using the config file:
+Start Firehose and pass it the config file.
 
 ```bash
-$ sfeth start -c config.yaml
+$ fireeth start -c config.yaml
 ```
 
-### Stream against your server
+### Run Substreams with Firehose
 
-And then run the `substreams` command against your local deployment with:
+Run the `substreams` command against the Firehose deployment using the following command.
 
 ```bash
 substreams run -p -e localhost:9000  # ...
 ```
 
-Where `-p` means plaintext, to run insecurely against your unsecured local server.
+The `-p` flag indicates plaintext, running insecurely against the unsecured Firehose local server.

@@ -90,7 +90,9 @@ protobuf:
 
 The Substreams packager will load files in any of the listed `importPaths`.
 
+{% hint style="info" %}
 _Note, the `imports` section will also affect which `.proto` files end up in the package._
+{% endhint %}
 
 They are packaged with the modules to help clients decode the incoming streams, but are not sent to Substreams server in network requests.
 
@@ -102,7 +104,9 @@ The `binaries` field specifies the binary code to use when executing modules.&#x
 
 The field `modules[].binary` has a default value of `default`.&#x20;
 
+{% hint style="info" %}
 _Note, it's important to define the `default` binary._
+{% endhint %}
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -122,7 +126,9 @@ You can override which binary to use in the [`modules` section](manifests.md#und
 
 The type of code and implied VM for execution.
 
+{% hint style="info" %}
 _Note, at the time of writing, there is only one VM available and it's value is: `wasm/rust-v1`._
+{% endhint %}
 
 #### `binaries[name].file`
 
@@ -161,11 +167,11 @@ The identifier for the module, starting with a letter, followed by a maximum of 
 It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Each package should have a unique name.
 
 {% hint style="info" %}
-This `name` also corresponds to the **Rust function name** that will be invoked on the compiled WASM code upon execution. This is the same function you will define `#[substreams::handlers::map]`(or`store`) in your Rust code.
+_Note: `modules[].name` also corresponds to the **name of the Rust function** that will be invoked on the compiled WASM code upon execution. It is the same function that will be defined. `#[substreams::handlers::map]`(or`store`) in your Rust code._
 {% endhint %}
 
 {% hint style="success" %}
-When importing another package, all module names will be prefixed with the package's name and a colon. This ensures that there will be no name clashes across multiple imported packages and nearly any names can be safely used.
+_Tip: When importing another package, all module names will be prefixed with the package's name and a colon. This prefixing ensures that there will be no name clashes across multiple imported packages and nearly any names can be safely used._
 {% endhint %}
 
 #### `modules[].initialBlock`

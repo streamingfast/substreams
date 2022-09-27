@@ -123,6 +123,8 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 ```
 
 {% hint style="info" %}
+_Note:_
+
 **Rust Macros**
 
 Notice the `#[substreams::handlers::map]` above the function, this is a [rust macro](https://doc.rust-lang.org/book/ch19-06-macros.html) that is provided by the `substreams` crate. This macro decorates our handler function as a `map`. There is also a macro used to decorate the handler of kind `store`:
@@ -201,11 +203,13 @@ _Note, the `store` will always receive itself as its own last input._&#x20;
 In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
 
 {% hint style="info" %}
-**Store Types**
+_Note: ****_&#x20;
 
-The last parameter of a `store` module function should always be the writable store _itself_.&#x20;
+_**Store Types**_
 
-The type of the writable store is based on the `store` module `updatePolicy` and `valueType`.&#x20;
+_The last parameter of a `store` module function should always be the writable store itself._&#x20;
+
+_The type of the writable store is based on the `store` module `updatePolicy` and `valueType`_.&#x20;
 {% endhint %}
 
 The goal of the `store` in this example is to track a holder's current NFT count for the contract supplied. This tracking is achieved through the analyzation of transfers.

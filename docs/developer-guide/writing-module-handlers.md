@@ -201,7 +201,7 @@ fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 ```
 
 {% hint style="info" %}
-_Note, the `store` will always receive itself as its own last input._&#x20;
+_Note: the `store` will always receive itself as its own last input._&#x20;
 {% endhint %}
 
 In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.

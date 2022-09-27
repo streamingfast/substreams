@@ -25,7 +25,7 @@ curl -L  $LINK  | tar zxf -
 ```
 
 {% hint style="warning" %}
-Important: Check the [official Github repository](https://github.com/streamingfast/substreams/releases) to get the latest CLI release available.&#x20;
+_Important: Check the_ [_official Github repository_](https://github.com/streamingfast/substreams/releases) _to get the latest CLI release available._&#x20;
 {% endhint %}
 
 #### Substreams Source Installation

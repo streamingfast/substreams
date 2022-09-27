@@ -91,7 +91,7 @@ protobuf:
 The Substreams packager will load files in any of the listed `importPaths`.
 
 {% hint style="info" %}
-_Note, the `imports` section will also affect which `.proto` files end up in the package._
+_Note: the `imports` section will also affect which `.proto` files end up in the package._
 {% endhint %}
 
 They are packaged with the modules to help clients decode the incoming streams, but are not sent to Substreams server in network requests.

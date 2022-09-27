@@ -21,7 +21,7 @@ Learn about Substreams from StreamingFast's Alex.
 {% endembed %}
 
 {% hint style="warning" %}
-Code examples in the Introduction video are slightly outdated. Please refer to the [Developer Guide](broken-reference) and [Reference](broken-reference) section of the documentation for updated information.
+_Important: Code examples in the Introduction video are slightly outdated. Please refer to the_ [_Developer Guide_](broken-reference) _and_ [_Reference_](broken-reference) _section of the documentation for updated information_.
 {% endhint %}
 
 ### Community

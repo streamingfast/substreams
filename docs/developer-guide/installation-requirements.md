@@ -93,11 +93,11 @@ cargo install protoc-gen-prost
 To use Gitpod with Substreams:
 
 1. First, [copy this repository](https://github.com/streamingfast/substreams-template/generate)
-2. Grab a StreamingFast key from [https://app.dfuse.io/](https://app.dfuse.io/)
+2. Obtain a StreamingFast key from [https://app.streamingfast.io/](https://app.streamingfast.io/)
 3. Create a [Gitpod](https://gitpod.io/) account
-4. Configure a `STREAMINGFAST_KEY` variable in your [Gitpod account settings](https://gitpod.io/variables)
+4. Configure a `STREAMINGFAST_KEY` variable in the [Gitpod account settings](https://gitpod.io/variables)
 5. Open the repository copied in step 1 as a [Gitpod workspace](https://gitpod.io/workspaces).
 6. The substream template comes with a `Makefile` that makes building and running the substream easy:
    1. `make build` will rebuild the substream. Run this whenever changes have been made.
-   2. `make stream` will run the stream for a few blocks. As you make changes to your substream, you'll want to change this command to use your own substream modules and a block range more suitable to the data your indexing. Simply edit `Makefile` to do this.
+   2. `make stream` will run the stream for a few blocks. As changes are made to the Substream, change this command to use the custom substream modules and a block range more suitable to the data being indexed. Simply edit `Makefile` to do this.
 {% endhint %}

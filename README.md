@@ -14,25 +14,3 @@ Substreams is the successor of https://github.com/streamingfast/sparkle. This it
 ## Documentation
 
 Full documentation is accessible at https://substreams.streamingfast.io.
-
-### Getting Started
-
-* [Your First Stream](https://substreams.streamingfast.io/getting-started/your-first-stream)
-
-### Concept & Fundamentals
-
-* [Definition](https://substreams.streamingfast.io/concepts/definition)
-* [Comparison](https://substreams.streamingfast.io/concepts/comparison)
-* [Modules](https://substreams.streamingfast.io/concepts/modules)
-  * [Inputs](https://substreams.streamingfast.io/concept-and-fundamentals/modules/inputs)
-  * [Outputs](https://substreams.streamingfast.io/concept-and-fundamentals/modules/outputs)
-
-### Developer Guide
-
-* [Overview](https://substreams.streamingfast.io/developer-guide/overview)
-* [Installation](https://substreams.streamingfast.io/developer-guide/installation-requirements)
-* [Creating your Manifest](https://substreams.streamingfast.io/developer-guide/creating-your-manifest)
-* [Creating Protobuf Schemas](https://substreams.streamingfast.io/developer-guide/creating-protobuf-schemas)
-* [Setting Up Handlers](https://substreams.streamingfast.io/developer-guide/setting-up-handlers)
-* [Writing Module Handlers](https://substreams.streamingfast.io/developer-guide/writing-module-handlers)
-* [Running Your Substreams](https://substreams.streamingfast.io/developer-guide/running-substreams)

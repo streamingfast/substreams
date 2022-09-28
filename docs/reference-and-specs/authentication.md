@@ -14,8 +14,6 @@ An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will g
 
 The API key is required for obtaining an authentication token. Register for an authentication key at [`app.streamingfast.io`](https://app.streamingfast.io).&#x20;
 
-_Note, StreamingFast was previously known as **** dfuse._
-
 The StreamingFast team is generally available on [Discord](https://discord.gg/jZwqxJAvRs) and can assist with API key __ generation there as well.
 
 ### Request Authentication Token

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 
 	"github.com/streamingfast/dgrpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -35,6 +36,8 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 	}
 }
 
+var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
+
 func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 	if config == nil {
 		panic("substreams client config not set")
@@ -45,6 +48,10 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 	useInsecureTLSConnection := config.insecure
 
 	zlog.Info("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""), zap.Bool("plaintext", usePlainTextConnection), zap.Bool("insecure", useInsecureTLSConnection))
+
+	if !portSuffixRegex.MatchString(endpoint) {
+		return nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
+	}
 
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))

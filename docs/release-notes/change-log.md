@@ -6,7 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* moved rust modules to github.com/streamingfast/substreams-rs
+* Moved rust modules to github.com/streamingfast/substreams-rs
+
+### CLI
+
+* Endpoint's port is now validated otherwise when unspecified, it creates an infinite 'Connecting...' message that will never resolves.
 
 ## [0.0.20](https://github.com/streamingfast/substreams/releases/tag/v0.0.20)
 

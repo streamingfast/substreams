@@ -12,7 +12,7 @@ An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will g
 
 ### Obtain API key
 
-The API key is required for obtaining an authentication token. Register for an authentication key at [`auth.streamingfast.io`](http://auth.streamingfast.io/).&#x20;
+The API key is required for obtaining an authentication token. Register for an authentication key at [`app.streamingfast.io`](https://app.streamingfast.io).&#x20;
 
 _Note, StreamingFast was previously known as **** dfuse._
 

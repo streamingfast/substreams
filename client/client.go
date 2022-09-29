@@ -26,6 +26,7 @@ type SubstreamsClientConfig struct {
 	insecure  bool
 	plaintext bool
 }
+type Factory = func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error)
 
 func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plaintext bool) *SubstreamsClientConfig {
 	return &SubstreamsClientConfig{
@@ -38,9 +39,23 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 
 var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
 
+func NewFactory(config *SubstreamsClientConfig) Factory {
+	if os.Getenv("GRPC_XDS_BOOTSTRAP") == "" {
+		return func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+			return NewSubstreamsClient(config)
+		}
+	}
+
+	noop := func() error { return nil }
+	cli, _, callOpts, err := NewSubstreamsClient(config)
+	return func() (pbsubstreams.StreamClient, func() error, []grpc.CallOption, error) {
+		return cli, noop, callOpts, err
+	}
+}
+
 func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 	if config == nil {
-		panic("substreams client config not set")
+		return nil, nil, nil, fmt.Errorf("substreams client config not set")
 	}
 	endpoint := config.endpoint
 	jwt := config.jwt

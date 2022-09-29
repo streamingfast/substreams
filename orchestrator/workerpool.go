@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/client"
 	"io"
 	"sync"
 	"time"
@@ -105,14 +106,21 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func NewWorkerPool(workerCount int, grpcClient pbsubstreams.StreamClient, callOpts []grpc.CallOption) *WorkerPool {
+func NewWorkerPool(workerCount int, clientFactory client.Factory) (*WorkerPool, error) {
+	zlog.Info("creating gprc client")
+	grpcClient, closeFunc, grpcCallOpts, err := clientFactory()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+	}
+
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	tracer := otel.GetTracerProvider().Tracer("worker")
 	workers := make(chan *Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
 		workers <- &Worker{
 			grpcClient: grpcClient,
-			callOpts:   callOpts,
+			closeFunc:  closeFunc,
+			callOpts:   grpcCallOpts,
 			tracer:     tracer,
 		}
 	}
@@ -131,7 +139,7 @@ func NewWorkerPool(workerCount int, grpcClient pbsubstreams.StreamClient, callOp
 	// stats logger.
 	workerPool.jobStats.StartPeriodicLogger()
 
-	return workerPool
+	return workerPool, nil
 }
 
 func (p *WorkerPool) Borrow() *Worker {
@@ -147,6 +155,7 @@ type Worker struct {
 	grpcClient pbsubstreams.StreamClient
 	callOpts   []grpc.CallOption
 	tracer     ttrace.Tracer
+	closeFunc  func() error
 }
 
 type RetryableErr struct {
@@ -180,7 +189,12 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats *JobStats, requestM
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
 	}
 	defer func() {
-		stream.CloseSend()
+		if err := stream.CloseSend(); err != nil {
+			jobLogger.Warn("failed to close stream on job termination: %w", zap.Error(err))
+		}
+		if err := w.closeFunc(); err != nil {
+			jobLogger.Warn("failed to close grpc client on job termination: %w", zap.Error(err))
+		}
 	}()
 
 	meta, err := stream.Header()

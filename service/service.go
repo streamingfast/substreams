@@ -113,22 +113,22 @@ func New(
 	blockRangeSizeSubRequests int,
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
-) (*Service, error) {
+) (s *Service, err error) {
 	tracer := otel.GetTracerProvider().Tracer("service")
-	s := &Service{
+	s = &Service{
 		baseStateStore:            stateStore,
 		blockType:                 blockType,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		tracer:                    tracer,
 	}
+	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
+	clientFactory := client.NewFactory(substreamsClientConfig)
 
-	grpcClient, _, grpcCallOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+	s.workerPool, err = orchestrator.NewWorkerPool(parallelSubRequests, clientFactory)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+		return nil, fmt.Errorf("failed to create worker pool: %w", err)
 	}
-
-	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, grpcClient, grpcCallOpts)
 
 	for _, opt := range opts {
 		opt(s)

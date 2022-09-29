@@ -17,7 +17,6 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -112,17 +111,10 @@ func NewWorkerPool(workerCount int, clientFactory client.Factory) (*WorkerPool, 
 	workers := make(chan *Worker, workerCount)
 
 	for i := 0; i < workerCount; i++ {
-		zlog.Info("creating gprc client")
-		grpcClient, closeFunc, grpcCallOpts, err := clientFactory()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Substreams client: %w", err)
-		}
 
 		workers <- &Worker{
-			grpcClient: grpcClient,
-			closeFunc:  closeFunc,
-			callOpts:   grpcCallOpts,
-			tracer:     tracer,
+			clientFactory: clientFactory,
+			tracer:        tracer,
 		}
 	}
 
@@ -153,10 +145,8 @@ func (p *WorkerPool) ReturnWorker(worker *Worker) {
 }
 
 type Worker struct {
-	grpcClient pbsubstreams.StreamClient
-	callOpts   []grpc.CallOption
-	tracer     ttrace.Tracer
-	closeFunc  func() error
+	tracer        ttrace.Tracer
+	clientFactory client.Factory
 }
 
 type RetryableErr struct {
@@ -175,13 +165,19 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats *JobStats, requestM
 	defer span.End()
 	start := time.Now()
 
+	zlog.Info("creating gprc client")
+	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+	}
+
 	jobLogger := zlog.With(zap.Object("job", job))
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
 	request := job.createRequest(requestModules)
 
-	stream, err := w.grpcClient.Blocks(ctx, request, w.callOpts...)
+	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, err
@@ -193,7 +189,7 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats *JobStats, requestM
 		if err := stream.CloseSend(); err != nil {
 			jobLogger.Warn("failed to close stream on job termination", zap.Error(err))
 		}
-		if err := w.closeFunc(); err != nil {
+		if err := closeFunc(); err != nil {
 			jobLogger.Warn("failed to close grpc client on job termination", zap.Error(err))
 		}
 	}()

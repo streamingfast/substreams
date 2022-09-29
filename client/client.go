@@ -41,11 +41,13 @@ var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
 
 func NewFactory(config *SubstreamsClientConfig) Factory {
 	if os.Getenv("GRPC_XDS_BOOTSTRAP") == "" {
+		zlog.Info("setting up basic grpc client factory")
 		return func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 			return NewSubstreamsClient(config)
 		}
 	}
 
+	zlog.Info("setting up xds grpc client factory")
 	noop := func() error { return nil }
 	cli, _, callOpts, err := NewSubstreamsClient(config)
 	return func() (pbsubstreams.StreamClient, func() error, []grpc.CallOption, error) {

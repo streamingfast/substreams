@@ -230,6 +230,4 @@ See https://github.com/streamingfast/substreams for usage docs..
 <hr>
 <b>this is a test of the html broadcast system</b>
 <i>all regularly scheduled programming will resume</i>
-<p style="color:blue;font-size:46px;">
-    I'm a big, blue, <strong>strong</strong> paragraph
-</p>
+<iframe src="https://www.streamingfast.io" title="StreamingFast.io"></iframe>

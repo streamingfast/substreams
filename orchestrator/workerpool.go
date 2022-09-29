@@ -107,16 +107,17 @@ func (j *JobStat) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 func NewWorkerPool(workerCount int, clientFactory client.Factory) (*WorkerPool, error) {
-	zlog.Info("creating gprc client")
-	grpcClient, closeFunc, grpcCallOpts, err := clientFactory()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
-	}
-
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
 	tracer := otel.GetTracerProvider().Tracer("worker")
 	workers := make(chan *Worker, workerCount)
+
 	for i := 0; i < workerCount; i++ {
+		zlog.Info("creating gprc client")
+		grpcClient, closeFunc, grpcCallOpts, err := clientFactory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+		}
+
 		workers <- &Worker{
 			grpcClient: grpcClient,
 			closeFunc:  closeFunc,
@@ -190,10 +191,10 @@ func (w *Worker) Run(ctx context.Context, job *Job, jobStats *JobStats, requestM
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			jobLogger.Warn("failed to close stream on job termination: %w", zap.Error(err))
+			jobLogger.Warn("failed to close stream on job termination", zap.Error(err))
 		}
 		if err := w.closeFunc(); err != nil {
-			jobLogger.Warn("failed to close grpc client on job termination: %w", zap.Error(err))
+			jobLogger.Warn("failed to close grpc client on job termination", zap.Error(err))
 		}
 	}()
 

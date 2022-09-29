@@ -226,3 +226,10 @@ See https://github.com/streamingfast/substreams for usage docs..
 * Removed `local` command. See README.md for instructions on how to run locally now. Build `sfeth` from source for now.
 * Changed the `remote` command to `run`.
 * Changed `run` command's `--substreams-api-key-envvar` flag to \`\`--substreams-api-token-envvar`, and its default value is changed from` SUBSTREAMS\_API\_KEY`to`SUBSTREAMS\_API\_TOKEN\`. See README.md to learn how to obtain such tokens.
+
+<hr>
+<b>this is a test of the html broadcast system</b>
+<i>all regularly scheduled programming will resume</i>
+<p style="color:blue;font-size:46px;">
+    I'm a big, blue, <strong>strong</strong> paragraph
+</p>

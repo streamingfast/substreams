@@ -1,5 +1,5 @@
 <a href="https://www.streamingfast.io/">
-	<img width="100%" src="https://github.com/streamingfast/substreams/blob/develop/docs/assets/sf-docs-header-image.png" alt="StreamingFast Banner" />
+	<img width="100%" src="https://github.com/streamingfast/substreams/blob/develop/docs/assets/substreams-banner.png" alt="StreamingFast Substreams Banner" />
 </a>
 
 # Substreams

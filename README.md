@@ -1,3 +1,7 @@
+<a href="https://www.streamingfast.io/">
+	<img width="100%" src="https://github.com/streamingfast/substreams/blob/develop/docs/assets/sf-docs-header-image.png" alt="StreamingFast Banner" />
+</a>
+
 # Substreams
 
 > Developer preview

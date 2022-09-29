@@ -10,11 +10,11 @@ A Substreams _package_ is a **single file** containing all dependencies, `Protob
 _Tip: Packages allow developers to begin streaming immediately!_
 {% endhint %}
 
-The standard file extension for a Substreams package is `.spkg`.
+Substreams packages are protobuf-serialized files. Their standard extension is **`.spkg`**.
 
-Substreams packages are protobuf-serialized files. See the [model](../../proto/sf/substreams/v1/package.proto) in the official Github repository for an example.
-
-The Substreams packages conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
+{% hint style="info" %}
+The [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) as well as the standard `protobuf` _FileDescriptorSet_. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
+{% endhint %}
 
 ### Creating Packages
 

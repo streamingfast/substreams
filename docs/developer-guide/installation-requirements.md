@@ -6,28 +6,25 @@ description: StreamingFast Substreams dependency installation
 
 ### Dependencies Overview
 
-Working with Substreams requires a few additional applications and tools.
-
-* Substreams CLI
-* Rust
-* Buf
-* `cmake`
-* `build-essential`
-* `protoc-gen-prost`
+Working with Substreams requires a few applications and tools: the `substreams` CLI, Rust, `buf` and `protoc-gen-prost`.
 
 Instructions and links are provided below to assist with the installation of the required dependencies.
 
-#### Gitpod Substreams Installations
+{% hint style="success" %}
+See [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod installation
+{% endhint %}
 
-Substreams can be installed locally or in the cloud using Gitpod. Gitpod [installation instructions](installation-requirements.md#cloud-based-gitpod-installation) for Substreams are available at the bottom of this page. Continue reading for local installation instructions.
+## Local installation
 
-### CLI Installation
+### `substreams` CLI Installation
 
-The CLI is essentially the user interface for working with Substreams and is required.  Follow the steps outlined on the [installation page](../getting-started/installing-the-cli.md) for further information before proceeding.
+The CLI is required and is essentially the user interface for working with Substreams.
+
+> See the [`substreams` installation page](../getting-started/installing-the-cli.md) for instructions.
 
 ### Rust Installation
 
-Substreams modules are written in the [Rust programming language](https://www.rust-lang.org/). Working with Substreams requires a working Rust installation.
+Developing Substreams modules requires a working [Rust](https://www.rust-lang.org/) compilation environment.
 
 There are [several ways to install Rust](https://www.rust-lang.org/tools/install), but for the sake of simplicity using `curl` from the terminal is the quickest and easiest.
 
@@ -36,28 +33,31 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env # to configure your current shell
 ```
 
-### Buf Installation
+### `buf` Installation
 
 Buf simplifies the generation of typed structures in any language.
 
 Buf invokes `protoc` and simplifies the process of working with Substreams. Visit the [Buf website](https://buf.build/) for additional information and [installation instructions](https://docs.buf.build/installation).
 
 {% hint style="info" %}
-_Note: Substreams packages are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
+_Note:_ [_Substreams packages_](../reference-and-specs/packages.md) _are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
 {% endhint %}
 
-macOS users can simply install Buf using Homebrew.
+macOS users can simply install Buf using Homebrew:
 
 ```bash
-brew install bufbuild/buf/buf
+$ brew install bufbuild/buf/buf
 ```
 
-macOS users can continue to [install `protoc-gen-prost`](installation-requirements.md#protoc-gen-prost).&#x20;
+### `protoc-gen-prost` Installation
 
-Linux users have a few additional dependencies to install.
+The `protoc-gen-prost` crate is used to generate protobuf files. Once Rust is installed, install `protoc-gen-prost` using `cargo` with the following command:
 
-### Linux Specific Tools Installation
+```bash
+$ cargo install protoc-gen-prost
+```
 
+{% hint style="warning" %}
 Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.
 
 #### CMake
@@ -74,19 +74,9 @@ Run the following commands to install build-essential.
 apt update
 apt install cmake build-essential
 ```
+{% endhint %}
 
-### `protoc-gen-prost`
-
-The `protoc-gen-prost` crate is used to generate protobuf files. Install `protoc-gen-prost` using `cargo` with the following command.
-
-```
-cargo install protoc-gen-prost
-```
-
-### Cloud-based Gitpod Installation
-
-{% hint style="success" %}
-**Develop in the cloud with Gitpod**
+## Cloud-based environment with Gitpod
 
 [Gitpod](https://www.gitpod.io/) can be used in place of a local installation on a developer's machine.
 
@@ -97,7 +87,6 @@ To use Gitpod with Substreams:
 3. Create a [Gitpod](https://gitpod.io/) account
 4. Configure a `STREAMINGFAST_KEY` variable in the [Gitpod account settings](https://gitpod.io/variables)
 5. Open the repository copied in step 1 as a [Gitpod workspace](https://gitpod.io/workspaces).
-6. The substream template comes with a `Makefile` that makes building and running the substream easy:
+6. The substreams template comes with a `Makefile` that makes building and running the substream easy:
    1. `make build` will rebuild the substream. Run this whenever changes have been made.
-   2. `make stream` will run the stream for a few blocks. As changes are made to the Substream, change this command to use the custom substream modules and a block range more suitable to the data being indexed. Simply edit `Makefile` to do this.
-{% endhint %}
+   2. `make stream` will run the stream for a few blocks. As changes are made to the Substream, edit `Makefile` to change the `substreams` invocation to meet your needs.

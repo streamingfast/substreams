@@ -136,7 +136,7 @@ _#\[substreams::handlers::store]_
 
 The goal of the `map` being built is to extract `ERC721` transfers from a given block.&#x20;
 
-This can be achieved by finding all the `Transfer` events that are emitted by the contract being tracking. As events are found they will be decoded into Transfer objects.
+This can be achieved by finding all the `Transfer` events that are emitted by the contract that is currently being tracked. As events are found they will be decoded into Transfer objects.
 
 ```rust
 /// Extracts transfer events from the contract

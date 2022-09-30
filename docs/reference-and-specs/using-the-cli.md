@@ -135,3 +135,32 @@ modules {
     name: "my_module_name"
 ...
 ```
+
+### Help
+
+The commands and a brief explanation are also provided in the Substreams CLI application. To access the help at any time simply execute the `substreams` command, in a terminal, and pass a flag of `-h`.
+
+Output similar to the following will appear in the terminal.
+
+```
+Usage:
+  substreams [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  decode      
+  graph       Generate mermaid-js graph document
+  help        Help about any command
+  info        Display package modules and docs
+  inspect     Display low-level package structure
+  pack        Build an .spkg out of a .yaml manifest
+  protogen    Generate Rust bindings from a package
+  run         Stream modules from a given package on a remote endpoint
+  tools       Developer tools related to substreams
+
+Flags:
+  -h, --help      help for substreams
+  -v, --version   version for substreams
+
+Use "substreams [command] --help" for more information about a command.
+```

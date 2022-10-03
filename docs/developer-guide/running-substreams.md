@@ -82,4 +82,4 @@ block_to_transfers: message "eth.erc721.v1.Transfers": {
 }
 ```
 
-The example output shown above contains data for thirty different transfers from data in the blockchain. These transfers can also be verified on [Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).
+The example output shown above contains data for different transfers from data in the blockchain. These transfers can also be verified on [Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).

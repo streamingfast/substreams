@@ -192,7 +192,7 @@ Now define the `store` module. As a reminder, here is the module definition from
 _Note: `name: nft_state` will also correspond to the handler function name._
 {% endhint %}
 
-The input corresponds to the output of the `block_to_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code. Resulting in the following function signature.
+One input had been defined. The input corresponds to the output of the `block_to_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code. Resulting in the following function signature.
 
 ```rust
 /// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder

@@ -160,7 +160,7 @@ Run the build script to generate the ABI directory and files.
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-Next, create a `mod.rs` file in that directory to export the generated Rust code.
+Next, create a `mod.rs` file in the abi directory (that was created by the Rust build process) to export the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
 ```rust

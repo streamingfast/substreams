@@ -34,10 +34,10 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 		store := stores[modName]
 		var storeSquasher *StoreSquasher
 		if workUnit.initialStoreFile == nil {
-			zlog.Info("setting up initial store", zap.String("store", store.Name), zap.Object("initial_store_fiel", workUnit.initialStoreFile))
+			zlog.Info("setting up initial store", zap.String("store", store.Name), zap.String("module_hash", store.ModuleHash), zap.Object("initial_store_file", workUnit.initialStoreFile))
 			storeSquasher = NewStoreSquasher(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, jobsPlanner)
 		} else {
-			zlog.Info("loading initial store", zap.String("store", store.Name), zap.Object("initial_store_fiel", workUnit.initialStoreFile))
+			zlog.Info("loading initial store", zap.String("store", store.Name), zap.String("module_hash", store.ModuleHash), zap.Object("initial_store_file", workUnit.initialStoreFile))
 			squish, err := store.LoadFrom(ctx, workUnit.initialStoreFile)
 			if err != nil {
 				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.initialStoreFile, err)
@@ -64,7 +64,7 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 	squasher.OnTerminating(func(err error) {
 		zlog.Info("squasher terminating", zap.Error(err))
 		for _, squashable := range storeSquashers {
-			zlog.Info("shutting down store squasher", zap.String("store", squashable.name))
+			zlog.Info("shutting down store squasher", zap.String("store", squashable.name), zap.String("module_hash", squashable.store.ModuleHash))
 			squashable.Shutter.Shutdown(err)
 		}
 	})
@@ -86,10 +86,10 @@ func (s *Squasher) ValidateStoresReady() (out map[string]*state.Store, err error
 	var errs []string
 	for _, squashable := range s.storeSquashers {
 		if !squashable.targetExclusiveEndBlockReach {
-			errs = append(errs, fmt.Sprintf("module %q: target %d not reached (next expected: %d)", squashable.name, s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
+			errs = append(errs, fmt.Sprintf("module %q (%q): target %d not reached (next expected: %d)", squashable.name, squashable.store.ModuleHash, s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
 		}
 		if !squashable.IsEmpty() {
-			errs = append(errs, fmt.Sprintf("module %q: missing ranges %s", squashable.name, squashable.ranges))
+			errs = append(errs, fmt.Sprintf("module %q (%q): missing ranges %s", squashable.name, squashable.store.ModuleHash, squashable.ranges))
 		}
 
 		out[squashable.store.Name] = squashable.store

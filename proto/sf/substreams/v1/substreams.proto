@@ -26,6 +26,7 @@ message Request {
 
 message Response {
   oneof message {
+    SessionInit session = 5; // Always sent first
     ModulesProgress progress = 1; // Progress of data preparation, before sending in the stream of `data` events.
     InitialSnapshotData snapshot_data = 2;
     InitialSnapshotComplete snapshot_complete = 3;
@@ -45,6 +46,10 @@ enum ForkStep {
   STEP_IRREVERSIBLE = 4;
   // Removed, was STEP_STALLED
   reserved 5;
+}
+
+message SessionInit  {
+  string trace_id = 1;
 }
 
 message InitialSnapshotComplete {

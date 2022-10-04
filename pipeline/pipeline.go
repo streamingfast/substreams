@@ -329,7 +329,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
 
-	if step == bstream.StepUndo {
+	if step.Matches(bstream.StepUndo) {
 		span.AddEvent("handling_step_undo")
 		if err = p.forkHandler.handleUndo(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
 			span.SetStatus(codes.Error, err.Error())
@@ -338,7 +338,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		return nil
 	}
 
-	if step == bstream.StepIrreversible {
+	if step.Matches(bstream.StepIrreversible) {
 		// FIXME: what about bstream.StepNewIrreversible ??
 		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 			span.SetStatus(codes.Error, err.Error())
@@ -346,13 +346,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	if step == bstream.StepIrreversible {
+	if step.Matches(bstream.StepIrreversible) {
 		// todo: should we send the output??
 		span.AddEvent("handling_step_irreversible")
 		p.forkHandler.handleIrreversible(block.Number)
 	}
 
-	if step == bstream.StepStalled {
+	if step.Matches(bstream.StepStalled) {
 		span.AddEvent("handling_step_stalled")
 		p.forkHandler.handleIrreversible(block.Number)
 		return nil

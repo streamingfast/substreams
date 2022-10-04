@@ -231,7 +231,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		// it, but ONLY when we are certain that our Pipeline supports
 		// reorgs navigation, which is not the case right now.
 		// FIXME(abourget): will we also honor the IrreversibilityCondition?
-		// perhaps on the day we actually support it in the Firehose :)x
+		// perhaps on the day we actually support it in the Firehose :)
 	}
 
 	if err := pipe.Init(s.workerPool); err != nil {

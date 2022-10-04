@@ -265,6 +265,27 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 func (p *Pipeline) initStoreSaveBoundary() {
 	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
 }
+
+func (p *Pipeline) HandleStoreSaveBoundaries(ctx context.Context, span ttrace.Span, blockNum uint64) error {
+	for p.nextStoreSaveBoundary <= blockNum {
+		p.logger.Debug("saving stores on boundary", zap.Uint64("block_num", p.nextStoreSaveBoundary))
+		if span != nil {
+			span.AddEvent("store_save_boundary_reach")
+		}
+		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
+			if span != nil {
+				span.SetStatus(codes.Error, err.Error())
+			}
+			return fmt.Errorf("saving stores: %w", err)
+		}
+		p.bumpStoreSaveBoundary()
+		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
+			break
+		}
+	}
+	return nil
+}
+
 func (p *Pipeline) bumpStoreSaveBoundary() bool {
 	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
 	return p.request.StopBlockNum == p.nextStoreSaveBoundary
@@ -347,20 +368,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}
 
-	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
-	for p.nextStoreSaveBoundary <= blockNum {
-		p.logger.Debug("saving stores on boundary", zap.Uint64("block_num", p.nextStoreSaveBoundary))
-		span.AddEvent("store_save_boundary_reach")
-		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("saving stores: %w", err)
-		}
-		p.bumpStoreSaveBoundary()
-		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
-			break
-		}
+	if err := p.HandleStoreSaveBoundaries(ctx, span, blockNum); err != nil {
+		return err
 	}
-
 	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
 		p.logger.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
 		if err := p.moduleOutputCache.Flush(ctx); err != nil {

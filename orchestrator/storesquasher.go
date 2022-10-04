@@ -22,6 +22,7 @@ type StoreSquasher struct {
 	targetStartBlock        uint64
 	targetExclusiveEndBlock uint64
 	nextExpectedStartBlock  uint64
+	log                     *zap.Logger
 
 	jobsPlanner *JobsPlanner
 
@@ -40,18 +41,19 @@ func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpec
 		jobsPlanner:             jobsPlanner,
 		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
 		waitForCompletion:       make(chan interface{}),
+		log:                     zlog.With(zap.String("module", initialStore.Name), zap.String("module_hash", initialStore.ModuleHash)),
 	}
 	s.OnTerminating(func(err error) {
 		if err != nil {
-			zlog.Info("squasher terminating because of an error", zap.String("module", s.name), zap.Error(err))
+			s.log.Info("squasher terminating because of an error", zap.Error(err))
 			return
 		}
-		zlog.Info("will terminate after partials chucks chan empty", zap.String("module", s.name))
+		s.log.Info("will terminate after partials chucks chan empty")
 		close(s.partialsChunks)
 
-		zlog.Info("waiting completion", zap.String("module", s.name))
+		s.log.Info("waiting completion")
 		<-s.waitForCompletion
-		zlog.Info("partials chucks chan empty, terminating", zap.String("module", s.name))
+		s.log.Info("partials chucks chan empty, terminating")
 	})
 	return s
 }
@@ -61,26 +63,26 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
 	}
 
-	zlog.Info("cumulating squash request range", zap.String("module", s.name), zap.Stringer("req_chunk", partialsChunks))
+	s.log.Info("cumulating squash request range", zap.Stringer("req_chunk", partialsChunks))
 	s.partialsChunks <- partialsChunks
 	return nil
 }
 
 func (s *StoreSquasher) launch(ctx context.Context) {
-	zlog.Info("launching squasher", zap.String("module_name", s.store.Name))
+	s.log.Info("launching squasher")
 	for {
 		select {
 		case <-ctx.Done():
-			zlog.Info("quitting on a close context", zap.String("module_name", s.store.Name))
+			s.log.Info("quitting on a close context")
 			return
 
 		case partialsChunks, ok := <-s.partialsChunks:
 			if !ok {
-				zlog.Info("squashing done, no more partial chunks to squash", zap.String("module_name", s.store.Name))
+				s.log.Info("squashing done, no more partial chunks to squash")
 				close(s.waitForCompletion)
 				return
 			}
-			zlog.Info("got partials chunks", zap.String("module_name", s.store.Name), zap.Stringer("partials_chunks", partialsChunks))
+			s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
 			s.ranges = append(s.ranges, partialsChunks...)
 			sort.Slice(s.ranges, func(i, j int) bool {
 				return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
@@ -97,11 +99,11 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			}
 
 			if len(s.ranges) == 0 {
-				zlog.Info("no more ranges to squash", zap.String("module_name", s.store.Name))
+				s.log.Info("no more ranges to squash")
 				break
 			}
 			squashableRange := s.ranges[0]
-			zlog.Info("testing first range", zap.String("module_name", s.store.Name), zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))
+			s.log.Info("testing first range", zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))
 
 			if squashableRange.StartBlock < s.nextExpectedStartBlock {
 				s.Shutdown(fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges))
@@ -111,7 +113,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 				break
 			}
 
-			zlog.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
+			s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 			squashCount++
 
 			nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.StartBlock, squashableRange.ExclusiveEndBlock))
@@ -120,7 +122,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 				return
 			}
 
-			zlog.Debug("next store loaded", zap.Object("store", nextStore))
+			s.log.Debug("next store loaded", zap.Object("store", nextStore))
 
 			err = s.store.Merge(nextStore)
 			if err != nil {
@@ -155,10 +157,10 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			if squashableRange.ExclusiveEndBlock == s.targetExclusiveEndBlock {
 				s.targetExclusiveEndBlockReach = true
 			}
-			zlog.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
+			s.log.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
 			lastExclusiveEndBlock = squashableRange.ExclusiveEndBlock
 		}
-		zlog.Info("waiting for eg to finish", zap.String("module_name", s.store.Name))
+		s.log.Info("waiting for eg to finish")
 		if err := eg.Wait(); err != nil {
 			// eg.Wait() will block until everything is done, and return the first error.
 			s.Shutdown(err)
@@ -174,7 +176,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		if squashCount > 0 {
 			avgDuration = totalDuration / time.Duration(squashCount)
 		}
-		zlog.Info("squashing done", zap.String("module_name", s.store.Name), zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
+		s.log.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
 	}
 }
 

@@ -80,7 +80,9 @@ out:
 			zlog.Debug("retryable error", zap.Error(err))
 			continue
 		default:
-			zlog.Debug("not a retryable error", zap.Error(err))
+			if err != nil {
+				zlog.Debug("not a retryable error", zap.Error(err))
+			}
 			break out
 		}
 	}

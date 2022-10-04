@@ -262,7 +262,10 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		}
 
 		if errors.Is(err, stream.ErrStopBlockReached) {
-			logger.Info("stream of blocks reached end block")
+			logger.Info("stream of blocks reached end block", zap.Uint64("stop_block_num", firehoseReq.StopBlockNum))
+			if err := pipe.HandleStoreSaveBoundaries(ctx, span, firehoseReq.StopBlockNum); err != nil { // treat StopBlockNum as possible boundaries (if chain has holes...)
+				return err
+			}
 			span.SetStatus(otelcode.Ok, "")
 			return nil
 		}

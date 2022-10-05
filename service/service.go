@@ -249,7 +249,14 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 	if err := blockStream.Run(ctx); err != nil {
-		if errors.Is(err, io.EOF) {
+		if errors.Is(err, stream.ErrStopBlockReached) {
+			logger.Debug("stream of blocks reached end block, triggering StoreSave", zap.Uint64("stop_block_num", firehoseReq.StopBlockNum))
+			if err := pipe.HandleStoreSaveBoundaries(ctx, span, firehoseReq.StopBlockNum); err != nil { // treat StopBlockNum as possible boundaries (if chain has holes...)
+				return err
+			}
+		}
+
+		if errors.Is(err, io.EOF) || errors.Is(err, stream.ErrStopBlockReached) {
 			var d []string
 			for _, rng := range pipe.PartialsWritten() {
 				d = append(d, fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock))
@@ -257,15 +264,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			partialsWritten := []string{strings.Join(d, ",")}
 			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
 			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
-			span.SetStatus(otelcode.Ok, "")
-			return nil
-		}
-
-		if errors.Is(err, stream.ErrStopBlockReached) {
-			logger.Info("stream of blocks reached end block", zap.Uint64("stop_block_num", firehoseReq.StopBlockNum))
-			if err := pipe.HandleStoreSaveBoundaries(ctx, span, firehoseReq.StopBlockNum); err != nil { // treat StopBlockNum as possible boundaries (if chain has holes...)
-				return err
-			}
 			span.SetStatus(otelcode.Ok, "")
 			return nil
 		}

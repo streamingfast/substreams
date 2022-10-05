@@ -338,24 +338,20 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		return nil
 	}
 
+	if step.Matches(bstream.StepStalled) {
+		span.AddEvent("handling_step_stalled")
+		p.forkHandler.handleStalled(block.Number)
+		return nil
+	}
+
 	if step.Matches(bstream.StepIrreversible) {
-		// FIXME: what about bstream.StepNewIrreversible ??
+		span.AddEvent("updating_module_output_cache")
 		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("updating module output cache: %w", err)
 		}
-	}
-
-	if step.Matches(bstream.StepIrreversible) {
-		// todo: should we send the output??
 		span.AddEvent("handling_step_irreversible")
 		p.forkHandler.handleIrreversible(block.Number)
-	}
-
-	if step.Matches(bstream.StepStalled) {
-		span.AddEvent("handling_step_stalled")
-		p.forkHandler.handleIrreversible(block.Number)
-		return nil
 	}
 
 	for _, hook := range p.preBlockHooks {

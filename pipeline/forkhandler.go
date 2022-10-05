@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
@@ -40,6 +41,10 @@ func (f *ForkHandler) handleUndo(
 }
 
 func (f *ForkHandler) handleIrreversible(blockNumber uint64) {
+	delete(f.reversibleOutputs, blockNumber)
+}
+
+func (f *ForkHandler) handleStalled(blockNumber uint64) {
 	delete(f.reversibleOutputs, blockNumber)
 }
 

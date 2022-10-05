@@ -269,9 +269,7 @@ func (p *Pipeline) initStoreSaveBoundary() {
 func (p *Pipeline) HandleStoreSaveBoundaries(ctx context.Context, span ttrace.Span, blockNum uint64) error {
 	for p.nextStoreSaveBoundary <= blockNum {
 		p.logger.Debug("saving stores on boundary", zap.Uint64("block_num", p.nextStoreSaveBoundary))
-		if span != nil {
-			span.AddEvent("store_save_boundary_reach")
-		}
+		span.AddEvent("store_save_boundary_reach")
 		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
 			if span != nil {
 				span.SetStatus(codes.Error, err.Error())

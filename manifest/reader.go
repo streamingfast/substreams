@@ -53,6 +53,14 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 	return r.newPkgFromFile(r.input)
 }
 
+func (r *Reader) IsLocalManifest() bool {
+	if u, err := url.Parse(r.input); err == nil && u.Scheme == "http" || u.Scheme == "https" {
+		return false
+	}
+
+	return strings.HasSuffix(r.input, ".yaml")
+}
+
 func (r *Reader) newPkgFromFile(inputFilePath string) (pkg *pbsubstreams.Package, err error) {
 	cnt, err := ioutil.ReadFile(inputFilePath)
 	if err != nil {

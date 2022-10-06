@@ -6,10 +6,13 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/manifest"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,16 +26,27 @@ var protogenCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(protogenCmd)
-	protogenCmd.Flags().StringP("output-path", "o", "src/pb", "Directory to output generated .rs files")
+	protogenCmd.Flags().StringP("output-path", "o", "src/pb", cli.FlagDescription(`
+		Directory to output generated .rs files, if the received <package> argument is a local Substreams manifest file
+		(e.g. a local file ending with .yaml), the output path will be made relative to it
+	`))
 	protogenCmd.Flags().StringArrayP("exclude-paths", "x", []string{}, "Exclude specific files or directories, for example \"proto/a/a.proto\" or \"proto/a\"")
-
 }
 
 func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := mustGetString(cmd, "output-path")
+
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
 	manifestPath := args[0]
 	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
+
+	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {
+		newOutputPath := filepath.Join(filepath.Dir(manifestPath), outputPath)
+
+		zlog.Debug("manifest path is a local manifest, making output path relative to it", zap.String("old", outputPath), zap.String("new", newOutputPath))
+		outputPath = newOutputPath
+	}
+
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)

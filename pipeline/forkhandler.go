@@ -40,15 +40,11 @@ func (f *ForkHandler) handleUndo(
 	return nil
 }
 
-func (f *ForkHandler) handleIrreversible(blockNumber uint64) {
+func (f *ForkHandler) removeReversibleOutput(blockNumber uint64) {
 	delete(f.reversibleOutputs, blockNumber)
 }
 
-func (f *ForkHandler) handleStalled(blockNumber uint64) {
-	delete(f.reversibleOutputs, blockNumber)
-}
-
-func (f *ForkHandler) addModuleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockNum uint64) {
+func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockNum uint64) {
 	f.reversibleOutputs[blockNum] = append(f.reversibleOutputs[blockNum], moduleOutput)
 }
 

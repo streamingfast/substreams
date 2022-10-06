@@ -329,19 +329,85 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
 
-	if step.Matches(bstream.StepUndo) {
+	switch {
+
+	case step.Matches(bstream.StepUndo):
 		span.AddEvent("handling_step_undo")
 		if err = p.forkHandler.handleUndo(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("reverting outputs: %w", err)
 		}
 		return nil
-	}
 
-	if step.Matches(bstream.StepStalled) {
-		span.AddEvent("handling_step_stalled")
-		p.forkHandler.handleStalled(block.Number)
+	case step.Matches(bstream.StepStalled):
+		p.forkHandler.removeReversibleOutput(block.Number)
 		return nil
+
+	case step.Matches(bstream.StepNew):
+		for _, hook := range p.preBlockHooks {
+			span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
+			if err := hook(ctx, p.clock); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return fmt.Errorf("pre block hook: %w", err)
+			}
+		}
+
+		if err := p.HandleStoreSaveBoundaries(ctx, span, blockNum); err != nil {
+			return err
+		}
+		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
+			p.logger.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
+			if err := p.moduleOutputCache.Flush(ctx); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return fmt.Errorf("saving partial caches")
+			}
+			return io.EOF
+		}
+
+		if err = p.assignSource(block); err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			return fmt.Errorf("setting up sources: %w", err)
+		}
+
+		ctx, execSpan := p.tracer.Start(ctx, "modules_executions")
+		for _, executor := range p.moduleExecutors {
+			err = p.runExecutor(ctx, executor, cursor.ToOpaque())
+			if err != nil {
+				//if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
+				//	return fmt.Errorf("progress error: %w", returnErr)
+				//}
+				return err
+			}
+		}
+		execSpan.End()
+
+		// Snapshot all outputs, in case we undo
+		// map[block_id]outputs
+
+		if shouldReturnProgress(p.isSubrequest) {
+			if err := p.returnModuleProgressOutputs(); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return err
+			}
+		}
+
+		if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+			p.logger.Debug("will return module outputs")
+			if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return err
+			}
+		}
+
+		for _, s := range p.storeMap {
+			s.Flush()
+		}
+
+		p.moduleOutputs = nil
+		p.wasmOutputs = map[string][]byte{}
+		p.logger.Debug("block processed", zap.Uint64("block_num", block.Number))
+		span.SetStatus(codes.Ok, "")
+		// not returning here, we may also match irreversible
 	}
 
 	if step.Matches(bstream.StepIrreversible) {
@@ -350,74 +416,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("updating module output cache: %w", err)
 		}
-		span.AddEvent("handling_step_irreversible")
-		p.forkHandler.handleIrreversible(block.Number)
+		p.forkHandler.removeReversibleOutput(block.Number)
 	}
 
-	for _, hook := range p.preBlockHooks {
-		span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
-		if err := hook(ctx, p.clock); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("pre block hook: %w", err)
-		}
-	}
-
-	if err := p.HandleStoreSaveBoundaries(ctx, span, blockNum); err != nil {
-		return err
-	}
-	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
-		p.logger.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
-		if err := p.moduleOutputCache.Flush(ctx); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("saving partial caches")
-		}
-		return io.EOF
-	}
-
-	if err = p.assignSource(block); err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("setting up sources: %w", err)
-	}
-
-	ctx, execSpan := p.tracer.Start(ctx, "modules_executions")
-	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
-		if err != nil {
-			//if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
-			//	return fmt.Errorf("progress error: %w", returnErr)
-			//}
-			return err
-		}
-	}
-	execSpan.End()
-
-	// Snapshot all outputs, in case we undo
-	// map[block_id]outputs
-
-	if shouldReturnProgress(p.isSubrequest) {
-		if err := p.returnModuleProgressOutputs(); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return err
-		}
-	}
-
-	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
-		p.logger.Debug("will return module outputs")
-		if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return err
-		}
-	}
-
-	for _, s := range p.storeMap {
-		s.Flush()
-	}
-
-	p.moduleOutputs = nil
-	p.wasmOutputs = map[string][]byte{}
-
-	p.logger.Debug("block processed", zap.Uint64("block_num", block.Number))
-	span.SetStatus(codes.Ok, "")
 	return nil
 }
 
@@ -459,7 +460,7 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 				LogsTruncated: truncated,
 			}
 			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
-			p.forkHandler.addModuleOutput(moduleOutput, p.clock.Number)
+			p.forkHandler.addReversibleOutput(moduleOutput, p.clock.Number)
 		}
 	}
 

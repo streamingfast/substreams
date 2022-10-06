@@ -337,11 +337,12 @@ func strToFloat(in string) float64 {
 }
 
 func strToBigInt(in string) *big.Int {
-	i64, err := strconv.ParseInt(in, 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("cannot load int %q: %s", in, err))
+	bi := &big.Int{}
+	_, success := bi.SetString(in, 10)
+	if !success {
+		panic(fmt.Sprintf("cannot load int %q", in))
 	}
-	return big.NewInt(i64)
+	return bi
 }
 
 func bytesToBigFloat(in []byte) *big.Float {

@@ -40,14 +40,18 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
 
 func NewFactory(config *SubstreamsClientConfig) Factory {
-	if os.Getenv("GRPC_XDS_BOOTSTRAP") == "" {
-		zlog.Info("setting up basic grpc client factory")
+	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
+
+	if bootStrapFilename == "" {
+		zlog.Info("setting up basic grpc client factory (no XDS bootstrap)")
+
 		return func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 			return NewSubstreamsClient(config)
 		}
 	}
 
-	zlog.Info("setting up xds grpc client factory")
+	zlog.Info("setting up xds grpc client factory", zap.String("GRPC_XDS_BOOTSTRAP", bootStrapFilename))
+
 	noop := func() error { return nil }
 	cli, _, callOpts, err := NewSubstreamsClient(config)
 	return func() (pbsubstreams.StreamClient, func() error, []grpc.CallOption, error) {
@@ -71,7 +75,6 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 	}
 
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
-	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
 
 	var dialOptions []grpc.DialOption
 	skipAuth := jwt == "" || usePlainTextConnection

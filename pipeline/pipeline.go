@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/metrics"
 	"io"
 	"math"
 	"runtime/debug"
@@ -298,6 +299,7 @@ func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	ctx, span := p.tracer.Start(p.context, "process_block")
+	metrics.BlockBeginProcess.Inc()
 	span.SetAttributes(attribute.Int64("block_num", int64(block.Num())))
 	defer span.End()
 
@@ -379,6 +381,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 				return err
 			}
 		}
+		metrics.BlockEndProcess.Inc()
 		execSpan.End()
 
 		// Snapshot all outputs, in case we undo

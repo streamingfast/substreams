@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/metrics"
 	"sort"
 	"time"
 
@@ -70,6 +71,7 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 
 func (s *StoreSquasher) launch(ctx context.Context) {
 	s.log.Info("launching squasher")
+	metrics.SquashesLaunched.Inc()
 	for {
 		select {
 		case <-ctx.Done():
@@ -176,6 +178,9 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		if squashCount > 0 {
 			avgDuration = totalDuration / time.Duration(squashCount)
 		}
+
+		metrics.LastSquashDuration.SetUint64(uint64(totalDuration))
+		metrics.LastSquashAvgDuration.SetUint64(uint64(avgDuration))
 		s.log.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
 	}
 }

@@ -395,7 +395,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 
 	metrics.BlockEndProcess.Inc()
-	execSpan.End()
 
 		if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
 			p.logger.Debug("will return module outputs")

@@ -14,7 +14,6 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
@@ -298,7 +297,6 @@ func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 }
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
-	metrics.BlockBeginProcess.Inc()
 	ctx, span := p.tracer.Start(p.context, "process_block")
 	span.SetAttributes(attribute.Int64("block_num", int64(block.Num())))
 	defer span.End()
@@ -392,9 +390,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 				return err
 			}
 		}
-	}
-
-	metrics.BlockEndProcess.Inc()
 
 		if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
 			p.logger.Debug("will return module outputs")

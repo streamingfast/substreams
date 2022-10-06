@@ -5,14 +5,12 @@ import (
 
 	"github.com/abourget/llerrgroup"
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/state"
 	"go.uber.org/zap"
 )
 
 var cleanUpCmd = &cobra.Command{
 	Use:   "cleanup <store_url>",
-	Short: "Checks for partial files which have already merged into a full KV store and purges them",
+	Short: "Checks for partial files which have already merged into a full kv store and purges them",
 	Args:  cobra.ExactArgs(1),
 	RunE:  cleanUpE,
 }
@@ -25,10 +23,8 @@ func init() {
 func cleanUpE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	var store dstore.Store
-
 	dsn := args[0]
-	store, err := dstore.NewStore(dsn, "", "", false)
+	store, remoteStore, err := newStore(dsn)
 	if err != nil {
 		return fmt.Errorf("creating store: %w", err)
 	}
@@ -36,23 +32,21 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 	highestKVBlock := uint64(0)
 	partialFiles := map[uint64]string{}
 
-	_ = store.Walk(ctx, "", func(filename string) (err error) {
-		fileinfo, ok := state.ParseFileName(filename)
-		if !ok {
+	files, err := store.ListSnapshotFiles(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list snapshots: %w", err)
+	}
+
+	for _, file := range files {
+		if file.Partial {
+			partialFiles[file.EndBlock] = file.Filename
+		}
+
+		if !file.Partial && file.EndBlock > highestKVBlock {
+			highestKVBlock = file.EndBlock
 			return nil
 		}
-
-		if fileinfo.Partial {
-			partialFiles[fileinfo.EndBlock] = filename
-		}
-
-		if !fileinfo.Partial && fileinfo.EndBlock > highestKVBlock {
-			highestKVBlock = fileinfo.EndBlock
-			return nil
-		}
-
-		return nil
-	})
+	}
 
 	if len(partialFiles) == 0 {
 		zlog.Info("no partial files found")
@@ -74,7 +68,7 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			err := store.DeleteObject(ctx, fn)
+			err := remoteStore.DeleteObject(ctx, fn)
 			if err != nil {
 				zlog.Warn("error deleting file", zap.String("filename", fn), zap.String("store", dsn))
 			}

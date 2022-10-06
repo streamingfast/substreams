@@ -13,15 +13,6 @@ type PipelineOptioner interface {
 
 type Option func(p *Pipeline)
 
-// TODO(abourget):
-// OrchestratedExecution -> Subrequest
-// isOrchestrated -> isSubrequest
-func WithSubrequestExecution() Option {
-	return func(p *Pipeline) {
-		p.isSubrequest = true
-	}
-}
-
 func WithPreBlockHook(f substreams.BlockHook) Option {
 	return func(p *Pipeline) {
 		p.preBlockHooks = append(p.preBlockHooks, f)

@@ -1,120 +1,107 @@
 package pipeline
 
 import (
-	"context"
 	"fmt"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
-	"github.com/streamingfast/substreams/state"
-	"go.opentelemetry.io/otel/codes"
+	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
 
 func (p *Pipeline) backProcessStores(
-	ctx context.Context,
 	workerPool *orchestrator.WorkerPool,
-	initialStoreMap map[string]*state.Store,
-) (
-	map[string]*state.Store,
-	error,
-) {
-	ctx, span := p.tracer.Start(p.context, "back_processing")
-	defer span.End()
+	storeModules []*pbsubstreams.Module,
+) (out map[string]store.Store, err error) {
+	p.reqCtx.StartSpan("back_processing", p.tracer)
+	defer p.reqCtx.EndSpan(err)
 
-	logger := p.logger.Named("back_process")
+	logger := p.reqCtx.logger.Named("back_process")
 	logger.Info("synchronizing stores")
 
-	storageState, err := orchestrator.FetchStorageState(ctx, initialStoreMap)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("fetching stores states: %w", err)
+	var storageState *orchestrator.StorageState
+	if storageState, err = orchestrator.FetchStorageState(p.reqCtx, p.storeMap); err != nil {
+		err = fmt.Errorf("fetching stores states: %w", err)
+		return nil, err
 	}
 
 	logger.Info("storage state found")
-
 	workPlan := orchestrator.WorkPlan{}
-	for _, mod := range p.storeModules {
+	for _, mod := range storeModules {
 		snapshot, ok := storageState.Snapshots[mod.Name]
 		if !ok {
-			err := fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
-			span.SetStatus(codes.Error, err.Error())
+			err = fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
 			return nil, err
 		}
-		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeSaveInterval, mod.InitialBlock, uint64(p.request.StartBlockNum), snapshot)
+		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeFactory.saveInterval, mod.InitialBlock, p.reqCtx.StartBlockNum(), snapshot)
 	}
 
 	logger.Info("work plan ready", zap.Stringer("work_plan", workPlan))
 
 	progressMessages := workPlan.ProgressMessages()
-	if err := p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("sending progress: %w", err)
+	if err = p.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
+		err = fmt.Errorf("sending progress: %w", err)
+		return nil, err
 	}
 
-	upToBlock := uint64(p.request.StartBlockNum)
+	upToBlock := p.reqCtx.StartBlockNum()
 
-	jobsPlanner, err := orchestrator.NewJobsPlanner(ctx, workPlan, uint64(p.subrequestSplitSize), initialStoreMap, p.graph)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("creating strategy: %w", err)
+	var jobsPlanner *orchestrator.JobsPlanner
+	if jobsPlanner, err = orchestrator.NewJobsPlanner(p.reqCtx, workPlan, uint64(p.subrequestSplitSize), p.graph); err != nil {
+		err = fmt.Errorf("creating strategy: %w", err)
+		return nil, err
 	}
 
 	logger.Debug("launching squasher")
 
-	squasher, err := orchestrator.NewSquasher(ctx, workPlan, initialStoreMap, upToBlock, jobsPlanner)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("initializing squasher: %w", err)
-	}
-
-	err = workPlan.SquashPartialsPresent(squasher)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+	var squasher *orchestrator.Squasher
+	if squasher, err = orchestrator.NewSquasher(p.reqCtx, workPlan, p.storeMap, upToBlock, p.storeFactory.saveInterval, jobsPlanner); err != nil {
+		err = fmt.Errorf("initializing squasher: %w", err)
 		return nil, err
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, jobsPlanner.AvailableJobs, squasher, workerPool, p.respFunc)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("initializing scheduler: %w", err)
+	if err = workPlan.SquashPartialsPresent(squasher); err != nil {
+		return nil, err
+	}
+
+	var scheduler *orchestrator.Scheduler
+	if scheduler, err = orchestrator.NewScheduler(p.reqCtx, jobsPlanner.AvailableJobs, squasher, workerPool, p.respFunc); err != nil {
+		err = fmt.Errorf("initializing scheduler: %w", err)
+		return nil, err
 	}
 
 	result := make(chan error)
 
 	logger.Debug("launching scheduler")
 
-	go scheduler.Launch(ctx, p.request.Modules, result)
+	go scheduler.Launch(p.reqCtx, p.reqCtx.Request().Modules, result)
 
 	jobCount := jobsPlanner.JobCount()
 	for resultCount := 0; resultCount < jobCount; {
 		select {
-		case <-ctx.Done():
-			err := ctx.Err()
-			if err != nil {
-				span.SetStatus(codes.Error, err.Error())
+		case <-p.reqCtx.Done():
+			if err = p.reqCtx.Err(); err != nil {
 				return nil, err
 			}
-			span.SetStatus(codes.Ok, "canceled")
+			logger.Info("job canceled")
 			return nil, nil
-		case err := <-result:
+		case err = <-result:
 			resultCount++
 			if err != nil {
-				span.SetStatus(codes.Error, err.Error())
-				return nil, fmt.Errorf("from worker: %w", err)
+				err = fmt.Errorf("from worker: %w", err)
+				return nil, err
 			}
-			logger.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount), zap.Error(err))
+			logger.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount))
 		}
 	}
 
 	logger.Info("all jobs completed, waiting for squasher to finish")
 	squasher.Shutdown(nil)
 
-	newStores, err := squasher.ValidateStoresReady()
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("squasher incomplete: %w", err)
+	if out, err = squasher.ValidateStoresReady(); err != nil {
+		err = fmt.Errorf("squasher incomplete: %w", err)
+		return nil, err
 	}
-	span.SetStatus(codes.Ok, "completed")
-	return newStores, nil
+	return out, nil
 }

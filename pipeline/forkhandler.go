@@ -5,8 +5,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/outputs"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
 )
 
 type ForkHandler struct {
@@ -22,8 +21,7 @@ func NewForkHandle() *ForkHandler {
 func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
-	moduleOutputCache *outputs.ModulesOutputCache,
-	storeMap map[string]*state.Store,
+	storeMap *store.Map,
 	respFunc func(resp *pbsubstreams.Response) error,
 ) error {
 	if moduleOutputs, found := f.reversibleOutputs[clock.Number]; found {
@@ -31,10 +29,11 @@ func (f *ForkHandler) handleUndo(
 			return fmt.Errorf("calling return func when reverting outputs: %w", err)
 		}
 		for _, moduleOutput := range moduleOutputs {
-			if outputCache, ok := moduleOutputCache.OutputCaches[moduleOutput.Name]; ok {
-				outputCache.Delete(clock.Id)
+			if s, found := storeMap.Get(moduleOutput.Name); found {
+				if deltaStore, ok := s.(store.DeltaAccessor); ok {
+					deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().GetDeltas())
+				}
 			}
-			reverseDeltas(storeMap, moduleOutput.Name, moduleOutput.GetStoreDeltas())
 		}
 	}
 	return nil
@@ -50,10 +49,4 @@ func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutpu
 
 type DeltaGetter interface {
 	GetDeltas() []*pbsubstreams.StoreDelta
-}
-
-func reverseDeltas(storeMap map[string]*state.Store, name string, deltaGetter DeltaGetter) {
-	if store, found := storeMap[name]; found {
-		store.ApplyDeltaReverse(deltaGetter.GetDeltas())
-	}
 }

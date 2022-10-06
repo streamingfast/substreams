@@ -11,7 +11,7 @@ func PrintMermaid(mods *pbsubstreams.Modules) {
 	fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
 
 	for _, s := range mods.Modules {
-		// fmt.Println("module", s.Name)
+		// fmt.Println("module", s.Filename)
 		switch s.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			fmt.Printf("  %s[map: %s]\n", s.Name, s.Name)

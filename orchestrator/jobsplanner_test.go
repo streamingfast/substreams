@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +18,6 @@ import (
 func TestNewJobsPlanner(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
 
-	storeSplit := uint64(10)
 	subreqSplit := uint64(100)
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
@@ -29,12 +27,16 @@ func TestNewJobsPlanner(t *testing.T) {
 	require.NoError(t, err)
 
 	mockDStore := dstore.NewMockStore(nil)
-	stores := map[string]*state.Store{}
+
+	//{}(storeSplit, 0, 0, mockDStore, zlog)
+	storeMap := store.NewMap()
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
+
+		newStore, err := store.NewKVStore(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
 		require.NoError(t, err)
-		stores[newStore.Name] = newStore
+
+		storeMap.Set(mod.Name, newStore)
 	}
 
 	splitWorkMods := WorkPlan{
@@ -54,7 +56,6 @@ func TestNewJobsPlanner(t *testing.T) {
 		ctx,
 		splitWorkMods,
 		subreqSplit,
-		stores, // INIT
 		graph,
 	)
 	require.NoError(t, err)
@@ -79,8 +80,6 @@ func TestNewJobsPlanner(t *testing.T) {
 }
 
 func Test_OrderedJobsPlanner(t *testing.T) {
-	storeSplit := uint64(10)
-
 	modules := []*pbsubstreams.Module{
 		{
 			Name:         "A",
@@ -103,18 +102,6 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 
 	graph, err := manifest.NewModuleGraph(modules)
 	require.NoError(t, err)
-
-	storeModules, err := graph.StoresDownTo([]string{"B"})
-	require.NoError(t, err)
-
-	mockDStore := dstore.NewMockStore(nil)
-	stores := map[string]*state.Store{}
-	for _, mod := range storeModules {
-		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-		newStore, err := state.NewStore(mod.Name, storeSplit, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
-		require.NoError(t, err)
-		stores[newStore.Name] = newStore
-	}
 
 	workPlan := WorkPlan{
 		"A": &WorkUnit{
@@ -158,13 +145,11 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 		ctx,
 		workPlan,
 		uint64(100),
-		stores, // INIT
 		graph,
 	)
 	require.NoError(t, err)
 	close(jobsPlanner.AvailableJobs)
 
-	fmt.Println(jobsPlanner.AvailableJobs)
 	for job := range jobsPlanner.AvailableJobs {
 		require.NotEqual(t, "B", job.ModuleName)
 	}

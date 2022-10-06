@@ -897,7 +897,7 @@ var file_sf_substreams_v1_modules_proto_enumTypes = make([]protoimpl.EnumInfo, 2
 var file_sf_substreams_v1_modules_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_sf_substreams_v1_modules_proto_goTypes = []interface{}{
 	(Module_KindStore_UpdatePolicy)(0), // 0: sf.substreams.v1.Module.KindStore.UpdatePolicy
-	(Module_Input_Store_Mode)(0),       // 1: sf.substreams.v1.Module.Input.Store.Mode
+	(Module_Input_Store_Mode)(0),       // 1: sf.substreams.v1.Module.Input.KVStore.Mode
 	(*Modules)(nil),                    // 2: sf.substreams.v1.Modules
 	(*Binary)(nil),                     // 3: sf.substreams.v1.Binary
 	(*Module)(nil),                     // 4: sf.substreams.v1.Module
@@ -907,7 +907,7 @@ var file_sf_substreams_v1_modules_proto_goTypes = []interface{}{
 	(*Module_Output)(nil),              // 8: sf.substreams.v1.Module.Output
 	(*Module_Input_Source)(nil),        // 9: sf.substreams.v1.Module.Input.Source
 	(*Module_Input_Map)(nil),           // 10: sf.substreams.v1.Module.Input.Map
-	(*Module_Input_Store)(nil),         // 11: sf.substreams.v1.Module.Input.Store
+	(*Module_Input_Store)(nil),         // 11: sf.substreams.v1.Module.Input.KVStore
 }
 var file_sf_substreams_v1_modules_proto_depIdxs = []int32{
 	4,  // 0: sf.substreams.v1.Modules.modules:type_name -> sf.substreams.v1.Module
@@ -919,8 +919,8 @@ var file_sf_substreams_v1_modules_proto_depIdxs = []int32{
 	0,  // 6: sf.substreams.v1.Module.KindStore.update_policy:type_name -> sf.substreams.v1.Module.KindStore.UpdatePolicy
 	9,  // 7: sf.substreams.v1.Module.Input.source:type_name -> sf.substreams.v1.Module.Input.Source
 	10, // 8: sf.substreams.v1.Module.Input.map:type_name -> sf.substreams.v1.Module.Input.Map
-	11, // 9: sf.substreams.v1.Module.Input.store:type_name -> sf.substreams.v1.Module.Input.Store
-	1,  // 10: sf.substreams.v1.Module.Input.Store.mode:type_name -> sf.substreams.v1.Module.Input.Store.Mode
+	11, // 9: sf.substreams.v1.Module.Input.store:type_name -> sf.substreams.v1.Module.Input.KVStore
+	1,  // 10: sf.substreams.v1.Module.Input.KVStore.mode:type_name -> sf.substreams.v1.Module.Input.KVStore.Mode
 	11, // [11:11] is the sub-list for method output_type
 	11, // [11:11] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name

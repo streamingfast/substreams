@@ -49,7 +49,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	fmt.Println("Modules:")
 	fmt.Println("----")
 	for modIdx, module := range pkg.Modules.Modules {
-		fmt.Println("Name:", module.Name)
+		fmt.Println("Filename:", module.Name)
 		fmt.Println("Initial block:", module.InitialBlock)
 		kind := module.GetKind()
 		switch v := kind.(type) {

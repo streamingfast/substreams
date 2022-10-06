@@ -2,11 +2,13 @@ package tools
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/state"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/store"
 )
 
 var checkCmd = &cobra.Command{
@@ -23,33 +25,54 @@ func init() {
 func checkE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	store, err := dstore.NewStore(args[0], "", "", false)
+	stateStore, _, err := newStore(args[0])
 	if err != nil {
-		return fmt.Errorf("could not create store from %s: %w", args[0], err)
+		return fmt.Errorf("failed to create store: %w", err)
 	}
-
-	stateStore := state.Store{
-		Store: store,
-	}
-
-	snapshots, err := stateStore.ListSnapshots(ctx)
+	files, err := stateStore.ListSnapshotFiles(ctx)
 	if err != nil {
 		return fmt.Errorf("listing snapshots: %w", err)
 	}
 
 	var prevRange *block.Range
-	for _, curRange := range snapshots.Partials {
+	for _, file := range files {
+		if !file.Partial {
+			continue
+		}
+		currentRange := block.NewRange(file.StartBlock, file.EndBlock)
+
 		if prevRange == nil {
-			prevRange = curRange
+			prevRange = currentRange
 			continue
 		}
 
-		if curRange.StartBlock != prevRange.ExclusiveEndBlock {
-			return fmt.Errorf("**hole found** between %d and %d", prevRange.ExclusiveEndBlock, curRange.ExclusiveEndBlock)
+		if currentRange.StartBlock != prevRange.ExclusiveEndBlock {
+			return fmt.Errorf("**hole found** between %d and %d", prevRange.ExclusiveEndBlock, currentRange.ExclusiveEndBlock)
 		}
 
-		prevRange = curRange
+		prevRange = currentRange
 	}
 
 	return err
+}
+
+func newStore(storeURL string) (*store.KVStore, dstore.Store, error) {
+	remoteStore, err := dstore.NewStore(storeURL, "", "", false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
+	}
+
+	s, err := store.NewKVStore(
+		"",
+		0,
+		"",
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS,
+		"",
+		remoteStore, zap.NewNop(),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s, remoteStore, nil
 }

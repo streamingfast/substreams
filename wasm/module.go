@@ -9,7 +9,6 @@ import (
 	"github.com/dustin/go-humanize"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 type Module struct {
@@ -77,7 +76,7 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 	return m, nil
 }
 
-func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Instance, error) {
+func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*Instance, error) {
 	entrypoint := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint).Func()
 	if entrypoint == nil {
 		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
@@ -90,36 +89,25 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, inputs []*Input) (*Insta
 	}
 
 	var args []interface{}
-	for _, input := range inputs {
-		switch input.Type {
-		case InputSource:
-			ptr, err := m.Heap.Write(input.StreamData, input.Name)
+	for _, input := range arguments {
+		switch v := input.(type) {
+		case *StoreWriterOutput:
+			m.CurrentInstance.outputStore = v.Store
+			m.CurrentInstance.updatePolicy = v.UpdatePolicy
+			m.CurrentInstance.valueType = v.ValueType
+		case *StoreReaderInput:
+			m.CurrentInstance.inputStores = append(m.CurrentInstance.inputStores, v.Store)
+			args = append(args, int32(len(m.CurrentInstance.inputStores)-1))
+		case ValueArgument:
+			cnt := v.Value()
+			ptr, err := m.Heap.Write(cnt, input.Name())
 			if err != nil {
-				return nil, fmt.Errorf("writing %q to heap: %w", input.Name, err)
+				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)
 			}
-			length := int32(len(input.StreamData))
+			length := int32(len(cnt))
 			args = append(args, ptr, length)
-		case InputStore:
-			if input.Deltas {
-				//todo: this maybe sub optimal when deltas are extracted from zeroModule output cache
-				cnt, err := proto.Marshal(&pbsubstreams.StoreDeltas{Deltas: input.Store.Deltas})
-				if err != nil {
-					return nil, fmt.Errorf("marshaling store deltas: %w", err)
-				}
-				ptr, err := m.Heap.Write(cnt, input.Name)
-				if err != nil {
-					return nil, fmt.Errorf("writing %q (deltas=%v) to heap: %w", input.Name, input.Deltas, err)
-				}
-
-				args = append(args, ptr, int32(len(cnt)))
-			} else {
-				m.CurrentInstance.inputStores = append(m.CurrentInstance.inputStores, input.Store)
-				args = append(args, int32(len(m.CurrentInstance.inputStores)-1))
-			}
-		case OutputStore:
-			m.CurrentInstance.outputStore = input.Store
-			m.CurrentInstance.updatePolicy = input.UpdatePolicy
-			m.CurrentInstance.valueType = input.ValueType
+		default:
+			panic("unknown wasm argument type")
 		}
 	}
 	m.CurrentInstance.args = args

@@ -3,13 +3,9 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
-
-	"github.com/streamingfast/derr"
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
+	"sort"
 )
 
 type Snapshots struct {
@@ -62,35 +58,22 @@ type Snapshot struct {
 	Path string
 }
 
-func listSnapshots(ctx context.Context, store dstore.Store) (*Snapshots, error) {
+func listSnapshots(ctx context.Context, store store.Store) (*Snapshots, error) {
 	out := &Snapshots{}
 
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		if err := store.Walk(ctx, "", func(filename string) (err error) {
-			if filename == "___store-metadata.json" || strings.HasPrefix(filename, "__") {
-				return nil
-			}
-
-			fileInfo, ok := state.ParseFileName(filename)
-			if !ok {
-				return nil
-			}
-
-			if fileInfo.Partial {
-				out.Partials = append(out.Partials, block.NewRange(fileInfo.StartBlock, fileInfo.EndBlock))
-			} else {
-				out.Completes = append(out.Completes, block.NewRange(fileInfo.StartBlock, fileInfo.EndBlock))
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("walking snapshots: %w", err)
-		}
-		return nil
-	})
+	files, err := store.ListSnapshotFiles(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list snapshots: %w", err)
 	}
 
+	for _, file := range files {
+		if file.Partial {
+			out.Partials = append(out.Partials, block.NewRange(file.StartBlock, file.EndBlock))
+		} else {
+			out.Completes = append(out.Completes, block.NewRange(file.StartBlock, file.EndBlock))
+		}
+
+	}
 	out.Sort()
 	return out, nil
 }

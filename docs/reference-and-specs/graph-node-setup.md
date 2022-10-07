@@ -22,13 +22,6 @@ Substreams is capable of working in conjunction with graph-node. In addition, Su
 * Cloned repo for The Graph’s Graph Node
 * Cloned repo of StreamingFast Graph Node Dev
 
-#### **Overview**
-
-* Clone StreamingFast Graph Node Dev
-* Install Docker
-* Install NodeJS, NPM & Yarn
-* Install NodeJS Dependencies
-
 #### **StreamingFast Graph Node Dev**
 
 The first step to get up and running with graph-node and Substreams is to clone the StreamingFast graph-node-dev repository on Github.&#x20;

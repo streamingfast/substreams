@@ -62,7 +62,7 @@ Additional information for Yarn installation can be found in the official yarn d
 
 <details>
 
-<summary>PostgreSQL</summary>
+<summary>PostgreSQL Setup</summary>
 
 PostgreSQL is required to use StreamingFast graph-node-dev. Make sure the target machine has a fully functional PostgreSQL installation in place prior to proceeding.
 

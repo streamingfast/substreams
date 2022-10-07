@@ -14,4 +14,4 @@ Essentially the developer of an end-user application will design and create a da
 
 The Substreams engine will use the data refinement strategy to isolate a very specific data set. Substreams receives data from StreamingFast Firehose in the form of streams.&#x20;
 
-The streamed data is passed from Firehose through Substreams, then refined, and finally routed to wherever the developer desires, from relational databases to subgraphs, or even straight into an application.
+The streamed data is passed from Firehose through Substreams, then refined, and finally routed to wherever the developer desires, from relational databases to subgraphs.

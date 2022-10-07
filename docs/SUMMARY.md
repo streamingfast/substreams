@@ -34,6 +34,7 @@
 * [Using the CLI](reference-and-specs/using-the-cli.md)
 * [Authentication](reference-and-specs/authentication.md)
 * [Rust APIs](reference-and-specs/rust-api.md)
+* [Graph-Node Setup](reference-and-specs/graph-node-setup.md)
 * [Advanced](advanced/README.md)
   * [Running Substreams locally](advanced/running-locally.md)
 

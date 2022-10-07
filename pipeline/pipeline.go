@@ -366,7 +366,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			return io.EOF
 		}
 
-		if err = p.assignSource(block); err != nil {
+		if err = p.assignBlock(block); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("setting up sources: %w", err)
 		}
@@ -553,7 +553,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
-func (p *Pipeline) assignSource(block *bstream.Block) error {
+func (p *Pipeline) assignBlock(block *bstream.Block) error {
 	switch p.vmType {
 	case "wasm/rust-v1":
 		blkBytes, err := block.Payload.Get()

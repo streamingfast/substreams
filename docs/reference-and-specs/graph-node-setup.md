@@ -118,7 +118,7 @@ The following shell script starts the services for Solana.
 
 #### The Graph Protocol Graph Node
 
-The graph-node repository from The Graph is also required for working with StreamingFast graph-node-dev. The clone the repository to the target machine by issuing the following command to the terminal.
+The graph-node repository from The Graph is also required for working with StreamingFast graph-node-dev. The repository can be cloned to the target machine by issuing the following command to the terminal.
 
 ```
 git clone https://github.com/graphprotocol/graph-node

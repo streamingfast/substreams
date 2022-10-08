@@ -55,15 +55,15 @@ _**Note**: all update policies provide the `delete_prefix` method._
 {% endhint %}
 
 {% hint style="info" %}
-**Note:** The **merge strategy** is applied during parallel processing. A module has built two _partial_ stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two _partial_ stores to make it a _complete_ store.
+_**Note:** The **merge strategy** is applied during parallel processing. A module has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store._
 
-The _complete_ store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly.
+_The complete store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly._
 {% endhint %}
 
 {% hint style="warning" %}
-**Warning:** To preserve the parallelization capabilities of the system Substreams can never _read_ what it has written or read from a store that is currently being written.
+_**Important:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is currently being written._
 
-To read from a store a downstream module is created with one of its inputs pointing to the store module's output.
+_To read from a store a downstream module is created with one of its inputs pointing to the store module's output._
 {% endhint %}
 
 #### Ordinals
@@ -82,18 +82,20 @@ Data can be consumed in one of two modes when declaring a `store` as an input to
 
 #### `get Mode`
 
-Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed; readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
+Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. The `stores` can be readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
 
-{% hint style="info" %}
-_**Note:**, Lookups are local, in-memory, and extremely fast!_
+{% hint style="success" %}
+_**Tip:** Lookups are local, in-memory, and extremely fast!_
 {% endhint %}
 
 {% hint style="info" %}
-**Note:** `` The `get_last` method is the fastest because it queries the store directly.&#x20;
+_**Note:** Store method behavior is defined as:_
 
-The `get_first` method will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+_The `get_last` method is the fastest because it queries the store directly._&#x20;
 
-The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
+_The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block._&#x20;
+
+_The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed._
 {% endhint %}
 
 #### `deltas Mode`

@@ -83,7 +83,7 @@ The module is linked to the wasm code containing the business logic. The modules
 
 The Rust function which implements the modules business logic for the module is defined by the module name and is called `block_to_transfers` (in this example).
 
-The first transfers of tokens orifinated from the contracts occurred at block `12287507,` so `initialBlock` is used in the `map` module.
+The first transfers of tokens originated from the contracts occurred at block `12287507,` so `initialBlock` is used in the `map` module.
 
 **`nft_state`**
 

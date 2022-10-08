@@ -47,16 +47,18 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 | `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept           |
 | `append`            | `string`, `bytes`                        | Both keys are concatenated in order |
 
-_Note, all update policies provide the `delete_prefix` method._
+{% hint style="info" %}
+_**Note**: all update policies provide the `delete_prefix` method._
+{% endhint %}
 
 {% hint style="info" %}
-The **merge strategy** is applied during parallel processing. A module has built two _partial_ stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two _partial_ stores to make it a _complete_ store.
+**Note:** The **merge strategy** is applied during parallel processing. A module has built two _partial_ stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two _partial_ stores to make it a _complete_ store.
 
 The _complete_ store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly.
 {% endhint %}
 
 {% hint style="warning" %}
-To preserve the parallelization capabilities of the system Substreams can never _read_ what it has written or read from a store that is currently being written.
+**Warning:** To preserve the parallelization capabilities of the system Substreams can never _read_ what it has written or read from a store that is currently being written.
 
 To read from a store a downstream module is created with one of its inputs pointing to the store module's output.
 {% endhint %}
@@ -69,7 +71,7 @@ For example, the price for a token could change after transaction B and transact
 
 Ordinals _must be set_ each time a key is set and keys can _only be set in increasing ordinal order_, or with an ordinal equal to the previous.
 
-For instances that require only a single key per block and ordering in the store isn't important the ordinal can simply use a zero value.
+For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 
 ### Store Modes
 
@@ -79,18 +81,22 @@ Data can be consumed in one of two modes when declaring a `store` as an input to
 
 Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed; readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
 
-_Note, lookups are local, in-memory, and extremely fast._
+{% hint style="info" %}
+_**Note:**, Lookups are local, in-memory, and extremely fast!_
+{% endhint %}
 
 {% hint style="info" %}
-`get_last` is the fastest because it queries the store directly.&#x20;
+**Note:** `` The `get_last` method is the fastest because it queries the store directly.&#x20;
 
-`get_first` will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+The `get_first` method will first go through the current block's _deltas_ in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
 
-`get_at` will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
+The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
 {% endhint %}
 
 #### `deltas Mode`
 
 Deltas mode provides the module with _all_ _the_ _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys mutated during that specific block become available.
 
-_Note, when a store is set as an input to the module, it is read-only and cannot be modified, updated, or mutated in any way._
+{% hint style="info" %}
+_**Note:** When a store is set as an input to the module, it is read-only and cannot be modified, updated, or mutated in any way._
+{% endhint %}

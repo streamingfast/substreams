@@ -6,7 +6,10 @@ description: StreamingFast Substreams module types
 
 ### Two Module Types
 
-Substreams uses two types of modules, `map` and `store`. Map modules send and receive bytes. Store modules are stateful, saving and tracking data using simple key-value stores.
+Substreams uses two types of modules, `map` and `store`.&#x20;
+
+* Map modules send and receive bytes.&#x20;
+* Store modules are stateful, saving and tracking data using simple key-value stores.
 
 ### Store Modules
 

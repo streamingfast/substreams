@@ -10,15 +10,19 @@ Modules are small pieces of code, running in a WebAssembly virtual machine. Modu
 
 Modules can also process network history from flat files backed by StreamingFast Firehose. See [Firehose documentation](http://firehose.streamingfast.io/) for additional information.
 
-Modules can have one or more inputs. The inputs can be in the form of a `map` or `store,` or a `Block` or `Clock` received from the blockchain's data source.
+Modules have one or more inputs. The inputs can be in the form of a `map` or `store,` or a `Block` or `Clock` received from the blockchain's data source.
 
 {% hint style="info" %}
-Multiple inputs are made possible because blockchains are clocked. Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable traditional streaming engines.
+**Note:** Multiple inputs are made possible because blockchains are clocked.&#x20;
+
+Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable traditional streaming engines.
 {% endhint %}
+
+#### Single Output
 
 Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes being sent from the module.
 
-Modules can be formed into a graph. Data that is output from one module is used as the input for the subsequent module.
+Modules can be formed into a graph. Data that is output from one module is used as the input for subsequent modules.
 
 In the diagram shown below the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_count` store module tracks the number of transfers that have occurred.
 
@@ -34,4 +38,6 @@ Modules with multiple inputs diagram
 
 All of the modules are executed as a directed acyclic graph (DAG) each time a new `Block` is processed.
 
-_Note, The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution._
+{% hint style="info" %}
+_**Note:** The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution._
+{% endhint %}

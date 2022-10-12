@@ -123,15 +123,10 @@ func New(
 		tracer:                    tracer,
 	}
 	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
-	clientFactory := client.NewFactory(substreamsClientConfig)
-
-	s.workerPool, err = orchestrator.NewWorkerPool(parallelSubRequests, clientFactory)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create worker pool: %w", err)
-	}
+	newSubstreamClientFunc := client.NewFactory(substreamsClientConfig)
 
 	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func(tracer ttrace.Tracer) orchestrator.Worker {
-		return orchestrator.NewRemoteWorker(grpcClient, grpcCallOpts, tracer)
+		return orchestrator.NewRemoteWorker(newSubstreamClientFunc)
 	})
 
 	for _, opt := range opts {

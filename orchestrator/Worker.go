@@ -8,6 +8,7 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/client"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -25,16 +26,14 @@ type Worker interface {
 type NewWorkerFunc func(tracer trace.Tracer) Worker
 
 type RemoteWorker struct {
-	grpcClient pbsubstreams.StreamClient
-	callOpts   []grpc.CallOption
-	tracer     ttrace.Tracer
+	callOpts           []grpc.CallOption
+	tracer             ttrace.Tracer
+	newSubstreamClient client.NewSubstreamClient
 }
 
-func NewRemoteWorker(grpcClient pbsubstreams.StreamClient, callOpts []grpc.CallOption, tracer ttrace.Tracer) *RemoteWorker {
+func NewRemoteWorker(newSubstreamClient client.NewSubstreamClient) *RemoteWorker {
 	return &RemoteWorker{
-		grpcClient: grpcClient,
-		callOpts:   callOpts,
-		tracer:     tracer,
+		newSubstreamClient: newSubstreamClient,
 	}
 }
 
@@ -46,19 +45,33 @@ func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubs
 	defer span.End()
 	start := time.Now()
 
+	zlog.Info("creating gprc client")
+	grpcClient, closeFunc, grpcCallOpts, err := w.newSubstreamClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+	}
+
 	jobLogger := zlog.With(zap.Object("job", job))
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
 	request := job.CreateRequest(requestModules)
 
-	stream, err := w.grpcClient.Blocks(ctx, request, w.callOpts...)
+	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, err
+		}
 		span.SetStatus(codes.Error, err.Error())
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
 	}
 	defer func() {
-		stream.CloseSend()
+		if err := stream.CloseSend(); err != nil {
+			jobLogger.Warn("failed to close stream on job termination", zap.Error(err))
+		}
+		if err := closeFunc(); err != nil {
+			jobLogger.Warn("failed to close grpc client on job termination", zap.Error(err))
+		}
 	}()
 
 	meta, err := stream.Header()

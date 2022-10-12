@@ -1,44 +1,64 @@
+---
+description: StreamingFast Substreams authentication reference
+---
+
 # Authentication
 
-To connect to the Substreams server you will need to get a StreamingFast authentication token. The authentication token is essentially a [JWT](https://jwt.io/) that will give you access to the StreamingFast infrastructure.&#x20;
+### Substreams Authentication
 
-The first step is to get a StreamingFast API key that will allow you to get a token. You can sign up at [https://app.dfuse.io/](https://app.dfuse.io/) to get a key or you can [ask us in discord](https://discord.gg/jZwqxJAvRs).
+A StreamingFast authentication token is required for connecting to the Substreams server.
 
-Once you have your key, you can use this one-liner to get your token:
+An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will grant access to the StreamingFast infrastructure.
+
+### Obtain API key
+
+The API key is required for obtaining an authentication token. Register for an authentication key at [`app.streamingfast.io`](https://app.streamingfast.io).&#x20;
+
+The StreamingFast team is generally available on [Discord](https://discord.gg/jZwqxJAvRs) and can assist with API key __ generation there as well.
+
+### Request Authentication Token
+
+An authentication token must be requested after successfully obtaining the API key.
+
+Use the following command to request the authentication token using the StreamingFast API key.
 
 ```bash
-curl https://auth.dfuse.io/v1/auth/issue -s \
-    --data-binary \
-    '{"api_key":"'$SF_API_KEY'"}' | jq -r .token
+curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key":"your-secret-key"}'
 ```
 
-Once you have obtained a token, you should set it as an ENV variable:
+### Set Environment Variable
+
+The token should be set as an ENV variable through the terminal using the following command. _Note, be sure to surround the token in quotes as seen in the code below._&#x20;
 
 ```
 export SUBSTREAMS_API_TOKEN="your_token"
 ```
 
-The `substreams run`  command will check by default the `SUBSTREAMS_API_TOKEN` environment variable for your StreamingFast authentication token.
+By default the `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token.
 
 {% hint style="info" %}
-**Authentication Token Env Flag**
+_Note:_
 
-You can change the default behavior of the `substreams run` command and specify your own ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar`
+_**Authentication Token Env Flag**_
+
+_The default behavior of the `substreams run` command can use a custom ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar.`_
 {% endhint %}
 
-We suggestion you setup the following `bash` function that you can call to get a token. Dump this function somewhere like `.bashrc`:
+### Environment Variable Script
+
+The following `bash` function can be run from the command line to obtain a token. The following function can be placed in the `.bashrc` file, located in the computer's home directory.&#x20;
 
 ```bash
 # Ask us on Discord for a key
 export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  
 function sftoken {
-    export FIREHOSE_API_TOKEN=$(curl https://auth.dfuse.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
-	export SUBSTREAMS_API_TOKEN=$FIREHOSE_API_TOKEN
+    export FIREHOSE_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
+    export SUBSTREAMS_API_TOKEN=$FIREHOSE_API_TOKEN
     echo Token set on FIREHOSE_API_TOKEN and SUBSTREAMS_API_TOKEN
 }
 ```
 
-Then in your shell, load a key into an environment variable with:
+Issue the following command to the terminal to load the key into the `SUBSTREAMS_API_TOKEN` environment variable.
 
 ```bash
 sftoken

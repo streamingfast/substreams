@@ -1,38 +1,29 @@
+<a href="https://www.streamingfast.io/">
+	<img width="100%" src="https://github.com/streamingfast/substreams/blob/develop/docs/assets/substreams-banner.png" alt="StreamingFast Substreams Banner" />
+</a>
+
 # Substreams
 
 > Developer preview
 
 Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
 
-It enables you to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.
+Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.
 
 
-It has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
-
-Substreams is the successor of https://github.com/streamingfast/sparkle. This iteration enables greater composability, provides similar powers of parallelization, and is a much simpler model to work with.
+Substreams has all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
 ## Documentation
 
-Full documentation is accessible at https://substreams.streamingfast.io.
+Full documentation for installing, running and working with Substreams is available at: https://substreams.streamingfast.io.
 
-### Getting Started
+## Contributing
 
-* [Your First Stream](https://substreams.streamingfast.io/getting-started/your-first-stream)
+**Please first refer to the general
+[StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md)**,
+if you wish to contribute to this code base.
 
-### Concept & Fundamentals
 
-* [Definition](https://substreams.streamingfast.io/concepts/definition)
-* [Comparison](https://substreams.streamingfast.io/concepts/comparison)
-* [Modules](https://substreams.streamingfast.io/concepts/modules)
-  * [Inputs](https://substreams.streamingfast.io/concept-and-fundamentals/modules/inputs)
-  * [Outputs](https://substreams.streamingfast.io/concept-and-fundamentals/modules/outputs)
+## License
 
-### Developer Guide
-
-* [Overview](https://substreams.streamingfast.io/developer-guide/overview)
-* [Installation](https://substreams.streamingfast.io/developer-guide/installation-requirements)
-* [Creating your Manifest](https://substreams.streamingfast.io/developer-guide/creating-your-manifest)
-* [Creating Protobuf Schemas](https://substreams.streamingfast.io/developer-guide/creating-protobuf-schemas)
-* [Setting Up Handlers](https://substreams.streamingfast.io/developer-guide/setting-up-handlers)
-* [Writing Module Handlers](https://substreams.streamingfast.io/developer-guide/writing-module-handlers)
-* [Running Your Substreams](https://substreams.streamingfast.io/developer-guide/running-substreams)
+[Apache 2.0](LICENSE)

@@ -15,6 +15,8 @@ import (
 type ModuleGraph struct {
 	*graph.Mutable
 
+	currentHashesCache map[string][]byte // moduleName => hash
+
 	modules     []*pbsubstreams.Module
 	moduleIndex map[string]int
 	indexIndex  map[int]*pbsubstreams.Module
@@ -22,10 +24,11 @@ type ModuleGraph struct {
 
 func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 	g := &ModuleGraph{
-		Mutable:     graph.New(len(modules)),
-		modules:     modules,
-		moduleIndex: make(map[string]int),
-		indexIndex:  make(map[int]*pbsubstreams.Module),
+		Mutable:            graph.New(len(modules)),
+		modules:            modules,
+		moduleIndex:        make(map[string]int),
+		indexIndex:         make(map[int]*pbsubstreams.Module),
+		currentHashesCache: make(map[string][]byte),
 	}
 
 	for i, module := range modules {
@@ -60,6 +63,13 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 	}
 
 	return g, nil
+}
+
+// ResetGraphHashes is to be called when you want to force a recomputation of the module hashes.
+func (graph *ModuleGraph) ResetGraphHashes() {
+	graph.currentHashesCache = make(map[string][]byte)
+	// TODO: when we support multiple `initialBlock` for a given `moduleName`, we'll want
+	// to make sure we call this between the boundaries, to reset the module hashes.
 }
 
 func (g *ModuleGraph) GetSources() []string {

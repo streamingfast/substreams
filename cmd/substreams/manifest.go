@@ -44,6 +44,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("Doc: " + strings.Replace(doc, "\n", "\n  ", -1))
 	}
 
+	hashes := manifest.NewModuleHashes()
+
 	fmt.Println("Modules:")
 	fmt.Println("----")
 	for modIdx, module := range pkg.Modules.Modules {
@@ -61,7 +63,10 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		default:
 			fmt.Println("Kind: Unknown")
 		}
-		fmt.Println("Hash:", manifest.HashModuleAsString(pkg.Modules, graph, module))
+
+		hashes.HashModule(pkg.Modules, module, graph)
+
+		fmt.Println("Hash:", hashes.Get(module.Name))
 		moduleMeta := pkg.ModuleMeta[modIdx]
 		if moduleMeta != nil && moduleMeta.Doc != "" {
 			fmt.Println("Doc: " + strings.Replace(moduleMeta.Doc, "\n", "\n  ", -1))

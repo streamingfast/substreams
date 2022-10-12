@@ -1,26 +1,22 @@
 ---
-description: Installation instructions for the `substreams` command-line interface.
+description: StreamingFast Substreams CLI installation
 ---
 
 # Installing the CLI
 
-{% hint style="success" %}
-Alternatively to installing the `substreams` locally, you can [use Gitpod to get started quickly](../developer-guide/installation-requirements.md).
-{% endhint %}
+### CLI Installation
 
-### Installing the `substreams` command-line interface
+The Substreams command line interface (CLI) is the main means of interacting with and using the product.
 
-The `substreams` CLI allows you to interact with Substreams endpoints, stream data in real-time, as well as package your own Substreams modules.
+The CLI allows you to connect to Substreams endpoints, stream data in real time, and package custom Substreams modules.
 
-#### From brew (for Mac OS)
+#### Homebrew Installation
 
 ```
 brew install streamingfast/tap/substreams
 ```
 
-#### From pre-compiled binary
-
-Download the binary
+#### Pre-compiled Binary Installation
 
 ```bash
 # Use correct binary for your platform
@@ -28,11 +24,11 @@ LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/la
 curl -L  $LINK  | tar zxf -
 ```
 
-{% hint style="info" %}
-Check [https://github.com/streamingfast/substreams/releases](https://github.com/streamingfast/substreams/releases) and use the latest release available
+{% hint style="warning" %}
+_Important: Check the_ [_official Github repository_](https://github.com/streamingfast/substreams/releases) _to get the latest CLI release available._&#x20;
 {% endhint %}
 
-#### From Source
+#### Substreams Source Installation
 
 ```bash
 git clone git@github.com:streamingfast/substreams
@@ -40,11 +36,15 @@ cd substreams
 go install -v ./cmd/substreams
 ```
 
-### Validation
+### CLI Install Validation
 
-Ensure that `substreams` CLI works as expected:
+Run Substreams passing it the version flag to ensure the CLI is working as expected.
 
 ```bash
 substreams --version
-substreams version 0.0.12 (Commit 7b30088, Built 2022-06-03T18:32:00Z)
+substreams version dev
 ```
+
+{% hint style="info" %}
+_Note:_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._
+{% endhint %}

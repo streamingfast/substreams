@@ -70,17 +70,6 @@ main() {
   fi
 
   goreleaser release $args
-
-  args="${CARGO_PUBISH_ARGS:-}"
-  if [[ "$force" == "false" ]]; then
-    args="--dry-run $args"
-  fi
-
-  # We need to publish one crate at a time, one after the one
-  cargo publish $args --target wasm32-unknown-unknown -p substreams-macro
-
-  maybe_wait_publish
-  cargo publish $args --target wasm32-unknown-unknown -p substreams
 }
 
 cleanup_tag() {

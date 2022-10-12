@@ -1,22 +1,33 @@
-# Creating Protobuf Schemas
+---
+description: StreamingFast Substreams protobuf schemas
+---
 
-Now that our manifest has been written, it is time to create your custom Protobuf definition, the one we'll use as an input/output in your manifest file.
+# Protobuf Schemas
 
-Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data – think XML, but smaller, faster, and simpler. If you have not used Protobuf before, here are a couple of resources to get started:
+### Protobuf Overview
 
-* Protobuf - [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
-* Tutorials - [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
+After creating the Substreams manifest a custom protobuf needs to be defined in the manifest file. The protobuf is used for defining input and output.
 
-We have defined a protobuf \_\_ model as `proto:eth.erc721.v1.Transfers` which represents a list of ERC721 transfers.
+{% hint style="success" %}
+_Tip: Protocol Buffers are Google's language-neutral extensible mechanism for serializing structured data. They are like XML, but smaller, faster, and simpler. Find additional information regarding Protocol Buffers on the_ [_Google website_](https://developers.google.com/protocol-buffers)_._
 
-Firstly, let's create the `proto` folder:
+__\
+__**Google Protobuf Documentation**
 
-```bash
-mkdir proto
-cd proto
-```
+[https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
 
-and in there, create our first protobuf definition file:
+####
+
+#### Google Protobuf Tutorial
+
+[https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
+{% endhint %}
+
+### Protofuf Definition
+
+Define a protobuf model as `proto:eth.erc721.v1.Transfers` representing a list of ERC721 transfers.
+
+Create a proto directory in the substreams directory and then create the protobuf definition file.
 
 {% code title="eth/erc721/v1/erc721.proto" %}
 ```protobuf
@@ -39,18 +50,18 @@ message Transfer {
 {% endcode %}
 
 {% hint style="success" %}
-It is recommended that you use a fully qualified path for your protobuf files, so there are fewer risks of conflict when people build on your [_Substreams Package_](../reference-and-specs/packages.md#dependencies)_._
+_Tip: using a fully qualified path for protobuf files reduces the risk of conflicts when other community members build their own_ [_Substreams Packages_](../reference-and-specs/packages.md#dependencies)_._
 {% endhint %}
 
-Now that we have created our custom Protobuf definition file, we will generate the associated Rust code.
+Next, generate the associated Rust code for the protobuf.
 
 ```bash
 substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"
 ```
 
-You should now see your generated Rust code here `src/pb/eth.erc721.v1.rs`
+The generated Rust code will be created as `src/pb/eth.erc721.v1.rs`
 
-Lastly, we will add a `mod.rs` file in the `src/pb` directory to export the newly generated Rust code:
+Next, add a `mod.rs` file in the `src/pb` directory to export the newly generated Rust code.
 
 {% code title="src/pb/mod.rs" %}
 ```rust

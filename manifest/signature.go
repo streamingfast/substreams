@@ -10,9 +10,27 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+type ModuleHashes struct {
+	cache map[string][]byte
+}
+
+func NewModuleHashes() *ModuleHashes {
+	return &ModuleHashes{
+		cache: make(map[string][]byte),
+	}
+}
+
 type ModuleHash []byte
 
-func HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
+func (m *ModuleHashes) Get(moduleName string) string {
+	return hex.EncodeToString(m.cache[moduleName])
+}
+
+func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
+	if cachedHash := m.cache[module.Name]; cachedHash != nil {
+		return cachedHash
+	}
+
 	buf := bytes.NewBuffer(nil)
 
 	initialBlockBytes := make([]byte, 8)
@@ -44,7 +62,7 @@ func HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, grap
 	buf.WriteString("ancestors")
 	ancestors, _ := graph.AncestorsOf(module.Name)
 	for _, ancestor := range ancestors {
-		sig := HashModule(modules, ancestor, graph)
+		sig := m.HashModule(modules, ancestor, graph)
 		buf.Write(sig)
 	}
 
@@ -54,11 +72,11 @@ func HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, grap
 	h := sha1.New()
 	h.Write(buf.Bytes())
 
-	return h.Sum(nil)
+	output := h.Sum(nil)
+	m.cache[module.Name] = output
+	return output
 }
-func HashModuleAsString(modules *pbsubstreams.Modules, graph *ModuleGraph, module *pbsubstreams.Module) string {
-	return hex.EncodeToString(HashModule(modules, module, graph))
-}
+
 func inputName(input *pbsubstreams.Module_Input) string {
 	switch input.Input.(type) {
 	case *pbsubstreams.Module_Input_Store_:

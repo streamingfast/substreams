@@ -1,38 +1,60 @@
+---
+description: StreamingFast Substreams module inputs
+---
+
 # Inputs
 
-A `map` and `store` module can define one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
+### Data Inputs
 
-### `Source`
+Modules come in two varieties: `map` and `store` and can define one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
 
-An _Input_ of type `source` represent a chain-specific, firehose-provisioned protobuf object.
+#### `Source`
 
-For example, for Substreams on Ethereum you would specify `sf.ethereum.type.v1.Block.`
+An Input of type `source` represents a chain-specific, firehose-provisioned protobuf object.
+
+{% hint style="info" %}
+_**Note:** Find the supported protocols and their corresponding message types in the_ [_Chains & Inputs documentation_](../../reference-and-specs/chains-and-endpoints.md)_._
+{% endhint %}
+
+Ethereum based Substreams implementations would specify `sf.ethereum.type.v2.Block.`&#x20;
+
+The `source` inputs type __ is defined in the Substreams manifest as seen below.
 
 ```yaml
   inputs:
-    - source: sf.ethereum.type.v1.Block
+    - source: sf.ethereum.type.v2.Block
 ```
 
-Another `source` type available on any chains is the `sf.substreams.v1.Clock` object, representing the block number, a block ID and a block timestamp.
+The `sf.substreams.v1.Clock` object is another source type available on any of the supported chains.
 
-### `Map`
+The `sf.substreams.v1.Clock` represents:
 
-An _Input_ of type `map` represents the output of another `map` module. The type of the object would be type defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module. **A map module cannot depend on itself.**
+* the block number,&#x20;
+* a block ID,&#x20;
+* and a block timestamp.
 
-Example:
+#### `Map`
+
+An Input of type `map` represents the output of another `map` module. The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
+
+{% hint style="info" %}
+_**Note:** Map modules **cannot** depend on themselves._
+{% endhint %}
+
+The `map` inputs type __ is defined in the Substreams manifest as seen below.
 
 ```yaml
   inputs:
     - map: my_map
 ```
 
-Read more about maps [here](../../concepts/modules.md#the-map-module-type).
+Find additional information about `maps` in the Substreams [modules documentation](../../concepts/modules.md#the-map-module-type).
 
-### `Store`
+#### `Store`
 
-An _Input_ of type `store` is the state of another store. &#x20;
+An Input of type `store` is the state of another store used with Substreams.
 
-Example:
+The `store` inputs type __ is defined in the Substreams manifest as seen below.
 
 ```yaml
   inputs:
@@ -41,16 +63,30 @@ Example:
     - store: my_store # defaults to mode: get
 ```
 
-There are two possible `mode` that you can define:
+### Modes
 
-* `get`: in this mode you will be provided with a key/value store that is guaranteed to be synced up to the block being processed, readily queryable. **This is the default value.**
-* `delta`: in this mode you will be provided with a protobuf _object_ containing all the changes that occurred in the `store` module in the same block.
+There are two possible modes that can be defined for modules:
 
-{% hint style="warning" %}
-Here are some constraints on stores:
+* `get`
+* and `delta`.
 
-* Stores received as `inputs` are _read-only_.
-* A `store` cannot depend on itself
+#### `get`
+
+Get mode provides a key/value store that is readily queryable and guaranteed to be in sync with the block being processed.&#x20;
+
+{% hint style="info" %}
+_**Note:** `get` mode is the default mode._
 {% endhint %}
 
-Read more about stores [here](../../concepts/modules.md#the-store-module-type).
+#### `delta`
+
+Delta mode provides a protobuf object containing all the changes that occurred in the `store` module in the same block.
+
+{% hint style="warning" %}
+_Important: Stores have constraints defined as_:
+
+* Stores received as `inputs` are read-only.
+* Stores cannot depend on themselves.
+{% endhint %}
+
+Find additional information for `stores` in the Substreams [modules documentation](../../concepts/modules.md#the-store-module-type).

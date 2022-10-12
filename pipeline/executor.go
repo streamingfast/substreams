@@ -98,7 +98,8 @@ func (e *StoreModuleExecutor) String() string {
 	return e.moduleName
 }
 
-func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
+//todo: find better name for vals
+func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) (err error) {
 	ctx, span := e.tracer.Start(ctx, "exec_map")
 	span.SetAttributes(attribute.String("module", e.moduleName))
 	defer span.End()
@@ -106,14 +107,19 @@ func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, 
 	output, found := e.cache.Get(clock)
 	if found {
 		e.mapperOutput = output
+		vals[e.Name()] = output
 		span.SetStatus(codes.Ok, "cache_hit")
 		return nil
 	}
 
-	if err := e.wasmMapCall(ctx, vals, clock); err != nil {
+	var out []byte
+	if out, err = e.wasmMapCall(vals, clock); err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
+	// note: vals is consumed upstream and will be passed to the following modules executing
+	// thus by adding the output of our map. It will be used to configure the next module
+	vals[e.Name()] = out
 
 	if err := e.cache.Set(clock, cursor, e.mapperOutput); err != nil {
 		return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
@@ -144,8 +150,7 @@ func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, c
 		span.SetStatus(codes.Ok, "cache_hit")
 		return nil
 	}
-
-	if err := e.wasmStoreCall(ctx, vals, clock); err != nil {
+	if err := e.wasmStoreCall(vals, clock); err != nil {
 		return err
 	}
 
@@ -163,39 +168,33 @@ func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, c
 	}
 
 	span.SetStatus(codes.Ok, "module_executed")
-
 	return nil
 }
 
-func (e *MapperModuleExecutor) wasmMapCall(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
+func (e *MapperModuleExecutor) wasmMapCall(vals map[string][]byte, clock *pbsubstreams.Clock) (out []byte, err error) {
 	var vm *wasm.Instance
-	if vm, err = e.wasmCall(ctx, vals, clock); err != nil {
-		return err
+	if vm, err = e.wasmCall(vals, clock); err != nil {
+		return nil, err
 	}
 
-	name := e.moduleName
 	if vm != nil {
-		out := vm.Output()
-		vals[name] = out
-		e.mapperOutput = out
-
-	} else {
-		// This means wasm execution was skipped because all inputs were empty.
-		vals[name] = nil
-		e.mapperOutput = nil
+		e.mapperOutput = vm.Output()
+		return e.mapperOutput, nil
 	}
-	return nil
+
+	e.mapperOutput = nil
+	return nil, nil
 }
 
-func (e *StoreModuleExecutor) wasmStoreCall(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
-	if _, err := e.wasmCall(ctx, vals, clock); err != nil {
+func (e *StoreModuleExecutor) wasmStoreCall(vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
+	if _, err := e.wasmCall(vals, clock); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e *BaseExecutor) wasmCall(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock) (instance *wasm.Instance, err error) {
+func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Clock) (instance *wasm.Instance, err error) {
 	hasInput := false
 	for _, input := range e.wasmInputs {
 		switch input.Type {

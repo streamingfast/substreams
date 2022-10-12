@@ -8,12 +8,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
+	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose"
-	firehoseServer "github.com/streamingfast/firehose/server"
 	"github.com/streamingfast/logging"
-	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -46,8 +46,7 @@ type Service struct {
 	storesSaveInterval           uint64
 	outputCacheSaveBlockInterval uint64
 
-	firehoseServer *firehoseServer.Server
-	streamFactory  *firehose.StreamFactory
+	streamFactory *StreamFactory
 
 	logger *zap.Logger
 
@@ -57,6 +56,42 @@ type Service struct {
 	blockRangeSizeSubRequests int
 
 	tracer ttrace.Tracer
+}
+
+type StreamFactory struct {
+	mergedBlocksStore dstore.Store
+	forkedBlocksStore dstore.Store
+	hub               *hub.ForkableHub
+}
+
+func (sf *StreamFactory) New(
+	ctx context.Context,
+	h bstream.Handler,
+	startBlockNum int64,
+	stopBlockNum uint64,
+	cursor string,
+) (*stream.Stream, error) {
+
+	options := []stream.Option{
+		stream.WithStopBlock(stopBlockNum),
+		stream.WithCustomStepTypeFilter(bstream.StepsAll), // substreams always wants new, undo, new+irreversible, irreversible, stalled
+	}
+
+	if cursor != "" {
+		cur, err := bstream.CursorFromOpaque(cursor)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid start cursor %q: %s", cursor, err)
+		}
+		options = append(options, stream.WithCursor(cur))
+	}
+
+	return stream.New(
+		sf.forkedBlocksStore,
+		sf.mergedBlocksStore,
+		sf.hub,
+		startBlockNum,
+		h,
+		options...), nil
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
@@ -78,19 +113,21 @@ func New(
 	blockRangeSizeSubRequests int,
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
-) (*Service, error) {
+) (s *Service, err error) {
 	tracer := otel.GetTracerProvider().Tracer("service")
-	s := &Service{
+	s = &Service{
 		baseStateStore:            stateStore,
 		blockType:                 blockType,
 		parallelSubRequests:       parallelSubRequests,
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		tracer:                    tracer,
 	}
+	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
+	clientFactory := client.NewFactory(substreamsClientConfig)
 
-	grpcClient, _, grpcCallOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+	s.workerPool, err = orchestrator.NewWorkerPool(parallelSubRequests, clientFactory)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+		return nil, fmt.Errorf("failed to create worker pool: %w", err)
 	}
 
 	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func(tracer ttrace.Tracer) orchestrator.Worker {
@@ -104,11 +141,22 @@ func New(
 	return s, nil
 }
 
-func (s *Service) Register(firehoseServer *firehoseServer.Server, streamFactory *firehose.StreamFactory, logger *zap.Logger) {
-	s.streamFactory = streamFactory
-	s.firehoseServer = firehoseServer
+func (s *Service) Register(
+	server dgrpcserver.Server,
+	mergedBlocksStore dstore.Store,
+	forkedBlocksStore dstore.Store,
+	forkableHub *hub.ForkableHub,
+	logger *zap.Logger) {
+
+	sf := &StreamFactory{
+		mergedBlocksStore: mergedBlocksStore,
+		forkedBlocksStore: forkedBlocksStore,
+		hub:               forkableHub,
+	}
+
+	s.streamFactory = sf
 	s.logger = logger
-	firehoseServer.Server.RegisterService(func(gs grpc.ServiceRegistrar) {
+	server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreams.RegisterStreamServer(gs, s)
 	})
 }
@@ -133,6 +181,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	}
 	span.SetAttributes(attribute.String("hostname", hostname))
 
+	logger.Info("serving blocks")
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
 		err := fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
@@ -215,55 +264,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		return nil
 	}
 
-	// TODO: check p.cacheEnabled here also if we make this condition back to true
-	if false && !isSubrequest && len(request.OutputModules) == 1 && len(request.InitialStoreSnapshotForModules) == 0 {
-		moduleName := request.OutputModules[0]
-		module, err := graph.Module(moduleName)
-
-		zlog.Info("try to send module output from cached files", zap.String("module_name", moduleName))
-		if err != nil {
-			span.SetStatus(otelcode.Error, err.Error())
-			return fmt.Errorf("getting module %q from graph: %w", moduleName, err)
-		}
-
-		hash := manifest.HashModuleAsString(request.Modules, graph, module)
-		moduleCacheStore, err := s.baseStateStore.SubStore(fmt.Sprintf("%s/outputs", hash))
-		moduleOutputCache := outputs.NewOutputCache(moduleName, moduleCacheStore, s.outputCacheSaveBlockInterval, zlog)
-
-		lastBlockSent, err := sendCachedModuleOutput(ctx, uint64(request.StartBlockNum), request.StopBlockNum, module, moduleOutputCache, responseHandler)
-		if err != nil {
-			fmt.Println("sending cached module output: %w", err)
-		}
-
-		if lastBlockSent != nil && *lastBlockSent >= request.StopBlockNum {
-			zlog.Info("sent full requested data from cached output", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
-			span.SetStatus(otelcode.Ok, "")
-			return nil // all done
-		}
-
-		if lastBlockSent != nil {
-			zlog.Info("sent cached data", zap.String("module_name", moduleName), zap.Uint64("last_block_sent", *lastBlockSent))
-			// FIXME(abourget): +1 is always smelly, why wouldn't `sendCachedModuleOutput` return a cursor?
-			request.StartBlockNum = int64(*lastBlockSent + 1)
-		}
-
-	}
-
 	pipeTracer := otel.GetTracerProvider().Tracer("pipeline")
 	pipe := pipeline.New(ctx, pipeTracer, request, graph, s.blockType, s.baseStateStore, s.storesSaveInterval, s.outputCacheSaveBlockInterval, s.wasmExtensions, s.blockRangeSizeSubRequests, responseHandler, opts...)
-
-	firehoseReq := &pbfirehose.Request{
-		StartBlockNum:   request.StartBlockNum,
-		StopBlockNum:    request.StopBlockNum,
-		Cursor:          request.StartCursor,
-		FinalBlocksOnly: false,
-		// FIXME(abourget), right now, the pbsubstreams.Request has a
-		// ForkSteps that we IGNORE. Eventually, we will want to honor
-		// it, but ONLY when we are certain that our Pipeline supports
-		// reorgs navigation, which is not the case right now.
-		// FIXME(abourget): will we also honor the IrreversibilityCondition?
-		// perhaps on the day we actually support it in the Firehose :)x
-	}
 
 	if err := pipe.Init(s.workerPool); err != nil {
 		span.SetStatus(otelcode.Error, err.Error())
@@ -271,16 +273,29 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	}
 
 	zlog.Info("creating firehose stream",
-		zap.Int64("start_block", firehoseReq.StartBlockNum),
-		zap.Uint64("end_block", firehoseReq.StopBlockNum),
+		zap.Int64("start_block", request.StartBlockNum),
+		zap.Uint64("end_block", request.StopBlockNum),
 	)
-	blockStream, err := s.streamFactory.New(ctx, pipe, firehoseReq, false, zap.NewNop())
+	blockStream, err := s.streamFactory.New(
+		ctx,
+		pipe,
+		request.StartBlockNum,
+		request.StopBlockNum,
+		request.StartCursor,
+	)
 	if err != nil {
 		span.SetStatus(otelcode.Error, err.Error())
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 	if err := blockStream.Run(ctx); err != nil {
-		if errors.Is(err, io.EOF) {
+		if errors.Is(err, stream.ErrStopBlockReached) {
+			logger.Debug("stream of blocks reached end block, triggering StoreSave", zap.Uint64("stop_block_num", request.StopBlockNum))
+			if err := pipe.HandleStoreSaveBoundaries(ctx, span, request.StopBlockNum); err != nil { // treat StopBlockNum as possible boundaries (if chain has holes...)
+				return err
+			}
+		}
+
+		if errors.Is(err, io.EOF) || errors.Is(err, stream.ErrStopBlockReached) {
 			var d []string
 			for _, rng := range pipe.PartialsWritten() {
 				d = append(d, fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock))
@@ -288,12 +303,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			partialsWritten := []string{strings.Join(d, ",")}
 			zlog.Info("setting trailer", zap.Strings("ranges", partialsWritten))
 			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": partialsWritten})
-			span.SetStatus(otelcode.Ok, "")
-			return nil
-		}
-
-		if errors.Is(err, stream.ErrStopBlockReached) {
-			logger.Info("stream of blocks reached end block")
 			span.SetStatus(otelcode.Ok, "")
 			return nil
 		}

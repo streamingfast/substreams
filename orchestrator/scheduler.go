@@ -77,10 +77,12 @@ out:
 
 		switch err.(type) {
 		case *RetryableErr:
-			zlog.Debug("retryable error")
+			zlog.Debug("retryable error", zap.Error(err))
 			continue
 		default:
-			zlog.Debug("not a retryable error")
+			if err != nil {
+				zlog.Debug("not a retryable error", zap.Error(err))
+			}
 			break out
 		}
 	}

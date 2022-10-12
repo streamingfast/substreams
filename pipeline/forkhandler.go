@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputs"
@@ -39,11 +40,11 @@ func (f *ForkHandler) handleUndo(
 	return nil
 }
 
-func (f *ForkHandler) handleIrreversible(blockNumber uint64) {
+func (f *ForkHandler) removeReversibleOutput(blockNumber uint64) {
 	delete(f.reversibleOutputs, blockNumber)
 }
 
-func (f *ForkHandler) addModuleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockNum uint64) {
+func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockNum uint64) {
 	f.reversibleOutputs[blockNum] = append(f.reversibleOutputs[blockNum], moduleOutput)
 }
 

@@ -60,7 +60,7 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 	saveInterval := mustGetUint64(cmd, "save-interval")
 	startBlock := outputs.ComputeStartBlock(blockNumber, saveInterval)
 
-	store, _, err := dstore.NewStoreFromURL(storeUrl)
+	store, err := dstore.NewSimpleStore(storeUrl)
 	if err != nil {
 		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
 	}
@@ -80,18 +80,20 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
+	hashes := manifest.NewModuleHashes()
+
 	var hash string
 	var protoDefinition string
+	var found bool
 	for _, module := range pkg.Modules.Modules {
 		if module.Name == moduleName {
-			hash = manifest.HashModuleAsString(pkg.Modules, moduleGraph, module)
+			found = true
+			hashes.HashModule(pkg.Modules, module, moduleGraph)
+			hash = hashes.Get(module.Name)
 			protoDefinition = module.Output.GetType()
 		}
 	}
-
-	hash = "6f6559bc7955c183aedd5fb3da1df3a0a32d5888"
-
-	if hash == "" {
+	if !found {
 		return fmt.Errorf("module name not found %q", moduleName)
 	}
 
@@ -101,7 +103,7 @@ func runDecodeOutput(cmd *cobra.Command, args []string) error {
 	}
 
 	outputCache := outputs.NewOutputCache(moduleName, moduleStore, saveInterval, zlog)
-	found, err := outputCache.LoadAtBlock(cmd.Context(), startBlock)
+	found, err = outputCache.LoadAtBlock(cmd.Context(), startBlock)
 	if err != nil {
 		return fmt.Errorf("loading cache: %w", err)
 	}
@@ -152,7 +154,7 @@ func runDecodeStore(cmd *cobra.Command, args []string) error {
 	saveInterval := mustGetUint64(cmd, "save-interval")
 	startBlock := outputs.ComputeStartBlock(blockNumber, saveInterval)
 
-	store, _, err := dstore.NewStoreFromURL(storeUrl)
+	store, err := dstore.NewSimpleStore(storeUrl)
 	if err != nil {
 		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
 	}
@@ -172,21 +174,24 @@ func runDecodeStore(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
+	hashes := manifest.NewModuleHashes()
+
 	var hash string
 	var protoDefinition string
+	var found bool
 	var pbModule *pbsubstreams.Module
 	for _, module := range pkg.Modules.Modules {
 		if module.Name == moduleName {
-			hash = manifest.HashModuleAsString(pkg.Modules, moduleGraph, module)
+			found = true
+			hashes.HashModule(pkg.Modules, module, moduleGraph)
+			hash = hashes.Get(module.Name)
 			protoDefinition = module.GetKindStore().GetValueType()
 			pbModule = module
 		}
 	}
-
-	if hash == "" {
+	if !found {
 		return fmt.Errorf("module name not found %q", moduleName)
 	}
-	hash = "2d5d4eca48116399e881cabf533226fefda50f9e"
 
 	moduleStore, err := state.NewStore(moduleName, saveInterval, pbModule.InitialBlock, hash, pbModule.GetKindStore().GetUpdatePolicy(), pbModule.GetKindStore().GetValueType(), store, zlog)
 	if err != nil {

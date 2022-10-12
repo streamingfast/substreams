@@ -56,8 +56,9 @@ func Test_HashModule(t *testing.T) {
 	}
 
 	graph, _ := NewModuleGraph(manifest.Modules)
-	hashMapPoolsCreated := HashModule(manifest, mapPoolsCreatedModule, graph)
-	hashMapPoolsInitialized := HashModule(manifest, mapPoolsInitializationModule, graph)
+	hashes := NewModuleHashes()
+	hashMapPoolsCreated := hashes.HashModule(manifest, mapPoolsCreatedModule, graph)
+	hashMapPoolsInitialized := hashes.HashModule(manifest, mapPoolsInitializationModule, graph)
 
 	require.NotEqual(t, hashMapPoolsInitialized, hashMapPoolsCreated)
 }

@@ -1,12 +1,20 @@
+---
+description: StreamingFast Substreams module outputs
+---
+
 # Outputs
 
-A `map` module can define one output, which is the protobuf data type it announces it will produce.&#x20;
+### Data Outputs
 
-A `store` modules cannot define an output
+A `map` module can define one output. The output is the protobuf data type the module will produce.
+
+{% hint style="info" %}
+_**Note:**  `store` modules **cannot** define an output._
+{% endhint %}
+
+An output object has an attribute `type` that defines the type of the output for the `map` module. The output definition is found in the manifest for the Substreams implementation.
 
 ```yaml
 output:
     type: proto:eth.erc721.v1.Transfers
 ```
-
-An output object has an attribute `type` that defines the type of the output of the `map` module.

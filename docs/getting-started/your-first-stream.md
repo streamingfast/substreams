@@ -1,38 +1,58 @@
-# Get Streaming
+---
+description: Get streaming with StreamingFast Substreams
+---
 
-{% hint style="info" %}
-Make sure you first [installed the `substreams` CLI](installing-the-cli.md).
+# Start Streaming
+
+### Authentication
+
+A StreamingFast authentication token is required to connect to the Substreams server. Additional information is provided for [obtaining an authentication token](../reference-and-specs/authentication.md) in the references section of the documentation.
+
+{% hint style="warning" %}
+_Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to continue._
 {% endhint %}
 
-#### Authentication
+### Run First Substream
 
-To connect to the Substreams server you will need to get a StreamingFast authentication token. Follow [these steps](../reference-and-specs/authentication.md).
-
-### Run your first Stream
-
-Once you have setup your StreamingFast authentication token and your `CLI` tool you can now run your Substreams.
+Once the StreamingFast authentication token has been attained and the Substreams CLI has been installed it's time to run Substreams.
 
 ```bash
-substreams run -e api-dev.streamingfast.io:443 \
-   https://github.com/streamingfast/substreams-template/releases/download/v0.1.0/substreams-template-v0.1.0.spkg \
-   map_transfers \
-   --start-block 12292922 \
-   --stop-block +1
+substreams run -e api-dev.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
 
-Let's break down everything happening above.
-
-* `substreams`: is our executable (the `CLI` tool you installed)
-* `-e api-dev.streamingfast.io:443`: is the provider that will run your Substreams
-* `https://github.com/../substreams-template-v0.5.0.spkg` : Path to the Substreams you wish to run. This examples points to our [template Substreams](https://github.com/streamingfast/substreams-template). This can be an `.spkg` or a `substreams.yaml` file.
-* `map_transfers`: this is the module which we want to run, defined in the manifest
-* `--start-block 12292922`: start mapping as of block `12292922`
-* `--stop-block +1` only request a single block (stop block will be start block + 1)\\
-
 {% hint style="info" %}
-**Packages & Manifest**
-
-The example above runs a Substreams based on a published `.spkg` file (a.k.a [Package](../reference-and-specs/packages.md)). You can also run a Substreams by pointing it directly to a .yaml file (a.k.a [Manifest](../reference-and-specs/manifests.md)).
-
-You can think of Package as published Substreams that you can utilize and start streaming data right away.
+Note: A full explanation for the Substreams run command is provided in the [Using the CLI documentation](../reference-and-specs/using-the-cli.md).
 {% endhint %}
+
+### Explanation
+
+#### Substreams Run
+
+First, start the Substreams CLI tool using the `run` command.
+
+#### Endpoint
+
+The endpoint is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
+`-e api-dev.streamingfast.io:443`
+
+#### Substreams Package
+
+The Substreams package being run is also passed to the `substreams` command. [https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg ](https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg)\
+
+
+This example points to the StreamingFast Substreams Template in the form of a `.spkg` file. In full Substreams setups, a configuration file `substreams.yaml` is generally used.
+
+#### Module
+
+The `map_transfers` module is defined in the manifest and it is the module that will be run by Substreams.
+
+#### Block Mapping
+
+Start mapping at the specific block 12292922 by using passing the flag and block number. \
+`--start-block 12292922`
+
+Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
+
+### Next steps
+
+At this point, the Substreams CLI is installed and should be functioning correctly. Simple data was sent back to the terminal to provide an idea of what is now possible. The [Developer Guide](broken-reference) provides an in-depth look at Substreams and how to target specific blockchain data.

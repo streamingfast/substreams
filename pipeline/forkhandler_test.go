@@ -1,10 +1,11 @@
 package pipeline
 
 import (
+	"testing"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/state"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var reversibleOutputs = map[uint64][]*pbsubstreams.ModuleOutput{
@@ -104,7 +105,7 @@ func Test_HandleIrreversibility(t *testing.T) {
 				reversibleOutputs: reversibleOutputs,
 			}
 			for _, blockNum := range test.blockNumbers {
-				forkHandler.handleIrreversible(blockNum)
+				forkHandler.removeReversibleOutput(blockNum)
 			}
 			require.Equal(t, test.expectedOutputs, forkHandler.reversibleOutputs)
 		})

@@ -1,32 +1,42 @@
-# Substreams
+---
+description: StreamingFast Substreams documentation
+---
 
-> Developer Preview
+# 🔀 Substreams
 
-Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
+### Where to Start
 
-It enables you to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.
+First, read through the [basic concepts](broken-reference) and study the [visual diagram. ](concept-and-fundamentals/visual-diagram.md)Next, review the [definition](concepts/definition.md) and [comparison](broken-reference) documentation.&#x20;
 
-It has all the benefits of the Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+For developers looking to work with and create Substreams [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md).
 
-Substreams is the successor of [https://github.com/streamingfast/sparkle](https://github.com/streamingfast/sparkle). This iteration enables greater composability, provides similar powers of parallelization, and is a much simpler model to work with.
+Take a moment to learn about [modules](concepts/modules.md) before moving on to the [Developer Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 
-## Getting Started
+#### Introduction Video
 
-[Install the CLI](getting-started/installing-the-cli.md) and then run [run your first stream](getting-started/your-first-stream.md).
+For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substreams users gain an understanding to provide a deeper context.
 
-## Resources
+{% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
+Learn about Substreams from StreamingFast's Alex.
+{% endembed %}
 
-* Checkout our [Getting Started Guide](developer-guide/overview.md)
-* Take a look at the [Substreams Template](https://github.com/streamingfast/substreams-template) repository for a sample Substreams
-* Take a look at the [Substreams Playground](https://github.com/streamingfast/substreams-playground) repository for more learnings and examples
+{% hint style="warning" %}
+_Important: Code examples in the Introduction video are slightly outdated. Please refer to the_ [_Developer Guide_](broken-reference) _and_ [_Reference_](broken-reference) _section of the documentation for updated information_.
+{% endhint %}
 
-## Community
+### Community
 
-Need any help? Reach out!
+_**Need help? Reach out!**_
+
+Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
+
+Connect with the StreamingFast team on Discord!
 
 * [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
+* [StreamingFast on Twitter](https://twitter.com/streamingfastio)
+* [StreamingFast on YouTube](https://www.youtube.com/c/streamingfast)
 
-## License
+### License
 
-[Apache 2.0](../LICENSE/)
+Substreams is currently licensed under [Apache 2.0](../LICENSE/).

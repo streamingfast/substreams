@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 
 	"github.com/streamingfast/dgrpc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -25,6 +26,7 @@ type SubstreamsClientConfig struct {
 	insecure  bool
 	plaintext bool
 }
+type Factory = func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error)
 
 func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plaintext bool) *SubstreamsClientConfig {
 	return &SubstreamsClientConfig{
@@ -35,9 +37,31 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 	}
 }
 
+var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
+
+func NewFactory(config *SubstreamsClientConfig) Factory {
+	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
+
+	if bootStrapFilename == "" {
+		zlog.Info("setting up basic grpc client factory (no XDS bootstrap)")
+
+		return func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+			return NewSubstreamsClient(config)
+		}
+	}
+
+	zlog.Info("setting up xds grpc client factory", zap.String("GRPC_XDS_BOOTSTRAP", bootStrapFilename))
+
+	noop := func() error { return nil }
+	cli, _, callOpts, err := NewSubstreamsClient(config)
+	return func() (pbsubstreams.StreamClient, func() error, []grpc.CallOption, error) {
+		return cli, noop, callOpts, err
+	}
+}
+
 func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 	if config == nil {
-		panic("substreams client config not set")
+		return nil, nil, nil, fmt.Errorf("substreams client config not set")
 	}
 	endpoint := config.endpoint
 	jwt := config.jwt
@@ -46,8 +70,11 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 
 	zlog.Info("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""), zap.Bool("plaintext", usePlainTextConnection), zap.Bool("insecure", useInsecureTLSConnection))
 
+	if !portSuffixRegex.MatchString(endpoint) {
+		return nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
+	}
+
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
-	zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
 
 	var dialOptions []grpc.DialOption
 	skipAuth := jwt == "" || usePlainTextConnection
@@ -59,32 +86,18 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 		}
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	} else {
+		if useInsecureTLSConnection && usePlainTextConnection {
+			return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
+		}
+		switch {
+		case usePlainTextConnection:
+			zlog.Debug("setting plain text option")
 
-		bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
-		zlog.Info("looked for GRPC_XDS_BOOTSTRAP", zap.String("filename", bootStrapFilename))
+			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
-		var dialOptions []grpc.DialOption
-		if bootStrapFilename != "" {
-			log.Println("Using xDS credentials...")
-			creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
-			}
-			dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
-		} else {
-			if useInsecureTLSConnection && usePlainTextConnection {
-				return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
-			}
-			switch {
-			case usePlainTextConnection:
-				zlog.Debug("setting plain text option")
-
-				dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-
-			case useInsecureTLSConnection:
-				zlog.Debug("setting insecure tls connection option")
-				dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
-			}
+		case useInsecureTLSConnection:
+			zlog.Debug("setting insecure tls connection option")
+			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
 		}
 	}
 

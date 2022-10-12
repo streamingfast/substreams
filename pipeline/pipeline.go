@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/metrics"
 	"io"
 	"math"
 	"runtime/debug"
@@ -43,10 +44,11 @@ type Pipeline struct {
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
 
-	context  context.Context
-	request  *pbsubstreams.Request
-	graph    *manifest.ModuleGraph
-	respFunc func(resp *pbsubstreams.Response) error
+	context      context.Context
+	request      *pbsubstreams.Request
+	graph        *manifest.ModuleGraph
+	moduleHashes *manifest.ModuleHashes
+	respFunc     func(resp *pbsubstreams.Response) error
 
 	modules              []*pbsubstreams.Module
 	outputModuleMap      map[string]bool
@@ -136,6 +138,17 @@ func GetTraceID(ctx context.Context) (out ttrace.TraceID) {
 	span := ttrace.SpanFromContext(ctx)
 	return span.SpanContext().TraceID()
 }
+
+func (p *Pipeline) computeModuleHashes() {
+	p.moduleHashes = manifest.NewModuleHashes()
+
+	for _, module := range p.modules {
+		if p.outputModuleMap[module.Name] {
+			p.moduleHashes.HashModule(p.request.Modules, module, p.graph)
+		}
+	}
+}
+
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	ctx := p.context
 	traceID := GetTraceID(ctx)
@@ -143,6 +156,13 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	ctx, span := p.tracer.Start(ctx, "pipeline_init")
 	defer span.End()
+	defer func() {
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
+	}()
 
 	p.logger.Info("initializing handler", zap.Uint64("requested_start_block", p.requestedStartBlockNum), zap.Uint64("requested_stop_block", p.request.StopBlockNum), zap.Bool("is_backprocessing", p.isSubrequest), zap.Strings("outputs", p.request.OutputModules))
 
@@ -153,19 +173,19 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("building pipeline: %w", err)
 	}
 
+	p.computeModuleHashes()
+
 	for _, module := range p.modules {
 		isOutput := p.outputModuleMap[module.Name]
 
 		if isOutput && p.requestedStartBlockNum < module.InitialBlock {
 			err := fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.requestedStartBlockNum, module.Name, module.InitialBlock)
-			span.SetStatus(codes.Error, err.Error())
 			return err
 		}
 
-		hash := manifest.HashModuleAsString(p.request.Modules, p.graph, module)
+		hash := p.moduleHashes.Get(module.Name)
 		_, err := p.moduleOutputCache.RegisterModule(module, hash, p.baseStateStore)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("registering output cache for module %q: %w", module.Name, err)
 		}
 	}
@@ -174,7 +194,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	initialStoreMap, err := p.buildStoreMap()
 	p.logger.Info("stores load", zap.Int("number_of_stores", len(initialStoreMap)))
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("building store map: %w", err)
 	}
 
@@ -195,7 +214,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 				zap.Bool("is_last_store", isLastStore),
 				zap.Int("output_module_count", totalOutputModules))
 			err := fmt.Errorf("invalid conditions to backprocess leaf store %q", outputName)
-			span.SetStatus(codes.Error, err.Error())
 			return err
 		}
 
@@ -204,7 +222,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		backProcessingStore.Roll(p.requestedStartBlockNum)
 
 		if err = loadCompleteStores(ctx, initialStoreMap, p.requestedStartBlockNum); err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("loading stores: %w", err)
 		}
 
@@ -213,7 +230,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	} else {
 		backProcessedStores, err := p.backProcessStores(ctx, workerPool, initialStoreMap)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("synchronizing stores: %w", err)
 		}
 
@@ -227,7 +243,6 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		if len(p.request.InitialStoreSnapshotForModules) != 0 {
 			p.logger.Info("sending snapshot", zap.Strings("modules", p.request.InitialStoreSnapshotForModules))
 			if err := p.sendSnapshots(p.request.InitialStoreSnapshotForModules); err != nil {
-				span.SetStatus(codes.Error, err.Error())
 				return fmt.Errorf("send initial snapshots: %w", err)
 			}
 		}
@@ -237,25 +252,41 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 
 	err = p.buildWASM(ctx, p.request, p.modules)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
 	for _, cache := range p.moduleOutputCache.OutputCaches {
 		atBlock := outputs.ComputeStartBlock(p.requestedStartBlockNum, p.outputCacheSaveBlockInterval)
 		if _, err := cache.LoadAtBlock(ctx, atBlock); err != nil {
-			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("loading outputs caches")
 		}
 	}
 
-	span.SetStatus(codes.Ok, "")
 	return nil
 }
 
 func (p *Pipeline) initStoreSaveBoundary() {
 	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.requestedStartBlockNum)
 }
+
+func (p *Pipeline) HandleStoreSaveBoundaries(ctx context.Context, span ttrace.Span, blockNum uint64) error {
+	for p.nextStoreSaveBoundary <= blockNum {
+		p.logger.Debug("saving stores on boundary", zap.Uint64("block_num", p.nextStoreSaveBoundary))
+		span.AddEvent("store_save_boundary_reach")
+		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
+			if span != nil {
+				span.SetStatus(codes.Error, err.Error())
+			}
+			return fmt.Errorf("saving stores: %w", err)
+		}
+		p.bumpStoreSaveBoundary()
+		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
+			break
+		}
+	}
+	return nil
+}
+
 func (p *Pipeline) bumpStoreSaveBoundary() bool {
 	p.nextStoreSaveBoundary = p.computeNextStoreSaveBoundary(p.nextStoreSaveBoundary)
 	return p.request.StopBlockNum == p.nextStoreSaveBoundary
@@ -270,6 +301,7 @@ func (p *Pipeline) computeNextStoreSaveBoundary(fromBlock uint64) uint64 {
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	ctx, span := p.tracer.Start(p.context, "process_block")
+	metrics.BlockBeginProcess.Inc()
 	span.SetAttributes(attribute.Int64("block_num", int64(block.Num())))
 	defer span.End()
 
@@ -281,7 +313,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 			p.logger.Error(string(debug.Stack()))
 			span.SetStatus(codes.Error, err.Error())
 		}
-		if err == io.EOF || err == nil { //graceful completion
+		if err != nil {
 			for _, hook := range p.postJobHooks {
 				if err := hook(ctx, p.clock); err != nil {
 					p.logger.Warn("post job hook failed", zap.Error(err))
@@ -301,109 +333,97 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
 
-	if step == bstream.StepUndo {
+	switch {
+
+	case step.Matches(bstream.StepUndo):
 		span.AddEvent("handling_step_undo")
 		if err = p.forkHandler.handleUndo(p.clock, cursor, p.moduleOutputCache, p.storeMap, p.respFunc); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("reverting outputs: %w", err)
 		}
 		return nil
+
+	case step.Matches(bstream.StepStalled):
+		p.forkHandler.removeReversibleOutput(block.Number)
+		return nil
+
+	case step.Matches(bstream.StepNew):
+		for _, hook := range p.preBlockHooks {
+			span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
+			if err := hook(ctx, p.clock); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return fmt.Errorf("pre block hook: %w", err)
+			}
+		}
+
+		if err := p.HandleStoreSaveBoundaries(ctx, span, blockNum); err != nil {
+			return err
+		}
+		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
+			p.logger.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
+			if err := p.moduleOutputCache.Flush(ctx); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return fmt.Errorf("saving partial caches")
+			}
+			return io.EOF
+		}
+
+		if err = p.assignBlock(block); err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			return fmt.Errorf("setting up sources: %w", err)
+		}
+
+		ctx, execSpan := p.tracer.Start(ctx, "modules_executions")
+		for _, executor := range p.moduleExecutors {
+			err = p.runExecutor(ctx, executor, cursor.ToOpaque())
+			if err != nil {
+				//if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
+				//	return fmt.Errorf("progress error: %w", returnErr)
+				//}
+				return err
+			}
+		}
+		metrics.BlockEndProcess.Inc()
+		execSpan.End()
+
+		// Snapshot all outputs, in case we undo
+		// map[block_id]outputs
+
+		if shouldReturnProgress(p.isSubrequest) {
+			if err := p.returnModuleProgressOutputs(); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return err
+			}
+		}
+
+		if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
+			p.logger.Debug("will return module outputs")
+			if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
+				span.SetStatus(codes.Error, err.Error())
+				return err
+			}
+		}
+
+		for _, s := range p.storeMap {
+			s.Flush()
+		}
+
+		p.moduleOutputs = nil
+		p.wasmOutputs = map[string][]byte{}
+		p.logger.Debug("block processed", zap.Uint64("block_num", block.Number))
+		span.SetStatus(codes.Ok, "")
+		// not returning here, we may also match irreversible
 	}
 
-	if step == bstream.StepIrreversible {
+	if step.Matches(bstream.StepIrreversible) {
+		span.AddEvent("updating_module_output_cache")
 		if err = p.moduleOutputCache.Update(ctx, p.currentBlockRef); err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("updating module output cache: %w", err)
 		}
+		p.forkHandler.removeReversibleOutput(block.Number)
 	}
 
-	if step == bstream.StepIrreversible {
-		// todo: should we send the output??
-		span.AddEvent("handling_step_irreversible")
-		p.forkHandler.handleIrreversible(block.Number)
-	}
-
-	if step == bstream.StepStalled {
-		span.AddEvent("handling_step_stalled")
-		p.forkHandler.handleIrreversible(block.Number)
-		return nil
-	}
-
-	for _, hook := range p.preBlockHooks {
-		span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
-		if err := hook(ctx, p.clock); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("pre block hook: %w", err)
-		}
-	}
-
-	// NOTE: the tests for this code test on a COPY of these lines: (TestBump)
-	for p.nextStoreSaveBoundary <= blockNum {
-		p.logger.Debug("saving stores on boundary", zap.Uint64("block_num", p.nextStoreSaveBoundary))
-		span.AddEvent("store_save_boundary_reach")
-		if err := p.saveStoresSnapshots(ctx, p.nextStoreSaveBoundary); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("saving stores: %w", err)
-		}
-		p.bumpStoreSaveBoundary()
-		if isStopBlockReached(blockNum, p.request.StopBlockNum) {
-			break
-		}
-	}
-
-	if isStopBlockReached(blockNum, p.request.StopBlockNum) {
-		p.logger.Debug("about to save cache output", zap.Uint64("clock", blockNum), zap.Uint64("stop_block", p.request.StopBlockNum))
-		if err := p.moduleOutputCache.Flush(ctx); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("saving partial caches")
-		}
-		return io.EOF
-	}
-
-	if err = p.assignSource(block); err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("setting up sources: %w", err)
-	}
-
-	ctx, execSpan := p.tracer.Start(ctx, "modules_executions")
-	for _, executor := range p.moduleExecutors {
-		err = p.runExecutor(ctx, executor, cursor.ToOpaque())
-		if err != nil {
-			//if returnErr := p.returnFailureProgress(err, executor); returnErr != nil {
-			//	return fmt.Errorf("progress error: %w", returnErr)
-			//}
-			return err
-		}
-	}
-	execSpan.End()
-
-	// Snapshot all outputs, in case we undo
-	// map[block_id]outputs
-
-	if shouldReturnProgress(p.isSubrequest) {
-		if err := p.returnModuleProgressOutputs(); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return err
-		}
-	}
-
-	if shouldReturnDataOutputs(blockNum, p.requestedStartBlockNum, p.isSubrequest) {
-		p.logger.Debug("will return module outputs")
-		if err := returnModuleDataOutputs(p.clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return err
-		}
-	}
-
-	for _, s := range p.storeMap {
-		s.Flush()
-	}
-
-	p.moduleOutputs = nil
-	p.wasmOutputs = map[string][]byte{}
-
-	p.logger.Debug("block processed", zap.Uint64("block_num", block.Number))
-	span.SetStatus(codes.Ok, "")
 	return nil
 }
 
@@ -445,7 +465,7 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, cur
 				LogsTruncated: truncated,
 			}
 			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
-			p.forkHandler.addModuleOutput(moduleOutput, p.clock.Number)
+			p.forkHandler.addReversibleOutput(moduleOutput, p.clock.Number)
 		}
 	}
 
@@ -535,7 +555,7 @@ func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecuto
 	return p.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
-func (p *Pipeline) assignSource(block *bstream.Block) error {
+func (p *Pipeline) assignBlock(block *bstream.Block) error {
 	switch p.vmType {
 	case "wasm/rust-v1":
 		blkBytes, err := block.Payload.Get()
@@ -749,7 +769,7 @@ func (p *Pipeline) buildStoreMap() (storeMap map[string]*state.Store, err error)
 			storeModule.Name,
 			p.storeSaveInterval,
 			storeModule.InitialBlock,
-			manifest.HashModuleAsString(p.request.Modules, p.graph, storeModule),
+			p.moduleHashes.Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			p.baseStateStore,

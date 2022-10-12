@@ -4,8 +4,10 @@ package:
   version: v0.1.0
 
 protobuf:
+  files:
+#    - "sf/substreams/v1/test/test.proto"
   importPaths:
-    - ./proto
+    - ../../../proto
 
 binaries:
   default:

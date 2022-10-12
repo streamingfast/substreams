@@ -39,7 +39,7 @@ func (g LinearBlockGenerator) Generate() []*pbsubstreamstest.Block {
 		blocks = append(blocks, &pbsubstreamstest.Block{
 			Id:     "block-" + strconv.FormatUint(i, 10),
 			Number: i,
-			Step:   int32(bstream.StepIrreversible),
+			Step:   int32(bstream.StepNewIrreversible),
 		})
 	}
 	return blocks
@@ -49,17 +49,14 @@ type TestWorker struct {
 	t                 *testing.T
 	moduleGraph       *manifest.ModuleGraph
 	responseCollector *responseCollector
+	newBlockGenerator NewTestBlockGenerator
 }
 
 func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
-	blockGenerator := LinearBlockGenerator{
-		startBlock:         uint64(req.StartBlockNum),
-		inclusiveStopBlock: req.StopBlockNum,
-	}
 
-	_ = processRequest(w.t, req, w.moduleGraph, blockGenerator, nil, w.responseCollector, true)
+	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true)
 	//todo: cumulate responses
 
 	return block.Ranges{
@@ -87,7 +84,7 @@ type responseCollector struct {
 	responses []*pbsubstreams.Response
 }
 
-func NewResponseCollector() *responseCollector {
+func newResponseCollector() *responseCollector {
 	return &responseCollector{
 		responses: []*pbsubstreams.Response{},
 	}
@@ -98,7 +95,9 @@ func (c *responseCollector) Collect(resp *pbsubstreams.Response) error {
 	return nil
 }
 
-func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, generator TestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool) (out []*pbsubstreams.Response) {
+type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator
+
+func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool) (out []*pbsubstreams.Response) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -125,6 +124,8 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 	if err := pipe.Init(workerPool); err != nil {
 		require.NoError(t, err)
 	}
+
+	generator := newGenerator(uint64(request.StartBlockNum), request.StopBlockNum)
 
 	for _, b := range generator.Generate() {
 		o := &Obj{
@@ -183,7 +184,7 @@ type TestMapOutput struct {
 	Result     *pbsubstreamstest.MapResult `json:"result"`
 }
 
-func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string) (moduleOutputs []string) {
+func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator) (moduleOutputs []string) {
 	//_, _ = logging.ApplicationLogger("test", "test")
 
 	err := os.RemoveAll("/tmp/test.store")
@@ -200,21 +201,17 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		OutputModules: moduleNames,
 	}
 
-	responseCollector := NewResponseCollector()
+	responseCollector := newResponseCollector()
 	workerPool := orchestrator.NewWorkerPool(1, func(tracer ttrace.Tracer) orchestrator.Worker {
 		return &TestWorker{
 			t:                 t,
 			moduleGraph:       moduleGraph,
-			responseCollector: NewResponseCollector(),
+			responseCollector: newResponseCollector(),
+			newBlockGenerator: newBlockGenerator,
 		}
 	})
 
-	blockGenerator := LinearBlockGenerator{
-		startBlock:         uint64(request.StartBlockNum),
-		inclusiveStopBlock: request.StopBlockNum,
-	}
-
-	processRequest(t, request, moduleGraph, blockGenerator, workerPool, responseCollector, false)
+	processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false)
 
 	for _, response := range responseCollector.responses {
 		switch r := response.Message.(type) {
@@ -283,7 +280,13 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	moduleOutputs := runTest(t, 10, 12, []string{"map_test"})
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	moduleOutputs := runTest(t, 10, 12, []string{"map_test"}, newBlockGenerator)
 	require.Equal(t, []string{
 		`{"name":"map_test","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"map_test","result":{"block_number":11,"block_hash":"block-11"}}`,
@@ -291,7 +294,13 @@ func Test_SimpleMapModule(t *testing.T) {
 }
 
 func Test_store_add_int64(t *testing.T) {
-	moduleOutputs := runTest(t, 10, 13, []string{"store_add_int64"})
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	moduleOutputs := runTest(t, 10, 13, []string{"store_add_int64"}, newBlockGenerator)
 	require.Equal(t, []string{
 		`{"name":"store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
 		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
@@ -300,7 +309,13 @@ func Test_store_add_int64(t *testing.T) {
 }
 
 func Test_store_map_result(t *testing.T) {
-	moduleOutputs := runTest(t, 10, 12, []string{"store_map_result"})
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	moduleOutputs := runTest(t, 10, 12, []string{"store_map_result"}, newBlockGenerator)
 	require.Equal(t, []string{
 		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
 		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
@@ -308,7 +323,13 @@ func Test_store_map_result(t *testing.T) {
 }
 
 func Test_MultipleModule(t *testing.T) {
-	moduleOutputs := runTest(t, 10, 12, []string{"map_test", "store_add_int64", "store_map_result"})
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	moduleOutputs := runTest(t, 10, 12, []string{"map_test", "store_add_int64", "store_map_result"}, newBlockGenerator)
 	require.Equal(t, []string{
 		`{"name":"map_test","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
@@ -320,13 +341,26 @@ func Test_MultipleModule(t *testing.T) {
 }
 
 func Test_MultipleModule_Batch(t *testing.T) {
-	moduleOutputs := runTest(t, 110, 112, []string{"map_test", "store_add_int64", "store_map_result"})
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+
+	moduleOutputs := runTest(t, 110, 112, []string{"map_test", "store_add_int64", "store_map_result"}, newBlockGenerator)
+
+	//Module start is set to 10.
+	//store_add_int64 will be call 102 in total.
+	//The first 100 will be batched. and produce no output.
+	//When block 110 will be processed the store_add_int64 should be at 100
+
 	require.Equal(t, []string{
 		`{"name":"map_test","result":{"block_number":110,"block_hash":"block-110"}}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"90","new":"91"}]}`,
+		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"100","new":"101"}]}`,
 		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
 		`{"name":"map_test","result":{"block_number":111,"block_hash":"block-111"}}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"91","new":"92"}]}`,
+		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"101","new":"102"}]}`,
 		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
 }

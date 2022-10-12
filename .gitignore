@@ -5,3 +5,4 @@ target
 .goreleaser.SOURCE_ME.sh
 /dist
 /substreams
+.fleet

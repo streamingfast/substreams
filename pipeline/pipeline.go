@@ -2,9 +2,10 @@ package pipeline
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"math"
 	"strings"
+
+	"github.com/streamingfast/substreams/pipeline/execout"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -100,6 +101,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	p.reqCtx.logger.Info("initializing handler",
 		zap.Uint64("requested_start_block", p.reqCtx.StartBlockNum()),
 		zap.Uint64("requested_stop_block", p.reqCtx.StopBlockNum()),
+		zap.String("requested_start_cursor", p.reqCtx.Request().StartCursor),
 		zap.Bool("is_back_processing", p.reqCtx.isSubRequest),
 		zap.Strings("outputs", p.reqCtx.Request().OutputModules),
 	)

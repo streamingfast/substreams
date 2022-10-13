@@ -11,11 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-	"github.com/streamingfast/substreams/store"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
@@ -24,7 +19,11 @@ import (
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
+	"github.com/streamingfast/substreams/pipeline"
+	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
+	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -207,7 +206,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 
 	//todo: compile substreams
 
-	pkg, moduleGraph := processManifest(t, "./test_data/simple_substreams/substreams.yaml")
+	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")
 
 	request := &pbsubstreams.Request{
 		StartBlockNum: startBlock,

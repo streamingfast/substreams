@@ -93,7 +93,7 @@ fn test_store_delete(block: test::Block, s: StoreSetI64) {
     if block.number > 1 {
         let previous_block_num = block.number - 1;
         let to_delete_key = format!("key:{}", previous_block_num);
-        s.delete_prefix(9, &to_delete_key)
+        s.delete_prefix(100, &to_delete_key)
     }
 }
 

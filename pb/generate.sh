@@ -37,13 +37,6 @@ function main() {
   popd >/dev/null
   popd >/dev/null
 
-  pushd "$ROOT/rust" > /dev/null
-
-  generate_rust "sf/substreams/v1/substreams.proto" "substreams/src/pb/"
-  generate_rust "sf/substreams/v1/test/test.proto" "substreams/src/pb/"
-
-  popd >/dev/null
-
   echo "generate.sh - `date` - `whoami`" > $ROOT/pb/last_generate.txt
   echo "streamingfast/proto revision: `GIT_DIR=$ROOT/.git git rev-parse HEAD`" >> $ROOT/pb/last_generate.txt
 }

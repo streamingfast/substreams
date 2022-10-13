@@ -50,6 +50,7 @@ fn expected_operation(block_num: u64) -> substreams::pb::substreams::store_delta
 
 #[substreams::handlers::store]
 fn test_store_add_bigint(_blk: test::Block, s: StoreAddBigInt) {
+    s.add(1, "a.key.pos", BigInt::from(TO_ADD));
     s.add(1, "a.key.neg", BigInt::from(TO_SUBTRACT));
 }
 

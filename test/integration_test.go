@@ -159,8 +159,8 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 		_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
 		require.NoError(t, err)
 		err = pipe.ProcessBlock(bb, o)
-		if err != nil {
-			require.True(t, errors.Is(err, io.EOF))
+		if !errors.Is(err, io.EOF) {
+			require.NoError(t, err)
 		}
 	}
 
@@ -361,44 +361,9 @@ func Test_MultipleModule_Batch(t *testing.T) {
 		}
 	}
 
-	moduleOutputs := runTest(t, 110, 112, []string{"test_store_add_int64", "assert_test_store_add_int64"}, newBlockGenerator)
+	//todo: Need to validate the storage file
 
-	//Module start is set to 10.
-	//test_store_add_int64 will be call 102 in total.
-	//The first 100 will be batched. and produce no output.
-	//When block 110 will be processed the test_store_add_int64 should be at 100
-
-	require.Equal(t, []string{
-		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"109","new":"110"}]}`,
-		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
-		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"110","new":"111"}]}`,
-		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
-	}, moduleOutputs)
-}
-
-func Test_MultipleModule_Batch_2(t *testing.T) {
-	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-		return &LinearBlockGenerator{
-			startBlock:         startBlock,
-			inclusiveStopBlock: inclusiveStopBlock,
-		}
-	}
-
-	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator)
-
-	//Module start is set to 10.
-	//test_store_add_int64 will be call 102 in total.
-	//The first 100 will be batched. and produce no output.
-	//When block 110 will be processed the test_store_add_int64 should be at 100
-
-	require.Equal(t, []string{
-		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
-		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
-		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
-		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
-	}, moduleOutputs)
+	runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
 }
 
 func Test_test_store_add_int64(t *testing.T) {

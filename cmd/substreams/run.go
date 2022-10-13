@@ -24,7 +24,7 @@ func init() {
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
-	runCmd.Flags().BoolP("initial-snapshots", "i", false, "Fetch an initial snapshot at start block, before continuing processing.")
+	runCmd.Flags().BoolP("initial-snapshots", "i", false, "Load an initial snapshot at start block, before continuing processing.")
 
 	rootCmd.AddCommand(runCmd)
 }

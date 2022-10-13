@@ -7,8 +7,8 @@ import (
 
 var storeCmd = &cobra.Command{
 	Use:   "store get <manifest_path> <module_name> <block_id> <key>",
-	Short: "Store files in a common archive format",
-	Long:  `Store files in a common archive format`,
+	Short: "KVStore files in a common archive format",
+	Long:  `KVStore files in a common archive format`,
 	RunE:  storeGetE,
 	Args:  cobra.ExactArgs(4),
 }

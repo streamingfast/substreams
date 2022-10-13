@@ -10,6 +10,8 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+type ModuleHash []byte
+
 type ModuleHashes struct {
 	cache map[string][]byte
 }
@@ -20,10 +22,17 @@ func NewModuleHashes() *ModuleHashes {
 	}
 }
 
-type ModuleHash []byte
-
 func (m *ModuleHashes) Get(moduleName string) string {
 	return hex.EncodeToString(m.cache[moduleName])
+}
+
+func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
+	for name, hash := range m.cache {
+		if err := cb(hex.EncodeToString(hash), name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {

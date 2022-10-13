@@ -26,7 +26,7 @@ type SubstreamsClientConfig struct {
 	insecure  bool
 	plaintext bool
 }
-type NewSubstreamClient = func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error)
+type Factory = func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error)
 
 func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plaintext bool) *SubstreamsClientConfig {
 	return &SubstreamsClientConfig{
@@ -39,7 +39,7 @@ func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plain
 
 var portSuffixRegex = regexp.MustCompile(":[0-9]{2,5}$")
 
-func NewFactory(config *SubstreamsClientConfig) NewSubstreamClient {
+func NewFactory(config *SubstreamsClientConfig) Factory {
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 
 	if bootStrapFilename == "" {

@@ -1,15 +1,15 @@
 package orchestrator
 
+import "C"
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
+	"go.uber.org/zap"
 )
 
 // Squasher produces _complete_ stores, by merging backing partial stores.
@@ -28,21 +28,42 @@ type Squasher struct {
 // synchronizes around the actual data: the state of storages
 // present, the requests needed to fill in those stores up to the
 // target block, etc..
-func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*state.Store, reqStartBlock uint64, jobsPlanner *JobsPlanner) (*Squasher, error) {
+func NewSquasher(
+	ctx context.Context,
+	workPlan WorkPlan,
+	storeMap *store.Map,
+	reqStartBlock uint64,
+	storeSaveInterval uint64,
+	jobsPlanner *JobsPlanner) (*Squasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
 	for modName, workUnit := range workPlan {
-		store := stores[modName]
+		genericStore, found := storeMap.Get(modName)
+		if !found {
+			return nil, fmt.Errorf("store %q not found", modName)
+		}
+
+		s, ok := genericStore.(store.Cloneable)
+		if !ok {
+			return nil, fmt.Errorf("can only run sqausher on kv stores and not kv partial stores")
+		}
+		clonedStore := s.Clone()
+
 		var storeSquasher *StoreSquasher
 		if workUnit.initialStoreFile == nil {
-			zlog.Info("setting up initial store", zap.String("store", store.Name), zap.String("module_hash", store.ModuleHash), zap.Object("initial_store_file", workUnit.initialStoreFile))
-			storeSquasher = NewStoreSquasher(store.CloneStructure(store.ModuleInitialBlock), reqStartBlock, store.ModuleInitialBlock, jobsPlanner)
+			zlog.Info("setting up initial store",
+				zap.String("store", modName),
+				zap.Object("initial_store_file", workUnit.initialStoreFile),
+			)
+			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, clonedStore.InitialBlock(), storeSaveInterval, jobsPlanner)
 		} else {
-			zlog.Info("loading initial store", zap.String("store", store.Name), zap.String("module_hash", store.ModuleHash), zap.Object("initial_store_file", workUnit.initialStoreFile))
-			squish, err := store.LoadFrom(ctx, workUnit.initialStoreFile)
-			if err != nil {
-				return nil, fmt.Errorf("loading store %q: range %s: %w", store.Name, workUnit.initialStoreFile, err)
+			zlog.Info("loading initial store",
+				zap.String("store", modName),
+				zap.Object("initial_store_file", workUnit.initialStoreFile),
+			)
+			if err := clonedStore.Load(ctx, workUnit.initialStoreFile.ExclusiveEndBlock); err != nil {
+				return nil, fmt.Errorf("load store %q: range %s: %w", modName, workUnit.initialStoreFile, err)
 			}
-			storeSquasher = NewStoreSquasher(squish, reqStartBlock, workUnit.initialStoreFile.ExclusiveEndBlock, jobsPlanner)
+			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, workUnit.initialStoreFile.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
 
 			jobsPlanner.SignalCompletionUpUntil(modName, workUnit.initialStoreFile.ExclusiveEndBlock)
 		}
@@ -52,7 +73,7 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 		}
 
 		go storeSquasher.launch(ctx)
-		storeSquashers[store.Name] = storeSquasher
+		storeSquashers[modName] = storeSquasher
 	}
 
 	squasher := &Squasher{
@@ -64,7 +85,7 @@ func NewSquasher(ctx context.Context, workPlan WorkPlan, stores map[string]*stat
 	squasher.OnTerminating(func(err error) {
 		zlog.Info("squasher terminating", zap.Error(err))
 		for _, squashable := range storeSquashers {
-			zlog.Info("shutting down store squasher", zap.String("store", squashable.name), zap.String("module_hash", squashable.store.ModuleHash))
+			zlog.Info("shutting down store squasher", zap.String("store", squashable.name))
 			squashable.Shutter.Shutdown(err)
 		}
 	})
@@ -81,18 +102,18 @@ func (s *Squasher) Squash(moduleName string, partialsRanges block.Ranges) error 
 	return squashable.squash(partialsRanges)
 }
 
-func (s *Squasher) ValidateStoresReady() (out map[string]*state.Store, err error) {
-	out = map[string]*state.Store{}
+func (s *Squasher) ValidateStoresReady() (out map[string]store.Store, err error) {
+	out = map[string]store.Store{}
 	var errs []string
-	for _, squashable := range s.storeSquashers {
+	for name, squashable := range s.storeSquashers {
 		if !squashable.targetExclusiveEndBlockReach {
-			errs = append(errs, fmt.Sprintf("module %q (%q): target %d not reached (next expected: %d)", squashable.name, squashable.store.ModuleHash, s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
+			errs = append(errs, fmt.Sprintf("module %s: target %d not reached (next expected: %d)", squashable.store.String(), s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
 		}
 		if !squashable.IsEmpty() {
-			errs = append(errs, fmt.Sprintf("module %q (%q): missing ranges %s", squashable.name, squashable.store.ModuleHash, squashable.ranges))
+			errs = append(errs, fmt.Sprintf("module %s: missing ranges %s", squashable.store.String(), squashable.ranges))
 		}
 
-		out[squashable.store.Name] = squashable.store
+		out[name] = squashable.store
 	}
 	if len(errs) != 0 {
 		return nil, fmt.Errorf("%d errors: %s", len(errs), strings.Join(errs, "; "))

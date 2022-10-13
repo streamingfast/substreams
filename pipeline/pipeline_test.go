@@ -1,226 +1,127 @@
 package pipeline
 
 import (
-	"testing"
-
+	"context"
+	"encoding/hex"
+	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/stretchr/testify/assert"
+	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/wasm"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"io/ioutil"
+	"testing"
+	"time"
 )
 
-func TestStoreSaveBoundaries(t *testing.T) {
+func TestPipeline_runExecutor(t *testing.T) {
 	tests := []struct {
-		name         string
-		input        string
-		isSubrequest bool
-		fromBlock    uint64
-		reqStop      uint64
-		expectNext   uint64
+		name       string
+		moduleName string
+		block      *pbsubstreams.Block
+		request    *RequestContext
+		executor   ModuleExecutor
+		testFunc   func(t *testing.T, data []byte)
 	}{
 		{
-			name:         "from block on boundary, skip to next",
-			isSubrequest: true,
-			fromBlock:    80,
-			reqStop:      90,
-			expectNext:   90,
-		},
-		{
-			name:         "from block on boundary, skip to next, stop on boundary",
-			isSubrequest: true,
-			fromBlock:    80,
-			reqStop:      91,
-			expectNext:   90,
-		},
-		{
-			name:         "no subreq, from block on boundary, skip to next, stop off boundary",
-			isSubrequest: false,
-			fromBlock:    80,
-			reqStop:      91,
-			expectNext:   90,
-		},
-		{
-			name:         "no subreq, from block on boundary, skip to next, stop on boundary",
-			isSubrequest: false,
-			fromBlock:    80,
-			reqStop:      90,
-			expectNext:   90,
-		},
-		{
-			name:         "no subreq, from block on boundary, skip to next, stop below boundary",
-			isSubrequest: false,
-			fromBlock:    80,
-			reqStop:      89,
-			expectNext:   90,
-		},
-		{
-			name:         "from block on boundary, skip to next, stop below boundary",
-			isSubrequest: true,
-			fromBlock:    80,
-			reqStop:      89,
-			expectNext:   89,
-		},
-		{
-			name:         "from block off boundary, skip to next, stop below boundary",
-			isSubrequest: true,
-			fromBlock:    82,
-			reqStop:      89,
-			expectNext:   89,
+			name:       "golden path",
+			moduleName: "map_test",
+			block:      &pbsubstreams.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
+			executor:   mapTestExecutor(t),
+			testFunc: func(t *testing.T, data []byte) {
+				out := &pbsubstreams.MapResult{}
+				err := proto.Unmarshal(data, out)
+				require.NoError(t, err)
+				assertProtoEqual(t, &pbsubstreams.MapResult{
+					BlockNumber: 10,
+					BlockHash:   "block-10",
+				}, out)
+			},
 		},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := &Pipeline{
-				isSubrequest:      test.isSubrequest,
-				storeSaveInterval: 10,
-				request: &pbsubstreams.Request{
-					StopBlockNum: test.reqStop,
-				},
+			pipe := &Pipeline{
+				reqCtx: testRequestContext(context.Background()),
 			}
-
-			res := p.computeNextStoreSaveBoundary(test.fromBlock)
-
-			assert.Equal(t, int(test.expectNext), int(res))
+			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
+			execOutput := execout.NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
+			err := pipe.runExecutor(test.executor, execOutput)
+			require.NoError(t, err)
+			output, found := execOutput.Values[test.moduleName]
+			require.Equal(t, true, found)
+			test.testFunc(t, output)
 		})
 	}
 }
 
-func TestBump(t *testing.T) {
-	tests := []struct {
-		name         string
-		input        string
-		isSubrequest bool
-		reqStart     uint64
-		reqStop      uint64
-		blockSkip    int // default 1
-		expectSaves  []int
-	}{
-		{
-			name:         "subreq, should flush because stop block",
-			isSubrequest: true,
-			reqStart:     80,
-			reqStop:      90,
-			expectSaves:  []int{90},
-		},
-		{
-			name:         "no subreq, should NOT flush because stop block",
-			isSubrequest: false,
-			reqStart:     80,
-			reqStop:      90,
-			expectSaves:  []int{90},
-		},
-		{
-			name:         "subreq, current on next boundary",
-			isSubrequest: true,
-			reqStart:     80,
-			reqStop:      95,
-			expectSaves:  []int{90, 95},
-		},
-		{
-			name:         "no subreq, current 5+ next boundary",
-			isSubrequest: false,
-			reqStart:     80,
-			reqStop:      95,
-			expectSaves:  []int{90},
-		},
-		{
-			name:         "subreq, reqStart off bounds, current one off bound",
-			isSubrequest: true,
-			reqStart:     85,
-			reqStop:      95,
-			expectSaves:  []int{90, 95},
-		},
-		{
-			name:         "no subreq, reqStart off bounds, current one off bound",
-			isSubrequest: false,
-			reqStart:     85,
-			reqStop:      95,
-			expectSaves:  []int{90},
-		},
-		// Block skips 2
-		{
-			name:         "skip 2, subreq, should flush because stop block",
-			isSubrequest: true,
-			reqStart:     80,
-			reqStop:      90,
-			blockSkip:    2,
-			expectSaves:  []int{90},
-		},
-		{
-			name:         "skip 2, no subreq, should NOT flush because stop block",
-			isSubrequest: false,
-			reqStart:     80,
-			reqStop:      90,
-			blockSkip:    2,
-			expectSaves:  []int{90},
-		},
-		{
-			name:         "skip 2, subreq, current on next boundary",
-			isSubrequest: true,
-			reqStart:     80,
-			reqStop:      95,
-			blockSkip:    2,
-			expectSaves:  []int{90, 95},
-		},
-		{
-			name:         "skip 2, no subreq, current 5+ next boundary",
-			isSubrequest: false,
-			reqStart:     80,
-			reqStop:      95,
-			blockSkip:    2,
-			expectSaves:  []int{90},
-		},
-		{
-			name:         "skip 3, subreq, reqStart off bounds, current one off bound",
-			isSubrequest: true,
-			reqStart:     85,
-			reqStop:      95,
-			blockSkip:    3,
-			expectSaves:  []int{90, 95},
-		},
-		{
-			name:         "skip 3, no subreq, reqStart off bounds, current one off bound",
-			isSubrequest: false,
-			reqStart:     85,
-			reqStop:      95,
-			blockSkip:    3,
-			expectSaves:  []int{90},
-		},
+func testRequestContext(ctx context.Context) *RequestContext {
+	return &RequestContext{
+		Context: ctx,
+		logger:  zap.NewNop(),
 	}
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			p := &Pipeline{
-				isSubrequest:           test.isSubrequest,
-				storeSaveInterval:      10,
-				requestedStartBlockNum: test.reqStart,
-				request: &pbsubstreams.Request{
-					StopBlockNum: test.reqStop,
-				},
-			}
+func mapTestExecutor(t *testing.T) *MapperModuleExecutor {
+	cnt, err := ioutil.ReadFile("./testdata/map_test.code.hex")
+	require.NoError(t, err)
 
-			p.initStoreSaveBoundary()
+	code, err := hex.DecodeString(string(cnt))
+	require.NoError(t, err)
 
-			blockSkip := test.blockSkip
-			if blockSkip == 0 {
-				blockSkip = 1
-			}
+	wasmModule, err := wasm.NewRuntime(nil).NewModule(
+		context.Background(),
+		nil,
+		code,
+		"map_test",
+		"map_test",
+	)
+	require.NoError(t, err)
 
-			var res []int
-			for blockNum := test.reqStart; blockNum < test.reqStop+5; blockNum += uint64(blockSkip) {
-				//fmt.Println("Block", blockNum)
-				for p.nextStoreSaveBoundary <= uint64(blockNum) {
-					res = append(res, int(p.nextStoreSaveBoundary))
-					p.bumpStoreSaveBoundary()
-					if isStopBlockReached(uint64(blockNum), test.reqStop) {
-						break
-					}
-				}
-				if isStopBlockReached(uint64(blockNum), test.reqStop) {
-					break
-				}
-			}
-
-			assert.Equal(t, test.expectSaves, res)
-		})
+	return &MapperModuleExecutor{
+		BaseExecutor: BaseExecutor{
+			moduleName: "map_test",
+			wasmModule: wasmModule,
+			wasmArguments: []wasm.Argument{
+				wasm.NewBlockInput("sf.substreams.v1.test.Block"),
+			},
+			entrypoint: "map_test",
+			tracer:     otel.GetTracerProvider().Tracer("test"),
+		},
+		outputType: "",
 	}
+}
+
+type Obj struct {
+	cursor *bstream.Cursor
+	step   bstream.StepType
+}
+
+func (o *Obj) Cursor() *bstream.Cursor {
+	return o.cursor
+}
+
+func (o *Obj) Step() bstream.StepType {
+	return o.step
+}
+
+func bstreamBlk(t *testing.T, blk *pbsubstreams.Block) *bstream.Block {
+	payload, err := proto.Marshal(blk)
+	require.NoError(t, err)
+
+	bb := &bstream.Block{
+		Id:             blk.Id,
+		Number:         blk.Number,
+		PreviousId:     "",
+		Timestamp:      time.Time{},
+		LibNum:         0,
+		PayloadKind:    0,
+		PayloadVersion: 0,
+	}
+	_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
+	require.NoError(t, err)
+
+	return bb
 }

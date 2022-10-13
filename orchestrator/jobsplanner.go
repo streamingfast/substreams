@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/state"
 	"go.opentelemetry.io/otel"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -27,7 +26,6 @@ func NewJobsPlanner(
 	ctx context.Context,
 	workPlan WorkPlan,
 	subrequestSplitSize uint64,
-	stores map[string]*state.Store,
 	graph *manifest.ModuleGraph,
 ) (*JobsPlanner, error) {
 	planner := &JobsPlanner{
@@ -37,15 +35,13 @@ func NewJobsPlanner(
 	ctx, span := planner.tracer.Start(ctx, "job_planning")
 	defer span.End()
 
-	for modName, workUnit := range workPlan {
+	for storeName, workUnit := range workPlan {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 			// do nothing
 		}
-
-		store := stores[modName]
 
 		requests := workUnit.batchRequests(subrequestSplitSize)
 		rangeLen := len(requests)
@@ -59,15 +55,15 @@ func NewJobsPlanner(
 			// TODO(abourget): here we loop WorkUnit.reqChunks, and grab the ancestor modules
 			// to setup the waiter.
 			// blockRange's start/end come from `requestRange`
-			ancestorStoreModules, err := graph.AncestorStoresOf(store.Name)
+			ancestorStoreModules, err := graph.AncestorStoresOf(storeName)
 			if err != nil {
-				return nil, fmt.Errorf("getting ancestore stores for %s: %w", store.Name, err)
+				return nil, fmt.Errorf("getting ancestore stores for %s: %w", storeName, err)
 			}
 
-			job := NewJob(store.Name, requestRange, ancestorStoreModules, rangeLen, idx)
+			job := NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
 			planner.jobs = append(planner.jobs, job)
 
-			zlog.Info("job planned", zap.String("module_name", store.Name), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
+			zlog.Info("job planned", zap.String("module_name", storeName), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
 		}
 	}
 
@@ -135,25 +131,3 @@ func (p *JobsPlanner) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddInt("available_jobs", len(p.AvailableJobs))
 	return nil
 }
-
-// func (s *OrderedStrategy) getRequestStream(ctx context.Context) <-chan *Job {
-// 	requestsStream := make(chan *Job)
-// 	go func() {
-// 		defer close(requestsStream)
-
-// 		for {
-// 			job, err := s.requestPool.GetNext(ctx)
-// 			if err == io.EOF {
-// 				zlog.Debug("EOF in getRequestStream")
-// 				return
-// 			}
-// 			select {
-// 			case <-ctx.Done():
-// 				zlog.Debug("ctx cannnlaskdfjlkj")
-// 				return
-// 			case requestsStream <- job:
-// 			}
-// 		}
-// 	}()
-// 	return requestsStream
-// }

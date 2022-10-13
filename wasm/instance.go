@@ -6,12 +6,12 @@ import (
 
 	"github.com/bytecodealliance/wasmtime-go"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
 )
 
 type Instance struct {
-	inputStores  []state.Reader
-	outputStore  *state.Store
+	inputStores  []store.Reader
+	outputStore  store.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 
 	valueType string
@@ -74,7 +74,7 @@ func (i *Instance) Output() []byte {
 	return i.returnValue
 }
 
-func (i *Instance) SetOutputStore(store *state.Store) {
+func (i *Instance) SetOutputStore(store *store.KVStore) {
 	i.outputStore = store
 }
 

@@ -10,29 +10,34 @@ import (
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
 
 type StoreSquasher struct {
 	*shutter.Shutter
-	name                    string
-	store                   *state.Store
-	requestRange            *block.Range
-	ranges                  block.Ranges
-	targetStartBlock        uint64
-	targetExclusiveEndBlock uint64
-	nextExpectedStartBlock  uint64
-	log                     *zap.Logger
-
-	jobsPlanner *JobsPlanner
-
+	name                         string
+	store                        *store.KVStore
+	requestRange                 *block.Range
+	ranges                       block.Ranges
+	targetStartBlock             uint64
+	targetExclusiveEndBlock      uint64
+	nextExpectedStartBlock       uint64
+	log                          *zap.Logger
+	jobsPlanner                  *JobsPlanner
 	targetExclusiveEndBlockReach bool
 	partialsChunks               chan block.Ranges
 	waitForCompletion            chan interface{}
+	storeSaveInterval            uint64
 }
 
-func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpectedStartBlock uint64, jobsPlanner *JobsPlanner) *StoreSquasher {
+func NewStoreSquasher(
+	initialStore *store.KVStore,
+	targetExclusiveBlock,
+	nextExpectedStartBlock uint64,
+	storeSaveInterval uint64,
+	jobsPlanner *JobsPlanner,
+) *StoreSquasher {
 	s := &StoreSquasher{
 		Shutter:                 shutter.New(),
 		name:                    initialStore.Name,
@@ -40,9 +45,10 @@ func NewStoreSquasher(initialStore *state.Store, targetExclusiveBlock, nextExpec
 		targetExclusiveEndBlock: targetExclusiveBlock,
 		nextExpectedStartBlock:  nextExpectedStartBlock,
 		jobsPlanner:             jobsPlanner,
+		storeSaveInterval:       storeSaveInterval,
 		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
 		waitForCompletion:       make(chan interface{}),
-		log:                     zlog.With(zap.String("module", initialStore.Name), zap.String("module_hash", initialStore.ModuleHash)),
+		log:                     zlog.With(zap.Object("initial_store", initialStore)),
 	}
 	s.OnTerminating(func(err error) {
 		if err != nil {
@@ -118,16 +124,15 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
 			squashCount++
 
-			nextStore, err := s.store.LoadFrom(ctx, block.NewRange(squashableRange.StartBlock, squashableRange.ExclusiveEndBlock))
-			if err != nil {
+			nextStore := store.NewPartialStore(s.store, squashableRange.StartBlock)
+			if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 				s.Shutdown(fmt.Errorf("initializing next partial store %q: %w", s.name, err))
 				return
 			}
 
 			s.log.Debug("next store loaded", zap.Object("store", nextStore))
 
-			err = s.store.Merge(nextStore)
-			if err != nil {
+			if err := s.store.Merge(nextStore); err != nil {
 				s.Shutdown(fmt.Errorf("merging: %s", err))
 				return
 			}
@@ -141,17 +146,18 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			storeDeleter := nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 			eg.Go(storeDeleter.Delete)
 
-			isSaveIntervalReached := squashableRange.ExclusiveEndBlock%nextStore.SaveInterval == 0
-			isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == s.store.ModuleInitialBlock
-			isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.store.SaveInterval == 0
-			zlog.Info("should write store?", zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock), zap.Uint64("save_interval", nextStore.SaveInterval), zap.Bool("is_save_interval_reached", isSaveIntervalReached), zap.Bool("is_first_kv_for_module", isFirstKvForModule), zap.Bool("is_completed_kv", isCompletedKv))
+			isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
+			isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == s.store.InitialBlock()
+			isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.storeSaveInterval == 0
+			zlog.Info("should write store?", zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock), zap.Uint64("store_interval", s.storeSaveInterval), zap.Bool("is_save_interval_reached", isSaveIntervalReached), zap.Bool("is_first_kv_for_module", isFirstKvForModule), zap.Bool("is_completed_kv", isCompletedKv))
 			if isFirstKvForModule || isCompletedKv {
-				storeWriter, err := s.store.WriteState(ctx, squashableRange.ExclusiveEndBlock)
-				if err != nil {
-					s.Shutdown(fmt.Errorf("store writer marshaling: %w", err))
-					return
-				}
-				eg.Go(storeWriter.Write)
+				eg.Go(func() error {
+					_, err := s.store.Save(ctx, squashableRange.ExclusiveEndBlock)
+					if err != nil {
+						return fmt.Errorf("store writer marshaling: %w", err)
+					}
+					return nil
+				})
 			}
 
 			s.ranges = s.ranges[1:]

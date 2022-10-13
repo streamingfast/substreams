@@ -3,37 +3,36 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"io"
-	"time"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"io"
+	"time"
 )
 
 type Worker interface {
 	Run(ctx context.Context, job *Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error)
 }
 
-type NewWorkerFunc func(tracer trace.Tracer) Worker
+// The tracer will be provided by the worker pool, on worker creation
+type WorkerFactory = func() Worker
 
 type RemoteWorker struct {
-	callOpts           []grpc.CallOption
-	tracer             ttrace.Tracer
-	newSubstreamClient client.NewSubstreamClient
+	clientFactory client.Factory
+	tracer        ttrace.Tracer
 }
 
-func NewRemoteWorker(newSubstreamClient client.NewSubstreamClient) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.Factory) *RemoteWorker {
 	return &RemoteWorker{
-		newSubstreamClient: newSubstreamClient,
+		clientFactory: clientFactory,
+		tracer:        otel.GetTracerProvider().Tracer("worker"),
 	}
 }
 
@@ -46,7 +45,7 @@ func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubs
 	start := time.Now()
 
 	zlog.Info("creating gprc client")
-	grpcClient, closeFunc, grpcCallOpts, err := w.newSubstreamClient()
+	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
 	}
@@ -121,6 +120,13 @@ func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubs
 						return nil, err
 					}
 				}
+
+				//if len(resp.GetProgress().Modules) > 0 {
+				//	module := resp.GetProgress().Modules[0]
+				//	if rangeCount := len(module.GetProcessedRanges().ProcessedRanges); rangeCount > 0 {
+				//		endBlock := module.GetProcessedRanges().ProcessedRanges[rangeCount-1].EndBlock
+				//	}
+				//}
 
 			case *pbsubstreams.Response_SnapshotData:
 				_ = r.SnapshotData

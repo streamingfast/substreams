@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 )
 
@@ -9,12 +8,11 @@ type WorkerPool struct {
 	workers chan Worker
 }
 
-func NewWorkerPool(workerCount int, newWorkerFunc NewWorkerFunc) *WorkerPool {
+func NewWorkerPool(workerCount int, newWorkerFunc WorkerFactory) *WorkerPool {
 	zlog.Info("initiating worker pool", zap.Int("worker_count", workerCount))
-	tracer := otel.GetTracerProvider().Tracer("worker")
 	workers := make(chan Worker, workerCount)
 	for i := 0; i < workerCount; i++ {
-		workers <- newWorkerFunc(tracer)
+		workers <- newWorkerFunc()
 	}
 
 	workerPool := &WorkerPool{

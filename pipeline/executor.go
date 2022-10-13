@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/pipeline/execout"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/outputs"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -48,179 +48,149 @@ type ModuleExecutor interface {
 	// Reset the wasm instance, avoid propagating logs.
 	Reset()
 
-	run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error
+	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
+	applyCachedOutput(value []byte) error
 
 	moduleLogs() (logs []string, truncated bool)
-	moduleOutputData() pbsubstreams.ModuleOutputData
-	getCurrentExecutionStack() []string
+	currentExecutionStack() []string
 }
 
 type BaseExecutor struct {
-	moduleName string
-	wasmModule *wasm.Module
-	wasmInputs []*wasm.Input
-	cache      *outputs.OutputCache
-	isOutput   bool // whether output is enabled for this module
-	entrypoint string
-	tracer     ttrace.Tracer
+	moduleName    string
+	wasmModule    *wasm.Module
+	wasmArguments []wasm.Argument
+	entrypoint    string
+	tracer        ttrace.Tracer
+}
+
+func (e *BaseExecutor) moduleLogs() (logs []string, truncated bool) {
+	if instance := e.wasmModule.CurrentInstance; instance != nil {
+		return instance.Logs, instance.ReachedLogsMaxByteCount()
+	}
+	return
+}
+func (e *BaseExecutor) currentExecutionStack() []string {
+	return e.wasmModule.CurrentInstance.ExecutionStack
 }
 
 var _ ModuleExecutor = (*MapperModuleExecutor)(nil)
 
 type MapperModuleExecutor struct {
 	BaseExecutor
-	outputType   string
-	mapperOutput []byte
+	outputType string
 }
 
 var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
 
 // Name implements ModuleExecutor
-func (e *MapperModuleExecutor) Name() string {
-	return e.moduleName
-}
+func (e *MapperModuleExecutor) Name() string { return e.moduleName }
 
-func (e *MapperModuleExecutor) String() string {
-	return e.moduleName
-}
+func (e *MapperModuleExecutor) String() string { return e.Name() }
 
-type StoreModuleExecutor struct {
-	BaseExecutor
-	outputStore *state.Store
-}
+func (e *MapperModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
 
-// Name implements ModuleExecutor
-func (e *StoreModuleExecutor) Name() string {
-	return e.moduleName
-}
+func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
-func (e *StoreModuleExecutor) String() string {
-	return e.moduleName
-}
-
-//todo: find better name for vals
-func (e *MapperModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) (err error) {
+func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
 	ctx, span := e.tracer.Start(ctx, "exec_map")
 	span.SetAttributes(attribute.String("module", e.moduleName))
 	defer span.End()
 
-	output, found := e.cache.Get(clock)
-	if found {
-		e.mapperOutput = output
-		vals[e.Name()] = output
-		span.SetStatus(codes.Ok, "cache_hit")
-		return nil
-	}
-
-	var out []byte
-	if out, err = e.wasmMapCall(vals, clock); err != nil {
+	var instance *wasm.Instance
+	if instance, err = e.wasmCall(reader); err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		return err
+		return nil, nil, fmt.Errorf("failed to run maps wasm call: %w", err)
 	}
-	// note: vals is consumed upstream and will be passed to the following modules executing
-	// thus by adding the output of our map. It will be used to configure the next module
-	vals[e.Name()] = out
 
-	if err := e.cache.Set(clock, cursor, e.mapperOutput); err != nil {
-		return fmt.Errorf("setting mapper output to cache at block %d: %w", clock.Number, err)
+	if instance != nil {
+		out = instance.Output()
+	}
+
+	if out != nil {
+		moduleOutput = &pbsubstreams.ModuleOutput_MapOutput{
+			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: out},
+		}
 	}
 
 	span.SetStatus(codes.Ok, "module_executed")
-	return nil
+	return out, moduleOutput, nil
 }
 
-func (e *StoreModuleExecutor) run(ctx context.Context, vals map[string][]byte, clock *pbsubstreams.Clock, cursor string) error {
+type StoreModuleExecutor struct {
+	BaseExecutor
+	outputStore store.DeltaAccessor
+}
+
+func (e *StoreModuleExecutor) Name() string { return e.moduleName }
+
+func (e *StoreModuleExecutor) String() string { return e.Name() }
+
+func (e *StoreModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
+
+func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
+	deltas := &pbsubstreams.StoreDeltas{}
+	err := proto.Unmarshal(value, deltas)
+	if err != nil {
+		return fmt.Errorf("unmarshalling output deltas: %w", err)
+	}
+	e.outputStore.SetDeltas(deltas.Deltas)
+	return nil
+
+}
+
+func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
 	ctx, span := e.tracer.Start(ctx, "exec_store")
 	span.SetAttributes(attribute.String("module", e.moduleName))
 	defer span.End()
 
-	output, found := e.cache.Get(clock)
-
-	if found {
-		deltas := &pbsubstreams.StoreDeltas{}
-		err := proto.Unmarshal(output, deltas)
-		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return fmt.Errorf("unmarshalling output deltas: %w", err)
-		}
-		e.outputStore.Deltas = deltas.Deltas
-		for _, delta := range deltas.Deltas {
-			e.outputStore.ApplyDelta(delta)
-		}
-		span.SetStatus(codes.Ok, "cache_hit")
-		return nil
-	}
-	if err := e.wasmStoreCall(vals, clock); err != nil {
-		return err
+	if _, err := e.wasmCall(reader); err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		return nil, nil, fmt.Errorf("failed to run store wasm call: %w", err)
 	}
 
 	deltas := &pbsubstreams.StoreDeltas{
-		Deltas: e.outputStore.Deltas,
+		Deltas: e.outputStore.GetDeltas(),
 	}
+
 	data, err := proto.Marshal(deltas)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("caching: marshalling delta: %w", err)
+		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
 	}
-	if err = e.cache.Set(clock, cursor, data); err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("setting delta to cache at block %d: %w", clock.Number, err)
+
+	moduleOutput = &pbsubstreams.ModuleOutput_StoreDeltas{
+		StoreDeltas: deltas,
 	}
 
 	span.SetStatus(codes.Ok, "module_executed")
-	return nil
+	return data, moduleOutput, nil
 }
 
-func (e *MapperModuleExecutor) wasmMapCall(vals map[string][]byte, clock *pbsubstreams.Clock) (out []byte, err error) {
-	var vm *wasm.Instance
-	if vm, err = e.wasmCall(vals, clock); err != nil {
-		return nil, err
-	}
-
-	if vm != nil {
-		e.mapperOutput = vm.Output()
-		return e.mapperOutput, nil
-	}
-
-	e.mapperOutput = nil
-	return nil, nil
-}
-
-func (e *StoreModuleExecutor) wasmStoreCall(vals map[string][]byte, clock *pbsubstreams.Clock) (err error) {
-	if _, err := e.wasmCall(vals, clock); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Clock) (instance *wasm.Instance, err error) {
+func (e *BaseExecutor) wasmCall(reader execout.ExecutionOutputGetter) (instance *wasm.Instance, err error) {
 	hasInput := false
-	for _, input := range e.wasmInputs {
-		switch input.Type {
-		case wasm.InputSource:
-			val := vals[input.Name]
-			if len(val) != 0 {
-				input.StreamData = val
-				hasInput = true
-			} else {
-				input.StreamData = nil
-			}
-		case wasm.InputStore:
+	for _, input := range e.wasmArguments {
+		switch v := input.(type) {
+		case *wasm.StoreWriterOutput:
+		case *wasm.StoreReaderInput:
 			hasInput = true
-		case wasm.OutputStore:
-
+		case wasm.ValueArgument:
+			hasInput = true
+			data, _, err := reader.Get(v.Name())
+			if err != nil {
+				return nil, fmt.Errorf("failed to get block input data: %w", err)
+			}
+			v.SetValue(data)
 		default:
-			panic(fmt.Sprintf("Invalid input type %d", input.Type))
+			panic("unknown wasm argument type")
 		}
 	}
-
 	// This allows us to skip the execution of the VM if there are no inputs.
 	// This assumption should either be configurable by the manifest, or clearly documented:
 	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
 	//  state store in read mode)
 	if hasInput {
-		instance, err = e.wasmModule.NewInstance(clock, e.wasmInputs)
+		clock := reader.Clock()
+		instance, err = e.wasmModule.NewInstance(clock, e.wasmArguments)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}
@@ -238,107 +208,4 @@ func (e *BaseExecutor) wasmCall(vals map[string][]byte, clock *pbsubstreams.Cloc
 		}
 	}
 	return
-}
-
-func (e *StoreModuleExecutor) moduleLogs() (logs []string, truncated bool) {
-	if instance := e.wasmModule.CurrentInstance; instance != nil {
-		return instance.Logs, instance.ReachedLogsMaxByteCount()
-	}
-	return
-}
-
-func (e *StoreModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
-	if len(e.outputStore.Deltas) != 0 {
-		return &pbsubstreams.ModuleOutput_StoreDeltas{
-			StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
-		}
-	}
-	return nil
-}
-
-func (e *StoreModuleExecutor) getCurrentExecutionStack() []string {
-	return e.wasmModule.CurrentInstance.ExecutionStack
-}
-
-// func (e *StoreModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
-// 	if !e.isOutput {
-// 		return moduleOutputs
-// 	}
-
-// 	var logs []string
-// 	logsTruncated := false
-// 	if instance := e.wasmModule.CurrentInstance; instance != nil {
-// 		logs = instance.Logs
-// 		logsTruncated = instance.ReachedLogsMaxByteCount()
-// 	}
-
-// 	if len(e.outputStore.Deltas) != 0 || len(logs) != 0 {
-// 		zlog.Debug("append to output, store")
-// 		moduleOutputs = append(moduleOutputs, &pbsubstreams.ModuleOutput{
-// 			Name: e.moduleName,
-// 			Data: &pbsubstreams.ModuleOutput_StoreDeltas{
-// 				StoreDeltas: &pbsubstreams.StoreDeltas{Deltas: e.outputStore.Deltas},
-// 			},
-// 			Logs:            logs,
-// 			IsLogsTruncated: logsTruncated,
-// 		})
-// 	}
-
-// 	return moduleOutputs
-// }
-
-func (e *StoreModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
-
-func (e *MapperModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
-
-func (e *MapperModuleExecutor) moduleLogs() (logs []string, truncated bool) {
-	if instance := e.wasmModule.CurrentInstance; instance != nil {
-		return instance.Logs, instance.ReachedLogsMaxByteCount()
-	}
-	return
-}
-
-func (e *MapperModuleExecutor) moduleOutputData() pbsubstreams.ModuleOutputData {
-	if e.mapperOutput != nil {
-		return &pbsubstreams.ModuleOutput_MapOutput{
-			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
-		}
-	}
-	return nil
-}
-
-func (e *MapperModuleExecutor) getCurrentExecutionStack() []string {
-	return e.wasmModule.CurrentInstance.ExecutionStack
-}
-
-// func (e *MapperModuleExecutor) appendOutput(moduleOutputs []*pbsubstreams.ModuleOutput) []*pbsubstreams.ModuleOutput {
-// 	if !e.isOutput {
-// 		return moduleOutputs
-// 	}
-
-// 	var logs []string
-// 	logsTruncated := false
-// 	if instance := e.wasmModule.CurrentInstance; instance != nil {
-// 		logs = instance.Logs
-// 		logsTruncated = instance.ReachedLogsMaxByteCount()
-// 	}
-
-// 	if e.mapperOutput != nil || len(logs) != 0 {
-// 		zlog.Debug("append to output, map")
-// 		moduleOutputs = append(moduleOutputs, &pbsubstreams.ModuleOutput{
-// 			Name: e.moduleName,
-// 			Data: &pbsubstreams.ModuleOutput_MapOutput{
-// 				MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: e.mapperOutput},
-// 			},
-// 			Logs:            logs,
-// 			IsLogsTruncated: logsTruncated,
-// 		})
-// 	}
-
-// 	return moduleOutputs
-// }
-
-func OptimizeExecutors(moduleOutputCache map[string]*outputs.OutputCache, moduleExecutors []ModuleExecutor, requestedOutputStores []string) (optimizedModuleExecutors []ModuleExecutor, skipBlockSource bool) {
-
-	return nil, false
 }

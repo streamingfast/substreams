@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/abourget/llerrgroup"
-	"github.com/streamingfast/substreams/state"
+	"github.com/streamingfast/substreams/store"
 )
 
 type StorageState struct {
@@ -29,18 +29,19 @@ func (s *StorageState) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out *StorageState, err error) {
+func FetchStorageState(ctx context.Context, storeMaps *store.Map) (out *StorageState, err error) {
 	out = NewStorageState()
 	eg := llerrgroup.New(10)
-	for storeName, store := range stores {
+
+	for name, storeObj := range storeMaps.All() {
 		if eg.Stop() {
 			break
 		}
-
-		objStore := store.Store
-		storeName := storeName
+		storeName := name
+		store := storeObj
 		eg.Go(func() error {
-			snapshots, err := listSnapshots(ctx, objStore)
+
+			snapshots, err := listSnapshots(ctx, store)
 			if err != nil {
 				return err
 			}
@@ -50,6 +51,7 @@ func FetchStorageState(ctx context.Context, stores map[string]*state.Store) (out
 			return nil
 		})
 	}
+
 	if err = eg.Wait(); err != nil {
 		return nil, fmt.Errorf("running list snapshots: %w", err)
 	}

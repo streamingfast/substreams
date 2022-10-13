@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -183,6 +184,10 @@ type TestMapOutput struct {
 	ModuleName string                      `json:"name"`
 	Result     *pbsubstreamstest.MapResult `json:"result"`
 }
+type AssertMapOutput struct {
+	ModuleName string `json:"name"`
+	Result     bool   `json:"result"`
+}
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator) (moduleOutputs []string) {
 	//_, _ = logging.ApplicationLogger("test", "test")
@@ -227,7 +232,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 					fmt.Println("LOG: ", log)
 				}
 				if out := output.GetMapOutput(); out != nil {
-					if output.Name == "map_test" {
+					if output.Name == "test_map" {
 						r := &pbsubstreamstest.MapResult{}
 						err = proto.Unmarshal(out.Value, r)
 						require.NoError(t, err)
@@ -239,7 +244,20 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 						jsonData, err := json.Marshal(out)
 						require.NoError(t, err)
 						moduleOutputs = append(moduleOutputs, string(jsonData))
+						continue
 					}
+
+					if strings.HasPrefix(output.Name, "assert") {
+						assertOut := &AssertMapOutput{
+							ModuleName: output.Name,
+							Result:     len(out.Value) > 0,
+						}
+
+						jsonData, err := json.Marshal(assertOut)
+						require.NoError(t, err)
+						moduleOutputs = append(moduleOutputs, string(jsonData))
+					}
+
 				}
 				if out := output.GetStoreDeltas(); out != nil {
 					testOutput := &TestStoreOutput{
@@ -247,7 +265,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 					}
 					for _, delta := range out.Deltas {
 
-						if output.Name == "store_map_result" {
+						if output.Name == "test_store_proto" {
 							o := &pbsubstreamstest.MapResult{}
 							err = proto.Unmarshal(delta.OldValue, o)
 							require.NoError(t, err)
@@ -286,39 +304,24 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"map_test"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 10, 12, []string{"test_map"}, newBlockGenerator)
 	require.Equal(t, []string{
-		`{"name":"map_test","result":{"block_number":10,"block_hash":"block-10"}}`,
-		`{"name":"map_test","result":{"block_number":11,"block_hash":"block-11"}}`,
+		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
+		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
 	}, moduleOutputs)
 }
 
-func Test_store_add_int64(t *testing.T) {
+func Test_test_store_proto(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 13, []string{"store_add_int64"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 10, 12, []string{"test_store_proto"}, newBlockGenerator)
 	require.Equal(t, []string{
-		`{"name":"store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"2","new":"3"}]}`,
-	}, moduleOutputs)
-}
-
-func Test_store_map_result(t *testing.T) {
-	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-		return &LinearBlockGenerator{
-			startBlock:         startBlock,
-			inclusiveStopBlock: inclusiveStopBlock,
-		}
-	}
-	moduleOutputs := runTest(t, 10, 12, []string{"store_map_result"}, newBlockGenerator)
-	require.Equal(t, []string{
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
 	}, moduleOutputs)
 }
 
@@ -329,14 +332,14 @@ func Test_MultipleModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"map_test", "store_add_int64", "store_map_result"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator)
 	require.Equal(t, []string{
-		`{"name":"map_test","result":{"block_number":10,"block_hash":"block-10"}}`,
-		`{"name":"store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
-		`{"name":"map_test","result":{"block_number":11,"block_hash":"block-11"}}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
+		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
+		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
 	}, moduleOutputs)
 }
 
@@ -348,26 +351,57 @@ func Test_MultipleModule_Batch(t *testing.T) {
 		}
 	}
 
-	moduleOutputs := runTest(t, 110, 112, []string{"map_test", "store_add_int64", "store_map_result"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator)
 
 	//Module start is set to 10.
-	//store_add_int64 will be call 102 in total.
+	//test_store_add_int64 will be call 102 in total.
 	//The first 100 will be batched. and produce no output.
-	//When block 110 will be processed the store_add_int64 should be at 100
+	//When block 110 will be processed the test_store_add_int64 should be at 100
 
 	require.Equal(t, []string{
-		`{"name":"map_test","result":{"block_number":110,"block_hash":"block-110"}}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"100","new":"101"}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
-		`{"name":"map_test","result":{"block_number":111,"block_hash":"block-111"}}`,
-		`{"name":"store_add_int64","deltas":[{"op":"UPDATE","old":"101","new":"102"}]}`,
-		`{"name":"store_map_result","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
+		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"100","new":"101"}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
+		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"101","new":"102"}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
 }
 
-func Test_SimpleEmptyObjectMarshall(t *testing.T) {
-	b := &pbsubstreamstest.Block{}
-	data, err := proto.Marshal(b)
-	require.NoError(t, err)
-	require.Empty(t, data)
+func Test_test_store_add_int64(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	moduleOutputs := runTest(t, 1, 1, []string{"test_store_add_int64", "assert_test_store_add_int64"}, newBlockGenerator)
+	require.Equal(t, []string{
+		`{"name":"test_store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"2","new":"3"}]}`,
+	}, moduleOutputs)
+}
+
+func Test_test_store_add_bigint(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+
+	runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
+
+}
+func Test_test_store_delete(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+
+	runTest(t, 10, 12, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
+
 }

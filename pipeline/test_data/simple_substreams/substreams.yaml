@@ -5,7 +5,7 @@ package:
 
 protobuf:
   files:
-#    - "sf/substreams/v1/test/test.proto"
+  #    - "sf/substreams/v1/test/test.proto"
   importPaths:
     - ../../../proto
 
@@ -15,7 +15,7 @@ binaries:
     file: /Users/cbillett/devel/sf/substreams/pipeline/test_data/simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
 
 modules:
-  - name: map_test
+  - name: test_map
     kind: map
     initialBlock: 10
     inputs:
@@ -23,18 +23,47 @@ modules:
     output:
       type: proto:sf.substreams.v1.test.MapResult
 
-  - name: store_map_result
+  - name: test_store_proto
     kind: store
     initialBlock: 10
     updatePolicy: set
     valueType: proto:sf.substreams.v1.test.MapResult
     inputs:
-      - map: map_test
+      - map: test_map
 
-  - name: store_add_int64
+  - name: test_store_add_int64
     kind: store
-    initialBlock: 10
+    initialBlock: 1
     updatePolicy: add
     valueType: int64
     inputs:
-      - map: map_test
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_int64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - store: test_store_add_int64
+        mode: deltas
+      - store: test_store_add_int64
+    output:
+      type: boolean
+
+  - name: test_store_add_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_bigint
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: test_store_add_bigint
+        mode: deltas
+      - store: test_store_add_bigint
+    output:
+      type: boolean

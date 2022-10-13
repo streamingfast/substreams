@@ -68,7 +68,7 @@ modules:
     output:
       type: boolean
 
-  - name: test_store_delete
+  - name: test_store_delete_prefix
     kind: store
     initialBlock: 1
     updatePolicy: set
@@ -76,13 +76,13 @@ modules:
     inputs:
       - source: sf.substreams.v1.test.Block
 
-  - name: assert_test_store_delete
+  - name: assert_test_store_delete_prefix
     kind: map
     initialBlock: 1
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_store_delete
+      - store: test_store_delete_prefix
         mode: deltas
-      - store: test_store_delete
+      - store: test_store_delete_prefix
     output:
       type: boolean

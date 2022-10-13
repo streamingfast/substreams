@@ -1,15 +1,13 @@
-use substreams::store::{
-    DeltaBigInt, DeltaI64, StoreGetBigInt, StoreGetI64, StoreSetBigInt, StoreSetI64, StoreSetProto,
-};
+mod pb;
+use crate::pb::test;
+
 use substreams::{
     errors, log,
     scalar::BigInt,
-    store::{Deltas, StoreAddBigInt, StoreAddInt64, StoreGet, StoreSet},
+    store::{Deltas, StoreAddBigInt, StoreAddInt64, StoreGet, StoreSet, StoreAdd, DeltaBigInt, DeltaI64, StoreGetBigInt, StoreGetI64, StoreSetBigInt, StoreSetI64, StoreSetProto},
 };
 
-use crate::pb::test;
 
-mod pb;
 
 #[substreams::handlers::map]
 fn test_map(blk: test::Block) -> Result<test::MapResult, errors::Error> {
@@ -87,9 +85,9 @@ fn assert_test_store_add_bigint(
 }
 
 #[substreams::handlers::store]
-fn test_store_delete(block: test::Block, s: StoreSetI64) {
+fn test_store_delete_prefix(block: test::Block, s: StoreSetI64) {
     let to_set_key = format!("key:{}", block.number);
-    s.set(1, to_set_key, &TO_SET);
+    s.set(1, to_set_key, TO_SET);
 
     if block.number > 1 {
         let previous_block_num = block.number - 1;
@@ -99,7 +97,7 @@ fn test_store_delete(block: test::Block, s: StoreSetI64) {
 }
 
 #[substreams::handlers::map]
-fn assert_test_store_delete(
+fn assert_test_store_delete_prefix(
     block: test::Block,
     deltas: Deltas<DeltaI64>,
     s: StoreGetI64,

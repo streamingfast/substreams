@@ -392,7 +392,7 @@ func Test_test_store_add_bigint(t *testing.T) {
 	runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
 
 }
-func Test_test_store_delete(t *testing.T) {
+func Test_test_store_delete_prefix(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,
@@ -400,6 +400,6 @@ func Test_test_store_delete(t *testing.T) {
 		}
 	}
 
-	runTest(t, 10, 12, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
+	runTest(t, 100, 120, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator)
 
 }

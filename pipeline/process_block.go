@@ -33,7 +33,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		// TODO should we check th error here
 		p.runPostJobHooks(clock)
 	}
-	return nil
+	return
 }
 
 func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) (err error) {

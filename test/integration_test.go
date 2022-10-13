@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -159,7 +160,7 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 		require.NoError(t, err)
 		err = pipe.ProcessBlock(bb, o)
 		if err != nil {
-			require.Equal(t, io.EOF, err)
+			require.True(t, errors.Is(err, io.EOF))
 		}
 	}
 

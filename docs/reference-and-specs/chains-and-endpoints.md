@@ -25,7 +25,7 @@ Protobuf model: [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/f
 * **Ethereum Mainnet**: `mainnet.eth.streamingfast.io:443`
 * **Görli**: `goerli.eth.streamingfast.io:443`
 * **Polygon** **Mainnet**: `polygon.streamingfast.io:443`
-* **BSC**: `bsc.streamingfast.io:443`
+* **BNB**: `bnb.streamingfast.io:443`
 
 ## Near
 

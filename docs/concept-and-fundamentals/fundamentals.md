@@ -49,8 +49,6 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 ### **Protobufs for Substreams**
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-12 at 2.56.56 PM.png" alt=""><figcaption><p><strong>Substreams Module Handlers &#x26; Protobufs</strong></p></figcaption></figure>
-
 Protobufs are the data models operated on by the Rust-based module handler functions. Data models are defined and outlined in the protobufs, including the names of the data objects and the fields accessible within them.&#x20;
 
 Many of the protobuf definitions have already been created, such as the erc721 token model, that can be used by developers creating Substreams data transformation strategies.

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	tests := []struct {
 		name       string
 		moduleName string
-		block      *pbsubstreams.Block
+		block      *pbsubstreamstest.Block
 		request    *RequestContext
 		executor   ModuleExecutor
 		testFunc   func(t *testing.T, data []byte)
@@ -28,13 +29,13 @@ func TestPipeline_runExecutor(t *testing.T) {
 		{
 			name:       "golden path",
 			moduleName: "map_test",
-			block:      &pbsubstreams.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
+			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
 			executor:   mapTestExecutor(t),
 			testFunc: func(t *testing.T, data []byte) {
-				out := &pbsubstreams.MapResult{}
+				out := &pbsubstreamstest.MapResult{}
 				err := proto.Unmarshal(data, out)
 				require.NoError(t, err)
-				assertProtoEqual(t, &pbsubstreams.MapResult{
+				assertProtoEqual(t, &pbsubstreamstest.MapResult{
 					BlockNumber: 10,
 					BlockHash:   "block-10",
 				}, out)
@@ -107,7 +108,7 @@ func (o *Obj) Step() bstream.StepType {
 	return o.step
 }
 
-func bstreamBlk(t *testing.T, blk *pbsubstreams.Block) *bstream.Block {
+func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *bstream.Block {
 	payload, err := proto.Marshal(blk)
 	require.NoError(t, err)
 

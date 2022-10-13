@@ -165,7 +165,7 @@ func searchStoreModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	moduleStore, err := store.NewKVStore(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore, zlog)
+	moduleStore, err := store.NewFullKV(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore, zlog)
 	if err != nil {
 		return fmt.Errorf("initializing store for module %q: %w", module.Name, err)
 	}

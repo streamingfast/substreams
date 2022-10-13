@@ -443,7 +443,7 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 				codePath := binaryDef.File
 				var byteCode []byte
 				if !r.skipSourceCodeImportValidation {
-					byteCode, err = ioutil.ReadFile(m.resolvePath(codePath))
+					byteCode, err = ioutil.ReadFile(codePath)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
 					}

@@ -33,7 +33,7 @@ func TestNewJobsPlanner(t *testing.T) {
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
 
-		newStore, err := store.NewKVStore(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
+		newStore, err := store.NewFullKV(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
 		require.NoError(t, err)
 
 		storeMap.Set(mod.Name, newStore)

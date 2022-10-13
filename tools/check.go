@@ -56,13 +56,13 @@ func checkE(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func newStore(storeURL string) (*store.BaseStore, dstore.Store, error) {
+func newStore(storeURL string) (*store.FullKV, dstore.Store, error) {
 	remoteStore, err := dstore.NewStore(storeURL, "", "", false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
 	}
 
-	s, err := store.NewKVStore(
+	s, err := store.NewFullKV(
 		"",
 		0,
 		"",

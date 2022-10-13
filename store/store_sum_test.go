@@ -5,21 +5,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 )
-
-func initTestStore(key string, value []byte) *BaseStore {
-	b, err := NewKVStore("b", 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil), zlog)
-	if err != nil {
-		panic(err)
-	}
-	if value != nil {
-		b.kv[key] = value
-	}
-	return b
-}
 
 func TestStoreSumBigInt(t *testing.T) {
 	tests := []struct {
@@ -47,7 +35,10 @@ func TestStoreSumBigInt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestStore(test.key, test.existingValue)
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+			if test.existingValue != nil {
+				b.kv[test.key] = test.existingValue
+			}
 
 			b.SumBigInt(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
@@ -88,7 +79,10 @@ func TestStoreSumInt64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestStore(test.key, test.existingValue)
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+			if test.existingValue != nil {
+				b.kv[test.key] = test.existingValue
+			}
 
 			b.SumInt64(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
@@ -130,7 +124,10 @@ func TestStoreSumFloat64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestStore(test.key, test.existingValue)
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+			if test.existingValue != nil {
+				b.kv[test.key] = test.existingValue
+			}
 
 			b.SumFloat64(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
@@ -172,7 +169,10 @@ func TestStoreSumBigFloat(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := initTestStore(test.key, test.existingValue)
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+			if test.existingValue != nil {
+				b.kv[test.key] = test.existingValue
+			}
 
 			b.SumBigFloat(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)

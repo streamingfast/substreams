@@ -67,3 +67,22 @@ modules:
       - store: test_store_add_bigint
     output:
       type: boolean
+
+  - name: test_store_delete
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_delete
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: test_store_delete
+        mode: deltas
+      - store: test_store_delete
+    output:
+      type: boolean

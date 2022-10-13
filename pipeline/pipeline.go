@@ -41,7 +41,7 @@ type Pipeline struct {
 	respFunc     func(resp *pbsubstreams.Response) error
 
 	outputModuleMap      map[string]bool
-	backprocessingStores []*store.KVPartialStore
+	backprocessingStores []store.Store
 
 	moduleExecutors []ModuleExecutor
 
@@ -162,15 +162,28 @@ func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) er
 
 	p.reqCtx.logger.Info("marking leaf store for partial processing", zap.String("module", outputStoreModule.Name))
 
-	partialStore, err := p.storeFactory.NewKVPartialStore(
+	var partialStore store.Store
+	var err error
+	// if a subtrequest's StartBlock is equal to the module StartBlock, we will create a full store regardless
+	isPartialStore := p.reqCtx.StartBlockNum() != outputStoreModule.InitialBlock
+	//if isPartialStore {
+	partialStore, err = p.storeFactory.NewKVPartialStore(
 		p.moduleHashes.Get(outputStoreModule.Name),
 		outputStoreModule,
 		p.reqCtx.StartBlockNum(),
 		p.reqCtx.logger,
 	)
+	//} else {
+	//	partialStore, err = p.storeFactory.NewKVStore(
+	//		p.moduleHashes.Get(outputStoreModule.Name),
+	//		outputStoreModule,
+	//		p.reqCtx.logger,
+	//	)
+	//}
 	if err != nil {
-		return fmt.Errorf("failed to create partial store %q for back processing: %w", outputStoreModule.Name, err)
+		return fmt.Errorf("creating store (partial: %t): %w", isPartialStore, err)
 	}
+
 	// update the KVStore to a partial store for a backprocessing output
 	p.storeMap.Set(outputStoreModule.Name, partialStore)
 
@@ -196,6 +209,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerP
 	if err != nil {
 		return fmt.Errorf("synchronizing stores: %w", err)
 	}
+	fmt.Println("backprocess complete")
 
 	for modName, store := range backProcessedStores {
 		p.storeMap.Set(modName, store)
@@ -265,7 +279,6 @@ func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
 			return fmt.Errorf("sacing store %q at boundary %d: %w", name, boundaryBlock, err)
 		}
 
-		p.reqCtx.logger.Info("store written", zap.String("store_name", name))
 		if p.reqCtx.isSubRequest && p.isOutputModule(name) {
 			p.partialsWritten = append(p.partialsWritten, blockRange)
 			p.reqCtx.logger.Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
@@ -374,7 +387,7 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 	var progress []*pbsubstreams.ModuleProgress
 	for _, store := range p.backprocessingStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
-			Name: store.Name,
+			Name: store.Name(),
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 				// TODO charles: add p.hostname
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{

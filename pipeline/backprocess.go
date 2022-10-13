@@ -97,7 +97,9 @@ func (p *Pipeline) backProcessStores(
 	}
 
 	logger.Info("all jobs completed, waiting for squasher to finish")
-	squasher.Shutdown(nil)
+	if err := squasher.WaitTillComplete(); err != nil {
+		return nil, fmt.Errorf("squasher failed: %w", err)
+	}
 
 	if out, err = squasher.ValidateStoresReady(); err != nil {
 		err = fmt.Errorf("squasher incomplete: %w", err)

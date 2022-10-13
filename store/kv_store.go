@@ -22,7 +22,7 @@ var _ Store = (*KVStore)(nil)
 var _ Cloneable = (*KVStore)(nil)
 
 type KVStore struct {
-	Name       string
+	name       string
 	moduleHash string
 	store      dstore.Store
 
@@ -46,7 +46,7 @@ func NewKVStore(name string, moduleInitialBlock uint64, moduleHash string, updat
 	}
 
 	b := &KVStore{
-		Name:               name,
+		name:               name,
 		kv:                 make(map[string][]byte),
 		updatePolicy:       updatePolicy,
 		valueType:          valueType,
@@ -61,7 +61,7 @@ func NewKVStore(name string, moduleInitialBlock uint64, moduleHash string, updat
 
 func (s *KVStore) Clone() *KVStore {
 	return &KVStore{
-		Name:               s.Name,
+		name:               s.name,
 		store:              s.store,
 		moduleInitialBlock: s.moduleInitialBlock,
 		moduleHash:         s.moduleHash,
@@ -71,14 +71,14 @@ func (s *KVStore) Clone() *KVStore {
 		logger:             s.logger,
 	}
 }
-
+func (s *KVStore) Name() string         { return s.name }
 func (s *KVStore) InitialBlock() uint64 { return s.moduleInitialBlock }
 
 func (s *KVStore) String() string {
-	return fmt.Sprintf("%s (%s)", s.Name, s.moduleHash)
+	return fmt.Sprintf("%s (%s)", s.name, s.moduleHash)
 }
 func (s *KVStore) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("name", s.Name)
+	enc.AddString("name", s.name)
 	enc.AddString("hash", s.moduleHash)
 	enc.AddUint64("module_initial_block", s.moduleInitialBlock)
 	enc.AddInt("key_count", len(s.kv))
@@ -92,11 +92,11 @@ func (s *KVStore) storageFilename(exclusiveEndBlock uint64) string {
 
 func (s *KVStore) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	fileName := s.storageFilename(exclusiveEndBlock)
-	s.logger.Debug("loading state from file", zap.String("module_name", s.Name), zap.String("fileName", fileName))
+	s.logger.Debug("loading full store state from file", zap.String("module_name", s.name), zap.String("fileName", fileName))
 
 	data, err := loadStore(ctx, s.store, fileName)
 	if err != nil {
-		return fmt.Errorf("load store %s at %s: %w", s.Name, fileName, err)
+		return fmt.Errorf("load full store %s at %s: %w", s.name, fileName, err)
 	}
 
 	kv := map[string][]byte{}
@@ -105,7 +105,7 @@ func (s *KVStore) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	}
 	s.kv = kv
 
-	s.logger.Debug("store loaded", zap.String("store_name", s.Name), zap.String("fileName", fileName))
+	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName))
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (s *KVStore) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
 func (s *KVStore) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
-	s.logger.Debug("writing state", zap.Object("store", s))
+	s.logger.Debug("writing full store state", zap.Object("store", s))
 
 	content, err := json.MarshalIndent(s.kv, "", "  ")
 	if err != nil {
@@ -121,45 +121,33 @@ func (s *KVStore) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Ran
 	}
 
 	filename := s.storageFilename(endBoundaryBlock)
-	s.logger.Info("about to write state",
-		zap.String("store", s.Name),
+	if err := saveStore(ctx, s.store, filename, content); err != nil {
+		return nil, fmt.Errorf("write fill store %q in file %q: %w", s.name, filename, err)
+	}
+
+	brange := block.NewRange(s.moduleInitialBlock, endBoundaryBlock)
+	s.logger.Info("full store state written",
+		zap.String("store", s.name),
 		zap.String("file_name", filename),
+		zap.Object("block_range", brange),
 	)
 
-	if err := saveStore(ctx, s.store, filename, content); err != nil {
-		return nil, fmt.Errorf("write store %q in file %q: %w", s.Name, filename, err)
-	}
-
-	return block.NewRange(s.moduleInitialBlock, endBoundaryBlock), nil
+	return brange, nil
 }
 
-func (s *KVStore) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) *storeDeleter {
+func (s *KVStore) DeleteStore(ctx context.Context, exclusiveEndBlock uint64) (err error) {
 	filename := s.storageFilename(exclusiveEndBlock)
+	zlog.Debug("deleting full store file", zap.String("file_name", filename))
 
-	return &storeDeleter{
-		objStore: s.store,
-		filename: filename,
-		ctx:      ctx,
+	if err = s.store.DeleteObject(ctx, filename); err != nil {
+		zlog.Warn("deleting  file", zap.String("file_name", filename), zap.Error(err))
 	}
-}
-
-type storeDeleter struct {
-	objStore dstore.Store
-	filename string
-	ctx      context.Context
-}
-
-func (d *storeDeleter) Delete() error {
-	zlog.Debug("deleting store file", zap.String("file_name", d.filename))
-	if err := d.objStore.DeleteObject(d.ctx, d.filename); err != nil {
-		zlog.Warn("deleting partial file", zap.String("filename", d.filename), zap.Error(err))
-	}
-	return nil
+	return err
 }
 
 func (s *KVStore) Reset() {
 	if tracer.Enabled() {
-		s.logger.Debug("flushing store", zap.String("name", s.Name), zap.Int("delta_count", len(s.deltas)), zap.Int("entry_count", len(s.kv)))
+		s.logger.Debug("flushing store", zap.String("name", s.name), zap.Int("delta_count", len(s.deltas)), zap.Int("entry_count", len(s.kv)))
 	}
 	s.deltas = nil
 	s.lastOrdinal = 0

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
@@ -14,7 +13,6 @@ import (
 
 // Squasher produces _complete_ stores, by merging backing partial stores.
 type Squasher struct {
-	*shutter.Shutter
 	storeSquashers       map[string]*StoreSquasher
 	storeSaveInterval    uint64
 	targetExclusiveBlock uint64
@@ -36,10 +34,12 @@ func NewSquasher(
 	storeSaveInterval uint64,
 	jobsPlanner *JobsPlanner) (*Squasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
-	for modName, workUnit := range workPlan {
-		genericStore, found := storeMap.Get(modName)
+	zlog.Info("creating a new squasher", zap.Int("work_plan_count", len(workPlan)))
+
+	for storeModuleName, workUnit := range workPlan {
+		genericStore, found := storeMap.Get(storeModuleName)
 		if !found {
-			return nil, fmt.Errorf("store %q not found", modName)
+			return nil, fmt.Errorf("store %q not found", storeModuleName)
 		}
 
 		s, ok := genericStore.(store.Cloneable)
@@ -49,23 +49,23 @@ func NewSquasher(
 		clonedStore := s.Clone()
 
 		var storeSquasher *StoreSquasher
-		if workUnit.initialStoreFile == nil {
+		if workUnit.initialCompleteRange == nil {
 			zlog.Info("setting up initial store",
-				zap.String("store", modName),
-				zap.Object("initial_store_file", workUnit.initialStoreFile),
+				zap.String("store", storeModuleName),
+				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
 			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, clonedStore.InitialBlock(), storeSaveInterval, jobsPlanner)
 		} else {
 			zlog.Info("loading initial store",
-				zap.String("store", modName),
-				zap.Object("initial_store_file", workUnit.initialStoreFile),
+				zap.String("store", storeModuleName),
+				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
-			if err := clonedStore.Load(ctx, workUnit.initialStoreFile.ExclusiveEndBlock); err != nil {
-				return nil, fmt.Errorf("load store %q: range %s: %w", modName, workUnit.initialStoreFile, err)
+			if err := clonedStore.Load(ctx, workUnit.initialCompleteRange.ExclusiveEndBlock); err != nil {
+				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, workUnit.initialCompleteRange, err)
 			}
-			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, workUnit.initialStoreFile.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
+			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
 
-			jobsPlanner.SignalCompletionUpUntil(modName, workUnit.initialStoreFile.ExclusiveEndBlock)
+			jobsPlanner.SignalCompletionUpUntil(storeModuleName, workUnit.initialCompleteRange.ExclusiveEndBlock)
 		}
 
 		if len(workUnit.partialsMissing) == 0 {
@@ -73,24 +73,29 @@ func NewSquasher(
 		}
 
 		go storeSquasher.launch(ctx)
-		storeSquashers[modName] = storeSquasher
+		storeSquashers[storeModuleName] = storeSquasher
 	}
 
 	squasher := &Squasher{
-		Shutter:              shutter.New(),
 		storeSquashers:       storeSquashers,
 		targetExclusiveBlock: reqStartBlock,
 	}
-
-	squasher.OnTerminating(func(err error) {
-		zlog.Info("squasher terminating", zap.Error(err))
-		for _, squashable := range storeSquashers {
-			zlog.Info("shutting down store squasher", zap.String("store", squashable.name))
-			squashable.Shutter.Shutdown(err)
-		}
-	})
-
 	return squasher, nil
+}
+
+func (s *Squasher) WaitTillComplete() error {
+	zlog.Info("squasher waiting till squasher stores are completed",
+		zap.Int("store_count", len(s.storeSquashers)),
+	)
+	for _, squashable := range s.storeSquashers {
+		zlog.Info("shutting down store squasher",
+			zap.String("store", squashable.name),
+		)
+		if err := squashable.WaitForCompletion(); err != nil {
+			return fmt.Errorf("%q completed with err: %w", squashable.name, err)
+		}
+	}
+	return nil
 }
 
 func (s *Squasher) Squash(moduleName string, partialsRanges block.Ranges) error {

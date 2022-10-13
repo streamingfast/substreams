@@ -29,7 +29,7 @@ func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		enc.AddBool("nil", true)
 	} else {
 		enc.AddUint64("start_block", r.StartBlock)
-		enc.AddUint64("end_block", r.ExclusiveEndBlock)
+		enc.AddUint64("exclusive_end_block", r.ExclusiveEndBlock)
 	}
 	return nil
 }

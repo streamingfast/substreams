@@ -12,7 +12,7 @@ protobuf:
 binaries:
   default:
     type: wasm/rust-v1
-    file: /Users/cbillett/devel/sf/substreams/pipeline/test_data/simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
+    file: /Users/julien/codebase/sf/substreams/test/testdata/simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
 
 modules:
   - name: test_map

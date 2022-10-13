@@ -8,6 +8,7 @@ import (
 )
 
 type Store interface {
+	Name() string
 	InitialBlock() uint64
 
 	Loadable

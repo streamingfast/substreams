@@ -25,16 +25,16 @@ func (p WorkPlan) SquashPartialsPresent(squasher *Squasher) error {
 
 func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p {
-		if unit.initialStoreFile == nil {
+		if unit.initialCompleteRange == nil {
 			continue
 		}
 
 		var more []*pbsubstreams.BlockRange
-		if unit.initialStoreFile != nil {
+		if unit.initialCompleteRange != nil {
 			more = append(more, &pbsubstreams.BlockRange{
 				// FIXME(abourget): we'll use opentelemetry tracing for that!
-				StartBlock: unit.initialStoreFile.StartBlock,
-				EndBlock:   unit.initialStoreFile.ExclusiveEndBlock,
+				StartBlock: unit.initialCompleteRange.StartBlock,
+				EndBlock:   unit.initialCompleteRange.ExclusiveEndBlock,
 			})
 		}
 
@@ -60,7 +60,7 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 func (p WorkPlan) String() string {
 	var out []string
 	for k, v := range p {
-		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.initialStoreFile, v.partialsMissing, v.partialsPresent))
+		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.initialCompleteRange, v.partialsMissing, v.partialsPresent))
 	}
 	return strings.Join(out, ";")
 }
@@ -68,9 +68,9 @@ func (p WorkPlan) String() string {
 type WorkUnit struct {
 	modName string
 
-	initialStoreFile *block.Range // Points to a complete .kv file, to initialize the store upon getting started.
-	partialsMissing  block.Ranges
-	partialsPresent  block.Ranges
+	initialCompleteRange *block.Range // Points to a complete .kv file, to initialize the store upon getting started.
+	partialsMissing      block.Ranges
+	partialsPresent      block.Ranges
 }
 
 func (w *WorkUnit) initialProcessedPartials() block.Ranges {
@@ -93,7 +93,7 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 	backProcessStartBlock := modInitBlock
 	if completeSnapshot != nil {
 		backProcessStartBlock = completeSnapshot.ExclusiveEndBlock
-		work.initialStoreFile = block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock)
+		work.initialCompleteRange = block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock)
 
 		if completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
 			return work

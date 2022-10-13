@@ -8,14 +8,12 @@ import (
 	"time"
 
 	"github.com/abourget/llerrgroup"
-	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
 
 type StoreSquasher struct {
-	*shutter.Shutter
 	name                         string
 	store                        *store.KVStore
 	requestRange                 *block.Range
@@ -27,7 +25,7 @@ type StoreSquasher struct {
 	jobsPlanner                  *JobsPlanner
 	targetExclusiveEndBlockReach bool
 	partialsChunks               chan block.Ranges
-	waitForCompletion            chan interface{}
+	waitForCompletion            chan error
 	storeSaveInterval            uint64
 }
 
@@ -39,30 +37,30 @@ func NewStoreSquasher(
 	jobsPlanner *JobsPlanner,
 ) *StoreSquasher {
 	s := &StoreSquasher{
-		Shutter:                 shutter.New(),
-		name:                    initialStore.Name,
+		name:                    initialStore.Name(),
 		store:                   initialStore,
 		targetExclusiveEndBlock: targetExclusiveBlock,
 		nextExpectedStartBlock:  nextExpectedStartBlock,
 		jobsPlanner:             jobsPlanner,
 		storeSaveInterval:       storeSaveInterval,
 		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
-		waitForCompletion:       make(chan interface{}),
+		waitForCompletion:       make(chan error),
 		log:                     zlog.With(zap.Object("initial_store", initialStore)),
 	}
-	s.OnTerminating(func(err error) {
-		if err != nil {
-			s.log.Info("squasher terminating because of an error", zap.Error(err))
-			return
-		}
-		s.log.Info("will terminate after partials chucks chan empty")
-		close(s.partialsChunks)
-
-		s.log.Info("waiting completion")
-		<-s.waitForCompletion
-		s.log.Info("partials chucks chan empty, terminating")
-	})
 	return s
+}
+
+func (s *StoreSquasher) WaitForCompletion() error {
+	s.log.Info("waiting form terminate after partials chucks chan empty")
+	close(s.partialsChunks)
+
+	s.log.Info("waiting completion")
+	err := <-s.waitForCompletion
+	if err != nil {
+		return err
+	}
+	s.log.Info("partials chucks chan empty, terminating")
+	return nil
 }
 
 func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
@@ -76,18 +74,19 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 }
 
 func (s *StoreSquasher) launch(ctx context.Context) {
-	s.log.Info("launching squasher")
+	s.log.Info("launching store squasher")
 	metrics.SquashesLaunched.Inc()
 	for {
 		select {
 		case <-ctx.Done():
 			s.log.Info("quitting on a close context")
+			s.waitForCompletion <- ctx.Err()
 			return
 
 		case partialsChunks, ok := <-s.partialsChunks:
 			if !ok {
 				s.log.Info("squashing done, no more partial chunks to squash")
-				close(s.waitForCompletion)
+				s.waitForCompletion <- nil
 				return
 			}
 			s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
@@ -110,30 +109,36 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 				s.log.Info("no more ranges to squash")
 				break
 			}
+
 			squashableRange := s.ranges[0]
-			s.log.Info("testing first range", zap.Object("range", squashableRange), zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock))
+			s.log.Info("testing first range",
+				zap.Object("range", squashableRange),
+				zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock),
+			)
 
 			if squashableRange.StartBlock < s.nextExpectedStartBlock {
-				s.Shutdown(fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges))
+				s.waitForCompletion <- fmt.Errorf("module %q: non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.name, s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges)
 				return
 			}
 			if s.nextExpectedStartBlock != squashableRange.StartBlock {
 				break
 			}
 
-			s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
+			s.log.Debug("found range to merge",
+				zap.Stringer("squashable", s),
+				zap.Stringer("squashable_range", squashableRange),
+			)
 			squashCount++
 
-			nextStore := store.NewPartialStore(s.store, squashableRange.StartBlock)
+			nextStore := store.NewPartialStore(s.store.Clone(), squashableRange.StartBlock)
 			if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
-				s.Shutdown(fmt.Errorf("initializing next partial store %q: %w", s.name, err))
+				s.waitForCompletion <- fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 				return
 			}
 
-			s.log.Debug("next store loaded", zap.Object("store", nextStore))
-
+			s.log.Debug("merging next store loaded", zap.Object("store", nextStore))
 			if err := s.store.Merge(nextStore); err != nil {
-				s.Shutdown(fmt.Errorf("merging: %s", err))
+				s.waitForCompletion <- fmt.Errorf("merging: %s", err)
 				return
 			}
 
@@ -143,8 +148,10 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 
 			zlog.Info("deleting store", zap.Object("store", nextStore))
 
-			storeDeleter := nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
-			eg.Go(storeDeleter.Delete)
+			eg.Go(func() error {
+				nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+				return nil
+			})
 
 			isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
 			isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == s.store.InitialBlock()
@@ -168,10 +175,11 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			s.log.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
 			lastExclusiveEndBlock = squashableRange.ExclusiveEndBlock
 		}
+
 		s.log.Info("waiting for eg to finish")
 		if err := eg.Wait(); err != nil {
 			// eg.Wait() will block until everything is done, and return the first error.
-			s.Shutdown(err)
+			s.waitForCompletion <- fmt.Errorf("waiting: %w", err)
 			return
 		}
 

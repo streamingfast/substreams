@@ -8,7 +8,7 @@ import (
 func (s *KVStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF is reserved for internal use.
 	if len(delta.Key) == 0 {
-		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", s.Name))
+		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", s.name))
 	}
 	if delta.Key[0] == byte(255) {
 		panic(fmt.Sprintf("key %q invalid, must be at least 1 character and not start with 0xFF", delta.Key))

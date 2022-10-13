@@ -44,11 +44,11 @@ type storeData struct {
 
 func (p *KVPartialStore) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	filename := p.storageFilename(exclusiveEndBlock)
-	p.logger.Debug("loading state from file", zap.String("filename", filename))
+	p.logger.Debug("loading partial store state from file", zap.String("filename", filename))
 
 	data, err := loadStore(ctx, p.store, filename)
 	if err != nil {
-		return fmt.Errorf("load partial store %s at %s: %w", p.Name, filename, err)
+		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
 	}
 
 	stateData := &storeData{}
@@ -63,7 +63,7 @@ func (p *KVPartialStore) Load(ctx context.Context, exclusiveEndBlock uint64) err
 }
 
 func (p *KVPartialStore) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
-	p.logger.Debug("writing state", zap.Object("store", p))
+	p.logger.Debug("writing partial store  state", zap.Object("store", p))
 
 	data := &storeData{
 		KV:              p.kv,
@@ -72,20 +72,22 @@ func (p *KVPartialStore) Save(ctx context.Context, endBoundaryBlock uint64) (*bl
 
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshal kv state: %w", err)
+		return nil, fmt.Errorf("marshal partial data: %w", err)
 	}
 
 	filename := p.storageFilename(endBoundaryBlock)
-	p.logger.Info("about to write state",
-		zap.String("store", p.Name),
-		zap.String("file_name", filename),
-	)
-
 	if err := saveStore(ctx, p.store, filename, content); err != nil {
-		return nil, fmt.Errorf("write partial store %q in file %q: %w", p.Name, filename, err)
+		return nil, fmt.Errorf("write partial store %q in file %q: %w", p.name, filename, err)
 	}
 
-	return block.NewRange(p.initialBlock, endBoundaryBlock), nil
+	brange := block.NewRange(p.initialBlock, endBoundaryBlock)
+	p.logger.Info("partial store  state written",
+		zap.String("store", p.name),
+		zap.String("file_name", filename),
+		zap.Object("block_range", brange),
+	)
+
+	return brange, nil
 }
 
 func (p *KVPartialStore) DeletePrefix(ord uint64, prefix string) {

@@ -59,6 +59,7 @@ func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModu
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
 
+	fmt.Println("Running Worker", req.StartBlockNum, req.StopBlockNum, strings.Join(req.OutputModules, ","))
 	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true)
 	//todo: cumulate responses
 
@@ -360,7 +361,7 @@ func Test_MultipleModule_Batch(t *testing.T) {
 		}
 	}
 
-	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 110, 112, []string{"test_store_add_int64", "assert_test_store_add_int64"}, newBlockGenerator)
 
 	//Module start is set to 10.
 	//test_store_add_int64 will be call 102 in total.
@@ -369,10 +370,35 @@ func Test_MultipleModule_Batch(t *testing.T) {
 
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"100","new":"101"}]}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"109","new":"110"}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
 		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"101","new":"102"}]}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"110","new":"111"}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
+	}, moduleOutputs)
+}
+
+func Test_MultipleModule_Batch_2(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+
+	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator)
+
+	//Module start is set to 10.
+	//test_store_add_int64 will be call 102 in total.
+	//The first 100 will be batched. and produce no output.
+	//When block 110 will be processed the test_store_add_int64 should be at 100
+
+	require.Equal(t, []string{
+		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"109","new":"110"}]}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
+		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"110","new":"111"}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
 }

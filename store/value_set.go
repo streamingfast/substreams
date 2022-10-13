@@ -7,23 +7,23 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (s *KVStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
+func (s *BaseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
 	s.setIfNotExists(ord, key, value)
 }
 
-func (s *KVStore) SetIfNotExists(ord uint64, key string, value string) {
+func (s *BaseStore) SetIfNotExists(ord uint64, key string, value string) {
 	s.setIfNotExists(ord, key, []byte(value))
 }
 
-func (s *KVStore) SetBytes(ord uint64, key string, value []byte) {
+func (s *BaseStore) SetBytes(ord uint64, key string, value []byte) {
 	s.set(ord, key, value)
 }
 
-func (s *KVStore) Set(ord uint64, key string, value string) {
+func (s *BaseStore) Set(ord uint64, key string, value string) {
 	s.set(ord, key, []byte(value))
 }
 
-func (s *KVStore) set(ord uint64, key string, value []byte) {
+func (s *BaseStore) set(ord uint64, key string, value []byte) {
 	// FIXME(abourget): these should return an error up the stack instead, would bubble up
 	// in the wasm/module.go and fail the query, with proper error propagation.
 	if strings.HasPrefix(key, "__!__") {
@@ -66,7 +66,7 @@ func (s *KVStore) set(ord uint64, key string, value []byte) {
 	s.deltas = append(s.deltas, delta)
 }
 
-func (s *KVStore) setIfNotExists(ord uint64, key string, value []byte) {
+func (s *BaseStore) setIfNotExists(ord uint64, key string, value []byte) {
 	_, found := s.GetLast(key)
 	if found {
 		return

@@ -11,8 +11,8 @@ import (
 func TestStore_Merge(t *testing.T) {
 	tests := []struct {
 		name          string
-		latest        *KVPartialStore
-		prev          *KVStore
+		latest        *PartialStore
+		prev          *BaseStore
 		expectedError bool
 		expectedKV    map[string][]byte
 	}{
@@ -350,15 +350,15 @@ func TestStore_Merge(t *testing.T) {
 	}
 }
 
-func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, deletedPrefixes []string) *KVPartialStore {
-	return &KVPartialStore{
-		KVStore:         newStore(kv, updatePolicy, valueType),
+func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, deletedPrefixes []string) *PartialStore {
+	return &PartialStore{
+		BaseStore:       newStore(kv, updatePolicy, valueType),
 		DeletedPrefixes: deletedPrefixes,
 	}
 }
 
-func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *KVStore {
-	return &KVStore{
+func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *BaseStore {
+	return &BaseStore{
 		kv:           kv,
 		updatePolicy: updatePolicy,
 		valueType:    valueType,

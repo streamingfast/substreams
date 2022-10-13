@@ -8,32 +8,31 @@ import (
 	"go.uber.org/zap"
 )
 
-//compile-time check that KVStore implements all interfaces
-var _ Store = (*KVPartialStore)(nil)
-var _ Store = (*KVPartialStore)(nil)
+//compile-time check that BaseStore implements all interfaces
+var _ Store = (*PartialKV)(nil)
 
-type KVPartialStore struct {
-	*KVStore
+type PartialKV struct {
+	*BaseStore
 
 	initialBlock    uint64 // block at which we initialized this store
 	DeletedPrefixes []string
 }
 
-func NewPartialStore(store *KVStore, initialBlock uint64) *KVPartialStore {
-	return &KVPartialStore{
-		KVStore:      store,
+func NewPartialKV(store *BaseStore, initialBlock uint64) *PartialKV {
+	return &PartialKV{
+		BaseStore:    store,
 		initialBlock: initialBlock,
 	}
 }
 
-func (p *KVPartialStore) Roll(lastBlock uint64) {
+func (p *PartialKV) Roll(lastBlock uint64) {
 	p.initialBlock = lastBlock
-	p.KVStore.kv = map[string][]byte{}
+	p.BaseStore.kv = map[string][]byte{}
 }
 
-func (s *KVPartialStore) InitialBlock() uint64 { return s.initialBlock }
+func (s *PartialKV) InitialBlock() uint64 { return s.initialBlock }
 
-func (p *KVPartialStore) storageFilename(exclusiveEndBlock uint64) string {
+func (p *PartialKV) storageFilename(exclusiveEndBlock uint64) string {
 	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock))
 }
 
@@ -42,7 +41,7 @@ type storeData struct {
 	DeletedPrefixes []string          `json:"deleted_prefixes"`
 }
 
-func (p *KVPartialStore) Load(ctx context.Context, exclusiveEndBlock uint64) error {
+func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	filename := p.storageFilename(exclusiveEndBlock)
 	p.logger.Debug("loading partial store state from file", zap.String("filename", filename))
 
@@ -62,7 +61,7 @@ func (p *KVPartialStore) Load(ctx context.Context, exclusiveEndBlock uint64) err
 	return nil
 }
 
-func (p *KVPartialStore) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
+func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
 	p.logger.Debug("writing partial store  state", zap.Object("store", p))
 
 	data := &storeData{
@@ -90,8 +89,18 @@ func (p *KVPartialStore) Save(ctx context.Context, endBoundaryBlock uint64) (*bl
 	return brange, nil
 }
 
-func (p *KVPartialStore) DeletePrefix(ord uint64, prefix string) {
-	p.KVStore.DeletePrefix(ord, prefix)
+func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
+	p.BaseStore.DeletePrefix(ord, prefix)
 
 	p.DeletedPrefixes = append(p.DeletedPrefixes, prefix)
+}
+
+func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error) {
+	filename := p.storageFilename(endBlock)
+	zlog.Debug("deleting full store file", zap.String("file_name", filename))
+
+	if err = p.store.DeleteObject(ctx, filename); err != nil {
+		zlog.Warn("deleting  file", zap.String("file_name", filename), zap.Error(err))
+	}
+	return err
 }

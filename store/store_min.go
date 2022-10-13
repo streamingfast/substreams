@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-func (s *KVStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
+func (s *BaseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
 	min := new(big.Int)
 	val, found := s.GetAt(ord, key)
 	if !found {
@@ -22,7 +22,7 @@ func (s *KVStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
 	s.set(ord, key, []byte(min.String()))
 }
 
-func (s *KVStore) SetMinInt64(ord uint64, key string, value int64) {
+func (s *BaseStore) SetMinInt64(ord uint64, key string, value int64) {
 	var min int64
 	val, found := s.GetAt(ord, key)
 	if !found {
@@ -38,7 +38,7 @@ func (s *KVStore) SetMinInt64(ord uint64, key string, value int64) {
 	s.set(ord, key, []byte(fmt.Sprintf("%d", min)))
 }
 
-func (s *KVStore) SetMinFloat64(ord uint64, key string, value float64) {
+func (s *BaseStore) SetMinFloat64(ord uint64, key string, value float64) {
 	var min float64
 	val, found := s.GetAt(ord, key)
 	if !found {
@@ -55,7 +55,7 @@ func (s *KVStore) SetMinFloat64(ord uint64, key string, value float64) {
 	s.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }
 
-func (s *KVStore) SetMinBigFloat(ord uint64, key string, value *big.Float) {
+func (s *BaseStore) SetMinBigFloat(ord uint64, key string, value *big.Float) {
 	min := new(big.Float)
 	val, found := s.GetAt(ord, key)
 	if !found {

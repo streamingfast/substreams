@@ -5,7 +5,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (s *KVStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
+func (s *BaseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF is reserved for internal use.
 	if len(delta.Key) == 0 {
 		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", s.name))
@@ -22,7 +22,7 @@ func (s *KVStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	}
 }
 
-func (s *KVStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
+func (s *BaseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 	for i := len(deltas) - 1; i >= 0; i-- {
 		delta := deltas[i]
 		switch delta.Operation {
@@ -34,10 +34,10 @@ func (s *KVStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 	}
 }
 
-func (k *KVStore) GetDeltas() []*pbsubstreams.StoreDelta {
+func (k *BaseStore) GetDeltas() []*pbsubstreams.StoreDelta {
 	return k.deltas
 }
 
-func (k *KVStore) SetDeltas(in []*pbsubstreams.StoreDelta) {
+func (k *BaseStore) SetDeltas(in []*pbsubstreams.StoreDelta) {
 	k.deltas = in
 }

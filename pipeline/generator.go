@@ -20,8 +20,8 @@ func NewStoreFactory(baseStore dstore.Store, saveInterval uint64) *StoreFactory 
 	}
 }
 
-func (g *StoreFactory) NewKVStore(hash string, storeModule *pbsubstreams.Module, logger *zap.Logger) (*store.KVStore, error) {
-	return store.NewKVStore(
+func (g *StoreFactory) NewFullKV(hash string, storeModule *pbsubstreams.Module, logger *zap.Logger) (*store.FullKV, error) {
+	return store.NewFullKV(
 		storeModule.Name,
 		storeModule.InitialBlock,
 		hash,
@@ -32,8 +32,8 @@ func (g *StoreFactory) NewKVStore(hash string, storeModule *pbsubstreams.Module,
 	)
 }
 
-func (g *StoreFactory) NewKVPartialStore(hash string, storeModule *pbsubstreams.Module, initialBlock uint64, logger *zap.Logger) (*store.KVPartialStore, error) {
-	s, err := store.NewKVStore(
+func (g *StoreFactory) NewPartialKV(hash string, storeModule *pbsubstreams.Module, initialBlock uint64, logger *zap.Logger) (*store.PartialKV, error) {
+	s, err := store.NewBaseStore(
 		storeModule.Name,
 		storeModule.InitialBlock,
 		hash,
@@ -45,5 +45,5 @@ func (g *StoreFactory) NewKVPartialStore(hash string, storeModule *pbsubstreams.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create store: %w", err)
 	}
-	return store.NewPartialStore(s, initialBlock), nil
+	return store.NewPartialKV(s, initialBlock), nil
 }

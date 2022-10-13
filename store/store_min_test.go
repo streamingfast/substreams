@@ -13,7 +13,7 @@ import (
 func TestStoreSetMinBigInt(t *testing.T) {
 	tests := []struct {
 		name          string
-		store         *KVStore
+		store         *BaseStore
 		key           string
 		existingValue *big.Int
 		value         *big.Int
@@ -45,7 +45,7 @@ func TestStoreSetMinBigInt(t *testing.T) {
 		},
 	}
 
-	initTestStore := func(b *KVStore, key string, value *big.Int) {
+	initTestStore := func(b *BaseStore, key string, value *big.Int) {
 		b.kv = map[string][]byte{}
 		if value != nil {
 			b.kv[key] = []byte(value.String())
@@ -79,7 +79,7 @@ func TestStoreSetMinInt64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		store         *KVStore
+		store         *BaseStore
 		key           string
 		existingValue *int64
 		value         int64
@@ -111,7 +111,7 @@ func TestStoreSetMinInt64(t *testing.T) {
 		},
 	}
 
-	initTestStore := func(b *KVStore, key string, value *int64) {
+	initTestStore := func(b *BaseStore, key string, value *int64) {
 		b.kv = map[string][]byte{}
 		if value != nil {
 			b.kv[key] = []byte(fmt.Sprintf("%d", *value))
@@ -146,7 +146,7 @@ func TestStoreSetMinFloat64(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		store         *KVStore
+		store         *BaseStore
 		key           string
 		existingValue *float64
 		value         float64
@@ -178,7 +178,7 @@ func TestStoreSetMinFloat64(t *testing.T) {
 		},
 	}
 
-	initTestStore := func(b *KVStore, key string, value *float64) {
+	initTestStore := func(b *BaseStore, key string, value *float64) {
 		b.kv = map[string][]byte{}
 		if value != nil {
 			b.kv[key] = []byte(strconv.FormatFloat(*value, 'g', 100, 64))
@@ -206,7 +206,7 @@ func TestStoreSetMinFloat64(t *testing.T) {
 func TestStoreSetMinBigFloat(t *testing.T) {
 	tests := []struct {
 		name          string
-		store         *KVStore
+		store         *BaseStore
 		key           string
 		existingValue *big.Float
 		value         *big.Float
@@ -238,7 +238,7 @@ func TestStoreSetMinBigFloat(t *testing.T) {
 		},
 	}
 
-	initTestStore := func(b *KVStore, key string, value *big.Float) {
+	initTestStore := func(b *BaseStore, key string, value *big.Float) {
 		b.kv = map[string][]byte{}
 		if value != nil {
 			b.kv[key] = []byte(value.Text('g', -1))

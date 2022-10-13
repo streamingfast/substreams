@@ -1,6 +1,6 @@
 package store
 
-func (s *KVStore) Append(ord uint64, key string, value []byte) {
+func (s *BaseStore) Append(ord uint64, key string, value []byte) {
 	var newVal []byte
 	oldVal, found := s.GetAt(ord, key)
 	if !found {

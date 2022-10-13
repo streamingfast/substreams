@@ -167,14 +167,14 @@ func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) er
 	// if a subtrequest's StartBlock is equal to the module StartBlock, we will create a full store regardless
 	isPartialStore := p.reqCtx.StartBlockNum() != outputStoreModule.InitialBlock
 	//if isPartialStore {
-	partialStore, err = p.storeFactory.NewKVPartialStore(
+	partialStore, err = p.storeFactory.NewPartialKV(
 		p.moduleHashes.Get(outputStoreModule.Name),
 		outputStoreModule,
 		p.reqCtx.StartBlockNum(),
 		p.reqCtx.logger,
 	)
 	//} else {
-	//	partialStore, err = p.storeFactory.NewKVStore(
+	//	partialStore, err = p.storeFactory.NewFullKV(
 	//		p.moduleHashes.Get(outputStoreModule.Name),
 	//		outputStoreModule,
 	//		p.reqCtx.logger,
@@ -184,7 +184,7 @@ func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) er
 		return fmt.Errorf("creating store (partial: %t): %w", isPartialStore, err)
 	}
 
-	// update the KVStore to a partial store for a backprocessing output
+	// update the BaseStore to a partial store for a backprocessing output
 	p.storeMap.Set(outputStoreModule.Name, partialStore)
 
 	for _, store := range p.storeMap.All() {
@@ -209,8 +209,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerP
 	if err != nil {
 		return fmt.Errorf("synchronizing stores: %w", err)
 	}
-	fmt.Println("backprocess complete")
-
+	
 	for modName, store := range backProcessedStores {
 		p.storeMap.Set(modName, store)
 	}
@@ -537,7 +536,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 
 func (p *Pipeline) addStores(storeModules []*pbsubstreams.Module) error {
 	for _, storeModule := range storeModules {
-		store, err := p.storeFactory.NewKVStore(p.moduleHashes.Get(storeModule.Name), storeModule, p.reqCtx.logger)
+		store, err := p.storeFactory.NewFullKV(p.moduleHashes.Get(storeModule.Name), storeModule, p.reqCtx.logger)
 		if err != nil {
 			return fmt.Errorf("failed to load store: %w", err)
 		}

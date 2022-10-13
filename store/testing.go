@@ -12,16 +12,10 @@ func NewTestKVStore(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
-) *KVStore {
-	t.Helper()
-	if store == nil {
-		store = dstore.NewMockStore(nil)
-	}
+) *FullKV {
+	base := newTestBaseStore(t, updatePolicy, valueType, store)
+	return &FullKV{base}
 
-	stateStore, err := NewKVStore("test", 0, "test.module.hash", updatePolicy, valueType, store, zlog)
-	require.NoError(t, err)
-
-	return stateStore
 }
 
 func NewTestKVPartialStore(
@@ -30,7 +24,26 @@ func NewTestKVPartialStore(
 	valueType string,
 	store dstore.Store,
 	initialPartialBlock uint64,
-) *KVPartialStore {
-	s := NewTestKVStore(t, updatePolicy, valueType, store)
-	return NewPartialStore(s, initialPartialBlock)
+) *PartialKV {
+	base := newTestBaseStore(t, updatePolicy, valueType, store)
+	return &PartialKV{
+		BaseStore:    base,
+		initialBlock: initialPartialBlock,
+	}
+}
+
+func newTestBaseStore(
+	t *testing.T,
+	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
+	valueType string,
+	store dstore.Store,
+) *BaseStore {
+	if store == nil {
+		store = dstore.NewMockStore(nil)
+	}
+
+	baseStore, err := NewBaseStore("test", 0, "test.module.hash", updatePolicy, valueType, store, zlog)
+	require.NoError(t, err)
+
+	return baseStore
 }

@@ -59,7 +59,6 @@ func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModu
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
 
-	fmt.Println("Running Worker", req.StartBlockNum, req.StopBlockNum, strings.Join(req.OutputModules, ","))
 	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true)
 	//todo: cumulate responses
 
@@ -395,10 +394,8 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"109","new":"110"}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
 		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"110","new":"111"}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
 }

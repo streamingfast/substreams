@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func initTestStore(key string, value []byte) *KVStore {
+func initTestStore(key string, value []byte) *BaseStore {
 	b, err := NewKVStore("b", 100, "modulehash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", dstore.NewMockStore(nil), zlog)
 	if err != nil {
 		panic(err)

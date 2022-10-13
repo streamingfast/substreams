@@ -15,7 +15,7 @@ import (
 
 type StoreSquasher struct {
 	name                         string
-	store                        *store.KVStore
+	store                        *store.FullKV
 	requestRange                 *block.Range
 	ranges                       block.Ranges
 	targetStartBlock             uint64
@@ -30,7 +30,7 @@ type StoreSquasher struct {
 }
 
 func NewStoreSquasher(
-	initialStore *store.KVStore,
+	initialStore *store.FullKV,
 	targetExclusiveBlock,
 	nextExpectedStartBlock uint64,
 	storeSaveInterval uint64,
@@ -130,7 +130,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			)
 			squashCount++
 
-			nextStore := store.NewPartialStore(s.store.Clone(), squashableRange.StartBlock)
+			nextStore := store.NewPartialKV(s.store.Clone().BaseStore, squashableRange.StartBlock)
 			if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 				s.waitForCompletion <- fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 				return

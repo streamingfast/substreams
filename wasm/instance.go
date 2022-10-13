@@ -74,7 +74,7 @@ func (i *Instance) Output() []byte {
 	return i.returnValue
 }
 
-func (i *Instance) SetOutputStore(store *store.KVStore) {
+func (i *Instance) SetOutputStore(store store.Store) {
 	i.outputStore = store
 }
 

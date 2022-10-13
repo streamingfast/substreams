@@ -6,7 +6,7 @@ import (
 	"github.com/streamingfast/derr"
 )
 
-func (s *KVStore) ListSnapshotFiles(ctx context.Context) (files []*FileInfo, err error) {
+func (s *BaseStore) ListSnapshotFiles(ctx context.Context) (files []*FileInfo, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		if err := s.store.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(filename)

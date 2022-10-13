@@ -6,7 +6,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (s *KVStore) GetFirst(key string) ([]byte, bool) {
+func (s *BaseStore) GetFirst(key string) ([]byte, bool) {
 	for _, delta := range s.deltas {
 		if delta.Key == key {
 			switch delta.Operation {
@@ -25,7 +25,7 @@ func (s *KVStore) GetFirst(key string) ([]byte, bool) {
 	return val, found
 }
 
-func (s *KVStore) GetLast(key string) ([]byte, bool) {
+func (s *BaseStore) GetLast(key string) ([]byte, bool) {
 	for i := len(s.deltas) - 1; i >= 0; i-- {
 		delta := s.deltas[i]
 		if delta.Key == key {
@@ -45,7 +45,7 @@ func (s *KVStore) GetLast(key string) ([]byte, bool) {
 }
 
 // GetAt returns the key for the state that includes the processing of `ord`.
-func (s *KVStore) GetAt(ord uint64, key string) (out []byte, found bool) {
+func (s *BaseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
 	out, found = s.GetLast(key)
 
 	for i := len(s.deltas) - 1; i >= 0; i-- {

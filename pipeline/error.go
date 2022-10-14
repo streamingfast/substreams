@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/streamingfast/bstream/stream"
 	errors2 "github.com/streamingfast/substreams/errors"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -11,8 +14,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"io"
-	"strings"
 )
 
 func (p *Pipeline) StreamEndedWithErr(streamSrv pbsubstreams.Stream_BlocksServer, err error) errors2.GRPCError {
@@ -21,8 +22,12 @@ func (p *Pipeline) StreamEndedWithErr(streamSrv pbsubstreams.Stream_BlocksServer
 			zap.Uint64("stop_block_num", p.reqCtx.StopBlockNum()),
 		)
 
-		// treat StopBlockNum as possible boundaries (if chain has holes...)
-		if err := p.FlushStores(p.reqCtx.StopBlockNum()); err != nil {
+		// We use `StopBlockNum` as the argument to flush stores as possible boundaries (if chain has holes...)
+		//
+		// The `StreamEndedWithErr` is invoked by the service when an error occurs with the connection, in this case,
+		// we are outside any active span and we want to attach the event to the root span of the pipeline
+		// which should always be set.
+		if err := p.flushStores(p.reqCtx.StopBlockNum(), p.rootSpan); err != nil {
 			return errors2.NewBasicErr(status.Errorf(codes.Internal, "handling store save boundaries: %s", err), err)
 		}
 	}

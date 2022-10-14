@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/tracing"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -18,6 +19,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
@@ -57,8 +59,10 @@ type Pipeline struct {
 
 	subrequestSplitSize int
 
-	storeMap     *store.Map
-	tracer       ttrace.Tracer
+	storeMap *store.Map
+	tracer   ttrace.Tracer
+	// rootSpan represents the top-level span of the Pipeline object, initiated when `Init` is called
+	rootSpan     ttrace.Span
 	storeFactory *StoreFactory
 	bounder      *StoreBoundary
 }
@@ -95,8 +99,8 @@ func New(reqCtx *RequestContext, graph *manifest.ModuleGraph, blockType string, 
 }
 
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
-	p.reqCtx.StartSpan("pipeline_init", p.tracer)
-	defer p.reqCtx.EndSpan(err)
+	_, p.rootSpan = p.tracer.Start(p.reqCtx.Context, "pipeline_init")
+	defer tracing.EndSpan(p.rootSpan, tracing.WithEndErr(err))
 
 	p.reqCtx.logger.Info("initializing handler",
 		zap.Uint64("requested_start_block", p.reqCtx.StartBlockNum()),
@@ -211,7 +215,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerP
 	if err != nil {
 		return fmt.Errorf("synchronizing stores: %w", err)
 	}
-	
+
 	for modName, store := range backProcessedStores {
 		p.storeMap.Set(modName, store)
 	}
@@ -234,17 +238,17 @@ func (p *Pipeline) validateAndHashModules(modules []*pbsubstreams.Module) error 
 	for _, module := range modules {
 		isOutput := p.outputModuleMap[module.Name]
 		if isOutput && p.reqCtx.StartBlockNum() < module.InitialBlock {
-			return fmt.Errorf("invalid request: start block %d smaller that request outputs for module: %q start block %d", p.reqCtx.StartBlockNum(), module.Name, module.InitialBlock)
+			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", p.reqCtx.StartBlockNum(), module.Name, module.InitialBlock)
 		}
 		p.moduleHashes.HashModule(p.reqCtx.Request().Modules, module, p.graph)
 	}
 	return nil
 }
 
-func (p *Pipeline) FlushStores(blockNum uint64) error {
+func (p *Pipeline) flushStores(blockNum uint64, span trace.Span) error {
 	subrequestStopBlock := p.reqCtx.isSubRequest && (p.reqCtx.StopBlockNum() == blockNum)
 	for p.bounder.PassedBoundary(blockNum) || subrequestStopBlock {
-		p.reqCtx.AddEvent("store_save_boundary_reach")
+		span.AddEvent("store_save_boundary_reach")
 
 		boundaryBlock := p.bounder.Boundary()
 		if subrequestStopBlock {
@@ -272,8 +276,8 @@ func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
 			continue
 		}
 
-		p.reqCtx.StartSpan("save_store_snapshot", p.tracer, ttrace.WithAttributes(attribute.String("store", name)))
-		defer p.reqCtx.EndSpan(err)
+		_, span := p.tracer.Start(p.reqCtx.Context, "save_store_snapshot", ttrace.WithAttributes(attribute.String("store", name)))
+		defer tracing.EndSpan(span, tracing.WithEndErr(err))
 
 		blockRange, err := s.Save(p.reqCtx, boundaryBlock)
 		if err != nil {
@@ -285,7 +289,7 @@ func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
 			p.reqCtx.logger.Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
 
 			if v, ok := s.(store.PartialStore); ok {
-				p.reqCtx.AddEvent("store_roll_trigger")
+				span.AddEvent("store_roll_trigger")
 				v.Roll(boundaryBlock)
 			}
 		}
@@ -302,9 +306,9 @@ func (p *Pipeline) runPostJobHooks(clock *pbsubstreams.Clock) {
 
 }
 
-func (p *Pipeline) runPreBlockHooks(clock *pbsubstreams.Clock) error {
+func (p *Pipeline) runPreBlockHooks(clock *pbsubstreams.Clock, span trace.Span) error {
 	for _, hook := range p.preBlockHooks {
-		p.reqCtx.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
+		span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
 		if err := hook(p.reqCtx, clock); err != nil {
 			return fmt.Errorf("pre block hook: %w", err)
 		}

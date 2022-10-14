@@ -2,21 +2,24 @@ package pipeline
 
 import (
 	"fmt"
+	"io"
+	"runtime/debug"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/store"
+	"github.com/streamingfast/substreams/tracing"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"runtime/debug"
 )
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
-	p.reqCtx.StartSpan("process_block", p.tracer)
-	defer p.reqCtx.EndSpan(err)
+	_, span := p.tracer.Start(p.reqCtx.Context, "process_block")
+	defer tracing.EndSpan(span, tracing.WithEndErr(err))
 
 	metrics.BlockBeginProcess.Inc()
 	clock := &pbsubstreams.Clock{
@@ -27,20 +30,20 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
 
-	p.reqCtx.SetAttributes(attribute.Int64("block_num", int64(block.Num())))
+	span.SetAttributes(attribute.Int64("block_num", int64(block.Num())))
 
-	if err = p.processBlock(block, clock, cursor, step); err != nil {
+	if err = p.processBlock(block, clock, cursor, step, span); err != nil {
 		// TODO should we check th error here
 		p.runPostJobHooks(clock)
 	}
 	return
 }
 
-func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) (err error) {
+func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType, span trace.Span) (err error) {
 	// TODO: should this move to the step new
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic at block %d: %s", block.Num(), r)
+			err = fmt.Errorf("panic at block %s: %s", block, r)
 			p.reqCtx.logger.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
 			p.reqCtx.logger.Error(string(debug.Stack()))
 		}
@@ -48,7 +51,7 @@ func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock,
 
 	switch {
 	case step.Matches(bstream.StepUndo):
-		if err = p.handleStepUndo(clock, cursor); err != nil {
+		if err = p.handleStepUndo(clock, cursor, span); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 
@@ -56,7 +59,7 @@ func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock,
 		p.forkHandler.removeReversibleOutput(block.Num())
 
 	case step.Matches(bstream.StepNew):
-		if err := p.handleStepMatchesNew(block, clock, cursor, step); err != nil {
+		if err := p.handleStepMatchesNew(block, clock, cursor, step, span); err != nil {
 			return fmt.Errorf("step new: %w", err)
 		}
 	}
@@ -72,26 +75,26 @@ func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock,
 	return nil
 }
 
-func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
-	p.reqCtx.AddEvent("handling_step_undo")
+func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, span trace.Span) error {
+	span.AddEvent("handling_step_undo")
 	if err := p.forkHandler.handleUndo(clock, cursor, p.storeMap, p.respFunc); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 	return nil
 }
 
-func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) error {
+func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType, span trace.Span) error {
 	execOutput, err := p.cachingEngine.NewExecOutput(p.blockType, block, clock, cursor)
 	if err != nil {
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err := p.runPreBlockHooks(clock); err != nil {
+	if err := p.runPreBlockHooks(clock, span); err != nil {
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
 	// TODO: will this happen twice? blockstream also calls this at stopBluckNum
-	if err = p.FlushStores(block.Num()); err != nil {
+	if err = p.flushStores(block.Num(), span); err != nil {
 		return fmt.Errorf("failed to flush stores: %w", err)
 	}
 
@@ -137,8 +140,8 @@ func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstream
 }
 
 func (p *Pipeline) executeModules(execOutput execout.ExecutionOutput) (err error) {
-	p.reqCtx.StartSpan("modules_executions", p.tracer)
-	defer p.reqCtx.EndSpan(err)
+	_, span := p.tracer.Start(p.reqCtx.Context, "modules_executions")
+	defer tracing.EndSpan(span, tracing.WithEndErr(err))
 
 	for _, executor := range p.moduleExecutors {
 		if err = p.runExecutor(executor, execOutput); err != nil {

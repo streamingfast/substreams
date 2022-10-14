@@ -2,7 +2,9 @@ package pipeline
 
 import (
 	"fmt"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/tracing"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -14,8 +16,8 @@ func (p *Pipeline) backProcessStores(
 	workerPool *orchestrator.WorkerPool,
 	storeModules []*pbsubstreams.Module,
 ) (out map[string]store.Store, err error) {
-	p.reqCtx.StartSpan("back_processing", p.tracer)
-	defer p.reqCtx.EndSpan(err)
+	_, span := p.tracer.Start(p.reqCtx.Context, "back_processing")
+	defer tracing.EndSpan(span, tracing.WithEndErr(err))
 
 	logger := p.reqCtx.logger.Named("back_process")
 	logger.Info("synchronizing stores")

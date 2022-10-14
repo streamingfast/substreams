@@ -380,7 +380,7 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		}
 	}
 
-	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator, nil)
 
 	//Module start is set to 10.
 	//test_store_add_int64 will be call 102 in total.
@@ -403,7 +403,7 @@ func Test_MultipleModule_Batch_3(t *testing.T) {
 		}
 	}
 
-	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator, nil)
 
 	//Module start is set to 10.
 	//test_store_add_int64 will be call 102 in total.

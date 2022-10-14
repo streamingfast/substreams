@@ -2,28 +2,30 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/streamingfast/bstream/hub"
+	"github.com/streamingfast/bstream/stream"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/errors"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/store"
+	"github.com/streamingfast/substreams/tracing"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	tracingcode "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	grpccode "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -110,9 +112,13 @@ func (s *Service) Register(
 	})
 }
 
-func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
+func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) (grpcError error) {
+	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
+	// and not only the `grpcError` one which is a subset view of the full `err`.
+	var err error
+
 	ctx, span := s.tracer.Start(streamSrv.Context(), "substreams_request")
-	defer span.End()
+	defer tracing.EndSpan(span, tracing.WithEndErr(err))
 
 	// Weird behavior because we want the pipeline to set the logger in the request Context
 	logger := logging.Logger(streamSrv.Context(), s.logger)
@@ -120,20 +126,23 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
-	if grpcError := s.blocks(ctx, request, streamSrv, logger); grpcError != nil {
-		span.SetStatus(tracingcode.Error, grpcError.Cause().Error())
-		return grpcError.RpcErr()
+	// We execute the blocks stream handler and then transform `err` to a gRPC error, keeping both of them.
+	// They will be both `nil` if `err` is `nil` itself.
+	err = s.blocks(ctx, request, streamSrv, logger)
+	grpcError = s.toGRPCError(err)
+
+	if grpcError != nil && status.Code(grpcError) == codes.Internal {
+		logger.Info("unexpected termination of stream of blocks", zap.Error(err))
 	}
-	span.SetStatus(tracingcode.Ok, "")
-	return nil
+
+	return grpcError
 }
 
-func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) errors.GRPCError {
+func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) error {
 	logger.Info("validating request")
-
 	graph, err := validateGraph(request, s.blockType)
 	if err != nil {
-		return errors.NewBasicErr(status.Error(grpccode.InvalidArgument, err.Error()), err)
+		return status.Error(grpccode.InvalidArgument, err.Error())
 	}
 
 	// TODO: missing dmetering hook that was present for each output
@@ -159,7 +168,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 			// TODO: only allow partial-mode if the AUTHORIZATION layer permits it
 			// partial-mode should be
 			if !s.partialModeEnabled {
-				return errors.NewBasicErr(status.Error(grpccode.InvalidArgument, "substreams-partial-mode not enabled on this instance"), fmt.Errorf("substreams-partial-mode not enabled on this instance"))
+				return status.Error(grpccode.InvalidArgument, "substreams-partial-mode not enabled on this instance")
 			}
 			isSubrequest = true
 		}
@@ -167,15 +176,15 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
-			return errors.NewErrSendBlock(err)
+			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
+			return status.Error(codes.Unavailable, err.Error())
 		}
 		return nil
 	}
 
-	// Seems that Go compiler is confused and refuse compilation when using `err` because `err` is defined before as `error` type (but shouldn't be a problem since we re-assing)
-	requestCtx, err2 := pipeline.NewRequestContext(ctx, request, isSubrequest)
-	if err2 != nil {
-		return err2
+	requestCtx, err := pipeline.NewRequestContext(ctx, request, isSubrequest)
+	if err != nil {
+		return err
 	}
 
 	storeGenerator := pipeline.NewStoreFactory(s.baseStateStore, s.storesSaveInterval)
@@ -184,7 +193,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	if s.baseStateStore != nil {
 		cachingEngine, err = cachev1.NewEngine(context.Background(), s.outputCacheSaveBlockInterval, s.baseStateStore, requestCtx.Logger())
 		if err != nil {
-			return errors.NewBasicErr(status.Errorf(grpccode.Internal, "error building caching engine: %s", err), err)
+			return fmt.Errorf("error building caching engine: %w", err)
 		}
 	}
 
@@ -204,7 +213,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	)
 
 	if err := pipe.Init(s.workerPool); err != nil {
-		return errors.NewBasicErr(status.Errorf(grpccode.Internal, "error building pipeline: %s", err), err)
+		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
 	zlog.Info("creating firehose stream",
@@ -218,13 +227,10 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		request.StartCursor,
 	)
 	if err != nil {
-		return errors.NewBasicErr(status.Errorf(grpccode.Internal, "error getting stream: %s", err), err)
+		return fmt.Errorf("error getting stream: %w", err)
 	}
 
-	if err := blockStream.Run(ctx); err != nil {
-		return pipe.StreamEndedWithErr(streamSrv, err)
-	}
-	return nil
+	return pipe.OnStreamTerminated(streamSrv, blockStream.Run(ctx))
 }
 
 func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) string {
@@ -241,4 +247,39 @@ func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, log
 		}
 	}
 	return hostname
+}
+
+// toGRPCError turns an `err` into a gRPC error if it's non-nil, in the `nil` case,
+// `nil` is returned right away.
+//
+// If the `err` has in its chain of error either `context.Canceled`, `context.DeadlineExceeded`
+// or `stream.ErrInvalidArg`, error is turned into a proper gRPC error respectively of code
+// `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
+//
+// If the `err` has its in chain any error constructed through `status.Error` (and its variants), then
+// we return the first found error of such type directly, because it's already a gRPC error.
+//
+// Otherwise, the error is assumed to be an internal error and turned backed into a proper
+// `status.Error(codes.Internal, err.Error())`.
+func (s *Service) toGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, context.Canceled) {
+		return status.Error(codes.Canceled, "source canceled")
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
+	}
+
+	var errInvalidArg *stream.ErrInvalidArg
+	if errors.As(err, &errInvalidArg) {
+		return status.Error(codes.InvalidArgument, errInvalidArg.Error())
+	}
+
+	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
+	// data?
+	return status.Error(codes.Internal, err.Error())
 }

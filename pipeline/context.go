@@ -5,7 +5,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/substreams/errors"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tracing"
 	"go.uber.org/zap"
@@ -25,7 +24,7 @@ type RequestContext struct {
 	logger              *zap.Logger
 }
 
-func NewRequestContext(ctx context.Context, req *pbsubstreams.Request, isSubRequest bool) (*RequestContext, errors.GRPCError) {
+func NewRequestContext(ctx context.Context, req *pbsubstreams.Request, isSubRequest bool) (*RequestContext, error) {
 	logger := _zlog.With(
 		zap.Strings("outputs", req.OutputModules),
 		zap.Bool("sub_request", isSubRequest),
@@ -46,10 +45,10 @@ func NewRequestContext(ctx context.Context, req *pbsubstreams.Request, isSubRequ
 	}, nil
 }
 
-func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, errors.GRPCError) {
+func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
 	// Should already be validated but we play safe here
 	if req.StartBlockNum < 0 {
-		return 0, errors.NewBasicErr(status.Error(codes.InvalidArgument, "start block num must be positive"), nil)
+		return 0, status.Error(codes.InvalidArgument, "start block num must be positive")
 	}
 
 	if req.StartCursor == "" {
@@ -58,7 +57,7 @@ func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, errors.GRPCError) 
 
 	cursor, err := bstream.CursorFromOpaque(req.StartCursor)
 	if err != nil {
-		return 0, errors.NewBasicErr(status.Errorf(codes.InvalidArgument, "cursor is invalid: %s", err.Error()), err)
+		return 0, status.Errorf(codes.InvalidArgument, "cursor is invalid: %s", err.Error())
 	}
 
 	return cursor.Block.Num(), nil

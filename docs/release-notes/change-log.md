@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Endpoint's port is now validated otherwise when unspecified, it creates an infinite 'Connecting...' message that will never resolves.
 
+## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
+
+### CLI
+
+* Added an optional flag to specify output-dir for pack command. Also made changes to allow for client to be run on windows OS.
+
 ## [0.0.20](https://github.com/streamingfast/substreams/releases/tag/v0.0.20)
 
 ### CLI

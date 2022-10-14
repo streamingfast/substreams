@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
@@ -37,7 +38,7 @@ func runInspect(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
-	filename := "/tmp/package.spkg"
+	filename := filepath.Join(os.TempDir(), "package.spkg")
 
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {

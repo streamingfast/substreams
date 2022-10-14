@@ -12,7 +12,7 @@ protobuf:
 binaries:
   default:
     type: wasm/rust-v1
-    file: ./target/wasm32-unknown-unknown/release/substreams_test.wasm
+    file: ./testdata/simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
 
 modules:
   - name: test_map
@@ -38,16 +38,6 @@ modules:
     valueType: int64
     inputs:
       - source: sf.substreams.v1.test.Block
-
-  - name: assert_test_store_add_int64
-    kind: map
-    initialBlock: 1
-    inputs:
-      - store: test_store_add_int64
-        mode: deltas
-      - store: test_store_add_int64
-    output:
-      type: boolean
 
   - name: test_store_add_bigint
     kind: store
@@ -82,7 +72,63 @@ modules:
     inputs:
       - source: sf.substreams.v1.test.Block
       - store: test_store_delete_prefix
+    output:
+      type: boolean
+
+  # -------------------- StoreAddI64 -------------------- #
+  - name: setup_test_store_add_i64
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_i64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_i64
+    output:
+      type: boolean
+
+  - name: assert_test_store_add_i64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_i64
+      - store: setup_test_store_add_i64
         mode: deltas
-      - store: test_store_delete_prefix
+    output:
+      type: boolean
+
+  # -------------------- StoreSetI64/StoreGetI64 -------------------- #
+  - name: setup_test_store_set_i64
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_i64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_i64
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_i64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_i64
+      - store: setup_test_store_set_i64
+        mode: deltas
     output:
       type: boolean

@@ -213,7 +213,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	require.NoError(t, err)
 
 	//todo: compile substreams
-	pkg, moduleGraph := processManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
+	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")
 
 	request := &pbsubstreams.Request{
 		StartBlockNum: startBlock,
@@ -352,10 +352,10 @@ func Test_MultipleModule(t *testing.T) {
 	moduleOutputs := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator, nil)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"9","new":"10"}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
 		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
+		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"10","new":"11"}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
 	}, moduleOutputs)
 }
@@ -421,21 +421,6 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	require.NotZero(t, outputFilesLen)
 }
 
-func Test_test_store_add_int64(t *testing.T) {
-	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-		return &LinearBlockGenerator{
-			startBlock:         startBlock,
-			inclusiveStopBlock: inclusiveStopBlock,
-		}
-	}
-	moduleOutputs := runTest(t, 1, 1, []string{"test_store_add_int64", "assert_test_store_add_int64"}, newBlockGenerator, nil)
-	require.Equal(t, []string{
-		`{"name":"test_store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
-		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"2","new":"3"}]}`,
-	}, moduleOutputs)
-}
-
 func Test_test_store_add_bigint(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -461,4 +446,46 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			require.Equal(t, uint64(1), s.Length())
 		}
 	})
+}
+
+// -------------------- StoreAddI64 -------------------- //
+func Test_test_store_add_i64(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64"}, newBlockGenerator, nil)
+}
+
+func Test_test_store_add_i64_deltas(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64_deltas"}, newBlockGenerator, nil)
+}
+
+// -------------------- StoreSetI64/StoreGetI64 -------------------- //
+func Test_test_store_set_i64(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64"}, newBlockGenerator, nil)
+}
+
+func Test_test_store_set_i64_deltas(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64_deltas"}, newBlockGenerator, nil)
 }

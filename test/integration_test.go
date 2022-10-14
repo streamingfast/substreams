@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -109,7 +110,8 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 
 	req := pipeline.NewRequestContext(ctx, request, isSubRequest)
 
-	baseStoreStore, err := dstore.NewStore("file:///tmp/test.store", "", "none", true)
+	file := fmt.Sprintf("file://%s", filepath.Join(os.TempDir(), "test.store"))
+	baseStoreStore, err := dstore.NewStore(file, "", "none", true)
 	require.NoError(t, err)
 
 	cachingEngine, err := cachev1.NewEngine(ctx, 10, baseStoreStore, zap.NewNop())
@@ -202,7 +204,8 @@ type AssertMapOutput struct {
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator) (moduleOutputs []string) {
 	//_, _ = logging.ApplicationLogger("test", "test")
 
-	err := os.RemoveAll("/tmp/test.store")
+	filepath := filepath.Join(os.TempDir(), "test.store")
+	err := os.RemoveAll(filepath)
 	require.NoError(t, err)
 
 	//todo: compile substreams

@@ -60,7 +60,7 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
-	defaultFilename := "/tmp/tmp.spkg"
+	defaultFilename := filepath.Join(os.TempDir(), "tmp.spkg")
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
@@ -91,8 +91,9 @@ plugins:
 		}
 	}
 
+	filepath := filepath.Join(os.TempDir(), "tmp.spkg#format=bin")
 	cmdArgs := []string{
-		"generate", "/tmp/tmp.spkg#format=bin",
+		"generate", filepath,
 	}
 	for _, excludePath := range excludePaths {
 		cmdArgs = append(cmdArgs, "--exclude-path", excludePath)

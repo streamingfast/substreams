@@ -24,7 +24,7 @@ var packCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(packCmd)
-	packCmd.Flags().StringP("output-dir", "o", "src/pb", cli.FlagDescription(`
+	packCmd.Flags().StringP("output-dir", "o", ".", cli.FlagDescription(`
 		Optional flag to specify output directory to output generated .spkg file. If the received <package> argument is a local Substreams manifest file
 		(e.g. a local file ending with .yaml), the output folder will be made relative to it
 	`))
@@ -71,7 +71,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		outputFile := filepath.Join(outputDir, defaultFilename)
 		if err := ioutil.WriteFile(outputFile, cnt, 0644); err != nil {
 			fmt.Println("")
-			return fmt.Errorf("writing %q: %w", defaultFilename, err)
+			return fmt.Errorf("writing %q: %w", outputFile, err)
 		}
 	} else {
 		if err := ioutil.WriteFile(defaultFilename, cnt, 0644); err != nil {

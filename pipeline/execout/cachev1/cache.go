@@ -70,6 +70,11 @@ func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
 	return !c.currentBlockRange.ContainsBlockRef(ref)
 }
 
+func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {
+	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
+	return c.IsOutOfRange(incRef)
+}
+
 func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
 	c.Lock()
 	defer c.Unlock()

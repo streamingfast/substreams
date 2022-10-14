@@ -1,10 +1,11 @@
 package store
 
 import (
+	"testing"
+
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func NewTestKVStore(

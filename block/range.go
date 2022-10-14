@@ -2,11 +2,28 @@ package block
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap/zapcore"
 )
+
+func ParseRange(in string) *Range {
+	if in == "" {
+		return nil
+	}
+	ch := strings.Split(in, "-")
+	lo, err := strconv.ParseInt(ch[0], 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	hi, err := strconv.ParseInt(ch[1], 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return NewRange(uint64(lo), uint64(hi))
+}
 
 type Range struct {
 	StartBlock        uint64
@@ -100,6 +117,16 @@ func (r *Range) Split(chunkSize uint64) []*Range {
 
 func (r *Range) Len() uint64 {
 	return r.ExclusiveEndBlock - r.StartBlock
+}
+
+func ParseRanges(in string) (out Ranges) {
+	for _, e := range strings.Split(in, ",") {
+		newRange := ParseRange(strings.Trim(e, " "))
+		if newRange != nil {
+			out = append(out, newRange)
+		}
+	}
+	return
 }
 
 type Ranges []*Range

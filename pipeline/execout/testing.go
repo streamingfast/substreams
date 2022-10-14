@@ -1,11 +1,12 @@
 package execout
 
 import (
+	"testing"
+
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
-	"testing"
 )
 
 type ExecOutputTesting struct {

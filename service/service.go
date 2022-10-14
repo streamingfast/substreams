@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/streamingfast/bstream/hub"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
@@ -25,7 +27,6 @@ import (
 	grpccode "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"os"
 )
 
 type Service struct {
@@ -171,7 +172,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return nil
 	}
 
-	requestCtx := pipeline.NewRequestContext(ctx, request, isSubrequest)
+	// Seems that Go compiler is confused and refuse compilation when using `err` because `err` is defined before as `error` type (but shouldn't be a problem since we re-assing)
+	requestCtx, err2 := pipeline.NewRequestContext(ctx, request, isSubrequest)
+	if err2 != nil {
+		return err2
+	}
+
 	storeGenerator := pipeline.NewStoreFactory(s.baseStateStore, s.storesSaveInterval)
 	storeBoundary := pipeline.NewStoreBoundary(s.storesSaveInterval)
 	cachingEngine := execout.NewNoOpCache()

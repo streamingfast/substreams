@@ -1,9 +1,15 @@
 package tracing
 
 import (
+	"context"
+
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
+
+func GetTraceID(ctx context.Context) (out trace.TraceID) {
+	return trace.SpanFromContext(ctx).SpanContext().TraceID()
+}
 
 type EndSpanOption interface {
 	applyToSpan(span trace.Span)

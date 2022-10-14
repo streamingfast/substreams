@@ -110,7 +110,8 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 
 	var opts []pipeline.Option
 
-	req := pipeline.NewRequestContext(ctx, request, isSubRequest)
+	req, err2 := pipeline.NewRequestContext(ctx, request, isSubRequest)
+	require.Nil(t, err2)
 
 	baseStoreStore, err := dstore.NewStore("file:///tmp/test.store", "", "none", true)
 	require.NoError(t, err)

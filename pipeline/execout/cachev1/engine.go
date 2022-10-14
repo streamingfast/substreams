@@ -64,7 +64,7 @@ func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) erro
 }
 func (e *Engine) maybeFlushCaches(blockRef bstream.BlockRef, step bstream.StepType) error {
 	for name, cache := range e.caches {
-		if cache.c.IsOutOfRange(blockRef) {
+		if !cache.c.IsOutOfRange(blockRef) {
 			continue
 		}
 

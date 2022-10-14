@@ -14,10 +14,6 @@ type CacheEngine interface {
 	Init(modules *manifest.ModuleHashes) error
 
 	NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error
-
-	//UndoBlock(moduleName string, blockID string)
-	//Flush(ctx context.Context) error
-	//FlushAndUpdate(ctx context.Context, blockRef bstream.BlockRef) error
 }
 
 type ExecutionOutputGetter interface {
@@ -34,7 +30,3 @@ type ExecutionOutput interface {
 	ExecutionOutputGetter
 	ExecutionOutputSetter
 }
-
-//func(arg1) arg2 {
-//
-//}

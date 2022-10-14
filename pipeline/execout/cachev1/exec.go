@@ -1,24 +1,9 @@
 package cachev1
 
 import (
-	"fmt"
 	"github.com/streamingfast/bstream"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
 )
-
-func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
-	execOutMap, err := execout.NewExecOutputMap(blockType, block, clock)
-	if err != nil {
-		return nil, fmt.Errorf("setting up map: %w", err)
-	}
-
-	return &ExecOutputCache{
-		ExecOutputMap: execOutMap,
-		engine:        e,
-		cursor:        cursor,
-	}, nil
-}
 
 type ExecOutputCache struct {
 	*execout.ExecOutputMap

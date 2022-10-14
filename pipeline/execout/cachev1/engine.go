@@ -49,6 +49,20 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 		return nil
 	})
 }
+
+func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
+	execOutMap, err := execout.NewExecOutputMap(blockType, block, clock)
+	if err != nil {
+		return nil, fmt.Errorf("setting up map: %w", err)
+	}
+
+	return &ExecOutputCache{
+		ExecOutputMap: execOutMap,
+		engine:        e,
+		cursor:        cursor,
+	}, nil
+}
+
 func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error {
 	err := e.maybeFlushCaches(blockRef)
 	if err != nil {
@@ -56,12 +70,16 @@ func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) erro
 	}
 
 	if step.Matches(bstream.StepUndo) {
-		e.undoCaches(blockRef)
+		err := e.undoCaches(blockRef)
+		if err != nil {
+			return fmt.Errorf("undoing caches: %w", err)
+		}
 		return nil
 	}
 
 	return nil
 }
+
 func (e *Engine) maybeFlushCaches(blockRef bstream.BlockRef) error {
 	for name, cache := range e.caches {
 		if !cache.c.IsAtUpperBoundary(blockRef) && !cache.c.IsOutOfRange(blockRef) {
@@ -86,12 +104,6 @@ func (e *Engine) undoCaches(blockRef bstream.BlockRef) error {
 		cache.c.Delete(blockRef.ID())
 	}
 	return nil
-}
-
-func (e *Engine) UndoBlock(moduleName string, blockID string) {
-	if outputCache, found := e.caches[moduleName]; found {
-		outputCache.c.Delete(blockID)
-	}
 }
 
 func (e *Engine) registerCache(moduleName, moduleHash string) error {

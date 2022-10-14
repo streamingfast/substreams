@@ -50,7 +50,7 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 	})
 }
 func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error {
-	err := e.maybeFlushCaches(blockRef, step)
+	err := e.maybeFlushCaches(blockRef)
 	if err != nil {
 		return fmt.Errorf("flushing caches: %w", err)
 	}
@@ -62,7 +62,7 @@ func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) erro
 
 	return nil
 }
-func (e *Engine) maybeFlushCaches(blockRef bstream.BlockRef, step bstream.StepType) error {
+func (e *Engine) maybeFlushCaches(blockRef bstream.BlockRef) error {
 	for name, cache := range e.caches {
 		if !cache.c.IsOutOfRange(blockRef) {
 			continue

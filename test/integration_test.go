@@ -388,6 +388,29 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 	}, moduleOutputs)
 }
 
+func Test_MultipleModule_Batch_3(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+
+	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator)
+
+	//Module start is set to 10.
+	//test_store_add_int64 will be call 102 in total.
+	//The first 100 will be batched. and produce no output.
+	//When block 110 will be processed the test_store_add_int64 should be at 100
+
+	require.Equal(t, []string{
+		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":110,"block_hash":"block-110"}}]}`,
+		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
+		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
+	}, moduleOutputs)
+}
+
 func Test_test_store_add_int64(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{

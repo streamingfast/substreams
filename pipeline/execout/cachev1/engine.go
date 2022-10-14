@@ -50,26 +50,32 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 	})
 }
 func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error {
-	if step.Matches(bstream.StepIrreversible) {
-		return e.flushCaches(blockRef)
+	err := e.maybeFlushCaches(blockRef, step)
+	if err != nil {
+		return fmt.Errorf("flushing caches: %w", err)
 	}
+
 	if step.Matches(bstream.StepUndo) {
 		e.undoCaches(blockRef)
 		return nil
 	}
+
 	return nil
 }
-func (e *Engine) flushCaches(blockRef bstream.BlockRef) error {
+func (e *Engine) maybeFlushCaches(blockRef bstream.BlockRef, step bstream.StepType) error {
 	for name, cache := range e.caches {
 		if cache.c.IsOutOfRange(blockRef) {
-			e.logger.Debug("saving cache", zap.Object("cache", cache.c))
-			if err := cache.c.save(e.ctx, cache.c.currentFilename()); err != nil {
-				return fmt.Errorf("save: saving outpust or module kv %s: %w", name, err)
-			}
+			continue
+		}
 
-			if _, err := cache.c.LoadAtBlock(e.ctx, cache.c.currentBlockRange.ExclusiveEndBlock); err != nil {
-				return fmt.Errorf("loading blocks %d for module kv %s: %w", cache.c.currentBlockRange.ExclusiveEndBlock, cache.c.moduleName, err)
-			}
+		e.logger.Debug("saving cache", zap.Object("cache", cache.c))
+		err := cache.c.save(e.ctx, cache.c.currentFilename())
+		if err != nil {
+			return fmt.Errorf("save: saving outpust or module kv %s: %w", name, err)
+		}
+
+		if _, err := cache.c.LoadAtBlock(e.ctx, cache.c.currentBlockRange.ExclusiveEndBlock); err != nil {
+			return fmt.Errorf("loading blocks %d for module kv %s: %w", cache.c.currentBlockRange.ExclusiveEndBlock, cache.c.moduleName, err)
 		}
 	}
 	return nil

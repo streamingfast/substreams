@@ -182,7 +182,8 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 	go func() {
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
-			return c.store.WriteObject(ctx, filename, reader)
+			err := c.store.WriteObject(ctx, filename, reader)
+			return err
 		})
 		if err != nil {
 			c.logger.Warn("failed writing output cache", zap.Error(err))

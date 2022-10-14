@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
 )
 
-//compile-time check that BaseStore implements all interfaces
+// compile-time check that BaseStore implements all interfaces
 var _ Store = (*PartialKV)(nil)
 
 type PartialKV struct {

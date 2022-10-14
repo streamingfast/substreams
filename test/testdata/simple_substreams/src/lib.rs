@@ -87,12 +87,12 @@ fn assert_test_store_add_bigint(
 #[substreams::handlers::store]
 fn test_store_delete_prefix(block: test::Block, s: StoreSetI64) {
     let to_set_key = format!("key:{}", block.number);
-    s.set(1, to_set_key, TO_SET);
+    s.set(block.number, to_set_key, TO_SET);
 
     if block.number > 1 {
         let previous_block_num = block.number - 1;
         let to_delete_key = format!("key:{}", previous_block_num);
-        s.delete_prefix(100, &to_delete_key)
+        s.delete_prefix(block.number as i64, &to_delete_key)
     }
 }
 
@@ -110,9 +110,7 @@ fn assert_test_store_delete_prefix(
         let deleted_key = format!("key:{}", previous_block_num);
         assert_eq!(None, s.get_last(deleted_key))
     }
-
-    //todo test deltas
-
+    
     Ok(true)
 }
 

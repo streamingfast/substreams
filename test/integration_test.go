@@ -28,6 +28,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type blockProcessedCallBack func(p *pipeline.Pipeline, b *bstream.Block, stores *store.Map)
+
 type TestBlockGenerator interface {
 	Generate() []*pbsubstreamstest.Block
 }
@@ -50,17 +52,18 @@ func (g LinearBlockGenerator) Generate() []*pbsubstreamstest.Block {
 }
 
 type TestWorker struct {
-	t                 *testing.T
-	moduleGraph       *manifest.ModuleGraph
-	responseCollector *responseCollector
-	newBlockGenerator NewTestBlockGenerator
+	t                      *testing.T
+	moduleGraph            *manifest.ModuleGraph
+	responseCollector      *responseCollector
+	newBlockGenerator      NewTestBlockGenerator
+	blockProcessedCallBack blockProcessedCallBack
 }
 
 func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
 
-	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true)
+	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true, w.blockProcessedCallBack)
 	//todo: cumulate responses
 
 	return block.Ranges{
@@ -101,7 +104,7 @@ func (c *responseCollector) Collect(resp *pbsubstreams.Response) error {
 
 type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator
 
-func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool) (out []*pbsubstreams.Response) {
+func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack) (out []*pbsubstreams.Response) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -162,6 +165,9 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 		if !errors.Is(err, io.EOF) {
 			require.NoError(t, err)
 		}
+		if blockProcessedCallBack != nil && err == nil {
+			blockProcessedCallBack(pipe, bb, storeMap)
+		}
 	}
 
 	return
@@ -199,7 +205,7 @@ type AssertMapOutput struct {
 	Result     bool   `json:"result"`
 }
 
-func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator) (moduleOutputs []string) {
+func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string) {
 	//_, _ = logging.ApplicationLogger("test", "test")
 
 	err := os.RemoveAll("/tmp/test.store")
@@ -218,14 +224,15 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	responseCollector := newResponseCollector()
 	workerPool := orchestrator.NewWorkerPool(1, func() orchestrator.Worker {
 		return &TestWorker{
-			t:                 t,
-			moduleGraph:       moduleGraph,
-			responseCollector: newResponseCollector(),
-			newBlockGenerator: newBlockGenerator,
+			t:                      t,
+			moduleGraph:            moduleGraph,
+			responseCollector:      newResponseCollector(),
+			newBlockGenerator:      newBlockGenerator,
+			blockProcessedCallBack: blockProcessedCallBack,
 		}
 	})
 
-	processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false)
+	processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false, blockProcessedCallBack)
 
 	for _, response := range responseCollector.responses {
 		switch r := response.Message.(type) {
@@ -313,7 +320,7 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"test_map"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 10, 12, []string{"test_map"}, newBlockGenerator, nil)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
@@ -327,7 +334,7 @@ func Test_test_store_proto(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"test_store_proto"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 10, 12, []string{"test_store_proto"}, newBlockGenerator, nil)
 	require.Equal(t, []string{
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
@@ -341,7 +348,7 @@ func Test_MultipleModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator, nil)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"test_store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
@@ -362,7 +369,7 @@ func Test_MultipleModule_Batch(t *testing.T) {
 
 	//todo: Need to validate the storage file
 
-	runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
+	runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
 }
 
 func Test_MultipleModule_Batch_2(t *testing.T) {
@@ -418,7 +425,7 @@ func Test_test_store_add_int64(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 1, 1, []string{"test_store_add_int64", "assert_test_store_add_int64"}, newBlockGenerator)
+	moduleOutputs := runTest(t, 1, 1, []string{"test_store_add_int64", "assert_test_store_add_int64"}, newBlockGenerator, nil)
 	require.Equal(t, []string{
 		`{"name":"test_store_add_int64","deltas":[{"op":"CREATE","old":"","new":"1"}]}`,
 		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"1","new":"2"}]}`,
@@ -434,7 +441,7 @@ func Test_test_store_add_bigint(t *testing.T) {
 		}
 	}
 
-	runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator)
+	runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
 
 }
 func Test_test_store_delete_prefix(t *testing.T) {
@@ -444,7 +451,11 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-
-	runTest(t, 100, 120, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator)
-
+	runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores *store.Map) {
+		if b.Number == 40 {
+			s, storeFound := stores.Get("test_store_delete_prefix")
+			require.True(t, storeFound)
+			require.Equal(t, uint64(1), s.Length())
+		}
+	})
 }

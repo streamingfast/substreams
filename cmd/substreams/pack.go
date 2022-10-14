@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/manifest"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,31 +24,43 @@ var packCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(packCmd)
 	packCmd.Flags().StringP("output-dir", "o", ".", cli.FlagDescription(`
-		Optional flag to specify output directory to output generated .spkg file. If the received <package> argument is a local Substreams manifest file
-		(e.g. a local file ending with .yaml), the output folder will be made relative to it
+		Optional flag to specify output directory to output generated .spkg file. 
+		If the received argument starts with a "." it will be treated as a local path relative to the supplied manifest path.
 	`))
+}
+
+func is_relative_path(path string) bool {
+	return path[0:1] == "."
 }
 
 func runPack(cmd *cobra.Command, args []string) error {
 	outputDir := maybeGetString(cmd, "output-dir")
-
-	validOutputDirectorySpecified := true
-	fileInfo, err := os.Stat(outputDir)
-	if err != nil || !fileInfo.IsDir() {
-		fmt.Println("WARNING: Output directory specified is invalid - falling back to default path!\nOutputDir=", outputDir)
-		fmt.Println("")
-		validOutputDirectorySpecified = false
+	if outputDir == "." {
+		outputDir = ""
 	}
 
 	manifestPath := args[0]
 
-	manifestReader := manifest.NewReader(manifestPath)
+	if outputDir != "" {
+		if is_relative_path(outputDir) {
+			workingDirectory, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("can't retrieve current directory information")
+			}
+			newOutputDir := filepath.Join(filepath.Dir(filepath.Join(workingDirectory, manifestPath)), outputDir)
+			fmt.Printf("Output directory specified: %s \nThis will be treated as a local path.\nFull folderpath: %s\n", outputDir, newOutputDir)
+			outputDir = newOutputDir
+		} else {
+			fmt.Printf("Output directory treated as an absolute path.\nFull folderpath: %s\n", outputDir)
+		}
 
-	if validOutputDirectorySpecified && manifestReader.IsLocalManifest() && !filepath.IsAbs(outputDir) {
-		newOutputDir := filepath.Join(filepath.Dir(manifestPath), outputDir)
-		zlog.Debug("manifest path is a local manifest, making output folder relative to it", zap.String("old", outputDir), zap.String("new", newOutputDir))
-		outputDir = newOutputDir
+		err := os.MkdirAll(outputDir, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("error creating output directory: %w", err)
+		}
 	}
+
+	manifestReader := manifest.NewReader(manifestPath)
 
 	pkg, err := manifestReader.Read()
 	if err != nil {
@@ -67,17 +78,10 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	if validOutputDirectorySpecified {
-		outputFile := filepath.Join(outputDir, defaultFilename)
-		if err := ioutil.WriteFile(outputFile, cnt, 0644); err != nil {
-			fmt.Println("")
-			return fmt.Errorf("writing %q: %w", outputFile, err)
-		}
-	} else {
-		if err := ioutil.WriteFile(defaultFilename, cnt, 0644); err != nil {
-			fmt.Println("")
-			return fmt.Errorf("writing %q: %w", defaultFilename, err)
-		}
+	outputFile := filepath.Join(outputDir, defaultFilename)
+	if err := ioutil.WriteFile(outputFile, cnt, 0644); err != nil {
+		fmt.Println("")
+		return fmt.Errorf("writing %w", err)
 	}
 
 	fmt.Printf(`To generate bindings for your code:

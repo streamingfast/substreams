@@ -25,7 +25,7 @@ func init() {
 	rootCmd.AddCommand(packCmd)
 	packCmd.Flags().StringP("output-dir", "o", ".", cli.FlagDescription(`
 		Optional flag to specify output directory to output generated .spkg file. 
-		If the received argument starts with a "." it will be treated as a local path relative to the supplied manifest path.
+		If a local path is supplied it will be relative to the supplied manifest path.
 	`))
 }
 

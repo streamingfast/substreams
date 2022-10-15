@@ -31,9 +31,6 @@ func init() {
 
 func runPack(cmd *cobra.Command, args []string) error {
 	outputDir := maybeGetString(cmd, "output-dir")
-	if outputDir == "." {
-		outputDir = ""
-	}
 
 	manifestPath := args[0]
 

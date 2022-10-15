@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -9,7 +10,7 @@ import (
 func validateGraph(request *pbsubstreams.Request, blockType string) (*manifest.ModuleGraph, error) {
 	if request.StartBlockNum < 0 {
 		// TODO(abourget) start block resolving is an art, it should be handled here
-		return nil, fmt.Errorf("invalid negative startblock (not handled in substreams): %d", request.StartBlockNum)
+		return nil, fmt.Errorf("negative start block %d is not accepted", request.StartBlockNum)
 	}
 
 	if request.Modules == nil {

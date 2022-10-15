@@ -53,15 +53,15 @@ var tpl = template.Must(template.New("tpl").Funcs(template.FuncMap{
 		return humanize.Comma(int64(in))
 	},
 	"barmode": func(in ranges, m model) string {
-		return barmode(in, m.TargetBlock, m.BarSize)
+		return barmode(in, m.BackprocessingCompleteAtBlock, m.BarSize)
 	},
 }).Parse(viewTpl))
 
 // ▓▒░
 
-func barmode(in ranges, targetBlock, width uint64) string {
+func barmode(in ranges, backprocessingCompleteAtBlock, width uint64) string {
 	lo := in.Lo()
-	hi := targetBlock
+	hi := backprocessingCompleteAtBlock
 	binsize := (hi - lo) / width
 	var out []string
 	for i := uint64(0); i < width; i++ {

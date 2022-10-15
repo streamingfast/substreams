@@ -57,7 +57,7 @@ func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
 
 	cursor, err := bstream.CursorFromOpaque(req.StartCursor)
 	if err != nil {
-		return 0, status.Errorf(codes.InvalidArgument, "cursor is invalid: %s", err.Error())
+		return 0, status.Errorf(codes.InvalidArgument, "invalid start cursor %q: %s", cursor, err.Error())
 	}
 
 	return cursor.Block.Num(), nil
@@ -67,8 +67,20 @@ func (r *RequestContext) Request() *pbsubstreams.Request {
 	return r.request
 }
 
-func (r *RequestContext) StartBlockNum() uint64 {
+// EffectiveStartBlockNum is the actual block num at which the stream should start and take into
+// account the `StartCursor`. If `StartCursor` is set, effective start block num is the block num
+// cursor is pointing to, otherwise it's `request.StartBlockNum`.
+//
+// In almost all cases you want to use this `EffectiveStartBlockNum` over `StartBlockNum`.
+func (r *RequestContext) EffectiveStartBlockNum() uint64 {
 	return r.effectiveStartBlock
+}
+
+// StartBlockNum is the request's start block num without taking into consideration
+// the `StartCursor` which is super important in most cases. You should probably comment
+// on the call site why you are using this method over `EffectiveStartBlockNum`.
+func (r *RequestContext) StartBlockNum() int64 {
+	return r.request.StartBlockNum
 }
 
 func (r *RequestContext) StopBlockNum() uint64 {

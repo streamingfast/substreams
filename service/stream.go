@@ -32,6 +32,7 @@ func (sf *StreamFactory) New(
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid start cursor %q: %s", cursor, err)
 		}
+
 		options = append(options, stream.WithCursor(cur))
 	}
 

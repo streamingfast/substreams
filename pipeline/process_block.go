@@ -120,7 +120,7 @@ func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstream
 		}
 	}
 
-	if shouldReturnDataOutputs(clock.Number, p.reqCtx.StartBlockNum(), p.reqCtx.isSubRequest) {
+	if shouldReturnDataOutputs(clock.Number, p.reqCtx.EffectiveStartBlockNum(), p.reqCtx.isSubRequest) {
 		p.reqCtx.logger.Debug("will return module outputs")
 
 		if err = returnModuleDataOutputs(clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {

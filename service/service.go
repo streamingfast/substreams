@@ -216,9 +216,13 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
+	// It's ok to use `StartBlockNum` directly here (instead of `requestCtx.EffectiveStartBlockNum`)
+	// and in the constructor we also pass `StartCursor` which will be handled by `streamFactory.New`
+	// and will be used to bootstrap the stream correctly from it if set.
 	zlog.Info("creating firehose stream",
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("end_block", request.StopBlockNum),
+		zap.String("start_block", request.StartCursor),
 	)
 	blockStream, err := s.streamFactory.New(
 		pipe,

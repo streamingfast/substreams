@@ -67,13 +67,23 @@ type Pipeline struct {
 	bounder      *StoreBoundary
 }
 
-func New(reqCtx *RequestContext, graph *manifest.ModuleGraph, blockType string, wasmExtensions []wasm.WASMExtensioner, subRequestSplitSize int, engine execout.CacheEngine, storeMap *store.Map, storeGenerator *StoreFactory, bounder *StoreBoundary, respFunc func(resp *pbsubstreams.Response) error, opts ...Option) *Pipeline {
+func New(
+	reqCtx *RequestContext,
+	graph *manifest.ModuleGraph,
+	blockType string,
+	wasmExtensions []wasm.WASMExtensioner,
+	subRequestSplitSize int,
+	engine execout.CacheEngine,
+	storeMap *store.Map,
+	storeGenerator *StoreFactory,
+	bounder *StoreBoundary,
+	respFunc func(resp *pbsubstreams.Response) error,
+	opts ...Option,
+) *Pipeline {
 	pipe := &Pipeline{
-		reqCtx:        reqCtx,
-		cachingEngine: engine,
-		tracer:        otel.GetTracerProvider().Tracer("pipeline"),
-		// WARN: we don't support < 0 StartBlock for now
-		//requestedStartBlockNum: uint64(request.StartBlockNum),
+		reqCtx:                reqCtx,
+		cachingEngine:         engine,
+		tracer:                otel.GetTracerProvider().Tracer("pipeline"),
 		storeMap:              storeMap,
 		storeFactory:          storeGenerator,
 		graph:                 graph,
@@ -103,7 +113,8 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	defer tracing.EndSpan(p.rootSpan, tracing.WithEndErr(err))
 
 	p.reqCtx.logger.Info("initializing handler",
-		zap.Uint64("requested_start_block", p.reqCtx.StartBlockNum()),
+		zap.Int64("requested_start_block", p.reqCtx.StartBlockNum()),
+		zap.Uint64("effective_start_block", p.reqCtx.EffectiveStartBlockNum()),
 		zap.Uint64("requested_stop_block", p.reqCtx.StopBlockNum()),
 		zap.String("requested_start_cursor", p.reqCtx.Request().StartCursor),
 		zap.Bool("is_back_processing", p.reqCtx.isSubRequest),
@@ -149,9 +160,10 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
-	p.bounder.InitBoundary(p.reqCtx.StartBlockNum())
+	p.bounder.InitBoundary(p.reqCtx.EffectiveStartBlockNum())
+
 	p.reqCtx.logger.Info("initialized store boundary block",
-		zap.Uint64("request_start_block", p.reqCtx.StartBlockNum()),
+		zap.Uint64("effective_start_block", p.reqCtx.EffectiveStartBlockNum()),
 		zap.Uint64("next_boundary_block", p.bounder.Boundary()),
 	)
 
@@ -168,43 +180,30 @@ func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) er
 
 	p.reqCtx.logger.Info("marking leaf store for partial processing", zap.String("module", outputStoreModule.Name))
 
-	var partialStore store.Store
-	var err error
-	// if a subtrequest's StartBlock is equal to the module StartBlock, we will create a full store regardless
-	isPartialStore := p.reqCtx.StartBlockNum() != outputStoreModule.InitialBlock
-	//if isPartialStore {
-	partialStore, err = p.storeFactory.NewPartialKV(
+	partialStore, err := p.storeFactory.NewPartialKV(
 		p.moduleHashes.Get(outputStoreModule.Name),
 		outputStoreModule,
-		p.reqCtx.StartBlockNum(),
+		p.reqCtx.EffectiveStartBlockNum(),
 		p.reqCtx.logger,
 	)
-	//} else {
-	//	partialStore, err = p.storeFactory.NewFullKV(
-	//		p.moduleHashes.Get(outputStoreModule.Name),
-	//		outputStoreModule,
-	//		p.reqCtx.logger,
-	//	)
-	//}
 	if err != nil {
-		return fmt.Errorf("creating store (partial: %t): %w", isPartialStore, err)
+		return fmt.Errorf("new partial store: %w", err)
 	}
 
 	// update the BaseStore to a partial store for a backprocessing output
 	p.storeMap.Set(outputStoreModule.Name, partialStore)
 
 	for _, store := range p.storeMap.All() {
-		// we want to load the store's start block if
-		// the module initial block is not the request start block.. why
-		// I'm not sure yet
-		if store.InitialBlock() == p.reqCtx.StartBlockNum() {
-			continue
-		}
-
-		if err := store.Load(p.reqCtx, p.reqCtx.StartBlockNum()); err != nil {
-			return fmt.Errorf("failed to initialize store: %w", err)
+		// We avoid loading the store if does not exist yet, which is the case when
+		// the store initial block is the effective start block of the request since
+		// it means we did no work for this subrequest
+		if store.InitialBlock() != p.reqCtx.EffectiveStartBlockNum() {
+			if err := store.Load(p.reqCtx, p.reqCtx.EffectiveStartBlockNum()); err != nil {
+				return fmt.Errorf("load partial store: %w", err)
+			}
 		}
 	}
+
 	p.backprocessingStores = append(p.backprocessingStores, partialStore)
 	return nil
 }
@@ -235,13 +234,16 @@ func (p *Pipeline) isOutputModule(name string) bool {
 
 func (p *Pipeline) validateAndHashModules(modules []*pbsubstreams.Module) error {
 	p.moduleHashes = manifest.NewModuleHashes()
+
 	for _, module := range modules {
 		isOutput := p.outputModuleMap[module.Name]
-		if isOutput && p.reqCtx.StartBlockNum() < module.InitialBlock {
-			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", p.reqCtx.StartBlockNum(), module.Name, module.InitialBlock)
+		if isOutput && p.reqCtx.EffectiveStartBlockNum() < module.InitialBlock {
+			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", p.reqCtx.EffectiveStartBlockNum(), module.Name, module.InitialBlock)
 		}
+
 		p.moduleHashes.HashModule(p.reqCtx.Request().Modules, module, p.graph)
 	}
+
 	return nil
 }
 
@@ -372,16 +374,16 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.Execu
 	return nil
 }
 
-func shouldReturn(blockNum, requestedStartBlockNum uint64) bool {
-	return blockNum >= requestedStartBlockNum
+func shouldReturn(blockNum, effectiveStartBlockNum uint64) bool {
+	return blockNum >= effectiveStartBlockNum
 }
 
 func shouldReturnProgress(isSubRequest bool) bool {
 	return isSubRequest
 }
 
-func shouldReturnDataOutputs(blockNum, requestedStartBlockNum uint64, isSubRequest bool) bool {
-	return shouldReturn(blockNum, requestedStartBlockNum) && !isSubRequest
+func shouldReturnDataOutputs(blockNum, effectiveStartBlockNum uint64, isSubRequest bool) bool {
+	return shouldReturn(blockNum, effectiveStartBlockNum) && !isSubRequest
 }
 
 func isStopBlockReached(currentBlock uint64, stopBlock uint64) bool {

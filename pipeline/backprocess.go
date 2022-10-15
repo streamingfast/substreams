@@ -29,14 +29,17 @@ func (p *Pipeline) backProcessStores(
 	}
 
 	logger.Info("storage state found")
+
+	upToBlock := p.reqCtx.EffectiveStartBlockNum()
 	workPlan := orchestrator.WorkPlan{}
+
 	for _, mod := range storeModules {
 		snapshot, ok := storageState.Snapshots[mod.Name]
 		if !ok {
 			err = fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
 			return nil, err
 		}
-		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeFactory.saveInterval, mod.InitialBlock, p.reqCtx.StartBlockNum(), snapshot)
+		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeFactory.saveInterval, mod.InitialBlock, upToBlock, snapshot)
 	}
 
 	logger.Info("work plan ready", zap.Stringer("work_plan", workPlan))
@@ -46,8 +49,6 @@ func (p *Pipeline) backProcessStores(
 		err = fmt.Errorf("sending progress: %w", err)
 		return nil, err
 	}
-
-	upToBlock := p.reqCtx.StartBlockNum()
 
 	var jobsPlanner *orchestrator.JobsPlanner
 	if jobsPlanner, err = orchestrator.NewJobsPlanner(p.reqCtx, workPlan, uint64(p.subrequestSplitSize), p.graph); err != nil {

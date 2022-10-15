@@ -30,7 +30,7 @@ func NewSquasher(
 	ctx context.Context,
 	workPlan WorkPlan,
 	storeMap *store.Map,
-	reqStartBlock uint64,
+	reqEffectiveStartBlock uint64,
 	storeSaveInterval uint64,
 	jobsPlanner *JobsPlanner) (*Squasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
@@ -54,7 +54,7 @@ func NewSquasher(
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
-			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, clonedStore.InitialBlock(), storeSaveInterval, jobsPlanner)
+			storeSquasher = NewStoreSquasher(clonedStore, reqEffectiveStartBlock, clonedStore.InitialBlock(), storeSaveInterval, jobsPlanner)
 		} else {
 			zlog.Info("loading initial store",
 				zap.String("store", storeModuleName),
@@ -63,7 +63,7 @@ func NewSquasher(
 			if err := clonedStore.Load(ctx, workUnit.initialCompleteRange.ExclusiveEndBlock); err != nil {
 				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, workUnit.initialCompleteRange, err)
 			}
-			storeSquasher = NewStoreSquasher(clonedStore, reqStartBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
+			storeSquasher = NewStoreSquasher(clonedStore, reqEffectiveStartBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
 
 			jobsPlanner.SignalCompletionUpUntil(storeModuleName, workUnit.initialCompleteRange.ExclusiveEndBlock)
 		}
@@ -78,7 +78,7 @@ func NewSquasher(
 
 	squasher := &Squasher{
 		storeSquashers:       storeSquashers,
-		targetExclusiveBlock: reqStartBlock,
+		targetExclusiveBlock: reqEffectiveStartBlock,
 	}
 	return squasher, nil
 }

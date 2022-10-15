@@ -42,7 +42,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case *pbsubstreams.Request:
 		m.Request = msg
-		m.TargetBlock = uint64(m.Request.StartBlockNum)
+		// It's ok to use `StartBlockNum` directly instead of effective start block (start block
+		// of cursor if present, `StartBlockNum` otherwise) because this is only used in backprocessing
+		// `barmode` which is effective only when no cursor has been passed yet.
+		m.BackprocessingCompleteAtBlock = uint64(m.Request.StartBlockNum)
 		return m, nil
 	case *pbsubstreams.ModuleProgress:
 		m.Updates += 1

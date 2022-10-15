@@ -23,9 +23,9 @@ type model struct {
 	UpdatesPerSecond  int
 	UpdatesThisSecond int
 
-	Request     *pbsubstreams.Request
-	TargetBlock uint64
-	Connected   bool
+	Request                       *pbsubstreams.Request
+	BackprocessingCompleteAtBlock uint64
+	Connected                     bool
 
 	Failures    int
 	LastFailure *pbsubstreams.ModuleProgress_Failed

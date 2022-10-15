@@ -77,14 +77,14 @@ func (w *WorkUnit) initialProcessedPartials() block.Ranges {
 	return w.partialsPresent.Merged()
 }
 
-func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStartBlock uint64, snapshots *Snapshots) *WorkUnit {
+func SplitWork(modName string, storeSaveInterval, modInitBlock, reqEffectiveStartBlock uint64, snapshots *Snapshots) *WorkUnit {
 	work := &WorkUnit{modName: modName}
 
-	if incomingReqStartBlock <= modInitBlock {
+	if reqEffectiveStartBlock <= modInitBlock {
 		return work
 	}
 
-	completeSnapshot := snapshots.LastCompleteSnapshotBefore(incomingReqStartBlock)
+	completeSnapshot := snapshots.LastCompleteSnapshotBefore(reqEffectiveStartBlock)
 
 	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock <= modInitBlock {
 		panic("cannot have saved last store before module's init block") // 0 has special meaning
@@ -95,13 +95,13 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, incomingReqStart
 		backProcessStartBlock = completeSnapshot.ExclusiveEndBlock
 		work.initialCompleteRange = block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock)
 
-		if completeSnapshot.ExclusiveEndBlock == incomingReqStartBlock {
+		if completeSnapshot.ExclusiveEndBlock == reqEffectiveStartBlock {
 			return work
 		}
 	}
 
-	for ptr := backProcessStartBlock; ptr < incomingReqStartBlock; {
-		end := minOf(ptr-ptr%storeSaveInterval+storeSaveInterval, incomingReqStartBlock)
+	for ptr := backProcessStartBlock; ptr < reqEffectiveStartBlock; {
+		end := minOf(ptr-ptr%storeSaveInterval+storeSaveInterval, reqEffectiveStartBlock)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {
 			work.partialsMissing = append(work.partialsMissing, newPartial)

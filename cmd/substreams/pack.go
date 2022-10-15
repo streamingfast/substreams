@@ -29,10 +29,6 @@ func init() {
 	`))
 }
 
-func is_relative_path(path string) bool {
-	return path[0:1] == "."
-}
-
 func runPack(cmd *cobra.Command, args []string) error {
 	outputDir := maybeGetString(cmd, "output-dir")
 	if outputDir == "." {
@@ -42,16 +38,16 @@ func runPack(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 
 	if outputDir != "" {
-		if is_relative_path(outputDir) {
+		if !filepath.IsAbs(outputDir) {
 			workingDirectory, err := os.Getwd()
 			if err != nil {
 				return fmt.Errorf("can't retrieve current directory information")
 			}
 			newOutputDir := filepath.Join(filepath.Dir(filepath.Join(workingDirectory, manifestPath)), outputDir)
-			fmt.Printf("Output directory specified: %s \nThis will be treated as a local path.\nFull folderpath: %s\n", outputDir, newOutputDir)
+			fmt.Printf("Output directory specified: %s \nThis will be treated as a local path.\nFull folderpath: %s\n\n", outputDir, newOutputDir)
 			outputDir = newOutputDir
 		} else {
-			fmt.Printf("Output directory treated as an absolute path.\nFull folderpath: %s\n", outputDir)
+			fmt.Printf("Output directory treated as an absolute path.\nFull folderpath: %s\n\n", outputDir)
 		}
 
 		err := os.MkdirAll(outputDir, os.ModePerm)

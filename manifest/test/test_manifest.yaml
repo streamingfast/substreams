@@ -5,7 +5,7 @@ package:
 
 protobuf:
   files:
-    - ./test/code/pancakeswap.proto
+    - ./code/pancakeswap.proto
 
 binaries:
   default:

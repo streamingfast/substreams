@@ -156,6 +156,25 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
+			"testdata/protobuf_files_relative_path.yaml",
+			args{},
+			&pbsubstreams.Package{
+				Version: 1,
+				ProtoFiles: append(
+					systemProtoDefs,
+					readProtoDescriptor(t, "./testdata", "./proto1/sf/substreams/test1.proto"),
+				),
+				Modules: &pbsubstreams.Modules{},
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "test",
+						Version: "v0.0.0",
+					},
+				},
+			},
+			require.NoError,
+		},
+		{
 			"testdata/protobuf_importPaths_relative_path.yaml",
 			args{},
 			&pbsubstreams.Package{

@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* Fixed relative path not resolved correctly against manifest's location in `protobuf.files` list.
+
 * Fixed relative path not resolved correctly against manifest's location in `binaries` list.
 
 * `substreams protogen <package> --output-path <path>` flag is now relative to `<package>` if `<package>` is a local manifest file ending with `.yaml`.

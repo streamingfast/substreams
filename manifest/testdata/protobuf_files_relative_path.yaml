@@ -1,0 +1,8 @@
+specVersion: v0.1.0
+package:
+  name: test
+  version: v0.0.0
+
+protobuf:
+  files:
+    - ./proto1/sf/substreams/test1.proto

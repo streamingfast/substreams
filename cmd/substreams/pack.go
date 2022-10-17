@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/manifest"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,37 +24,22 @@ var packCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(packCmd)
-	packCmd.Flags().StringP("output-dir", "o", ".", cli.FlagDescription(`
-		Optional flag to specify output directory to output generated .spkg file. 
-		If a local path is supplied it will be relative to the supplied manifest path.
+	packCmd.Flags().StringP("output-file", "o", "{manifestDir}/{spkgDefaultName}", cli.FlagDescription(`
+		Specifies output file where the generated "spkg" file will be written. You can use template directives when
+		specifying the value of the flag. You can use "{manifestDir}" which resolves to manifest's
+		directory. You can use "{spkgDefaultName}" which is the pre-computed default name in the form
+		"<name>-<version>" where "<name>" is the manifest's "package.name" value ("_" values in the name are
+		replaced by "-") and "<version>" is "package.version" value.
 	`))
 }
 
 func runPack(cmd *cobra.Command, args []string) error {
-	outputDir := maybeGetString(cmd, "output-dir")
-
 	manifestPath := args[0]
-
-	if outputDir != "" {
-		if !filepath.IsAbs(outputDir) {
-			workingDirectory, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("can't retrieve current directory information")
-			}
-			newOutputDir := filepath.Join(filepath.Dir(filepath.Join(workingDirectory, manifestPath)), outputDir)
-			fmt.Printf("Output directory specified: %s \nThis will be treated as a local path.\nFull folderpath: %s\n\n", outputDir, newOutputDir)
-			outputDir = newOutputDir
-		} else {
-			fmt.Printf("Output directory treated as an absolute path.\nFull folderpath: %s\n\n", outputDir)
-		}
-
-		err := os.MkdirAll(outputDir, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("error creating output directory: %w", err)
-		}
-	}
-
 	manifestReader := manifest.NewReader(manifestPath)
+
+	if !manifestReader.IsLocalManifest() {
+		return fmt.Errorf(`"pack" can only be use to pack local manifest file`)
+	}
 
 	pkg, err := manifestReader.Read()
 	if err != nil {
@@ -64,25 +50,43 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
-	defaultFilename := fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version)
+	originalOutputFile := maybeGetString(cmd, "output-file")
+	resolvedOutputFile := resolveOutputFile(originalOutputFile, map[string]string{
+		"manifestDir":     filepath.Dir(manifestPath),
+		"spkgDefaultName": fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version),
+	})
+
+	zlog.Debug("resolved output file", zap.String("original", originalOutputFile), zap.String("resolved", resolvedOutputFile))
+
+	outputDir := filepath.Dir(resolvedOutputFile)
+	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+		return fmt.Errorf("create output directories: %w", err)
+	}
 
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	outputFile := filepath.Join(outputDir, defaultFilename)
-	if err := ioutil.WriteFile(outputFile, cnt, 0644); err != nil {
+	if err := ioutil.WriteFile(resolvedOutputFile, cnt, 0644); err != nil {
 		fmt.Println("")
-		return fmt.Errorf("writing %w", err)
+		return fmt.Errorf("writing file: %w", err)
 	}
 
 	fmt.Printf(`To generate bindings for your code:
 substream protogen %s
 
-`, defaultFilename)
+`, resolvedOutputFile)
 	fmt.Printf("----------------------------------------\n")
-	fmt.Printf("Successfully wrote %q.\n", defaultFilename)
+	fmt.Printf("Successfully wrote %q.\n", resolvedOutputFile)
 
 	return nil
+}
+
+func resolveOutputFile(input string, bindings map[string]string) string {
+	for k, v := range bindings {
+		input = strings.ReplaceAll(input, `{`+k+`}`, v)
+	}
+
+	return input
 }

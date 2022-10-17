@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* Command `substreams pack` is now restricted to local manifest file.
+
+* Made changes to allow for `substreams` CLI to run on Windows OS (thanks @robinbernon).
+
 * Added flag `--output-file <template>` to `substreams pack` command to control where the `.skpg` is written, `{manifestDir}` and `{spkgDefaultName}` can be used in the `template` value where  `{manifestDir}` resolves to manifest's directory and `{spkgDefaultName}` is the pre-computed default name in the form `<name>-<version>` where `<name>` is the manifest's "package.name" value (`_` values in the name are replaced by `-`) and `<version>` is `package.version` value.
 
 * Fixed relative path not resolved correctly against manifest's location in `protobuf.files` list.

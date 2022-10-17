@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Moved rust modules to github.com/streamingfast/substreams-rs
+* Moved Rust modules to `github.com/streamingfast/substreams-rs`
 
 ### CLI
 

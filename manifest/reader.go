@@ -440,7 +440,7 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 			// `Binaries`, by comparing its, length + hash or value.
 			codeIndex, found := moduleCodeIndexes[binaryDef.File]
 			if !found {
-				codePath := binaryDef.File
+				codePath := m.resolvePath(binaryDef.File)
 				var byteCode []byte
 				if !r.skipSourceCodeImportValidation {
 					byteCode, err = ioutil.ReadFile(codePath)

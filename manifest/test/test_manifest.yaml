@@ -10,7 +10,7 @@ protobuf:
 binaries:
   default:
     type: wasm/rust-v1
-    file: ./test/code/pcs_substreams_bg.wasm
+    file: ./code/pcs_substreams_bg.wasm
 
 modules:
   - name: map_pairs

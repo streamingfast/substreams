@@ -6,7 +6,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 ### Working with Substreams Fundamentals
 
-Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, Rust modules, and protobufs.
+Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, [Rust modules](../concepts/modules.md), and protobufs.
 
 This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, WASM, and Substreams CLI.
 
@@ -29,20 +29,20 @@ Note: _The Substreams engine is responsible for running data transformations def
 
 Developers send commands, flags, and a reference to the manifest configuration file through the Substreams CLI to the Substreams engine.&#x20;
 
-Developers create the data transformation strategies in Substreams “module handlers” defined using the Rust programming language. The module handlers act on protobuf-based data models referenced from within the Substreams manifest.
+Developers create the data transformation strategies in Substreams “[module handlers](../developer-guide/setting-up-handlers.md)” defined using the [Rust programming language](https://www.rust-lang.org/). The module handlers act on protobuf-based data models referenced from within the Substreams manifest. Learn more about the protobufs for the different blockchains in the [chains and endpoints](../reference-and-specs/chains-and-endpoints.md) section of the Substreams documentation.
 
 ### **How Substreams Modules Communicate**
 
 The Substreams engine runs the code defined by developers in the Rust-based module handlers. _**Substreams modules have a uni-directional flow of data**_. The data can be passed from one module to another, but only in a single direction.&#x20;
 
-The flow of data is defined in the Substreams manifest through the “inputs” and “outputs” fields of the configuration file. These fields generally reference the protobuf definitions for the targeted blockchain data. The flow of data can also be defined using the “inputs” field to send data directly from one module to another.
+The flow of data is defined in the [Substreams manifest](../reference-and-specs/manifests.md) through the “inputs” and “outputs” fields of the configuration file. These fields generally reference the protobuf definitions for the targeted blockchain data. The flow of data can also be defined using the “inputs” field to send data directly from one module to another.
 
 ### **What is a Substreams DAG?**
 
-Substreams modules are composed through a directed acyclic graph (DAG).&#x20;
+Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).&#x20;
 
 {% hint style="info" %}
-_**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs._
+_**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs; a one directional flow._
 {% endhint %}
 
 The Substreams manifest references the modules, the handlers defined within them, and lays out the intention of how each is used by the Substreams engine.&#x20;
@@ -53,11 +53,15 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 ### **Protobufs for Substreams**
 
-Protobufs are the data models operated on by the Rust-based module handler functions. Data models are defined and outlined in the protobufs Protobufs include the names of the data objects and the fields contained and accessible within them.&#x20;
+[Protocol buffers](https://developers.google.com/protocol-buffers), or protobufs, are the data models operated on by the [Rust-based module handler functions](../developer-guide/writing-module-handlers.md). Data models are defined and outlined in the protobufs.&#x20;
 
-Many of the protobuf definitions have already been created, such as the erc721 token model, that can be used by developers creating Substreams data transformation strategies.
+{% hint style="info" %}
+**Note:** _Protobufs include the names of the data objects and the fields contained and accessible within them._&#x20;
+{% endhint %}
 
-Custom smart contracts targeted by developers, such as UniSwap, can have protobuf definitions that have already been created for them by others. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
+Many of the protobuf definitions have already been created, such as the [erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), that can be used by developers creating Substreams data transformation strategies.
+
+Custom smart contracts targeted by developers, such as [UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), can have protobuf definitions that have already been created for them by others. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
 
 In object-oriented programming terminology, the protobufs are the objects or object models. In front-end web development terms, protobufs are similar to the REST, or other data access API.&#x20;
 
@@ -78,3 +82,5 @@ _**Note**: Substreams modules work together by passing data from one module to a
 {% endhint %}
 
 Two types of module handlers are defined within the Rust modules; maps and stores. The two module types work in conjunction to sort, sift, temporarily store and transform blockchain data from smart contracts for use in data sinks, such as databases or subgraphs.
+
+Continue to the modules documentation to learn more about detailed aspects of their use and purpose.

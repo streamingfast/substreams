@@ -250,7 +250,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
-			test.store.SetMaxBigFloat(0, test.key, test.value)
+			test.store.SetMaxBigDecimal(0, test.key, test.value)
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")

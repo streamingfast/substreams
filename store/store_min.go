@@ -55,7 +55,7 @@ func (s *BaseStore) SetMinFloat64(ord uint64, key string, value float64) {
 	s.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }
 
-func (s *BaseStore) SetMinBigFloat(ord uint64, key string, value *big.Float) {
+func (s *BaseStore) SetMinBigDecimal(ord uint64, key string, value *big.Float) {
 	min := new(big.Float)
 	val, found := s.GetAt(ord, key)
 	if !found {

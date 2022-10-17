@@ -2,20 +2,14 @@ package store
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"math/big"
 	"strconv"
 	"strings"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-)
+	"github.com/streamingfast/substreams/manifest"
+	"go.uber.org/zap"
 
-const (
-	OutputValueTypeInt64    = "int64"
-	OutputValueTypeFloat64  = "float64"
-	OutputValueTypeBigInt   = "bigint"
-	OutputValueTypeBigFloat = "bigfloat"
-	OutputValueTypeString   = "string"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 // Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
@@ -61,7 +55,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD:
 		// check valueType to do the right thing
 		switch intoValueTypeLower {
-		case OutputValueTypeInt64:
+		case manifest.OutputValueTypeInt64:
 			sum := func(a, b uint64) uint64 {
 				return a + b
 			}
@@ -71,7 +65,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroUint64(v, true)
 				s.kv[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
-		case OutputValueTypeFloat64:
+		case manifest.OutputValueTypeFloat64:
 			sum := func(a, b float64) float64 {
 				return a + b
 			}
@@ -81,7 +75,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroFloat(v, true)
 				s.kv[k] = []byte(floatToStr(sum(v0, v1)))
 			}
-		case OutputValueTypeBigInt:
+		case manifest.OutputValueTypeBigInt:
 			sum := func(a, b *big.Int) *big.Int {
 				return bi().Add(a, b)
 			}
@@ -91,7 +85,9 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroBigInt(v, true)
 				s.kv[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
-		case OutputValueTypeBigFloat:
+		case manifest.OutputValueTypeBigFloat:
+			fallthrough
+		case manifest.OutputValueTypeBigDecimal:
 			sum := func(a, b *big.Float) *big.Float {
 				return bf().Add(a, b).SetPrec(100)
 			}
@@ -106,7 +102,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch intoValueTypeLower {
-		case OutputValueTypeInt64:
+		case manifest.OutputValueTypeInt64:
 			max := func(a, b uint64) uint64 {
 				if a >= b {
 					return a
@@ -124,7 +120,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 
 				s.kv[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
-		case OutputValueTypeFloat64:
+		case manifest.OutputValueTypeFloat64:
 			max := func(a, b float64) float64 {
 				if a < b {
 					return b
@@ -142,7 +138,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 
 				s.kv[k] = []byte(floatToStr(max(v0, v1)))
 			}
-		case OutputValueTypeBigInt:
+		case manifest.OutputValueTypeBigInt:
 			max := func(a, b *big.Int) *big.Int {
 				if a.Cmp(b) <= 0 {
 					return b
@@ -160,7 +156,9 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 
 				s.kv[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
-		case OutputValueTypeBigFloat:
+		case manifest.OutputValueTypeBigFloat:
+			fallthrough
+		case manifest.OutputValueTypeBigDecimal:
 			max := func(a, b *big.Float) *big.Float {
 				if a.Cmp(b) <= 0 {
 					return b
@@ -183,7 +181,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch intoValueTypeLower {
-		case OutputValueTypeInt64:
+		case manifest.OutputValueTypeInt64:
 			min := func(a, b uint64) uint64 {
 				if a <= b {
 					return a
@@ -201,7 +199,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 
 				s.kv[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
-		case OutputValueTypeFloat64:
+		case manifest.OutputValueTypeFloat64:
 			min := func(a, b float64) float64 {
 				if a < b {
 					return a
@@ -219,7 +217,7 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 
 				s.kv[k] = []byte(floatToStr(min(v0, v1)))
 			}
-		case OutputValueTypeBigInt:
+		case manifest.OutputValueTypeBigInt:
 			min := func(a, b *big.Int) *big.Int {
 				if a.Cmp(b) <= 0 {
 					return a
@@ -237,7 +235,9 @@ func (s *BaseStore) Merge(kvPartialStore *PartialKV) error {
 
 				s.kv[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
-		case OutputValueTypeBigFloat:
+		case manifest.OutputValueTypeBigFloat:
+			fallthrough
+		case manifest.OutputValueTypeBigDecimal:
 			min := func(a, b *big.Float) *big.Float {
 				if a.Cmp(b) <= 0 {
 					return a

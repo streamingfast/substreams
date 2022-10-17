@@ -174,7 +174,7 @@ func TestStoreSumBigFloat(t *testing.T) {
 				b.kv[test.key] = test.existingValue
 			}
 
-			b.SumBigFloat(0, test.key, test.value)
+			b.SumBigDecimal(0, test.key, test.value)
 			actual, found := b.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")

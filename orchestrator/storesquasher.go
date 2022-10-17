@@ -51,17 +51,22 @@ func NewStoreSquasher(
 	return s
 }
 
-func (s *StoreSquasher) WaitForCompletion() error {
+func (s *StoreSquasher) WaitForCompletion(ctx context.Context) error {
 	s.log.Info("waiting form terminate after partials chucks chan empty")
 	close(s.partialsChunks)
 
-	s.log.Info("waiting completion")
-	err := <-s.waitForCompletion
-	if err != nil {
-		return err
+	s.log.Info("waiting for completion")
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-s.waitForCompletion:
+		if err != nil {
+			return fmt.Errorf("store squasher waiting for completion: %w", err)
+		}
+		s.log.Info("squasher completed")
+		return nil
 	}
-	s.log.Info("partials chucks chan empty, terminating")
-	return nil
 }
 
 func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
@@ -87,7 +92,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		case partialsChunks, ok := <-s.partialsChunks:
 			if !ok {
 				s.log.Info("squashing done, no more partial chunks to squash")
-				s.waitForCompletion <- nil
+				close(s.waitForCompletion)
 				return
 			}
 			s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
@@ -154,7 +159,7 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 		if err != nil {
 			return nil, fmt.Errorf("process range %s: %w", squashableRange.String(), err)
 		}
-		
+
 		out.lastExclusiveEndBlock++
 
 		s.ranges = s.ranges[1:]

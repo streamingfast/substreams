@@ -83,7 +83,7 @@ func NewSquasher(
 	return squasher, nil
 }
 
-func (s *Squasher) WaitTillComplete() error {
+func (s *Squasher) WaitUntilCompleted(ctx context.Context) error {
 	zlog.Info("squasher waiting till squasher stores are completed",
 		zap.Int("store_count", len(s.storeSquashers)),
 	)
@@ -91,7 +91,7 @@ func (s *Squasher) WaitTillComplete() error {
 		zlog.Info("shutting down store squasher",
 			zap.String("store", squashable.name),
 		)
-		if err := squashable.WaitForCompletion(); err != nil {
+		if err := squashable.WaitForCompletion(ctx); err != nil {
 			return fmt.Errorf("%q completed with err: %w", squashable.name, err)
 		}
 	}

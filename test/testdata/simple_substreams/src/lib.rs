@@ -7,8 +7,8 @@ use substreams::{
     errors,
     scalar::BigInt,
     store::{
-        DeltaBigInt, DeltaI64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreGet,
-        StoreGetBigInt, StoreGetI64, StoreSet, StoreSetI64, StoreSetProto,
+        DeltaBigInt, DeltaI64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreDelete,
+        StoreGet, StoreGetBigInt, StoreGetI64, StoreNew, StoreSet, StoreSetI64, StoreSetProto,
     },
 };
 
@@ -77,7 +77,7 @@ fn assert_test_store_add_bigint(
 #[substreams::handlers::store]
 fn test_store_delete_prefix(block: test::Block, s: StoreSetI64) {
     let to_set_key = format!("key:{}", block.number);
-    s.set(block.number, to_set_key, TO_SET);
+    s.set(block.number, to_set_key, &TO_SET);
 
     if block.number > 1 {
         let previous_block_num = block.number - 1;
@@ -145,9 +145,9 @@ fn assert_test_store_add_i64_deltas(
 // -------------------- StoreSetI64/StoreGetI64 -------------------- //
 #[substreams::handlers::store]
 fn setup_test_store_set_i64(block: test::Block, store: StoreSetI64) {
-    store.set(block.number, "0", 0);
-    store.set(block.number, "min", i64::MIN);
-    store.set(block.number, "max", i64::MAX);
+    store.set(block.number, "0", &0);
+    store.set(block.number, "min", &i64::MIN);
+    store.set(block.number, "max", &i64::MAX);
 }
 
 #[substreams::handlers::map]

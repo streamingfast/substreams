@@ -127,6 +127,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			avgDuration = totalDuration / time.Duration(out.squashCount)
 		}
 
+		metrics.SquashesPerProcess.SetUint64(out.squashCount)
 		metrics.LastSquashDuration.SetUint64(uint64(totalDuration))
 		metrics.LastSquashAvgDuration.SetUint64(uint64(avgDuration))
 		s.log.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))

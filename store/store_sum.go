@@ -53,7 +53,7 @@ func (s *BaseStore) SumFloat64(ord uint64, key string, value float64) {
 	s.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
 }
 
-func (s *BaseStore) SumBigFloat(ord uint64, key string, value *big.Float) {
+func (s *BaseStore) SumBigDecimal(ord uint64, key string, value *big.Float) {
 	sum := new(big.Float)
 	val, found := s.GetAt(ord, key)
 	if !found {

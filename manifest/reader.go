@@ -469,11 +469,12 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 }
 
 var validValueTypes = map[string]bool{
-	"bigint":   true,
-	"int64":    true,
-	"float64":  true,
-	"bigfloat": true,
-	"bytes":    true,
-	"string":   true,
-	"proto":    true,
+	"bigint":     true,
+	"int64":      true,
+	"float64":    true,
+	"bigdecimal": true,
+	"bigfloat":   true,
+	"bytes":      true,
+	"string":     true,
+	"proto":      true,
 }

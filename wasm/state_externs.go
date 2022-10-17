@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/streamingfast/substreams/manifest"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -16,7 +18,7 @@ func returnStateError(cause error) {
 
 func (m *Module) set(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_SET {
-		returnStateErrorString("invalid store operation: 'set' only valid for stores with updatePolicy == 'replace'")
+		returnStateErrorString(fmt.Sprintf("invalid store operation: %q only valid for stores with updatePolicy == 'replace'", manifest.UpdatePolicySet))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadBytes(valPtr, valLength)
@@ -27,7 +29,7 @@ func (m *Module) set(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 
 func (m *Module) setIfNotExists(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS {
-		returnStateErrorString("invalid store operation: 'set_if_not_exists' only valid for stores with updatePolicy == 'ignore'")
+		returnStateErrorString(fmt.Sprintf("invalid store operation: %q only valid for stores with updatePolicy == 'ignore'", manifest.UpdatePolicySetIfNotExists))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadBytes(valPtr, valLength)
@@ -38,7 +40,7 @@ func (m *Module) setIfNotExists(ord int64, keyPtr, keyLength, valPtr, valLength 
 
 func (m *Module) append(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND {
-		returnStateErrorString("invalid store operation: 'append' only valid for stores with updatePolicy == 'append'")
+		returnStateErrorString(fmt.Sprintf("invalid store operation: %q only valid for stores with updatePolicy == %q", manifest.UpdatePolicyAppend, manifest.UpdatePolicyAppend))
 	}
 
 	key := m.Heap.ReadString(keyPtr, keyLength)
@@ -55,8 +57,11 @@ func (m *Module) deletePrefix(ord int64, keyPtr, keyLength int32) {
 }
 
 func (m *Module) addBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "bigint" {
-		returnErrorString("state", "invalid store operation: 'add_bigint' only valid for stores with updatePolicy == 'add' and valueType == 'bigint'")
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeBigInt {
+
+		returnErrorString("state", fmt.Sprintf("invalid store operation: 'add_bigint' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyAdd, manifest.OutputValueTypeBigInt))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadString(valPtr, valLength)
@@ -64,30 +69,34 @@ func (m *Module) addBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32
 	toAdd, _ := new(big.Int).SetString(value, 10)
 	m.CurrentInstance.outputStore.SumBigInt(uint64(ord), key, toAdd)
 	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addBigInt  %q", m.name, key))
-
-	return
 }
 
-func (m *Module) addBigFloat(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "bigfloat" {
-		returnErrorString("state", "invalid store operation: 'add_bigfloat' only valid for stores with updatePolicy == 'add' and valueType == 'bigfloat'")
+func (m *Module) addBigDecimal(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD &&
+		!(m.CurrentInstance.valueType == manifest.OutputValueTypeBigDecimal || m.CurrentInstance.valueType == manifest.OutputValueTypeBigFloat) {
+
+		returnErrorString("state", fmt.Sprintf("invalid store operation: 'add_bigdecimal' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyAdd, manifest.OutputValueTypeBigDecimal))
 	}
 
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadString(valPtr, valLength)
 
-	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigFloat's read of the kv value
+	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
 	if err != nil {
-		returnStateError(fmt.Errorf("parsing bigfloat: %w", err))
+		returnStateError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
 
-	m.CurrentInstance.outputStore.SumBigFloat(uint64(ord), key, toAdd)
-	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addBigFloat  %q", m.name, key))
+	m.CurrentInstance.outputStore.SumBigDecimal(uint64(ord), key, toAdd)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.addBigDecimal  %q", m.name, key))
 }
 
 func (m *Module) addInt64(ord int64, keyPtr, keyLength int32, value int64) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "int64" {
-		returnStateErrorString("invalid store operation: 'add_int64' only valid for stores with updatePolicy == 'add' and valueType == 'int64'")
+	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy !=
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeInt64 {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'add_int64' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyAdd, manifest.OutputValueTypeInt64))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
@@ -97,8 +106,11 @@ func (m *Module) addInt64(ord int64, keyPtr, keyLength int32, value int64) {
 }
 
 func (m *Module) addFloat64(ord int64, keyPtr, keyLength int32, value float64) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD && m.CurrentInstance.valueType != "float64" {
-		returnStateErrorString("invalid store operation: 'add_float64' only valid for stores with updatePolicy == 'add' and valueType == 'float64'")
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeFloat64 {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'add_float64' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyAdd, manifest.OutputValueTypeFloat64))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
@@ -107,8 +119,11 @@ func (m *Module) addFloat64(ord int64, keyPtr, keyLength int32, value float64) {
 }
 
 func (m *Module) setMinInt64(ord int64, keyPtr, keyLength int32, value int64) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "int64" {
-		returnStateErrorString("invalid store operation: 'set_min_int64' only valid for stores with updatePolicy == 'min' and valueType == 'int64'")
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeInt64 {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_min_int64' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMin, manifest.OutputValueTypeInt64))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
@@ -117,8 +132,11 @@ func (m *Module) setMinInt64(ord int64, keyPtr, keyLength int32, value int64) {
 }
 
 func (m *Module) setMinBigint(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "bigfloat" {
-		returnStateErrorString("invalid store operation: 'set_min_bigint' only valid for stores with updatePolicy == 'min' and valueType == 'bigint'")
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeBigInt {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_min_bigint' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMin, manifest.OutputValueTypeBigInt))
 	}
 
 	key := m.Heap.ReadString(keyPtr, keyLength)
@@ -129,19 +147,25 @@ func (m *Module) setMinBigint(ord int64, keyPtr, keyLength, valPtr, valLength in
 	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinBigint %q", m.name, key))
 }
 
-func (m *Module) setMinfloat64(ord int64, keyPtr, keyLength int32, value float64) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "float" {
-		returnStateErrorString("invalid store operation: 'set_min_float' only valid for stores with updatePolicy == 'min' and valueType == 'float'")
+func (m *Module) setMinFloat64(ord int64, keyPtr, keyLength int32, value float64) {
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeFloat64 {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_min_float' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMin, manifest.OutputValueTypeFloat64))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
 	m.CurrentInstance.outputStore.SetMinFloat64(uint64(ord), key, value)
-	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinfloat64 %q", m.name, key))
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinFloat64 %q", m.name, key))
 }
 
-func (m *Module) setMinBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN && m.CurrentInstance.valueType != "bigint" {
-		returnStateErrorString("invalid store operation: 'set_min_bigfloat' only valid for stores with updatePolicy == 'min' and valueType == 'bigfloat'")
+func (m *Module) setMinBigDecimal(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN &&
+		!(m.CurrentInstance.valueType == manifest.OutputValueTypeBigDecimal || m.CurrentInstance.valueType == manifest.OutputValueTypeBigFloat) {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_min_bigdecimal' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMin, manifest.OutputValueTypeBigDecimal))
 	}
 
 	key := m.Heap.ReadString(keyPtr, keyLength)
@@ -149,15 +173,18 @@ func (m *Module) setMinBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength 
 
 	toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
 	if err != nil {
-		returnStateError(fmt.Errorf("parsing bigfloat: %w", err))
+		returnStateError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
-	m.CurrentInstance.outputStore.SetMinBigFloat(uint64(ord), key, toSet)
-	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMinBigfloat %q", m.name, key))
+	m.CurrentInstance.outputStore.SetMinBigDecimal(uint64(ord), key, toSet)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.set_min_bigdecimal %q", m.name, key))
 }
 
 func (m *Module) setMaxInt64(ord int64, keyPtr, keyLength int32, value int64) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "int64" {
-		returnStateErrorString("invalid store operation: 'set_max_int64' only valid for stores with updatePolicy == 'max' and valueType == 'int64'")
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeInt64 {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_max_int64' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMax, manifest.OutputValueTypeInt64))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
@@ -165,9 +192,12 @@ func (m *Module) setMaxInt64(ord int64, keyPtr, keyLength int32, value int64) {
 	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxInt64 %q", m.name, key))
 }
 
-func (m *Module) setMaxBigint(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "bigint" {
-		returnStateErrorString("invalid store operation: 'set_max_bigint' only valid for stores with updatePolicy == 'max' and valueType == 'bigint'")
+func (m *Module) setMaxBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeBigInt {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_max_bigint' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMax, manifest.OutputValueTypeBigInt))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadString(valPtr, valLength)
@@ -178,8 +208,11 @@ func (m *Module) setMaxBigint(ord int64, keyPtr, keyLength, valPtr, valLength in
 }
 
 func (m *Module) setMaxFloat64(ord int64, keyPtr, keyLength int32, value float64) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "float" {
-		returnStateErrorString("invalid store operation: 'set_max_float' only valid for stores with updatePolicy == 'max' and valueType == 'float'")
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX &&
+		m.CurrentInstance.valueType != manifest.OutputValueTypeFloat64 {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_max_float' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMax, manifest.OutputValueTypeFloat64))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 
@@ -187,19 +220,22 @@ func (m *Module) setMaxFloat64(ord int64, keyPtr, keyLength int32, value float64
 	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxFloat64 %q", m.name, key))
 }
 
-func (m *Module) setMaxBigfloat(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
-	if m.CurrentInstance.outputStore == nil && m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX && m.CurrentInstance.valueType != "bigint" {
-		returnStateErrorString("invalid store operation: 'set_max_bigfloat' only valid for stores with updatePolicy == 'max' and valueType == 'bigfloat'")
+func (m *Module) setMaxBigDecimal(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
+	if m.CurrentInstance.outputStore == nil &&
+		m.CurrentInstance.updatePolicy != pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX &&
+		!(m.CurrentInstance.valueType == manifest.OutputValueTypeBigDecimal || m.CurrentInstance.valueType == manifest.OutputValueTypeBigFloat) {
+
+		returnStateErrorString(fmt.Sprintf("invalid store operation: 'set_max_bigdecimal' only valid for stores with updatePolicy == %q and valueType == %q", manifest.UpdatePolicyMax, manifest.OutputValueTypeBigDecimal))
 	}
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadString(valPtr, valLength)
 
 	toSet, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven)
 	if err != nil {
-		returnStateError(fmt.Errorf("parsing bigfloat: %w", err))
+		returnStateError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
-	m.CurrentInstance.outputStore.SetMaxBigFloat(uint64(ord), key, toSet)
-	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxBigfloat %q", m.name, key))
+	m.CurrentInstance.outputStore.SetMaxBigDecimal(uint64(ord), key, toSet)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.setMaxBigDecimal %q", m.name, key))
 }
 
 func (m *Module) getAt(storeIndex int32, ord int64, keyPtr, keyLength, outputPtr int32) int32 {

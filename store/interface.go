@@ -2,9 +2,10 @@ package store
 
 import (
 	"context"
+	"math/big"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"math/big"
 )
 
 type Store interface {
@@ -29,17 +30,17 @@ type Store interface {
 	MaxBigIntSetter
 	MaxInt64Setter
 	MaxFloat64Setter
-	MaxBigFloatSetter
+	MaxBigDecimalSetter
 
 	MinBigIntSetter
 	MinInt64Setter
 	MinFloat64Setter
-	MinBigFloatSetter
+	MinBigDecimalSetter
 
 	SumBigIntSetter
 	SumInt64Setter
 	SumFloat64Setter
-	SumBigFloatSetter
+	SumBigDecimalSetter
 }
 
 type PartialStore interface {
@@ -110,8 +111,8 @@ type MaxInt64Setter interface {
 type MaxFloat64Setter interface {
 	SetMaxFloat64(ord uint64, key string, value float64)
 }
-type MaxBigFloatSetter interface {
-	SetMaxBigFloat(ord uint64, key string, value *big.Float)
+type MaxBigDecimalSetter interface {
+	SetMaxBigDecimal(ord uint64, key string, value *big.Float)
 }
 
 type MinBigIntSetter interface {
@@ -123,8 +124,8 @@ type MinInt64Setter interface {
 type MinFloat64Setter interface {
 	SetMinFloat64(ord uint64, key string, value float64)
 }
-type MinBigFloatSetter interface {
-	SetMinBigFloat(ord uint64, key string, value *big.Float)
+type MinBigDecimalSetter interface {
+	SetMinBigDecimal(ord uint64, key string, value *big.Float)
 }
 
 type SumBigIntSetter interface {
@@ -136,6 +137,6 @@ type SumInt64Setter interface {
 type SumFloat64Setter interface {
 	SumFloat64(ord uint64, key string, value float64)
 }
-type SumBigFloatSetter interface {
-	SumBigFloat(ord uint64, key string, value *big.Float)
+type SumBigDecimalSetter interface {
+	SumBigDecimal(ord uint64, key string, value *big.Float)
 }

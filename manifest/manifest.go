@@ -148,22 +148,27 @@ func validateStoreBuilder(module *Module) error {
 		return errors.New("missing 'output.valueType' for kind 'store'")
 	}
 
+	// keep big float to be backward-compatible
 	combinations := []string{
 		"max:bigint",
 		"max:int64",
+		"max:bigdecimal",
 		"max:bigfloat",
 		"max:float64",
 		"min:bigint",
 		"min:int64",
+		"min:bigdecimal",
 		"min:bigfloat",
 		"min:float64",
 		"add:bigint",
 		"add:int64",
+		"add:bigdecimal",
 		"add:bigfloat",
 		"add:float64",
 		"set:bytes",
 		"set:string",
 		"set:proto",
+		"set:bigdecimal",
 		"set:bigfloat",
 		"set:bigint",
 		"set:int64",
@@ -171,6 +176,7 @@ func validateStoreBuilder(module *Module) error {
 		"set_if_not_exists:bytes",
 		"set_if_not_exists:string",
 		"set_if_not_exists:proto",
+		"set_if_not_exists:bigdecimal",
 		"set_if_not_exists:bigfloat",
 		"set_if_not_exists:bigint",
 		"set_if_not_exists:int64",
@@ -280,6 +286,17 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 
 	return nil
 }
+
+const (
+	OutputValueTypeInt64      = "int64"
+	OutputValueTypeFloat64    = "float64"
+	OutputValueTypeBigInt     = "bigint"
+	OutputValueTypeBigDecimal = "bigdecimal"
+
+	// Deprecated: bigfloat value type replaced with bigdecimal
+	OutputValueTypeBigFloat = "bigfloat"
+	OutputValueTypeString   = "string"
+)
 
 const (
 	UpdatePolicySet            = "set"

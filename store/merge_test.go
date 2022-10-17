@@ -1,8 +1,10 @@
 package store
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/streamingfast/substreams/manifest"
+	"github.com/stretchr/testify/require"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
@@ -18,14 +20,14 @@ func TestStore_Merge(t *testing.T) {
 	}{
 		{
 			name:          "incompatible merge strategies",
-			latest:        newPartialStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
-			prev:          newStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString),
+			latest:        newPartialStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, manifest.OutputValueTypeString, nil),
+			prev:          newStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, manifest.OutputValueTypeString),
 			expectedError: true,
 		},
 		{
 			name:          "incompatible value types",
-			latest:        newPartialStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
-			prev:          newStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeBigFloat),
+			latest:        newPartialStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, manifest.OutputValueTypeString, nil),
+			prev:          newStore(map[string][]byte{}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, manifest.OutputValueTypeBigDecimal),
 			expectedError: true,
 		},
 		{
@@ -36,7 +38,7 @@ func TestStore_Merge(t *testing.T) {
 					"two": []byte("bar"),
 				},
 				pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
-				OutputValueTypeString,
+				manifest.OutputValueTypeString,
 				nil,
 			),
 			prev: newStore(
@@ -45,7 +47,7 @@ func TestStore_Merge(t *testing.T) {
 					"three": []byte("lol"),
 				},
 				pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
-				OutputValueTypeString,
+				manifest.OutputValueTypeString,
 			),
 			expectedError: false,
 			expectedKV: map[string][]byte{
@@ -59,11 +61,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("foo"),
 				"two": []byte("bar"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, manifest.OutputValueTypeString, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("baz"),
 				"three": []byte("lol"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, OutputValueTypeString),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, manifest.OutputValueTypeString),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("baz"),
@@ -76,11 +78,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("foo;"),
 				"two": []byte("bar;"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, manifest.OutputValueTypeString, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("baz;"),
 				"three": []byte("lol;"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, OutputValueTypeString),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, manifest.OutputValueTypeString),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("baz;foo;"),
@@ -93,11 +95,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeInt64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("1"),
 				"three": []byte("3"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeInt64),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeInt64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("2"),
@@ -110,11 +112,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigInt, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeBigInt, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("1"),
 				"three": []byte("3"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigInt),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeBigInt),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("2"),
@@ -128,11 +130,11 @@ func TestStore_Merge(t *testing.T) {
 				map[string][]byte{
 					"one": []byte("1"),
 					"two": []byte("2"),
-				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeInt64, nil),
+				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeInt64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeInt64),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeInt64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("1"),
@@ -146,12 +148,12 @@ func TestStore_Merge(t *testing.T) {
 				map[string][]byte{
 					"one": []byte("1"),
 					"two": []byte("2"),
-				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigInt, nil),
+				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeBigInt, nil),
 			prev: newStore(
 				map[string][]byte{
 					"one":   []byte("2"),
 					"three": []byte("3"),
-				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigInt),
+				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeBigInt),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("1"),
@@ -165,11 +167,11 @@ func TestStore_Merge(t *testing.T) {
 				map[string][]byte{
 					"one": []byte("1"),
 					"two": []byte("2"),
-				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeInt64, nil),
+				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeInt64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeInt64),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeInt64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("2"),
@@ -182,11 +184,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("1"),
 				"two": []byte("2"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigInt, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeBigInt, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("2"),
 				"three": []byte("3"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigInt),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeBigInt),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("2"),
@@ -199,11 +201,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeFloat64, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeFloat64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("10.1"),
 				"three": []byte("30.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeFloat64),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeFloat64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("20.2"),
@@ -212,15 +214,15 @@ func TestStore_Merge(t *testing.T) {
 			},
 		},
 		{
-			name: "sum_big_float",
+			name: "sum_big_decimal",
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigFloat, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeBigDecimal, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("10.1"),
 				"three": []byte("30.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, OutputValueTypeBigFloat),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, manifest.OutputValueTypeBigDecimal),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("20.2"),
@@ -233,11 +235,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeFloat64, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeFloat64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeFloat64),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeFloat64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("10.1"),
@@ -246,15 +248,15 @@ func TestStore_Merge(t *testing.T) {
 			},
 		},
 		{
-			name: "min_big_float",
+			name: "min_big_decimal",
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigFloat, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeBigDecimal, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, OutputValueTypeBigFloat),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, manifest.OutputValueTypeBigDecimal),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("10.1"),
@@ -267,11 +269,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeFloat64, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeFloat64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeFloat64),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeFloat64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("20.1"),
@@ -280,15 +282,15 @@ func TestStore_Merge(t *testing.T) {
 			},
 		},
 		{
-			name: "max_big_float",
+			name: "max_big_decimal",
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("10.1"),
 				"two": []byte("20.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigFloat, nil),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeBigDecimal, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("20.1"),
 				"three": []byte("30.1"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, OutputValueTypeBigFloat),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, manifest.OutputValueTypeBigDecimal),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("20.1"),
@@ -301,11 +303,11 @@ func TestStore_Merge(t *testing.T) {
 			latest: newPartialStore(
 				map[string][]byte{
 					"t:1": []byte("bar"),
-				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString, []string{"p:"}),
+				}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, manifest.OutputValueTypeString, []string{"p:"}),
 			prev: newStore(map[string][]byte{
 				"t:1": []byte("baz"),
 				"p:3": []byte("lol"),
-			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, OutputValueTypeString),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, manifest.OutputValueTypeString),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"t:1": []byte("bar"),
@@ -324,7 +326,7 @@ func TestStore_Merge(t *testing.T) {
 			}
 
 			for k, v := range test.prev.kv {
-				if test.latest.valueType == OutputValueTypeBigFloat {
+				if test.latest.valueType == manifest.OutputValueTypeBigDecimal {
 					actual, _ := foundOrZeroBigFloat(v, true).Float64()
 					expected, _ := foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)
@@ -336,7 +338,7 @@ func TestStore_Merge(t *testing.T) {
 			}
 
 			for k, v := range test.expectedKV {
-				if test.latest.valueType == OutputValueTypeBigFloat {
+				if test.latest.valueType == manifest.OutputValueTypeBigDecimal {
 					actual, _ := foundOrZeroBigFloat(v, true).Float64()
 					expected, _ := foundOrZeroBigFloat(test.prev.kv[k], true).Float64()
 					assert.InDelta(t, actual, expected, 0.01)

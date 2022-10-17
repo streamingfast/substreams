@@ -87,6 +87,9 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.log.Info("quitting on a close context")
+			// TODO(abourget): don't write anything here?
+			// the goroutine waiting on this one will ALSO trigger on `ctx.Done()`
+			// and exit properly... so no need to clog that channel.
 			s.waitForCompletion <- ctx.Err()
 			return
 

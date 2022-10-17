@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(abourget): Rename to MultiSquasher
+
 // Squasher produces _complete_ stores, by merging backing partial stores.
 type Squasher struct {
 	storeSquashers       map[string]*StoreSquasher
@@ -44,10 +46,13 @@ func NewSquasher(
 
 		s, ok := genericStore.(store.Cloneable)
 		if !ok {
-			return nil, fmt.Errorf("can only run sqausher on kv stores and not kv partial stores")
+			return nil, fmt.Errorf("can only run squasher on kv stores and not kv partial stores")
 		}
 		clonedStore := s.Clone()
 
+		// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
+		// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
+		// one is derived?
 		var storeSquasher *StoreSquasher
 		if workUnit.initialCompleteRange == nil {
 			zlog.Info("setting up initial store",

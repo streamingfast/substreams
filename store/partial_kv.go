@@ -33,10 +33,6 @@ func (p *PartialKV) Roll(lastBlock uint64) {
 
 func (s *PartialKV) InitialBlock() uint64 { return s.initialBlock }
 
-func (p *PartialKV) storageFilename(exclusiveEndBlock uint64) string {
-	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock))
-}
-
 type storeData struct {
 	KV              map[string][]byte `json:"kv"`
 	DeletedPrefixes []string          `json:"deleted_prefixes"`
@@ -81,7 +77,7 @@ func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.R
 	}
 
 	brange := block.NewRange(p.initialBlock, endBoundaryBlock)
-	p.logger.Info("partial store  state written",
+	p.logger.Info("partial store state written",
 		zap.String("store", p.name),
 		zap.String("file_name", filename),
 		zap.Object("block_range", brange),
@@ -98,10 +94,14 @@ func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
 
 func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error) {
 	filename := p.storageFilename(endBlock)
-	zlog.Debug("deleting full store file", zap.String("file_name", filename))
+	zlog.Debug("deleting partial store file", zap.String("file_name", filename))
 
 	if err = p.store.DeleteObject(ctx, filename); err != nil {
-		zlog.Warn("deleting  file", zap.String("file_name", filename), zap.Error(err))
+		zlog.Warn("deleting file", zap.String("file_name", filename), zap.Error(err))
 	}
 	return err
+}
+
+func (p *PartialKV) storageFilename(exclusiveEndBlock uint64) string {
+	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock))
 }

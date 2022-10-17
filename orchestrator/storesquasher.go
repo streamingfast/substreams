@@ -19,8 +19,8 @@ type StoreSquasher struct {
 	store                        *store.FullKV
 	requestRange                 *block.Range
 	ranges                       block.Ranges
-	targetStartBlock             uint64
-	targetExclusiveEndBlock      uint64
+	targetStartBlock             uint64  // FIXME: THIS ISN'T USED
+	targetExclusiveEndBlock      uint64 // FIXME: The value we receive in this is the `request.EffectiveStartBlock()` .. and its received as `targetExclusiveBlock` and assigned to `targetExclusiveEndBlock`. What's happening?
 	nextExpectedStartBlock       uint64
 	log                          *zap.Logger
 	jobsPlanner                  *JobsPlanner
@@ -52,6 +52,7 @@ func NewStoreSquasher(
 }
 
 func (s *StoreSquasher) WaitForCompletion(ctx context.Context) error {
+	// TODO(abourget): unsure what this line means, a `close()` doesn't wait?
 	s.log.Info("waiting form terminate after partials chucks chan empty")
 	close(s.partialsChunks)
 
@@ -108,6 +109,10 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		out, err := s.processRanges(ctx, eg)
 		if err != nil {
 			s.waitForCompletion <- err
+			// FIXME (abourget): shouldn't we return here?
+			// there are risks we're not waiting for all threads in `eg.Wait()`, and
+			// another risk that we block upon writing to `s.waitForCompletion` 5 lines
+			// below.
 		}
 
 		s.log.Info("waiting for eg to finish")
@@ -161,6 +166,7 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 			return nil, fmt.Errorf("process range %s: %w", squashableRange.String(), err)
 		}
 
+		// FIXME(abourget): this was `squashCount++` prior.. we're ++ on a EndBlock?!
 		out.lastExclusiveEndBlock++
 
 		s.ranges = s.ranges[1:]
@@ -194,6 +200,10 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 		zap.Stringer("squashable_range", squashableRange),
 	)
 
+	// FIXME(abourget): this is what was prior to the change:
+// 	s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
+// 	squashCount++
+
 	nextStore := store.NewPartialKV(s.store.Clone().BaseStore, squashableRange.StartBlock)
 	if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
@@ -209,14 +219,31 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 
 	zlog.Info("deleting store", zap.Object("store", nextStore))
 	eg.Go(func() error {
-		nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+		_ = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 		return nil
 	})
 
+	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {
+		eg.Go(func() error {
+			_, err := s.store.Save(ctx, squashableRange.ExclusiveEndBlock)
+			return err
+		})
+	}
+	return nil
+}
+
+func (s *StoreSquasher) shouldSaveFullKV(storeInitialBlock uint64, squashableRange *block.Range) bool {
+	// TODO(abourget): beautiful opportunity to create a table-driven tests function
+	// called `shouldSaveFullKV(...)` .. and wrap the `Save()` call in it.
+	// These are crazy conditions that are unreadable.. don't force us to dig into this
+	// at this level, if the only question is "should I save or not?"
+	// we'll dig in the conditions if we need
+
 	isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
-	isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == s.store.InitialBlock()
+	isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == storeInitialBlock
 	isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.storeSaveInterval == 0
-	zlog.Info("should write store?",
+	// This log was for debugging/testing in prod
+	zlog.Info("should write full store?",
 		zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock),
 		zap.Uint64("store_interval", s.storeSaveInterval),
 		zap.Bool("is_save_interval_reached", isSaveIntervalReached),
@@ -224,13 +251,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 		zap.Bool("is_completed_kv", isCompletedKv),
 	)
 
-	if isFirstKvForModule || isCompletedKv {
-		eg.Go(func() error {
-			_, err := s.store.Save(ctx, squashableRange.ExclusiveEndBlock)
-			return err
-		})
-	}
-	return nil
+	return isFirstKvForModule || isCompletedKv
 }
 
 func (s *StoreSquasher) IsEmpty() bool {

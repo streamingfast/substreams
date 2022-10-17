@@ -27,7 +27,7 @@ type RequestContext struct {
 func NewRequestContext(ctx context.Context, req *pbsubstreams.Request, isSubRequest bool) (*RequestContext, error) {
 	logger := _zlog.With(
 		zap.Strings("outputs", req.OutputModules),
-		zap.Bool("sub_request", isSubRequest),
+		zap.Bool("subreq", isSubRequest),
 		zap.Stringer("trace_id", tracing.GetTraceID(ctx)),
 	)
 
@@ -89,10 +89,6 @@ func (r *RequestContext) StopBlockNum() uint64 {
 
 func (r *RequestContext) StartCursor() string {
 	return r.request.StartCursor
-}
-
-func (r *RequestContext) SetLogger(logger *zap.Logger) {
-	r.logger = logger
 }
 
 func (r *RequestContext) Logger() *zap.Logger {

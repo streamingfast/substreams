@@ -29,11 +29,11 @@ func (s *StorageState) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchStorageState(ctx context.Context, storeMaps *store.Map) (out *StorageState, err error) {
+func FetchStorageState(ctx context.Context, storeMap *store.Map) (out *StorageState, err error) {
 	out = NewStorageState()
 	eg := llerrgroup.New(10)
 
-	for name, storeObj := range storeMaps.All() {
+	for name, storeObj := range storeMap.All() {
 		if eg.Stop() {
 			break
 		}

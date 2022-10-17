@@ -6,15 +6,15 @@ description: StreamingFast Substreams fundamental knowledge
 
 ### Working with Substreams Fundamentals
 
-Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, [Rust modules](../concepts/modules.md), and protobufs.
+Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, [Rust modules](../concepts/modules.md), and [protobufs](../developer-guide/creating-protobuf-schemas.md).
 
-This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, WASM, and Substreams CLI.
+This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, [WASM](https://webassembly.org/), and Substreams CLI.
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
 ### Building a Substream Key Steps
 
-* Identify smart contract addresses of interest (wallets, DEXs, etc.).
+* Identify smart contract addresses of interest (wallets, decentralized exchanges (DEXs), etc.).
 * Identify data, and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update substreams manifest, point to protobufs and handlers.

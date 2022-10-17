@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -9,40 +10,37 @@ import (
 )
 
 type BaseStore struct {
-	name       string
-	moduleHash string
-	store      dstore.Store
+	Config
 
-	//SaveInterval       uint64
-	moduleInitialBlock uint64
-	//storeInitialBlock  uint64 // block at which we initialized this store
+	kv          map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
+	deltas      []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
+	lastOrdinal uint64
 
-	kv     map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
-	deltas []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
-
-	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
-	valueType    string
-	lastOrdinal  uint64
-	logger       *zap.Logger
+	logger *zap.Logger
 }
 
-func NewBaseStore(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, logger *zap.Logger) (*BaseStore, error) {
+func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
-		return nil, fmt.Errorf("creating sub store: %w", err)
+		return Config{}, fmt.Errorf("creating sub store: %w", err)
 	}
 
-	return &BaseStore{
+	return Config{
 		name:               name,
-		kv:                 make(map[string][]byte),
 		updatePolicy:       updatePolicy,
 		valueType:          valueType,
 		store:              subStore,
-		moduleHash:         moduleHash,
 		moduleInitialBlock: moduleInitialBlock,
-		logger:             logger.Named("store").With(zap.String("store_name", name)),
+		moduleHash:         moduleHash,
 	}, nil
+}
 
+func (c Config) NewBaseStore(logger *zap.Logger) *BaseStore {
+	return &BaseStore{
+		Config: c,
+		kv:     make(map[string][]byte),
+		logger: logger.Named("store").With(zap.String("store_name", c.name)),
+	}
 }
 
 func (s *BaseStore) Name() string { return s.name }

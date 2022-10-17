@@ -140,21 +140,24 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	}
 
 	p.reqCtx.logger.Info("initializing and adding stores")
-	if err := p.addStores(storeModules); err != nil {
-		return fmt.Errorf("failed to add stores: %w", err)
-	}
+
+	storeConfigMap := p.initializeStoreConfigMap(storeModules)
 
 	p.reqCtx.logger.Info("stores loaded", zap.Object("stores", p.storeMap))
 
 	if p.reqCtx.isSubRequest {
-		if err := p.setupSubrequestStores(storeModules); err != nil {
+		if storeMap, err := p.setupSubrequestStores(storeConfigMap); err != nil {
 			return fmt.Errorf("faile to setup backprocessings: %w", err)
 		}
 	} else {
-		if err := p.runBackProcessAndSetupStores(workerPool, storeModules); err != nil {
+		// TODO(abourget): this means this function will NOT assume that it has
+		// an initialized `storeMap`, it will do its job, based on its own
+		// criterias, and needs.
+		if storeMap, err := p.runBackProcessAndSetupStores(workerPool, storeConfigMap); err != nil {
 			return fmt.Errorf("faile setup request: %w", err)
 		}
 	}
+	p.storeMap = storeMap
 
 	if err = p.buildWASM(modules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
@@ -179,6 +182,8 @@ func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) er
 	outputStoreModule := storeModules[0]
 
 	p.reqCtx.logger.Info("marking leaf store for partial processing", zap.String("module", outputStoreModule.Name))
+
+	if isSubrequest
 
 	partialStore, err := p.storeFactory.NewPartialKV(
 		p.moduleHashes.Get(outputStoreModule.Name),
@@ -208,9 +213,9 @@ func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) er
 	return nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeModules []*pbsubstreams.Module) error {
+func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigMap store.ConfigMap, storeModules []*pbsubstreams.Module) error {
 	// this is a long run process, it will run the whole back process logic
-	backProcessedStores, err := p.backProcessStores(workerPool, storeModules)
+	backProcessedStores, err := p.backProcessStores(workerPool, storeConfigMap, storeModules)
 	if err != nil {
 		return fmt.Errorf("synchronizing stores: %w", err)
 	}

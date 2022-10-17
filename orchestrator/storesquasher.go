@@ -116,6 +116,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			// there are risks we're not waiting for all threads in `eg.Wait()`, and
 			// another risk that we block upon writing to `s.waitForCompletion` 5 lines
 			// below.
+			return
 		}
 
 		s.log.Info("waiting for eg to finish")

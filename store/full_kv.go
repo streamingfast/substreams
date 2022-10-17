@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/streamingfast/dstore"
+
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
@@ -24,8 +23,8 @@ type FullKV struct {
 	*BaseStore
 }
 
-func NewFullKV(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, logger *zap.Logger) (*FullKV, error) {
-	b, err := NewBaseStore(name, moduleInitialBlock, moduleHash, updatePolicy, valueType, store, logger)
+func (c Config) NewFullKV(logger *zap.Logger) (*FullKV, error) {
+	b, err := c.NewBaseStore(logger)
 	if err != nil {
 		return nil, fmt.Errorf("creating base store: %w", err)
 	}
@@ -34,14 +33,9 @@ func NewFullKV(name string, moduleInitialBlock uint64, moduleHash string, update
 
 func (s *FullKV) Clone() *FullKV {
 	b := &BaseStore{
-		name:               s.name,
-		store:              s.store,
-		moduleInitialBlock: s.moduleInitialBlock,
-		moduleHash:         s.moduleHash,
-		kv:                 map[string][]byte{},
-		updatePolicy:       s.updatePolicy,
-		valueType:          s.valueType,
-		logger:             s.logger,
+		Config: s.Config,
+		kv:     map[string][]byte{},
+		logger: s.logger,
 	}
 	return &FullKV{b}
 }

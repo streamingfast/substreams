@@ -157,7 +157,7 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 		} else {
 			return ui.jsonSnapshotData(m.SnapshotData)
 		}
-		fmt.Println("Incoming snapshot data")
+
 	case *pbsubstreams.Response_SnapshotComplete:
 		if ui.decorateOutput {
 			fmt.Println("Snapshot data dump complete")

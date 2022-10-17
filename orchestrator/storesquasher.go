@@ -82,7 +82,7 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 
 func (s *StoreSquasher) launch(ctx context.Context) {
 	s.log.Info("launching store squasher")
-	metrics.SquashesLaunched.Inc()
+	metrics.SquashProcessesLaunched.Inc()
 	for {
 		select {
 		case <-ctx.Done():
@@ -132,10 +132,8 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			avgDuration = totalDuration / time.Duration(out.squashCount)
 		}
 
-		metrics.SquashesPerProcess.SetUint64(out.squashCount)
-		metrics.LastSquashDuration.SetUint64(uint64(totalDuration))
-		metrics.LastSquashAvgDuration.SetUint64(uint64(avgDuration))
 		s.log.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
+		metrics.SquashProcessesClosed.Inc()
 	}
 }
 

@@ -6,12 +6,9 @@ import (
 
 var Metricset = dmetrics.NewSet()
 
-var SquashesPerProcess = Metricset.NewGauge("substreams_last_process_squashes", "Gauge to track how many unique squashes were last completed")
-
 var BlockBeginProcess = Metricset.NewCounter("substreams_block_process_start_counter", "Counter for total block processes started, used for rate")
 var BlockEndProcess = Metricset.NewCounter("substreams_block_process_end_counter", "Counter for total block processes ended, used for rate")
 
-var LastSquashDuration = Metricset.NewGauge("substreams_last_squash_process_duration", "Gauge for monitoring most recent complete squash duration")
-var LastSquashAvgDuration = Metricset.NewGauge("substreams_last_squash_process_avg_duration", "Gauge for monitoring the average individual duration of the most recent complete squash")
-
-var SquashesLaunched = Metricset.NewCounter("substreams_total_squashes_launched", "Counter for Total squash processes launched, used for rate")
+var SquashesLaunched = Metricset.NewCounter("substreams_total_squashes_launched", "Counter for Total squashes launched, used for rate")
+var SquashProcessesLaunched = Metricset.NewCounter("substreams_total_squash_processes_launched", "Counter for Total squash processes launched, used for rate")
+var SquashProcessesClosed = Metricset.NewCounter("substreams_total_squash_processes_closed", "Counter for Total squash processes closed, used for active processes")

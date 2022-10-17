@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -207,7 +208,9 @@ type AssertMapOutput struct {
 }
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string) {
-	//_, _ = logging.ApplicationLogger("test", "test")
+	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
+		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
+	}
 
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")
@@ -248,7 +251,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 				if out := output.GetMapOutput(); out != nil {
 					if output.Name == "test_map" {
 						r := &pbsubstreamstest.MapResult{}
-						err = proto.Unmarshal(out.Value, r)
+						err := proto.Unmarshal(out.Value, r)
 						require.NoError(t, err)
 
 						out := &TestMapOutput{
@@ -281,7 +284,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 
 						if output.Name == "test_store_proto" {
 							o := &pbsubstreamstest.MapResult{}
-							err = proto.Unmarshal(delta.OldValue, o)
+							err := proto.Unmarshal(delta.OldValue, o)
 							require.NoError(t, err)
 
 							n := &pbsubstreamstest.MapResult{}

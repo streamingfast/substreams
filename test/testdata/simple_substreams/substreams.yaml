@@ -7,12 +7,12 @@ protobuf:
   files:
   #    - "sf/substreams/v1/test/test.proto"
   importPaths:
-    - ../../../proto
+    - ./proto
 
 binaries:
   default:
     type: wasm/rust-v1
-    file: ./testdata/simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
+    file: ./target/wasm32-unknown-unknown/release/substreams_test.wasm
 
 modules:
   - name: test_map

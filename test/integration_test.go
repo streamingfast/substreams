@@ -60,7 +60,7 @@ type TestWorker struct {
 	testTempDir            string
 }
 
-func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+func (w *TestWorker) Run(_ context.Context, job *orchestrator.Job, requestModules *pbsubstreams.Modules, _ substreams.ResponseFunc) ([]*block.Range, error) {
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
 
@@ -425,12 +425,13 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"},
 		newBlockGenerator,
 		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-			baseStore.Walk(context.Background(), "", func(filename string) (err error) {
+			err := baseStore.Walk(context.Background(), "", func(filename string) (err error) {
 				if strings.Contains(filename, "output") {
 					outputFilesLen++
 				}
 				return nil
 			})
+			require.NoError(t, err)
 		},
 	)
 	require.NoError(t, err)

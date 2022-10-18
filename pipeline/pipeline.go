@@ -118,7 +118,7 @@ func New(
 
 func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	_, p.rootSpan = p.tracer.Start(p.reqCtx.Context, "pipeline_init")
-	defer tracing.EndSpan(p.rootSpan, tracing.WithEndErr(err))
+	defer tracing.EndSpan(p.rootSpan, tracing.WithEndErr(&err))
 
 	p.reqCtx.logger.Info("initializing handler",
 		zap.Int64("requested_start_block", p.reqCtx.StartBlockNum()),
@@ -294,7 +294,7 @@ func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
 		}
 
 		_, span := p.tracer.Start(p.reqCtx.Context, "save_store_snapshot", ttrace.WithAttributes(attribute.String("store", name)))
-		defer tracing.EndSpan(span, tracing.WithEndErr(err))
+		defer tracing.EndSpan(span, tracing.WithEndErr(&err))
 
 		blockRange, err := s.Save(p.reqCtx, boundaryBlock)
 		if err != nil {

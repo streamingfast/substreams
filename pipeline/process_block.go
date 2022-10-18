@@ -19,7 +19,7 @@ import (
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	_, span := p.tracer.Start(p.reqCtx.Context, "process_block")
-	defer tracing.EndSpan(span, tracing.WithEndErr(err))
+	defer tracing.EndSpan(span, tracing.WithEndErr(&err))
 
 	metrics.BlockBeginProcess.Inc()
 	clock := &pbsubstreams.Clock{
@@ -141,7 +141,7 @@ func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstream
 
 func (p *Pipeline) executeModules(execOutput execout.ExecutionOutput) (err error) {
 	_, span := p.tracer.Start(p.reqCtx.Context, "modules_executions")
-	defer tracing.EndSpan(span, tracing.WithEndErr(err))
+	defer tracing.EndSpan(span, tracing.WithEndErr(&err))
 
 	for _, executor := range p.moduleExecutors {
 		if err = p.runExecutor(executor, execOutput); err != nil {

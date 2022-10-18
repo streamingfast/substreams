@@ -121,7 +121,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	var err error
 
 	ctx, span := s.tracer.Start(streamSrv.Context(), "substreams_request")
-	defer tracing.EndSpan(span, tracing.WithEndErr(err))
+	defer tracing.EndSpan(span, tracing.WithEndErr(&err))
 
 	// Weird behavior because we want the pipeline to set the logger in the request Context
 	logger := logging.Logger(streamSrv.Context(), s.logger)

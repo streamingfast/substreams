@@ -29,12 +29,12 @@ func (e withEndError) applyToSpan(span trace.Span) {
 // will be called on the span when it ends.
 //
 // Otherwise, if the `err` is nil, a no-op option is returned.
-func WithEndErr(err error) EndSpanOption {
-	if err == nil {
+func WithEndErr(err *error) EndSpanOption {
+	if *err == nil {
 		return noOpEndSpanOptionSingleton
 	}
 
-	return withEndError{err}
+	return withEndError{*err}
 }
 
 var noOpEndSpanOptionSingleton *noOpEndSpanOption = nil

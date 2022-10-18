@@ -77,7 +77,11 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 }
 
 func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*Instance, error) {
-	entrypoint := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint).Func()
+	export := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint)
+	if export == nil {
+		return nil, fmt.Errorf("failed to get entrypoint %q most likely does not exists", m.entrypoint)
+	}
+	entrypoint := export.Func()
 	if entrypoint == nil {
 		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
 	}

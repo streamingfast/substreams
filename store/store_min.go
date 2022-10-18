@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-func (s *BaseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
+func (b *baseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
 	min := new(big.Int)
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -19,12 +19,12 @@ func (s *BaseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
 			min = prev
 		}
 	}
-	s.set(ord, key, []byte(min.String()))
+	b.set(ord, key, []byte(min.String()))
 }
 
-func (s *BaseStore) SetMinInt64(ord uint64, key string, value int64) {
+func (b *baseStore) SetMinInt64(ord uint64, key string, value int64) {
 	var min int64
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -35,12 +35,12 @@ func (s *BaseStore) SetMinInt64(ord uint64, key string, value int64) {
 			min = prev
 		}
 	}
-	s.set(ord, key, []byte(fmt.Sprintf("%d", min)))
+	b.set(ord, key, []byte(fmt.Sprintf("%d", min)))
 }
 
-func (s *BaseStore) SetMinFloat64(ord uint64, key string, value float64) {
+func (b *baseStore) SetMinFloat64(ord uint64, key string, value float64) {
 	var min float64
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -52,12 +52,12 @@ func (s *BaseStore) SetMinFloat64(ord uint64, key string, value float64) {
 			min = prev
 		}
 	}
-	s.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
+	b.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }
 
-func (s *BaseStore) SetMinBigDecimal(ord uint64, key string, value *big.Float) {
+func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value *big.Float) {
 	min := new(big.Float)
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
@@ -69,5 +69,5 @@ func (s *BaseStore) SetMinBigDecimal(ord uint64, key string, value *big.Float) {
 			min = prev
 		}
 	}
-	s.set(ord, key, []byte(min.Text('g', -1)))
+	b.set(ord, key, []byte(min.Text('g', -1)))
 }

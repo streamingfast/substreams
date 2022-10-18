@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(abourget): Rename to MultiSquasher
+
 // Squasher produces _complete_ stores, by merging backing partial stores.
 type Squasher struct {
 	storeSquashers       map[string]*StoreSquasher
@@ -29,25 +31,29 @@ type Squasher struct {
 func NewSquasher(
 	ctx context.Context,
 	workPlan WorkPlan,
-	storeMap *store.Map,
+	storeConfigs []*store.Config,
 	reqEffectiveStartBlock uint64,
 	storeSaveInterval uint64,
 	jobsPlanner *JobsPlanner) (*Squasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
 	zlog.Info("creating a new squasher", zap.Int("work_plan_count", len(workPlan)))
 
+	storeMap := map[string]*store.Config{}
+	for _, c := range storeConfigs {
+		storeMap[c.Name()] = c
+	}
+
 	for storeModuleName, workUnit := range workPlan {
-		genericStore, found := storeMap.Get(storeModuleName)
+		storeConfig, found := storeMap[storeModuleName]
 		if !found {
 			return nil, fmt.Errorf("store %q not found", storeModuleName)
 		}
 
-		s, ok := genericStore.(store.Cloneable)
-		if !ok {
-			return nil, fmt.Errorf("can only run sqausher on kv stores and not kv partial stores")
-		}
-		clonedStore := s.Clone()
+		clonedStore := storeConfig.NewFullKV(zlog)
 
+		// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
+		// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
+		// one is derived?
 		var storeSquasher *StoreSquasher
 		if workUnit.initialCompleteRange == nil {
 			zlog.Info("setting up initial store",

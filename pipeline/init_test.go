@@ -2,6 +2,9 @@ package pipeline
 
 import (
 	"encoding/json"
+	"github.com/streamingfast/bstream"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/execout"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,4 +35,42 @@ func assertProtoEqual(t *testing.T, expected proto.Message, actual proto.Message
 		// fail which is what we want here
 		assert.Equal(t, expectedAsMap, actualAsMap)
 	}
+}
+
+type ExecOutputTesting struct {
+	Values map[string][]byte
+	clock  *pbsubstreams.Clock
+}
+
+func NewExecOutputTesting(t *testing.T, block *bstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
+	blkBytes, err := block.Payload.Get()
+	require.NoError(t, err)
+
+	clockBytes, err := proto.Marshal(clock)
+	require.NoError(t, err)
+
+	return &ExecOutputTesting{
+		clock: clock,
+		Values: map[string][]byte{
+			"sf.substreams.v1.test.Block": blkBytes,
+			"sf.substreams.v1.Clock":      clockBytes,
+		},
+	}
+}
+
+func (i *ExecOutputTesting) Get(moduleName string) (value []byte, cached bool, err error) {
+	val, found := i.Values[moduleName]
+	if !found {
+		return nil, false, execout.NotFound
+	}
+	return val, false, nil
+}
+
+func (i *ExecOutputTesting) Set(moduleName string, value []byte) (err error) {
+	i.Values[moduleName] = value
+	return nil
+}
+
+func (i *ExecOutputTesting) Clock() *pbsubstreams.Clock {
+	return i.clock
 }

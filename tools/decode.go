@@ -165,12 +165,12 @@ func searchStoreModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	moduleStore, err := store.NewFullKV(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore, zlog)
+	config, err := store.NewConfig(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore)
 	if err != nil {
-		return fmt.Errorf("initializing store for module %q: %w", module.Name, err)
+		return fmt.Errorf("initializing store config module %q: %w", module.Name, err)
 	}
-
-	if err = moduleStore.Load(ctx, (startBlock + saveInterval)); err != nil {
+	moduleStore := config.NewFullKV(zlog)
+	if err = moduleStore.Load(ctx, startBlock+saveInterval); err != nil {
 		return fmt.Errorf("unable to load file: %w", err)
 	}
 

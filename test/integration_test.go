@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -29,7 +28,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type blockProcessedCallBack func(p *pipeline.Pipeline, b *bstream.Block, stores *store.Map, baseStore dstore.Store)
+type blockProcessedCallBack func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store)
 
 type TestBlockGenerator interface {
 	Generate() []*pbsubstreamstest.Block
@@ -119,10 +118,7 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 
 	cachingEngine, err := cachev1.NewEngine(ctx, 10, baseStoreStore, zap.NewNop())
 	require.NoError(t, err)
-
-	storeGenerator := pipeline.NewStoreFactory(baseStoreStore, 10)
 	storeBoundary := pipeline.NewStoreBoundary(10)
-	storeMap := store.NewMap()
 
 	pipe := pipeline.New(
 		req,
@@ -131,8 +127,10 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 		nil,
 		10,
 		cachingEngine,
-		storeMap,
-		storeGenerator,
+		&pipeline.StoreConfig{
+			BaseURL:      baseStoreStore,
+			SaveInterval: 10,
+		},
 		storeBoundary,
 		responseCollector.Collect,
 		opts...,
@@ -168,7 +166,7 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 			require.NoError(t, err)
 		}
 		if blockProcessedCallBack != nil && err == nil {
-			blockProcessedCallBack(pipe, bb, storeMap, baseStoreStore)
+			blockProcessedCallBack(pipe, bb, pipe.StoreMap, baseStoreStore)
 		}
 	}
 
@@ -208,9 +206,9 @@ type AssertMapOutput struct {
 }
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string) {
-	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
-		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
-	}
+	//if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
+	//	t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
+	//}
 
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")
@@ -407,7 +405,7 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	outputFilesLen := 0
 	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"},
 		newBlockGenerator,
-		func(p *pipeline.Pipeline, b *bstream.Block, stores *store.Map, baseStore dstore.Store) {
+		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 			baseStore.Walk(context.Background(), "", func(filename string) (err error) {
 				if strings.Contains(filename, "output") {
 					outputFilesLen++
@@ -439,7 +437,7 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores *store.Map, baseStore dstore.Store) {
+	runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		if b.Number == 40 {
 			s, storeFound := stores.Get("test_store_delete_prefix")
 			require.True(t, storeFound)

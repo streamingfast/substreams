@@ -1,6 +1,7 @@
 package store
 
 import (
+	"go.uber.org/zap"
 	"testing"
 
 	"github.com/streamingfast/dstore"
@@ -28,7 +29,7 @@ func NewTestKVPartialStore(
 ) *PartialKV {
 	base := newTestBaseStore(t, updatePolicy, valueType, store)
 	return &PartialKV{
-		BaseStore:    base,
+		baseStore:    base,
 		initialBlock: initialPartialBlock,
 	}
 }
@@ -38,13 +39,16 @@ func newTestBaseStore(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
-) *BaseStore {
+) *baseStore {
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}
 
-	baseStore, err := NewBaseStore("test", 0, "test.module.hash", updatePolicy, valueType, store, zlog)
+	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store)
 	require.NoError(t, err)
-
-	return baseStore
+	return &baseStore{
+		Config: config,
+		kv:     make(map[string][]byte),
+		logger: zap.NewNop(),
+	}
 }

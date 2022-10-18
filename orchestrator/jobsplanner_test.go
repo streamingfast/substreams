@@ -32,11 +32,10 @@ func TestNewJobsPlanner(t *testing.T) {
 	storeMap := store.NewMap()
 	for _, mod := range storeMods {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
-
-		newStore, err := store.NewFullKV(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore, zlog)
+		config, err := store.NewConfig(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
 		require.NoError(t, err)
-
-		storeMap.Set(mod.Name, newStore)
+		newStore := config.NewFullKV(zlog)
+		storeMap.Set(newStore)
 	}
 
 	splitWorkMods := WorkPlan{

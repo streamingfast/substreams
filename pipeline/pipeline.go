@@ -24,6 +24,11 @@ import (
 	"go.uber.org/zap"
 )
 
+type backprocessingStore struct {
+	name            string
+	initialBlockNum uint64
+}
+
 type Pipeline struct {
 	vmType    string // wasm/rust-v1, native
 	blockType string
@@ -44,11 +49,11 @@ type Pipeline struct {
 	respFunc     func(resp *pbsubstreams.Response) error
 
 	outputModuleMap      map[string]bool
-	backprocessingStores []store.Store
+	backprocessingStores []*backprocessingStore
 
 	moduleExecutors []ModuleExecutor
 
-	cachingEngine execout.CacheEngine
+	execOutputCache execout.CacheEngine
 
 	baseStateStore dstore.Store
 
@@ -59,12 +64,17 @@ type Pipeline struct {
 
 	subrequestSplitSize int
 
-	storeMap *store.Map
-	tracer   ttrace.Tracer
+	storeConfig *StoreConfig
+	bounder     *StoreBoundary
+	StoreMap    store.Map
+	tracer      ttrace.Tracer
 	// rootSpan represents the top-level span of the Pipeline object, initiated when `Init` is called
-	rootSpan     ttrace.Span
-	storeFactory *StoreFactory
-	bounder      *StoreBoundary
+	rootSpan ttrace.Span
+}
+
+type StoreConfig struct {
+	BaseURL      dstore.Store
+	SaveInterval uint64
 }
 
 func New(
@@ -74,18 +84,16 @@ func New(
 	wasmExtensions []wasm.WASMExtensioner,
 	subRequestSplitSize int,
 	engine execout.CacheEngine,
-	storeMap *store.Map,
-	storeGenerator *StoreFactory,
+	storeConfig *StoreConfig,
 	bounder *StoreBoundary,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
 		reqCtx:                reqCtx,
-		cachingEngine:         engine,
+		execOutputCache:       engine,
 		tracer:                otel.GetTracerProvider().Tracer("pipeline"),
-		storeMap:              storeMap,
-		storeFactory:          storeGenerator,
+		storeConfig:           storeConfig,
 		graph:                 graph,
 		outputModuleMap:       map[string]bool{},
 		blockType:             blockType,
@@ -135,26 +143,28 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	}
 
 	p.reqCtx.logger.Info("priming caching engine")
-	if err := p.cachingEngine.Init(p.moduleHashes); err != nil {
+	if err := p.execOutputCache.Init(p.moduleHashes); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
-	p.reqCtx.logger.Info("initializing and adding stores")
-	if err := p.addStores(storeModules); err != nil {
-		return fmt.Errorf("failed to add stores: %w", err)
+	p.reqCtx.logger.Info("initializing store configurations", zap.Int("store_count", len(storeModules)))
+	storeConfigs, err := p.initializeStoreConfigs(storeModules)
+	if err != nil {
+		return fmt.Errorf("initialize store config map: %w", err)
 	}
 
-	p.reqCtx.logger.Info("stores loaded", zap.Object("stores", p.storeMap))
-
+	var storeMap store.Map
 	if p.reqCtx.isSubRequest {
-		if err := p.setupSubrequestStores(storeModules); err != nil {
+		p.reqCtx.logger.Info("stores loaded", zap.Object("stores", p.StoreMap))
+		if storeMap, err = p.setupSubrequestStores(storeConfigs); err != nil {
 			return fmt.Errorf("faile to setup backprocessings: %w", err)
 		}
 	} else {
-		if err := p.runBackProcessAndSetupStores(workerPool, storeModules); err != nil {
+		if storeMap, err = p.runBackProcessAndSetupStores(workerPool, storeConfigs); err != nil {
 			return fmt.Errorf("faile setup request: %w", err)
 		}
 	}
+	p.StoreMap = storeMap
 
 	if err = p.buildWASM(modules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
@@ -170,61 +180,74 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	return nil
 }
 
-func (p *Pipeline) setupSubrequestStores(storeModules []*pbsubstreams.Module) error {
+func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Map, error) {
 	outputStoreCount := len(p.reqCtx.Request().OutputModules)
 	if outputStoreCount > 1 {
 		// currently only support 1 lead stores
-		return fmt.Errorf("invalid number of backprocess leaf store: %d", outputStoreCount)
-	}
-	outputStoreModule := storeModules[0]
-
-	p.reqCtx.logger.Info("marking leaf store for partial processing", zap.String("module", outputStoreModule.Name))
-
-	partialStore, err := p.storeFactory.NewPartialKV(
-		p.moduleHashes.Get(outputStoreModule.Name),
-		outputStoreModule,
-		p.reqCtx.EffectiveStartBlockNum(),
-		p.reqCtx.logger,
-	)
-	if err != nil {
-		return fmt.Errorf("new partial store: %w", err)
+		return nil, fmt.Errorf("invalid number of backprocess leaf store: %d", outputStoreCount)
 	}
 
-	// update the BaseStore to a partial store for a backprocessing output
-	p.storeMap.Set(outputStoreModule.Name, partialStore)
+	outputModuleName := p.reqCtx.Request().OutputModules[0]
+	// In a backprocess the last store is the one we are "solving" for that is the
+	// partial store we will need to create. As a sanity check the last store's name
+	// should match the output module.
+	lastStore := storeConfigs[len(storeConfigs)-1]
+	if lastStore.Name() != outputModuleName {
+		return nil, fmt.Errorf("request output module %q does not match the last store module %q", outputModuleName, lastStore.Name)
+	}
 
-	for _, store := range p.storeMap.All() {
+	storeMap := store.NewMap()
+
+	var partialStore *store.PartialKV
+	for _, config := range storeConfigs {
+		if config.Name() == outputModuleName {
+			partialStore = config.NewPartialKV(p.reqCtx.EffectiveStartBlockNum(), p.reqCtx.logger)
+			storeMap.Set(partialStore)
+			continue
+		}
+		storeMap.Set(config.NewFullKV(p.reqCtx.logger))
+	}
+
+	for _, store := range storeMap.All() {
 		// We avoid loading the store if does not exist yet, which is the case when
 		// the store initial block is the effective start block of the request since
 		// it means we did no work for this subrequest
 		if store.InitialBlock() != p.reqCtx.EffectiveStartBlockNum() {
 			if err := store.Load(p.reqCtx, p.reqCtx.EffectiveStartBlockNum()); err != nil {
-				return fmt.Errorf("load partial store: %w", err)
+				return nil, fmt.Errorf("load partial store: %w", err)
 			}
 		}
 	}
 
-	p.backprocessingStores = append(p.backprocessingStores, partialStore)
-	return nil
+	p.backprocessingStores = append(p.backprocessingStores, &backprocessingStore{
+		name:            partialStore.Name(),
+		initialBlockNum: partialStore.InitialBlock(),
+	})
+	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeModules []*pbsubstreams.Module) error {
+func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigs []*store.Config) (store.Map, error) {
 	// this is a long run process, it will run the whole back process logic
-	backProcessedStores, err := p.backProcessStores(workerPool, storeModules)
+	backProcessedStores, err := p.backProcessStores(workerPool, storeConfigs)
 	if err != nil {
-		return fmt.Errorf("synchronizing stores: %w", err)
+		return nil, fmt.Errorf("synchronizing stores: %w", err)
 	}
 
-	for modName, store := range backProcessedStores {
-		p.storeMap.Set(modName, store)
+	storeMap := store.NewMap()
+	for _, config := range storeConfigs {
+		storeMap.Set(config.NewFullKV(p.reqCtx.logger))
+	}
+
+	for _, store := range backProcessedStores {
+		storeMap.Set(store)
 	}
 
 	p.backprocessingStores = nil
 
 	if err := p.sendSnapshots(); err != nil {
-		return fmt.Errorf("send initial snapshots: %w", err)
+		return nil, fmt.Errorf("send initial snapshots: %w", err)
 	}
-	return nil
+	return storeMap, nil
 }
 
 func (p *Pipeline) isOutputModule(name string) bool {
@@ -270,7 +293,7 @@ func (p *Pipeline) flushStores(blockNum uint64, span trace.Span) error {
 }
 
 func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
-	for name, s := range p.storeMap.All() {
+	for name, s := range p.StoreMap.All() {
 		// optimatinz because we know that in a subrequest we are only running throught the last store (output)
 		// all parent stores should have come from moduleOutput cache
 		if p.reqCtx.isSubRequest && !p.isOutputModule(name) {
@@ -394,13 +417,13 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 	var progress []*pbsubstreams.ModuleProgress
 	for _, store := range p.backprocessingStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
-			Name: store.Name(),
+			Name: store.name,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 				// TODO charles: add p.hostname
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: store.InitialBlock(),
+							StartBlock: store.initialBlockNum,
 							EndBlock:   clock.Number,
 						},
 					},
@@ -477,7 +500,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	for _, module := range modules {
-		inputs, err := renderWasmInputs(module, p.storeMap)
+		inputs, err := renderWasmInputs(module, p.StoreMap)
 		if err != nil {
 			return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 		}
@@ -513,7 +536,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 			updatePolicy := kind.KindStore.UpdatePolicy
 			valueType := kind.KindStore.ValueType
 
-			outputStore, found := p.storeMap.Get(modName)
+			outputStore, found := p.StoreMap.Get(modName)
 			if !found {
 				return fmt.Errorf(" store %q not found", modName)
 			}
@@ -542,15 +565,22 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 	return nil
 }
 
-func (p *Pipeline) addStores(storeModules []*pbsubstreams.Module) error {
+func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (out []*store.Config, err error) {
 	for _, storeModule := range storeModules {
-		store, err := p.storeFactory.NewFullKV(p.moduleHashes.Get(storeModule.Name), storeModule, p.reqCtx.logger)
+		c, err := store.NewConfig(
+			storeModule.Name,
+			storeModule.InitialBlock,
+			p.moduleHashes.Get(storeModule.Name),
+			storeModule.GetKindStore().UpdatePolicy,
+			storeModule.GetKindStore().ValueType,
+			p.storeConfig.BaseURL,
+		)
 		if err != nil {
-			return fmt.Errorf("failed to load store: %w", err)
+			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)
 		}
-		p.storeMap.Set(storeModule.Name, store)
+		out = append(out, c)
 	}
-	return nil
+	return out, nil
 }
 
 func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
@@ -569,7 +599,7 @@ func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, c
 	return nil
 }
 
-func renderWasmInputs(module *pbsubstreams.Module, storeAccessor *store.Map) (out []wasm.Argument, err error) {
+func renderWasmInputs(module *pbsubstreams.Module, storeAccessor store.Map) (out []wasm.Argument, err error) {
 	for _, input := range module.Inputs {
 		switch in := input.Input.(type) {
 		case *pbsubstreams.Module_Input_Map_:

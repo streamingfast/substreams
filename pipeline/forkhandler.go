@@ -21,7 +21,7 @@ func NewForkHandle() *ForkHandler {
 func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
-	storeMap *store.Map,
+	storeMap store.Map,
 	respFunc func(resp *pbsubstreams.Response) error,
 ) error {
 	if moduleOutputs, found := f.reversibleOutputs[clock.Number]; found {

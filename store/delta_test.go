@@ -78,7 +78,7 @@ func TestApplyDelta(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := &BaseStore{
+			s := &baseStore{
 				kv: make(map[string][]byte),
 			}
 			for _, delta := range test.deltas {
@@ -92,12 +92,12 @@ func TestApplyDelta(t *testing.T) {
 func Test_ApplyDeltasReverse(t *testing.T) {
 	testCases := []struct {
 		name       string
-		store      *BaseStore
+		store      *baseStore
 		expectedKV map[string][]byte
 	}{
 		{
 			name: "reverse one delta",
-			store: &BaseStore{
+			store: &baseStore{
 				deltas: []*pbsubstreams.StoreDelta{
 					{
 						Operation: pbsubstreams.StoreDelta_CREATE,
@@ -113,7 +113,7 @@ func Test_ApplyDeltasReverse(t *testing.T) {
 		},
 		{
 			name: "reverse a delta when multiple deltas were applied",
-			store: &BaseStore{
+			store: &baseStore{
 				deltas: []*pbsubstreams.StoreDelta{
 					{
 						Operation: pbsubstreams.StoreDelta_UPDATE,
@@ -132,7 +132,7 @@ func Test_ApplyDeltasReverse(t *testing.T) {
 		},
 		{
 			name: "reverse multiple deltas",
-			store: &BaseStore{
+			store: &baseStore{
 				deltas: []*pbsubstreams.StoreDelta{
 					{
 						Operation: pbsubstreams.StoreDelta_DELETE,

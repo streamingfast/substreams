@@ -19,7 +19,7 @@ type StoreSquasher struct {
 	store                        *store.FullKV
 	requestRange                 *block.Range
 	ranges                       block.Ranges
-	targetStartBlock             uint64  // FIXME: THIS ISN'T USED
+	targetStartBlock             uint64 // FIXME: THIS ISN'T USED
 	targetExclusiveEndBlock      uint64 // FIXME: The value we receive in this is the `request.EffectiveStartBlock()` .. and its received as `targetExclusiveBlock` and assigned to `targetExclusiveEndBlock`. What's happening?
 	nextExpectedStartBlock       uint64
 	log                          *zap.Logger
@@ -87,6 +87,9 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			s.log.Info("quitting on a close context")
+			// TODO(abourget): don't write anything here?
+			// the goroutine waiting on this one will ALSO trigger on `ctx.Done()`
+			// and exit properly... so no need to clog that channel.
 			s.waitForCompletion <- ctx.Err()
 			return
 
@@ -113,6 +116,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			// there are risks we're not waiting for all threads in `eg.Wait()`, and
 			// another risk that we block upon writing to `s.waitForCompletion` 5 lines
 			// below.
+			return
 		}
 
 		s.log.Info("waiting for eg to finish")
@@ -198,11 +202,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 		zap.Stringer("squashable_range", squashableRange),
 	)
 
-	// FIXME(abourget): this is what was prior to the change:
-// 	s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
-// 	squashCount++
-
-	nextStore := store.NewPartialKV(s.store.Clone().BaseStore, squashableRange.StartBlock)
+	nextStore := s.store.DerivePartialStore(squashableRange.StartBlock)
 	if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 	}

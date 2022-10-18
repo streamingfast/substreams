@@ -6,8 +6,8 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (s *BaseStore) GetFirst(key string) ([]byte, bool) {
-	for _, delta := range s.deltas {
+func (b *baseStore) GetFirst(key string) ([]byte, bool) {
+	for _, delta := range b.deltas {
 		if delta.Key == key {
 			switch delta.Operation {
 			case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
@@ -21,13 +21,13 @@ func (s *BaseStore) GetFirst(key string) ([]byte, bool) {
 		}
 	}
 
-	val, found := s.kv[key]
+	val, found := b.kv[key]
 	return val, found
 }
 
-func (s *BaseStore) GetLast(key string) ([]byte, bool) {
-	for i := len(s.deltas) - 1; i >= 0; i-- {
-		delta := s.deltas[i]
+func (b *baseStore) GetLast(key string) ([]byte, bool) {
+	for i := len(b.deltas) - 1; i >= 0; i-- {
+		delta := b.deltas[i]
 		if delta.Key == key {
 			switch delta.Operation {
 			case pbsubstreams.StoreDelta_DELETE:
@@ -40,16 +40,16 @@ func (s *BaseStore) GetLast(key string) ([]byte, bool) {
 		}
 	}
 
-	val, found := s.kv[key]
+	val, found := b.kv[key]
 	return val, found
 }
 
 // GetAt returns the key for the state that includes the processing of `ord`.
-func (s *BaseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
-	out, found = s.GetLast(key)
+func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
+	out, found = b.GetLast(key)
 
-	for i := len(s.deltas) - 1; i >= 0; i-- {
-		delta := s.deltas[i]
+	for i := len(b.deltas) - 1; i >= 0; i-- {
+		delta := b.deltas[i]
 		if delta.Ordinal <= ord {
 			break
 		}

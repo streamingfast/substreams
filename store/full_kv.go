@@ -4,46 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/streamingfast/dstore"
+
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
-// Cloneable Only the BaseStore and not the partial is cloneable. We use this interface
-// to make the distinction when setting up the squasher.
-type Cloneable interface {
-	Clone() *FullKV
-}
-
-//compile-time check that BaseStore implements all interfaces
+//compile-time check that baseStore implements all interfaces
 var _ Store = (*FullKV)(nil)
-var _ Cloneable = (*FullKV)(nil)
 
 type FullKV struct {
-	*BaseStore
+	*baseStore
 }
 
-func NewFullKV(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store, logger *zap.Logger) (*FullKV, error) {
-	b, err := NewBaseStore(name, moduleInitialBlock, moduleHash, updatePolicy, valueType, store, logger)
-	if err != nil {
-		return nil, fmt.Errorf("creating base store: %w", err)
+func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
+	b := &baseStore{
+		Config: s.Config,
+		kv:     map[string][]byte{},
+		logger: s.logger,
 	}
-	return &FullKV{b}, nil
-}
-
-func (s *FullKV) Clone() *FullKV {
-	b := &BaseStore{
-		name:               s.name,
-		store:              s.store,
-		moduleInitialBlock: s.moduleInitialBlock,
-		moduleHash:         s.moduleHash,
-		kv:                 map[string][]byte{},
-		updatePolicy:       s.updatePolicy,
-		valueType:          s.valueType,
-		logger:             s.logger,
+	return &PartialKV{
+		baseStore:    b,
+		initialBlock: initialBlock,
 	}
-	return &FullKV{b}
 }
 
 func (s *FullKV) storageFilename(exclusiveEndBlock uint64) string {

@@ -2,17 +2,15 @@ package pipeline
 
 import (
 	"context"
-	"encoding/hex"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"io/ioutil"
 	"testing"
 	"time"
 )
@@ -21,16 +19,29 @@ func TestPipeline_runExecutor(t *testing.T) {
 	tests := []struct {
 		name       string
 		moduleName string
-		block      *pbsubstreamstest.Block
-		request    *RequestContext
-		executor   ModuleExecutor
-		testFunc   func(t *testing.T, data []byte)
+		execOutput *MapperModuleExecutor
+		//block      *pbsubstreamstest.Block
+		request  *RequestContext
+		testFunc func(t *testing.T, data []byte)
 	}{
 		{
-			name:       "golden path",
-			moduleName: "map_test",
-			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
-			executor:   mapTestExecutor(t),
+			name:       "executes map",
+			moduleName: "test_map",
+			//block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
+			testFunc: func(t *testing.T, data []byte) {
+				out := &pbsubstreamstest.MapResult{}
+				err := proto.Unmarshal(data, out)
+				require.NoError(t, err)
+				assertProtoEqual(t, &pbsubstreamstest.MapResult{
+					BlockNumber: 10,
+					BlockHash:   "block-10",
+				}, out)
+			},
+		},
+		{
+			name:       "return map's cache",
+			moduleName: "test_map",
+			//block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
 			testFunc: func(t *testing.T, data []byte) {
 				out := &pbsubstreamstest.MapResult{}
 				err := proto.Unmarshal(data, out)
@@ -48,8 +59,9 @@ func TestPipeline_runExecutor(t *testing.T) {
 				reqCtx: testRequestContext(context.Background()),
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
-			execOutput := execout.NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
-			err := pipe.runExecutor(test.executor, execOutput)
+			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
+			executor := mapTestExecutor(t, test.moduleName)
+			err := pipe.runExecutor(executor, execOutput)
 			require.NoError(t, err)
 			output, found := execOutput.Values[test.moduleName]
 			require.Equal(t, true, found)
@@ -65,30 +77,35 @@ func testRequestContext(ctx context.Context) *RequestContext {
 	}
 }
 
-func mapTestExecutor(t *testing.T) *MapperModuleExecutor {
-	cnt, err := ioutil.ReadFile("./testdata/map_test.code.hex")
-	require.NoError(t, err)
+func mapTestExecutor(t *testing.T, name string) *MapperModuleExecutor {
+	pkg, _ := processManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
 
-	code, err := hex.DecodeString(string(cnt))
-	require.NoError(t, err)
+	binayrIndex := uint32(0)
+	for _, module := range pkg.Modules.Modules {
+		if module.Name == name {
+			binayrIndex = module.BinaryIndex
+		}
+	}
+	binary := pkg.Modules.Binaries[binayrIndex]
+	require.Greater(t, len(binary.Content), 1)
 
 	wasmModule, err := wasm.NewRuntime(nil).NewModule(
 		context.Background(),
 		nil,
-		code,
-		"map_test",
-		"map_test",
+		binary.Content,
+		name,
+		name,
 	)
 	require.NoError(t, err)
 
 	return &MapperModuleExecutor{
 		BaseExecutor: BaseExecutor{
-			moduleName: "map_test",
+			moduleName: name,
 			wasmModule: wasmModule,
 			wasmArguments: []wasm.Argument{
 				wasm.NewBlockInput("sf.substreams.v1.test.Block"),
 			},
-			entrypoint: "map_test",
+			entrypoint: name,
 			tracer:     otel.GetTracerProvider().Tracer("test"),
 		},
 		outputType: "",
@@ -125,4 +142,17 @@ func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *bstream.Block {
 	require.NoError(t, err)
 
 	return bb
+}
+
+func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, *manifest.ModuleGraph) {
+	t.Helper()
+
+	manifestReader := manifest.NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
+	require.NoError(t, err)
+
+	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	require.NoError(t, err)
+
+	return pkg, moduleGraph
 }

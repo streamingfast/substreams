@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -65,7 +64,11 @@ func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModu
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
 
-	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir)
+	_, err := processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir)
+	if err != nil {
+		return nil, fmt.Errorf("processing sub request: %w", err)
+	}
+
 	//todo: cumulate responses
 
 	return block.Ranges{
@@ -106,7 +109,17 @@ func (c *responseCollector) Collect(resp *pbsubstreams.Response) error {
 
 type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator
 
-func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack, testTempDir string) (out []*pbsubstreams.Response) {
+func processRequest(
+	t *testing.T,
+	request *pbsubstreams.Request,
+	moduleGraph *manifest.ModuleGraph,
+	newGenerator NewTestBlockGenerator,
+	workerPool *orchestrator.WorkerPool,
+	responseCollector *responseCollector,
+	isSubRequest bool,
+	blockProcessedCallBack blockProcessedCallBack,
+	testTempDir string,
+) (out []*pbsubstreams.Response, err error) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -164,8 +177,8 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 		_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
 		require.NoError(t, err)
 		err = pipe.ProcessBlock(bb, o)
-		if !errors.Is(err, io.EOF) {
-			require.NoError(t, err)
+		if !errors.Is(err, io.EOF) && err != nil {
+			return nil, fmt.Errorf("process block: %w", err)
 		}
 		if blockProcessedCallBack != nil && err == nil {
 			blockProcessedCallBack(pipe, bb, pipe.StoreMap, baseStoreStore)
@@ -207,15 +220,15 @@ type AssertMapOutput struct {
 	Result     bool   `json:"result"`
 }
 
-func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string) {
-	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
-		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
-	}
+func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
+	//if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
+	//	t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
+	//}
 
 	testTempDir := t.TempDir()
 
 	//todo: compile substreams
-	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")
+	pkg, moduleGraph := processManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
 
 	request := &pbsubstreams.Request{
 		StartBlockNum: startBlock,
@@ -236,7 +249,10 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		}
 	})
 
-	processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false, blockProcessedCallBack, testTempDir)
+	_, err = processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false, blockProcessedCallBack, testTempDir)
+	if err != nil {
+		return nil, fmt.Errorf("running test: %w", err)
+	}
 
 	for _, response := range responseCollector.responses {
 		switch r := response.Message.(type) {
@@ -324,7 +340,8 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"test_map"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
@@ -338,7 +355,9 @@ func Test_test_store_proto(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"test_store_proto"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, 12, []string{"test_store_proto"}, newBlockGenerator, nil)
+	require.NoError(t, err)
+
 	require.Equal(t, []string{
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":10,"block_hash":"block-10"}}]}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":11,"block_hash":"block-11"}}]}`,
@@ -352,7 +371,9 @@ func Test_MultipleModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator, nil)
+	require.NoError(t, err)
+
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"test_store_add_int64","deltas":[{"op":"UPDATE","old":"9","new":"10"}]}`,
@@ -373,7 +394,8 @@ func Test_MultipleModule_Batch(t *testing.T) {
 
 	//todo: Need to validate the storage file
 
-	runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
+	_, err := runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 }
 
 func Test_MultipleModule_Batch_2(t *testing.T) {
@@ -384,12 +406,8 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		}
 	}
 
-	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator, nil)
-
-	//Module start is set to 10.
-	//test_store_add_int64 will be call 102 in total.
-	//The first 100 will be batched. and produce no output.
-	//When block 110 will be processed the test_store_add_int64 should be at 100
+	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":110,"block_hash":"block-110"}}`,
@@ -408,7 +426,7 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	}
 
 	outputFilesLen := 0
-	moduleOutputs := runTest(t, 110, 112, []string{"test_map", "test_store_proto"},
+	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"},
 		newBlockGenerator,
 		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 			baseStore.Walk(context.Background(), "", func(filename string) (err error) {
@@ -419,6 +437,7 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 			})
 		},
 	)
+	require.NoError(t, err)
 
 	require.NotZero(t, moduleOutputs)
 	require.NotZero(t, outputFilesLen)
@@ -432,7 +451,8 @@ func Test_test_store_add_bigint(t *testing.T) {
 		}
 	}
 
-	runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
+	_, err := runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 
 }
 func Test_test_store_delete_prefix(t *testing.T) {
@@ -442,13 +462,14 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+	_, err := runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		if b.Number == 40 {
 			s, storeFound := stores.Get("test_store_delete_prefix")
 			require.True(t, storeFound)
 			require.Equal(t, uint64(1), s.Length())
 		}
 	})
+	require.NoError(t, err)
 }
 
 // -------------------- StoreAddI64 -------------------- //
@@ -459,7 +480,8 @@ func Test_test_store_add_i64(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64"}, newBlockGenerator, nil)
+	_, err := runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 }
 
 func Test_test_store_add_i64_deltas(t *testing.T) {
@@ -469,7 +491,8 @@ func Test_test_store_add_i64_deltas(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64_deltas"}, newBlockGenerator, nil)
+	_, err := runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64_deltas"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 }
 
 // -------------------- StoreSetI64/StoreGetI64 -------------------- //
@@ -480,7 +503,8 @@ func Test_test_store_set_i64(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64"}, newBlockGenerator, nil)
+	_, err := runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 }
 
 func Test_test_store_set_i64_deltas(t *testing.T) {
@@ -490,5 +514,6 @@ func Test_test_store_set_i64_deltas(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64_deltas"}, newBlockGenerator, nil)
+	_, err := runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64_deltas"}, newBlockGenerator, nil)
+	require.NoError(t, err)
 }

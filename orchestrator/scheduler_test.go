@@ -39,15 +39,15 @@ func TestNewJobsPlanner(t *testing.T) {
 	}
 
 	splitWorkMods := WorkPlan{
-		"A": &WorkUnit{modName: "A"},
-		"B": &WorkUnit{modName: "B"},
-		"C": &WorkUnit{modName: "C"},
-		"D": &WorkUnit{modName: "D"},
-		"E": &WorkUnit{modName: "E"},
-		"F": &WorkUnit{modName: "F"},
-		"G": &WorkUnit{modName: "G"},
-		"H": &WorkUnit{modName: "H"},
-		"K": &WorkUnit{modName: "K"},
+		"A": &WorkUnits{modName: "A"},
+		"B": &WorkUnits{modName: "B"},
+		"C": &WorkUnits{modName: "C"},
+		"D": &WorkUnits{modName: "D"},
+		"E": &WorkUnits{modName: "E"},
+		"F": &WorkUnits{modName: "F"},
+		"G": &WorkUnits{modName: "G"},
+		"H": &WorkUnits{modName: "H"},
+		"K": &WorkUnits{modName: "K"},
 	}
 
 	ctx := context.Background()
@@ -103,7 +103,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	require.NoError(t, err)
 
 	workPlan := WorkPlan{
-		"A": &WorkUnit{
+		"A": &WorkUnits{
 			modName: "A",
 			partialsMissing: block.Ranges{
 				&block.Range{
@@ -128,7 +128,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 				},
 			},
 		},
-		"B": &WorkUnit{
+		"B": &WorkUnits{
 			modName: "B",
 			partialsMissing: block.Ranges{
 				&block.Range{

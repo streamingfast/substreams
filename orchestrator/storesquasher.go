@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/metrics"
 	"sort"
 	"time"
+
+	"github.com/streamingfast/substreams/metrics"
 
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/block"
@@ -19,15 +20,15 @@ type StoreSquasher struct {
 	store                        *store.FullKV
 	requestRange                 *block.Range
 	ranges                       block.Ranges
-	targetStartBlock             uint64 // FIXME: THIS ISN'T USED
-	targetExclusiveEndBlock      uint64 // FIXME: The value we receive in this is the `request.EffectiveStartBlock()` .. and its received as `targetExclusiveBlock` and assigned to `targetExclusiveEndBlock`. What's happening?
-	nextExpectedStartBlock       uint64
-	log                          *zap.Logger
-	jobsPlanner                  *JobsPlanner
+	targetExclusiveEndBlock      uint64 // The upper bound of this Squasher's responsibility
 	targetExclusiveEndBlockReach bool
+	nextExpectedStartBlock       uint64 // This goes from a lower number up to `targetExclusiveEndBlock`
+	log                          *zap.Logger
 	partialsChunks               chan block.Ranges
 	waitForCompletion            chan error
 	storeSaveInterval            uint64
+
+	onStoreCompletedUntilBlock func(storeName string, blockNum uint64)
 }
 
 func NewStoreSquasher(
@@ -35,18 +36,18 @@ func NewStoreSquasher(
 	targetExclusiveBlock,
 	nextExpectedStartBlock uint64,
 	storeSaveInterval uint64,
-	jobsPlanner *JobsPlanner,
+	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) *StoreSquasher {
 	s := &StoreSquasher{
-		name:                    initialStore.Name(),
-		store:                   initialStore,
-		targetExclusiveEndBlock: targetExclusiveBlock,
-		nextExpectedStartBlock:  nextExpectedStartBlock,
-		jobsPlanner:             jobsPlanner,
-		storeSaveInterval:       storeSaveInterval,
-		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
-		waitForCompletion:       make(chan error),
-		log:                     zlog.With(zap.Object("initial_store", initialStore)),
+		name:                       initialStore.Name(),
+		store:                      initialStore,
+		targetExclusiveEndBlock:    targetExclusiveBlock,
+		nextExpectedStartBlock:     nextExpectedStartBlock,
+		onStoreCompletedUntilBlock: onStoreCompletedUntilBlock,
+		storeSaveInterval:          storeSaveInterval,
+		partialsChunks:             make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
+		waitForCompletion:          make(chan error),
+		log:                        zlog.With(zap.Object("initial_store", initialStore)),
 	}
 	return s
 }
@@ -114,22 +115,17 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		out, err := s.processRanges(ctx, eg)
 		if err != nil {
 			s.waitForCompletion <- err
-			// FIXME (abourget): shouldn't we return here?
-			// there are risks we're not waiting for all threads in `eg.Wait()`, and
-			// another risk that we block upon writing to `s.waitForCompletion` 5 lines
-			// below.
 			return
 		}
 
 		s.log.Info("waiting for eg to finish")
 		if err := eg.Wait(); err != nil {
-			// eg.Wait() will block until everything is done, and return the first error.
 			s.waitForCompletion <- fmt.Errorf("waiting: %w", err)
 			return
 		}
 
-		if out.lastExclusiveEndBlock != 0 {
-			s.jobsPlanner.SignalCompletionUpUntil(s.name, out.lastExclusiveEndBlock)
+		if out.lastExclusiveEndBlock != 0 { // TODO(abourget): have the caller ignore when it's 0, no?
+			s.onStoreCompletedUntilBlock(s.name, out.lastExclusiveEndBlock)
 		}
 
 		totalDuration := time.Since(start)

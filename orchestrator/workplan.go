@@ -7,9 +7,50 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type WorkPlan map[string]*WorkUnit
+func (b *Backprocessor) buildWorkPlan() (out *WorkPlan, err error) {
+	storageState, err := fetchStorageState(b.ctx, b.storeConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching stores states: %w", err)
+	}
 
-func (p WorkPlan) SquashPartialsPresent(squasher *Squasher) error {
+	out = &WorkPlan{
+		workUnitsMap: map[string]*WorkUnits{},  // per module
+	}
+
+	for _, config := range b.storeConfigs {
+		name := config.Name()
+		snapshot, ok := storageState.Snapshots[name]
+		if !ok {
+			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", name)
+		}
+		// TODO(abourget): Pass in the `SaveInterval` in some ways
+		out.workUnitsMap[name] = SplitWork(name, b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
+	}
+	b.log.Info("work plan ready", zap.Stringer("work_plan", out))
+
+
+	return
+}
+
+type WorkPlan struct {
+	// storageState // would we need that later? perhaps not
+
+	workUnitsMap map[string]*WorkUnits // WorksUnits split by module name
+
+	prioritizedJobs []*Job
+}
+
+func (p *WorkPlan) StoreCount() int {
+	return len(p.workMap)
+}
+
+// WorkPlan would not have `dispatch`, or an event handler like "CompletedUpUntil"
+// It is WORKED ON by the Schduler. The scheduler would call "GiveMeMyNextJob()" and dispatch it.
+// WorkPlan is acted upon, initialized, and updated when new data comes in, but not reactive.
+
+func (p *WorkPlan) SquashPartialsPresent(squasher *MultiSquasher) error {
+	// TODO(abourget): This belogns to the `NewSquasher()` or `Squasher::Init()`, based on
+	// its input of `workPlan`.
 	for _, w := range p {
 		if w.partialsPresent.Len() == 0 {
 			continue

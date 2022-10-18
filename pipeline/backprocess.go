@@ -12,6 +12,7 @@ import (
 )
 
 func (p *Pipeline) backProcessStores(
+	requestsPerUser uint64,
 	workerPool *orchestrator.WorkerPool,
 	storeConfigs []*store.Config,
 ) (out store.Map, err error) {
@@ -54,7 +55,7 @@ func (p *Pipeline) backProcessStores(
 
 	logger.Debug("launching squasher")
 
-	squasher, err := orchestrator.NewSquasher(p.reqCtx, workPlan, storeConfigs, upToBlock, p.storeConfig.SaveInterval, jobsPlanner)
+	squasher, err := orchestrator.NewMultiSquasher(p.reqCtx, workPlan, storeConfigs, upToBlock, p.storeConfig.SaveInterval, jobsPlanner)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}
@@ -94,13 +95,10 @@ func (p *Pipeline) backProcessStores(
 	}
 
 	logger.Info("all jobs completed, waiting for squasher to finish")
-	if err := squasher.WaitUntilCompleted(p.reqCtx); err != nil {
-		return nil, fmt.Errorf("squasher failed: %w", err)
-	}
 
-	if out, err = squasher.ValidateStoresReady(); err != nil {
-		return nil, fmt.Errorf("squasher incomplete: %w", err)
+	out, err = squasher.Wait(p.reqCtx)
+	if err != nil {
+		return nil, err
 	}
-
 	return
 }

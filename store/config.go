@@ -3,11 +3,14 @@ package store
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
+
+type ConfigMap map[string]*Config
 
 type Config struct {
 	name       string

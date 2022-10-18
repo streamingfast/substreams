@@ -8,6 +8,9 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+
+// TODO(abourget): the Job shouldn't be the one prioritizing itself.. an external Scheduler would
+// mutate the WorkPlan and reprioritize properly.
 type Job struct {
 	ModuleName   string // target
 	requestRange *block.Range
@@ -17,18 +20,33 @@ type Job struct {
 	deps jobDependencies
 }
 
+/*
+
+P:   9 8 7
+1:   A B C
+
+P:   10 9 8
+2:   D  E F
+
+P:   11 10 9
+3:   G  H  I
+
+*/
+
 func NewJob(storeName string, requestRange *block.Range, ancestorStoreModules []*pbsubstreams.Module, totalJobs, myJobIndex int) *Job {
 	j := &Job{
 		ModuleName:   storeName,
 		requestRange: requestRange,
 	}
 	j.defineDependencies(ancestorStoreModules)
-	j.priority = len(j.deps) + totalJobs - myJobIndex
+	j.priority = len(j.deps) * 2 + totalJobs - myJobIndex
 	return j
 }
 
 func (j *Job) defineDependencies(stores []*pbsubstreams.Module) {
 	for _, store := range stores {
+		// Here dependencies do not highlight any block range, so if we have
+		// ranges that are already completed, we'll have suboptimal planning.
 		j.deps = append(j.deps, &jobDependency{
 			storeName: store.Name,
 			resolved:  false,

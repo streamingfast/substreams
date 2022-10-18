@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/metrics"
 	"os"
+
+	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/service/config"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
@@ -204,11 +206,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		graph,
 		s.blockType,
 		s.wasmExtensions,
-		s.blockRangeSizeSubRequests,
 		cachingEngine,
-		&pipeline.StoreConfig{
-			BaseURL:      s.baseStateStore,
-			SaveInterval: s.storesSaveInterval,
+		&config.RuntimeConfig{
+			StoreSnapshotsObjectStore:  s.baseStateStore,
+			StoreSnapshotsSaveInterval: s.storesSaveInterval,
+			SubrequestsSplitSize:       s.blockRangeSizeSubRequests,
+			ParallelSubrequests:        s.parallelSubRequests,
 		},
 		storeBoundary,
 		responseHandler,

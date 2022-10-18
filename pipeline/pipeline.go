@@ -5,9 +5,6 @@ import (
 	"math"
 	"strings"
 
-	"github.com/streamingfast/substreams/pipeline/execout"
-	"github.com/streamingfast/substreams/tracing"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
@@ -15,7 +12,10 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
+	"github.com/streamingfast/substreams/tracing"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -72,19 +72,22 @@ type Pipeline struct {
 	rootSpan ttrace.Span
 }
 
+// TODO(abourget): refactor that freaking `SaveInterval` from everywhere, and distinguish between those intervals (soon):
+// replaces this one here by `config.RuntimeConfig`.
 type StoreConfig struct {
 	BaseURL      dstore.Store
 	SaveInterval uint64
 }
+
+// and we use that `config.RuntimeConfig` everywhere, with struct member name `runtimeConfig`
 
 func New(
 	reqCtx *RequestContext,
 	graph *manifest.ModuleGraph,
 	blockType string,
 	wasmExtensions []wasm.WASMExtensioner,
-	subRequestSplitSize int,
 	engine execout.CacheEngine,
-	storeConfig *StoreConfig,
+	runtimeConfig config.RuntimeConfig,
 	bounder *StoreBoundary,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option,
@@ -93,12 +96,11 @@ func New(
 		reqCtx:                reqCtx,
 		execOutputCache:       engine,
 		tracer:                otel.GetTracerProvider().Tracer("pipeline"),
-		storeConfig:           storeConfig,
+		runtimeConfig:         runtimeConfig,
 		graph:                 graph,
 		outputModuleMap:       map[string]bool{},
 		blockType:             blockType,
 		wasmExtensions:        wasmExtensions,
-		subrequestSplitSize:   subRequestSplitSize,
 		maxStoreSyncRangeSize: math.MaxUint64,
 		respFunc:              respFunc,
 		bounder:               bounder,
@@ -180,7 +182,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	return nil
 }
 
-func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Map, error) {
+func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Map, error) {
 	outputStoreCount := len(p.reqCtx.Request().OutputModules)
 	if outputStoreCount > 1 {
 		// currently only support 1 lead stores
@@ -188,50 +190,60 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Ma
 	}
 
 	outputModuleName := p.reqCtx.Request().OutputModules[0]
-	// In a backprocess the last store is the one we are "solving" for that is the
-	// partial store we will need to create. As a sanity check the last store's name
-	// should match the output module.
-	lastStore := storeConfigs[len(storeConfigs)-1]
-	if lastStore.Name() != outputModuleName {
-		return nil, fmt.Errorf("request output module %q does not match the last store module %q", outputModuleName, lastStore.Name())
-	}
 
 	storeMap := store.NewMap()
 
-	var partialStore *store.PartialKV
 	for _, config := range storeConfigs {
 		if config.Name() == outputModuleName {
-			partialStore = config.NewPartialKV(p.reqCtx.EffectiveStartBlockNum(), p.reqCtx.logger)
+			// TODO(abourget): what if this is the first segment?
+			// does the Squasher expect to have a Partial even for the first segment?
+			// Perhaps we want that simplicity, so we don't have to distinguish everywhere.
+			partialStore := config.NewPartialKV(p.reqCtx.EffectiveStartBlockNum(), p.reqCtx.logger)
 			storeMap.Set(partialStore)
-			continue
-		}
-		storeMap.Set(config.NewFullKV(p.reqCtx.logger))
-	}
 
-	for _, store := range storeMap.All() {
-		// We avoid loading the store if does not exist yet, which is the case when
-		// the store initial block is the effective start block of the request since
-		// it means we did no work for this subrequest
-		if store.InitialBlock() != p.reqCtx.EffectiveStartBlockNum() {
-			if err := store.Load(p.reqCtx, p.reqCtx.EffectiveStartBlockNum()); err != nil {
-				return nil, fmt.Errorf("load partial store: %w", err)
+			p.backprocessingStores = append(p.backprocessingStores, &backprocessingStore{
+				name:            partialStore.Name(),
+				initialBlockNum: partialStore.InitialBlock(),
+			})
+		} else {
+			fullStore := config.NewFullKV(p.reqCtx.logger)
+
+			if fullStore.InitialBlock() != p.reqCtx.EffectiveStartBlockNum() {
+				if err := fullStore.Load(p.reqCtx, p.reqCtx.EffectiveStartBlockNum()); err != nil {
+					return nil, fmt.Errorf("load partial store: %w", err)
+				}
 			}
+
+			storeMap.Set(fullStore)
 		}
 	}
 
-	p.backprocessingStores = append(p.backprocessingStores, &backprocessingStore{
-		name:            partialStore.Name(),
-		initialBlockNum: partialStore.InitialBlock(),
-	})
 	return storeMap, nil
 }
 
 func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigs []*store.Config) (store.Map, error) {
-	// this is a long run process, it will run the whole back process logic
-	storeMap, err := p.backProcessStores(workerPool, storeConfigs)
+
+	o := orchestrator.New(
+		p.reqCtx.Context,
+		p.runtimeConfig,
+		p.reqCtx.GetLogger(),
+		p.reqCtx.EffectiveStartBlockNum(),
+		p.reqCtx.Request().Modules,
+		p.graph,
+		p.respFunc,
+		storeConfigs,
+	)
+
+	storeMap, err := o.Run()
 	if err != nil {
-		return nil, fmt.Errorf("synchronizing stores: %w", err)
+		return nil, err
 	}
+
+	// // this is a long run process, it will run the whole back process logic
+	// storeMap, err := p.backProcessStores(workerPool, storeConfigs)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("synchronizing stores: %w", err)
+	// }
 
 	p.backprocessingStores = nil
 
@@ -557,7 +569,8 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 	return nil
 }
 
-func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (out []*store.Config, err error) {
+func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (out store.ConfigMap, err error) {
+	out = make(store.ConfigMap)
 	for _, storeModule := range storeModules {
 		c, err := store.NewConfig(
 			storeModule.Name,
@@ -565,12 +578,12 @@ func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (
 			p.moduleHashes.Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
-			p.storeConfig.BaseURL,
+			p.runtimeConfig.StoreSnapshotsObjectStore,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)
 		}
-		out = append(out, c)
+		out[storeModule.Name] = c
 	}
 	return out, nil
 }

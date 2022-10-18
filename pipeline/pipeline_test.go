@@ -156,3 +156,18 @@ func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, 
 
 	return pkg, moduleGraph
 }
+
+func TestSetupSubrequestStores(t *testing.T) {
+	// TODO(abourget):
+	// We need to test: setupSubrequestStores
+
+	// with stores: [A(init=10), B(init=10), C(init=20)], startBlock=20, outputModules=['B']
+	// assert: storeMap[A] is FullKV, storeMap[B] is PartialKV
+
+	// with stores: [A(init=10), B(init=10), C(init=20)], startBlock=20, outputModules=['D']
+	// assert: storeMap[A] is FullKV, storeMap[B] is PartialKV
+
+	// This will need to work for both a mapper and a store.
+	// If we ask for a store to be processed, we expect it to be a PartialKV
+	// Otherwise, if the output module we want is a mapper, everything needs to be FullKV
+}

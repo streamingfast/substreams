@@ -2,7 +2,8 @@ package orchestrator
 
 import "github.com/streamingfast/substreams/block"
 
-type WorkUnit struct {
+// WorkUnits contains all the ranges of things we'll want to plan work for, and things that are already available.
+type WorkUnits struct {
 	modName string
 
 	initialCompleteRange *block.Range // Points to a complete .kv file, to initialize the store upon getting started.
@@ -10,12 +11,12 @@ type WorkUnit struct {
 	partialsPresent      block.Ranges
 }
 
-func (w *WorkUnit) initialProcessedPartials() block.Ranges {
+func (w *WorkUnits) initialProcessedPartials() block.Ranges {
 	return w.partialsPresent.Merged()
 }
 
-func SplitWork(modName string, storeSaveInterval, modInitBlock, reqEffectiveStartBlock uint64, snapshots *Snapshots) *WorkUnit {
-	work := &WorkUnit{modName: modName}
+func SplitWork(modName string, storeSaveInterval, modInitBlock, reqEffectiveStartBlock uint64, snapshots *Snapshots) *WorkUnits {
+	work := &WorkUnits{modName: modName}
 
 	if reqEffectiveStartBlock <= modInitBlock {
 		return work
@@ -51,7 +52,7 @@ func SplitWork(modName string, storeSaveInterval, modInitBlock, reqEffectiveStar
 	return work
 
 }
-func (w *WorkUnit) batchRequests(subreqSplitSize uint64) block.Ranges {
+func (w *WorkUnits) batchRequests(subreqSplitSize uint64) block.Ranges {
 	ranges := w.partialsMissing.MergedBuckets(subreqSplitSize)
 	return ranges
 

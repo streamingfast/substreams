@@ -15,10 +15,8 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/tracing"
 	"github.com/streamingfast/substreams/wasm"
@@ -34,19 +32,13 @@ import (
 )
 
 type Service struct {
-	blockType                 string
-	partialModeEnabled        bool
-	wasmExtensions            []wasm.WASMExtensioner
-	pipelineOptions           []pipeline.PipelineOptioner
-	streamFactory             *StreamFactory
-	workerPool                *orchestrator.WorkerPool
-	parallelSubRequests       int
-	blockRangeSizeSubRequests int
+	blockType          string
+	partialModeEnabled bool
+	wasmExtensions     []wasm.WASMExtensioner
+	pipelineOptions    []pipeline.PipelineOptioner
+	streamFactory      *StreamFactory
 
-	// properties of cache
-	storesSaveInterval           uint64
-	outputCacheSaveBlockInterval uint64
-	baseStateStore               dstore.Store
+	runtimeConfig config.RuntimeConfig
 
 	tracer ttrace.Tracer
 	logger *zap.Logger
@@ -61,22 +53,24 @@ func New(
 	opts ...Option,
 ) (s *Service, err error) {
 	s = &Service{
-		baseStateStore:            stateStore,
-		blockType:                 blockType,
-		parallelSubRequests:       parallelSubRequests,
-		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
-		tracer:                    otel.GetTracerProvider().Tracer("service"),
+		runtimeConfig: config.RuntimeConfig{
+			StoreSnapshotsSaveInterval: uint64(blockRangeSizeSubRequests),
+			BaseObjectStore:            stateStore,
+			ParallelSubrequests:        parallelSubRequests,
+		},
+		blockType: blockType,
+		tracer:    otel.GetTracerProvider().Tracer("service"),
 	}
 
 	zlog.Info("registering substreams metrics")
 	metrics.Metricset.Register()
 
 	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
-	newSubstreamClientFunc := client.NewFactory(substreamsClientConfig)
+	s.runtimeConfig.SubstreamsClientFactory = client.NewFactory(substreamsClientConfig)
 
-	s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func() orchestrator.Worker {
-		return orchestrator.NewRemoteWorker(newSubstreamClientFunc)
-	})
+	// s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func() orchestrator.Worker {
+	// 	return orchestrator.NewRemoteWorker(newSubstreamClientFunc)
+	// })
 
 	for _, opt := range opts {
 		opt(s)
@@ -86,7 +80,7 @@ func New(
 }
 
 func (s *Service) BaseStateStore() dstore.Store {
-	return s.baseStateStore
+	return s.runtimeConfig.BaseObjectStore
 }
 
 func (s *Service) BlockType() string {
@@ -192,13 +186,13 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return err
 	}
 
-	storeBoundary := pipeline.NewStoreBoundary(s.storesSaveInterval)
-	cachingEngine := execout.NewNoOpCache()
-	if s.baseStateStore != nil {
-		cachingEngine, err = cachev1.NewEngine(context.Background(), s.outputCacheSaveBlockInterval, s.baseStateStore, requestCtx.Logger())
-		if err != nil {
-			return fmt.Errorf("error building caching engine: %w", err)
-		}
+	// TODO(abourget): create a `StoreBoundary` at _this_ level? Just to bring along the save interval?
+	// The RuntimeConfig now holds that data, and everyone has it
+	storeBoundary := pipeline.NewStoreBoundary(s.runtimeConfig.StoreSnapshotsSaveInterval)
+
+	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, requestCtx.Logger())
+	if err != nil {
+		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
 	pipe := pipeline.New(
@@ -206,19 +200,14 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		graph,
 		s.blockType,
 		s.wasmExtensions,
-		cachingEngine,
-		&config.RuntimeConfig{
-			StoreSnapshotsObjectStore:  s.baseStateStore,
-			StoreSnapshotsSaveInterval: s.storesSaveInterval,
-			SubrequestsSplitSize:       s.blockRangeSizeSubRequests,
-			ParallelSubrequests:        s.parallelSubRequests,
-		},
+		execOutputCacheEngine,
+		s.runtimeConfig,
 		storeBoundary,
 		responseHandler,
 		opts...,
 	)
 
-	if err := pipe.Init(s.workerPool); err != nil {
+	if err := pipe.Init(); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 

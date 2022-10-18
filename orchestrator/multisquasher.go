@@ -28,12 +28,12 @@ type MultiSquasher struct {
 // target block, etc..
 func NewMultiSquasher(
 	ctx context.Context,
-	workPlan WorkPlan,
+	runtimeConfig config.RuntimeConfig,
+	workPlan *WorkPlan,
 	storeConfigs store.ConfigMap,
 	upToBlock uint64,
-	runtimeConfig config.RuntimeConfig,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
-	jobsPlanner *JobsPlanner) (*MultiSquasher, error) {
+) (*MultiSquasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
 	zlog.Info("creating a new squasher", zap.Int("work_plan_count", workPlan.StoreCount()))
 
@@ -72,7 +72,10 @@ func NewMultiSquasher(
 			storeSquasher.targetExclusiveEndBlockReach = true
 		}
 
-		go storeSquasher.launch(ctx)
+		if len(workUnit.partialsPresent) != 0 {
+			storeSquasher.squash(workUnit.partialsPresent)
+		}
+
 		storeSquashers[storeModuleName] = storeSquasher
 	}
 
@@ -80,7 +83,14 @@ func NewMultiSquasher(
 		storeSquashers:       storeSquashers,
 		targetExclusiveBlock: upToBlock,
 	}
+
 	return squasher, nil
+}
+
+func (s *MultiSquasher) Launch(ctx context.Context) {
+	for _, squasher := range s.storeSquashers {
+		go squasher.launch(ctx)
+	}
 }
 
 func (s *MultiSquasher) Squash(moduleName string, partialsRanges block.Ranges) error {

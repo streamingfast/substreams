@@ -14,6 +14,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+
+// TODO(abourget): wuuutz that? In `error.go` we're doing critical return value handling (setting the `ranges` trailer based on data accumulated as a side-effeect in `partialsWritten`.
+// We end up saying we're not responsible for doing error handling? But we're in `error.go` ! Who else otherwise?
+// So many comments in here. Let's clean this up a bit.
+
 // OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.
 func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer, err error) error {

@@ -2,6 +2,9 @@ package pipeline
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -11,8 +14,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"testing"
-	"time"
 )
 
 func TestPipeline_runExecutor(t *testing.T) {
@@ -158,6 +159,7 @@ func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, 
 }
 
 func TestSetupSubrequestStores(t *testing.T) {
+	t.Skip("these need to be written")
 	// TODO(abourget):
 	// We need to test: setupSubrequestStores
 

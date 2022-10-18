@@ -1,6 +1,9 @@
 package config
 
-import "github.com/streamingfast/dstore"
+import (
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/client"
+)
 
 type RuntimeConfig struct {
 	StoreSnapshotsSaveInterval uint64
@@ -9,6 +12,9 @@ type RuntimeConfig struct {
 	SubrequestsSplitSize int // in multiple of the SaveIntervals above
 	ParallelSubrequests  int // how many sub-jobs to launch for a given user
 
-	StoreSnapshotsObjectStore dstore.Store // only for `store` modules snapshots (full and partial)
-	ExecOutputObjectStore     dstore.Store // execution output of both `map` and `store` module kinds
+	// derives substores `states/`, for `store` modules snapshots (full and partial)
+	// and `outputs/` for execution output of both `map` and `store` module kinds
+	BaseObjectStore dstore.Store
+
+	SubstreamsClientFactory client.Factory
 }

@@ -3,13 +3,14 @@ package cachev1
 import (
 	"context"
 	"fmt"
+	"regexp"
+
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/service/config"
 	"go.uber.org/zap"
-	"regexp"
 )
 
 var cacheFilenameRegex *regexp.Regexp
@@ -19,11 +20,12 @@ func init() {
 }
 
 type Engine struct {
-	ctx               context.Context
-	caches            map[string]*OutputCacheState
-	SaveBlockInterval uint64
-	baseCacheStore    dstore.Store
-	logger            *zap.Logger
+	ctx           context.Context
+	caches        map[string]*OutputCacheState
+	runtimeConfig config.RuntimeConfig
+	// SaveBlockInterval uint64
+	// baseCacheStore    dstore.Store
+	logger *zap.Logger
 }
 
 type OutputCacheState struct {
@@ -31,13 +33,14 @@ type OutputCacheState struct {
 	initialized bool
 }
 
-func NewEngine(ctx context.Context, saveBlockInterval uint64, baseCacheStore dstore.Store, logger *zap.Logger) (execout.CacheEngine, error) {
+func NewEngine(runtimeConfig config.RuntimeConfig, logger *zap.Logger) (execout.CacheEngine, error) {
 	e := &Engine{
-		ctx:               ctx,
-		caches:            make(map[string]*OutputCacheState),
-		SaveBlockInterval: saveBlockInterval,
-		baseCacheStore:    baseCacheStore,
-		logger:            logger,
+		ctx:           context.Background(),
+		runtimeConfig: runtimeConfig,
+		caches:        make(map[string]*OutputCacheState),
+		// SaveBlockInterval: saveBlockInterval,
+		// baseCacheStore:    baseCacheStore,
+		logger: logger,
 	}
 	return e, nil
 }
@@ -113,13 +116,13 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 		return fmt.Errorf("cache alreayd registered: %q", moduleName)
 	}
 
-	moduleStore, err := e.baseCacheStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
+	moduleStore, err := e.runtimeConfig.BaseObjectStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
 	if err != nil {
 		return fmt.Errorf("failed createing substore: %w", err)
 	}
 
 	e.caches[moduleName] = &OutputCacheState{
-		c:           NewOutputCache(moduleName, moduleStore, e.SaveBlockInterval, e.logger),
+		c:           NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger),
 		initialized: false,
 	}
 	return nil

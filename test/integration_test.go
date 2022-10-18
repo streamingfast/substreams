@@ -23,6 +23,7 @@ import (
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
+	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -108,17 +109,16 @@ type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) Te
 
 func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack, testTempDir string) (out []*pbsubstreams.Response) {
 	t.Helper()
-	ctx := context.Background()
 
 	var opts []pipeline.Option
 
-	req, err := pipeline.NewRequestContext(ctx, request, isSubRequest)
+	req, err := pipeline.NewRequestContext(context.Background(), request, isSubRequest)
 	require.Nil(t, err)
 
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
 
-	cachingEngine, err := cachev1.NewEngine(ctx, 10, baseStoreStore, zap.NewNop())
+	cachingEngine, err := cachev1.NewEngine(config.RuntimeConfig{StoreSnapshotsSaveInterval: 10, BaseObjectStore: baseStoreStore}, zap.NewNop())
 	require.NoError(t, err)
 	storeBoundary := pipeline.NewStoreBoundary(10)
 
@@ -127,18 +127,17 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 		moduleGraph,
 		"sf.substreams.v1.test.Block",
 		nil,
-		10,
 		cachingEngine,
-		&pipeline.StoreConfig{
-			BaseURL:      baseStoreStore,
-			SaveInterval: 10,
+		config.RuntimeConfig{
+			BaseObjectStore:            baseStoreStore,
+			StoreSnapshotsSaveInterval: 10,
 		},
 		storeBoundary,
 		responseCollector.Collect,
 		opts...,
 	)
 
-	err = pipe.Init(workerPool)
+	err = pipe.Init()
 	require.NoError(t, err)
 
 	generator := newGenerator(uint64(request.StartBlockNum), request.StopBlockNum)
@@ -226,6 +225,8 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 
 	responseCollector := newResponseCollector()
 	workerPool := orchestrator.NewWorkerPool(1, func() orchestrator.Worker {
+		// TODO(abourget): this isn't used anymore, but we still need a way to mock this E2E test.
+		// Unsure about the best way to do this. Will need to look into it.
 		return &TestWorker{
 			t:                      t,
 			moduleGraph:            moduleGraph,

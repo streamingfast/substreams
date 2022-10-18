@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -55,38 +54,26 @@ type Pipeline struct {
 
 	execOutputCache execout.CacheEngine
 
-	baseStateStore dstore.Store
-
 	moduleOutputs []*pbsubstreams.ModuleOutput
 	forkHandler   *ForkHandler
 
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 
-	subrequestSplitSize int
+	runtimeConfig config.RuntimeConfig
 
-	storeConfig *StoreConfig
-	bounder     *StoreBoundary
-	StoreMap    store.Map
-	tracer      ttrace.Tracer
+	bounder  *StoreBoundary
+	StoreMap store.Map
+	tracer   ttrace.Tracer
 	// rootSpan represents the top-level span of the Pipeline object, initiated when `Init` is called
 	rootSpan ttrace.Span
 }
-
-// TODO(abourget): refactor that freaking `SaveInterval` from everywhere, and distinguish between those intervals (soon):
-// replaces this one here by `config.RuntimeConfig`.
-type StoreConfig struct {
-	BaseURL      dstore.Store
-	SaveInterval uint64
-}
-
-// and we use that `config.RuntimeConfig` everywhere, with struct member name `runtimeConfig`
 
 func New(
 	reqCtx *RequestContext,
 	graph *manifest.ModuleGraph,
 	blockType string,
 	wasmExtensions []wasm.WASMExtensioner,
-	engine execout.CacheEngine,
+	execOutputCache execout.CacheEngine,
 	runtimeConfig config.RuntimeConfig,
 	bounder *StoreBoundary,
 	respFunc func(resp *pbsubstreams.Response) error,
@@ -94,7 +81,7 @@ func New(
 ) *Pipeline {
 	pipe := &Pipeline{
 		reqCtx:                reqCtx,
-		execOutputCache:       engine,
+		execOutputCache:       execOutputCache,
 		tracer:                otel.GetTracerProvider().Tracer("pipeline"),
 		runtimeConfig:         runtimeConfig,
 		graph:                 graph,
@@ -118,7 +105,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
+func (p *Pipeline) Init() (err error) {
 	_, p.rootSpan = p.tracer.Start(p.reqCtx.Context, "pipeline_init")
 	defer tracing.EndSpan(p.rootSpan, tracing.WithEndErr(&err))
 
@@ -162,7 +149,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 			return fmt.Errorf("faile to setup backprocessings: %w", err)
 		}
 	} else {
-		if storeMap, err = p.runBackProcessAndSetupStores(workerPool, storeConfigs); err != nil {
+		if storeMap, err = p.runBackProcessAndSetupStores(storeConfigs); err != nil {
 			return fmt.Errorf("faile setup request: %w", err)
 		}
 	}
@@ -221,29 +208,23 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Ma
 	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigs []*store.Config) (store.Map, error) {
+func (p *Pipeline) runBackProcessAndSetupStores(storeConfigs store.ConfigMap) (store.Map, error) {
 
 	o := orchestrator.New(
 		p.reqCtx.Context,
 		p.runtimeConfig,
-		p.reqCtx.GetLogger(),
+		p.reqCtx.Logger(),
 		p.reqCtx.EffectiveStartBlockNum(),
-		p.reqCtx.Request().Modules,
 		p.graph,
 		p.respFunc,
 		storeConfigs,
+		p.reqCtx.Request().Modules,
 	)
 
 	storeMap, err := o.Run()
 	if err != nil {
 		return nil, err
 	}
-
-	// // this is a long run process, it will run the whole back process logic
-	// storeMap, err := p.backProcessStores(workerPool, storeConfigs)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("synchronizing stores: %w", err)
-	// }
 
 	p.backprocessingStores = nil
 
@@ -578,7 +559,7 @@ func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (
 			p.moduleHashes.Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
-			p.runtimeConfig.StoreSnapshotsObjectStore,
+			p.runtimeConfig.BaseObjectStore,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)

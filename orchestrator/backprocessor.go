@@ -2,7 +2,9 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
@@ -40,15 +42,17 @@ func New(
 	graph *manifest.ModuleGraph,
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
+	upstreamRequestModules *pbsubstreams.Modules,
 ) *Backprocessor {
 	return &Backprocessor{
-		ctx:           ctx,
-		runtimeConfig: runtimeConfig,
-		upToBlock:     upToBlock,
-		log:           logger,
-		graph:         graph,
-		respFunc:      respFunc,
-		storeConfigs:  storeConfigs,
+		ctx:                    ctx,
+		runtimeConfig:          runtimeConfig,
+		upToBlock:              upToBlock,
+		log:                    logger,
+		graph:                  graph,
+		respFunc:               respFunc,
+		storeConfigs:           storeConfigs,
+		upstreamRequestModules: upstreamRequestModules,
 	}
 }
 
@@ -58,30 +62,32 @@ func (b *Backprocessor) Run() (store.Map, error) {
 	// and it could be a changing plan, reshufflable,
 	// This contains all what the jobsPlanner had
 	// This calls `SplitWork`, with save Interval, moduleInitialBlock, snapshots
-	workPlan, err := b.buildWorkPlan()
+	workPlan, err := b.planWork()
 	if err != nil {
 		return nil, err
 	}
 
-	scheduler, err := NewScheduler(b.ctx, workPlan, b.runtimeConfig)
+	scheduler, err := NewScheduler(b.ctx, b.runtimeConfig, workPlan, b.graph, b.respFunc, b.log, b.upstreamRequestModules)
 	if err != nil {
 		return nil, err
 	}
 
-	multiSquasher, err := NewMultiSquasher(b.ctx, workPlan, b.storeConfigs, b.upToBlock, b.runtimeConfig)
+	multiSquasher, err := NewMultiSquasher(b.ctx, b.runtimeConfig, workPlan, b.storeConfigs, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
 	if err != nil {
 		return nil, err
 	}
 
-	multiSquasher.OnStoreCompletedUntilBlock = scheduler.OnStoreCompletedUntilBlock
-	scheduler.OnJobTerminated = multiSquasher.Squash
+	scheduler.OnStoreJobTerminated = multiSquasher.Squash
 
 	// parallelDownloader := NewLinearExecOutputReader()
 	// go parallelDownloader.Launch()
-	go multiSquasher.Launch()
-	go scheduler.Launch()
+	multiSquasher.Launch(b.ctx)
 
-	finalStoreMap, err := multiSquasher.Wait()
+	if err := scheduler.Run(b.ctx, b.upstreamRequestModules); err != nil {
+		return nil, fmt.Errorf("scheduler: %w", err)
+	}
+
+	finalStoreMap, err := multiSquasher.Wait(b.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -91,4 +97,48 @@ func (b *Backprocessor) Run() (store.Map, error) {
 	// }
 
 	return finalStoreMap, nil
+}
+
+func (b *Backprocessor) planWork() (out *WorkPlan, err error) {
+	storageState, err := fetchStorageState(b.ctx, b.storeConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching stores states: %w", err)
+	}
+
+	workPlan, err := b.buildWorkPlan(storageState)
+	if err != nil {
+		return nil, fmt.Errorf("build work plan: %w", err)
+	}
+
+	if err := b.sendWorkPlanProgress(workPlan); err != nil {
+		return nil, fmt.Errorf("sending work plan progress: %w", err)
+	}
+
+	return workPlan, nil
+}
+
+func (b *Backprocessor) buildWorkPlan(storageState *StorageState) (out *WorkPlan, err error) {
+	out = &WorkPlan{
+		workUnitsMap: map[string]*WorkUnits{}, // per module
+	}
+	for _, config := range b.storeConfigs {
+		name := config.Name()
+		snapshot, ok := storageState.Snapshots[name]
+		if !ok {
+			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", name)
+		}
+		// TODO(abourget): Pass in the `SaveInterval` in some ways
+		out.workUnitsMap[name] = SplitWork(name, b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), b.upToBlock, snapshot)
+	}
+	b.log.Info("work plan ready", zap.Stringer("work_plan", out))
+
+	return
+}
+
+func (b *Backprocessor) sendWorkPlanProgress(workPlan *WorkPlan) (err error) {
+	progressMessages := workPlan.ProgressMessages()
+	if err := b.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
+		return err
+	}
+	return nil
 }

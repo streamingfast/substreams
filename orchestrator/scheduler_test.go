@@ -18,7 +18,7 @@ import (
 func TestNewJobsPlanner(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
 
-	subreqSplit := uint64(100)
+	subreqSplit := 100
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestNewJobsPlanner(t *testing.T) {
 		storeMap.Set(newStore)
 	}
 
-	splitWorkMods := WorkPlan{
+	splitWorkMods := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
 		"A": &WorkUnits{modName: "A"},
 		"B": &WorkUnits{modName: "B"},
 		"C": &WorkUnits{modName: "C"},
@@ -48,7 +48,7 @@ func TestNewJobsPlanner(t *testing.T) {
 		"G": &WorkUnits{modName: "G"},
 		"H": &WorkUnits{modName: "H"},
 		"K": &WorkUnits{modName: "K"},
-	}
+	}}
 
 	ctx := context.Background()
 	s, err := NewJobsPlanner(
@@ -102,7 +102,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	graph, err := manifest.NewModuleGraph(modules)
 	require.NoError(t, err)
 
-	workPlan := WorkPlan{
+	workPlan := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
 		"A": &WorkUnits{
 			modName: "A",
 			partialsMissing: block.Ranges{
@@ -137,13 +137,13 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 				},
 			},
 		},
-	}
+	}}
 
 	ctx := context.Background()
 	jobsPlanner, err := NewJobsPlanner(
 		ctx,
 		workPlan,
-		uint64(100),
+		100,
 		graph,
 	)
 	require.NoError(t, err)

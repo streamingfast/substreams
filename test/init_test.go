@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.WarnLevel))
+	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
 }

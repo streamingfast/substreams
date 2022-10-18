@@ -52,7 +52,7 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 }
 
 func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
-	p.logger.Debug("writing partial store  state", zap.Object("store", p))
+	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
 	data := &storeData{
 		KV:              p.kv,

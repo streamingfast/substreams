@@ -58,13 +58,14 @@ type TestWorker struct {
 	responseCollector      *responseCollector
 	newBlockGenerator      NewTestBlockGenerator
 	blockProcessedCallBack blockProcessedCallBack
+	testTempDir            string
 }
 
 func (w *TestWorker) Run(ctx context.Context, job *orchestrator.Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	w.t.Helper()
 	req := job.CreateRequest(requestModules)
 
-	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true, w.blockProcessedCallBack)
+	_ = processRequest(w.t, req, w.moduleGraph, w.newBlockGenerator, nil, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir)
 	//todo: cumulate responses
 
 	return block.Ranges{
@@ -105,7 +106,7 @@ func (c *responseCollector) Collect(resp *pbsubstreams.Response) error {
 
 type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator
 
-func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack) (out []*pbsubstreams.Response) {
+func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *manifest.ModuleGraph, newGenerator NewTestBlockGenerator, workerPool *orchestrator.WorkerPool, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack, testTempDir string) (out []*pbsubstreams.Response) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -114,7 +115,7 @@ func processRequest(t *testing.T, request *pbsubstreams.Request, moduleGraph *ma
 	req, err := pipeline.NewRequestContext(ctx, request, isSubRequest)
 	require.Nil(t, err)
 
-	baseStoreStore, err := dstore.NewStore(filepath.Join(t.TempDir(), "test.store"), "", "none", true)
+	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
 
 	cachingEngine, err := cachev1.NewEngine(ctx, 10, baseStoreStore, zap.NewNop())
@@ -211,6 +212,8 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
 	}
 
+	testTempDir := t.TempDir()
+
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")
 
@@ -229,10 +232,11 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 			responseCollector:      newResponseCollector(),
 			newBlockGenerator:      newBlockGenerator,
 			blockProcessedCallBack: blockProcessedCallBack,
+			testTempDir:            testTempDir,
 		}
 	})
 
-	processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false, blockProcessedCallBack)
+	processRequest(t, request, moduleGraph, newBlockGenerator, workerPool, responseCollector, false, blockProcessedCallBack, testTempDir)
 
 	for _, response := range responseCollector.responses {
 		switch r := response.Message.(type) {

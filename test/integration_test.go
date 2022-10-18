@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -206,9 +207,9 @@ type AssertMapOutput struct {
 }
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string) {
-	//if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
-	//	t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
-	//}
+	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
+		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
+	}
 
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/simple_substreams/substreams.yaml")

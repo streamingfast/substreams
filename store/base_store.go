@@ -38,7 +38,7 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 func (c Config) NewBaseStore(logger *zap.Logger) *BaseStore {
 	return &BaseStore{
 		Config: c,
-		kv:     make(map[string][]byte),
+		kv:     make(map[string][]byte),asdf
 		logger: logger.Named("store").With(zap.String("store_name", c.name)),
 	}
 }

@@ -68,7 +68,7 @@ func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock,
 		p.forkHandler.removeReversibleOutput(block.Num())
 	}
 
-	if err := p.cachingEngine.NewBlock(block.AsRef(), step); err != nil {
+	if err := p.execOutputCache.NewBlock(block.AsRef(), step); err != nil {
 		return fmt.Errorf("caching engine new block %s: %w", block.AsRef().String(), err)
 	}
 
@@ -84,7 +84,7 @@ func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cur
 }
 
 func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType, span trace.Span) error {
-	execOutput, err := p.cachingEngine.NewExecOutput(p.blockType, block, clock, cursor)
+	execOutput, err := p.execOutputCache.NewExecOutput(p.blockType, block, clock, cursor)
 	if err != nil {
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
@@ -104,7 +104,7 @@ func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstream
 		//		zap.Uint64("clock", clock.Number),
 		//		zap.Uint64("stop_block", p.reqCtx.StopBlockNum()),
 		//	)
-		//	if err = p.cachingEngine.Flush(p.reqCtx.Context()); err != nil {
+		//	if err = p.execOutputCache.Flush(p.reqCtx.Context()); err != nil {
 		//		return fmt.Errorf("failed to flush cache engines: %w", err)
 		//	}
 		return io.EOF

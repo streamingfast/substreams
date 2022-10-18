@@ -49,7 +49,7 @@ func NewSquasher(
 			return nil, fmt.Errorf("store %q not found", storeModuleName)
 		}
 
-		clonedStore := storeConfig.NewFullKV(zlog)
+		startingStore := storeConfig.NewFullKV(zlog)
 
 		// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
 		// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
@@ -60,16 +60,16 @@ func NewSquasher(
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
-			storeSquasher = NewStoreSquasher(clonedStore, reqEffectiveStartBlock, clonedStore.InitialBlock(), storeSaveInterval, jobsPlanner)
+			storeSquasher = NewStoreSquasher(startingStore, reqEffectiveStartBlock, startingStore.InitialBlock(), storeSaveInterval, jobsPlanner)
 		} else {
 			zlog.Info("loading initial store",
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
-			if err := clonedStore.Load(ctx, workUnit.initialCompleteRange.ExclusiveEndBlock); err != nil {
+			if err := startingStore.Load(ctx, workUnit.initialCompleteRange.ExclusiveEndBlock); err != nil {
 				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, workUnit.initialCompleteRange, err)
 			}
-			storeSquasher = NewStoreSquasher(clonedStore, reqEffectiveStartBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
+			storeSquasher = NewStoreSquasher(startingStore, reqEffectiveStartBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, storeSaveInterval, jobsPlanner)
 
 			jobsPlanner.SignalCompletionUpUntil(storeModuleName, workUnit.initialCompleteRange.ExclusiveEndBlock)
 		}

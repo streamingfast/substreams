@@ -62,17 +62,11 @@ func newStore(storeURL string) (*store.FullKV, dstore.Store, error) {
 		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
 	}
 
-	s, err := store.NewFullKV(
-		"",
-		0,
-		"",
-		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS,
-		"",
-		remoteStore, zap.NewNop(),
-	)
+	config, err := store.NewConfig("", 0, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	s := config.NewFullKV(zap.NewNop())
 	return s, remoteStore, nil
 }

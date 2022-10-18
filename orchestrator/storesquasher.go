@@ -202,11 +202,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 		zap.Stringer("squashable_range", squashableRange),
 	)
 
-	// FIXME(abourget): this is what was prior to the change:
-	// 	s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
-	// 	squashCount++
-
-	nextStore := store.NewPartialKV(s.store.Clone().baseStore, squashableRange.StartBlock)
+	nextStore := s.store.DerivePartialStore(squashableRange.StartBlock)
 	if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 	}

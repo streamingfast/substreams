@@ -17,7 +17,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/tracing"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
@@ -187,7 +186,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return err
 	}
 
-	storeGenerator := pipeline.NewStoreFactory(s.baseStateStore, s.storesSaveInterval)
 	storeBoundary := pipeline.NewStoreBoundary(s.storesSaveInterval)
 	cachingEngine := execout.NewNoOpCache()
 	if s.baseStateStore != nil {
@@ -197,7 +195,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		}
 	}
 
-	storeMap := store.NewMap()
 	pipe := pipeline.New(
 		requestCtx,
 		graph,
@@ -205,8 +202,10 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		s.wasmExtensions,
 		s.blockRangeSizeSubRequests,
 		cachingEngine,
-		storeMap,
-		storeGenerator,
+		&pipeline.StoreConfig{
+			BaseURL:      s.baseStateStore,
+			SaveInterval: s.storesSaveInterval,
+		},
 		storeBoundary,
 		responseHandler,
 		opts...,

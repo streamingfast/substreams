@@ -36,10 +36,10 @@ func (p *Pipeline) backProcessStores(
 		name := config.Name()
 		snapshot, ok := storageState.Snapshots[name]
 		if !ok {
-			err = fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
+			err = fmt.Errorf("fatal: storage state not reported for module name %q", name)
 			return nil, err
 		}
-		workPlan[mod.Name] = orchestrator.SplitWork(mod.Name, p.storeFactory.saveInterval, mod.InitialBlock, upToBlock, snapshot)
+		workPlan[name] = orchestrator.SplitWork(name, p.storeConfig.SaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
 	}
 
 	logger.Info("work plan ready", zap.Stringer("work_plan", workPlan))
@@ -59,7 +59,7 @@ func (p *Pipeline) backProcessStores(
 	logger.Debug("launching squasher")
 
 	var squasher *orchestrator.Squasher
-	if squasher, err = orchestrator.NewSquasher(p.reqCtx, workPlan, p.storeMap, upToBlock, p.storeFactory.saveInterval, jobsPlanner); err != nil {
+	if squasher, err = orchestrator.NewSquasher(p.reqCtx, workPlan, storeConfigs, upToBlock, p.storeConfig.SaveInterval, jobsPlanner); err != nil {
 		err = fmt.Errorf("initializing squasher: %w", err)
 		return nil, err
 	}

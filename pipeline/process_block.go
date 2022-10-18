@@ -77,7 +77,7 @@ func (p *Pipeline) processBlock(block *bstream.Block, clock *pbsubstreams.Clock,
 
 func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, span trace.Span) error {
 	span.AddEvent("handling_step_undo")
-	if err := p.forkHandler.handleUndo(clock, cursor, p.storeMap, p.respFunc); err != nil {
+	if err := p.forkHandler.handleUndo(clock, cursor, p.StoreMap, p.respFunc); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 	return nil
@@ -128,7 +128,7 @@ func (p *Pipeline) handleStepMatchesNew(block *bstream.Block, clock *pbsubstream
 		}
 	}
 
-	for _, s := range p.storeMap.All() {
+	for _, s := range p.StoreMap.All() {
 		if resetableStore, ok := s.(store.Resetable); ok {
 			resetableStore.Reset()
 		}

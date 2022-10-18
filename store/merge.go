@@ -98,7 +98,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				b.kv[k] = []byte(bigFloatToStr(sum(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %b", b.updatePolicy, b.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch intoValueTypeLower {
@@ -177,7 +177,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				b.kv[k] = []byte(bigFloatToStr(max(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %b", kvPartialStore.updatePolicy, kvPartialStore.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch intoValueTypeLower {
@@ -256,7 +256,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				b.kv[k] = []byte(bigFloatToStr(min(v0, v1)))
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %b", b.updatePolicy, b.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
 		}
 	default:
 		return fmt.Errorf("update policy %q not supported", b.updatePolicy) // should have been validated already

@@ -47,6 +47,10 @@ func (c *Config) Name() string {
 	return c.name
 }
 
+func (c *Config) ModuleInitialBlock() uint64 {
+	return c.moduleInitialBlock
+}
+
 func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
 	return &FullKV{c.newBaseStore(logger)}
 }

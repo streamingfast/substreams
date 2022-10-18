@@ -14,7 +14,7 @@ func (p *Pipeline) sendSnapshots() error {
 	}
 
 	for _, modName := range snapshotModules {
-		store, found := p.storeMap.Get(modName)
+		store, found := p.StoreMap.Get(modName)
 		if !found {
 			return fmt.Errorf("store %q not found", modName)
 		}

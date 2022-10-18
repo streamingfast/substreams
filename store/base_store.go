@@ -9,7 +9,7 @@ import (
 )
 
 type baseStore struct {
-	Config
+	*Config
 
 	kv          map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
 	deltas      []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
@@ -23,7 +23,7 @@ func (b *baseStore) Name() string { return b.name }
 func (b *baseStore) InitialBlock() uint64 { return b.moduleInitialBlock }
 
 func (b *baseStore) String() string {
-	return fmt.Sprintf("%b (%b)", b.name, b.moduleHash)
+	return fmt.Sprintf("%q (%q)", b.name, b.moduleHash)
 }
 
 func (b *baseStore) MarshalLogObject(enc zapcore.ObjectEncoder) error {

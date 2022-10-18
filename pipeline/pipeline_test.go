@@ -20,14 +20,14 @@ func TestPipeline_runExecutor(t *testing.T) {
 		name       string
 		moduleName string
 		execOutput *MapperModuleExecutor
-		//block      *pbsubstreamstest.Block
-		request  *RequestContext
-		testFunc func(t *testing.T, data []byte)
+		block      *pbsubstreamstest.Block
+		request    *RequestContext
+		testFunc   func(t *testing.T, data []byte)
 	}{
 		{
 			name:       "executes map",
 			moduleName: "test_map",
-			//block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
+			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
 			testFunc: func(t *testing.T, data []byte) {
 				out := &pbsubstreamstest.MapResult{}
 				err := proto.Unmarshal(data, out)
@@ -41,7 +41,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 		{
 			name:       "return map's cache",
 			moduleName: "test_map",
-			//block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
+			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
 			testFunc: func(t *testing.T, data []byte) {
 				out := &pbsubstreamstest.MapResult{}
 				err := proto.Unmarshal(data, out)

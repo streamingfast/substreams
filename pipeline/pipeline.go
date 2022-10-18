@@ -193,7 +193,7 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Ma
 	// should match the output module.
 	lastStore := storeConfigs[len(storeConfigs)-1]
 	if lastStore.Name() != outputModuleName {
-		return nil, fmt.Errorf("request output module %q does not match the last store module %q", outputModuleName, lastStore.Name)
+		return nil, fmt.Errorf("request output module %q does not match the last store module %q", outputModuleName, lastStore.Name())
 	}
 
 	storeMap := store.NewMap()

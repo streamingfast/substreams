@@ -113,10 +113,10 @@ func (s *Squasher) Squash(moduleName string, partialsRanges block.Ranges) error 
 	return squashable.squash(partialsRanges)
 }
 
-func (s *Squasher) ValidateStoresReady() (out map[string]store.Store, err error) {
-	out = map[string]store.Store{}
+func (s *Squasher) ValidateStoresReady() (out store.Map, err error) {
+	out = store.NewMap()
 	var errs []string
-	for name, squashable := range s.storeSquashers {
+	for _, squashable := range s.storeSquashers {
 		if !squashable.targetExclusiveEndBlockReach {
 			errs = append(errs, fmt.Sprintf("module %s: target %d not reached (next expected: %d)", squashable.store.String(), s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
 		}
@@ -124,7 +124,7 @@ func (s *Squasher) ValidateStoresReady() (out map[string]store.Store, err error)
 			errs = append(errs, fmt.Sprintf("module %s: missing ranges %s", squashable.store.String(), squashable.ranges))
 		}
 
-		out[name] = squashable.store
+		out.Set(squashable.store)
 	}
 	if len(errs) != 0 {
 		return nil, fmt.Errorf("%d errors: %s", len(errs), strings.Join(errs, "; "))

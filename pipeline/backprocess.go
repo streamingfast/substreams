@@ -14,7 +14,7 @@ import (
 func (p *Pipeline) backProcessStores(
 	workerPool *orchestrator.WorkerPool,
 	storeConfigs []*store.Config,
-) (out map[string]store.Store, err error) {
+) (out store.Map, err error) {
 	_, span := p.tracer.Start(p.reqCtx.Context, "back_processing")
 	defer tracing.EndSpan(span, tracing.WithEndErr(err))
 

@@ -228,18 +228,9 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Ma
 
 func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigs []*store.Config) (store.Map, error) {
 	// this is a long run process, it will run the whole back process logic
-	backProcessedStores, err := p.backProcessStores(workerPool, storeConfigs)
+	storeMap, err := p.backProcessStores(workerPool, storeConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("synchronizing stores: %w", err)
-	}
-
-	storeMap := store.NewMap()
-	for _, config := range storeConfigs {
-		storeMap.Set(config.NewFullKV(p.reqCtx.logger))
-	}
-
-	for _, store := range backProcessedStores {
-		storeMap.Set(store)
 	}
 
 	p.backprocessingStores = nil
@@ -247,6 +238,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerP
 	if err := p.sendSnapshots(); err != nil {
 		return nil, fmt.Errorf("send initial snapshots: %w", err)
 	}
+
 	return storeMap, nil
 }
 

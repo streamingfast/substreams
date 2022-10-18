@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/metrics"
 	"os"
 
 	"github.com/streamingfast/bstream/hub"
@@ -64,6 +65,9 @@ func New(
 		blockRangeSizeSubRequests: blockRangeSizeSubRequests,
 		tracer:                    otel.GetTracerProvider().Tracer("service"),
 	}
+
+	zlog.Info("registering substreams metrics")
+	metrics.Metricset.Register()
 
 	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
 	newSubstreamClientFunc := client.NewFactory(substreamsClientConfig)

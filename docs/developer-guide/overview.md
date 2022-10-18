@@ -9,7 +9,7 @@ description: StreamingFast Substreams developer guide overview
 The Substreams Developer Guide explains the process of building a Substream that tracks the ERC721 holder count for a given contract.
 
 {% hint style="warning" %}
-_Important: StreamingFast provides documentation for Ethereum based Substreams setups for the time being. Detailed information and documentation for other supported chains is coming soon._
+_Important: StreamingFast provides documentation for Ethereum-based Substreams setups at this time. Detailed information and documentation for other supported chains are in development._
 {% endhint %}
 
 The Substreams developer guide is broken down into the following sections.

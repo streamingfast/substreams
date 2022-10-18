@@ -31,20 +31,15 @@ type Squasher struct {
 func NewSquasher(
 	ctx context.Context,
 	workPlan WorkPlan,
-	storeConfigs []*store.Config,
+	storeConfigMap map[string]*store.Config,
 	reqEffectiveStartBlock uint64,
 	storeSaveInterval uint64,
 	jobsPlanner *JobsPlanner) (*Squasher, error) {
 	storeSquashers := map[string]*StoreSquasher{}
 	zlog.Info("creating a new squasher", zap.Int("work_plan_count", len(workPlan)))
 
-	storeMap := map[string]*store.Config{}
-	for _, c := range storeConfigs {
-		storeMap[c.Name()] = c
-	}
-
 	for storeModuleName, workUnit := range workPlan {
-		storeConfig, found := storeMap[storeModuleName]
+		storeConfig, found := storeConfigMap[storeModuleName]
 		if !found {
 			return nil, fmt.Errorf("store %q not found", storeModuleName)
 		}

@@ -180,7 +180,7 @@ func (p *Pipeline) Init(workerPool *orchestrator.WorkerPool) (err error) {
 	return nil
 }
 
-func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Map, error) {
+func (p *Pipeline) setupSubrequestStores(storeConfigs map[string]*store.Config) (store.Map, error) {
 	outputStoreCount := len(p.reqCtx.Request().OutputModules)
 	if outputStoreCount > 1 {
 		// currently only support 1 lead stores
@@ -188,19 +188,17 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Ma
 	}
 
 	outputModuleName := p.reqCtx.Request().OutputModules[0]
-	// In a backprocess the last store is the one we are "solving" for that is the
-	// partial store we will need to create. As a sanity check the last store's name
-	// should match the output module.
-	lastStore := storeConfigs[len(storeConfigs)-1]
-	if lastStore.Name() != outputModuleName {
-		return nil, fmt.Errorf("request output module %q does not match the last store module %q", outputModuleName, lastStore.Name())
+
+	// there is an assumption that in backgprocess mode the outputModule is a store
+	if _, found := storeConfigs[outputModuleName]; !found {
+		return nil, fmt.Errorf("request output module %q is not found int he store", outputModuleName)
+
 	}
 
 	storeMap := store.NewMap()
-
 	var partialStore *store.PartialKV
-	for _, config := range storeConfigs {
-		if config.Name() == outputModuleName {
+	for name, config := range storeConfigs {
+		if name == outputModuleName {
 			partialStore = config.NewPartialKV(p.reqCtx.EffectiveStartBlockNum(), p.reqCtx.logger)
 			storeMap.Set(partialStore)
 			continue
@@ -226,7 +224,7 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs []*store.Config) (store.Ma
 	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigs []*store.Config) (store.Map, error) {
+func (p *Pipeline) runBackProcessAndSetupStores(workerPool *orchestrator.WorkerPool, storeConfigs map[string]*store.Config) (store.Map, error) {
 	// this is a long run process, it will run the whole back process logic
 	storeMap, err := p.backProcessStores(workerPool, storeConfigs)
 	if err != nil {
@@ -557,7 +555,8 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 	return nil
 }
 
-func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (out []*store.Config, err error) {
+func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (map[string]*store.Config, error) {
+	out := map[string]*store.Config{}
 	for _, storeModule := range storeModules {
 		c, err := store.NewConfig(
 			storeModule.Name,
@@ -570,7 +569,7 @@ func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (
 		if err != nil {
 			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)
 		}
-		out = append(out, c)
+		out[storeModule.Name] = c
 	}
 	return out, nil
 }

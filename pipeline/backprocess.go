@@ -11,9 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// mapA -> storeA [0,1k]
+// mapA -> storeA [1k,2k]
+
 func (p *Pipeline) backProcessStores(
 	workerPool *orchestrator.WorkerPool,
-	storeConfigs []*store.Config,
+	storeConfigMap map[string]*store.Config,
 ) (out store.Map, err error) {
 	_, span := p.tracer.Start(p.reqCtx.Context, "back_processing")
 	defer tracing.EndSpan(span, tracing.WithEndErr(&err))
@@ -21,7 +24,7 @@ func (p *Pipeline) backProcessStores(
 	logger := p.reqCtx.logger.Named("back_process")
 	logger.Info("synchronizing stores")
 
-	storageState, err := orchestrator.FetchStorageState(p.reqCtx, storeConfigs)
+	storageState, err := orchestrator.FetchStorageState(p.reqCtx, storeConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
@@ -32,7 +35,7 @@ func (p *Pipeline) backProcessStores(
 
 	workPlan := orchestrator.WorkPlan{}
 
-	for _, config := range storeConfigs {
+	for _, config := range storeConfigMap {
 		name := config.Name()
 		snapshot, ok := storageState.Snapshots[name]
 		if !ok {
@@ -54,7 +57,7 @@ func (p *Pipeline) backProcessStores(
 
 	logger.Debug("launching squasher")
 
-	squasher, err := orchestrator.NewSquasher(p.reqCtx, workPlan, storeConfigs, upToBlock, p.storeConfig.SaveInterval, jobsPlanner)
+	squasher, err := orchestrator.NewSquasher(p.reqCtx, workPlan, storeConfigMap, upToBlock, p.storeConfig.SaveInterval, jobsPlanner)
 	if err != nil {
 		return nil, fmt.Errorf("initializing squasher: %w", err)
 	}

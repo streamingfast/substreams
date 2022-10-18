@@ -3,7 +3,6 @@ package pipeline
 import (
 	"fmt"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tracing"
 
 	"github.com/streamingfast/substreams"
@@ -14,7 +13,7 @@ import (
 
 func (p *Pipeline) backProcessStores(
 	workerPool *orchestrator.WorkerPool,
-	storeModules []*pbsubstreams.Module,
+	storeConfigs []*store.Config,
 ) (out map[string]store.Store, err error) {
 	_, span := p.tracer.Start(p.reqCtx.Context, "back_processing")
 	defer tracing.EndSpan(span, tracing.WithEndErr(err))
@@ -23,7 +22,7 @@ func (p *Pipeline) backProcessStores(
 	logger.Info("synchronizing stores")
 
 	var storageState *orchestrator.StorageState
-	if storageState, err = orchestrator.FetchStorageState(p.reqCtx, p.storeMap); err != nil {
+	if storageState, err = orchestrator.FetchStorageState(p.reqCtx, storeConfigs); err != nil {
 		err = fmt.Errorf("fetching stores states: %w", err)
 		return nil, err
 	}
@@ -33,8 +32,9 @@ func (p *Pipeline) backProcessStores(
 	upToBlock := p.reqCtx.EffectiveStartBlockNum()
 	workPlan := orchestrator.WorkPlan{}
 
-	for _, mod := range storeModules {
-		snapshot, ok := storageState.Snapshots[mod.Name]
+	for _, config := range storeConfigs {
+		name := config.Name()
+		snapshot, ok := storageState.Snapshots[name]
 		if !ok {
 			err = fmt.Errorf("fatal: storage state not reported for module name %q", mod.Name)
 			return nil, err

@@ -29,19 +29,19 @@ func (s *StorageState) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchStorageState(ctx context.Context, storeMap *store.Map) (out *StorageState, err error) {
+func FetchStorageState(ctx context.Context, storeConfigs []*store.Config) (out *StorageState, err error) {
 	out = NewStorageState()
 	eg := llerrgroup.New(10)
 
-	for name, storeObj := range storeMap.All() {
+	for _, config := range storeConfigs {
 		if eg.Stop() {
 			break
 		}
-		storeName := name
-		store := storeObj
+		storeName := config.Name()
+		storeConfig := config
 		eg.Go(func() error {
 
-			snapshots, err := listSnapshots(ctx, store)
+			snapshots, err := listSnapshots(ctx, storeConfig)
 			if err != nil {
 				return err
 			}

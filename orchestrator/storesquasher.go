@@ -19,7 +19,7 @@ type StoreSquasher struct {
 	store                        *store.FullKV
 	requestRange                 *block.Range
 	ranges                       block.Ranges
-	targetStartBlock             uint64  // FIXME: THIS ISN'T USED
+	targetStartBlock             uint64 // FIXME: THIS ISN'T USED
 	targetExclusiveEndBlock      uint64 // FIXME: The value we receive in this is the `request.EffectiveStartBlock()` .. and its received as `targetExclusiveBlock` and assigned to `targetExclusiveEndBlock`. What's happening?
 	nextExpectedStartBlock       uint64
 	log                          *zap.Logger
@@ -203,10 +203,10 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	)
 
 	// FIXME(abourget): this is what was prior to the change:
-// 	s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
-// 	squashCount++
+	// 	s.log.Debug("found range to merge", zap.Stringer("squashable", s), zap.Stringer("squashable_range", squashableRange))
+	// 	squashCount++
 
-	nextStore := store.NewPartialKV(s.store.Clone().BaseStore, squashableRange.StartBlock)
+	nextStore := store.NewPartialKV(s.store.Clone().baseStore, squashableRange.StartBlock)
 	if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 	}

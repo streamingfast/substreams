@@ -353,20 +353,20 @@ func TestStore_Merge(t *testing.T) {
 }
 
 func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, deletedPrefixes []string) *PartialKV {
-	b := &BaseStore{
+	b := &baseStore{
 		kv:           kv,
 		updatePolicy: updatePolicy,
 		valueType:    valueType,
 	}
 
-	return &PartialKV{BaseStore: b, DeletedPrefixes: deletedPrefixes}
+	return &PartialKV{baseStore: b, DeletedPrefixes: deletedPrefixes}
 }
 
 func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *FullKV {
-	b := &BaseStore{
+	b := &baseStore{
 		kv:           kv,
 		updatePolicy: updatePolicy,
 		valueType:    valueType,
 	}
-	return &FullKV{BaseStore: b}
+	return &FullKV{baseStore: b}
 }

@@ -5,9 +5,9 @@ import (
 	"strconv"
 )
 
-func (s *BaseStore) SumBigInt(ord uint64, key string, value *big.Int) {
+func (b *baseStore) SumBigInt(ord uint64, key string, value *big.Int) {
 	sum := new(big.Int)
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -18,12 +18,12 @@ func (s *BaseStore) SumBigInt(ord uint64, key string, value *big.Int) {
 			sum.Add(prev, value)
 		}
 	}
-	s.set(ord, key, []byte(sum.String()))
+	b.set(ord, key, []byte(sum.String()))
 }
 
-func (s *BaseStore) SumInt64(ord uint64, key string, value int64) {
+func (b *baseStore) SumInt64(ord uint64, key string, value int64) {
 	var sum int64
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -34,12 +34,12 @@ func (s *BaseStore) SumInt64(ord uint64, key string, value int64) {
 			sum = prev + value
 		}
 	}
-	s.set(ord, key, []byte(strconv.FormatInt(sum, 10)))
+	b.set(ord, key, []byte(strconv.FormatInt(sum, 10)))
 }
 
-func (s *BaseStore) SumFloat64(ord uint64, key string, value float64) {
+func (b *baseStore) SumFloat64(ord uint64, key string, value float64) {
 	var sum float64
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -50,12 +50,12 @@ func (s *BaseStore) SumFloat64(ord uint64, key string, value float64) {
 			sum = prev + value
 		}
 	}
-	s.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
+	b.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
 }
 
-func (s *BaseStore) SumBigDecimal(ord uint64, key string, value *big.Float) {
+func (b *baseStore) SumBigDecimal(ord uint64, key string, value *big.Float) {
 	sum := new(big.Float)
-	val, found := s.GetAt(ord, key)
+	val, found := b.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
@@ -66,5 +66,5 @@ func (s *BaseStore) SumBigDecimal(ord uint64, key string, value *big.Float) {
 			sum.Add(prev, value)
 		}
 	}
-	s.set(ord, key, []byte(sum.Text('g', 100)))
+	b.set(ord, key, []byte(sum.Text('g', 100)))
 }

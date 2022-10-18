@@ -9,30 +9,22 @@ import (
 	"go.uber.org/zap"
 )
 
-// Cloneable Only the BaseStore and not the partial is cloneable. We use this interface
+// Cloneable Only the baseStore and not the partial is cloneable. We use this interface
 // to make the distinction when setting up the squasher.
 type Cloneable interface {
 	Clone() *FullKV
 }
 
-//compile-time check that BaseStore implements all interfaces
+//compile-time check that baseStore implements all interfaces
 var _ Store = (*FullKV)(nil)
 var _ Cloneable = (*FullKV)(nil)
 
 type FullKV struct {
-	*BaseStore
-}
-
-func (c Config) NewFullKV(logger *zap.Logger) (*FullKV, error) {
-	b, err := c.NewBaseStore(logger)
-	if err != nil {
-		return nil, fmt.Errorf("creating base store: %w", err)
-	}
-	return &FullKV{b}, nil
+	*baseStore
 }
 
 func (s *FullKV) Clone() *FullKV {
-	b := &BaseStore{
+	b := &baseStore{
 		Config: s.Config,
 		kv:     map[string][]byte{},
 		logger: s.logger,

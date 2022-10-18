@@ -28,7 +28,7 @@ func NewTestKVPartialStore(
 ) *PartialKV {
 	base := newTestBaseStore(t, updatePolicy, valueType, store)
 	return &PartialKV{
-		BaseStore:    base,
+		baseStore:    base,
 		initialBlock: initialPartialBlock,
 	}
 }
@@ -38,7 +38,7 @@ func newTestBaseStore(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
-) *BaseStore {
+) *baseStore {
 	if store == nil {
 		store = dstore.NewMockStore(nil)
 	}

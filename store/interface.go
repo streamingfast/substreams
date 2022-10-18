@@ -14,7 +14,6 @@ type Store interface {
 
 	Loadable
 	Saveable
-	SnapshotLister
 	Iterable
 	DeltaAccessor
 	Resetable
@@ -53,10 +52,6 @@ type Loadable interface {
 
 type Saveable interface {
 	Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error)
-}
-
-type SnapshotLister interface {
-	ListSnapshotFiles(ctx context.Context) (files []*FileInfo, err error)
 }
 
 type Resetable interface {

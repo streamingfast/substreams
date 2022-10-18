@@ -6,7 +6,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-//func (s *BaseStore) Del(ord uint64, key string) {
+//func (s *baseStore) Del(ord uint64, key string) {
 //	s.bumpOrdinal(ord)
 //
 //	val, found := s.GetLast(key)
@@ -23,10 +23,10 @@ import (
 //	}
 //}
 
-func (s *BaseStore) DeletePrefix(ord uint64, prefix string) {
-	s.bumpOrdinal(ord)
+func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
+	b.bumpOrdinal(ord)
 
-	for key, val := range s.kv {
+	for key, val := range b.kv {
 		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
@@ -37,7 +37,7 @@ func (s *BaseStore) DeletePrefix(ord uint64, prefix string) {
 			OldValue:  val,
 			NewValue:  nil,
 		}
-		s.ApplyDelta(delta)
-		s.deltas = append(s.deltas, delta)
+		b.ApplyDelta(delta)
+		b.deltas = append(b.deltas, delta)
 	}
 }

@@ -9,26 +9,19 @@ import (
 	"go.uber.org/zap"
 )
 
-// compile-time check that BaseStore implements all interfaces
+// compile-time check that baseStore implements all interfaces
 var _ Store = (*PartialKV)(nil)
 
 type PartialKV struct {
-	*BaseStore
+	*baseStore
 
 	initialBlock    uint64 // block at which we initialized this store
 	DeletedPrefixes []string
 }
 
-func NewPartialKV(store *BaseStore, initialBlock uint64) *PartialKV {
-	return &PartialKV{
-		BaseStore:    store,
-		initialBlock: initialBlock,
-	}
-}
-
 func (p *PartialKV) Roll(lastBlock uint64) {
 	p.initialBlock = lastBlock
-	p.BaseStore.kv = map[string][]byte{}
+	p.baseStore.kv = map[string][]byte{}
 }
 
 func (s *PartialKV) InitialBlock() uint64 { return s.initialBlock }
@@ -87,7 +80,7 @@ func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.R
 }
 
 func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
-	p.BaseStore.DeletePrefix(ord, prefix)
+	p.baseStore.DeletePrefix(ord, prefix)
 
 	p.DeletedPrefixes = append(p.DeletedPrefixes, prefix)
 }

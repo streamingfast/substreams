@@ -7,23 +7,23 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (s *BaseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
-	s.setIfNotExists(ord, key, value)
+func (b *baseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
+	b.setIfNotExists(ord, key, value)
 }
 
-func (s *BaseStore) SetIfNotExists(ord uint64, key string, value string) {
-	s.setIfNotExists(ord, key, []byte(value))
+func (b *baseStore) SetIfNotExists(ord uint64, key string, value string) {
+	b.setIfNotExists(ord, key, []byte(value))
 }
 
-func (s *BaseStore) SetBytes(ord uint64, key string, value []byte) {
-	s.set(ord, key, value)
+func (b *baseStore) SetBytes(ord uint64, key string, value []byte) {
+	b.set(ord, key, value)
 }
 
-func (s *BaseStore) Set(ord uint64, key string, value string) {
-	s.set(ord, key, []byte(value))
+func (b *baseStore) Set(ord uint64, key string, value string) {
+	b.set(ord, key, []byte(value))
 }
 
-func (s *BaseStore) set(ord uint64, key string, value []byte) {
+func (b *baseStore) set(ord uint64, key string, value []byte) {
 	// FIXME(abourget): these should return an error up the stack instead, would bubble up
 	// in the wasm/module.go and fail the query, with proper error propagation.
 	if strings.HasPrefix(key, "__!__") {
@@ -37,9 +37,9 @@ func (s *BaseStore) set(ord uint64, key string, value []byte) {
 		panic(fmt.Sprintf("invalid key"))
 	}
 
-	s.bumpOrdinal(ord)
+	b.bumpOrdinal(ord)
 
-	val, found := s.GetLast(key)
+	val, found := b.GetLast(key)
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
@@ -62,17 +62,17 @@ func (s *BaseStore) set(ord uint64, key string, value []byte) {
 		}
 	}
 
-	s.ApplyDelta(delta)
-	s.deltas = append(s.deltas, delta)
+	b.ApplyDelta(delta)
+	b.deltas = append(b.deltas, delta)
 }
 
-func (s *BaseStore) setIfNotExists(ord uint64, key string, value []byte) {
-	_, found := s.GetLast(key)
+func (b *baseStore) setIfNotExists(ord uint64, key string, value []byte) {
+	_, found := b.GetLast(key)
 	if found {
 		return
 	}
 
-	s.bumpOrdinal(ord)
+	b.bumpOrdinal(ord)
 
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
@@ -85,6 +85,6 @@ func (s *BaseStore) setIfNotExists(ord uint64, key string, value []byte) {
 		NewValue:  cpValue,
 	}
 
-	s.ApplyDelta(delta)
-	s.deltas = append(s.deltas, delta)
+	b.ApplyDelta(delta)
+	b.deltas = append(b.deltas, delta)
 }

@@ -58,10 +58,10 @@ type Snapshot struct {
 	Path string
 }
 
-func listSnapshots(ctx context.Context, store store.Store) (*Snapshots, error) {
+func listSnapshots(ctx context.Context, storeConfig *store.Config) (*Snapshots, error) {
 	out := &Snapshots{}
 
-	files, err := store.ListSnapshotFiles(ctx)
+	files, err := storeConfig.ListSnapshotFiles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list snapshots: %w", err)
 	}

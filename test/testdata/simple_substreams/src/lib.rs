@@ -176,11 +176,20 @@ fn assert_test_store_set_i64_deltas(
     assert(block.number, i64::MAX, delta_2.new_value);
 
     Ok(true)
+
 }
 
-//todo: test get_first
-//todo: test get_last
-//todo: test delete_prefix
+#[substreams::handlers::store]
+fn assert_all_test(
+        _assert_test_store_add_bigint: bool,
+        _assert_test_store_delete_prefix: bool,
+        _assert_test_store_add_i64: bool,
+        _assert_test_store_add_i64_deltas: bool,
+        _assert_test_store_set_i64: bool,
+        _assert_test_store_set_i64_deltas: bool)
+{
+    //nop!
+}
 
 fn assert<T: Debug + Display + PartialEq>(block_number: u64, expected_value: T, actual_value: T) {
     assert_eq!(

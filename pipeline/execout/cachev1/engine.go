@@ -3,13 +3,14 @@ package cachev1
 import (
 	"context"
 	"fmt"
+	"regexp"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"go.uber.org/zap"
-	"regexp"
 )
 
 var cacheFilenameRegex *regexp.Regexp
@@ -128,7 +129,7 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 func (e *Engine) get(moduleName string, clock *pbsubstreams.Clock) ([]byte, bool, error) {
 	cache, found := e.caches[moduleName]
 	if !found {
-		return nil, false, fmt.Errorf("cache %q not found", moduleName)
+		return nil, false, fmt.Errorf("cache %q not found in: %s", moduleName, e.caches)
 	}
 	if !cache.initialized {
 		if _, err := cache.c.LoadAtBlock(e.ctx, clock.Number); err != nil {

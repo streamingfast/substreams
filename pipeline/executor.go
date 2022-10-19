@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/substreams/pipeline/execout"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -145,7 +146,7 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 
 	if _, err := e.wasmCall(reader); err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		return nil, nil, fmt.Errorf("failed to run store wasm call: %w", err)
+		return nil, nil, fmt.Errorf("calling wasm store: %w", err)
 	}
 
 	deltas := &pbsubstreams.StoreDeltas{
@@ -166,7 +167,7 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	return data, moduleOutput, nil
 }
 
-func (e *BaseExecutor) wasmCall(reader execout.ExecutionOutputGetter) (instance *wasm.Instance, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (instance *wasm.Instance, err error) {
 	hasInput := false
 	for _, input := range e.wasmArguments {
 		switch v := input.(type) {
@@ -175,9 +176,9 @@ func (e *BaseExecutor) wasmCall(reader execout.ExecutionOutputGetter) (instance 
 			hasInput = true
 		case wasm.ValueArgument:
 			hasInput = true
-			data, _, err := reader.Get(v.Name())
+			data, _, err := outputGetter.Get(v.Name())
 			if err != nil {
-				return nil, fmt.Errorf("failed to get block input data: %w", err)
+				return nil, fmt.Errorf("input data for %q: %w", v.Name(), err)
 			}
 			v.SetValue(data)
 		default:
@@ -189,7 +190,7 @@ func (e *BaseExecutor) wasmCall(reader execout.ExecutionOutputGetter) (instance 
 	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
 	//  state store in read mode)
 	if hasInput {
-		clock := reader.Clock()
+		clock := outputGetter.Clock()
 		instance, err = e.wasmModule.NewInstance(clock, e.wasmArguments)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)

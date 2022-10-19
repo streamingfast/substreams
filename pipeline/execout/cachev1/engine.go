@@ -129,7 +129,7 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 func (e *Engine) get(moduleName string, clock *pbsubstreams.Clock) ([]byte, bool, error) {
 	cache, found := e.caches[moduleName]
 	if !found {
-		return nil, false, fmt.Errorf("cache %q not found in: %s", moduleName, e.caches)
+		return nil, false, fmt.Errorf("cache %q not found in: %v", moduleName, e.caches)
 	}
 	if !cache.initialized {
 		if _, err := cache.c.LoadAtBlock(e.ctx, clock.Number); err != nil {

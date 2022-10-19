@@ -36,11 +36,9 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 	}
 
 	// User-specified protos
-	parser := ProtobufParser{
-		parser: &protoparse.Parser{
-			ImportPaths:           importPaths,
-			IncludeSourceCodeInfo: true,
-		},
+	parser := &protoparse.Parser{
+		ImportPaths:           importPaths,
+		IncludeSourceCodeInfo: true,
 	}
 
 	for _, file := range manif.Protobuf.Files {
@@ -49,7 +47,7 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 		}
 	}
 
-	customFiles, err := parser.Parse(manif.Protobuf.Files...)
+	customFiles, err := parser.ParseFiles(manif.Protobuf.Files...)
 	if err != nil {
 		return fmt.Errorf("error parsing proto files %q (import paths: %q): %w", manif.Protobuf.Files, importPaths, err)
 	}

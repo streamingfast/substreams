@@ -150,8 +150,7 @@ func processRequest(
 		opts...,
 	)
 
-	err = pipe.Init()
-	require.NoError(t, err)
+	require.NoError(t, pipe.Init())
 
 	generator := newGenerator(uint64(request.StartBlockNum), request.StopBlockNum)
 

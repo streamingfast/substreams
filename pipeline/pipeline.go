@@ -345,6 +345,9 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.Execu
 	executorName := executor.Name()
 	p.reqCtx.logger.Debug("executing", zap.String("module_name", executorName))
 
+
+	// extract into : "getExecutorOutput()"
+
 	output, cached, err := execOutput.Get(executor.Name())
 	if err != nil && err != execout.NotFound {
 		return fmt.Errorf("error getting module %q output: %w", executor.Name(), err)
@@ -355,6 +358,22 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.Execu
 		}
 		return nil
 	}
+
+	// output, cached, err := p.getExecutorOutput(execOutput, executor)
+	// if err != nil {
+	// 	return err
+	// }
+	// if cached {
+	// 	return nil
+	// }
+
+
+	// extract into `runSingleExecutor`
+
+	// outputData, moduleOutputData, err := p.runSingleExecutor(execOutput)
+	// if err != nil {
+	// 	return err
+	// }
 
 	outputData, moduleOutputData, err := executor.run(p.reqCtx, execOutput)
 	if err != nil {
@@ -369,10 +388,12 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.Execu
 		}
 		return fmt.Errorf("running module: %w", err)
 	}
-
 	if err := execOutput.Set(executor.Name(), outputData); err != nil {
 		return fmt.Errorf("failed to set output %w", err)
 	}
+
+
+	// extract into `addExecutorOutput()
 
 	if p.isOutputModule(executorName) {
 		logs, truncated := executor.moduleLogs()
@@ -389,6 +410,7 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.Execu
 	}
 
 	executor.Reset()
+
 	return nil
 }
 

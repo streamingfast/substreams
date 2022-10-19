@@ -15,6 +15,9 @@ import (
 	"go.uber.org/zap"
 )
 
+var SkipRange = errors.New("skip range")
+var PartialChunksDone = errors.New("partial chunks done")
+
 type StoreSquasher struct {
 	name                         string
 	store                        *store.FullKV
@@ -87,26 +90,14 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 	defer metrics.SquashersEnded.Inc()
 
 	for {
-		select {
-		case <-ctx.Done():
-			s.log.Info("quitting on a close context")
-			// TODO(abourget): don't write anything here?
-			// the goroutine waiting on this one will ALSO trigger on `ctx.Done()`
-			// and exit properly... so no need to clog that channel.
-			s.waitForCompletion <- ctx.Err()
-			return
 
-		case partialsChunks, ok := <-s.partialsChunks:
-			if !ok {
-				s.log.Info("squashing done, no more partial chunks to squash")
+		if err := s.getPartialChunks(ctx); err != nil {
+			if err == PartialChunksDone {
 				close(s.waitForCompletion)
 				return
 			}
-			s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
-			s.ranges = append(s.ranges, partialsChunks...)
-			sort.Slice(s.ranges, func(i, j int) bool {
-				return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
-			})
+			s.waitForCompletion <- err
+			return
 		}
 
 		eg := llerrgroup.New(250)
@@ -124,7 +115,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			return
 		}
 
-		if out.lastExclusiveEndBlock != 0 { // TODO(abourget): have the caller ignore when it's 0, no?
+		if out.lastExclusiveEndBlock != 0 {
 			s.onStoreCompletedUntilBlock(s.name, out.lastExclusiveEndBlock)
 		}
 
@@ -141,6 +132,26 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 type rangeProgress struct {
 	squashCount           uint64
 	lastExclusiveEndBlock uint64
+}
+
+func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		s.log.Info("quitting on a close context")
+		return ctx.Err()
+
+	case partialsChunks, ok := <-s.partialsChunks:
+		if !ok {
+			s.log.Info("squashing done, no more partial chunks to squash")
+			return PartialChunksDone
+		}
+		s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
+		s.ranges = append(s.ranges, partialsChunks...)
+		sort.Slice(s.ranges, func(i, j int) bool {
+			return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
+		})
+	}
+	return nil
 }
 
 func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rangeProgress, error) {
@@ -178,8 +189,6 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 	}
 	return out, nil
 }
-
-var SkipRange = errors.New("skip range")
 
 func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, squashableRange *block.Range) error {
 	s.log.Info("testing squashable range",
@@ -232,24 +241,16 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 }
 
 func (s *StoreSquasher) shouldSaveFullKV(storeInitialBlock uint64, squashableRange *block.Range) bool {
-	// TODO(abourget): beautiful opportunity to create a table-driven tests function
-	// called `shouldSaveFullKV(...)` .. and wrap the `Save()` call in it.
-	// These are crazy conditions that are unreadable.. don't force us to dig into this
-	// at this level, if the only question is "should I save or not?"
-	// we'll dig in the conditions if we need
 
+	// we check if the squashableRange we just merged into our FullKV store, ends on a storeInterval boundary block
+	// If someone the storeSaveInterval
+
+	// squashable range must end on a store boundary block
 	isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
+	// we expect the range to be euqal to the store save interval, except if the range start block
+	// is the same as the store initial block
 	isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == storeInitialBlock
 	isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.storeSaveInterval == 0
-	// This logger was for debugging/testing in prod
-	zlog.Info("should write full store?",
-		zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock),
-		zap.Uint64("store_interval", s.storeSaveInterval),
-		zap.Bool("is_save_interval_reached", isSaveIntervalReached),
-		zap.Bool("is_first_kv_for_module", isFirstKvForModule),
-		zap.Bool("is_completed_kv", isCompletedKv),
-	)
-
 	return isFirstKvForModule || isCompletedKv
 }
 

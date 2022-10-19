@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/streamingfast/substreams/work"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -219,9 +220,9 @@ type AssertMapOutput struct {
 }
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
-	//if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
-	//	t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
-	//}
+	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
+		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
+	}
 
 	testTempDir := t.TempDir()
 

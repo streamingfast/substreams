@@ -119,7 +119,7 @@ func (b *Backprocessor) buildWorkPlan(storageState *StorageState) (out *WorkPlan
 		}
 
 		wu := &WorkUnits{modName: name}
-		if err := wu.init(uint64(b.runtimeConfig.StoreSnapshotsSaveInterval), config.ModuleInitialBlock(), b.upToBlock, snapshot); err != nil {
+		if err := wu.init(b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), b.upToBlock, snapshot); err != nil {
 			return nil, fmt.Errorf("init worker unit %q: %w", name, err)
 		}
 

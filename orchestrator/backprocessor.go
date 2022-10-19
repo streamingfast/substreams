@@ -15,7 +15,7 @@ import (
 type Backprocessor struct {
 	ctx                          context.Context
 	runtimeConfig                config.RuntimeConfig
-	storeConfigs                 store.ConfigMap
+	storeConfigMap               store.ConfigMap
 	upToBlock                    uint64 // We stop at this block exclusively. This is an irreversible block.
 	graph                        *manifest.ModuleGraph
 	upstreamRequestModules       *pbsubstreams.Modules
@@ -41,7 +41,7 @@ func New(
 		logger:                 logger,
 		graph:                  graph,
 		respFunc:               respFunc,
-		storeConfigs:           storeConfigs,
+		storeConfigMap:         storeConfigs,
 		upstreamRequestModules: upstreamRequestModules,
 	}
 }
@@ -62,7 +62,7 @@ func (b *Backprocessor) Run() (store.Map, error) {
 		return nil, err
 	}
 
-	multiSquasher, err := NewMultiSquasher(b.ctx, b.runtimeConfig, workPlan, b.storeConfigs, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
+	multiSquasher, err := NewMultiSquasher(b.ctx, b.runtimeConfig, workPlan, b.storeConfigMap, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (b *Backprocessor) Run() (store.Map, error) {
 }
 
 func (b *Backprocessor) planWork() (out *WorkPlan, err error) {
-	storageState, err := fetchStorageState(b.ctx, b.storeConfigs)
+	storageState, err := fetchStorageState(b.ctx, b.storeConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
@@ -111,7 +111,7 @@ func (b *Backprocessor) buildWorkPlan(storageState *StorageState) (out *WorkPlan
 	out = &WorkPlan{
 		workUnitsMap: map[string]*WorkUnits{}, // per module
 	}
-	for _, config := range b.storeConfigs {
+	for _, config := range b.storeConfigMap {
 		name := config.Name()
 		snapshot, ok := storageState.Snapshots[name]
 		if !ok {

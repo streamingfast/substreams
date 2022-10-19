@@ -132,3 +132,16 @@ modules:
         mode: deltas
     output:
       type: boolean
+
+  - name: assert_all_test
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - source: assert_test_store_delete_prefix
+      - source: assert_test_store_add_bigint
+      - source: assert_test_store_add_i64
+      - source: assert_test_store_add_i64_deltas
+      - source: assert_test_store_set_i64
+      - source: assert_test_store_set_i64_deltas

@@ -178,10 +178,16 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Ma
 
 	outputModuleName := p.reqCtx.Request().OutputModules[0]
 
+	// there is an assumption that in backgprocess mode the outputModule is a store
+	if _, found := storeConfigs[outputModuleName]; !found {
+		return nil, fmt.Errorf("request output module %q is not found int he store", outputModuleName)
+
+	}
+
 	storeMap := store.NewMap()
 
-	for _, config := range storeConfigs {
-		if config.Name() == outputModuleName {
+	for name, config := range storeConfigs {
+		if name == outputModuleName {
 			// TODO(abourget): what if this is the first segment?
 			// does the Squasher expect to have a Partial even for the first segment?
 			// Perhaps we want that simplicity, so we don't have to distinguish everywhere.

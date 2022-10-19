@@ -145,7 +145,7 @@ func (p *Pipeline) executeModules(execOutput execout.ExecutionOutput) (err error
 
 	for _, executor := range p.moduleExecutors {
 		if err = p.runExecutor(executor, execOutput); err != nil {
-			return err
+			return fmt.Errorf("running executor %q: %w", executor.Name(), err)
 		}
 	}
 	metrics.BlockEndProcess.Inc()

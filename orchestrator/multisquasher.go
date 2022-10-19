@@ -54,7 +54,7 @@ func NewMultiSquasher(
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
-			storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), runtimeConfig.StoreSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+			storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 		} else {
 			zlog.Info("loading initial store",
 				zap.String("store", storeModuleName),
@@ -63,7 +63,7 @@ func NewMultiSquasher(
 			if err := startingStore.Load(ctx, workUnit.initialCompleteRange.ExclusiveEndBlock); err != nil {
 				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, workUnit.initialCompleteRange, err)
 			}
-			storeSquasher = NewStoreSquasher(startingStore, upToBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, runtimeConfig.StoreSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+			storeSquasher = NewStoreSquasher(startingStore, upToBlock, workUnit.initialCompleteRange.ExclusiveEndBlock, uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 
 			onStoreCompletedUntilBlock(storeModuleName, workUnit.initialCompleteRange.ExclusiveEndBlock)
 		}

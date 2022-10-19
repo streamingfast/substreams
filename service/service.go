@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/work"
 	"os"
 
 	"github.com/streamingfast/substreams/metrics"
@@ -47,26 +48,33 @@ type Service struct {
 func New(
 	stateStore dstore.Store,
 	blockType string,
-	parallelSubRequests int,
-	blockRangeSizeSubRequests int,
+	parallelSubRequests uint64,
+	blockRangeSizeSubRequests uint64,
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
 ) (s *Service, err error) {
-	s = &Service{
-		runtimeConfig: config.RuntimeConfig{
-			StoreSnapshotsSaveInterval: uint64(blockRangeSizeSubRequests),
-			BaseObjectStore:            stateStore,
-			ParallelSubrequests:        parallelSubRequests,
+
+	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
+	clientFactory := client.NewFactory(substreamsClientConfig)
+
+	runtimeConfig := config.NewRuntimeConfig(
+		blockRangeSizeSubRequests,
+		0,
+		0,
+		parallelSubRequests,
+		stateStore,
+		func(logger *zap.Logger) work.Worker {
+			return work.NewRemoteWorker(clientFactory, logger)
 		},
-		blockType: blockType,
-		tracer:    otel.GetTracerProvider().Tracer("service"),
+	)
+	s = &Service{
+		runtimeConfig: runtimeConfig,
+		blockType:     blockType,
+		tracer:        otel.GetTracerProvider().Tracer("service"),
 	}
 
 	zlog.Info("registering substreams metrics")
 	metrics.Metricset.Register()
-
-	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
-	s.runtimeConfig.SubstreamsClientFactory = client.NewFactory(substreamsClientConfig)
 
 	// s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func() orchestrator.Worker {
 	// 	return orchestrator.NewRemoteWorker(newSubstreamClientFunc)
@@ -188,7 +196,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	// TODO(abourget): create a `StoreBoundary` at _this_ level? Just to bring along the save interval?
 	// The RuntimeConfig now holds that data, and everyone has it
-	storeBoundary := pipeline.NewStoreBoundary(s.runtimeConfig.StoreSnapshotsSaveInterval)
+	storeBoundary := pipeline.NewStoreBoundary(uint64(s.runtimeConfig.StoreSnapshotsSaveInterval))
 
 	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, requestCtx.Logger())
 	if err != nil {

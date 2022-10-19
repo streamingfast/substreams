@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/work"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 func TestNewJobsPlanner(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
 
-	subreqSplit := 100
+	subreqSplit := uint64(100)
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
@@ -154,6 +155,6 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	}
 }
 
-func jobstr(j *Job) string {
-	return fmt.Sprintf("%s %d-%d", j.ModuleName, j.requestRange.StartBlock, j.requestRange.ExclusiveEndBlock)
+func jobstr(j *work.Job) string {
+	return fmt.Sprintf("%s %d-%d", j.ModuleName, j.RequestRange.StartBlock, j.RequestRange.ExclusiveEndBlock)
 }

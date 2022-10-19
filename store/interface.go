@@ -51,7 +51,7 @@ type Loadable interface {
 }
 
 type Saveable interface {
-	Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error)
+	Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error)
 }
 
 type Resetable interface {

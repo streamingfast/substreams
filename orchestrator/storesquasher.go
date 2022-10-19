@@ -206,7 +206,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 
 	s.log.Debug("merging next store loaded", zap.Object("store", nextStore))
 	if err := s.store.Merge(nextStore); err != nil {
-		return fmt.Errorf("merging: %s", err)
+		return fmt.Errorf("merging: %w", err)
 	}
 
 	zlog.Debug("store merge", zap.Object("store", s.store))
@@ -219,9 +219,13 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	})
 
 	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {
+		_, writer, err := s.store.Save(squashableRange.ExclusiveEndBlock)
+		if err != nil {
+			return fmt.Errorf("save full store: %w", err)
+		}
+
 		eg.Go(func() error {
-			_, err := s.store.Save(ctx, squashableRange.ExclusiveEndBlock)
-			return err
+			return writer.Write(ctx)
 		})
 	}
 	return nil
@@ -237,7 +241,7 @@ func (s *StoreSquasher) shouldSaveFullKV(storeInitialBlock uint64, squashableRan
 	isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
 	isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == storeInitialBlock
 	isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.storeSaveInterval == 0
-	// This log was for debugging/testing in prod
+	// This logger was for debugging/testing in prod
 	zlog.Info("should write full store?",
 		zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock),
 		zap.Uint64("store_interval", s.storeSaveInterval),

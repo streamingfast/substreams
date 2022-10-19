@@ -1,4 +1,4 @@
-package orchestrator
+package work
 
 import (
 	"context"
@@ -22,35 +22,37 @@ type Worker interface {
 }
 
 // The tracer will be provided by the worker pool, on worker creation
-type WorkerFactory = func() Worker
+type WorkerFactory = func(logger *zap.Logger) Worker
 
 type RemoteWorker struct {
 	clientFactory client.Factory
 	tracer        ttrace.Tracer
+	logger        *zap.Logger
 }
 
-func NewRemoteWorker(clientFactory client.Factory) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWorker {
 	return &RemoteWorker{
 		clientFactory: clientFactory,
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
+		logger:        logger,
 	}
 }
 
 func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 	ctx, span := w.tracer.Start(ctx, "running_job")
 	span.SetAttributes(attribute.String("module_name", job.ModuleName))
-	span.SetAttributes(attribute.Int64("start_block", int64(job.requestRange.StartBlock)))
-	span.SetAttributes(attribute.Int64("stop_block", int64(job.requestRange.ExclusiveEndBlock)))
+	span.SetAttributes(attribute.Int64("start_block", int64(job.RequestRange.StartBlock)))
+	span.SetAttributes(attribute.Int64("stop_block", int64(job.RequestRange.ExclusiveEndBlock)))
 	defer span.End()
 	start := time.Now()
 
-	zlog.Info("creating gprc client")
+	jobLogger := w.logger.With(zap.Object("job", job))
+
+	jobLogger.Info("creating gprc client")
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
 	}
-
-	jobLogger := zlog.With(zap.Object("job", job))
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 

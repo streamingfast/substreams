@@ -1,4 +1,4 @@
-package orchestrator
+package work
 
 import (
 	"fmt"
@@ -8,14 +8,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-
 // TODO(abourget): the Job shouldn't be the one prioritizing itself.. an external Scheduler would
 // mutate the WorkPlan and reprioritize properly.
 type Job struct {
 	ModuleName   string // target
-	requestRange *block.Range
-	priority     int
-	scheduled    bool
+	RequestRange *block.Range
+	Priority     int
+	Scheduled    bool
 
 	deps jobDependencies
 }
@@ -36,10 +35,10 @@ P:   11 10 9
 func NewJob(storeName string, requestRange *block.Range, ancestorStoreModules []*pbsubstreams.Module, totalJobs, myJobIndex int) *Job {
 	j := &Job{
 		ModuleName:   storeName,
-		requestRange: requestRange,
+		RequestRange: requestRange,
 	}
 	j.defineDependencies(ancestorStoreModules)
-	j.priority = len(j.deps) * 2 + totalJobs - myJobIndex
+	j.Priority = len(j.deps)*2 + totalJobs - myJobIndex
 	return j
 }
 
@@ -54,15 +53,15 @@ func (j *Job) defineDependencies(stores []*pbsubstreams.Module) {
 	}
 }
 
-func (j *Job) signalDependencyResolved(storeName string, blockNum uint64) {
+func (j *Job) SignalDependencyResolved(storeName string, blockNum uint64) {
 	for _, dep := range j.deps {
-		if dep.storeName == storeName && blockNum >= j.requestRange.StartBlock {
+		if dep.storeName == storeName && blockNum >= j.RequestRange.StartBlock {
 			dep.resolved = true
 		}
 	}
 }
 
-func (j *Job) readyForDispatch() bool {
+func (j *Job) ReadyForDispatch() bool {
 	for _, dep := range j.deps {
 		if !dep.resolved {
 			return false
@@ -73,8 +72,8 @@ func (j *Job) readyForDispatch() bool {
 
 func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
-		StartBlockNum: int64(j.requestRange.StartBlock),
-		StopBlockNum:  j.requestRange.ExclusiveEndBlock,
+		StartBlockNum: int64(j.RequestRange.StartBlock),
+		StopBlockNum:  j.RequestRange.ExclusiveEndBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
 		Modules:       originalModules,
@@ -87,9 +86,9 @@ type jobDependency struct {
 	resolved  bool
 }
 
-type jobList []*Job
+type JobList []*Job
 
-func (l jobList) MarshalLogArray(enc zapcore.ArrayEncoder) error {
+func (l JobList) MarshalLogArray(enc zapcore.ArrayEncoder) error {
 	for _, d := range l {
 		enc.AppendObject(d)
 	}
@@ -112,13 +111,13 @@ func (d *jobDependency) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 func (j *Job) String() string {
-	return fmt.Sprintf("job: module=%s range=%s", j.ModuleName, j.requestRange)
+	return fmt.Sprintf("job: module=%s range=%s", j.ModuleName, j.RequestRange)
 }
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module_name", j.ModuleName)
-	enc.AddUint64("start_block", j.requestRange.StartBlock)
-	enc.AddUint64("end_block", j.requestRange.ExclusiveEndBlock)
+	enc.AddUint64("start_block", j.RequestRange.StartBlock)
+	enc.AddUint64("end_block", j.RequestRange.ExclusiveEndBlock)
 	//enc.AddArray("deps", j.deps)
 	return nil
 }

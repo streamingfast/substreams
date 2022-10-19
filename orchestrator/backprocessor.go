@@ -13,25 +13,15 @@ import (
 )
 
 type Backprocessor struct {
-	ctx           context.Context
-	runtimeConfig config.RuntimeConfig
-	storeConfigs  store.ConfigMap
-	log           *zap.Logger
-
-	upToBlock uint64 // We stop at this block exclusively. This is an irreversible block.
-
+	ctx                          context.Context
+	runtimeConfig                config.RuntimeConfig
+	storeConfigs                 store.ConfigMap
+	upToBlock                    uint64 // We stop at this block exclusively. This is an irreversible block.
 	graph                        *manifest.ModuleGraph
 	upstreamRequestModules       *pbsubstreams.Modules
 	upstreamRequestOutputModules []string // TODO(abourget): we'll need to distinguish here if upstream wants parallel download for those, so perhaps another map. This will mean we'll probably want to adjust the gRPC Request/Response models, to have flags instead of list of output modules. See the GitHub issues with details and an example. # ? :)
-
-	respFunc func(resp *pbsubstreams.Response) error
-
-	// respFunc
-	// storeConfigs
-
-	// BuildWorkPlan()
-	// workPlan
-	// workerPool
+	respFunc                     func(resp *pbsubstreams.Response) error
+	logger                       *zap.Logger
 }
 
 func New(
@@ -48,7 +38,7 @@ func New(
 		ctx:                    ctx,
 		runtimeConfig:          runtimeConfig,
 		upToBlock:              upToBlock,
-		log:                    logger,
+		logger:                 logger,
 		graph:                  graph,
 		respFunc:               respFunc,
 		storeConfigs:           storeConfigs,
@@ -61,13 +51,13 @@ func (b *Backprocessor) Run() (store.Map, error) {
 	// workPlan should hold all the jobs, dependencies
 	// and it could be a changing plan, reshufflable,
 	// This contains all what the jobsPlanner had
-	// This calls `SplitWork`, with save Interval, moduleInitialBlock, snapshots
+	// This calls `splitWork`, with save Interval, moduleInitialBlock, snapshots
 	workPlan, err := b.planWork()
 	if err != nil {
 		return nil, err
 	}
 
-	scheduler, err := NewScheduler(b.ctx, b.runtimeConfig, workPlan, b.graph, b.respFunc, b.log, b.upstreamRequestModules)
+	scheduler, err := NewScheduler(b.ctx, b.runtimeConfig, workPlan, b.graph, b.respFunc, b.logger, b.upstreamRequestModules)
 	if err != nil {
 		return nil, err
 	}
@@ -127,11 +117,15 @@ func (b *Backprocessor) buildWorkPlan(storageState *StorageState) (out *WorkPlan
 		if !ok {
 			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", name)
 		}
-		// TODO(abourget): Pass in the `SaveInterval` in some ways
-		out.workUnitsMap[name] = SplitWork(name, b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), b.upToBlock, snapshot)
-	}
-	b.log.Info("work plan ready", zap.Stringer("work_plan", out))
 
+		wu := &WorkUnits{modName: name}
+		if err := wu.init(uint64(b.runtimeConfig.StoreSnapshotsSaveInterval), config.ModuleInitialBlock(), b.upToBlock, snapshot); err != nil {
+			return nil, fmt.Errorf("init worker unit %q: %w", name, err)
+		}
+
+		out.workUnitsMap[name] = wu
+	}
+	b.logger.Info("work plan ready", zap.Stringer("work_plan", out))
 	return
 }
 

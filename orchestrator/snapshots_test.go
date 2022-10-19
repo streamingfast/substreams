@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"github.com/streamingfast/substreams/block"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,26 +20,81 @@ func TestSnapshots_LastCompleted(t *testing.T) {
 }
 
 func TestSnapshots_LastCompleteBefore(t *testing.T) {
-	s := &Snapshots{
-		Completes: parseRanges("10-20,10-50,10-1000"),
+	tests := []struct {
+		name         string
+		snapshot     *Snapshots
+		blockNum     uint64
+		expectBrange *block.Range
+	}{
+		{
+			name: "no complete range covering block",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     0,
+			expectBrange: nil,
+		},
+		{
+			name: "no complete range covering block",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     19,
+			expectBrange: nil,
+		},
+		{
+			name: "complete range ending on block",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     20,
+			expectBrange: block.NewRange(10, 20),
+		},
+		{
+			name: "complete range ending just before lookup block",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     21,
+			expectBrange: block.NewRange(10, 20),
+		},
+		{
+			name: "complete range ending before lookup block",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     49,
+			expectBrange: block.NewRange(10, 20),
+		},
+		{
+			name: "better complete range ending on block",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     50,
+			expectBrange: block.NewRange(10, 50),
+		},
+		{
+			name: "another test 1",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     51,
+			expectBrange: block.NewRange(10, 50),
+		},
+		{
+			name: "another test 2",
+			snapshot: &Snapshots{
+				Completes: parseRanges("10-20,10-50,10-1000"),
+			},
+			blockNum:     1003,
+			expectBrange: block.NewRange(10, 1000),
+		},
 	}
-
-	assert.Nil(t, s.LastCompleteSnapshotBefore(0))
-	assert.Nil(t, s.LastCompleteSnapshotBefore(5))
-	assert.Nil(t, s.LastCompleteSnapshotBefore(19))
-	assert.Equal(t, 20, int(s.LastCompleteSnapshotBefore(20).ExclusiveEndBlock))
-	assert.Equal(t, 20, int(s.LastCompleteSnapshotBefore(21).ExclusiveEndBlock))
-	assert.Equal(t, 20, int(s.LastCompleteSnapshotBefore(49).ExclusiveEndBlock))
-	assert.Equal(t, 50, int(s.LastCompleteSnapshotBefore(50).ExclusiveEndBlock))
-	assert.Equal(t, 50, int(s.LastCompleteSnapshotBefore(51).ExclusiveEndBlock))
-	assert.Equal(t, 50, int(s.LastCompleteSnapshotBefore(999).ExclusiveEndBlock))
-	assert.Equal(t, 1000, int(s.LastCompleteSnapshotBefore(1000).ExclusiveEndBlock))
-	assert.Equal(t, 1000, int(s.LastCompleteSnapshotBefore(1001).ExclusiveEndBlock))
-	assert.Equal(t, 1000, int(s.LastCompleteSnapshotBefore(10000).ExclusiveEndBlock))
-
-	s = &Snapshots{
-		Completes: parseRanges(""),
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			blockRange := test.snapshot.LastCompleteSnapshotBefore(test.blockNum)
+			assert.Equal(t, test.expectBrange, blockRange)
+		})
 	}
-	assert.Nil(t, s.LastCompleteSnapshotBefore(0))
-	assert.Nil(t, s.LastCompleteSnapshotBefore(5))
 }

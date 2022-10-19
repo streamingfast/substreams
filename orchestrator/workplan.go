@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/work"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -12,7 +13,7 @@ type WorkPlan struct {
 
 	workUnitsMap map[string]*WorkUnits // WorksUnits split by module name
 
-	prioritizedJobs []*Job
+	prioritizedJobs []*work.Job
 }
 
 func (p *WorkPlan) StoreCount() int {

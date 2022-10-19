@@ -51,7 +51,7 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	return nil
 }
 
-func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
+func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
 	data := &storeData{
@@ -61,22 +61,25 @@ func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.R
 
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshal partial data: %w", err)
+		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}
 
 	filename := p.storageFilename(endBoundaryBlock)
-	if err := saveStore(ctx, p.store, filename, content); err != nil {
-		return nil, fmt.Errorf("write partial store %q in file %q: %w", p.name, filename, err)
-	}
 
 	brange := block.NewRange(p.initialBlock, endBoundaryBlock)
-	p.logger.Info("partial store state written",
+	p.logger.Info("partial store save written",
 		zap.String("store", p.name),
 		zap.String("file_name", filename),
 		zap.Object("block_range", brange),
 	)
 
-	return brange, nil
+	fw := &FileWriter{
+		store:    p.store,
+		filename: filename,
+		content:  content,
+	}
+
+	return brange, fw, nil
 }
 
 func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {

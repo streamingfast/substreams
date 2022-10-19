@@ -289,9 +289,13 @@ func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
 		_, span := p.tracer.Start(p.reqCtx.Context, "save_store_snapshot", ttrace.WithAttributes(attribute.String("store", name)))
 		defer tracing.EndSpan(span, tracing.WithEndErr(&err))
 
-		blockRange, err := s.Save(p.reqCtx, boundaryBlock)
+		blockRange, writer, err := s.Save(boundaryBlock)
 		if err != nil {
-			return fmt.Errorf("sacing store %q at boundary %d: %w", name, boundaryBlock, err)
+			return fmt.Errorf("saving store %q at boundary %d: %w", name, boundaryBlock, err)
+		}
+
+		if err := writer.Write(p.reqCtx); err != nil {
+			return fmt.Errorf("failed to write store: %w", err)
 		}
 
 		if p.reqCtx.isSubRequest && p.isOutputModule(name) {

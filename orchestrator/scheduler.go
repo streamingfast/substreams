@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/work"
 	"sort"
 	"sync"
 	"time"
@@ -19,7 +20,7 @@ import (
 )
 
 type Scheduler struct {
-	workerPool             *WorkerPool
+	workerPool             *work.WorkerPool
 	respFunc               substreams.ResponseFunc
 	graph                  *manifest.ModuleGraph
 	upstreamRequestModules *pbsubstreams.Modules
@@ -44,9 +45,7 @@ func NewScheduler(
 ) (*Scheduler, error) {
 	tracer := otel.GetTracerProvider().Tracer("scheduler")
 
-	workerPool := NewWorkerPool(runtimeConfig.ParallelSubrequests, func() Worker {
-		return NewRemoteWorker(runtimeConfig.SubstreamsClientFactory)
-	})
+	workerPool := work.NewWorkerPool(runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory, logger)
 
 	// TODO(abourget): rework that jobsPlanner to better fit within the Scheduler, but now at
 	// least it's isolated within, and no one externally knows about it.
@@ -141,7 +140,7 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, worker Worker, job *Job, requestModules *pbsubstreams.Modules) error {
+func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) error {
 	var partialsWritten []*block.Range
 	var err error
 
@@ -150,7 +149,7 @@ out:
 		partialsWritten, err = worker.Run(ctx, job, requestModules, s.respFunc)
 
 		switch err.(type) {
-		case *RetryableErr:
+		case *work.RetryableErr:
 			zlog.Debug("retryable error", zap.Error(err))
 			continue
 		default:
@@ -183,8 +182,8 @@ out:
 type JobsPlanner struct {
 	sync.Mutex
 
-	jobs          jobList // all jobs, completed or not
-	AvailableJobs chan *Job
+	jobs          work.JobList // all jobs, completed or not
+	AvailableJobs chan *work.Job
 	completed     bool
 	tracer        ttrace.Tracer
 }
@@ -192,7 +191,7 @@ type JobsPlanner struct {
 func NewJobsPlanner(
 	ctx context.Context,
 	workPlan *WorkPlan,
-	subrequestSplitSize int,
+	subrequestSplitSize uint64,
 	graph *manifest.ModuleGraph,
 ) (*JobsPlanner, error) {
 	planner := &JobsPlanner{
@@ -210,7 +209,7 @@ func NewJobsPlanner(
 			// do nothing
 		}
 
-		requests := workUnit.batchRequests(uint64(subrequestSplitSize))
+		requests := workUnit.batchRequests(subrequestSplitSize)
 		rangeLen := len(requests)
 		for idx, requestRange := range requests {
 			select {
@@ -227,7 +226,7 @@ func NewJobsPlanner(
 				return nil, fmt.Errorf("getting ancestore stores for %s: %w", storeName, err)
 			}
 
-			job := NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
+			job := work.NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
 			planner.jobs = append(planner.jobs, job)
 
 			zlog.Info("job planned", zap.String("module_name", storeName), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
@@ -235,7 +234,7 @@ func NewJobsPlanner(
 	}
 
 	planner.sortJobs()
-	planner.AvailableJobs = make(chan *Job, len(planner.jobs))
+	planner.AvailableJobs = make(chan *work.Job, len(planner.jobs))
 	planner.dispatch()
 
 	zlog.Info("jobs planner ready")
@@ -246,7 +245,7 @@ func NewJobsPlanner(
 func (p *JobsPlanner) sortJobs() {
 	sort.Slice(p.jobs, func(i, j int) bool {
 		// reverse sorts priority, higher first
-		return p.jobs[i].priority > p.jobs[j].priority
+		return p.jobs[i].Priority > p.jobs[j].Priority
 	})
 }
 
@@ -255,11 +254,11 @@ func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64)
 	defer p.Unlock()
 
 	for _, job := range p.jobs {
-		if job.scheduled {
+		if job.Scheduled {
 			continue
 		}
 
-		job.signalDependencyResolved(storeName, blockNum)
+		job.SignalDependencyResolved(storeName, blockNum)
 	}
 
 	p.dispatch()
@@ -273,12 +272,12 @@ func (p *JobsPlanner) dispatch() {
 
 	var scheduled int
 	for _, job := range p.jobs {
-		if job.scheduled {
+		if job.Scheduled {
 			scheduled++
 			continue
 		}
-		if job.readyForDispatch() {
-			job.scheduled = true
+		if job.ReadyForDispatch() {
+			job.Scheduled = true
 			zlog.Debug("dispatching job", zap.Object("job", job))
 			p.AvailableJobs <- job
 		}

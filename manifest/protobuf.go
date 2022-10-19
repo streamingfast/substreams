@@ -22,7 +22,7 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 		seen[*file.Name] = true
 	}
 
-	importPaths := []string{}
+	var importPaths []string
 	for _, imp := range manif.Protobuf.ImportPaths {
 		importPaths = append(importPaths, manif.resolvePath(imp))
 	}
@@ -30,13 +30,13 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) error {
 	// The manifest's root directory is always added to the list of import paths so that
 	// files specified relative to the manifest's directory works properly. It is added last
 	// so that if user's specified import paths contains the file, it's picked from their
-	// import paths instead of the implicitely added folder.
+	// import paths instead of the implicitly added folder.
 	if manif.Workdir != "" {
 		importPaths = append(importPaths, manif.Workdir)
 	}
 
 	// User-specified protos
-	parser := protoparse.Parser{
+	parser := &protoparse.Parser{
 		ImportPaths:           importPaths,
 		IncludeSourceCodeInfo: true,
 	}

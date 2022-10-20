@@ -48,7 +48,11 @@ strip = "debuginfo"
 ```
 {% endcode %}
 
-The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
+
+The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
 ### **Cargo.toml Breakdown**
 
@@ -93,6 +97,10 @@ components = [ "rustfmt" ]
 targets = [ "wasm32-unknown-unknown" ]
 ```
 {% endcode %}
+
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml)
 
 The code can now be built.
 
@@ -154,6 +162,10 @@ fn main() -> Result<(), anyhow::Error> {
 ```
 {% endcode %}
 
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/build.rs](https://github.com/streamingfast/substreams-template/blob/develop/build.rs)
+
 Run the build script to generate the ABI directory and files.
 
 ```bash
@@ -167,5 +179,9 @@ Next, create a `mod.rs` file in the abi directory (that was created by the Rust 
 pub mod erc721;
 ```
 {% endcode %}
+
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs)
 
 The next step in the Substreams setup process is to write the actual module handlers themselves.

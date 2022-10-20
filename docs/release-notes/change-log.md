@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* CLI is now able to read `.spkg` from `gs://`, `s3://` and `az://` URLs, the URL format must be supported by our [dstore](https://github.com/streamingfast/dstore) library).
+
 * Command `substreams pack` is now restricted to local manifest file.
 
 * Made changes to allow for `substreams` CLI to run on Windows OS (thanks @robinbernon).

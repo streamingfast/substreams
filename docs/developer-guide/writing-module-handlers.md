@@ -74,6 +74,10 @@ fn generate_key(holder: &Vec<u8>) -> String {
 ```
 {% endcode %}
 
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
+
 ### **Module Handler Breakdown**
 
 Each logical section of the `lib.rs` file is outlined and described in greater detail below.
@@ -125,11 +129,11 @@ fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::
 ```
 
 {% hint style="info" %}
-_Note:_
+**Note**: _ **Rust Macros**_
 
-_**Rust Macros**_
+_Notice the #\[substreams::handlers::map] above the function, this is a Rust "macro" that is provided by the substreams crate._&#x20;
 
-_Notice the #\[substreams::handlers::map] above the function, this is a rust macro that is provided by the substreams crate. This macro decorates our handler function as a map. There is also a macro used to decorate the handler of kind store:_
+_This macro decorates our handler function as a map. There is also a macro used to decorate the handler of kind store represented as follows._
 
 _#\[substreams::handlers::store]_
 {% endhint %}

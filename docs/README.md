@@ -6,11 +6,13 @@ description: StreamingFast Substreams documentation
 
 ### Where to Start
 
-First, read through the [basic concepts](broken-reference) and study the [visual diagram. ](concept-and-fundamentals/visual-diagram.md)Next, review the [definition](concepts/definition.md) and [comparison](broken-reference) documentation.&#x20;
+Substreams is a new technology developed by StreamingFast working with The Graph Foundation. The product provides extremely fast consumption and processing of indexed blockchain data.
 
-For developers looking to work with and create Substreams [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md).
+Learning more about [what Substreams is](concepts/definition.md), studying the [conceptual diagram](concept-and-fundamentals/visual-diagram.md), and then reading through the [fundamentals](concept-and-fundamentals/fundamentals.md) is a great track for learning more.
 
-Take a moment to learn about [modules](concepts/modules.md) before moving on to the [Developer Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
+For developers looking to get started right away, [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md) with Substreams.
+
+Additional information is available for understanding [modules](concepts/modules.md) and sample code with explanations can be found in the [Developer Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 
 #### Introduction Video
 

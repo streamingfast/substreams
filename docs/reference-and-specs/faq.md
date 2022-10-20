@@ -73,3 +73,29 @@ Right now, it’s only command line. Substreams is not meant to be piped to a we
 ### Is it possible to continuously listen for new blocks with Substreams?
 
 Specifying a stop block value of zero (0), the default, enables transparent handoff from historical to real-time blocks.
+
+### **Does StreamingFast have a Discord?**
+
+Yes! Join the StreamingFast Discord by clicking the link below.
+
+[https://discord.gg/Ugc7KtkA](https://discord.gg/Ugc7KtkA)
+
+### **Is StreamingFast on Twitter?**
+
+Yes! Find StreamingFast on their official Twitter account.
+
+[https://twitter.com/streamingfastio](https://twitter.com/streamingfastio)
+
+### **Is StreamingFast on YouTube?**
+
+Yes! Find StreamingFast on their official YouTube account.
+
+[https://www.youtube.com/c/streamingfast](https://www.youtube.com/c/streamingfast)
+
+### **Who is dfuse?**
+
+StreamingFast was originally called dfuse. The company changed the name and is in the process of phasing the old brand out.
+
+### **Who is StreamingFast?**
+
+StreamingFast is a protocol infrastructure company that provides a massively scalable architecture for streaming blockchain data. StreamingFast is one of the core developers working alongside The Graph Foundation.

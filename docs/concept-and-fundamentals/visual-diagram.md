@@ -1,12 +1,12 @@
 ---
-description: StreamingFast Substreams visual diagram
+description: StreamingFast Substreams conceptual diagram
 ---
 
-# Visual Diagram
+# Conceptual Diagram
 
-### Substreams visual representation
+### Substreams Conceptual Diagram
 
-<img src="../.gitbook/assets/substreams.excalidraw (1).svg" alt="StreamingFast Substreams high-level visual diagram" class="gitbook-drawing">
+<img src="../.gitbook/assets/substreams.excalidraw (1).svg" alt="StreamingFast Substreams high-level conceptual diagram" class="gitbook-drawing">
 
 Substreams has two perspectives as illustrated in the high-level visual diagram seen below. One perspective is the architecture of and Substreams engine itself. The other perspective is from that of an end-user developer. &#x20;
 

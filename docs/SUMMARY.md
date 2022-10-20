@@ -5,7 +5,7 @@
 ## Concept & Fundamentals
 
 * [What is Substreams](concepts/definition.md)
-* [Visual Diagram](concept-and-fundamentals/visual-diagram.md)
+* [Conceptual Diagram](concept-and-fundamentals/visual-diagram.md)
 * [Fundamentals](concept-and-fundamentals/fundamentals.md)
 * [Modules](concepts/modules.md)
   * [Module Types](concept-and-fundamentals/modules/module-types.md)

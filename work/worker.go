@@ -3,6 +3,8 @@ package work
 import (
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
@@ -14,8 +16,6 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
-	"io"
-	"time"
 )
 
 type Worker interface {
@@ -43,8 +43,12 @@ func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWo
 func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) (ranges []*block.Range, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "running_job")
 	defer span.EndWithErr(&err)
+	span.SetAttributes(attribute.StringSlice("module_names", request.OutputModules))
+	span.SetAttributes(attribute.Int64("start_block", int64(request.StartBlockNum)))
+	span.SetAttributes(attribute.Int64("stop_block", int64(request.StopBlockNum)))
+	logger := w.logger
 
-	start := time.Now()
+	logger.Info("creating gprc client")
 	w.logger.Info("creating gprc client")
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
@@ -62,28 +66,24 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			w.logger.Warn("failed to close stream on job termination", zap.Error(err))
+			logger.Warn("failed to close stream on job termination", zap.Error(err))
 		}
 		if err := closeFunc(); err != nil {
-			w.logger.Warn("failed to close grpc client on job termination", zap.Error(err))
+			logger.Warn("failed to close grpc client on job termination", zap.Error(err))
 		}
 	}()
 
 	meta, err := stream.Header()
 	if err != nil {
-		w.logger.Warn("error getting stream header", zap.Error(err))
+		logger.Warn("error getting stream header", zap.Error(err))
 	}
 	remoteHostname := "unknown"
 	if hosts := meta.Get("host"); len(hosts) != 0 {
 		remoteHostname = hosts[0]
-		w.logger = w.logger.With(zap.String("remote_hostname", remoteHostname))
+		logger = logger.With(zap.String("remote_hostname", remoteHostname))
 	}
-	span.SetAttributes(attribute.String("remote_hostname", remoteHostname))
 
-	w.logger.Info("running job")
-	defer func() {
-		w.logger.Info("job completed", zap.Duration("in", time.Since(start)))
-	}()
+	span.SetAttributes(attribute.String("remote_hostname", remoteHostname))
 
 	for {
 		select {
@@ -132,11 +132,11 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 
 		if err != nil {
 			if err == io.EOF {
-				w.logger.Info("worker done")
+				logger.Info("worker done")
 				trailers := stream.Trailer().Get("substreams-partials-written")
 				var partialsWritten []*block.Range
 				if len(trailers) != 0 {
-					w.logger.Info("partial written", zap.String("trailer", trailers[0]))
+					logger.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
 				return partialsWritten, nil

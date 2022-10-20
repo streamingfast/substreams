@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/work"
 	"sort"
 	"sync"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/work"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -143,7 +143,11 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 
 out:
 	for i := 0; uint64(i) < 3; i++ {
-		partialsWritten, err = worker.Run(ctx, job.CreateRequest(requestModules), s.respFunc)
+		t0 := time.Now()
+		newRequest := job.CreateRequest(requestModules)
+		s.log.Info("running job", zap.Object("job", job))
+		partialsWritten, err = worker.Run(ctx, newRequest, s.respFunc)
+		s.log.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(t0)))
 		switch err.(type) {
 		case *work.RetryableErr:
 			logger.Debug("retryable error", zap.Error(err))

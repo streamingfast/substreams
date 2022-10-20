@@ -134,6 +134,12 @@ type rangeProgress struct {
 	lastExclusiveEndBlock uint64
 }
 
+func (s *StoreSquasher) sortRange() {
+	sort.Slice(s.ranges, func(i, j int) bool {
+		return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
+	})
+}
+
 func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -147,9 +153,7 @@ func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
 		}
 		s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
 		s.ranges = append(s.ranges, partialsChunks...)
-		sort.Slice(s.ranges, func(i, j int) bool {
-			return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
-		})
+		s.sortRange()
 	}
 	return nil
 }

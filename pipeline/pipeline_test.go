@@ -39,20 +39,6 @@ func TestPipeline_runExecutor(t *testing.T) {
 				}, out)
 			},
 		},
-		{
-			name:       "return map's cache",
-			moduleName: "test_map",
-			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
-			testFunc: func(t *testing.T, data []byte) {
-				out := &pbsubstreamstest.MapResult{}
-				err := proto.Unmarshal(data, out)
-				require.NoError(t, err)
-				assertProtoEqual(t, &pbsubstreamstest.MapResult{
-					BlockNumber: 10,
-					BlockHash:   "block-10",
-				}, out)
-			},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

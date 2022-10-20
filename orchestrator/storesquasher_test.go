@@ -7,18 +7,16 @@ import (
 	"fmt"
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/store"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/streamingfast/substreams/block"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestShouldSaveFullKV(t *testing.T) {
@@ -119,77 +117,40 @@ func TestStoreSquasher_squash(t *testing.T) {
 		})
 	}
 }
-func TestStoreSquasher_getPartialChunks(t *testing.T) {
-	tests := []struct {
-		name         string
-		ranges       block.Ranges
-		getContext   func(ctx context.Context) (context.Context, context.CancelFunc)
-		execute      func(ctx context.Context, cancelFunc context.CancelFunc, s *StoreSquasher)
-		expectRanges block.Ranges
-		expectErr    error
-	}{
-		{
-			name:   "get partial chunks",
-			ranges: []*block.Range{},
-			getContext: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				return ctx, func() {}
-			},
-			execute: func(ctx context.Context, cancelFunc context.CancelFunc, s *StoreSquasher) {
-				s.partialsChunks <- block.ParseRanges("0-10")
-			},
-			expectRanges: []*block.Range{{0, 10}},
-		},
-		{
-			name:   "get partial chunks and sorts",
-			ranges: []*block.Range{{30, 40}},
-			getContext: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				return ctx, func() {}
-			},
-			execute: func(ctx context.Context, cancelFunc context.CancelFunc, s *StoreSquasher) {
-				s.partialsChunks <- block.ParseRanges("10-20,20-30")
-			},
-			expectRanges: []*block.Range{{10, 20}, {20, 30}, {30, 40}},
-		},
-		{
-			name: "received end of partial ",
-			getContext: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				return ctx, func() {}
-			},
-			execute: func(ctx context.Context, cancelFunc context.CancelFunc, s *StoreSquasher) {
-				close(s.partialsChunks)
-			},
-			expectErr: PartialChunksDone,
-		},
-		{
-			name:       "context canceled",
-			getContext: context.WithCancel,
-			execute: func(ctx context.Context, cancelFunc context.CancelFunc, s *StoreSquasher) {
-				time.Sleep(1 * time.Second)
-				cancelFunc()
-			},
-			expectErr: context.Canceled,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			squasher := &StoreSquasher{
-				partialsChunks: make(chan block.Ranges, 10),
-				ranges:         test.ranges,
-				log:            zap.NewNop(),
-			}
-			ctx, closeFunc := test.getContext(context.Background())
-			go test.execute(ctx, closeFunc, squasher)
-			err := squasher.getPartialChunks(ctx)
+func TestStoreSquasher_sortRange(t *testing.T) {
+	s := &StoreSquasher{ranges: parseRanges("10-20,40-50,0-10")}
+	s.sortRange()
+	assert.Equal(t, parseRanges("0-10,10-20,40-50"), s.ranges)
+}
 
-			if test.expectErr != nil {
-				require.Error(t, err)
-				assert.Equal(t, test.expectErr, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, test.expectRanges, squasher.ranges)
-			}
-		})
+func TestStoreSquasher_getPartialChunks(t *testing.T) {
+	ctx := context.Background()
+	s := &StoreSquasher{
+		partialsChunks: make(chan block.Ranges, 10),
+		ranges:         []*block.Range{},
+		log:            zap.NewNop(),
 	}
+	go func() {
+		s.partialsChunks <- block.ParseRanges("0-10")
+	}()
+	err := s.getPartialChunks(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(s.ranges))
+
+	cacnelCtx, cancelFunc := context.WithCancel(ctx)
+	go func() {
+		cancelFunc()
+	}()
+	err = s.getPartialChunks(cacnelCtx)
+	require.Error(t, err)
+	assert.Equal(t, context.Canceled, err)
+
+	go func() {
+		close(s.partialsChunks)
+	}()
+	err = s.getPartialChunks(ctx)
+	require.Error(t, err)
+	assert.Equal(t, PartialChunksDone, err)
 }
 
 func TestStoreSquasher_processRange(t *testing.T) {

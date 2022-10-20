@@ -7,6 +7,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -18,7 +19,7 @@ import (
 )
 
 type Worker interface {
-	Run(ctx context.Context, job *Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error)
+	Run(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error)
 }
 
 // The tracer will be provided by the worker pool, on worker creation
@@ -38,17 +39,13 @@ func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWo
 	}
 }
 
-func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubstreams.Modules, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
-	ctx, span := w.tracer.Start(ctx, "running_job")
-	span.SetAttributes(attribute.String("module_name", job.ModuleName))
-	span.SetAttributes(attribute.Int64("start_block", int64(job.RequestRange.StartBlock)))
-	span.SetAttributes(attribute.Int64("stop_block", int64(job.RequestRange.ExclusiveEndBlock)))
-	defer span.End()
+//job *Job, requestModules *pbsubstreams.Modules
+func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) (ranges []*block.Range, err error) {
+	ctx, span := reqctx.WithSpan(ctx, "running_job")
+	defer span.EndWithErr(&err)
+
 	start := time.Now()
-
-	jobLogger := w.logger.With(zap.Object("job", job))
-
-	jobLogger.Info("creating gprc client")
+	w.logger.Info("creating gprc client")
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
@@ -56,40 +53,36 @@ func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubs
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
-	request := job.CreateRequest(requestModules)
-
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, err
 		}
-		span.SetStatus(codes.Error, err.Error())
 		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			jobLogger.Warn("failed to close stream on job termination", zap.Error(err))
+			w.logger.Warn("failed to close stream on job termination", zap.Error(err))
 		}
 		if err := closeFunc(); err != nil {
-			jobLogger.Warn("failed to close grpc client on job termination", zap.Error(err))
+			w.logger.Warn("failed to close grpc client on job termination", zap.Error(err))
 		}
 	}()
 
 	meta, err := stream.Header()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		jobLogger.Warn("error getting stream header", zap.Error(err))
+		w.logger.Warn("error getting stream header", zap.Error(err))
 	}
 	remoteHostname := "unknown"
 	if hosts := meta.Get("host"); len(hosts) != 0 {
 		remoteHostname = hosts[0]
-		jobLogger = jobLogger.With(zap.String("remote_hostname", remoteHostname))
+		w.logger = w.logger.With(zap.String("remote_hostname", remoteHostname))
 	}
 	span.SetAttributes(attribute.String("remote_hostname", remoteHostname))
 
-	jobLogger.Info("running job", zap.Object("job", job))
+	w.logger.Info("running job")
 	defer func() {
-		jobLogger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+		w.logger.Info("job completed", zap.Duration("in", time.Since(start)))
 	}()
 
 	for {
@@ -97,10 +90,8 @@ func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubs
 		case <-ctx.Done():
 			err := ctx.Err()
 			if err != nil {
-				span.SetStatus(codes.Error, err.Error())
 				return nil, err
 			}
-			span.SetStatus(codes.Ok, "context cancelled")
 			return nil, nil
 		default:
 		}
@@ -141,17 +132,15 @@ func (w *RemoteWorker) Run(ctx context.Context, job *Job, requestModules *pbsubs
 
 		if err != nil {
 			if err == io.EOF {
-				jobLogger.Info("worker done", zap.Object("job", job))
+				w.logger.Info("worker done")
 				trailers := stream.Trailer().Get("substreams-partials-written")
 				var partialsWritten []*block.Range
 				if len(trailers) != 0 {
-					jobLogger.Info("partial written", zap.String("trailer", trailers[0]))
+					w.logger.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
-				span.SetStatus(codes.Ok, "done")
 				return partialsWritten, nil
 			}
-			span.SetStatus(codes.Error, err.Error())
 			return nil, &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)}
 		}
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -22,7 +21,6 @@ func TestPipeline_runExecutor(t *testing.T) {
 		moduleName string
 		execOutput *MapperModuleExecutor
 		block      *pbsubstreamstest.Block
-		request    *RequestContext
 		testFunc   func(t *testing.T, data []byte)
 	}{
 		{
@@ -42,25 +40,17 @@ func TestPipeline_runExecutor(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			pipe := &Pipeline{
-				reqCtx: testRequestContext(context.Background()),
-			}
+			ctx := context.Background()
+			pipe := &Pipeline{}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)
-			err := pipe.runExecutor(executor, execOutput)
+			err := pipe.runExecutor(ctx, executor, execOutput)
 			require.NoError(t, err)
 			output, found := execOutput.Values[test.moduleName]
 			require.Equal(t, true, found)
 			test.testFunc(t, output)
 		})
-	}
-}
-
-func testRequestContext(ctx context.Context) *RequestContext {
-	return &RequestContext{
-		Context: ctx,
-		logger:  zap.NewNop(),
 	}
 }
 

@@ -1,7 +1,9 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 	"math"
 	"strings"
 
@@ -14,7 +16,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
-	"github.com/streamingfast/substreams/tracing"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -29,6 +30,8 @@ type backprocessingStore struct {
 }
 
 type Pipeline struct {
+	ctx context.Context
+
 	vmType    string // wasm/rust-v1, native
 	blockType string
 
@@ -40,8 +43,6 @@ type Pipeline struct {
 
 	wasmRuntime    *wasm.Runtime
 	wasmExtensions []wasm.WASMExtensioner
-
-	reqCtx *RequestContext
 
 	graph        *manifest.ModuleGraph
 	moduleHashes *manifest.ModuleHashes
@@ -63,13 +64,10 @@ type Pipeline struct {
 
 	bounder  *StoreBoundary
 	StoreMap store.Map
-	tracer   ttrace.Tracer
-	// rootSpan represents the top-level span of the Pipeline object, initiated when `Init` is called
-	rootSpan ttrace.Span
 }
 
 func New(
-	reqCtx *RequestContext,
+	ctx context.Context,
 	graph *manifest.ModuleGraph,
 	blockType string,
 	wasmExtensions []wasm.WASMExtensioner,
@@ -80,9 +78,8 @@ func New(
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
-		reqCtx:                reqCtx,
+		ctx:                   ctx,
 		execOutputCache:       execOutputCache,
-		tracer:                otel.GetTracerProvider().Tracer("pipeline"),
 		runtimeConfig:         runtimeConfig,
 		graph:                 graph,
 		outputModuleMap:       map[string]bool{},
@@ -94,10 +91,6 @@ func New(
 		forkHandler:           NewForkHandle(),
 	}
 
-	for _, name := range reqCtx.Request().OutputModules {
-		pipe.outputModuleMap[name] = true
-	}
-
 	for _, opt := range opts {
 		opt(pipe)
 	}
@@ -106,16 +99,23 @@ func New(
 }
 
 func (p *Pipeline) Init() (err error) {
-	_, p.rootSpan = p.tracer.Start(p.reqCtx.Context, "pipeline_init")
-	defer tracing.EndSpan(p.rootSpan, tracing.WithEndErr(&err))
+	ctx := p.ctx
+	reqDetails := reqctx.Details(ctx)
+	logger := reqctx.Logger(ctx)
+	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
+	defer span.EndWithErr(&err)
 
-	p.reqCtx.logger.Info("initializing handler",
-		zap.Int64("requested_start_block", p.reqCtx.StartBlockNum()),
-		zap.Uint64("effective_start_block", p.reqCtx.EffectiveStartBlockNum()),
-		zap.Uint64("requested_stop_block", p.reqCtx.StopBlockNum()),
-		zap.String("requested_start_cursor", p.reqCtx.Request().StartCursor),
-		zap.Bool("is_back_processing", p.reqCtx.isSubRequest),
-		zap.Strings("outputs", p.reqCtx.Request().OutputModules),
+	for _, name := range reqDetails.Request.OutputModules {
+		p.outputModuleMap[name] = true
+	}
+
+	logger.Info("initializing handler",
+		zap.Int64("requested_start_block", reqDetails.Request.StartBlockNum),
+		zap.Uint64("effective_start_block", reqDetails.EffectiveStartBlockNum),
+		zap.Uint64("requested_stop_block", reqDetails.Request.StopBlockNum),
+		zap.String("requested_start_cursor", reqDetails.Request.StartCursor),
+		zap.Bool("is_back_processing", reqDetails.IsSubRequest),
+		zap.Strings("outputs", reqDetails.Request.OutputModules),
 	)
 
 	if err := p.validateBinaries(); err != nil {
@@ -127,29 +127,29 @@ func (p *Pipeline) Init() (err error) {
 		return fmt.Errorf("failed to retrieve modules: %w", err)
 	}
 
-	if err := p.validateAndHashModules(modules); err != nil {
+	if err := p.validateAndHashModules(ctx, modules); err != nil {
 		return fmt.Errorf("module failed validation: %w", err)
 	}
 
-	p.reqCtx.logger.Info("priming caching engine")
+	logger.Info("priming caching engine")
 	if err := p.execOutputCache.Init(p.moduleHashes); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
-	p.reqCtx.logger.Info("initializing store configurations", zap.Int("store_count", len(storeModules)))
+	logger.Info("initializing store configurations", zap.Int("store_count", len(storeModules)))
 	storeConfigs, err := p.initializeStoreConfigs(storeModules)
 	if err != nil {
 		return fmt.Errorf("initialize store config map: %w", err)
 	}
 
 	var storeMap store.Map
-	if p.reqCtx.isSubRequest {
-		p.reqCtx.logger.Info("stores loaded", zap.Object("stores", p.StoreMap))
-		if storeMap, err = p.setupSubrequestStores(storeConfigs); err != nil {
+	if reqDetails.IsSubRequest {
+		logger.Info("stores loaded", zap.Object("stores", p.StoreMap))
+		if storeMap, err = p.setupSubrequestStores(ctx, storeConfigs); err != nil {
 			return fmt.Errorf("faile to setup backprocessings: %w", err)
 		}
 	} else {
-		if storeMap, err = p.runBackProcessAndSetupStores(storeConfigs); err != nil {
+		if storeMap, err = p.runBackProcessAndSetupStores(ctx, storeConfigs); err != nil {
 			return fmt.Errorf("faile setup request: %w", err)
 		}
 	}
@@ -159,31 +159,33 @@ func (p *Pipeline) Init() (err error) {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
-	p.bounder.InitBoundary(p.reqCtx.EffectiveStartBlockNum())
+	p.bounder.InitBoundary(reqDetails.EffectiveStartBlockNum)
 
-	p.reqCtx.logger.Info("initialized store boundary block",
-		zap.Uint64("effective_start_block", p.reqCtx.EffectiveStartBlockNum()),
+	logger.Info("initialized store boundary block",
+		zap.Uint64("effective_start_block", reqDetails.EffectiveStartBlockNum),
 		zap.Uint64("next_boundary_block", p.bounder.Boundary()),
 	)
 
 	return nil
 }
 
-func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Map, error) {
-	outputStoreCount := len(p.reqCtx.Request().OutputModules)
+func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store.ConfigMap) (store.Map, error) {
+	reqDetails := reqctx.Details(ctx)
+	logger := reqctx.Logger(ctx)
+	outputStoreCount := len(reqDetails.Request.OutputModules)
 	if outputStoreCount > 1 {
 		// currently only support 1 lead stores
 		return nil, fmt.Errorf("invalid number of backprocess leaf store: %d", outputStoreCount)
 	}
 
-	outputModuleName := p.reqCtx.Request().OutputModules[0]
+	outputModuleName := reqDetails.Request.OutputModules[0]
 
 	// there is an assumption that in backgprocess mode the outputModule is a store
 	if _, found := storeConfigs[outputModuleName]; !found {
 		return nil, fmt.Errorf("request output module %q is not found int he store", outputModuleName)
-
 	}
 
+	ttrace.SpanContextFromContext(context.Background())
 	storeMap := store.NewMap()
 
 	for name, config := range storeConfigs {
@@ -191,7 +193,7 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Ma
 			// TODO(abourget): what if this is the first segment?
 			// does the Squasher expect to have a Partial even for the first segment?
 			// Perhaps we want that simplicity, so we don't have to distinguish everywhere.
-			partialStore := config.NewPartialKV(p.reqCtx.EffectiveStartBlockNum(), p.reqCtx.logger)
+			partialStore := config.NewPartialKV(reqDetails.EffectiveStartBlockNum, logger)
 			storeMap.Set(partialStore)
 
 			p.backprocessingStores = append(p.backprocessingStores, &backprocessingStore{
@@ -199,10 +201,10 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Ma
 				initialBlockNum: partialStore.InitialBlock(),
 			})
 		} else {
-			fullStore := config.NewFullKV(p.reqCtx.logger)
+			fullStore := config.NewFullKV(logger)
 
-			if fullStore.InitialBlock() != p.reqCtx.EffectiveStartBlockNum() {
-				if err := fullStore.Load(p.reqCtx, p.reqCtx.EffectiveStartBlockNum()); err != nil {
+			if fullStore.InitialBlock() != reqDetails.EffectiveStartBlockNum {
+				if err := fullStore.Load(p.ctx, reqDetails.EffectiveStartBlockNum); err != nil {
 					return nil, fmt.Errorf("load partial store: %w", err)
 				}
 			}
@@ -214,27 +216,25 @@ func (p *Pipeline) setupSubrequestStores(storeConfigs store.ConfigMap) (store.Ma
 	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(storeConfigs store.ConfigMap) (store.Map, error) {
-
+func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfigs store.ConfigMap) (store.Map, error) {
+	reqDetails := reqctx.Details(ctx)
 	o := orchestrator.New(
-		p.reqCtx.Context,
 		p.runtimeConfig,
-		p.reqCtx.Logger(),
-		p.reqCtx.EffectiveStartBlockNum(),
+		reqDetails.EffectiveStartBlockNum,
 		p.graph,
 		p.respFunc,
 		storeConfigs,
-		p.reqCtx.Request().Modules,
+		reqDetails.Request.Modules,
 	)
 
-	storeMap, err := o.Run()
+	storeMap, err := o.Run(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	p.backprocessingStores = nil
 
-	if err := p.sendSnapshots(); err != nil {
+	if err := p.sendSnapshots(ctx); err != nil {
 		return nil, fmt.Errorf("send initial snapshots: %w", err)
 	}
 
@@ -246,81 +246,99 @@ func (p *Pipeline) isOutputModule(name string) bool {
 	return found
 }
 
-func (p *Pipeline) validateAndHashModules(modules []*pbsubstreams.Module) error {
+func (p *Pipeline) validateAndHashModules(ctx context.Context, modules []*pbsubstreams.Module) error {
+	reqDetails := reqctx.Details(ctx)
+
 	p.moduleHashes = manifest.NewModuleHashes()
 
 	for _, module := range modules {
 		isOutput := p.outputModuleMap[module.Name]
-		if isOutput && p.reqCtx.EffectiveStartBlockNum() < module.InitialBlock {
-			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", p.reqCtx.EffectiveStartBlockNum(), module.Name, module.InitialBlock)
+		if isOutput && reqDetails.EffectiveStartBlockNum < module.InitialBlock {
+			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", reqDetails.EffectiveStartBlockNum, module.Name, module.InitialBlock)
 		}
 
-		p.moduleHashes.HashModule(p.reqCtx.Request().Modules, module, p.graph)
+		p.moduleHashes.HashModule(reqDetails.Request.Modules, module, p.graph)
 	}
 
 	return nil
 }
 
-func (p *Pipeline) flushStores(blockNum uint64, span trace.Span) error {
-	subrequestStopBlock := p.reqCtx.isSubRequest && (p.reqCtx.StopBlockNum() == blockNum)
+func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64, span trace.Span) error {
+	reqDetails := reqctx.Details(ctx)
+	subrequestStopBlock := reqDetails.IsSubRequest && (reqDetails.Request.StopBlockNum == blockNum)
 	for p.bounder.PassedBoundary(blockNum) || subrequestStopBlock {
-		span.AddEvent("store_save_boundary_reach")
+		if span != nil {
+			span.AddEvent("store_save_boundary_reach")
+		}
 
 		boundaryBlock := p.bounder.Boundary()
 		if subrequestStopBlock {
-			boundaryBlock = p.reqCtx.StopBlockNum()
+			boundaryBlock = reqDetails.Request.StopBlockNum
 		}
 
-		if err := p.saveStoresSnapshots(boundaryBlock); err != nil {
+		if err := p.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
 			return fmt.Errorf("error saving stores snashotps: %w", err)
 		}
 
 		p.bounder.BumpBoundary()
-		if isStopBlockReached(blockNum, p.reqCtx.StopBlockNum()) {
+		if isStopBlockReached(blockNum, reqDetails.Request.StopBlockNum) {
 			break
 		}
 	}
 	return nil
 }
 
-func (p *Pipeline) saveStoresSnapshots(boundaryBlock uint64) (err error) {
+func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) (err error) {
+	reqDetails := reqctx.Details(ctx)
+
 	for name, s := range p.StoreMap.All() {
 		// optimatinz because we know that in a subrequest we are only running throught the last store (output)
 		// all parent stores should have come from moduleOutput cache
-		if p.reqCtx.isSubRequest && !p.isOutputModule(name) {
+		if reqDetails.IsSubRequest && !p.isOutputModule(name) {
 			// skip saving snapshot for non-output stores in sub request
 			continue
 		}
 
-		_, span := p.tracer.Start(p.reqCtx.Context, "save_store_snapshot", ttrace.WithAttributes(attribute.String("store", name)))
-		defer tracing.EndSpan(span, tracing.WithEndErr(&err))
-
-		blockRange, writer, err := s.Save(boundaryBlock)
-		if err != nil {
-			return fmt.Errorf("saving store %q at boundary %d: %w", name, boundaryBlock, err)
+		ctx, span := reqctx.WithSpan(ctx, "save_store_snapshot")
+		span.SetAttributes(attribute.String("store", name))
+		if err := p.saveStoreSnapshot(ctx, s, boundaryBlock); err != nil {
+			span.EndWithErr(&err)
+			return fmt.Errorf("save store snapshot: %w", err)
 		}
+		span.EndWithErr(nil)
 
-		if err := writer.Write(p.reqCtx); err != nil {
-			return fmt.Errorf("failed to write store: %w", err)
-		}
+	}
+	return nil
+}
 
-		if p.reqCtx.isSubRequest && p.isOutputModule(name) {
-			p.partialsWritten = append(p.partialsWritten, blockRange)
-			p.reqCtx.logger.Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
+func (p *Pipeline) saveStoreSnapshot(ctx context.Context, s store.Store, boundaryBlock uint64) (err error) {
+	blockRange, writer, errSave := s.Save(boundaryBlock)
+	if errSave != nil {
+		err = fmt.Errorf("saving store %q at boundary %d: %w", s.Name(), boundaryBlock, err)
+		return
+	}
 
-			if v, ok := s.(store.PartialStore); ok {
-				span.AddEvent("store_roll_trigger")
-				v.Roll(boundaryBlock)
-			}
+	if err = writer.Write(ctx); err != nil {
+		err = fmt.Errorf("failed to write store: %w", err)
+		return
+	}
+
+	if reqctx.Details(ctx).IsSubRequest && p.isOutputModule(s.Name()) {
+		p.partialsWritten = append(p.partialsWritten, blockRange)
+		reqctx.Logger(ctx).Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", p.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
+
+		if v, ok := s.(store.PartialStore); ok {
+			reqctx.Span(ctx).AddEvent("store_roll_trigger")
+			v.Roll(boundaryBlock)
 		}
 	}
 	return nil
 }
 
-func (p *Pipeline) runPostJobHooks(clock *pbsubstreams.Clock) {
+func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
 	for _, hook := range p.postJobHooks {
-		if err := hook(p.reqCtx, clock); err != nil {
-			p.reqCtx.logger.Warn("post job hook failed", zap.Error(err))
+		if err := hook(p.ctx, clock); err != nil {
+			reqctx.Logger(ctx).Warn("post job hook failed", zap.Error(err))
 		}
 	}
 
@@ -329,21 +347,18 @@ func (p *Pipeline) runPostJobHooks(clock *pbsubstreams.Clock) {
 func (p *Pipeline) runPreBlockHooks(clock *pbsubstreams.Clock, span trace.Span) error {
 	for _, hook := range p.preBlockHooks {
 		span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
-		if err := hook(p.reqCtx, clock); err != nil {
+		if err := hook(p.ctx, clock); err != nil {
 			return fmt.Errorf("pre block hook: %w", err)
 		}
 	}
 	return nil
 }
 
-func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.ExecutionOutput) error {
-	//FIXME(abourget): should we ever skip that work?
-	// if executor.ModuleInitialBlock < block.Number {
-	// 	continue ??
-	// }
-
+func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) error {
+	logger := reqctx.Logger(ctx)
+	span := reqctx.Span(ctx)
 	executorName := executor.Name()
-	p.reqCtx.logger.Debug("executing", zap.String("module_name", executorName))
+	logger.Debug("executing", zap.String("module_name", executorName))
 
 	// extract into : "getExecutorOutput()"
 
@@ -352,13 +367,15 @@ func (p *Pipeline) runExecutor(executor ModuleExecutor, execOutput execout.Execu
 		return fmt.Errorf("error getting module %q output: %w", executor.Name(), err)
 	}
 	if cached {
+		span.AddEvent("output_cache_hit")
 		if err := executor.applyCachedOutput(output); err != nil {
 			return fmt.Errorf("failed to apply cache output for module %q: %w", executorName, err)
 		}
 		return nil
 	}
+	span.AddEvent("output_cache_miss")
 
-	outputData, moduleOutputData, err := executor.run(p.reqCtx, execOutput)
+	outputData, moduleOutputData, err := executor.run(ctx, execOutput)
 	if err != nil {
 		logs, truncated := executor.moduleLogs()
 		if len(logs) != 0 || moduleOutputData != nil {
@@ -437,45 +454,46 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 	return nil
 }
 
-func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
-	var out []*pbsubstreams.ModuleProgress
-
-	failedProgress := &pbsubstreams.ModuleProgress{
-		Name: failedExecutor.Name(),
-		Type: &pbsubstreams.ModuleProgress_Failed_{
-			Failed: &pbsubstreams.ModuleProgress_Failed{
-				Reason: err.Error(),
-				Logs:   failedExecutor.currentExecutionStack(),
-			},
-		},
-	}
-	out = append(out, failedProgress)
-
-	for _, moduleOutput := range p.moduleOutputs {
-		if moduleOutput.Name == failedExecutor.Name() {
-			failedProgress.GetFailed().LogsTruncated = moduleOutput.GetLogsTruncated()
-		}
-
-		if len(moduleOutput.Logs) != 0 {
-			out = append(out, &pbsubstreams.ModuleProgress{
-				Name: moduleOutput.Name,
-				Type: &pbsubstreams.ModuleProgress_Failed_{
-					Failed: &pbsubstreams.ModuleProgress_Failed{
-						Reason:        fmt.Sprintf("Failed to execute %s: %s", failedExecutor.Name(), err.Error()),
-						Logs:          failedExecutor.currentExecutionStack(),
-						LogsTruncated: moduleOutput.LogsTruncated,
-					},
-				},
-			})
-		}
-	}
-
-	p.reqCtx.logger.Debug("return failed progress", zap.Int("progress_len", len(out)))
-	return p.respFunc(substreams.NewModulesProgressResponse(out))
-}
+//func (p *Pipeline) returnFailureProgress(err error, failedExecutor ModuleExecutor) error {
+//	var out []*pbsubstreams.ModuleProgress
+//
+//	failedProgress := &pbsubstreams.ModuleProgress{
+//		Name: failedExecutor.Name(),
+//		Type: &pbsubstreams.ModuleProgress_Failed_{
+//			Failed: &pbsubstreams.ModuleProgress_Failed{
+//				Reason: err.Error(),
+//				Logs:   failedExecutor.currentExecutionStack(),
+//			},
+//		},
+//	}
+//	out = append(out, failedProgress)
+//
+//	for _, moduleOutput := range p.moduleOutputs {
+//		if moduleOutput.Name == failedExecutor.Name() {
+//			failedProgress.GetFailed().LogsTruncated = moduleOutput.GetLogsTruncated()
+//		}
+//
+//		if len(moduleOutput.Logs) != 0 {
+//			out = append(out, &pbsubstreams.ModuleProgress{
+//				Name: moduleOutput.Name,
+//				Type: &pbsubstreams.ModuleProgress_Failed_{
+//					Failed: &pbsubstreams.ModuleProgress_Failed{
+//						Reason:        fmt.Sprintf("Failed to execute %s: %s", failedExecutor.Name(), err.Error()),
+//						Logs:          failedExecutor.currentExecutionStack(),
+//						LogsTruncated: moduleOutput.LogsTruncated,
+//					},
+//				},
+//			})
+//		}
+//	}
+//
+//	p.ctx.logger.Debug("return failed progress", zap.Int("progress_len", len(out)))
+//	return p.respFunc(substreams.NewModulesProgressResponse(out))
+//}
 
 func (p *Pipeline) validateBinaries() error {
-	for _, binary := range p.reqCtx.Request().Modules.Binaries {
+	reqDetails := reqctx.Details(p.ctx)
+	for _, binary := range reqDetails.Request.Modules.Binaries {
 		if binary.Type != "wasm/rust-v1" {
 			return fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
 		}
@@ -485,16 +503,18 @@ func (p *Pipeline) validateBinaries() error {
 }
 
 func (p *Pipeline) getModules() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
-	if modules, err = p.graph.ModulesDownTo(p.reqCtx.Request().OutputModules); err != nil {
+	reqDetails := reqctx.Details(p.ctx)
+	if modules, err = p.graph.ModulesDownTo(reqDetails.Request.OutputModules); err != nil {
 		return nil, nil, fmt.Errorf("building execution moduleGraph: %w", err)
 	}
-	if storeModules, err = p.graph.StoresDownTo(p.reqCtx.Request().OutputModules); err != nil {
+	if storeModules, err = p.graph.StoresDownTo(reqDetails.Request.OutputModules); err != nil {
 		return nil, nil, err
 	}
 	return modules, storeModules, nil
 }
 
 func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
+	request := reqctx.Details(p.ctx).Request
 	p.wasmRuntime = wasm.NewRuntime(p.wasmExtensions)
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
@@ -506,8 +526,8 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 
 		modName := module.Name // to ensure it's enclosed
 		entrypoint := module.BinaryEntrypoint
-		code := p.reqCtx.Request().Modules.Binaries[module.BinaryIndex]
-		wasmModule, err := p.wasmRuntime.NewModule(p.reqCtx, p.reqCtx.Request(), code.Content, module.Name, entrypoint)
+		code := request.Modules.Binaries[module.BinaryIndex]
+		wasmModule, err := p.wasmRuntime.NewModule(p.ctx, request, code.Content, module.Name, entrypoint)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}

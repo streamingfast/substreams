@@ -3,6 +3,7 @@ package pipeline
 import (
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 	"io"
 	"strings"
 
@@ -14,7 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // TODO(abourget): wuuutz that? In `error.go` we're doing critical return value handling (setting the `ranges` trailer based on data accumulated as a side-effeect in `partialsWritten`.
 // We end up saying we're not responsible for doing error handling? But we're in `error.go` ! Who else otherwise?
 // So many comments in here. Let's clean this up a bit.
@@ -22,12 +22,14 @@ import (
 // OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.
 func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer, err error) error {
+	logger := reqctx.Logger(p.ctx)
+	reqDetails := reqctx.Details(p.ctx)
 	isStopBlockReachedErr := errors.Is(err, stream.ErrStopBlockReached)
 
 	if isStopBlockReachedErr || errors.Is(err, io.EOF) {
 		if isStopBlockReachedErr {
-			p.reqCtx.Logger().Debug("stream of blocks reached end block, triggering StoreSave",
-				zap.Uint64("stop_block_num", p.reqCtx.StopBlockNum()),
+			logger.Debug("stream of blocks reached end block, triggering StoreSave",
+				zap.Uint64("stop_block_num", reqDetails.Request.StopBlockNum),
 			)
 
 			// We use `StopBlockNum` as the argument to flush stores as possible boundaries (if chain has holes...)
@@ -35,7 +37,7 @@ func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer
 			// `OnStreamTerminated` is invoked by the service when an error occurs with the connection, in this case,
 			// we are outside any active span and we want to attach the event to the root span of the pipeline
 			// which should always be set.
-			if err := p.flushStores(p.reqCtx.StopBlockNum(), p.rootSpan); err != nil {
+			if err := p.flushStores(p.ctx, reqDetails.Request.StopBlockNum, nil); err != nil {
 				return status.Errorf(codes.Internal, "handling store save boundaries: %s", err)
 			}
 		}
@@ -45,7 +47,7 @@ func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer
 			partialRanges[i] = fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock)
 		}
 
-		p.reqCtx.Logger().Info("setting trailer", zap.Strings("ranges", partialRanges))
+		logger.Info("setting trailer", zap.Strings("ranges", partialRanges))
 		streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": []string{strings.Join(partialRanges, ",")}})
 
 		// It was an ok error, so let's

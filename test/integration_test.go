@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/work"
+	"go.opentelemetry.io/otel"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -62,20 +65,20 @@ type TestWorker struct {
 	testTempDir            string
 }
 
-func (w *TestWorker) Run(_ context.Context, job *work.Job, requestModules *pbsubstreams.Modules, _ substreams.ResponseFunc) ([]*block.Range, error) {
+func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) (brange []*block.Range, err error) {
 	w.t.Helper()
-	req := job.CreateRequest(requestModules)
 
-	_, err := processRequest(w.t, req, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir)
-	if err != nil {
+	ctx, span := reqctx.WithSpan(ctx, "running_job_test")
+	defer span.EndWithErr(&err)
+
+	if _, err := processRequest(w.t, ctx, request, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir); err != nil {
 		return nil, fmt.Errorf("processing sub request: %w", err)
 	}
-	//todo: cumulate responses
 
 	return block.Ranges{
 		&block.Range{
-			StartBlock:        uint64(req.StartBlockNum),
-			ExclusiveEndBlock: req.StopBlockNum,
+			StartBlock:        uint64(request.StartBlockNum),
+			ExclusiveEndBlock: request.StopBlockNum,
 		},
 	}, nil
 }
@@ -112,6 +115,7 @@ type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) Te
 
 func processRequest(
 	t *testing.T,
+	ctx context.Context,
 	request *pbsubstreams.Request,
 	moduleGraph *manifest.ModuleGraph,
 	workerFactory work.WorkerFactory, newGenerator NewTestBlockGenerator, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack, testTempDir string,
@@ -120,7 +124,7 @@ func processRequest(
 
 	var opts []pipeline.Option
 
-	req, err := pipeline.NewRequestContext(context.Background(), request, isSubRequest)
+	ctx, err = reqctx.WithRequest(ctx, request, isSubRequest)
 	require.Nil(t, err)
 
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
@@ -139,7 +143,7 @@ func processRequest(
 		workerFactory,
 	)
 	pipe := pipeline.New(
-		req,
+		ctx,
 		moduleGraph,
 		"sf.substreams.v1.test.Block",
 		nil,
@@ -222,8 +226,23 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
 		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
 	}
+	ctx := context.Background()
 
-	testTempDir := t.TempDir()
+	testTempDir := os.TempDir()
+	defer func() {
+		if os.Getenv("SUBSTREAMS_INTEGRATION_NO_CLEANUP") == "" {
+			os.RemoveAll(testTempDir)
+		}
+	}()
+	//os.Setenv("SF_TRACING", "otelcol://localhost:4317")
+	os.Setenv("SF_TRACING", "zipkin://localhost:9411?scheme=http")
+	err = tracing.SetupOpenTelemetry("substreams")
+	require.NoError(t, err)
+
+	ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
+
+	ctx, span := reqctx.WithSpan(ctx, "substreams_request_test")
+	defer span.EndWithErr(nil)
 
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
@@ -250,7 +269,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		}
 	}
 
-	if _, err = processRequest(t, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir); err != nil {
+	if _, err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir); err != nil {
 		return nil, fmt.Errorf("running test: %w", err)
 	}
 
@@ -415,6 +434,9 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
+
+	fmt.Println("sleeping")
+	time.Sleep(1 * time.Minute)
 }
 
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
@@ -509,7 +531,6 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 //}
 
 func Test_assert_all_test(t *testing.T) {
-	t.Skip("skipping test")
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,

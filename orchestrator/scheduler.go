@@ -85,7 +85,7 @@ func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Module
 		case err = <-result:
 			resultCount++
 			if err != nil {
-				err = fmt.Errorf("from worker: %w", err)
+				err = fmt.Errorf("worker ended in error: %w", err)
 				return err
 			}
 			s.log.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount))
@@ -146,8 +146,7 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 
 out:
 	for i := 0; uint64(i) < 3; i++ {
-		partialsWritten, err = worker.Run(ctx, job, requestModules, s.respFunc)
-
+		partialsWritten, err = worker.Run(ctx, job.CreateRequest(requestModules), s.respFunc)
 		switch err.(type) {
 		case *work.RetryableErr:
 			zlog.Debug("retryable error", zap.Error(err))

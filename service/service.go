@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/work"
 	"os"
 
@@ -14,12 +15,10 @@ import (
 	"github.com/streamingfast/bstream/stream"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-	"github.com/streamingfast/substreams/tracing"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -124,18 +123,19 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 
-	ctx, span := s.tracer.Start(streamSrv.Context(), "substreams_request")
-	defer tracing.EndSpan(span, tracing.WithEndErr(&err))
+	logger := reqctx.Logger(streamSrv.Context())
+	ctx := reqctx.WithLogger(streamSrv.Context(), logger)
+	ctx = reqctx.WithTracer(ctx, s.tracer)
 
-	// Weird behavior because we want the pipeline to set the logger in the request Context
-	logger := logging.Logger(streamSrv.Context(), s.logger)
+	ctx, span := reqctx.WithSpan(ctx, "substream_request")
+	defer span.EndWithErr(&err)
 
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
 	// We execute the blocks stream handler and then transform `err` to a gRPC error, keeping both of them.
 	// They will be both `nil` if `err` is `nil` itself.
-	err = s.blocks(ctx, request, streamSrv, logger)
+	err = s.blocks(ctx, request, streamSrv)
 	grpcError = s.toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -145,7 +145,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	return grpcError
 }
 
-func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) error {
+func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
+	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 	graph, err := validateGraph(request, s.blockType)
 	if err != nil {
@@ -189,22 +190,19 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return nil
 	}
 
-	requestCtx, err := pipeline.NewRequestContext(ctx, request, isSubrequest)
+	ctx, err = reqctx.WithRequest(streamSrv.Context(), request, isSubrequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("context with request: %w", err)
 	}
 
-	// TODO(abourget): create a `StoreBoundary` at _this_ level? Just to bring along the save interval?
-	// The RuntimeConfig now holds that data, and everyone has it
-	storeBoundary := pipeline.NewStoreBoundary(uint64(s.runtimeConfig.StoreSnapshotsSaveInterval))
-
-	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, requestCtx.Logger())
+	storeBoundary := pipeline.NewStoreBoundary(s.runtimeConfig.StoreSnapshotsSaveInterval)
+	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, reqctx.Logger(ctx))
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
 	pipe := pipeline.New(
-		requestCtx,
+		ctx,
 		graph,
 		s.blockType,
 		s.wasmExtensions,

@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
@@ -13,7 +14,6 @@ import (
 )
 
 type Backprocessor struct {
-	ctx                          context.Context
 	runtimeConfig                config.RuntimeConfig
 	storeConfigMap               store.ConfigMap
 	upToBlock                    uint64 // We stop at this block exclusively. This is an irreversible block.
@@ -21,13 +21,10 @@ type Backprocessor struct {
 	upstreamRequestModules       *pbsubstreams.Modules
 	upstreamRequestOutputModules []string // TODO(abourget): we'll need to distinguish here if upstream wants parallel download for those, so perhaps another map. This will mean we'll probably want to adjust the gRPC Request/Response models, to have flags instead of list of output modules. See the GitHub issues with details and an example. # ? :)
 	respFunc                     func(resp *pbsubstreams.Response) error
-	logger                       *zap.Logger
 }
 
 func New(
-	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
-	logger *zap.Logger,
 	upToBlock uint64,
 	graph *manifest.ModuleGraph,
 	respFunc func(resp *pbsubstreams.Response) error,
@@ -35,10 +32,8 @@ func New(
 	upstreamRequestModules *pbsubstreams.Modules,
 ) *Backprocessor {
 	return &Backprocessor{
-		ctx:                    ctx,
 		runtimeConfig:          runtimeConfig,
 		upToBlock:              upToBlock,
-		logger:                 logger,
 		graph:                  graph,
 		respFunc:               respFunc,
 		storeConfigMap:         storeConfigs,
@@ -47,22 +42,23 @@ func New(
 }
 
 // TODO(abourget): WARN: this function should NOT GROW in functionality, or abstraction levels.
-func (b *Backprocessor) Run() (store.Map, error) {
+func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
+	logger := reqctx.Logger(ctx)
 	// workPlan should hold all the jobs, dependencies
 	// and it could be a changing plan, reshufflable,
 	// This contains all what the jobsPlanner had
 	// This calls `splitWork`, with save Interval, moduleInitialBlock, snapshots
-	workPlan, err := b.planWork()
+	workPlan, err := b.planWork(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	scheduler, err := NewScheduler(b.ctx, b.runtimeConfig, workPlan, b.graph, b.respFunc, b.logger, b.upstreamRequestModules)
+	scheduler, err := NewScheduler(ctx, b.runtimeConfig, workPlan, b.graph, b.respFunc, logger, b.upstreamRequestModules)
 	if err != nil {
 		return nil, err
 	}
 
-	multiSquasher, err := NewMultiSquasher(b.ctx, b.runtimeConfig, workPlan, b.storeConfigMap, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
+	multiSquasher, err := NewMultiSquasher(ctx, b.runtimeConfig, workPlan, b.storeConfigMap, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +67,13 @@ func (b *Backprocessor) Run() (store.Map, error) {
 
 	// parallelDownloader := NewLinearExecOutputReader()
 	// go parallelDownloader.Launch()
-	multiSquasher.Launch(b.ctx)
+	multiSquasher.Launch(ctx)
 
-	if err := scheduler.Run(b.ctx, b.upstreamRequestModules); err != nil {
-		return nil, fmt.Errorf("scheduler: %w", err)
+	if err := scheduler.Run(ctx, b.upstreamRequestModules); err != nil {
+		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	finalStoreMap, err := multiSquasher.Wait(b.ctx)
+	finalStoreMap, err := multiSquasher.Wait(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,13 +85,13 @@ func (b *Backprocessor) Run() (store.Map, error) {
 	return finalStoreMap, nil
 }
 
-func (b *Backprocessor) planWork() (out *WorkPlan, err error) {
-	storageState, err := fetchStorageState(b.ctx, b.storeConfigMap)
+func (b *Backprocessor) planWork(ctx context.Context) (out *WorkPlan, err error) {
+	storageState, err := fetchStorageState(ctx, b.storeConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	workPlan, err := b.buildWorkPlan(storageState)
+	workPlan, err := b.buildWorkPlan(ctx, storageState)
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}
@@ -107,7 +103,8 @@ func (b *Backprocessor) planWork() (out *WorkPlan, err error) {
 	return workPlan, nil
 }
 
-func (b *Backprocessor) buildWorkPlan(storageState *StorageState) (out *WorkPlan, err error) {
+func (b *Backprocessor) buildWorkPlan(ctx context.Context, storageState *StorageState) (out *WorkPlan, err error) {
+	logger := reqctx.Logger(ctx)
 	out = &WorkPlan{
 		workUnitsMap: map[string]*WorkUnits{}, // per module
 	}
@@ -125,7 +122,7 @@ func (b *Backprocessor) buildWorkPlan(storageState *StorageState) (out *WorkPlan
 
 		out.workUnitsMap[name] = wu
 	}
-	b.logger.Info("work plan ready", zap.Stringer("work_plan", out))
+	logger.Info("work plan ready", zap.Stringer("work_plan", out))
 	return
 }
 

@@ -48,7 +48,7 @@ strip = "debuginfo"
 ```
 {% endcode %}
 
-The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
+The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
 ### **Cargo.toml Breakdown**
 

@@ -23,7 +23,7 @@ __**Google Protobuf Documentation**
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 {% endhint %}
 
-### Protofuf Definition
+### Protobuf Definition
 
 Define a protobuf model as `proto:eth.erc721.v1.Transfers` representing a list of ERC721 transfers.
 

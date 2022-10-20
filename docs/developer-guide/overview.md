@@ -12,19 +12,11 @@ The Substreams Developer Guide explains the process of building a Substream that
 **Important**_: StreamingFast provides documentation for Ethereum-based Substreams setups at this time. Detailed information and documentation for other supported chains are in development._
 {% endhint %}
 
-The Substreams developer guide is broken down into the following sections.
-
-* [Dependency Installation](installation-requirements.md)
-* [Manifest Creation](creating-your-manifest.md)
-* [Protobuf Schemas](creating-protobuf-schemas.md)
-* [Writing Module Handlers](writing-module-handlers.md)
-* [Running Substreams](running-substreams.md)
-
 ### Substream Examples
 
 #### Substreams Template for Dev Guide
 
-The accompanying Substreams template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
 
 #### Uniswap-v3
 

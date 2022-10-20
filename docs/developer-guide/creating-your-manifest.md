@@ -59,7 +59,11 @@ modules:
 
 #### `imports.eth`&#x20;
 
-Substreams consumes Ethereum blocks and depends on the Ethereum Substreams package. _Note,_ _learn more about_ [_packages_](../reference-and-specs/packages.md) _in the reference and specs section of the documentation._
+Substreams consumes Ethereum blocks and depends on the Ethereum Substreams package.&#x20;
+
+{% hint style="info" %}
+**Note**_:_ _learn more about_ [_packages_](../reference-and-specs/packages.md) _in the reference and specs section of the documentation._
+{% endhint %}
 
 #### `protobuf.files`
 

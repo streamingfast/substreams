@@ -108,7 +108,7 @@ func (p *Pipeline) Init() (err error) {
 		p.outputModuleMap[name] = true
 	}
 
-	logger.Info("initializing handler",
+	logger.Info("initializing pipeline",
 		zap.Int64("requested_start_block", reqDetails.Request.StartBlockNum),
 		zap.Uint64("effective_start_block", reqDetails.EffectiveStartBlockNum),
 		zap.Uint64("requested_stop_block", reqDetails.Request.StopBlockNum),
@@ -266,14 +266,12 @@ func (p *Pipeline) validateAndHashModules(ctx context.Context, modules []*pbsubs
 
 func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	reqDetails := reqctx.Details(ctx)
-	ctx, span := reqctx.WithSpan(ctx, "flush_stores")
-	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.Int("boundary_reached", 0))
+	span := reqctx.Span(ctx)
 	count := 0
 	subrequestStopBlock := reqDetails.IsSubRequest && (reqDetails.Request.StopBlockNum == blockNum)
 	for p.bounder.PassedBoundary(blockNum) || subrequestStopBlock {
 		count++
-		span.SetAttributes(attribute.Int("boundary_reached", count))
+		span.SetAttributes(attribute.Int("pipeline.stores.boundary_reached", count))
 
 		boundaryBlock := p.bounder.Boundary()
 		if subrequestStopBlock {
@@ -361,10 +359,12 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 
 func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
+
 	ctx, span := reqctx.WithSpan(ctx, "module_execution")
 	defer span.EndWithErr(&err)
 	executorName := executor.Name()
 
+	logger = logger.With(zap.String("module_name", executorName))
 	span.SetAttributes(attribute.String("module.name", executorName))
 
 	logger.Debug("executing", zap.String("module_name", executorName))
@@ -373,8 +373,10 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, exe
 	if err != nil && err != execout.NotFound {
 		return fmt.Errorf("error getting module %q output: %w", executor.Name(), err)
 	}
+
 	span.SetAttributes(attribute.Bool("module.output.cached", cached))
 	if cached {
+		logger.Debug("skipping module execution, loading output from cache")
 		if err := executor.applyCachedOutput(output); err != nil {
 			return fmt.Errorf("failed to apply cache output for module %q: %w", executorName, err)
 		}
@@ -394,24 +396,26 @@ func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, exe
 		}
 		return fmt.Errorf("running module: %w", err)
 	}
-	if err := execOutput.Set(executor.Name(), outputData); err != nil {
-		return fmt.Errorf("failed to set output %w", err)
-	}
 
-	// extract into `addExecutorOutput()
-
-	if p.isOutputModule(executorName) {
-		logs, truncated := executor.moduleLogs()
-		if len(logs) != 0 || moduleOutputData != nil {
-			moduleOutput := &pbsubstreams.ModuleOutput{
-				Name:          executorName,
-				Data:          moduleOutputData,
-				Logs:          logs,
-				LogsTruncated: truncated,
-			}
-			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
-			p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Number)
+	if moduleOutputData != nil {
+		if err := execOutput.Set(executorName, outputData); err != nil {
+			return fmt.Errorf("failed to set output %w", err)
 		}
+
+		if p.isOutputModule(executorName) {
+			logs, truncated := executor.moduleLogs()
+			if len(logs) != 0 || moduleOutputData != nil {
+				moduleOutput := &pbsubstreams.ModuleOutput{
+					Name:          executorName,
+					Data:          moduleOutputData,
+					Logs:          logs,
+					LogsTruncated: truncated,
+				}
+				p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
+				p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Number)
+			}
+		}
+
 	}
 
 	executor.Reset()
@@ -593,6 +597,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (out store.ConfigMap, err error) {
 	out = make(store.ConfigMap)
 	for _, storeModule := range storeModules {
+
 		c, err := store.NewConfig(
 			storeModule.Name,
 			storeModule.InitialBlock,

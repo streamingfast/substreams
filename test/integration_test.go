@@ -71,6 +71,13 @@ func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ s
 	ctx, span := reqctx.WithSpan(ctx, "running_job_test")
 	defer span.EndWithErr(&err)
 
+	logger := reqctx.Logger(ctx)
+
+	logger.Info("worker running job",
+		zap.Strings("output_modules", request.OutputModules),
+		zap.Int64("start_block_num", request.StartBlockNum),
+		zap.Uint64("stop_block_num", request.StopBlockNum),
+	)
 	if _, err := processRequest(w.t, ctx, request, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir); err != nil {
 		return nil, fmt.Errorf("processing sub request: %w", err)
 	}
@@ -138,7 +145,7 @@ func processRequest(
 		10,
 		10,
 		10,
-		2,
+		1,
 		baseStoreStore,
 		workerFactory,
 	)
@@ -227,13 +234,12 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
 	}
 	ctx := context.Background()
+	ctx = reqctx.WithLogger(ctx, zlog)
 
 	testTempDir := os.TempDir()
-	defer func() {
-		if os.Getenv("SUBSTREAMS_INTEGRATION_NO_CLEANUP") == "" {
-			os.RemoveAll(testTempDir)
-		}
-	}()
+	if os.Getenv("SUBSTREAMS_INTEGRATION_NO_CLEANUP") == "" {
+		defer os.RemoveAll(testTempDir)
+	}
 
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
 	if tracingEnabled {
@@ -481,22 +487,23 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 //	require.NoError(t, err)
 //
 //}
-//func Test_test_store_delete_prefix(t *testing.T) {
-//	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-//		return &LinearBlockGenerator{
-//			startBlock:         startBlock,
-//			inclusiveStopBlock: inclusiveStopBlock,
-//		}
-//	}
-//	_, err := runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-//		if b.Number == 40 {
-//			s, storeFound := stores.Get("test_store_delete_prefix")
-//			require.True(t, storeFound)
-//			require.Equal(t, uint64(1), s.Length())
-//		}
-//	})
-//	require.NoError(t, err)
-//}
+func Test_test_store_delete_prefix(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	_, err := runTest(t, 20, 31, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+		if b.Number == 30 {
+			s, storeFound := stores.Get("test_store_delete_prefix")
+			require.True(t, storeFound)
+			require.Equal(t, uint64(1), s.Length())
+		}
+	})
+	require.NoError(t, err)
+}
+
 //
 //// -------------------- StoreAddI64 -------------------- //
 //func Test_test_store_add_i64(t *testing.T) {

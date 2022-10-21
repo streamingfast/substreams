@@ -142,20 +142,11 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 		return nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}
 
-	deltas := &pbsubstreams.StoreDeltas{
-		Deltas: e.outputStore.GetDeltas(),
+	if e.isPartialDeltas() {
+		return nil, nil, nil
 	}
 
-	data, err := proto.Marshal(deltas)
-	if err != nil {
-		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
-	}
-
-	moduleOutput = &pbsubstreams.ModuleOutput_StoreDeltas{
-		StoreDeltas: deltas,
-	}
-
-	return data, moduleOutput, nil
+	return e.wrapDeltas()
 }
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (instance *wasm.Instance, err error) {
@@ -200,4 +191,25 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 		}
 	}
 	return
+}
+
+func (e *StoreModuleExecutor) isPartialDeltas() bool {
+	_, ok := e.outputStore.(*store.PartialKV)
+	return ok
+}
+
+func (e *StoreModuleExecutor) wrapDeltas() (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
+	deltas := &pbsubstreams.StoreDeltas{
+		Deltas: e.outputStore.GetDeltas(),
+	}
+
+	data, err := proto.Marshal(deltas)
+	if err != nil {
+		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
+	}
+
+	moduleOutput = &pbsubstreams.ModuleOutput_StoreDeltas{
+		StoreDeltas: deltas,
+	}
+	return data, moduleOutput, nil
 }

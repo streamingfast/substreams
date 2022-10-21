@@ -13,10 +13,11 @@ type ExecOutputCache struct {
 	cursor *bstream.Cursor
 }
 
+// assert_test_store_delete_prefix
 func (e *ExecOutputCache) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, _, err := e.ExecOutputMap.Get(moduleName)
 	if err != nil && err != execout.NotFound {
-		return nil, false, fmt.Errorf("get from map: %w", err)
+		return nil, false, fmt.Errorf("get from memory: %w", err)
 	}
 	if err == nil {
 		return val, false, nil

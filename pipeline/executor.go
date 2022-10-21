@@ -10,7 +10,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/wasm"
-	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -94,7 +93,6 @@ func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.String("module", e.moduleName))
 
 	var instance *wasm.Instance
 	if instance, err = e.wasmCall(reader); err != nil {
@@ -139,7 +137,7 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "exec_store")
 	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.String("module", e.moduleName))
+
 	if _, err := e.wasmCall(reader); err != nil {
 		return nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}

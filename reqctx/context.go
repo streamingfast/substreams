@@ -2,6 +2,7 @@ package reqctx
 
 import (
 	"context"
+	"errors"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -10,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"io"
 )
 
 type contextKeyType int
@@ -71,6 +73,10 @@ func (s *span) EndWithErr(e *error) {
 
 	err := *e
 	if err == nil {
+		return
+	}
+
+	if errors.Is(err, io.EOF) {
 		return
 	}
 

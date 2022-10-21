@@ -234,15 +234,21 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 			os.RemoveAll(testTempDir)
 		}
 	}()
-	//os.Setenv("SF_TRACING", "otelcol://localhost:4317")
-	os.Setenv("SF_TRACING", "zipkin://localhost:9411?scheme=http")
-	err = tracing.SetupOpenTelemetry("substreams")
-	require.NoError(t, err)
 
-	ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
-
-	ctx, span := reqctx.WithSpan(ctx, "substreams_request_test")
-	defer span.EndWithErr(nil)
+	tracingEnabled := os.Getenv("SF_TRACING") != ""
+	if tracingEnabled {
+		fmt.Println("Running test with tracing enabled: ", os.Getenv("SF_TRACING"))
+		err = tracing.SetupOpenTelemetry("substreams")
+		require.NoError(t, err)
+		ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
+		spanCtx, span := reqctx.WithSpan(ctx, "substreams_request_test")
+		defer func() {
+			span.EndWithErr(nil)
+			fmt.Println("Test complete waiting 20s for tracing to be sent")
+			time.Sleep(20 * time.Second)
+		}()
+		ctx = spanCtx
+	}
 
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
@@ -434,9 +440,6 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		`{"name":"test_map","result":{"block_number":111,"block_hash":"block-111"}}`,
 		`{"name":"test_store_proto","deltas":[{"op":"CREATE","old":{},"new":{"block_number":111,"block_hash":"block-111"}}]}`,
 	}, moduleOutputs)
-
-	fmt.Println("sleeping")
-	time.Sleep(1 * time.Minute)
 }
 
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {

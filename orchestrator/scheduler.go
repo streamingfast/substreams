@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/work"
 	"sort"
 	"sync"
@@ -13,8 +14,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
-	"go.opentelemetry.io/otel"
-	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -27,11 +26,9 @@ type Scheduler struct {
 
 	OnStoreJobTerminated func(moduleName string, partialsWritten block.Ranges) error
 
-	tracer ttrace.Tracer
-	log    *zap.Logger
-
 	// TODO(abourget): deprecate this, and fuse it inside the Scheduler
 	jobsPlanner *JobsPlanner
+	log         *zap.Logger
 }
 
 func NewScheduler(
@@ -43,7 +40,6 @@ func NewScheduler(
 	logger *zap.Logger,
 	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Scheduler, error) {
-	tracer := otel.GetTracerProvider().Tracer("scheduler")
 
 	workerPool := work.NewWorkerPool(runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory, logger)
 
@@ -57,7 +53,6 @@ func NewScheduler(
 	s := &Scheduler{
 		workerPool:             workerPool,
 		respFunc:               respFunc,
-		tracer:                 tracer,
 		log:                    logger,
 		upstreamRequestModules: upstreamRequestModules,
 
@@ -98,7 +93,7 @@ func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Module
 }
 
 func (s *Scheduler) launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
-	ctx, span := s.tracer.Start(ctx, "running_schedule")
+	ctx, span := reqctx.WithSpan(ctx, "running_schedule")
 	defer span.End()
 	for {
 		zlog.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.jobsPlanner.AvailableJobs)))
@@ -184,7 +179,6 @@ type JobsPlanner struct {
 	jobs          work.JobList // all jobs, completed or not
 	AvailableJobs chan *work.Job
 	completed     bool
-	tracer        ttrace.Tracer
 }
 
 func NewJobsPlanner(
@@ -193,11 +187,9 @@ func NewJobsPlanner(
 	subrequestSplitSize uint64,
 	graph *manifest.ModuleGraph,
 ) (*JobsPlanner, error) {
-	planner := &JobsPlanner{
-		tracer: otel.GetTracerProvider().Tracer("executor"),
-	}
+	planner := &JobsPlanner{}
 
-	ctx, span := planner.tracer.Start(ctx, "job_planning")
+	ctx, span := reqctx.WithSpan(ctx, "job_planning")
 	defer span.End()
 
 	for storeName, workUnit := range workPlan.workUnitsMap {

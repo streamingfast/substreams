@@ -37,7 +37,7 @@ func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer
 			// `OnStreamTerminated` is invoked by the service when an error occurs with the connection, in this case,
 			// we are outside any active span and we want to attach the event to the root span of the pipeline
 			// which should always be set.
-			if err := p.flushStores(p.ctx, reqDetails.Request.StopBlockNum, nil); err != nil {
+			if err := p.flushStores(p.ctx, reqDetails.Request.StopBlockNum); err != nil {
 				return status.Errorf(codes.Internal, "handling store save boundaries: %s", err)
 			}
 		}

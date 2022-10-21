@@ -19,7 +19,6 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
@@ -216,7 +215,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store
 	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfigs store.ConfigMap) (store.Map, error) {
+func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfigs store.ConfigMap) (storeMap store.Map, err error) {
+	ctx, span := reqctx.WithSpan(ctx, "backprocess")
+	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
 	o := orchestrator.New(
 		p.runtimeConfig,
@@ -227,9 +228,9 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 		reqDetails.Request.Modules,
 	)
 
-	storeMap, err := o.Run(ctx)
+	storeMap, err = o.Run(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("backrprocess run: %w", err)
 	}
 
 	p.backprocessingStores = nil
@@ -263,13 +264,16 @@ func (p *Pipeline) validateAndHashModules(ctx context.Context, modules []*pbsubs
 	return nil
 }
 
-func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64, span trace.Span) error {
+func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	reqDetails := reqctx.Details(ctx)
+	ctx, span := reqctx.WithSpan(ctx, "flush_stores")
+	defer span.EndWithErr(&err)
+	span.SetAttributes(attribute.Int("boundary_reached", 0))
+	count := 0
 	subrequestStopBlock := reqDetails.IsSubRequest && (reqDetails.Request.StopBlockNum == blockNum)
 	for p.bounder.PassedBoundary(blockNum) || subrequestStopBlock {
-		if span != nil {
-			span.AddEvent("store_save_boundary_reach")
-		}
+		count++
+		span.SetAttributes(attribute.Int("boundary_reached", count))
 
 		boundaryBlock := p.bounder.Boundary()
 		if subrequestStopBlock {
@@ -299,28 +303,26 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 			continue
 		}
 
-		ctx, span := reqctx.WithSpan(ctx, "save_store_snapshot")
-		span.SetAttributes(attribute.String("store", name))
 		if err := p.saveStoreSnapshot(ctx, s, boundaryBlock); err != nil {
-			span.EndWithErr(&err)
 			return fmt.Errorf("save store snapshot: %w", err)
 		}
-		span.EndWithErr(nil)
 
 	}
 	return nil
 }
 
 func (p *Pipeline) saveStoreSnapshot(ctx context.Context, s store.Store, boundaryBlock uint64) (err error) {
-	blockRange, writer, errSave := s.Save(boundaryBlock)
-	if errSave != nil {
-		err = fmt.Errorf("saving store %q at boundary %d: %w", s.Name(), boundaryBlock, err)
-		return
+	ctx, span := reqctx.WithSpan(ctx, "save_store_snapshot")
+	span.SetAttributes(attribute.String("store", s.Name()))
+	defer span.EndWithErr(&err)
+
+	blockRange, writer, err := s.Save(boundaryBlock)
+	if err != nil {
+		return fmt.Errorf("saving store %q at boundary %d: %w", s.Name(), boundaryBlock, err)
 	}
 
 	if err = writer.Write(ctx); err != nil {
-		err = fmt.Errorf("failed to write store: %w", err)
-		return
+		return fmt.Errorf("failed to write store: %w", err)
 	}
 
 	if reqctx.Details(ctx).IsSubRequest && p.isOutputModule(s.Name()) {
@@ -344,36 +346,40 @@ func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Cloc
 
 }
 
-func (p *Pipeline) runPreBlockHooks(clock *pbsubstreams.Clock, span trace.Span) error {
+func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clock) (err error) {
+	_, span := reqctx.WithSpan(ctx, "pre_block_hooks")
+	defer span.EndWithErr(&err)
+
 	for _, hook := range p.preBlockHooks {
 		span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
-		if err := hook(p.ctx, clock); err != nil {
+		if err := hook(ctx, clock); err != nil {
 			return fmt.Errorf("pre block hook: %w", err)
 		}
 	}
 	return nil
 }
 
-func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) error {
+func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
-	span := reqctx.Span(ctx)
+	ctx, span := reqctx.WithSpan(ctx, "module_execution")
+	defer span.EndWithErr(&err)
 	executorName := executor.Name()
-	logger.Debug("executing", zap.String("module_name", executorName))
 
-	// extract into : "getExecutorOutput()"
+	span.SetAttributes(attribute.String("module.name", executorName))
+
+	logger.Debug("executing", zap.String("module_name", executorName))
 
 	output, cached, err := execOutput.Get(executor.Name())
 	if err != nil && err != execout.NotFound {
 		return fmt.Errorf("error getting module %q output: %w", executor.Name(), err)
 	}
+	span.SetAttributes(attribute.Bool("module.output.cached", cached))
 	if cached {
-		span.AddEvent("output_cache_hit")
 		if err := executor.applyCachedOutput(output); err != nil {
 			return fmt.Errorf("failed to apply cache output for module %q: %w", executorName, err)
 		}
 		return nil
 	}
-	span.AddEvent("output_cache_miss")
 
 	outputData, moduleOutputData, err := executor.run(ctx, execOutput)
 	if err != nil {

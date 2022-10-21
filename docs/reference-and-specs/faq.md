@@ -99,3 +99,13 @@ StreamingFast was originally called dfuse. The company changed the name and is i
 ### **Who is StreamingFast?**
 
 StreamingFast is a protocol infrastructure company that provides a massively scalable architecture for streaming blockchain data. StreamingFast is one of the core developers working alongside The Graph Foundation.
+
+### why wasm32-unknown-unknown?
+
+The first unknown is the system that you are compiling on, and the second is the system you are targeting.
+
+“Compile on almost any machine, run on almost any machine.”
+
+Additional information is available at the following link.
+
+[https://github.com/rustwasm/wasm-bindgen/issues/979](https://github.com/rustwasm/wasm-bindgen/issues/979)

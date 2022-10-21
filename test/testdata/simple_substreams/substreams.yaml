@@ -139,9 +139,9 @@ modules:
     updatePolicy: set
     valueType: int64
     inputs:
-      - source: assert_test_store_delete_prefix
-      - source: assert_test_store_add_bigint
-      - source: assert_test_store_add_i64
-      - source: assert_test_store_add_i64_deltas
-      - source: assert_test_store_set_i64
-      - source: assert_test_store_set_i64_deltas
+      - map: assert_test_store_delete_prefix
+      - map: assert_test_store_add_bigint
+      - map: assert_test_store_add_i64
+      - map: assert_test_store_add_i64_deltas
+      - map: assert_test_store_set_i64
+      - map: assert_test_store_set_i64_deltas

@@ -8,21 +8,21 @@ import (
 	"github.com/streamingfast/substreams/work"
 	"os"
 
-	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/service/config"
-
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
+	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -43,6 +43,9 @@ type Service struct {
 	tracer ttrace.Tracer
 	logger *zap.Logger
 }
+
+var workerID atomic.Uint64
+
 
 func New(
 	stateStore dstore.Store,
@@ -122,9 +125,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
-
-	logger := reqctx.Logger(streamSrv.Context())
-	ctx := reqctx.WithLogger(streamSrv.Context(), logger)
+	ctx := streamSrv.Context()
+	logger := reqctx.Logger(ctx)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
 	ctx, span := reqctx.WithSpan(ctx, "substream_request")
@@ -182,6 +184,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		}
 	}
 
+	if isSubrequest {
+		wid := workerID.Inc()
+		logger = logger.With(zap.Uint64("worker", wid))
+		ctx = reqctx.WithLogger(ctx, logger)
+	}
+
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
@@ -190,7 +198,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return nil
 	}
 
-	ctx, err = reqctx.WithRequest(streamSrv.Context(), request, isSubrequest)
+	ctx, err = reqctx.WithRequest(ctx, request, isSubrequest)
 	if err != nil {
 		return fmt.Errorf("context with request: %w", err)
 	}
@@ -213,7 +221,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		opts...,
 	)
 
-	if err := pipe.Init(); err != nil {
+	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
@@ -235,7 +243,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
-	return pipe.OnStreamTerminated(streamSrv, blockStream.Run(ctx))
+	return pipe.OnStreamTerminated(ctx, streamSrv, blockStream.Run(ctx))
 }
 
 func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) string {

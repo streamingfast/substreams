@@ -80,7 +80,7 @@ func mapTestExecutor(t *testing.T, name string) *MapperModuleExecutor {
 			moduleName: name,
 			wasmModule: wasmModule,
 			wasmArguments: []wasm.Argument{
-				wasm.NewBlockInput("sf.substreams.v1.test.Block"),
+				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
 			},
 			entrypoint: name,
 			tracer:     otel.GetTracerProvider().Tracer("test"),

@@ -161,7 +161,7 @@ func processRequest(
 		opts...,
 	)
 
-	require.NoError(t, pipe.Init())
+	require.NoError(t, pipe.Init(ctx))
 
 	generator := newGenerator(uint64(request.StartBlockNum), request.StopBlockNum)
 
@@ -494,8 +494,8 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, 20, 31, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-		if b.Number == 30 {
+	_, err := runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+		if b.Number == 40 {
 			s, storeFound := stores.Get("test_store_delete_prefix")
 			require.True(t, storeFound)
 			require.Equal(t, uint64(1), s.Length())

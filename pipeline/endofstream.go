@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/streamingfast/substreams/reqctx"
@@ -21,9 +22,9 @@ import (
 
 // OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.
-func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer, err error) error {
-	logger := reqctx.Logger(p.ctx)
-	reqDetails := reqctx.Details(p.ctx)
+func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv pbsubstreams.Stream_BlocksServer, err error) error {
+	logger := reqctx.Logger(ctx)
+	reqDetails := reqctx.Details(ctx)
 	isStopBlockReachedErr := errors.Is(err, stream.ErrStopBlockReached)
 
 	if isStopBlockReachedErr || errors.Is(err, io.EOF) {
@@ -35,9 +36,9 @@ func (p *Pipeline) OnStreamTerminated(streamSrv pbsubstreams.Stream_BlocksServer
 			// We use `StopBlockNum` as the argument to flush stores as possible boundaries (if chain has holes...)
 			//
 			// `OnStreamTerminated` is invoked by the service when an error occurs with the connection, in this case,
-			// we are outside any active span and we want to attach the event to the root span of the pipeline
+			// we are outside any active span we want to attach the event to the root span of the pipeline
 			// which should always be set.
-			if err := p.flushStores(p.ctx, reqDetails.Request.StopBlockNum); err != nil {
+			if err := p.flushStores(ctx, reqDetails.Request.StopBlockNum); err != nil {
 				return status.Errorf(codes.Internal, "handling store save boundaries: %s", err)
 			}
 		}

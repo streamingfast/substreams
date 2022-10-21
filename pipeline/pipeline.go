@@ -29,6 +29,8 @@ type backprocessingStore struct {
 }
 
 type Pipeline struct {
+	// storing context since the processBlock interface
+	// does not have context. For consistency, it should only be read in the processBlock function
 	ctx context.Context
 
 	vmType    string // wasm/rust-v1, native
@@ -97,8 +99,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) Init() (err error) {
-	ctx := p.ctx
+func (p *Pipeline) Init(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
@@ -117,11 +118,11 @@ func (p *Pipeline) Init() (err error) {
 		zap.Strings("outputs", reqDetails.Request.OutputModules),
 	)
 
-	if err := p.validateBinaries(); err != nil {
+	if err := p.validateBinaries(ctx); err != nil {
 		return fmt.Errorf("binary validation failed: %w", err)
 	}
 
-	modules, storeModules, err := p.getModules()
+	modules, storeModules, err := p.getModules(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve modules: %w", err)
 	}
@@ -154,7 +155,7 @@ func (p *Pipeline) Init() (err error) {
 	}
 	p.StoreMap = storeMap
 
-	if err = p.buildWASM(modules); err != nil {
+	if err = p.buildWASM(ctx, modules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
@@ -203,7 +204,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store
 			fullStore := config.NewFullKV(logger)
 
 			if fullStore.InitialBlock() != reqDetails.EffectiveStartBlockNum {
-				if err := fullStore.Load(p.ctx, reqDetails.EffectiveStartBlockNum); err != nil {
+				if err := fullStore.Load(ctx, reqDetails.EffectiveStartBlockNum); err != nil {
 					return nil, fmt.Errorf("load partial store: %w", err)
 				}
 			}
@@ -337,7 +338,7 @@ func (p *Pipeline) saveStoreSnapshot(ctx context.Context, s store.Store, boundar
 
 func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
 	for _, hook := range p.postJobHooks {
-		if err := hook(p.ctx, clock); err != nil {
+		if err := hook(ctx, clock); err != nil {
 			reqctx.Logger(ctx).Warn("post job hook failed", zap.Error(err))
 		}
 	}
@@ -501,8 +502,8 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 //	return p.respFunc(substreams.NewModulesProgressResponse(out))
 //}
 
-func (p *Pipeline) validateBinaries() error {
-	reqDetails := reqctx.Details(p.ctx)
+func (p *Pipeline) validateBinaries(ctx context.Context) error {
+	reqDetails := reqctx.Details(ctx)
 	for _, binary := range reqDetails.Request.Modules.Binaries {
 		if binary.Type != "wasm/rust-v1" {
 			return fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
@@ -512,8 +513,8 @@ func (p *Pipeline) validateBinaries() error {
 	return nil
 }
 
-func (p *Pipeline) getModules() (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
-	reqDetails := reqctx.Details(p.ctx)
+func (p *Pipeline) getModules(ctx context.Context) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
+	reqDetails := reqctx.Details(ctx)
 	if modules, err = p.graph.ModulesDownTo(reqDetails.Request.OutputModules); err != nil {
 		return nil, nil, fmt.Errorf("building execution moduleGraph: %w", err)
 	}
@@ -523,13 +524,13 @@ func (p *Pipeline) getModules() (modules []*pbsubstreams.Module, storeModules []
 	return modules, storeModules, nil
 }
 
-func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
-	request := reqctx.Details(p.ctx).Request
+func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module) error {
+	request := reqctx.Details(ctx).Request
 	p.wasmRuntime = wasm.NewRuntime(p.wasmExtensions)
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	for _, module := range modules {
-		inputs, err := renderWasmInputs(module, p.StoreMap)
+		inputs, err := p.renderWasmInputs(module)
 		if err != nil {
 			return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 		}
@@ -537,7 +538,7 @@ func (p *Pipeline) buildWASM(modules []*pbsubstreams.Module) error {
 		modName := module.Name // to ensure it's enclosed
 		entrypoint := module.BinaryEntrypoint
 		code := request.Modules.Binaries[module.BinaryIndex]
-		wasmModule, err := p.wasmRuntime.NewModule(p.ctx, request, code.Content, module.Name, entrypoint)
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name, entrypoint)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
@@ -630,7 +631,8 @@ func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, c
 	return nil
 }
 
-func renderWasmInputs(module *pbsubstreams.Module, storeAccessor store.Map) (out []wasm.Argument, err error) {
+func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Argument, err error) {
+	storeAccessor := p.StoreMap
 	for _, input := range module.Inputs {
 		switch in := input.Input.(type) {
 		case *pbsubstreams.Module_Input_Map_:
@@ -647,10 +649,17 @@ func renderWasmInputs(module *pbsubstreams.Module, storeAccessor store.Map) (out
 				out = append(out, wasm.NewStoreReaderInput(inputName, store))
 			}
 		case *pbsubstreams.Module_Input_Source_:
-			out = append(out, wasm.NewBlockInput(in.Source.Type))
+			if !p.isValidWasmSourceInputType(in.Source.Type) {
+				return nil, fmt.Errorf("input source has an unknown type: %q", in.Source.Type)
+			}
+			out = append(out, wasm.NewSourceInput(in.Source.Type))
 		default:
 			return nil, fmt.Errorf("invalid input struct for module %q", module.Name)
 		}
 	}
 	return out, nil
+}
+
+func (p *Pipeline) isValidWasmSourceInputType(inputType string) bool {
+	return (p.blockType == inputType) || (wasm.CLOCK_TYPE == inputType)
 }

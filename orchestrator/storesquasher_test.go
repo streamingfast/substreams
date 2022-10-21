@@ -103,7 +103,6 @@ func TestStoreSquasher_squash(t *testing.T) {
 			squasher := &StoreSquasher{
 				name:           "mod",
 				partialsChunks: partialsChunks,
-				log:            zap.NewNop(),
 			}
 			err := squasher.squash(test.ranges)
 			if test.expectErr != nil {
@@ -128,7 +127,6 @@ func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	s := &StoreSquasher{
 		partialsChunks: make(chan block.Ranges, 10),
 		ranges:         []*block.Range{},
-		log:            zap.NewNop(),
 	}
 	go func() {
 		s.partialsChunks <- block.ParseRanges("0-10")
@@ -217,7 +215,6 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				store:                  newTestStore(t, testStore, test.storeInitialBlock),
 				nextExpectedStartBlock: test.nextExpectedStartBlock,
 				storeSaveInterval:      test.storeSaveInterval,
-				log:                    zap.NewNop(),
 			}
 			err := squasher.processRange(context.Background(), eg, test.squashableRange)
 			require.NoError(t, eg.Wait())

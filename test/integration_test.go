@@ -237,9 +237,8 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	ctx = reqctx.WithLogger(ctx, zlog)
 
 	testTempDir := os.TempDir()
-	if os.Getenv("SUBSTREAMS_INTEGRATION_NO_CLEANUP") == "" {
-		defer os.RemoveAll(testTempDir)
-	}
+	// ensure the directory is clean before usage
+	os.RemoveAll(testTempDir)
 
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
 	if tracingEnabled {

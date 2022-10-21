@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/streamingfast/substreams/work"
+	"go.uber.org/zap"
 	"testing"
 	"time"
 
@@ -35,7 +36,7 @@ func TestNewJobsPlanner(t *testing.T) {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
 		config, err := store.NewConfig(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
 		require.NoError(t, err)
-		newStore := config.NewFullKV(zlog)
+		newStore := config.NewFullKV(zap.NewNop())
 		storeMap.Set(newStore)
 	}
 

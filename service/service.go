@@ -46,7 +46,6 @@ type Service struct {
 
 var workerID atomic.Uint64
 
-
 func New(
 	stateStore dstore.Store,
 	blockType string,
@@ -186,7 +185,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	if isSubrequest {
 		wid := workerID.Inc()
-		logger = logger.With(zap.Uint64("worker", wid))
+		logger = logger.With(zap.Uint64("req", wid))
 		ctx = reqctx.WithLogger(ctx, logger)
 	}
 

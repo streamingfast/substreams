@@ -28,7 +28,6 @@ type Scheduler struct {
 
 	// TODO(abourget): deprecate this, and fuse it inside the Scheduler
 	jobsPlanner *JobsPlanner
-	log         *zap.Logger
 }
 
 func NewScheduler(
@@ -53,7 +52,6 @@ func NewScheduler(
 	s := &Scheduler{
 		workerPool:             workerPool,
 		respFunc:               respFunc,
-		log:                    logger,
 		upstreamRequestModules: upstreamRequestModules,
 
 		jobsPlanner: jobsPlanner, // DEPRECATED
@@ -62,9 +60,10 @@ func NewScheduler(
 }
 
 func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Modules) (err error) {
+	logger := reqctx.Logger(ctx)
 	result := make(chan error)
 
-	s.log.Debug("launching scheduler")
+	logger.Debug("launching scheduler")
 
 	go s.launch(ctx, requestModules, result)
 
@@ -75,7 +74,7 @@ func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Module
 			if err = ctx.Err(); err != nil {
 				return err
 			}
-			s.log.Info("job canceled")
+			logger.Info("job canceled")
 			return nil
 		case err = <-result:
 			resultCount++
@@ -83,35 +82,36 @@ func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Module
 				err = fmt.Errorf("worker ended in error: %w", err)
 				return err
 			}
-			s.log.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount))
+			logger.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount))
 		}
 	}
 
-	s.log.Info("all jobs completed, waiting for squasher to finish")
+	logger.Info("all jobs completed, waiting for squasher to finish")
 
 	return nil
 }
 
 func (s *Scheduler) launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
+	logger := reqctx.Logger(ctx)
 	ctx, span := reqctx.WithSpan(ctx, "running_schedule")
 	defer span.End()
 	for {
-		zlog.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.jobsPlanner.AvailableJobs)))
+		logger.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.jobsPlanner.AvailableJobs)))
 		job, ok := <-s.jobsPlanner.AvailableJobs
 		if !ok {
-			zlog.Debug("no more job in scheduler, or context cancelled")
+			logger.Debug("no more job in scheduler, or context cancelled")
 			break
 		}
 
-		zlog.Info("scheduling job", zap.Object("job", job))
+		logger.Info("scheduling job", zap.Object("job", job))
 
 		start := time.Now()
 		jobWorker := s.workerPool.Borrow()
-		zlog.Debug("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+		logger.Debug("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 
 		select {
 		case <-ctx.Done():
-			zlog.Info("synchronize stores quit on cancel context")
+			logger.Info("synchronize stores quit on cancel context")
 			break
 		default:
 		}
@@ -136,6 +136,8 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 }
 
 func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) error {
+	logger := reqctx.Logger(ctx)
+
 	var partialsWritten []*block.Range
 	var err error
 
@@ -144,11 +146,11 @@ out:
 		partialsWritten, err = worker.Run(ctx, job.CreateRequest(requestModules), s.respFunc)
 		switch err.(type) {
 		case *work.RetryableErr:
-			zlog.Debug("retryable error", zap.Error(err))
+			logger.Debug("retryable error", zap.Error(err))
 			continue
 		default:
 			if err != nil {
-				zlog.Debug("not a retryable error", zap.Error(err))
+				logger.Debug("not a retryable error", zap.Error(err))
 			}
 			break out
 		}
@@ -189,6 +191,8 @@ func NewJobsPlanner(
 ) (*JobsPlanner, error) {
 	planner := &JobsPlanner{}
 
+	logger := reqctx.Logger(ctx)
+
 	ctx, span := reqctx.WithSpan(ctx, "job_planning")
 	defer span.End()
 
@@ -220,7 +224,7 @@ func NewJobsPlanner(
 			job := work.NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
 			planner.jobs = append(planner.jobs, job)
 
-			zlog.Info("job planned", zap.String("module_name", storeName), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
+			logger.Info("job planned", zap.String("module_name", storeName), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
 		}
 	}
 
@@ -228,7 +232,7 @@ func NewJobsPlanner(
 	planner.AvailableJobs = make(chan *work.Job, len(planner.jobs))
 	planner.dispatch()
 
-	zlog.Info("jobs planner ready")
+	logger.Info("jobs planner ready")
 
 	return planner, nil
 }
@@ -256,7 +260,6 @@ func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64)
 }
 
 func (p *JobsPlanner) dispatch() {
-	zlog.Debug("calling jobs planner dispatch", zap.Object("planner", p))
 	if p.completed {
 		return
 	}
@@ -269,7 +272,6 @@ func (p *JobsPlanner) dispatch() {
 		}
 		if job.ReadyForDispatch() {
 			job.Scheduled = true
-			zlog.Debug("dispatching job", zap.Object("job", job))
 			p.AvailableJobs <- job
 		}
 	}

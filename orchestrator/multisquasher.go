@@ -4,6 +4,7 @@ import "C"
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
 	"strings"
 
 	"github.com/streamingfast/substreams/block"
@@ -34,8 +35,9 @@ func NewMultiSquasher(
 	upToBlock uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) (*MultiSquasher, error) {
+	logger := reqctx.Logger(ctx)
 	storeSquashers := map[string]*StoreSquasher{}
-	zlog.Info("creating a new squasher", zap.Int("work_plan_count", workPlan.StoreCount()))
+	logger.Info("creating a new squasher", zap.Int("work_plan_count", workPlan.StoreCount()))
 
 	for storeModuleName, workUnit := range workPlan.workUnitsMap {
 		storeConfig, found := storeConfigs[storeModuleName]
@@ -43,20 +45,20 @@ func NewMultiSquasher(
 			return nil, fmt.Errorf("store %q not found", storeModuleName)
 		}
 
-		startingStore := storeConfig.NewFullKV(zlog)
+		startingStore := storeConfig.NewFullKV(logger)
 
 		// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
 		// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
 		// one is derived?
 		var storeSquasher *StoreSquasher
 		if workUnit.initialCompleteRange == nil {
-			zlog.Info("setting up initial store",
+			logger.Info("setting up initial store",
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
 			storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 		} else {
-			zlog.Info("loading initial store",
+			logger.Info("loading initial store",
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", workUnit.initialCompleteRange),
 			)
@@ -116,11 +118,12 @@ func (s *MultiSquasher) Wait(ctx context.Context) (out store.Map, err error) {
 }
 
 func (s *MultiSquasher) waitUntilCompleted(ctx context.Context) error {
-	zlog.Info("squasher waiting till squasher stores are completed",
+	logger := reqctx.Logger(ctx)
+	logger.Info("squasher waiting till squasher stores are completed",
 		zap.Int("store_count", len(s.storeSquashers)),
 	)
 	for _, squashable := range s.storeSquashers {
-		zlog.Info("shutting down store squasher",
+		logger.Info("shutting down store squasher",
 			zap.String("store", squashable.name),
 		)
 		if err := squashable.WaitForCompletion(ctx); err != nil {

@@ -202,7 +202,11 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return fmt.Errorf("context with request: %w", err)
 	}
 
-	storeBoundary := pipeline.NewStoreBoundary(s.runtimeConfig.StoreSnapshotsSaveInterval)
+	storeBoundary := pipeline.NewStoreBoundary(
+		s.runtimeConfig.StoreSnapshotsSaveInterval,
+		isSubrequest,
+		request.StopBlockNum,
+	)
 	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, reqctx.Logger(ctx))
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)

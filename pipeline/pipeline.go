@@ -265,28 +265,15 @@ func (p *Pipeline) validateAndHashModules(ctx context.Context, modules []*pbsubs
 	return nil
 }
 
-func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error) {
+func (p *Pipeline) storesEndOfStream(ctx context.Context, clock *pbsubstreams.Clock) (err error) {
 	reqDetails := reqctx.Details(ctx)
-	span := reqctx.Span(ctx)
-	count := 0
-	subrequestStopBlock := reqDetails.IsSubRequest && (reqDetails.Request.StopBlockNum == blockNum)
-	for p.bounder.PassedBoundary(blockNum) || subrequestStopBlock {
-		count++
-		span.SetAttributes(attribute.Int("pipeline.stores.boundary_reached", count))
-
-		boundaryBlock := p.bounder.Boundary()
-		if subrequestStopBlock {
-			boundaryBlock = reqDetails.Request.StopBlockNum
-		}
-
+	boundaryIntervals := p.bounder.GetStoreFlushRanges(reqDetails.IsSubRequest, reqDetails.Request.StopBlockNum, clock.Number)
+	reqctx.Span(ctx).SetAttributes(attribute.Int("pipeline.stores.boundary_reached", len(boundaryIntervals)))
+	for _, boundaryBlock := range boundaryIntervals {
 		if err := p.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
-			return fmt.Errorf("error saving stores snashotps: %w", err)
+			return fmt.Errorf("saving stores snapshot at obund %d: %w", boundaryBlock, err)
 		}
 
-		p.bounder.BumpBoundary()
-		if isStopBlockReached(blockNum, reqDetails.Request.StopBlockNum) {
-			break
-		}
 	}
 	return nil
 }
@@ -434,10 +421,6 @@ func shouldReturnProgress(isSubRequest bool) bool {
 
 func shouldReturnDataOutputs(blockNum, effectiveStartBlockNum uint64, isSubRequest bool) bool {
 	return shouldReturn(blockNum, effectiveStartBlockNum) && !isSubRequest
-}
-
-func isStopBlockReached(currentBlock uint64, stopBlock uint64) bool {
-	return stopBlock != 0 && currentBlock >= stopBlock
 }
 
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {

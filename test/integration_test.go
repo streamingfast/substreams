@@ -237,6 +237,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	ctx = reqctx.WithLogger(ctx, zlog)
 
 	testTempDir := os.TempDir()
+	fmt.Println(testTempDir)
 	// ensure the directory is clean before usage
 	os.RemoveAll(testTempDir)
 

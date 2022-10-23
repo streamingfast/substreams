@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -66,14 +65,14 @@ func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 	return
 }
 
-func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
-	return !c.currentBlockRange.ContainsBlockRef(ref)
+func (c *OutputCache) isOutOfRange(blockNum uint64) bool {
+	return !c.currentBlockRange.Contains(blockNum)
 }
 
-func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {
-	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
-	return c.IsOutOfRange(incRef)
-}
+//func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {
+//	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
+//	return c.isOutOfRange(incRef)
+//}
 
 func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
 	c.Lock()

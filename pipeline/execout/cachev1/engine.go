@@ -23,13 +23,11 @@ type Engine struct {
 	ctx           context.Context
 	caches        map[string]*OutputCacheState
 	runtimeConfig config.RuntimeConfig
-	// SaveBlockInterval uint64
-	// baseCacheStore    dstore.Store
-	logger *zap.Logger
+	logger        *zap.Logger
 }
 
 type OutputCacheState struct {
-	c           *OutputCache
+	*OutputCache
 	initialized bool
 }
 
@@ -38,9 +36,7 @@ func NewEngine(runtimeConfig config.RuntimeConfig, logger *zap.Logger) (execout.
 		ctx:           context.Background(),
 		runtimeConfig: runtimeConfig,
 		caches:        make(map[string]*OutputCacheState),
-		// SaveBlockInterval: saveBlockInterval,
-		// baseCacheStore:    baseCacheStore,
-		logger: logger,
+		logger:        logger,
 	}
 	return e, nil
 }
@@ -51,6 +47,29 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 		}
 		return nil
 	})
+}
+
+func (e *Engine) EndOfStream(context.Context, *pbsubstreams.Clock) error {
+	for _, cache := range e.caches {
+		if err := e.flushCache(cache); err != nil {
+			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
+		}
+	}
+	return nil
+}
+
+func (e *Engine) HandleFinal(_ context.Context, clock *pbsubstreams.Clock) error {
+	for name, cache := range e.caches {
+		fmt.Println("Flushing Output: ", name, clock.Number, cache.currentBlockRange.String())
+		if !cache.isOutOfRange(clock.Number) {
+			continue
+		}
+		if err := e.flushCache(cache); err != nil {
+			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
+		}
+
+	}
+	return nil
 }
 
 func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
@@ -66,45 +85,22 @@ func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pb
 	}, nil
 }
 
-func (e *Engine) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error {
-	err := e.maybeFlushCaches(blockRef)
+func (e *Engine) flushCache(cache *OutputCacheState) error {
+	e.logger.Debug("saving cache", zap.Object("cache", cache))
+	err := cache.save(e.ctx, cache.currentFilename())
 	if err != nil {
-		return fmt.Errorf("flushing caches: %w", err)
+		return fmt.Errorf("saving cache ouputs: %w", err)
 	}
 
-	if step.Matches(bstream.StepUndo) {
-		err := e.undoCaches(blockRef)
-		if err != nil {
-			return fmt.Errorf("undoing caches: %w", err)
-		}
-		return nil
-	}
-
-	return nil
-}
-
-func (e *Engine) maybeFlushCaches(blockRef bstream.BlockRef) error {
-	for name, cache := range e.caches {
-		if !cache.c.IsAtUpperBoundary(blockRef) && !cache.c.IsOutOfRange(blockRef) {
-			continue
-		}
-
-		e.logger.Debug("saving cache", zap.Object("cache", cache.c))
-		err := cache.c.save(e.ctx, cache.c.currentFilename())
-		if err != nil {
-			return fmt.Errorf("save: saving outpust or module kv %s: %w", name, err)
-		}
-
-		if _, err := cache.c.LoadAtBlock(e.ctx, cache.c.currentBlockRange.ExclusiveEndBlock); err != nil {
-			return fmt.Errorf("loading blocks %d for module kv %s: %w", cache.c.currentBlockRange.ExclusiveEndBlock, cache.c.moduleName, err)
-		}
+	if _, err := cache.LoadAtBlock(e.ctx, cache.currentBlockRange.ExclusiveEndBlock); err != nil {
+		return fmt.Errorf("loading cache outputs  at blocks %d: %w", cache.currentBlockRange.ExclusiveEndBlock, err)
 	}
 	return nil
 }
 
 func (e *Engine) undoCaches(blockRef bstream.BlockRef) error {
 	for _, cache := range e.caches {
-		cache.c.Delete(blockRef.ID())
+		cache.Delete(blockRef.ID())
 	}
 	return nil
 }
@@ -122,7 +118,7 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 	}
 
 	e.caches[moduleName] = &OutputCacheState{
-		c:           NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger),
+		OutputCache: NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger),
 		initialized: false,
 	}
 	return nil
@@ -134,13 +130,13 @@ func (e *Engine) get(moduleName string, clock *pbsubstreams.Clock) ([]byte, bool
 		return nil, false, fmt.Errorf("cache %q not found in: %v", moduleName, e.caches)
 	}
 	if !cache.initialized {
-		if _, err := cache.c.LoadAtBlock(e.ctx, clock.Number); err != nil {
+		if _, err := cache.LoadAtBlock(e.ctx, clock.Number); err != nil {
 			return nil, false, fmt.Errorf("unable to load cache %q at block %d: %w", moduleName, clock.Number, err)
 		}
 		cache.initialized = true
 	}
 
-	data, found := cache.c.Get(clock)
+	data, found := cache.Get(clock)
 	return data, found, nil
 }
 
@@ -150,5 +146,5 @@ func (e *Engine) set(moduleName string, data []byte, clock *pbsubstreams.Clock, 
 		return fmt.Errorf("cache %q not found", moduleName)
 	}
 
-	return cache.c.Set(clock, cursor, data)
+	return cache.Set(clock, cursor, data)
 }

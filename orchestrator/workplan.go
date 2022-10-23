@@ -56,7 +56,7 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 func (p WorkPlan) String() string {
 	var out []string
 	for k, v := range p.workUnitsMap {
-		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.initialCompleteRange, v.partialsMissing, v.partialsPresent))
+		out = append(out, fmt.Sprintf("mod=%q, initial=%t, partials missing=%v, present=%v", k, v.initialCompleteRange, v.partialsMissing, v.partialsPresent))
 	}
 	return strings.Join(out, ";")
 }

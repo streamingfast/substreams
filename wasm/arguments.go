@@ -5,7 +5,7 @@ import (
 	"github.com/streamingfast/substreams/store"
 )
 
-const CLOCK_TYPE = "sf.susbtreams.v1.Clock"
+const CLOCK_TYPE = "sf.substreams.v1.Clock"
 
 type InputType int
 

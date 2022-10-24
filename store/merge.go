@@ -56,13 +56,13 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		// check valueType to do the right thing
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			sum := func(a, b uint64) uint64 {
+			sum := func(a, b int64) int64 {
 				return a + b
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
-				v0 := foundOrZeroUint64(v0b, fv0)
-				v1 := foundOrZeroUint64(v, true)
+				v0 := foundOrZeroInt64(v0b, fv0)
+				v1 := foundOrZeroInt64(v, true)
 				b.kv[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
 		case manifest.OutputValueTypeFloat64:
@@ -103,20 +103,20 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			max := func(a, b uint64) uint64 {
+			max := func(a, b int64) int64 {
 				if a >= b {
 					return a
 				}
 				return b
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroUint64(v, true)
+				v1 := foundOrZeroInt64(v, true)
 				v, found := b.kv[k]
 				if !found {
 					b.kv[k] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
-				v0 := foundOrZeroUint64(v, true)
+				v0 := foundOrZeroInt64(v, true)
 
 				b.kv[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
@@ -182,20 +182,20 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			min := func(a, b uint64) uint64 {
+			min := func(a, b int64) int64 {
 				if a <= b {
 					return a
 				}
 				return b
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroUint64(v, true)
+				v1 := foundOrZeroInt64(v, true)
 				v, found := b.kv[k]
 				if !found {
 					b.kv[k] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
-				v0 := foundOrZeroUint64(v, true)
+				v0 := foundOrZeroInt64(v, true)
 
 				b.kv[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
@@ -265,7 +265,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	return nil
 }
 
-func foundOrZeroUint64(in []byte, found bool) uint64 {
+func foundOrZeroInt64(in []byte, found bool) int64 {
 	if !found {
 		return 0
 	}
@@ -273,7 +273,7 @@ func foundOrZeroUint64(in []byte, found bool) uint64 {
 	if err != nil {
 		return 0
 	}
-	return uint64(val)
+	return int64(val)
 }
 
 func foundOrZeroBigFloat(in []byte, found bool) *big.Float {

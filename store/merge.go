@@ -73,11 +73,11 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v0b, fv0 := b.kv[k]
 				v0 := foundOrZeroFloat(v0b, fv0)
 				v1 := foundOrZeroFloat(v, true)
-				b.kv[k] = []byte(floatToStr(sum(v0, v1)))
+				b.kv[k] = floatToBytes(sum(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			sum := func(a, b *big.Int) *big.Int {
-				return bi().Add(a, b)
+				return new(big.Int).Add(a, b)
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
@@ -89,13 +89,13 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
 			sum := func(a, b *big.Float) *big.Float {
-				return bf().Add(a, b).SetPrec(100)
+				return new(big.Float).SetPrec(100).Add(a, b).SetPrec(100)
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
 				v0 := foundOrZeroBigFloat(v0b, fv0)
 				v1 := foundOrZeroBigFloat(v, true)
-				b.kv[k] = []byte(bigFloatToStr(sum(v0, v1)))
+				b.kv[k] = bigFloatToBytes(sum(v0, v1))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -131,12 +131,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(floatToStr(v1))
+					b.kv[k] = floatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroFloat(v, true)
 
-				b.kv[k] = []byte(floatToStr(max(v0, v1)))
+				b.kv[k] = floatToBytes(max(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			max := func(a, b *big.Int) *big.Int {
@@ -169,12 +169,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroBigFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(bigFloatToStr(v1))
+					b.kv[k] = bigFloatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroBigFloat(v, true)
 
-				b.kv[k] = []byte(bigFloatToStr(max(v0, v1)))
+				b.kv[k] = bigFloatToBytes(max(v0, v1))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
@@ -210,12 +210,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(floatToStr(v1))
+					b.kv[k] = floatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroFloat(v, true)
 
-				b.kv[k] = []byte(floatToStr(min(v0, v1)))
+				b.kv[k] = floatToBytes(min(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			min := func(a, b *big.Int) *big.Int {
@@ -248,12 +248,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroBigFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(bigFloatToStr(v1))
+					b.kv[k] = bigFloatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroBigFloat(v, true)
 
-				b.kv[k] = []byte(bigFloatToStr(min(v0, v1)))
+				b.kv[k] = bigFloatToBytes(min(v0, v1))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -278,14 +278,14 @@ func foundOrZeroInt64(in []byte, found bool) int64 {
 
 func foundOrZeroBigFloat(in []byte, found bool) *big.Float {
 	if !found {
-		return bf()
+		return new(big.Float).SetPrec(100)
 	}
 	return bytesToBigFloat(in)
 }
 
 func foundOrZeroBigInt(in []byte, found bool) *big.Int {
 	if !found {
-		return bi()
+		return new(big.Int)
 	}
 	return bytesToBigInt(in)
 }
@@ -344,18 +344,6 @@ func floatToBytes(f float64) []byte {
 	return []byte(floatToStr(f))
 }
 
-func intToBytes(i int) []byte {
-	return []byte(strconv.Itoa(i))
-}
-
-func bytesToInt(b []byte) int {
-	i, err := strconv.Atoi(string(b))
-	if err != nil {
-		panic(fmt.Sprintf("cannot convert string %s to int: %s", string(b), err.Error()))
-	}
-	return i
-}
-
 func bigFloatToStr(f *big.Float) string {
 	return f.Text('g', -1)
 }
@@ -363,6 +351,3 @@ func bigFloatToStr(f *big.Float) string {
 func bigFloatToBytes(f *big.Float) []byte {
 	return []byte(bigFloatToStr(f))
 }
-
-var bf = func() *big.Float { return new(big.Float).SetPrec(100) }
-var bi = func() *big.Int { return new(big.Int) }

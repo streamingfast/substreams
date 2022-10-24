@@ -12,57 +12,48 @@ mod abi;
 mod pb;
 use hex_literal::hex;
 use pb::erc721;
-use substreams::{log, store, Hex};
-use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS, Event};
+use substreams::prelude::*;
+use substreams::{log, store::StoreAddInt64, Hex};
+use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS};
 
-// Bored Ape Yacht Club Contract
+// Bored Ape Club Contract
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 
-/// Extracts transfer events from the contract
+substreams_ethereum::init!();
+
+/// Extracts transfers events from the contract
 #[substreams::handlers::map]
-fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
-    let mut transfers: Vec<erc721::Transfer> = vec![];
-    for trx in blk.transaction_traces {
-        transfers.extend(trx.receipt.unwrap().logs.iter().filter_map(|log| {
-            if log.address != TRACKED_CONTRACT {
-                return None;
-            }
+fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
+    Ok(erc721::Transfers {
+        transfers: blk
+            .events::<abi::erc721::events::Transfer>(&[&TRACKED_CONTRACT])
+            .map(|(transfer, log)| {
+                substreams::log::info!("NFT Transfer seen");
 
-            log::debug!("NFT Contract {} invoked", Hex(&TRACKED_CONTRACT));
-
-            if !abi::erc721::events::Transfer::match_log(log) {
-                return None;
-            }
-
-            let transfer = abi::erc721::events::Transfer::match_and_decode(log).unwrap();
-
-            Some(erc721::Transfer {
-                trx_hash: trx.hash.clone(),
-                from: transfer.from,
-                to: transfer.to,
-                token_id: transfer.token_id.low_u64(),
-                ordinal: log.block_index as u64,
+                erc721::Transfer {
+                    trx_hash: log.receipt.transaction.hash.clone(),
+                    from: transfer.from,
+                    to: transfer.to,
+                    token_id: transfer.token_id.low_u64(),
+                    ordinal: log.block_index() as u64,
+                }
             })
-        }));
-    }
-
-    Ok(erc721::Transfers { transfers })
+            .collect(),
+    })
 }
 
-// Store the total balance of NFT tokens by address for the specific TRACKED_CONTRACT by holder
+/// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
 #[substreams::handlers::store]
-fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
-    log::info!("NFT state builder");
+fn store_transfers(transfers: erc721::Transfers, s: StoreAddInt64) {
+    log::info!("NFT holders state builder");
     for transfer in transfers.transfers {
         if transfer.from != NULL_ADDRESS {
-            log::info!("Found a transfer out");
-
+            log::info!("Found a transfer out {}", Hex(&transfer.trx_hash));
             s.add(transfer.ordinal, generate_key(&transfer.from), -1);
         }
 
         if transfer.to != NULL_ADDRESS {
-            log::info!("Found a transfer in");
-
+            log::info!("Found a transfer in {}", Hex(&transfer.trx_hash));
             s.add(transfer.ordinal, generate_key(&transfer.to), 1);
         }
     }
@@ -143,40 +134,25 @@ The goal of the `map` being built is to extract `ERC721` transfers from a given 
 This can be achieved by finding all the `Transfer` events that are emitted by the contract that is currently being tracked. As events are found they will be decoded into Transfer objects.
 
 ```rust
-/// Extracts transfer events from the contract
+/// Extracts transfers events from the contract
 #[substreams::handlers::map]
-fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
-    // variable to store the transfers we find
-    let mut transfers: Vec<erc721::Transfer> = vec![];
-    // loop through the block's transaction
-    for trx in blk.transaction_traces {
-        // iterate over the transaction logs
-        transfers.extend(trx.receipt.unwrap().logs.iter().filter_map(|log| {
-            // verifying that the logs emitted are from the contract we are tracking
-            if log.address != TRACKED_CONTRACT {
-                return None;
-            }
+fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
+    Ok(erc721::Transfers {
+        transfers: blk
+            .events::<abi::erc721::events::Transfer>(&[&TRACKED_CONTRACT])
+            .map(|(transfer, log)| {
+                substreams::log::info!("NFT Transfer seen");
 
-            log::debug!("NFT Contract {} invoked", Hex(&TRACKED_CONTRACT));
-            // verify if the log matches a Transfer Event
-            if !abi::erc721::events::Transfer::match_log(log) {
-                return None;
-            }
-            
-            // decode the event and store it
-            let transfer = abi::erc721::events::Transfer::match_and_decode(log).unwrap();
-            Some(erc721::Transfer {
-                trx_hash: trx.hash.clone(),
-                from: transfer.from,
-                to: transfer.to,
-                token_id: transfer.token_id.low_u64(),
-                ordinal: log.block_index as u64,
+                erc721::Transfer {
+                    trx_hash: log.receipt.transaction.hash.clone(),
+                    from: transfer.from,
+                    to: transfer.to,
+                    token_id: transfer.token_id.low_u64(),
+                    ordinal: log.block_index() as u64,
+                }
             })
-        }));
-    }
-    
-    // return our list of transfers for the given block
-    Ok(erc721::Transfers { transfers })
+            .collect(),
+    })
 }
 ```
 
@@ -222,7 +198,7 @@ _The last parameter of a `store` module function should always be the writable s
 _The type of the writable store is based on the `store` module `updatePolicy` and `valueType`_.&#x20;
 {% endhint %}
 
-The goal of the `store` in this example is to track a holder's current NFT count for the contract supplied. This tracking is achieved through the analyzation of transfers.
+The goal of the `store` in this example is to track a holder's current NFT count for the contract supplied. This tracking is achieved through the analysis of transfers.
 
 **Transfer in Detail**
 
@@ -263,20 +239,16 @@ The value being stored. The type is dependent on the store type being used.
 ```rust
 /// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
 #[substreams::handlers::store]
-fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
-    log::info!("NFT state builder");
-    // iterate over the transfers event
+fn store_transfers(transfers: erc721::Transfers, s: StoreAddInt64) {
+    log::info!("NFT holders state builder");
     for transfer in transfers.transfers {
-        // check if the from address field is not the NULL address
         if transfer.from != NULL_ADDRESS {
-            log::info!("Found a transfer out");
-            // decrement the count
+            log::info!("Found a transfer out {}", Hex(&transfer.trx_hash));
             s.add(transfer.ordinal, generate_key(&transfer.from), -1);
         }
-        // check if the to address field is not the NULL address
+
         if transfer.to != NULL_ADDRESS {
-            log::info!("Found a transfer in");
-            // increment the count
+            log::info!("Found a transfer in {}", Hex(&transfer.trx_hash));
             s.add(transfer.ordinal, generate_key(&transfer.to), 1);
         }
     }

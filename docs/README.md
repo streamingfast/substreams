@@ -18,8 +18,8 @@ Additional information is available for understanding [modules](concepts/modules
 
 For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substreams users gain an understanding to provide a deeper context.
 
-{% embed url="https://www.youtube.com/watch?v=qWxffTKpciU" %}
-Learn about Substreams from StreamingFast's Alex.
+{% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
+Introducing The Graph Substreams for High-Performance Indexing
 {% endembed %}
 
 {% hint style="warning" %}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
@@ -29,12 +30,14 @@ func BenchmarkFullKV_Save(b *testing.B) {
 				baseStore: newTestBaseStore(bb, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil),
 			}
 
-			// Let's show case for now even time passed doing the `set` to show case where time is spent
-			// bb.StopTimer()
+			startTime := time.Now()
 			for i := 0; i < keyCount; i++ {
 				s.baseStore.set(uint64(i), keyGen(), []byte(strconv.FormatInt(int64(i), 10)))
 			}
-			// bb.StartTimer()
+
+			if keyCount >= 100_000 {
+				fmt.Printf("\nTime elapsed to bootstreap %d keys is %s\n", keyCount, time.Since(startTime))
+			}
 
 			for n := 0; n < bb.N; n++ {
 				_, _, err := s.Save(uint64(keyCount))

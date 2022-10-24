@@ -1,4 +1,4 @@
-package pipeline
+package integration
 
 import (
 	"github.com/streamingfast/logging"
@@ -12,7 +12,7 @@ import (
 var zlog, _ = logging.PackageLogger("pipe.test", "github.com/streamingfast/substreams/test")
 
 func init() {
-	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.WarnLevel))
+	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
 }
 
 func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, *manifest.ModuleGraph) {

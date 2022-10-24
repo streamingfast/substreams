@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"math"
 	"strings"
@@ -52,7 +53,7 @@ type Pipeline struct {
 	outputModuleMap      map[string]bool
 	backprocessingStores []*backprocessingStore
 
-	moduleExecutors []ModuleExecutor
+	moduleExecutors []exec.ModuleExecutor
 
 	execOutputCache execout.CacheEngine
 
@@ -275,7 +276,6 @@ func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Cloc
 			reqctx.Logger(ctx).Warn("post job hook failed", zap.Error(err))
 		}
 	}
-
 }
 
 func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clock) (err error) {
@@ -291,67 +291,28 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 	return nil
 }
 
-func (p *Pipeline) runExecutor(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
 
-	ctx, span := reqctx.WithSpan(ctx, "module_execution")
-	defer span.EndWithErr(&err)
 	executorName := executor.Name()
-
-	logger = logger.With(zap.String("module_name", executorName))
-	span.SetAttributes(attribute.String("module.name", executorName))
-
 	logger.Debug("executing", zap.String("module_name", executorName))
 
-	output, cached, err := execOutput.Get(executor.Name())
-	if err != nil && err != execout.NotFound {
-		return fmt.Errorf("error getting module %q output: %w", executor.Name(), err)
+	output, runError := exec.RunModule(ctx, executor, execOutput)
+	saveOutput := func() {
+		if output != nil {
+			p.moduleOutputs = append(p.moduleOutputs, output)
+		}
+	}
+	if runError != nil {
+		saveOutput()
+		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	span.SetAttributes(attribute.Bool("module.output.cached", cached))
-	if cached {
-		logger.Debug("skipping module execution, loading output from cache")
-		if err := executor.applyCachedOutput(output); err != nil {
-			return fmt.Errorf("failed to apply cache output for module %q: %w", executorName, err)
-		}
-		return nil
+	if p.isOutputModule(executor.Name()) {
+		saveOutput()
 	}
 
-	outputData, moduleOutputData, err := executor.run(ctx, execOutput)
-	if err != nil {
-		logs, truncated := executor.moduleLogs()
-		if len(logs) != 0 || moduleOutputData != nil {
-			p.moduleOutputs = append(p.moduleOutputs, &pbsubstreams.ModuleOutput{
-				Name:          executorName,
-				Data:          moduleOutputData,
-				Logs:          logs,
-				LogsTruncated: truncated,
-			})
-		}
-		return fmt.Errorf("running module: %w", err)
-	}
-
-	if moduleOutputData != nil {
-		if err := execOutput.Set(executorName, outputData); err != nil {
-			return fmt.Errorf("failed to set output %w", err)
-		}
-
-		if p.isOutputModule(executorName) {
-			logs, truncated := executor.moduleLogs()
-			if len(logs) != 0 || moduleOutputData != nil {
-				moduleOutput := &pbsubstreams.ModuleOutput{
-					Name:          executorName,
-					Data:          moduleOutputData,
-					Logs:          logs,
-					LogsTruncated: truncated,
-				}
-				p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
-				p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Number)
-			}
-		}
-
-	}
-
+	p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
 	executor.Reset()
 
 	return nil
@@ -439,18 +400,15 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 		case *pbsubstreams.Module_KindMap_:
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
-			baseExecutor := BaseExecutor{
-				moduleName:    module.Name,
-				wasmModule:    wasmModule,
-				entrypoint:    entrypoint,
-				wasmArguments: inputs,
-				tracer:        tracer,
-			}
+			baseExecutor := exec.NewBaseExecutor(
+				module.Name,
+				wasmModule,
+				inputs,
+				entrypoint,
+				tracer,
+			)
 
-			executor := &MapperModuleExecutor{
-				BaseExecutor: baseExecutor,
-				outputType:   outType,
-			}
+			executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
 
 			p.moduleExecutors = append(p.moduleExecutors, executor)
 			continue
@@ -464,18 +422,15 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 			}
 			inputs = append(inputs, wasm.NewStoreWriterOutput(modName, outputStore, updatePolicy, valueType))
 
-			baseExecutor := BaseExecutor{
-				moduleName:    modName,
-				wasmModule:    wasmModule,
-				entrypoint:    entrypoint,
-				wasmArguments: inputs,
-				tracer:        tracer,
-			}
+			baseExecutor := exec.NewBaseExecutor(
+				modName,
+				wasmModule,
+				inputs,
+				entrypoint,
+				tracer,
+			)
 
-			s := &StoreModuleExecutor{
-				BaseExecutor: baseExecutor,
-				outputStore:  outputStore,
-			}
+			s := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
 
 			p.moduleExecutors = append(p.moduleExecutors, s)
 			continue

@@ -1,11 +1,9 @@
-package pipeline
+package integration
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/streamingfast/substreams/reqctx"
-	"go.opentelemetry.io/otel"
 	"os"
 	"strings"
 	"testing"
@@ -17,9 +15,11 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/work"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )

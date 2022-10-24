@@ -1,4 +1,4 @@
-package pipeline
+package integration
 
 import (
 	"github.com/streamingfast/bstream"

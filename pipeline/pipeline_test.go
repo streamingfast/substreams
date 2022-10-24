@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	tests := []struct {
 		name       string
 		moduleName string
-		execOutput *MapperModuleExecutor
+		execOutput *exec.MapperModuleExecutor
 		block      *pbsubstreamstest.Block
 		testFunc   func(t *testing.T, data []byte)
 	}{
@@ -45,7 +46,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)
-			err := pipe.runExecutor(ctx, executor, execOutput)
+			err := pipe.execute(ctx, executor, execOutput)
 			require.NoError(t, err)
 			output, found := execOutput.Values[test.moduleName]
 			require.Equal(t, true, found)
@@ -54,7 +55,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	}
 }
 
-func mapTestExecutor(t *testing.T, name string) *MapperModuleExecutor {
+func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	pkg, _ := processManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
 
 	binayrIndex := uint32(0)
@@ -75,18 +76,18 @@ func mapTestExecutor(t *testing.T, name string) *MapperModuleExecutor {
 	)
 	require.NoError(t, err)
 
-	return &MapperModuleExecutor{
-		BaseExecutor: BaseExecutor{
-			moduleName: name,
-			wasmModule: wasmModule,
-			wasmArguments: []wasm.Argument{
+	return exec.NewMapperModuleExecutor(
+		exec.NewBaseExecutor(
+			name,
+			wasmModule,
+			[]wasm.Argument{
 				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
 			},
-			entrypoint: name,
-			tracer:     otel.GetTracerProvider().Tracer("test"),
-		},
-		outputType: "",
-	}
+			name,
+			otel.GetTracerProvider().Tracer("test"),
+		),
+		"",
+	)
 }
 
 type Obj struct {

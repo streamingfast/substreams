@@ -150,7 +150,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	defer span.EndWithErr(&err)
 
 	for _, executor := range p.moduleExecutors {
-		if err := p.runExecutor(ctx, executor, execOutput); err != nil {
+		if err := p.execute(ctx, executor, execOutput); err != nil {
 			return fmt.Errorf("running executor %q: %w", executor.Name(), err)
 		}
 	}

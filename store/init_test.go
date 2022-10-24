@@ -2,7 +2,6 @@ package store
 
 import (
 	"go.uber.org/zap"
-	"testing"
 
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -10,7 +9,7 @@ import (
 )
 
 func newTestBaseStore(
-	t *testing.T,
+	t require.TestingT,
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,

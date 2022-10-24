@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//compile-time check that baseStore implements all interfaces
+// compile-time check that baseStore implements all interfaces
 var _ Store = (*FullKV)(nil)
 
 type FullKV struct {

@@ -91,9 +91,9 @@ plugins:
 		}
 	}
 
-	filepath := filepath.Join(os.TempDir(), "tmp.spkg#format=bin")
+	spkgFilepath := filepath.Join(os.TempDir(), "tmp.spkg#format=bin")
 	cmdArgs := []string{
-		"generate", filepath,
+		"generate", spkgFilepath,
 	}
 	for _, excludePath := range excludePaths {
 		cmdArgs = append(cmdArgs, "--exclude-path", excludePath)
@@ -110,7 +110,7 @@ plugins:
 	if bufFileNotFound {
 		fmt.Println("Removing temporary 'buf.gen.yaml'")
 		if err := os.Remove("buf.gen.yaml"); err != nil {
-			fmt.Errorf("error delefing buf.gen.yaml: %w", err)
+			return fmt.Errorf("error deleting buf.gen.yaml: %w", err)
 		}
 	}
 

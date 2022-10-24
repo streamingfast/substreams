@@ -2,7 +2,7 @@ package codegen
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"strings"
 	"text/template"
 
@@ -11,11 +11,13 @@ import (
 
 type Generator struct {
 	pkg *pbsubstreams.Package
+	io.Writer
 }
 
-func NewGenerator(pkg *pbsubstreams.Package) *Generator {
+func NewGenerator(pkg *pbsubstreams.Package, writer io.Writer) *Generator {
 	return &Generator{
-		pkg: pkg,
+		pkg:    pkg,
+		Writer: writer,
 	}
 }
 
@@ -26,7 +28,7 @@ func (g *Generator) Generate() error {
 	}
 
 	err = tmpl.Execute(
-		os.Stdout,
+		g.Writer,
 		&Engine{Package: g.pkg},
 	)
 	if err != nil {

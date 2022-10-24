@@ -1,0 +1,31 @@
+specVersion: v0.1.0
+package:
+  name: uniswap_v3
+  version: v0.1.0
+  url: https://github.com/streamingfast/substreams
+  doc: |
+    These substream modules compose multiple modules for testing purses for the codegen
+    command
+
+### section added to have the manifest validation work, don't need to build anything
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams_uniswap_v3.wasm
+
+modules:
+  - name: map_test
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:my.type.v1.Tests
+
+  - name: store_test
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: proto:my.type.v1.Test
+
+

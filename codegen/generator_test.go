@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"os"
 	"testing"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -8,14 +9,13 @@ import (
 )
 
 func TestGenerator_Generate(t *testing.T) {
-	manifestPath := "../../substreams-uniswap-v3/substreams.yaml"
+	manifestPath := "./substreams.yaml"
 	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
 
 	pkg, err := manifestReader.Read()
 	require.NoError(t, err)
 
-	g := NewGenerator(pkg)
+	g := NewGenerator(pkg, os.Stdout)
 	err = g.Generate()
 	require.NoError(t, err)
-
 }

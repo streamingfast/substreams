@@ -59,13 +59,13 @@ func NewScheduler(
 	return s, nil
 }
 
-func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Modules) (err error) {
+func (s *Scheduler) Run(ctx context.Context) (err error) {
 	logger := reqctx.Logger(ctx)
 	result := make(chan error)
 
 	logger.Debug("launching scheduler")
 
-	go s.launch(ctx, requestModules, result)
+	go s.launch(ctx, result)
 
 	jobCount := s.jobsPlanner.JobCount()
 	for resultCount := 0; resultCount < jobCount; {
@@ -91,7 +91,7 @@ func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Module
 	return nil
 }
 
-func (s *Scheduler) launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
+func (s *Scheduler) launch(ctx context.Context, result chan error) {
 	logger := reqctx.Logger(ctx)
 	ctx, span := reqctx.WithSpan(ctx, "running_schedule")
 	defer span.End()
@@ -106,7 +106,7 @@ func (s *Scheduler) launch(ctx context.Context, requestModules *pbsubstreams.Mod
 		logger.Info("scheduling job", zap.Object("job", job))
 
 		start := time.Now()
-		jobWorker := s.workerPool.Borrow()
+		jobRunner := s.workerPool.Borrow()
 		logger.Debug("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 
 		select {
@@ -118,7 +118,8 @@ func (s *Scheduler) launch(ctx context.Context, requestModules *pbsubstreams.Mod
 
 		go func() {
 			select {
-			case result <- s.runSingleJob(ctx, jobWorker, job, requestModules):
+			case result <- s.runSingleJob(ctx, jobRunner, job, s.upstreamRequestModules):
+				s.workerPool.ReturnWorker(jobRunner)
 			case <-ctx.Done():
 			}
 		}()
@@ -135,19 +136,18 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) error {
+func (s *Scheduler) runSingleJob(ctx context.Context, jobRunner work.JobRunner, job *work.Job, requestModules *pbsubstreams.Modules) (err error) {
 	logger := reqctx.Logger(ctx)
 
 	var partialsWritten []*block.Range
-	var err error
+	newRequest := job.CreateRequest(requestModules)
 
 out:
 	for i := 0; uint64(i) < 3; i++ {
 		t0 := time.Now()
-		newRequest := job.CreateRequest(requestModules)
-		s.log.Info("running job", zap.Object("job", job))
-		partialsWritten, err = worker.Run(ctx, newRequest, s.respFunc)
-		s.log.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(t0)))
+		logger.Info("running job", zap.Object("job", job))
+		partialsWritten, err = jobRunner(ctx, newRequest, s.respFunc)
+		logger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(t0)))
 		switch err.(type) {
 		case *work.RetryableErr:
 			logger.Debug("retryable error", zap.Error(err))
@@ -159,8 +159,6 @@ out:
 			break out
 		}
 	}
-
-	s.workerPool.ReturnWorker(worker)
 
 	if err != nil {
 		return err

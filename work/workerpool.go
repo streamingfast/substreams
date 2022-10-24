@@ -5,12 +5,12 @@ import (
 )
 
 type WorkerPool struct {
-	workers chan Worker
+	workers chan JobRunner
 }
 
 func NewWorkerPool(workerCount uint64, newWorkerFunc WorkerFactory, logger *zap.Logger) *WorkerPool {
 	logger.Info("initiating worker pool", zap.Uint64("worker_count", workerCount))
-	workers := make(chan Worker, workerCount)
+	workers := make(chan JobRunner, workerCount)
 	for i := uint64(0); i < workerCount; i++ {
 		workers <- newWorkerFunc(logger)
 	}
@@ -22,12 +22,12 @@ func NewWorkerPool(workerCount uint64, newWorkerFunc WorkerFactory, logger *zap.
 	return workerPool
 }
 
-func (p *WorkerPool) Borrow() Worker {
+func (p *WorkerPool) Borrow() JobRunner {
 	w := <-p.workers
 	return w
 }
 
-func (p *WorkerPool) ReturnWorker(worker Worker) {
+func (p *WorkerPool) ReturnWorker(worker JobRunner) {
 	p.workers <- worker
 }
 

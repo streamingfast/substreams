@@ -18,12 +18,10 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type Worker interface {
-	Run(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error)
-}
+type JobRunner func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error)
 
 // The tracer will be provided by the worker pool, on worker creation
-type WorkerFactory = func(logger *zap.Logger) Worker
+type WorkerFactory = func(logger *zap.Logger) JobRunner
 
 type RemoteWorker struct {
 	clientFactory client.Factory

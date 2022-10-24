@@ -263,7 +263,6 @@ func (p *Pipeline) validateAndHashModules(ctx context.Context, modules []*pbsubs
 		if isOutput && reqDetails.EffectiveStartBlockNum < module.InitialBlock {
 			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", reqDetails.EffectiveStartBlockNum, module.Name, module.InitialBlock)
 		}
-
 		p.moduleHashes.HashModule(reqDetails.Request.Modules, module, p.graph)
 	}
 

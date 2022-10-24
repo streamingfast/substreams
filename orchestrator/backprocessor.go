@@ -69,7 +69,7 @@ func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 	// go parallelDownloader.Launch()
 	multiSquasher.Launch(ctx)
 
-	if err := scheduler.Run(ctx, b.upstreamRequestModules); err != nil {
+	if err := scheduler.Run(ctx); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 

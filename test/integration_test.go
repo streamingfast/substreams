@@ -61,10 +61,10 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 
 	responseCollector := newResponseCollector()
 
-	workerFactory := func(_ *zap.Logger) work.Worker {
+	workerFactory := func(_ *zap.Logger) work.JobRunner {
 		// TODO(abourget): this isn't used anymore, but we still need a way to mock this E2E test.
 		// Unsure about the best way to do this. Will need to look into it.
-		return &TestWorker{
+		w := &TestWorker{
 			t:                      t,
 			moduleGraph:            moduleGraph,
 			responseCollector:      newResponseCollector(),
@@ -72,6 +72,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 			blockProcessedCallBack: blockProcessedCallBack,
 			testTempDir:            testTempDir,
 		}
+		return w.Run
 	}
 
 	if err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir); err != nil {

@@ -3,19 +3,101 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/work"
-	"go.uber.org/zap"
 	"testing"
 	"time"
 
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
+	"github.com/streamingfast/substreams/work"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
+
+func TestSchedulerInOut(t *testing.T) {
+	type in struct {
+		request  *pbsubstreams.Request
+		respFunc substreams.ResponseFunc
+	}
+	type out struct {
+		partialsWritten []*block.Range
+		err             error
+	}
+
+	inchan := make(chan in)
+	outchan := make(chan out)
+	ctx := context.Background()
+
+	mods := manifest.NewTestModules()
+	graph, err := manifest.NewModuleGraph(mods)
+	require.NoError(t, err)
+	sched, err := NewScheduler(
+		ctx,
+		config.RuntimeConfig{
+			WorkerFactory: func(logger *zap.Logger) work.JobRunner {
+				return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+					inchan <- in{request, respFunc}
+					out := <-outchan
+					return out.partialsWritten, out.err
+				}
+			},
+			ParallelSubrequests:        2,
+			SubrequestsSplitSize:       20,
+			ExecOutputSaveInterval:     10,
+			StoreSnapshotsSaveInterval: 10,
+		},
+		&WorkPlan{workUnitsMap: map[string]*WorkUnits{
+			"A": {modName: "A"},
+			"B": {
+				modName:         "B",
+				partialsMissing: block.ParseRanges("0-10,10-20"),
+			},
+			"C": {modName: "C"},
+			"D": {modName: "D"},
+			"E": {modName: "E"},
+			"F": {modName: "F"},
+			"G": {modName: "G"},
+			"H": {modName: "H"},
+			"K": {modName: "K"},
+		}},
+		graph,
+		func(resp *pbsubstreams.Response) error {
+			return nil
+		},
+		zap.NewNop(),
+		&pbsubstreams.Modules{Modules: mods},
+	)
+	require.NoError(t, err)
+	assert.NotNil(t, sched.workerPool)
+	assert.NotNil(t, sched.jobsPlanner)
+	planner := sched.jobsPlanner
+
+	var accumulatedRanges block.Ranges
+	sched.OnStoreJobTerminated = func(mod string, partialsWritten block.Ranges) error {
+		assert.Equal(t, "B", mod)
+		accumulatedRanges = append(accumulatedRanges, partialsWritten...)
+		return nil
+	}
+	assert.Equal(t, 1, len(planner.jobs))
+
+	go func() {
+		in := <-inchan
+		rng := fmt.Sprintf("%d-%d", in.request.StartBlockNum, in.request.StopBlockNum)
+		outchan <- out{partialsWritten: block.ParseRanges(rng)}
+
+		in = <-inchan
+		rng = fmt.Sprintf("%d-%d", in.request.StartBlockNum, in.request.StopBlockNum)
+		outchan <- out{partialsWritten: block.ParseRanges(rng)}
+	}()
+
+	assert.NoError(t, sched.Run(ctx))
+	assert.Equal(t, "[0, 20)", accumulatedRanges.Merged().String())
+}
 
 func TestNewJobsPlanner(t *testing.T) {
 	t.Skip("abourget: incomplete, untested")
@@ -41,15 +123,15 @@ func TestNewJobsPlanner(t *testing.T) {
 	}
 
 	splitWorkMods := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
-		"A": &WorkUnits{modName: "A"},
-		"B": &WorkUnits{modName: "B"},
-		"C": &WorkUnits{modName: "C"},
-		"D": &WorkUnits{modName: "D"},
-		"E": &WorkUnits{modName: "E"},
-		"F": &WorkUnits{modName: "F"},
-		"G": &WorkUnits{modName: "G"},
-		"H": &WorkUnits{modName: "H"},
-		"K": &WorkUnits{modName: "K"},
+		"A": {modName: "A"},
+		"B": {modName: "B"},
+		"C": {modName: "C"},
+		"D": {modName: "D"},
+		"E": {modName: "E"},
+		"F": {modName: "F"},
+		"G": {modName: "G"},
+		"H": {modName: "H"},
+		"K": {modName: "K"},
 	}}
 
 	ctx := context.Background()

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/work"
 	"os"
 
 	"github.com/streamingfast/bstream/hub"
@@ -19,6 +18,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/streamingfast/substreams/work"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
@@ -64,7 +64,7 @@ func New(
 		0,
 		parallelSubRequests,
 		stateStore,
-		func(logger *zap.Logger) work.Worker {
+		func(logger *zap.Logger) work.JobRunner {
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
 	)

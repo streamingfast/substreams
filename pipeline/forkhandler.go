@@ -8,14 +8,22 @@ import (
 	"github.com/streamingfast/substreams/store"
 )
 
+type UndoHandler func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput)
+
 type ForkHandler struct {
 	reversibleOutputs map[uint64][]*pbsubstreams.ModuleOutput
+	undoHandlers      []UndoHandler
 }
 
 func NewForkHandle() *ForkHandler {
 	return &ForkHandler{
 		reversibleOutputs: make(map[uint64][]*pbsubstreams.ModuleOutput),
+		undoHandlers:      []UndoHandler{},
 	}
+}
+
+func (f *ForkHandler) registerHandler(handler UndoHandler) {
+	f.undoHandlers = append(f.undoHandlers, handler)
 }
 
 func (f *ForkHandler) handleUndo(
@@ -28,11 +36,10 @@ func (f *ForkHandler) handleUndo(
 		if err := returnModuleDataOutputs(clock, bstream.StepUndo, cursor, moduleOutputs, respFunc); err != nil {
 			return fmt.Errorf("calling return func when reverting outputs: %w", err)
 		}
+
 		for _, moduleOutput := range moduleOutputs {
-			if s, found := storeMap.Get(moduleOutput.Name); found {
-				if deltaStore, ok := s.(store.DeltaAccessor); ok {
-					deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().GetDeltas())
-				}
+			for _, h := range f.undoHandlers {
+				h(clock, moduleOutput)
 			}
 		}
 	}

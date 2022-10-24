@@ -3,15 +3,11 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/work"
 	"go.opentelemetry.io/otel"
-	"io"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -19,215 +15,14 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
-	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
-
-type blockProcessedCallBack func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store)
-
-type TestBlockGenerator interface {
-	Generate() []*pbsubstreamstest.Block
-}
-
-type LinearBlockGenerator struct {
-	startBlock         uint64
-	inclusiveStopBlock uint64
-}
-
-func (g LinearBlockGenerator) Generate() []*pbsubstreamstest.Block {
-	var blocks []*pbsubstreamstest.Block
-	for i := g.startBlock; i <= g.inclusiveStopBlock; i++ {
-		blocks = append(blocks, &pbsubstreamstest.Block{
-			Id:     "block-" + strconv.FormatUint(i, 10),
-			Number: i,
-			Step:   int32(bstream.StepNewIrreversible),
-		})
-	}
-	return blocks
-}
-
-type TestWorker struct {
-	t                      *testing.T
-	moduleGraph            *manifest.ModuleGraph
-	responseCollector      *responseCollector
-	newBlockGenerator      NewTestBlockGenerator
-	blockProcessedCallBack blockProcessedCallBack
-	testTempDir            string
-}
-
-func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) (brange []*block.Range, err error) {
-	w.t.Helper()
-
-	ctx, span := reqctx.WithSpan(ctx, "running_job_test")
-	defer span.EndWithErr(&err)
-
-	logger := reqctx.Logger(ctx)
-
-	logger.Info("worker running job",
-		zap.Strings("output_modules", request.OutputModules),
-		zap.Int64("start_block_num", request.StartBlockNum),
-		zap.Uint64("stop_block_num", request.StopBlockNum),
-	)
-	if _, err := processRequest(w.t, ctx, request, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir); err != nil {
-		return nil, fmt.Errorf("processing sub request: %w", err)
-	}
-
-	return block.Ranges{
-		&block.Range{
-			StartBlock:        uint64(request.StartBlockNum),
-			ExclusiveEndBlock: request.StopBlockNum,
-		},
-	}, nil
-}
-
-type Obj struct {
-	cursor *bstream.Cursor
-	step   bstream.StepType
-}
-
-func (o *Obj) Cursor() *bstream.Cursor {
-	return o.cursor
-}
-
-func (o *Obj) Step() bstream.StepType {
-	return o.step
-}
-
-type responseCollector struct {
-	responses []*pbsubstreams.Response
-}
-
-func newResponseCollector() *responseCollector {
-	return &responseCollector{
-		responses: []*pbsubstreams.Response{},
-	}
-}
-
-func (c *responseCollector) Collect(resp *pbsubstreams.Response) error {
-	c.responses = append(c.responses, resp)
-	return nil
-}
-
-type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator
-
-func processRequest(
-	t *testing.T,
-	ctx context.Context,
-	request *pbsubstreams.Request,
-	moduleGraph *manifest.ModuleGraph,
-	workerFactory work.WorkerFactory, newGenerator NewTestBlockGenerator, responseCollector *responseCollector, isSubRequest bool, blockProcessedCallBack blockProcessedCallBack, testTempDir string,
-) (out []*pbsubstreams.Response, err error) {
-	t.Helper()
-
-	var opts []pipeline.Option
-
-	ctx, err = reqctx.WithRequest(ctx, request, isSubRequest)
-	require.Nil(t, err)
-
-	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
-	require.NoError(t, err)
-
-	cachingEngine, err := cachev1.NewEngine(config.RuntimeConfig{StoreSnapshotsSaveInterval: 10, BaseObjectStore: baseStoreStore}, zap.NewNop())
-	require.NoError(t, err)
-	storeBoundary := pipeline.NewStoreBoundary(10)
-
-	runtimeConfig := config.NewRuntimeConfig(
-		10,
-		10,
-		10,
-		1,
-		baseStoreStore,
-		workerFactory,
-	)
-	pipe := pipeline.New(
-		ctx,
-		moduleGraph,
-		"sf.substreams.v1.test.Block",
-		nil,
-		cachingEngine,
-		runtimeConfig,
-		storeBoundary,
-		responseCollector.Collect,
-		opts...,
-	)
-
-	require.NoError(t, pipe.Init(ctx))
-
-	generator := newGenerator(uint64(request.StartBlockNum), request.StopBlockNum)
-
-	for _, b := range generator.Generate() {
-		o := &Obj{
-			cursor: bstream.EmptyCursor,
-			step:   bstream.StepType(b.Step),
-		}
-
-		payload, err := proto.Marshal(b)
-		require.NoError(t, err)
-
-		bb := &bstream.Block{
-			Id:             b.Id,
-			Number:         b.Number,
-			PreviousId:     "",
-			Timestamp:      time.Time{},
-			LibNum:         0,
-			PayloadKind:    0,
-			PayloadVersion: 0,
-		}
-		_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
-		require.NoError(t, err)
-		err = pipe.ProcessBlock(bb, o)
-		if !errors.Is(err, io.EOF) && err != nil {
-			return nil, fmt.Errorf("process block: %w", err)
-		}
-		if blockProcessedCallBack != nil && err == nil {
-			blockProcessedCallBack(pipe, bb, pipe.StoreMap, baseStoreStore)
-		}
-	}
-
-	return
-}
-
-func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, *manifest.ModuleGraph) {
-	t.Helper()
-
-	manifestReader := manifest.NewReader(manifestPath)
-	pkg, err := manifestReader.Read()
-	require.NoError(t, err)
-
-	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	require.NoError(t, err)
-
-	return pkg, moduleGraph
-}
-
-type TestStoreDelta struct {
-	Operation string      `json:"op"`
-	OldValue  interface{} `json:"old"`
-	NewValue  interface{} `json:"new"`
-}
-
-type TestStoreOutput struct {
-	StoreName string            `json:"name"`
-	Deltas    []*TestStoreDelta `json:"deltas"`
-}
-type TestMapOutput struct {
-	ModuleName string                      `json:"name"`
-	Result     *pbsubstreamstest.MapResult `json:"result"`
-}
-type AssertMapOutput struct {
-	ModuleName string `json:"name"`
-	Result     bool   `json:"result"`
-}
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
 	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
@@ -236,16 +31,14 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	ctx := context.Background()
 	ctx = reqctx.WithLogger(ctx, zlog)
 
-	testTempDir := os.TempDir()
-	fmt.Println(testTempDir)
-	// ensure the directory is clean before usage
-	os.RemoveAll(testTempDir)
+	testTempDir := t.TempDir()
+	fmt.Println("Running test in temp dir: ", testTempDir)
+	require.NoError(t, os.RemoveAll(testTempDir))
 
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
 	if tracingEnabled {
 		fmt.Println("Running test with tracing enabled: ", os.Getenv("SF_TRACING"))
-		err = tracing.SetupOpenTelemetry("substreams")
-		require.NoError(t, err)
+		require.NoError(t, tracing.SetupOpenTelemetry("substreams"))
 		ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
 		spanCtx, span := reqctx.WithSpan(ctx, "substreams_request_test")
 		defer func() {
@@ -281,7 +74,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		}
 	}
 
-	if _, err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir); err != nil {
+	if err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir); err != nil {
 		return nil, fmt.Errorf("running test: %w", err)
 	}
 

@@ -49,7 +49,7 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 	})
 }
 
-func (e *Engine) EndOfStream(context.Context, *pbsubstreams.Clock) error {
+func (e *Engine) EndOfStream(blockNum uint64) error {
 	for _, cache := range e.caches {
 		if err := e.flushCache(cache); err != nil {
 			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
@@ -58,7 +58,7 @@ func (e *Engine) EndOfStream(context.Context, *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (e *Engine) HandleFinal(_ context.Context, clock *pbsubstreams.Clock) error {
+func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 	for name, cache := range e.caches {
 		fmt.Println("Flushing Output: ", name, clock.Number, cache.currentBlockRange.String())
 		if !cache.isOutOfRange(clock.Number) {
@@ -70,6 +70,12 @@ func (e *Engine) HandleFinal(_ context.Context, clock *pbsubstreams.Clock) error
 
 	}
 	return nil
+}
+
+func (e *Engine) HandleUndo(clock *pbsubstreams.Clock, moduleName string) {
+	if c, found := e.caches[moduleName]; found {
+		c.Delete(clock.Id)
+	}
 }
 
 func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {

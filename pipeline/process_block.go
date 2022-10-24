@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
-	"github.com/streamingfast/substreams/store"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -48,6 +47,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	if err = p.processBlock(ctx, block, clock, cursor, step, span); err != nil {
 		p.runPostJobHooks(ctx, clock)
+		return err
 	}
 
 	return
@@ -70,29 +70,10 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
-		if err == io.EOF {
-			if err := p.execOutputCache.EndOfStream(ctx, clock); err != nil {
-				return fmt.Errorf("step new: exec out end of stream: %w", err)
-			}
-
-			if err := p.storesEndOfStream(ctx, clock); err != nil {
-				return fmt.Errorf("step new irr: stores end of stream: %w", err)
-			}
-		}
 	case bstream.StepNewIrreversible:
 		err := p.handlerStepNew(ctx, block, clock, cursor, step, span)
-		if err != nil && err != io.EOF {
+		if err != nil {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
-		}
-
-		if err == io.EOF {
-			if err := p.execOutputCache.EndOfStream(ctx, clock); err != nil {
-				return fmt.Errorf("step new irr: exec out end of stream: %w", err)
-			}
-
-			if err := p.storesEndOfStream(ctx, clock); err != nil {
-				return fmt.Errorf("step new irr: stores end of stream: %w", err)
-			}
 		}
 
 		p.handleStepIrreversible(block.Number)
@@ -127,6 +108,10 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		return io.EOF
 	}
 
+	if err := p.flushStores(ctx, block.Number); err != nil {
+		return fmt.Errorf("step new irr: stores end of stream: %w", err)
+	}
+
 	logger := reqctx.Logger(ctx)
 	execOutput, err := p.execOutputCache.NewExecOutput(p.blockType, block, clock, cursor)
 	if err != nil {
@@ -155,12 +140,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		}
 	}
 
-	for _, s := range p.StoreMap.All() {
-		if resetableStore, ok := s.(store.Resetable); ok {
-			resetableStore.Reset()
-		}
-	}
-
+	p.resetStores()
 	p.moduleOutputs = nil
 	logger.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil

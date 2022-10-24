@@ -204,7 +204,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	storeBoundary := pipeline.NewStoreBoundary(
 		s.runtimeConfig.StoreSnapshotsSaveInterval,
-		isSubrequest,
 		request.StopBlockNum,
 	)
 	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, reqctx.Logger(ctx))
@@ -246,7 +245,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
-	return pipe.OnStreamTerminated(ctx, streamSrv, blockStream.Run(ctx))
+	return pipe.Launch(ctx, blockStream, streamSrv)
 }
 
 func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) string {

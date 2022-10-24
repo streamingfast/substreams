@@ -1,7 +1,6 @@
 package execout
 
 import (
-	"context"
 	"errors"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
@@ -14,11 +13,9 @@ type CacheEngine interface {
 	NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (ExecutionOutput, error)
 	Init(modules *manifest.ModuleHashes) error
 
-	EndOfStream(ctx context.Context, clock *pbsubstreams.Clock) error
-	HandleFinal(ctx context.Context, clock *pbsubstreams.Clock) error
-	//IRRBlock(ctx context.Context, clock *pbsubstreams.Clock) error
-	//NewBlock(blockRef bstream.BlockRef) error
-	//NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error
+	EndOfStream(blockNum uint64) error
+	HandleFinal(clock *pbsubstreams.Clock) error
+	HandleUndo(clock *pbsubstreams.Clock, moduleName string)
 }
 
 type ExecutionOutputGetter interface {

@@ -5,7 +5,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store"
 )
 
 type UndoHandler func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput)
@@ -29,7 +28,6 @@ func (f *ForkHandler) registerHandler(handler UndoHandler) {
 func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
-	storeMap store.Map,
 	respFunc func(resp *pbsubstreams.Response) error,
 ) error {
 	if moduleOutputs, found := f.reversibleOutputs[clock.Number]; found {

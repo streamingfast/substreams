@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -45,7 +44,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		attribute.Stringer("block.step", step),
 	)
 
-	if err = p.processBlock(ctx, block, clock, cursor, step, span); err != nil {
+	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
 		p.runPostJobHooks(ctx, clock)
 		return err
 	}
@@ -53,7 +52,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return
 }
 
-func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType, span trace.Span) (err error) {
+func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) (err error) {
 	switch step {
 	case bstream.StepUndo:
 		if err = p.handleStepUndo(ctx, clock, cursor); err != nil {
@@ -66,12 +65,12 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		}
 
 	case bstream.StepNew:
-		err := p.handlerStepNew(ctx, block, clock, cursor, step, span)
+		err := p.handlerStepNew(ctx, block, clock, cursor, step)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
 	case bstream.StepNewIrreversible:
-		err := p.handlerStepNew(ctx, block, clock, cursor, step, span)
+		err := p.handlerStepNew(ctx, block, clock, cursor, step)
 		if err != nil {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
 		}
@@ -92,7 +91,7 @@ func (p *Pipeline) handleStepStalled(_ context.Context, clock *pbsubstreams.Cloc
 
 func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
 	reqctx.Span(ctx).AddEvent("handling_step_undo")
-	if err := p.forkHandler.handleUndo(clock, cursor, p.StoreMap, p.respFunc); err != nil {
+	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 	return nil
@@ -102,9 +101,9 @@ func (p *Pipeline) handleStepIrreversible(blockNum uint64) {
 	p.forkHandler.removeReversibleOutput(blockNum)
 }
 
-func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType, span trace.Span) error {
+func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) error {
 	reqdetails := reqctx.Details(ctx)
-	if isStopBlockReached(clock.Number, reqdetails.Request.StopBlockNum) {
+	if isBlockOverStopBlock(clock.Number, reqdetails.Request.StopBlockNum) {
 		return io.EOF
 	}
 

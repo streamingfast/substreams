@@ -24,7 +24,7 @@ func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error)
 	reqctx.Span(ctx).SetAttributes(attribute.Int("pipeline.stores.boundary_reached", len(boundaryIntervals)))
 	for _, boundaryBlock := range boundaryIntervals {
 		if err := p.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
-			return fmt.Errorf("saving stores snapshot at obund %d: %w", boundaryBlock, err)
+			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
 
 	}

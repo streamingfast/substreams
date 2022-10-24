@@ -41,14 +41,19 @@ func (r *StoreBoundary) InitBoundary(blockNum uint64) {
 
 func (r *StoreBoundary) GetStoreFlushRanges(isSubrequest bool, reqStopBlockNum uint64, blockNum uint64) []uint64 {
 	boundaries := map[uint64]bool{}
+
 	for r.OverBoundary(blockNum) {
 		boundaries[r.nextBoundary] = true
 		r.BumpBoundary()
+		if isBlockOverStopBlock(r.nextBoundary, reqStopBlockNum) {
+			break
+		}
 	}
 
-	if isSubrequest && isStopBlockReached(blockNum, reqStopBlockNum) {
+	if isSubrequest && isBlockOverStopBlock(blockNum, reqStopBlockNum) {
 		boundaries[reqStopBlockNum] = true
 	}
+
 	out := []uint64{}
 	for v, _ := range boundaries {
 		out = append(out, v)
@@ -59,6 +64,6 @@ func (r *StoreBoundary) GetStoreFlushRanges(isSubrequest bool, reqStopBlockNum u
 	return out
 }
 
-func isStopBlockReached(currentBlock uint64, stopBlock uint64) bool {
+func isBlockOverStopBlock(currentBlock uint64, stopBlock uint64) bool {
 	return stopBlock != 0 && currentBlock >= stopBlock
 }

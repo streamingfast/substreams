@@ -159,7 +159,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		}
 	} else {
 		if storeMap, err = p.runBackProcessAndSetupStores(ctx, storeConfigs); err != nil {
-			return fmt.Errorf("faile setup request: %w", err)
+			return fmt.Errorf("failed setup request: %w", err)
 		}
 	}
 	p.StoreMap = storeMap
@@ -294,6 +294,8 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
 
+	executor.Reset()
+
 	executorName := executor.Name()
 	logger.Debug("executing", zap.String("module_name", executorName))
 
@@ -313,7 +315,6 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	}
 
 	p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
-	executor.Reset()
 
 	return nil
 }

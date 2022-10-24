@@ -19,7 +19,7 @@ type FullKV struct {
 func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	b := &baseStore{
 		Config: s.Config,
-		kv:     map[string][]byte{},
+		kv:     make(map[string][]byte),
 		logger: s.logger,
 	}
 	return &PartialKV{
@@ -54,27 +54,30 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 // Save is to be called ONLY when we just passed the
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
-func (s *FullKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
+func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
 	content, err := json.MarshalIndent(s.kv, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("marshal kv state: %w", err)
+		return nil, nil, fmt.Errorf("marshal kv state: %w", err)
 	}
 
 	filename := s.storageFilename(endBoundaryBlock)
-	if err := saveStore(ctx, s.store, filename, content); err != nil {
-		return nil, fmt.Errorf("write fill store %q in file %q: %w", s.name, filename, err)
-	}
-
 	brange := block.NewRange(s.moduleInitialBlock, endBoundaryBlock)
-	s.logger.Info("full store state written",
+
+	s.logger.Info("full store state saved",
 		zap.String("store", s.name),
 		zap.String("file_name", filename),
 		zap.Object("block_range", brange),
 	)
 
-	return brange, nil
+	fw := &FileWriter{
+		store:    s.store,
+		filename: filename,
+		content:  content,
+	}
+
+	return brange, fw, nil
 }
 
 func (s *FullKV) Reset() {

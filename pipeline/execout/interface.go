@@ -12,7 +12,10 @@ var NotFound = errors.New("inputs module value not found")
 type CacheEngine interface {
 	NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (ExecutionOutput, error)
 	Init(modules *manifest.ModuleHashes) error
-	NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error
+
+	EndOfStream(blockNum uint64) error
+	HandleFinal(clock *pbsubstreams.Clock) error
+	HandleUndo(clock *pbsubstreams.Clock, moduleName string)
 }
 
 type ExecutionOutputGetter interface {

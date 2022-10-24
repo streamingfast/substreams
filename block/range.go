@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/bstream"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -49,10 +48,6 @@ func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		enc.AddUint64("exclusive_end_block", r.ExclusiveEndBlock)
 	}
 	return nil
-}
-
-func (r *Range) ContainsBlockRef(blockRef bstream.BlockRef) bool {
-	return r.Contains(blockRef.Num())
 }
 
 func (r *Range) Contains(blockNum uint64) bool {

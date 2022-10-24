@@ -3,57 +3,115 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/work"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.opentelemetry.io/otel"
-	ttrace "go.opentelemetry.io/otel/trace"
+	"github.com/streamingfast/substreams/service/config"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Scheduler struct {
-	workerPool *WorkerPool
-	respFunc   substreams.ResponseFunc
+	workerPool             *work.WorkerPool
+	respFunc               substreams.ResponseFunc
+	graph                  *manifest.ModuleGraph
+	upstreamRequestModules *pbsubstreams.Modules
 
-	squasher      *Squasher
-	availableJobs <-chan *Job
-	tracer        ttrace.Tracer
+	OnStoreJobTerminated func(moduleName string, partialsWritten block.Ranges) error
+
+	// TODO(abourget): deprecate this, and fuse it inside the Scheduler
+	jobsPlanner *JobsPlanner
 }
 
-func NewScheduler(ctx context.Context, availableJobs chan *Job, squasher *Squasher, workerPool *WorkerPool, respFunc substreams.ResponseFunc) (*Scheduler, error) {
-	tracer := otel.GetTracerProvider().Tracer("scheduler")
+func NewScheduler(
+	ctx context.Context,
+	runtimeConfig config.RuntimeConfig,
+	workPlan *WorkPlan,
+	graph *manifest.ModuleGraph,
+	respFunc substreams.ResponseFunc,
+	logger *zap.Logger,
+	upstreamRequestModules *pbsubstreams.Modules,
+) (*Scheduler, error) {
+
+	workerPool := work.NewWorkerPool(runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory, logger)
+
+	// TODO(abourget): rework that jobsPlanner to better fit within the Scheduler, but now at
+	// least it's isolated within, and no one externally knows about it.
+	jobsPlanner, err := NewJobsPlanner(ctx, workPlan, runtimeConfig.SubrequestsSplitSize, graph)
+	if err != nil {
+		return nil, fmt.Errorf("creating strategy: %w", err)
+	}
+
 	s := &Scheduler{
-		squasher:      squasher,
-		availableJobs: availableJobs,
-		workerPool:    workerPool,
-		respFunc:      respFunc,
-		tracer:        tracer,
+		workerPool:             workerPool,
+		respFunc:               respFunc,
+		upstreamRequestModules: upstreamRequestModules,
+
+		jobsPlanner: jobsPlanner, // DEPRECATED
 	}
 	return s, nil
 }
 
-func (s *Scheduler) Launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
-	ctx, span := s.tracer.Start(ctx, "running_schedule")
+func (s *Scheduler) Run(ctx context.Context, requestModules *pbsubstreams.Modules) (err error) {
+	logger := reqctx.Logger(ctx)
+	result := make(chan error)
+
+	logger.Debug("launching scheduler")
+
+	go s.launch(ctx, requestModules, result)
+
+	jobCount := s.jobsPlanner.JobCount()
+	for resultCount := 0; resultCount < jobCount; {
+		select {
+		case <-ctx.Done():
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+			logger.Info("job canceled")
+			return nil
+		case err = <-result:
+			resultCount++
+			if err != nil {
+				err = fmt.Errorf("worker ended in error: %w", err)
+				return err
+			}
+			logger.Debug("received result", zap.Int("result_count", resultCount), zap.Int("job_count", jobCount))
+		}
+	}
+
+	logger.Info("all jobs completed, waiting for squasher to finish")
+
+	return nil
+}
+
+func (s *Scheduler) launch(ctx context.Context, requestModules *pbsubstreams.Modules, result chan error) {
+	logger := reqctx.Logger(ctx)
+	ctx, span := reqctx.WithSpan(ctx, "running_schedule")
 	defer span.End()
 	for {
-		zlog.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.availableJobs)))
-		job, ok := <-s.availableJobs
+		logger.Debug("getting a next job from scheduler", zap.Int("available_jobs", len(s.jobsPlanner.AvailableJobs)))
+		job, ok := <-s.jobsPlanner.AvailableJobs
 		if !ok {
-			zlog.Debug("no more job in scheduler, or context cancelled")
+			logger.Debug("no more job in scheduler, or context cancelled")
 			break
 		}
 
-		zlog.Info("scheduling job", zap.Object("job", job))
+		logger.Info("scheduling job", zap.Object("job", job))
 
 		start := time.Now()
 		jobWorker := s.workerPool.Borrow()
-		zlog.Debug("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
+		logger.Debug("got worker", zap.Object("job", job), zap.Duration("in", time.Since(start)))
 
 		select {
 		case <-ctx.Done():
-			zlog.Info("synchronize stores quit on cancel context")
+			logger.Info("synchronize stores quit on cancel context")
 			break
 		default:
 		}
@@ -67,21 +125,32 @@ func (s *Scheduler) Launch(ctx context.Context, requestModules *pbsubstreams.Mod
 	}
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, worker Worker, job *Job, requestModules *pbsubstreams.Modules) error {
+func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64) {
+	// This replaces the JobPlanner's signaling mechanism: allows decoupling from the Squasher and the Scheduler
+	//	func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64) {
+	s.jobsPlanner.SignalCompletionUpUntil(storeName, blockNum)
+
+	// TODO(abourget): is it only for `storeName` or `moduleName` can be used when we want parallel processing of
+	// exec output?
+
+}
+
+func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) error {
+	logger := reqctx.Logger(ctx)
+
 	var partialsWritten []*block.Range
 	var err error
 
 out:
 	for i := 0; uint64(i) < 3; i++ {
-		partialsWritten, err = worker.Run(ctx, job, requestModules, s.respFunc)
-
+		partialsWritten, err = worker.Run(ctx, job.CreateRequest(requestModules), s.respFunc)
 		switch err.(type) {
-		case *RetryableErr:
-			zlog.Debug("retryable error", zap.Error(err))
+		case *work.RetryableErr:
+			logger.Debug("retryable error", zap.Error(err))
 			continue
 		default:
 			if err != nil {
-				zlog.Debug("not a retryable error", zap.Error(err))
+				logger.Debug("not a retryable error", zap.Error(err))
 			}
 			break out
 		}
@@ -94,10 +163,133 @@ out:
 	}
 
 	if partialsWritten != nil {
-		if err := s.squasher.Squash(job.ModuleName, partialsWritten); err != nil {
+		// This is the back signal to the Squasher
+		if err := s.OnStoreJobTerminated(job.ModuleName, partialsWritten); err != nil {
 			return fmt.Errorf("squashing: %w", err)
 		}
 	}
 
 	return nil
 }
+
+// TODO(abourget): JobsPlanner, to be folded into the Scheduler, hidden behind it, an implementation
+// detail of the Scheduler.
+
+type JobsPlanner struct {
+	sync.Mutex
+
+	jobs          work.JobList // all jobs, completed or not
+	AvailableJobs chan *work.Job
+	completed     bool
+}
+
+func NewJobsPlanner(
+	ctx context.Context,
+	workPlan *WorkPlan,
+	subrequestSplitSize uint64,
+	graph *manifest.ModuleGraph,
+) (*JobsPlanner, error) {
+	planner := &JobsPlanner{}
+
+	logger := reqctx.Logger(ctx)
+
+	ctx, span := reqctx.WithSpan(ctx, "job_planning")
+	defer span.End()
+
+	for storeName, workUnit := range workPlan.workUnitsMap {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			// do nothing
+		}
+
+		requests := workUnit.batchRequests(subrequestSplitSize)
+		rangeLen := len(requests)
+		for idx, requestRange := range requests {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				// do nothing
+			}
+			// TODO(abourget): here we loop WorkUnit.reqChunks, and grab the ancestor modules
+			// to setup the waiter.
+			// blockRange's start/end come from `requestRange`
+			ancestorStoreModules, err := graph.AncestorStoresOf(storeName)
+			if err != nil {
+				return nil, fmt.Errorf("getting ancestore stores for %s: %w", storeName, err)
+			}
+
+			job := work.NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
+			planner.jobs = append(planner.jobs, job)
+
+			logger.Info("job planned", zap.String("module_name", storeName), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
+		}
+	}
+
+	planner.sortJobs()
+	planner.AvailableJobs = make(chan *work.Job, len(planner.jobs))
+	planner.dispatch()
+
+	logger.Info("jobs planner ready")
+
+	return planner, nil
+}
+
+func (p *JobsPlanner) sortJobs() {
+	sort.Slice(p.jobs, func(i, j int) bool {
+		// reverse sorts priority, higher first
+		return p.jobs[i].Priority > p.jobs[j].Priority
+	})
+}
+
+func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64) {
+	p.Lock()
+	defer p.Unlock()
+
+	for _, job := range p.jobs {
+		if job.Scheduled {
+			continue
+		}
+
+		job.SignalDependencyResolved(storeName, blockNum)
+	}
+
+	p.dispatch()
+}
+
+func (p *JobsPlanner) dispatch() {
+	if p.completed {
+		return
+	}
+
+	var scheduled int
+	for _, job := range p.jobs {
+		if job.Scheduled {
+			scheduled++
+			continue
+		}
+		if job.ReadyForDispatch() {
+			job.Scheduled = true
+			p.AvailableJobs <- job
+		}
+	}
+	if scheduled == len(p.jobs) {
+		close(p.AvailableJobs)
+		p.completed = true
+	}
+}
+
+func (p *JobsPlanner) JobCount() int {
+	return len(p.jobs)
+}
+
+func (p *JobsPlanner) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddArray("jobs", p.jobs)
+	enc.AddBool("completed", p.completed)
+	enc.AddInt("available_jobs", len(p.AvailableJobs))
+	return nil
+}
+
+//

@@ -3,6 +3,8 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/work"
+	"go.uber.org/zap"
 	"testing"
 	"time"
 
@@ -34,21 +36,21 @@ func TestNewJobsPlanner(t *testing.T) {
 		kindStore := mod.Kind.(*pbsubstreams.Module_KindStore_).KindStore
 		config, err := store.NewConfig(mod.Name, mod.InitialBlock, "myhash", kindStore.UpdatePolicy, kindStore.ValueType, mockDStore)
 		require.NoError(t, err)
-		newStore := config.NewFullKV(zlog)
+		newStore := config.NewFullKV(zap.NewNop())
 		storeMap.Set(newStore)
 	}
 
-	splitWorkMods := WorkPlan{
-		"A": &WorkUnit{modName: "A"},
-		"B": &WorkUnit{modName: "B"},
-		"C": &WorkUnit{modName: "C"},
-		"D": &WorkUnit{modName: "D"},
-		"E": &WorkUnit{modName: "E"},
-		"F": &WorkUnit{modName: "F"},
-		"G": &WorkUnit{modName: "G"},
-		"H": &WorkUnit{modName: "H"},
-		"K": &WorkUnit{modName: "K"},
-	}
+	splitWorkMods := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
+		"A": &WorkUnits{modName: "A"},
+		"B": &WorkUnits{modName: "B"},
+		"C": &WorkUnits{modName: "C"},
+		"D": &WorkUnits{modName: "D"},
+		"E": &WorkUnits{modName: "E"},
+		"F": &WorkUnits{modName: "F"},
+		"G": &WorkUnits{modName: "G"},
+		"H": &WorkUnits{modName: "H"},
+		"K": &WorkUnits{modName: "K"},
+	}}
 
 	ctx := context.Background()
 	s, err := NewJobsPlanner(
@@ -102,8 +104,8 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	graph, err := manifest.NewModuleGraph(modules)
 	require.NoError(t, err)
 
-	workPlan := WorkPlan{
-		"A": &WorkUnit{
+	workPlan := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
+		"A": &WorkUnits{
 			modName: "A",
 			partialsMissing: block.Ranges{
 				&block.Range{
@@ -128,7 +130,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 				},
 			},
 		},
-		"B": &WorkUnit{
+		"B": &WorkUnits{
 			modName: "B",
 			partialsMissing: block.Ranges{
 				&block.Range{
@@ -137,13 +139,13 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 				},
 			},
 		},
-	}
+	}}
 
 	ctx := context.Background()
 	jobsPlanner, err := NewJobsPlanner(
 		ctx,
 		workPlan,
-		uint64(100),
+		100,
 		graph,
 	)
 	require.NoError(t, err)
@@ -154,6 +156,6 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	}
 }
 
-func jobstr(j *Job) string {
-	return fmt.Sprintf("%s %d-%d", j.ModuleName, j.requestRange.StartBlock, j.requestRange.ExclusiveEndBlock)
+func jobstr(j *work.Job) string {
+	return fmt.Sprintf("%s %d-%d", j.ModuleName, j.RequestRange.StartBlock, j.RequestRange.ExclusiveEndBlock)
 }

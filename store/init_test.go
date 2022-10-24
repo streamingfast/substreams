@@ -9,31 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewTestKVStore(
-	t *testing.T,
-	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
-	valueType string,
-	store dstore.Store,
-) *FullKV {
-	base := newTestBaseStore(t, updatePolicy, valueType, store)
-	return &FullKV{base}
-
-}
-
-func NewTestKVPartialStore(
-	t *testing.T,
-	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
-	valueType string,
-	store dstore.Store,
-	initialPartialBlock uint64,
-) *PartialKV {
-	base := newTestBaseStore(t, updatePolicy, valueType, store)
-	return &PartialKV{
-		baseStore:    base,
-		initialBlock: initialPartialBlock,
-	}
-}
-
 func newTestBaseStore(
 	t *testing.T,
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,

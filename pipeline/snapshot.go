@@ -1,16 +1,17 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 )
 
-func (p *Pipeline) sendSnapshots() error {
-	snapshotModules := p.reqCtx.Request().InitialStoreSnapshotForModules
+func (p *Pipeline) sendSnapshots(ctx context.Context) error {
+	snapshotModules := reqctx.Details(ctx).Request.InitialStoreSnapshotForModules
 	if len(snapshotModules) == 0 {
 		return nil
-
 	}
 
 	for _, modName := range snapshotModules {

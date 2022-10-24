@@ -2,6 +2,9 @@ package pipeline
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -9,10 +12,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"testing"
-	"time"
 )
 
 func TestPipeline_runExecutor(t *testing.T) {
@@ -21,7 +21,6 @@ func TestPipeline_runExecutor(t *testing.T) {
 		moduleName string
 		execOutput *MapperModuleExecutor
 		block      *pbsubstreamstest.Block
-		request    *RequestContext
 		testFunc   func(t *testing.T, data []byte)
 	}{
 		{
@@ -38,42 +37,20 @@ func TestPipeline_runExecutor(t *testing.T) {
 				}, out)
 			},
 		},
-		{
-			name:       "return map's cache",
-			moduleName: "test_map",
-			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
-			testFunc: func(t *testing.T, data []byte) {
-				out := &pbsubstreamstest.MapResult{}
-				err := proto.Unmarshal(data, out)
-				require.NoError(t, err)
-				assertProtoEqual(t, &pbsubstreamstest.MapResult{
-					BlockNumber: 10,
-					BlockHash:   "block-10",
-				}, out)
-			},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			pipe := &Pipeline{
-				reqCtx: testRequestContext(context.Background()),
-			}
+			ctx := context.Background()
+			pipe := &Pipeline{}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)
-			err := pipe.runExecutor(executor, execOutput)
+			err := pipe.runExecutor(ctx, executor, execOutput)
 			require.NoError(t, err)
 			output, found := execOutput.Values[test.moduleName]
 			require.Equal(t, true, found)
 			test.testFunc(t, output)
 		})
-	}
-}
-
-func testRequestContext(ctx context.Context) *RequestContext {
-	return &RequestContext{
-		Context: ctx,
-		logger:  zap.NewNop(),
 	}
 }
 
@@ -103,7 +80,7 @@ func mapTestExecutor(t *testing.T, name string) *MapperModuleExecutor {
 			moduleName: name,
 			wasmModule: wasmModule,
 			wasmArguments: []wasm.Argument{
-				wasm.NewBlockInput("sf.substreams.v1.test.Block"),
+				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
 			},
 			entrypoint: name,
 			tracer:     otel.GetTracerProvider().Tracer("test"),
@@ -155,4 +132,20 @@ func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, 
 	require.NoError(t, err)
 
 	return pkg, moduleGraph
+}
+
+func TestSetupSubrequestStores(t *testing.T) {
+	t.Skip("these need to be written")
+	// TODO(abourget):
+	// We need to test: setupSubrequestStores
+
+	// with stores: [A(init=10), B(init=10), C(init=20)], startBlock=20, outputModules=['B']
+	// assert: storeMap[A] is FullKV, storeMap[B] is PartialKV
+
+	// with stores: [A(init=10), B(init=10), C(init=20)], startBlock=20, outputModules=['D']
+	// assert: storeMap[A] is FullKV, storeMap[B] is PartialKV
+
+	// This will need to work for both a mapper and a store.
+	// If we ask for a store to be processed, we expect it to be a PartialKV
+	// Otherwise, if the output module we want is a mapper, everything needs to be FullKV
 }

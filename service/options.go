@@ -27,12 +27,12 @@ func WithPartialMode() Option {
 
 func WithStoresSaveInterval(block uint64) Option {
 	return func(s *Service) {
-		s.storesSaveInterval = block
+		s.runtimeConfig.StoreSnapshotsSaveInterval = block
 	}
 }
 
 func WithOutCacheSaveInterval(block uint64) Option {
 	return func(s *Service) {
-		s.outputCacheSaveBlockInterval = block
+		s.runtimeConfig.ExecOutputSaveInterval = block
 	}
 }

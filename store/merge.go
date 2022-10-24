@@ -14,7 +14,7 @@ import (
 
 // Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
 func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
-	zlog.Debug("merging store", zap.Object("current_store", b), zap.Object("partial_store", kvPartialStore))
+	b.logger.Debug("merging store", zap.Object("current_store", b), zap.Object("partial_store", kvPartialStore))
 
 	if kvPartialStore.updatePolicy != b.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", b.updatePolicy, kvPartialStore.updatePolicy)

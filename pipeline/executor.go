@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-
 	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/reqctx"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/wasm"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -93,14 +91,12 @@ func (e *MapperModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
 func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
-	ctx, span := e.tracer.Start(ctx, "exec_map")
-	span.SetAttributes(attribute.String("module", e.moduleName))
-	defer span.End()
+	ctx, span := reqctx.WithSpan(ctx, "exec_map")
+	defer span.EndWithErr(&err)
 
 	var instance *wasm.Instance
 	if instance, err = e.wasmCall(reader); err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, nil, fmt.Errorf("failed to run maps wasm call: %w", err)
+		return nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 
 	if instance != nil {
@@ -113,7 +109,6 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 		}
 	}
 
-	span.SetStatus(codes.Ok, "module_executed")
 	return out, moduleOutput, nil
 }
 
@@ -140,31 +135,18 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 }
 
 func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
-	ctx, span := e.tracer.Start(ctx, "exec_store")
-	span.SetAttributes(attribute.String("module", e.moduleName))
-	defer span.End()
+	ctx, span := reqctx.WithSpan(ctx, "exec_store")
+	defer span.EndWithErr(&err)
 
 	if _, err := e.wasmCall(reader); err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, nil, fmt.Errorf("calling wasm store: %w", err)
+		return nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}
 
-	deltas := &pbsubstreams.StoreDeltas{
-		Deltas: e.outputStore.GetDeltas(),
+	if e.isPartialDeltas() {
+		return nil, nil, nil
 	}
 
-	data, err := proto.Marshal(deltas)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
-	}
-
-	moduleOutput = &pbsubstreams.ModuleOutput_StoreDeltas{
-		StoreDeltas: deltas,
-	}
-
-	span.SetStatus(codes.Ok, "module_executed")
-	return data, moduleOutput, nil
+	return e.wrapDeltas()
 }
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (instance *wasm.Instance, err error) {
@@ -209,4 +191,25 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 		}
 	}
 	return
+}
+
+func (e *StoreModuleExecutor) isPartialDeltas() bool {
+	_, ok := e.outputStore.(*store.PartialKV)
+	return ok
+}
+
+func (e *StoreModuleExecutor) wrapDeltas() (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
+	deltas := &pbsubstreams.StoreDeltas{
+		Deltas: e.outputStore.GetDeltas(),
+	}
+
+	data, err := proto.Marshal(deltas)
+	if err != nil {
+		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
+	}
+
+	moduleOutput = &pbsubstreams.ModuleOutput_StoreDeltas{
+		StoreDeltas: deltas,
+	}
+	return data, moduleOutput, nil
 }

@@ -2,28 +2,26 @@ package orchestrator
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/work"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type WorkPlan map[string]*WorkUnit
+type WorkPlan struct {
+	// storageState // would we need that later? perhaps not
 
-func (p WorkPlan) SquashPartialsPresent(squasher *Squasher) error {
-	for _, w := range p {
-		if w.partialsPresent.Len() == 0 {
-			continue
-		}
-		err := squasher.Squash(w.modName, w.partialsPresent)
-		if err != nil {
-			return fmt.Errorf("squash partials present for module %s: %w", w.modName, err)
-		}
-	}
-	return nil
+	workUnitsMap map[string]*WorkUnits // WorksUnits split by module name
+
+	prioritizedJobs []*work.Job
+}
+
+func (p *WorkPlan) StoreCount() int {
+	return len(p.workUnitsMap)
 }
 
 func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
-	for storeName, unit := range p {
+	for storeName, unit := range p.workUnitsMap {
 		if unit.initialCompleteRange == nil {
 			continue
 		}
@@ -31,7 +29,6 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 		var more []*pbsubstreams.BlockRange
 		if unit.initialCompleteRange != nil {
 			more = append(more, &pbsubstreams.BlockRange{
-				// FIXME(abourget): we'll use opentelemetry tracing for that!
 				StartBlock: unit.initialCompleteRange.StartBlock,
 				EndBlock:   unit.initialCompleteRange.ExclusiveEndBlock,
 			})
@@ -58,8 +55,8 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 
 func (p WorkPlan) String() string {
 	var out []string
-	for k, v := range p {
-		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.initialCompleteRange, v.partialsMissing, v.partialsPresent))
+	for k, v := range p.workUnitsMap {
+		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.initialCompleteRange.String(), v.partialsMissing, v.partialsPresent))
 	}
 	return strings.Join(out, ";")
 }

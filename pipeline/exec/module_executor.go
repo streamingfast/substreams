@@ -7,11 +7,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/execout"
 )
 
-type ModuleExecutorRunner struct {
-	executor ModuleExecutor
-	output   execout.ExecutionOutput
-}
-
 func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (*pbsubstreams.ModuleOutput, error) {
 	cached, output, err := cacheOutputExists(execOutput, executor)
 	if err != nil {

@@ -25,7 +25,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		return moduleOutput, fmt.Errorf("execute: %w", err)
 	}
 
-	if err = setOutputCache(executor, execOutput, outputBytes); err != nil {
+	if err = setOutputCache(executor.Name(), execOutput, outputBytes); err != nil {
 		return moduleOutput, fmt.Errorf("set output cache: %w", err)
 	}
 
@@ -40,8 +40,8 @@ func cacheOutputExists(execOutput execout.ExecutionOutput, executor ModuleExecut
 	return cached, output, nil
 }
 
-func setOutputCache(executor ModuleExecutor, execOutput execout.ExecutionOutput, value []byte) error {
-	err := execOutput.Set(executor.Name(), value)
+func setOutputCache(executorName string, execOutput execout.ExecutionOutput, value []byte) error {
+	err := execOutput.Set(executorName, value)
 	if err != nil {
 		return fmt.Errorf("set cached output: %w", err)
 	}

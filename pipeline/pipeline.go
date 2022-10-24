@@ -3,8 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/reqctx"
 	"math"
 	"strings"
 
@@ -14,7 +12,9 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/wasm"

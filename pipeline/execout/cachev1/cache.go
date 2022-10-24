@@ -34,16 +34,20 @@ type outputKV map[string]*CacheItem
 type OutputCache struct {
 	sync.RWMutex
 
+	wg                *sync.WaitGroup
 	moduleName        string
 	currentBlockRange *block.Range
 	kv                outputKV
 	store             dstore.Store
 	saveBlockInterval uint64
 	logger            *zap.Logger
+
+	initialized bool
 }
 
-func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *OutputCache {
+func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger, wg *sync.WaitGroup) *OutputCache {
 	return &OutputCache{
+		wg:                wg,
 		moduleName:        moduleName,
 		store:             store,
 		saveBlockInterval: saveBlockInterval,
@@ -183,7 +187,10 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 	}
 	cnt := buffer.Bytes()
 
+	c.wg.Add(1)
 	go func() {
+		defer c.wg.Done()
+
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
 			err := c.store.WriteObject(ctx, filename, reader)

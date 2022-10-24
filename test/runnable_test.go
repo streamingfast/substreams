@@ -112,7 +112,13 @@ func processRequest(
 		pipe:                   pipe,
 	}
 
-	return pipe.Launch(ctx, tr, &nooptrailable{})
+	err = pipe.Launch(ctx, tr, &nooptrailable{})
+
+	if closer, ok := cachingEngine.(io.Closer); ok {
+		closer.Close()
+	}
+
+	return err
 }
 
 type nooptrailable struct {

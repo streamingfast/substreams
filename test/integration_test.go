@@ -33,7 +33,6 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 
 	testTempDir := t.TempDir()
 	fmt.Println("Running test in temp dir: ", testTempDir)
-	require.NoError(t, os.RemoveAll(testTempDir))
 
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
 	if tracingEnabled {
@@ -155,6 +154,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 			}
 		}
 	}
+
 	return
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sync"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
@@ -21,22 +22,19 @@ func init() {
 
 type Engine struct {
 	ctx           context.Context
-	caches        map[string]*OutputCacheState
+	caches        map[string]*OutputCache
 	runtimeConfig config.RuntimeConfig
 	logger        *zap.Logger
-}
-
-type OutputCacheState struct {
-	*OutputCache
-	initialized bool
+	wg            *sync.WaitGroup
 }
 
 func NewEngine(runtimeConfig config.RuntimeConfig, logger *zap.Logger) (execout.CacheEngine, error) {
 	e := &Engine{
 		ctx:           context.Background(),
 		runtimeConfig: runtimeConfig,
-		caches:        make(map[string]*OutputCacheState),
+		caches:        make(map[string]*OutputCache),
 		logger:        logger,
+		wg:            &sync.WaitGroup{},
 	}
 	return e, nil
 }
@@ -91,7 +89,7 @@ func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pb
 	}, nil
 }
 
-func (e *Engine) flushCache(cache *OutputCacheState) error {
+func (e *Engine) flushCache(cache *OutputCache) error {
 	e.logger.Debug("saving cache", zap.Object("cache", cache))
 	err := cache.save(e.ctx, cache.currentFilename())
 	if err != nil {
@@ -123,10 +121,8 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 		return fmt.Errorf("failed createing substore: %w", err)
 	}
 
-	e.caches[moduleName] = &OutputCacheState{
-		OutputCache: NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger),
-		initialized: false,
-	}
+	e.caches[moduleName] = NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger, e.wg)
+
 	return nil
 }
 
@@ -153,4 +149,9 @@ func (e *Engine) set(moduleName string, data []byte, clock *pbsubstreams.Clock, 
 	}
 
 	return cache.Set(clock, cursor, data)
+}
+
+func (e *Engine) Close() error {
+	e.wg.Wait()
+	return nil
 }

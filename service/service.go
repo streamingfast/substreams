@@ -65,7 +65,7 @@ func New(
 		parallelSubRequests,
 		stateStore,
 		func(logger *zap.Logger) work.JobRunner {
-			return work.NewRemoteWorker(clientFactory, logger)
+			return work.NewRemoteWorker(clientFactory, logger).Run
 		},
 	)
 	s = &Service{

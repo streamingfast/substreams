@@ -1,6 +1,7 @@
 package store
 
 import (
+	"go.uber.org/zap"
 	"testing"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -371,6 +372,7 @@ func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_U
 			updatePolicy: updatePolicy,
 			valueType:    valueType,
 		},
+		logger: zap.NewNop(),
 	}
 	return &FullKV{baseStore: b}
 }

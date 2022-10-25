@@ -154,6 +154,7 @@ func TestLineBar(t *testing.T) {
 	t.Skip()
 	res := barmode(
 		ranges{
+
 			{Start: 1, End: 23},
 			{Start: 50, End: 100},
 			{Start: 200, End: 600},

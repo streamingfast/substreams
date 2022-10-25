@@ -39,7 +39,7 @@ func NewMultiSquasher(
 	storeSquashers := map[string]*StoreSquasher{}
 	logger.Info("creating a new squasher", zap.Int("work_plan_count", workPlan.StoreCount()))
 
-	for storeModuleName, workUnit := range workPlan.workUnitsMap {
+	for storeModuleName, workUnit := range workPlan.fileUnitsMap {
 		storeConfig, found := storeConfigs[storeModuleName]
 		if !found {
 			return nil, fmt.Errorf("store %q not found", storeModuleName)

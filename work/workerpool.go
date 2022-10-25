@@ -4,6 +4,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(abourget): JobRunner instead of Worker everywhere here.
+
+type JobRunnerPool interface {
+	Borrow() JobRunner
+	Return(JobRunner)
+}
+
 type WorkerPool struct {
 	workers chan JobRunner
 }
@@ -27,7 +34,7 @@ func (p *WorkerPool) Borrow() JobRunner {
 	return w
 }
 
-func (p *WorkerPool) ReturnWorker(worker JobRunner) {
+func (p *WorkerPool) Return(worker JobRunner) {
 	p.workers <- worker
 }
 

@@ -51,7 +51,7 @@ func TestSchedulerInOut(t *testing.T) {
 			ExecOutputSaveInterval:     10,
 			StoreSnapshotsSaveInterval: 10,
 		},
-		&WorkPlan{workUnitsMap: map[string]*WorkUnits{
+		&WorkPlan{fileUnitsMap: map[string]*FileUnits{
 			"A": {modName: "A"},
 			"B": {
 				modName:         "B",
@@ -95,7 +95,7 @@ func TestSchedulerInOut(t *testing.T) {
 		outchan <- out{partialsWritten: block.ParseRanges(rng)}
 	}()
 
-	assert.NoError(t, sched.Run(ctx))
+	assert.NoError(t, sched.Schedule(ctx))
 	assert.Equal(t, "[0, 20)", accumulatedRanges.Merged().String())
 }
 
@@ -122,7 +122,7 @@ func TestNewJobsPlanner(t *testing.T) {
 		storeMap.Set(newStore)
 	}
 
-	splitWorkMods := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
+	splitWorkMods := &WorkPlan{fileUnitsMap: map[string]*FileUnits{
 		"A": {modName: "A"},
 		"B": {modName: "B"},
 		"C": {modName: "C"},
@@ -186,8 +186,8 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	graph, err := manifest.NewModuleGraph(modules)
 	require.NoError(t, err)
 
-	workPlan := &WorkPlan{workUnitsMap: map[string]*WorkUnits{
-		"A": &WorkUnits{
+	workPlan := &WorkPlan{fileUnitsMap: map[string]*FileUnits{
+		"A": &FileUnits{
 			modName: "A",
 			partialsMissing: block.Ranges{
 				&block.Range{
@@ -212,7 +212,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 				},
 			},
 		},
-		"B": &WorkUnits{
+		"B": &FileUnits{
 			modName: "B",
 			partialsMissing: block.Ranges{
 				&block.Range{

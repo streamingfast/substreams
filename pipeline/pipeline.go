@@ -161,6 +161,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 			return fmt.Errorf("failed setup request: %w", err)
 		}
 	}
+
 	p.StoreMap = storeMap
 
 	if err = p.buildWASM(ctx, modules); err != nil {

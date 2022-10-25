@@ -70,7 +70,11 @@ func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 	// go parallelDownloader.Launch()
 	multiSquasher.Launch(ctx)
 
-	if err := scheduler.Run(ctx); err != nil {
+	// TODO: Here we'd create a JobRunnerPool, and pass it down as a simple interface to the
+	// Scheduler
+
+	// TODO: pass down the JobRunnerPool at this point, not within the object.
+	if err := scheduler.Schedule(ctx); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
@@ -107,7 +111,7 @@ func (b *Backprocessor) planWork(ctx context.Context) (out *WorkPlan, err error)
 func (b *Backprocessor) buildWorkPlan(ctx context.Context, storageState *StorageState) (out *WorkPlan, err error) {
 	logger := reqctx.Logger(ctx)
 	out = &WorkPlan{
-		workUnitsMap: map[string]*WorkUnits{}, // per module
+		fileUnitsMap: map[string]*FileUnits{}, // per module
 	}
 	for _, config := range b.storeConfigMap {
 		name := config.Name()
@@ -116,19 +120,19 @@ func (b *Backprocessor) buildWorkPlan(ctx context.Context, storageState *Storage
 			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", name)
 		}
 
-		wu := &WorkUnits{modName: name}
-		if err := wu.init(b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), b.upToBlock, snapshot); err != nil {
-			return nil, fmt.Errorf("init worker unit %q: %w", name, err)
+		fileUnits, err := NewFileUnits(name, b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), b.upToBlock, snapshot)
+		if err != nil {
+			return nil, fmt.Errorf("new file units %q: %w", name, err)
 		}
 
-		out.workUnitsMap[name] = wu
+		out.fileUnitsMap[name] = fileUnits
 	}
 	logger.Info("work plan ready", zap.Stringer("work_plan", out))
 	return
 }
 
 func (b *Backprocessor) sendWorkPlanProgress(workPlan *WorkPlan) (err error) {
-	progressMessages := workPlan.ProgressMessages()
+	progressMessages := workPlan.InitialProgressMessages()
 	if err := b.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return err
 	}

@@ -97,7 +97,7 @@ func TestWorkUnits_init(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			wu := &WorkUnits{modName: "mod"}
+			wu := &FileUnits{modName: "mod"}
 			err := wu.init(tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectInitLoad, wu.initialCompleteRange)

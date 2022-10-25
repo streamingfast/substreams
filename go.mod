@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dgrpc v0.0.0-20220909121013-162e9305bbfc
-	github.com/streamingfast/dstore v0.1.1-0.20221021155138-4baa2d406146
+	github.com/streamingfast/dstore v0.1.1-0.20221025062403-36259703e97b
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
 	github.com/stretchr/testify v1.8.0

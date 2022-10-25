@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// compile-time check that baseStore implements all interfaces
 var _ Store = (*PartialKV)(nil)
 
 type PartialKV struct {

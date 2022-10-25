@@ -2,15 +2,20 @@ package pipeline
 
 import (
 	"context"
-	"github.com/streamingfast/substreams/pipeline/exec"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
+	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/protobuf/proto"
@@ -138,17 +143,64 @@ func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, 
 }
 
 func TestSetupSubrequestStores(t *testing.T) {
-	t.Skip("these need to be written")
-	// TODO(abourget):
-	// We need to test: setupSubrequestStores
+	p := Pipeline{}
 
-	// with stores: [A(init=10), B(init=10), C(init=20)], startBlock=20, outputModules=['B']
-	// assert: storeMap[A] is FullKV, storeMap[B] is PartialKV
+	t.Run("test store types depending on input", func(t *testing.T) {
+		confMap := testConfigMap(t, []string{
+			"mod2/states/0000000010-0000000001.kv",
+		}, []testStoreConfig{
+			{"mod1", 10},
+			{"mod2", 1},
+			{"mod3", 5},
+		})
+		ctx := withTestRequest("mod3", 10)
 
-	// with stores: [A(init=10), B(init=10), C(init=20)], startBlock=20, outputModules=['D']
-	// assert: storeMap[A] is FullKV, storeMap[B] is PartialKV
+		storeMap, err := p.setupSubrequestStores(ctx, confMap)
 
-	// This will need to work for both a mapper and a store.
-	// If we ask for a store to be processed, we expect it to be a PartialKV
-	// Otherwise, if the output module we want is a mapper, everything needs to be FullKV
+		require.NoError(t, err)
+		assert.Len(t, storeMap, 3)
+
+		fullKV := storeMap["mod1"].(*store.FullKV)
+		assert.Equal(t, 10, int(fullKV.ModuleInitialBlock()))
+		val, _ := storeMap["mod2"].(*store.FullKV).GetLast("k")
+		assert.Equal(t, []byte("v"), val)
+		partialKV := storeMap["mod3"].(*store.PartialKV)
+		assert.Equal(t, 10, int(partialKV.InitialBlock()))
+	})
+
+	t.Run("fail with multiple output modules", func(t *testing.T) {
+		ctx := withTestRequest("mod1,mod2", 10)
+
+		_, err := p.setupSubrequestStores(ctx, nil)
+
+		assert.Equal(t, "invalid number of backprocess leaf store: 2", err.Error())
+	})
+}
+
+func testConfigMap(t *testing.T, files []string, configs []testStoreConfig) store.ConfigMap {
+	t.Helper()
+	confMap := make(store.ConfigMap)
+	objStore := dstore.NewMockStore(nil)
+	for _, file := range files {
+		objStore.SetFile(file, []byte(`{"k":"dg=="}`)) // "dg==" == "v"
+	}
+	for _, conf := range configs {
+		newStore, err := store.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
+		require.NoError(t, err)
+		confMap[newStore.Name()] = newStore
+	}
+	return confMap
+}
+
+type testStoreConfig struct {
+	name      string
+	initBlock uint64
+}
+
+func withTestRequest(outputModule string, startBlock uint64) context.Context {
+	ctx, _ := reqctx.WithRequest(context.Background(), &pbsubstreams.Request{
+		OutputModules: strings.Split(outputModule, ","),
+		StartBlockNum: int64(startBlock),
+	}, false)
+	return ctx
 }

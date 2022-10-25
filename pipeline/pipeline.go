@@ -191,7 +191,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store
 
 	// there is an assumption that in backgprocess mode the outputModule is a store
 	if _, found := storeConfigs[outputModuleName]; !found {
-		return nil, fmt.Errorf("request output module %q is not found int he store", outputModuleName)
+		return nil, fmt.Errorf("requested output module %q is not found in store configurations", outputModuleName)
 	}
 
 	ttrace.SpanContextFromContext(context.Background())

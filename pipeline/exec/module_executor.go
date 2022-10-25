@@ -25,8 +25,11 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		return moduleOutput, fmt.Errorf("execute: %w", err)
 	}
 
-	if err = setOutputCache(executor.Name(), execOutput, outputBytes); err != nil {
-		return moduleOutput, fmt.Errorf("set output cache: %w", err)
+	hasValidOutput := moduleOutput != nil
+	if hasValidOutput {
+		if err = setOutputCache(executor.Name(), execOutput, outputBytes); err != nil {
+			return moduleOutput, fmt.Errorf("set output cache: %w", err)
+		}
 	}
 
 	return moduleOutput, nil
@@ -38,14 +41,6 @@ func cacheOutputExists(execOutput execout.ExecutionOutput, executor ModuleExecut
 		return false, nil, fmt.Errorf("get cached output: %w", err)
 	}
 	return cached, output, nil
-}
-
-func setOutputCache(executorName string, execOutput execout.ExecutionOutput, value []byte) error {
-	err := execOutput.Set(executorName, value)
-	if err != nil {
-		return fmt.Errorf("set cached output: %w", err)
-	}
-	return nil
 }
 
 func executeModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) ([]byte, *pbsubstreams.ModuleOutput, error) {
@@ -71,4 +66,12 @@ func toModuleOutput(executor ModuleExecutor, data pbsubstreams.ModuleOutputData)
 		Data:          data,
 	}
 	return output
+}
+
+func setOutputCache(executorName string, execOutput execout.ExecutionOutput, value []byte) error {
+	err := execOutput.Set(executorName, value)
+	if err != nil {
+		return fmt.Errorf("set cached output: %w", err)
+	}
+	return nil
 }

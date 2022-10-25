@@ -44,14 +44,14 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 		return nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}
 
-	if e.isPartialDeltas() {
+	if e.holdsPartialStore() {
 		return nil, nil, nil
 	}
 
 	return e.wrapDeltas()
 }
 
-func (e *StoreModuleExecutor) isPartialDeltas() bool {
+func (e *StoreModuleExecutor) holdsPartialStore() bool {
 	_, ok := e.outputStore.(*store.PartialKV)
 	return ok
 }

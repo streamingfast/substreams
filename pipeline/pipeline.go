@@ -297,7 +297,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executor.Reset()
 
 	executorName := executor.Name()
-	logger.Debug("executing", zap.String("module_name", executorName))
+	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	output, runError := exec.RunModule(ctx, executor, execOutput)
 	saveOutput := func() {

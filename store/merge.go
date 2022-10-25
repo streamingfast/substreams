@@ -14,7 +14,7 @@ import (
 
 // Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
 func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
-	b.logger.Debug("merging store", zap.Object("current_store", b), zap.Object("partial_store", kvPartialStore))
+	b.logger.Debug("merging store", zap.Int("current_key_count", len(b.kv)), zap.String("current_hash", b.moduleHash), zap.Uint64("mod_init_block", b.moduleInitialBlock), zap.Int("partial_key_count", len(kvPartialStore.kv)), zap.Uint64("partial_start_block", kvPartialStore.initialBlock))
 
 	if kvPartialStore.updatePolicy != b.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", b.updatePolicy, kvPartialStore.updatePolicy)

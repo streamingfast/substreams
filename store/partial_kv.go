@@ -68,7 +68,6 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, er
 
 	brange := block.NewRange(p.initialBlock, endBoundaryBlock)
 	p.logger.Info("partial store save written",
-		zap.String("store", p.name),
 		zap.String("file_name", filename),
 		zap.Object("block_range", brange),
 	)

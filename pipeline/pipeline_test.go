@@ -42,7 +42,9 @@ func TestPipeline_runExecutor(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			pipe := &Pipeline{}
+			pipe := &Pipeline{
+				forkHandler: NewForkHandler(),
+			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)

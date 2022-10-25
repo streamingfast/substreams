@@ -14,7 +14,7 @@ type ForkHandler struct {
 	undoHandlers      []UndoHandler
 }
 
-func NewForkHandle() *ForkHandler {
+func NewForkHandler() *ForkHandler {
 	return &ForkHandler{
 		reversibleOutputs: make(map[uint64][]*pbsubstreams.ModuleOutput),
 		undoHandlers:      []UndoHandler{},

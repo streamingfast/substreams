@@ -90,7 +90,7 @@ func New(
 		maxStoreSyncRangeSize: math.MaxUint64,
 		respFunc:              respFunc,
 		bounder:               bounder,
-		forkHandler:           NewForkHandle(),
+		forkHandler:           NewForkHandler(),
 	}
 
 	for _, opt := range opts {
@@ -300,18 +300,18 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	output, runError := exec.RunModule(ctx, executor, execOutput)
-	saveOutput := func() {
+	returnOutput := func() {
 		if output != nil {
 			p.moduleOutputs = append(p.moduleOutputs, output)
 		}
 	}
 	if runError != nil {
-		saveOutput()
+		returnOutput()
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
 	if p.isOutputModule(executor.Name()) {
-		saveOutput()
+		returnOutput()
 	}
 
 	p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)

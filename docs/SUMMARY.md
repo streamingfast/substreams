@@ -1,9 +1,10 @@
 # Table of contents
 
-* [🔀 Substreams](README.md)
+* [Substreams](README.md)
 
 ## Concept & Fundamentals
 
+* [Introduction Video](concept-and-fundamentals/introduction-video.md)
 * [What is Substreams](concepts/definition.md)
 * [Conceptual Diagram](concept-and-fundamentals/visual-diagram.md)
 * [Fundamentals](concept-and-fundamentals/fundamentals.md)

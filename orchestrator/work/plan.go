@@ -8,8 +8,8 @@ import (
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
-	"sort"
 	"strings"
+	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -21,6 +21,8 @@ type Plan struct {
 
 	jobsCompleted   atomic.Int64
 	prioritizedJobs []*Job
+
+	mu sync.Mutex
 }
 
 func NewPlan() *Plan {
@@ -29,18 +31,18 @@ func NewPlan() *Plan {
 	}
 }
 
-func (p *Plan) Build(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, subrequestSplitSize uint64, upToBlock, graph *manifest.ModuleGraph) error {
+func (p *Plan) Build(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, subrequestSplitSize uint64, upToBlock uint64, graph *manifest.ModuleGraph) error {
 	storageState, err := fetchStorageState(ctx, storeConfigMap)
 	if err != nil {
 		return fmt.Errorf("fetching stores states: %w", err)
 	}
 
-	if err := b.buildPlan(ctx, storageState, storeSnapshotsSaveInterval, upToBlock); err != nil {
+	if err := p.buildPlan(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
 		return fmt.Errorf("build plan: %w", err)
 	}
 
-	b.splitWorkIntoJobs()
-	b.sendWorkPlanProgress()
+	p.splitWorkIntoJobs()
+	p.sendWorkPlanProgress()
 }
 
 func (p *Plan) buildPlan(ctx context.Context, storageState *StorageState, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, upToBlock uint64) error {
@@ -53,14 +55,14 @@ func (p *Plan) buildPlan(ctx context.Context, storageState *StorageState, storeC
 			return fmt.Errorf("fatal: storage state not reported for module name %q", name)
 		}
 
-		fileUnits, err := newModuleStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
+		moduleStorageState, err := newModuleStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
 		if err != nil {
 			return fmt.Errorf("new file units %q: %w", name, err)
 		}
 
-		out.modulesStateMap[name] = fileUnits
+		p.ModulesStateMap[name] = moduleStorageState
 	}
-	logger.Info("work plan ready", zap.Stringer("work_plan", out))
+	logger.Info("work plan ready", zap.Stringer("work_plan", p.ModulesStateMap))
 	return nil
 }
 
@@ -79,9 +81,7 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.Mod
 			}
 
 			job := NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
-			planner.jobs = append(planner.jobs, job)
-
-			logger.Info("job planned", zap.String("module_name", storeName), zap.Uint64("start_block", requestRange.StartBlock), zap.Uint64("end_block", requestRange.ExclusiveEndBlock))
+			p.prioritizedJobs = append(p.prioritizedJobs, job)
 		}
 	}
 
@@ -94,57 +94,63 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.Mod
 	planner.AvailableJobs = make(chan *Job, len(planner.jobs))
 	planner.dispatch()
 
-	logger.Info("jobs planner ready")
 	return nil
 }
 
-func (p *orchestrator.JobsPlanner) sortJobs() {
-	// TODO(abourget): absorb this method in the work.Plan
-	sort.Slice(p.jobs, func(i, j int) bool {
-		// reverse sorts priority, higher first
-		return p.jobs[i].Priority > p.jobs[j].Priority
-	})
+//
+//func (p *orchestrator.JobsPlanner) sortJobs() {
+//	// TODO(abourget): absorb this method in the work.Plan
+//	sort.Slice(p.jobs, func(i, j int) bool {
+//		// reverse sorts priority, higher first
+//		return p.jobs[i].Priority > p.jobs[j].Priority
+//	})
+//}
+//
+//func (p *orchestrator.JobsPlanner) dispatch() {
+//	// TODO(abourget): absorb this method in the work.Plan
+//	if p.completed {
+//		return
+//	}
+//
+//	var scheduled int
+//	for _, job := range p.jobs {
+//		if job.Scheduled {
+//			scheduled++
+//			continue
+//		}
+//		if job.ReadyForDispatch() {
+//			job.Scheduled = true
+//			p.AvailableJobs <- job
+//		}
+//	}
+//	if scheduled == len(p.jobs) {
+//		close(p.AvailableJobs)
+//		p.completed = true
+//	}
+//}
+
+func (p *Plan) Prioritize(prioritizer Prioritizer) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	prioritizer.Sort(p.prioritizedJobs)
 }
 
-func (p *orchestrator.JobsPlanner) dispatch() {
-	// TODO(abourget): absorb this method in the work.Plan
-	if p.completed {
-		return
-	}
+func (p *Plan) NextJob() *Job {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	var scheduled int
-	for _, job := range p.jobs {
-		if job.Scheduled {
-			scheduled++
-			continue
-		}
-		if job.ReadyForDispatch() {
-			job.Scheduled = true
-			p.AvailableJobs <- job
-		}
-	}
-	if scheduled == len(p.jobs) {
-		close(p.AvailableJobs)
-		p.completed = true
-	}
-}
+	job := p.prioritizedJobs[0]
+	p.prioritizedJobs = p.prioritizedJobs[1:]
 
-func (p *Plan) Prioritize() {
-	// mutex locked?
-	// sorts prioritizedJobs
-	// based on whatever is available to this work.Plan
-}
-
-func (b *Plan) NextJob() *Job {
-	// TODO: fetch from the already prioritizedJobs
-	// mutex locked?
+	return job
 }
 
 func (p *Plan) StoreCount() int {
 	return len(p.ModulesStateMap)
 }
 
-func (p Plan) InitialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+func (p *Plan) InitialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p.ModulesStateMap {
 		if unit.InitialCompleteRange == nil {
 			continue

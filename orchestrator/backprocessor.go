@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	
-	"github.com/streamingfast/substreams/orchestrator/work"
-	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
@@ -42,42 +41,26 @@ func New(
 }
 
 // TODO(abourget): WARN: this function should NOT GROW in functionality, or abstraction levels.
-func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
-	logger := reqctx.Logger(ctx)
+func (b *Backprocessor) Run(ctx context.Context, plan *work.Plan, scheduler *Scheduler, squasher *MultiSquasher, pool work.JobRunnerPool) (store.Map, error) {
 	// workPlan should hold all the jobs, dependencies
 	// and it could be a changing plan, reshufflable,
 	// This contains all what the jobsPlanner had
 	// This calls `splitWork`, with save Interval, moduleInitialBlock, snapshots
-	workPlan, err := b.planWork(ctx)
-	if err != nil {
-		return nil, err
-	}
 
-	scheduler, err := NewScheduler(ctx, b.runtimeConfig, workPlan, b.graph, b.respFunc, logger, b.upstreamRequestModules)
+	err := b.init(plan)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init: %w", err)
 	}
-
-	multiSquasher, err := NewMultiSquasher(ctx, b.runtimeConfig, workPlan.ModuleStorageState(), b.storeConfigMap, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	scheduler.OnStoreJobTerminated = multiSquasher.Squash
 
 	// parallelDownloader := NewLinearExecOutputReader()
 	// go parallelDownloader.Launch()
-	multiSquasher.Launch(ctx)
+	squasher.Launch(ctx)
 
-	// TODO: Here we'd create a JobRunnerPool, and pass it down as a simple interface to the
-	// Scheduler
-
-	// TODO: pass down the JobRunnerPool at this point, not within the object.
-	if err := scheduler.Schedule(ctx); err != nil {
+	if err := scheduler.Schedule(ctx, pool); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	finalStoreMap, err := multiSquasher.Wait(ctx)
+	finalStoreMap, err := squasher.Wait(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,22 +72,7 @@ func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 	return finalStoreMap, nil
 }
 
-func (b *Backprocessor) planWork(ctx context.Context) (out *work.Plan, err error) {
-	workPlan := work.NewPlan()
-
-	err := workPlan.Build(ctx, b.storeConfigMap, b.runtimeConfig.StoreSnapshotsSaveInterval, b.runtimeConfig.SubrequestsSplitSize, b.upToBlock, b.graph)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := b.sendWorkPlanProgress(workPlan); err != nil {
-		return nil, fmt.Errorf("sending work plan progress: %w", err)
-	}
-
-	return workPlan, nil
-}
-
-func (b *Backprocessor) sendWorkPlanProgress(workPlan *work.Plan) (err error) {
+func (b *Backprocessor) init(workPlan *work.Plan) (err error) {
 	progressMessages := workPlan.InitialProgressMessages()
 	if err := b.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return err

@@ -35,9 +35,9 @@ func NewScheduler(
 	workPlan *work.Plan,
 	graph *manifest.ModuleGraph,
 	respFunc substreams.ResponseFunc,
-	logger *zap.Logger,
 	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Scheduler, error) {
+	logger := reqctx.Logger(ctx)
 
 	// TODO(abourget): Have the WorkerPool arrive as an INTERFACE with only Borrow() and Return()
 	// so we don't even know anything about its internals.
@@ -51,7 +51,6 @@ func NewScheduler(
 	//}
 	//
 	s := &Scheduler{
-		workerPool:             workerPool,
 		workPlan:               workPlan,
 		respFunc:               respFunc,
 		upstreamRequestModules: upstreamRequestModules,
@@ -64,7 +63,7 @@ type jobResult struct {
 	err error
 }
 
-func (s *Scheduler) Schedule(ctx context.Context) (err error) {
+func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err error) {
 	logger := reqctx.Logger(ctx)
 	result := make(chan jobResult)
 	done := make(chan error, 1)
@@ -76,7 +75,8 @@ func (s *Scheduler) Schedule(ctx context.Context) (err error) {
 	logger.Debug("launching scheduler")
 
 	go func() {
-		for s.runOne(ctx, result) {
+		for s.runOne(ctx, result, pool) {
+		}
 		}
 	}()
 
@@ -109,9 +109,9 @@ func (s *Scheduler) resultGatherer(ctx context.Context, result chan jobResult) (
 	}
 }
 
-func (s *Scheduler) runOne(ctx context.Context, result chan jobResult) (moreJobs bool) {
-	jobRunner := s.workerPool.Borrow()
-	defer s.workerPool.Return(jobRunner)
+func (s *Scheduler) runOne(ctx context.Context, result chan jobResult, pool work.JobRunnerPool) (moreJobs bool) {
+	jobRunner := pool.Borrow()
+	defer pool.Return(jobRunner)
 
 	nextJob := s.workPlan.NextJob()
 	if nextJob == nil {

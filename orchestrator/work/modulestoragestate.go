@@ -20,13 +20,7 @@ type ModuleStorageStateMap map[string]*ModuleStorageState
 // ModuleStorageState contains all the file-related ranges of things we'll want to plan
 // work for, and things that are already available.
 type ModuleStorageState struct {
-
-	// FileStatus
-	// FileStates
-	// ModuleFiles
-	// ModuleStorageState
-	//
-	ModName string
+	ModuleName string
 
 	InitialCompleteRange *FullStoreFile // Points to a complete .kv file, to initialize the store upon getting started.
 	PartialsMissing      PartialStoreFiles
@@ -34,13 +28,12 @@ type ModuleStorageState struct {
 }
 
 func newModuleStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *Snapshots) (out *ModuleStorageState, err error) {
-	out = &ModuleStorageState{ModName: modName}
+	out = &ModuleStorageState{ModuleName: modName}
 	if workUpToBlockNum <= modInitBlock {
 		return
 	}
 
 	completeSnapshot := snapshots.LastCompleteSnapshotBefore(workUpToBlockNum)
-
 	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock <= modInitBlock {
 		return nil, fmt.Errorf("cannot have saved last store before module's init block")
 	}

@@ -37,29 +37,42 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating gen directory %v: %w", genFolderLocation, err)
 	}
 
-	generatedFilename := "generated.rs"
+	modRs := "mod.rs"
 
-	fi, err := os.Create(filepath.Join(genFolderLocation, filepath.Base(generatedFilename)))
+	modRsFile, err := os.Create(filepath.Join(genFolderLocation, filepath.Base(modRs)))
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		if err := fi.Close(); err != nil {
+		if err := modRsFile.Close(); err != nil {
 			panic(err)
 		}
 	}()
+	g := codegen.NewGenerator(pkg, modRsFile)
+	err = g.GenerateModRs()
 
-	g := codegen.NewGenerator(pkg, fi)
-	err = g.Generate()
+	generatedRs := "generated.rs"
+
+	generatedRsFile, err := os.Create(filepath.Join(genFolderLocation, filepath.Base(generatedRs)))
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := generatedRsFile.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	g = codegen.NewGenerator(pkg, generatedRsFile)
+	err = g.GenerateGeneratedRs()
 
 	//todo:
 	// 1- create ./gen/generated.rs
 	// 2- generate code in generated.rs from manifest
 	// 3- add tests for generator
 
-	//generatedFilename := "generated.rs"
-	//if err := os.WriteFile(generatedFilename, , os.ModePerm); err != nil {
-	//	return fmt.Errorf("writing %v file: %w", generatedFilename, err)
+	//generatedRs := "generated.rs"
+	//if err := os.WriteFile(generatedRs, , os.ModePerm); err != nil {
+	//	return fmt.Errorf("writing %v file: %w", generatedRs, err)
 	//}
 
 	return nil

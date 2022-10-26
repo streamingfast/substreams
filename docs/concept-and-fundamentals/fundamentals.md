@@ -14,10 +14,11 @@ This documentation aims to outline information to further help developers workin
 
 ### Building a Substream Key Steps
 
-* Identify smart contract addresses of interest (wallets, decentralized exchanges (DEXs), etc.).
+* Identify smart contract addresses of interest including wallets, decentralized exchanges (DEXs), etc.
 * Identify data, and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update substreams manifest, point to protobufs and handlers.
+* Issue command to Substreams CLI passing manifest.
 
 ### **The Substreams Engine**
 

@@ -17,7 +17,7 @@ func TestValueAppend(t *testing.T) {
 	}{
 		{
 			name:           "golden path",
-			store:          newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			store:          newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
 			key:            "key",
 			values:         [][]byte{{0x00, 0x01, 0x02}, {0x03, 0x04, 0x05}, {0x06}},
 			expectedValues: []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06},

@@ -14,6 +14,7 @@ type baseStore struct {
 	kv          map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
 	deltas      []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
 	lastOrdinal uint64
+	marshaller  Marshaller
 
 	logger *zap.Logger
 }

@@ -181,8 +181,9 @@ func testConfigMap(t *testing.T, files []string, configs []testStoreConfig) stor
 	t.Helper()
 	confMap := make(store.ConfigMap)
 	objStore := dstore.NewMockStore(nil)
+	bytes := []byte{1, 1, 107, 1, 118} // {"k": "v"}
 	for _, file := range files {
-		objStore.SetFile(file, []byte(`{"k":"dg=="}`)) // "dg==" == "v"
+		objStore.SetFile(file, bytes)
 	}
 	for _, conf := range configs {
 		newStore, err := store.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)

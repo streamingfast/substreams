@@ -40,9 +40,10 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 	return &baseStore{
-		Config: c,
-		kv:     make(map[string][]byte),
-		logger: logger.Named("store").With(zap.String("store_name", c.name)),
+		Config:     c,
+		kv:         make(map[string][]byte),
+		logger:     logger.Named("store").With(zap.String("store_name", c.name)),
+		marshaller: &BinaryMarshaller{},
 	}
 }
 

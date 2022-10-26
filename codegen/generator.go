@@ -1,50 +1,54 @@
 package codegen
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"strings"
 	"text/template"
 
 	"github.com/streamingfast/substreams/codegen/templates"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
-const EthereumBlockRust = "substreams_ethereum::pb::eth::v2::Block"
+//go:embed lib_ts.gotmpl
+var libRsTemplate string
 
-var WritableStore = [21]string{
-	"StoreSetRaw",
-	"StoreSetBigInt",
-	"StoreSetBigDecimal",
-	"StoreSetProto",
-	"StoreSetI64",
-	"StoreSetFloat64",
-	"StoreSetIfNotExistsRaw",
-	"StoreSetIfNotExistsProto",
-	"StoreAddInt64",
-	"StoreAddFloat64",
-	"StoreAddBigDecimal",
-	"StoreAddBigInt",
-	"StoreMaxInt64",
-	"StoreMaxBigInt",
-	"StoreMaxFloat64",
-	"StoreMaxBigDecimal",
-	"StoreMinInt64",
-	"StoreMinBigInt",
-	"StoreMinFloat64",
-	"StoreMinBigDecimal",
-	"StoreAppend",
+//go:embed externs.gotmpl
+var externsTemplate string
+
+const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
+
+const EthereumBlockRust = "substreams_ethereum::pb::sf_ethereum_type::v2::Block"
+
+//UPDATE_POLICY_UNSET
+//UPDATE_POLICY_SET
+//UPDATE_POLICY_SET_IF_NOT_EXISTS
+//UPDATE_POLICY_ADD
+//UPDATE_POLICY_MIN
+//UPDATE_POLICY_MAX
+//UPDATE_POLICY_APPEND
+
+var StoreType = map[string]string{
+	"bytes":      "Raw",
+	"string":     "String",
+	"bigint":     "BigInt",
+	"bigdecimal": "BigDecimal",
+	"bigfloat":   "BigDecimal",
+	"int64":      "Int64",
+	"i64":        "Int64",
+	"float64":    "Float64",
 }
 
-var ReadableStore = [6]string{
-	"StoreGetI64",
-	"StoreGetFloat64",
-	"StoreGetBigDecimal",
-	"StoreGetBigInt",
-	"StoreGetProto",
-	"StoreGetRaw",
+var UpdatePoliciesMap = map[string]string{
+	"UPDATE_POLICY_UNSET":             "Unset",
+	"UPDATE_POLICY_SET":               "Set",
+	"UPDATE_POLICY_SET_IF_NOT_EXISTS": "SetIfNotExist",
+	"UPDATE_POLICY_ADD":               "Add",
+	"UPDATE_POLICY_MIN":               "Min",
+	"UPDATE_POLICY_MAX":               "Max",
+	"UPDATE_POLICY_APPEND":            "Append",
+	"float64":                         "Float64",
 }
 
 type Generator struct {
@@ -77,13 +81,102 @@ func (g *Generator) GenerateModRs() error {
 	return nil
 }
 
-func (g *Generator) GenerateGeneratedRs() error {
+var utils = map[string]any{
+	"contains":                 strings.Contains,
+	"hasPrefix":                strings.HasPrefix,
+	"hasSuffix":                strings.HasSuffix,
+	"isDelta":                  IsDelta,
+	"writableStoreDeclaration": WritableStoreDeclaration,
+	"readableStoreDeclaration": ReadableStoreDeclaration,
+}
+
+func IsDelta(input *pbsubstreams.Module_Input) bool {
+	if storeInput := input.GetStore(); storeInput != nil {
+		return storeInput.Mode == pbsubstreams.Module_Input_Store_DELTAS
+	}
+	return false
+}
+func WritableStoreDeclaration(store pbsubstreams.Module_KindStore) string {
+	t := store.ValueType
+	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+	p = UpdatePoliciesMap[p]
+
+	if strings.HasPrefix(t, "proto") {
+		t = strings.TrimPrefix(t, "proto:")
+		t = strings.ReplaceAll(t, ".", "_")
+		t = "crate::pb::" + t
+		return fmt.Sprintf("let store: Store%sProto<%s> = StoreSetProto::new();", p, t)
+	}
+	return fmt.Sprintf("let store: Store%s%s = Store%s%s::new();", p, t, p, t)
+
+}
+func ReadableStoreDeclaration(name string, store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+	t := store.ValueType
+	isProto := strings.HasPrefix(t, "proto")
+	if isProto {
+		t = strings.TrimPrefix(t, "proto:")
+		t = strings.ReplaceAll(t, ".", "_")
+		t = "crate::pb::" + t
+	}
+
+	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
+		p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+		p = UpdatePoliciesMap[p]
+
+		if isProto {
+			//return fmt.Sprintf("let raw_totals_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(totals_deltas_ptr, totals_deltas_len).unwrap().deltas;")
+			//return fmt.Sprintf("let %s_deltas: store::Deltas<Delta%s> = substreams::store::Deltas::new(%s_deltas", name, p, name)
+		}
+		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(totals_deltas_ptr, totals_deltas_len).unwrap().deltas;", name)
+		delta := fmt.Sprintf("\t\tlet %s_deltas: store::Deltas<Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, p, name)
+		return raw + "\n" + delta
+	}
+
+	if strings.HasPrefix(t, "proto") {
+		return fmt.Sprintf("let %s: StoreGetProto<%s> = StoreGetProto::new();", name, t)
+	}
+
+	return fmt.Sprintf("let %s: StoreGet%s = StoreGet%s::new();", name, t, t)
+
+}
+
+func (g *Generator) Generate() (err error) {
+	//err := g.GenerateLib()
+	//if err != nil {
+	//	return fmt.Errorf("generating lib.ts: %w", err)
+	//}
+	err = g.GenerateExterns()
+	if err != nil {
+		return fmt.Errorf("generating externs.ts: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) GenerateExterns() error {
+	tmpl, err := template.New("externs").Funcs(utils).Parse(externsTemplate)
+	if err != nil {
+		return fmt.Errorf("parsing externs template: %w", err)
+	}
+
+	err = tmpl.Execute(
+		g.Writer,
+		&Engine{Package: g.pkg},
+	)
+	if err != nil {
+		return fmt.Errorf("executing externs template: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) GenerateLib() error {
 	//todo:
 	// > Use fully qualified fields
 	//  1. Hard-code the block type (for ethereum in the first place)
 	//	2. Fully qualified path for the prototypes defined in the yaml
 
-	tmplGeneratedRs, err := template.New("generated.rs").Parse(templates.LibRsTemplate)
+	tmplGeneratedRs, err := template.New("generated.rs").Funcs(utils).Parse(templates.LibRsTemplate)
 	if err != nil {
 		return fmt.Errorf("parsing generated.rs template: %w", err)
 	}
@@ -104,7 +197,17 @@ type Engine struct {
 	Package *pbsubstreams.Package
 }
 
-func (e *Engine) moduleOutput(moduleName string) (string, error) {
+func (e *Engine) MustModule(moduleName string) *pbsubstreams.Module {
+	for _, module := range e.Package.Modules.Modules {
+		if module.Name == moduleName {
+			return module
+		}
+	}
+	panic(fmt.Sprintf("MustModule %q not found", moduleName))
+}
+
+func (e *Engine) moduleOutputForName(moduleName string) (string, error) {
+	//todo: call MustModule ...
 	for _, module := range e.Package.Modules.Modules {
 		if module.Name == moduleName {
 			outputType := ""
@@ -117,18 +220,18 @@ func (e *Engine) moduleOutput(moduleName string) (string, error) {
 			return outputType, nil
 		}
 	}
-	return "", fmt.Errorf("module %q not found", moduleName)
+	return "", fmt.Errorf("MustModule %q not found", moduleName)
 }
 
-func (e *Engine) ExternFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
-	switch module.Kind.(type) {
-	case *pbsubstreams.Module_KindMap_:
-		return e.mapExternFunctionSignature(module)
-	case *pbsubstreams.Module_KindStore_:
-		return e.storeExternFunctionSignature(module)
-	default:
-		return nil, fmt.Errorf("unknown module kind: %T", module.Kind)
+func (e *Engine) moduleOutput(module *pbsubstreams.Module) string {
+	outputType := ""
+	if storeModule := module.GetKindStore(); storeModule != nil {
+		outputType = storeModule.ValueType
 	}
+	if mapModule := module.GetKindMap(); mapModule != nil {
+		outputType = mapModule.OutputType
+	}
+	return outputType
 }
 
 func (e *Engine) FunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
@@ -138,7 +241,7 @@ func (e *Engine) FunctionSignature(module *pbsubstreams.Module) (*FunctionSignat
 	case *pbsubstreams.Module_KindStore_:
 		return e.storeFunctionSignature(module)
 	default:
-		return nil, fmt.Errorf("unknown module kind: %T", module.Kind)
+		return nil, fmt.Errorf("unknown MustModule kind: %T", module.Kind)
 	}
 }
 
@@ -148,141 +251,17 @@ func (e *Engine) Arguments(module *pbsubstreams.Module) ([]string, error) {
 	return args, nil
 }
 
-func (e *Engine) mapExternFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
-	inputs, err := e.ModuleInputs(module.Inputs)
-	if err != nil {
-		return nil, fmt.Errorf("generating module intputs: %w", err)
-	}
-
-	transformedInputParams := make(map[string][]*InputParam)
-
-	for varName, input := range inputs {
-		if isWritableStore(input) {
-			return nil, fmt.Errorf("mapper substreams can't write in a store, check substreams 'kind'")
-		} else if isReadableStore(input) {
-			transformedInputParams[varName] = []*InputParam{
-				{
-					Name: fmt.Sprintf("%s_idx", varName),
-					Type: "u32",
-				},
-			}
-		} else {
-			transformedInputParams[varName] = []*InputParam{
-				{
-					Name: fmt.Sprintf("%s_ptr", varName),
-					Type: "*mut u8",
-				},
-				{
-					Name: fmt.Sprintf("%s_len", varName),
-					Type: "usize",
-				},
-			}
-		}
-	}
-
-	fn := &FunctionSignature{
-		Name:        module.Name,
-		Type:        "map",
-		InputParams: transformedInputParams,
-		OutputType:  transformOutputType(module.Output.Type),
-	}
-
-	return fn, nil
-}
-
-func isWritableStore(store string) bool {
-	for _, item := range WritableStore {
-		if item == store {
-			return true
-		}
-	}
-	return false
-}
-
-func isReadableStore(store string) bool {
-	for _, item := range ReadableStore {
-		if item == store {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *Engine) storeExternFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
-	storeModule := module.GetKindStore()
-
-	inputs, err := e.ModuleInputs(module.Inputs)
-	if err != nil {
-		return nil, fmt.Errorf("generating module intputs: %w", err)
-	}
-
-	transformedInputParams := make(map[string][]*InputParam)
-
-	for varName, input := range inputs {
-		if isWritableStore(input) {
-			return nil, fmt.Errorf("store substreams can't read and write at the same time")
-		} else if isReadableStore(input) {
-			transformedInputParams[varName] = []*InputParam{
-				{
-					Name: fmt.Sprintf("%s_idx", varName),
-					Type: "u32",
-				},
-			}
-		} else {
-			transformedInputParams[varName] = []*InputParam{
-				{
-					Name: fmt.Sprintf("%s_ptr", varName),
-					Type: "*mut u8",
-				},
-				{
-					Name: fmt.Sprintf("%s_len", varName),
-					Type: "usize",
-				},
-			}
-		}
-	}
-
-	fn := &FunctionSignature{
-		Name:        module.Name,
-		Type:        "store",
-		InputParams: transformedInputParams,
-		OutputType:  transformOutputType(storeModule.ValueType),
-	}
-
-	return fn, nil
-}
-
 func (e *Engine) mapFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
 	mapModule := module.GetKindMap()
 
-	inputs, err := e.ModuleInputs(module.Inputs)
+	inputs, err := e.ModuleArgument(module.Inputs)
 	if err != nil {
-		return nil, fmt.Errorf("generating module intputs: %w", err)
+		return nil, fmt.Errorf("generating MustModule intputs: %w", err)
 	}
 
-	transformedInputParams := make(map[string][]*InputParam)
-
-	for varName, input := range inputs {
-		if isWritableStore(input) {
-			return nil, fmt.Errorf("store substreams can't read and write at the same time")
-		} else if isReadableStore(input) {
-			// todo
-		} else {
-			transformedInputParams[varName] = []*InputParam{
-				{
-					Name: varName,
-					Type: input,
-				},
-			}
-		}
-	}
-
-	fn := &FunctionSignature{
-		Name:        module.Name,
-		Type:        "map",
-		InputParams: transformedInputParams,
-		OutputType:  strings.TrimPrefix(mapModule.OutputType, "proto:"),
-	}
+	outType := strings.TrimPrefix(mapModule.OutputType, "proto:")
+	outType = strings.ReplaceAll(outType, ".", ":")
+	fn := NewFunctionSignature(module.Name, "map", outType, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, inputs)
 
 	return fn, nil
 }
@@ -290,54 +269,40 @@ func (e *Engine) mapFunctionSignature(module *pbsubstreams.Module) (*FunctionSig
 func (e *Engine) storeFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
 	storeModule := module.GetKindStore()
 
-	inputs, err := e.ModuleInputs(module.Inputs)
+	arguments, err := e.ModuleArgument(module.Inputs)
 	if err != nil {
-		return nil, fmt.Errorf("generating module intputs: %w", err)
+		return nil, fmt.Errorf("generating MustModule intputs: %w", err)
 	}
 
-	// if isProto
-	// 	trim proto and create StoreSetProto<crate .... >
-	// else
-	// 	StoreSet{Type}
-
-	if strings.HasPrefix(storeModule.ValueType, "proto:") {
-		inputs["store"] = fmt.Sprintf("StoreSetProto<%s>", transformProtoType(storeModule.ValueType))
-	} else {
-		inputs["store"] = fmt.Sprintf("StoreSetProto")
-	}
-
-	fn := &FunctionSignature{
-		Name:        module.Name,
-		Type:        "store",
-		InputParams: nil,
-	}
+	fn := NewFunctionSignature(module.Name, "store", "", storeModule.UpdatePolicy, arguments)
 
 	return fn, nil
 }
 
-func (e *Engine) ModuleInputs(inputs []*pbsubstreams.Module_Input) (map[string]string, error) {
+type Arguments map[string]*Argument
+
+func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments, error) {
 	// fixme: refactor this
-	out := make(map[string]string)
+	out := make(Arguments)
 	for _, input := range inputs {
 		switch in := input.Input.(type) {
 		case *pbsubstreams.Module_Input_Map_:
-			inputType, err := e.moduleOutput(in.Map.ModuleName)
+			inputType, err := e.moduleOutputForName(in.Map.ModuleName)
 			if err != nil {
 				return nil, fmt.Errorf("getting map type: %w", err)
 			}
 			if strings.HasPrefix(inputType, "proto:") {
 				inputType = transformProtoType(inputType)
 			}
-			out[in.Map.ModuleName] = inputType
+			out[in.Map.ModuleName] = NewArgument(in.Map.ModuleName, inputType, input)
 		case *pbsubstreams.Module_Input_Store_:
-			inputType, err := e.moduleOutput(in.Store.ModuleName)
-			if err != nil {
-				return nil, fmt.Errorf("getting store type: %w", err)
-			}
+			mod := e.MustModule(in.Store.ModuleName)
+			inputType := e.moduleOutput(mod)
 			if strings.HasPrefix(inputType, "proto:") {
 				inputType = transformProtoType(inputType)
 			}
-			out[in.Store.ModuleName] = inputType
+
+			out[in.Store.ModuleName] = NewArgument(in.Store.ModuleName, inputType, input)
 		case *pbsubstreams.Module_Input_Source_:
 			parts := strings.Split(in.Source.Type, ".")
 			name := parts[len(parts)-1]
@@ -345,12 +310,12 @@ func (e *Engine) ModuleInputs(inputs []*pbsubstreams.Module_Input) (map[string]s
 
 			switch in.Source.Type {
 			case EthereumBlockManifest:
-				out[name] = EthereumBlockRust
+				out[name] = NewArgument(name, EthereumBlockRust, input)
 			default:
-				out[name] = in.Source.Type
+				panic(fmt.Sprintf("unsupported source %q", in.Source.Type))
 			}
 		default:
-			return nil, fmt.Errorf("unknown module kind: %T", in)
+			return nil, fmt.Errorf("unknown MustModule kind: %T", in)
 		}
 	}
 	return out, nil
@@ -372,10 +337,30 @@ type FunctionSignature struct {
 	Name        string
 	Type        string
 	OutputType  string
-	InputParams map[string][]*InputParam
+	StorePolicy string
+	Arguments   Arguments
 }
 
-type InputParam struct {
-	Name string
-	Type string
+func NewFunctionSignature(name string, t string, outType string, storePolicy pbsubstreams.Module_KindStore_UpdatePolicy, arguments Arguments) *FunctionSignature {
+	return &FunctionSignature{
+		Name:        name,
+		Type:        t,
+		OutputType:  outType,
+		StorePolicy: pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(storePolicy)],
+		Arguments:   arguments,
+	}
+}
+
+type Argument struct {
+	Name        string
+	Type        string
+	ModuleInput *pbsubstreams.Module_Input
+}
+
+func NewArgument(name string, argType string, moduleInput *pbsubstreams.Module_Input) *Argument {
+	return &Argument{
+		Name:        name,
+		Type:        argType,
+		ModuleInput: moduleInput,
+	}
 }

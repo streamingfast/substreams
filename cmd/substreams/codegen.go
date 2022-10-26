@@ -63,7 +63,7 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 		}
 	}()
 	g = codegen.NewGenerator(pkg, generatedRsFile)
-	err = g.GenerateGeneratedRs()
+	err = g.Generate()
 
 	//todo:
 	// 1- create ./gen/generated.rs

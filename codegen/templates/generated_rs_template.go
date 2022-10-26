@@ -36,7 +36,7 @@ pub struct Substreams {}
 
 {{define "mapFunctionTrait"}}
 	fn {{.Name}}(
-	{{- range $key, $value := .InputParams}}
+	{{- range $key, $value := .Arguments}}
 		{{- range $input, $inputVal := $value}}
 		{{$key}}: {{$inputVal.Type}},
 		{{- end}}
@@ -48,7 +48,7 @@ pub struct Substreams {}
 
 {{define "storeFunctionTrait"}}
 	fn {{.Name}}(
-	{{- range $key, $value := .InputParams}}
+	{{- range $key, $value := .Arguments}}
 		{{- range $input, $inputVal := $value}}
 		{{$key}}: {{$inputVal.Type}},
 		{{- end}}
@@ -61,7 +61,7 @@ pub struct Substreams {}
 {{define "externMapFunction"}}
 #[no_mangle]
 pub extern "C" fn {{.Name}}(
-{{- range $key, $value := .InputParams}}
+{{- range $key, $value := .Arguments}}
 	{{- range $input, $inputVal := $value}}
 		{{$key}}: {{$inputVal.Type}},
 		{{- end}}
@@ -78,7 +78,7 @@ pub extern "C" fn {{.Name}}(
 {{define "externStoreFunction"}}
 #[no_mangle]
 pub extern "C" fn {{.Name}}(
-{{- range $key, $value := .InputParams}}
+{{- range $key, $value := .Arguments}}
 	{{- range $input, $inputVal := $value}}
 		{{$key}}: {{$inputVal.Type}},
 		{{- end}}

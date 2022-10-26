@@ -34,6 +34,6 @@ func TestGenerator_Generate(t *testing.T) {
 	require.NoError(t, err)
 
 	g := NewGenerator(pkg, os.Stdout)
-	err = g.GenerateGeneratedRs()
+	err = g.Generate()
 	require.NoError(t, err)
 }

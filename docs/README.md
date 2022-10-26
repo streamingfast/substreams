@@ -10,7 +10,7 @@ Substreams is a new technology developed by StreamingFast working with [The Grap
 
 Learning more about [what Substreams is](concepts/definition.md), studying the [conceptual diagram](concept-and-fundamentals/visual-diagram.md), and then reading through the [fundamentals](concept-and-fundamentals/fundamentals.md) is a great track for learning more.
 
-For developers looking to get started right away, [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md) with Substreams.
+For developers looking to get started right away, first [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md) with Substreams.
 
 Additional information is available for understanding [modules](concepts/modules.md), and sample code with explanations can be found in the [Developer Guide](developer-guide/overview.md) to further explore actual Substreams implementations.&#x20;
 
@@ -18,7 +18,9 @@ Finally, visit the [Substreams Template](https://github.com/streamingfast/substr
 
 #### Introduction Video
 
-For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alex, covering aspects of the product's history, design, and uses. The introduction video will help new Substreams users gain an understanding to provide a deeper context.
+For a detailed walk-through of Substreams check out the video, created by StreamingFast's Alexandre Bourget.&#x20;
+
+The introduction video will help new Substreams users gain an understanding to provide a deeper context of the different parts and pieces that comprise the technology.
 
 {% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
 Introducing The Graph Substreams for High-Performance Indexing

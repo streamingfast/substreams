@@ -4,12 +4,12 @@
 {{$module := . -}}
 {{$functionSignature := $engine.FunctionSignature $module}}
 #[no_mangle]
-pub extern "C" fn {{$functionSignature.Name}}({{range $key, $value := $functionSignature.Arguments}}
+pub extern "C" fn {{$functionSignature.Name}}({{range $i, $value := $functionSignature.Arguments}}
     {{- if ne $value.ModuleInput.GetStore nil }}
-        {{$key}}_ptr: *mut u8,
+        {{$value.Name}}_ptr: *mut u8,
     {{- else}}
-        {{$key}}_ptr: *mut u8,
-        {{$key}}_len: usize{{end}},
+        {{$value.Name}}_ptr: *mut u8,
+        {{$value.Name}}_len: usize{{end}},
     {{- end }}
 ) {
     substreams::register_panic_hook();
@@ -18,9 +18,9 @@ pub extern "C" fn {{$functionSignature.Name}}({{range $key, $value := $functionS
         {{writableStoreDeclaration $module.GetKindStore }}
         {{end -}}
 
-        {{ range $key, $argument := $functionSignature.Arguments }}
+        {{ range $id, $argument := $functionSignature.Arguments }}
             {{- if eq $argument.ModuleInput.GetStore nil }}
-        let {{$key}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$key}}_ptr, {{$key}}_len).unwrap();
+        let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
             {{- else}}
             {{- $m := $engine.MustModule $argument.Name }}
         {{readableStoreDeclaration $argument.Name $m.GetKindStore $argument.ModuleInput.GetStore}}
@@ -28,11 +28,11 @@ pub extern "C" fn {{$functionSignature.Name}}({{range $key, $value := $functionS
         {{end }}
 
         {{.Name}}(
-        {{- range $key, $argument := $functionSignature.Arguments}}
+        {{- range $id, $argument := $functionSignature.Arguments}}
             {{- if isDelta $argument.ModuleInput }}{{/* delta mode */}}
-            {{$key}}_deltas,
+            {{$argument.Name}}_deltas,
             {{- else}}
-            {{$key}},
+            {{$argument.Name}},
             {{end -}}
         {{end}}
         {{- if ne $module.GetKindStore nil}}

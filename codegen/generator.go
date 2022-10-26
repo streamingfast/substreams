@@ -18,16 +18,7 @@ var libRsTemplate string
 var externsTemplate string
 
 const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
-
 const EthereumBlockRust = "substreams_ethereum::pb::sf_ethereum_type::v2::Block"
-
-//UPDATE_POLICY_UNSET
-//UPDATE_POLICY_SET
-//UPDATE_POLICY_SET_IF_NOT_EXISTS
-//UPDATE_POLICY_ADD
-//UPDATE_POLICY_MIN
-//UPDATE_POLICY_MAX
-//UPDATE_POLICY_APPEND
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",
@@ -279,11 +270,8 @@ func (e *Engine) storeFunctionSignature(module *pbsubstreams.Module) (*FunctionS
 	return fn, nil
 }
 
-type Arguments map[string]*Argument
-
 func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments, error) {
-	// fixme: refactor this
-	out := make(Arguments)
+	var out Arguments
 	for _, input := range inputs {
 		switch in := input.Input.(type) {
 		case *pbsubstreams.Module_Input_Map_:
@@ -294,7 +282,7 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 			if strings.HasPrefix(inputType, "proto:") {
 				inputType = transformProtoType(inputType)
 			}
-			out[in.Map.ModuleName] = NewArgument(in.Map.ModuleName, inputType, input)
+			out = append(out, NewArgument(in.Map.ModuleName, inputType, input))
 		case *pbsubstreams.Module_Input_Store_:
 			mod := e.MustModule(in.Store.ModuleName)
 			inputType := e.moduleOutput(mod)
@@ -302,7 +290,7 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 				inputType = transformProtoType(inputType)
 			}
 
-			out[in.Store.ModuleName] = NewArgument(in.Store.ModuleName, inputType, input)
+			out = append(out, NewArgument(in.Store.ModuleName, inputType, input))
 		case *pbsubstreams.Module_Input_Source_:
 			parts := strings.Split(in.Source.Type, ".")
 			name := parts[len(parts)-1]
@@ -310,7 +298,7 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 
 			switch in.Source.Type {
 			case EthereumBlockManifest:
-				out[name] = NewArgument(name, EthereumBlockRust, input)
+				out = append(out, NewArgument(name, EthereumBlockRust, input))
 			default:
 				panic(fmt.Sprintf("unsupported source %q", in.Source.Type))
 			}
@@ -350,6 +338,8 @@ func NewFunctionSignature(name string, t string, outType string, storePolicy pbs
 		Arguments:   arguments,
 	}
 }
+
+type Arguments []*Argument
 
 type Argument struct {
 	Name        string

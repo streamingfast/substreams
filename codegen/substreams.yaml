@@ -14,7 +14,7 @@ binaries:
     file: ./target/wasm32-unknown-unknown/release/substreams_uniswap_v3.wasm
 
 modules:
-  - name: map_test
+  - name: map_block
     kind: map
     initialBlock: 1
     inputs:
@@ -22,14 +22,13 @@ modules:
     output:
       type: proto:my.type.v1.Tests
 
-  - name: store_test
-    kind: store
+  - name: map_block_i64
+    kind: map
     initialBlock: 1
-    updatePolicy: set
-    valueType: proto:my.type.v1.Test
     inputs:
       - source: sf.ethereum.type.v2.Block
-      - map: map_test
+    output:
+      type: i64
 
   - name: store_test
     kind: store
@@ -38,7 +37,16 @@ modules:
     valueType: proto:my.type.v1.Test
     inputs:
       - source: sf.ethereum.type.v2.Block
-      - map: map_test
+      - map: map_block
+
+  - name: store_test
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: proto:my.type.v1.Test
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+      - map: map_block
 
   - name: store_test2
     kind: store
@@ -47,7 +55,8 @@ modules:
     valueType: proto:my.type.v1.Test2
     inputs:
       - source: sf.ethereum.type.v2.Block
-      - map: map_test
+      - map: map_block
       - store: store_test
       - store: store_test
         mode: deltas
+      - map: map_block_i64

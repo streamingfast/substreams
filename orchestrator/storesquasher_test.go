@@ -3,8 +3,12 @@ package orchestrator
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"strings"
+	"testing"
+
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -13,10 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"io"
-	"io/ioutil"
-	"strings"
-	"testing"
 )
 
 func TestShouldSaveFullKV(t *testing.T) {
@@ -203,7 +203,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				if strings.HasSuffix(name, ".partial") {
 					loadedPartialFilename = name
 				}
-				return newPartialKVContent(t, map[string][]byte{}), nil
+				return newPartialKVContent(t, map[string][]byte{}, &store.FullKV{}), nil
 			}
 			testStore.WriteObjectFunc = func(ctx context.Context, base string, f io.Reader) error {
 				if strings.HasSuffix(base, ".kv") {
@@ -245,9 +245,9 @@ func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *st
 	return c.NewFullKV(zap.NewNop())
 }
 
-func newPartialKVContent(t *testing.T, store map[string][]byte) io.ReadCloser {
-	content, err := json.MarshalIndent(store, "", "  ")
-	require.NoError(t, err)
-	return ioutil.NopCloser(bytes.NewReader(content))
-
+func newPartialKVContent(t *testing.T, data map[string][]byte, kv *store.FullKV) io.ReadCloser {
+	//marshaller := kv.Marshaller()
+	//content, err := marshaller.Marshal(data)
+	//require.NoError(t, err)
+	return ioutil.NopCloser(bytes.NewReader([]byte{}))
 }

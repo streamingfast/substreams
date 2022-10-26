@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/streamingfast/substreams/block"
@@ -23,7 +22,7 @@ func (p *PartialKV) Roll(lastBlock uint64) {
 	p.baseStore.kv = map[string][]byte{}
 }
 
-func (s *PartialKV) InitialBlock() uint64 { return s.initialBlock }
+func (p *PartialKV) InitialBlock() uint64 { return p.initialBlock }
 
 type storeData struct {
 	KV              map[string][]byte `json:"kv"`
@@ -40,9 +39,7 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	}
 
 	stateData := &storeData{}
-	if err = json.Unmarshal(data, &stateData); err != nil {
-		return fmt.Errorf("unmarshal data: %w", err)
-	}
+	stateData.KV, err = p.marshaller.Unmarshal(data)
 	p.kv = stateData.KV
 	p.DeletedPrefixes = stateData.DeletedPrefixes
 
@@ -58,7 +55,7 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, er
 		DeletedPrefixes: p.DeletedPrefixes,
 	}
 
-	content, err := json.MarshalIndent(data, "", "  ")
+	content, err := p.marshaller.Marshal(data.KV)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}

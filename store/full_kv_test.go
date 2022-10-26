@@ -12,7 +12,7 @@ import (
 	"go.uber.org/atomic"
 )
 
-func BenchmarkFullKV_Save(b *testing.B) {
+func BenchmarkFullKV_Marshall(b *testing.B) {
 	counter := atomic.NewUint64(0)
 	keyGen := func() string {
 		address1 := make([]byte, 20)
@@ -27,7 +27,7 @@ func BenchmarkFullKV_Save(b *testing.B) {
 	for _, keyCount := range []int{10, 100, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("%d_keys", keyCount), func(bb *testing.B) {
 			s := &FullKV{
-				baseStore: newTestBaseStore(bb, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil),
+				baseStore: newTestBaseStore(bb, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil, &BinaryMarshaller{}),
 			}
 
 			startTime := time.Now()
@@ -36,7 +36,7 @@ func BenchmarkFullKV_Save(b *testing.B) {
 			}
 
 			if keyCount >= 100_000 {
-				fmt.Printf("\nTime elapsed to bootstreap %d keys is %s\n", keyCount, time.Since(startTime))
+				fmt.Printf("\nTime elapsed to bootstrap %d keys is %s\n", keyCount, time.Since(startTime))
 			}
 
 			for n := 0; n < bb.N; n++ {

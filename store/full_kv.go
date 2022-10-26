@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/streamingfast/substreams/block"
@@ -15,11 +14,16 @@ type FullKV struct {
 	*baseStore
 }
 
+func (s *FullKV) Marshaller() Marshaller {
+	return s.marshaller
+}
+
 func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	b := &baseStore{
-		Config: s.Config,
-		kv:     make(map[string][]byte),
-		logger: s.logger,
+		Config:     s.Config,
+		kv:         make(map[string][]byte),
+		logger:     s.logger,
+		marshaller: &BinaryMarshaller{},
 	}
 	return &PartialKV{
 		baseStore:    b,
@@ -39,10 +43,9 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	if err != nil {
 		return fmt.Errorf("load full store %s at %s: %w", s.name, fileName, err)
 	}
-
-	kv := map[string][]byte{}
-	if err = json.Unmarshal(data, &kv); err != nil {
-		return fmt.Errorf("unmarshal data: %w", err)
+	kv, err := s.marshaller.Unmarshal(data)
+	if err != nil {
+		return fmt.Errorf("reading data: %w", err)
 	}
 	s.kv = kv
 
@@ -56,7 +59,7 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
-	content, err := json.MarshalIndent(s.kv, "", "  ")
+	content, err := s.marshaller.Marshal(s.kv)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal kv state: %w", err)
 	}

@@ -6,13 +6,15 @@ description: StreamingFast Substreams documentation
 
 ### Where to Start
 
-Substreams is a new technology developed by StreamingFast working with The Graph Foundation. The product provides extremely fast consumption and processing of indexed blockchain data.
+Substreams is a new technology developed by StreamingFast working with [The Graph Foundation](https://thegraph.com/). The product provides extremely fast consumption and processing of indexed blockchain data.
 
 Learning more about [what Substreams is](concepts/definition.md), studying the [conceptual diagram](concept-and-fundamentals/visual-diagram.md), and then reading through the [fundamentals](concept-and-fundamentals/fundamentals.md) is a great track for learning more.
 
 For developers looking to get started right away, [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md) with Substreams.
 
-Additional information is available for understanding [modules](concepts/modules.md) and sample code with explanations can be found in the [Developer Guide](developer-guide/overview.md). Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
+Additional information is available for understanding [modules](concepts/modules.md), and sample code with explanations can be found in the [Developer Guide](developer-guide/overview.md) to further explore actual Substreams implementations.&#x20;
+
+Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly creating your very own blockchain data streaming solution.
 
 #### Introduction Video
 
@@ -21,10 +23,6 @@ For a detailed walk-through of Substreams check out the video, created by Stream
 {% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
 Introducing The Graph Substreams for High-Performance Indexing
 {% endembed %}
-
-{% hint style="warning" %}
-_Important: Code examples in the Introduction video are slightly outdated. Please refer to the_ [_Developer Guide_](broken-reference) _and_ [_Reference_](broken-reference) _section of the documentation for updated information_.
-{% endhint %}
 
 ### Community
 

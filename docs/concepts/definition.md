@@ -18,8 +18,6 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
   Communities can combine Substreams data refinement strategies to form compounding levels of data richness and availability.
 * **Brand New Web3 Concepts**\
   Substreams brings a handful of new concepts to the wider ecosystem surrounding The Graph and its subgraphs.&#x20;
-* **Deep & Wide Blockchain Search**\
-  Subgraphs require one or more smart contract addresses to collect data to query. Substreams don’t require _ANY_ contract addresses and the _**entire chain** with history_ is available to query.
 * **Blockchain Infused Large-scale Data**\
   Substreams was inspired by traditional large-scale data systems now _fused_ with the novelties of blockchain.
 * **Rust & Protobufs**\
@@ -48,6 +46,8 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
 
 ### **Substreams Deep Dive**
 
+#### Composition Through Community
+
 Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
 
 #### Parallelization
@@ -64,7 +64,7 @@ Substreams has all the benefits of Firehose, like low-cost caching and archiving
 
 The Substreams _engine_ is completely agnostic of underlying blockchain protocols and works solely on data extracted from nodes using the Firehose.&#x20;
 
-Different protocols have different chain-specific extensions, such as Ethereum, which expose `eth_calls`.
+For example, different protocols have different chain-specific extensions, such as Ethereum, which expose `eth_calls`.
 
 #### Substreams & Sparkle
 

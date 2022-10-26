@@ -62,7 +62,7 @@ func (x *Block) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Block.ProtoReflect.Descriptor instead.
+// Deprecated: Use RecordBlock.ProtoReflect.Descriptor instead.
 func (*Block) Descriptor() ([]byte, []int) {
 	return file_sf_substreams_v1_test_test_proto_rawDescGZIP(), []int{0}
 }
@@ -181,7 +181,7 @@ func file_sf_substreams_v1_test_test_proto_rawDescGZIP() []byte {
 
 var file_sf_substreams_v1_test_test_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_sf_substreams_v1_test_test_proto_goTypes = []interface{}{
-	(*Block)(nil),     // 0: sf.substreams.v1.test.Block
+	(*Block)(nil),     // 0: sf.substreams.v1.test.RecordBlock
 	(*MapResult)(nil), // 1: sf.substreams.v1.test.MapResult
 }
 var file_sf_substreams_v1_test_test_proto_depIdxs = []int32{

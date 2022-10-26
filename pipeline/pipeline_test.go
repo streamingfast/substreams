@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"github.com/streamingfast/substreams/metrics"
 	"strings"
 	"testing"
 	"time"
@@ -49,6 +50,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			ctx := context.Background()
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
+				stats:       metrics.NewNoopStats(),
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
@@ -88,7 +90,7 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 			name,
 			wasmModule,
 			[]wasm.Argument{
-				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
+				wasm.NewSourceInput("sf.substreams.v1.test.RecordBlock"),
 			},
 			name,
 			otel.GetTracerProvider().Tracer("test"),

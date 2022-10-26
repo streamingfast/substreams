@@ -252,10 +252,10 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	}
 
 	if requestStats != nil {
-		requestStats.Start(15 * time.Second)
+		requestStats.Start(2 * time.Second)
 		defer requestStats.Shutdown()
 	}
-	
+
 	return pipe.Launch(ctx, blockStream, streamSrv)
 }
 

@@ -149,7 +149,7 @@ func searchMapModule(
 	}
 
 	if len(outputBytes) == 0 {
-		fmt.Printf("Block %d found but payload is empty. Module did not produce data at block num.", blockNumber)
+		fmt.Printf("RecordBlock %d found but payload is empty. Module did not produce data at block num.", blockNumber)
 		return nil
 	}
 

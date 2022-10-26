@@ -44,7 +44,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		attribute.Stringer("block.step", step),
 	)
 
-	p.stats.NewBlock(block.AsRef())
+	p.stats.RecordBlock(block.AsRef())
 	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
 		p.runPostJobHooks(ctx, clock)
 		return err

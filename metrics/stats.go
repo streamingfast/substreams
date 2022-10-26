@@ -9,7 +9,10 @@ import (
 )
 
 type Stats interface {
-	NewBlock(ref bstream.BlockRef)
+	RecordBlock(ref bstream.BlockRef)
+	RecordFlush(elapsed time.Duration)
+	RecordOutputCacheHit()
+	RecordOutputCacheMiss()
 	Start(each time.Duration)
 	Shutdown()
 }
@@ -27,27 +30,58 @@ func (n noopstats) Shutdown() {
 func (n noopstats) Start(each time.Duration) {
 }
 
-func (n noopstats) NewBlock(ref bstream.BlockRef) {
+func (n noopstats) RecordBlock(ref bstream.BlockRef) {
+}
+
+func (n noopstats) RecordFlush(elapsed time.Duration) {
+}
+
+func (n noopstats) RecordOutputCacheHit() {
+}
+
+func (n noopstats) RecordOutputCacheMiss() {
 }
 
 func NewStats(logger *zap.Logger) *stats {
 	return &stats{
-		Shutter:   shutter.New(),
-		blockRate: dmetrics.NewLocalRateCounter(1*time.Second, "blocks"),
-		logger:    logger,
+		Shutter:           shutter.New(),
+		blockRate:         dmetrics.NewAvgLocalRateCounter(1*time.Second, "blocks"),
+		flushDurationRate: dmetrics.NewAvgLocalRateCounter(1*time.Second, "flush duration"),
+		flushCountRate:    dmetrics.NewAvgLocalRateCounter(1*time.Second, "flush count"),
+		outputCacheHit:    uint64(0),
+		outputCacheMiss:   uint64(0),
+		logger:            logger,
 	}
 }
 
 type stats struct {
 	*shutter.Shutter
-	blockRate *dmetrics.LocalCounter
-	lastBlock bstream.BlockRef
-	logger    *zap.Logger
+	blockRate         *dmetrics.LocalCounter
+	flushDurationRate *dmetrics.LocalCounter
+	flushCountRate    *dmetrics.LocalCounter
+	lastBlock         bstream.BlockRef
+	logger            *zap.Logger
+	outputCacheMiss   uint64
+	outputCacheHit    uint64
 }
 
-func (s *stats) NewBlock(ref bstream.BlockRef) {
-	s.blockRate.Inc()
+func (s *stats) RecordBlock(ref bstream.BlockRef) {
+	s.blockRate.IncByElapsedTime(time.Now())
+	//s.blockRate.Inc()
 	s.lastBlock = ref
+}
+
+func (s *stats) RecordFlush(elapsed time.Duration) {
+	s.flushDurationRate.IncBy(elapsed.Nanoseconds())
+	s.flushCountRate.Inc()
+}
+
+func (s *stats) RecordOutputCacheHit() {
+	s.outputCacheHit++
+}
+
+func (s *stats) RecordOutputCacheMiss() {
+	s.outputCacheMiss++
 }
 
 func (s *stats) Start(each time.Duration) {
@@ -68,6 +102,10 @@ func (s *stats) Start(each time.Duration) {
 				// them so the development logs looks nicer.
 				fields := []zap.Field{
 					zap.Stringer("block_rate", s.blockRate),
+					zap.Stringer("flush_count", s.flushCountRate),
+					zap.Stringer("flush_duration", s.flushDurationRate),
+					zap.Uint64("output_cache_hit", s.outputCacheHit),
+					zap.Uint64("output_cache_miss", s.outputCacheMiss),
 				}
 
 				if s.lastBlock == nil {
@@ -78,11 +116,12 @@ func (s *stats) Start(each time.Duration) {
 
 				s.logger.Info("substreams request stats", fields...)
 			case <-s.Terminating():
-				break
+				return
 			}
 		}
 	}()
 }
 func (s *stats) Shutdown() {
+	s.logger.Info("shutting down request stats")
 	s.Shutter.Shutdown(nil)
 }

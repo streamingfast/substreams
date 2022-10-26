@@ -636,7 +636,7 @@ type Module_Input_Source struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // ex: "sf.ethereum.type.v1.Block"
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // ex: "sf.ethereum.type.v1.RecordBlock"
 }
 
 func (x *Module_Input_Source) Reset() {

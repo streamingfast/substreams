@@ -92,7 +92,7 @@ func processRequest(
 	pipe := pipeline.New(
 		ctx,
 		moduleGraph,
-		"sf.substreams.v1.test.Block",
+		"sf.substreams.v1.test.RecordBlock",
 		nil,
 		cachingEngine,
 		runtimeConfig,

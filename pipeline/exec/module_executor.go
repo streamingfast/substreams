@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
@@ -11,7 +12,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/execout"
 )
 
-func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (*pbsubstreams.ModuleOutput, error) {
+func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput, requestStats metrics.Stats) (*pbsubstreams.ModuleOutput, error) {
 	logger := reqctx.Logger(ctx)
 
 	var err error
@@ -31,11 +32,13 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	span.SetAttributes(attribute.Bool("module.cached", cached))
 
 	if cached {
+		requestStats.RecordOutputCacheHit()
 		if err = executor.applyCachedOutput(output); err != nil {
 			return nil, fmt.Errorf("apply cached output: %w", err)
 		}
 		return nil, nil
 	}
+	requestStats.RecordOutputCacheMiss()
 
 	outputBytes, moduleOutput, err := executeModule(ctx, executor, execOutput)
 	if err != nil {

@@ -302,7 +302,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	output, runError := exec.RunModule(ctx, executor, execOutput)
+	output, runError := exec.RunModule(ctx, executor, execOutput, p.stats)
 	returnOutput := func() {
 		if output != nil {
 			p.moduleOutputs = append(p.moduleOutputs, output)

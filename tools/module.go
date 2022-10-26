@@ -120,7 +120,7 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 	fmt.Println("")
 	fmt.Printf("Module: %s [%s]\n", module.Name, kind)
 	fmt.Printf("Hash: %s\n", moduleHash)
-	fmt.Printf("Start Block: %d\n", module.InitialBlock)
+	fmt.Printf("Start RecordBlock: %d\n", module.InitialBlock)
 	fmt.Printf("Output Files: %d Ouput files found\n", len(outputFiles))
 	displayList(outputFiles)
 

@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/substreams/store"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
+	"time"
 )
 
 func (p *Pipeline) resetStores() {
@@ -27,10 +28,11 @@ func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error)
 	}
 	reqctx.Span(ctx).SetAttributes(attribute.Int("pipeline.stores.boundary_reached", len(boundaryIntervals)))
 	for _, boundaryBlock := range boundaryIntervals {
+		t0 := time.Now()
 		if err := p.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
 			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
-
+		p.stats.RecordFlush(time.Since(t0))
 	}
 	return nil
 }

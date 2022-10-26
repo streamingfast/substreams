@@ -31,11 +31,11 @@ type ForkStep int32
 
 const (
 	ForkStep_STEP_UNKNOWN ForkStep = 0
-	// Block is new head block of the chain, that is linear with the previous block
+	// RecordBlock is new head block of the chain, that is linear with the previous block
 	ForkStep_STEP_NEW ForkStep = 1
-	// Block is now forked and should be undone, it's not the head block of the chain anymore
+	// RecordBlock is now forked and should be undone, it's not the head block of the chain anymore
 	ForkStep_STEP_UNDO ForkStep = 2
-	// Block is now irreversible and can be committed to (finality is chain specific, see chain documentation for more details)
+	// RecordBlock is now irreversible and can be committed to (finality is chain specific, see chain documentation for more details)
 	ForkStep_STEP_IRREVERSIBLE ForkStep = 4
 )
 

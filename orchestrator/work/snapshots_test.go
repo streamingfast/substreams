@@ -1,4 +1,4 @@
-package orchestrator
+package work
 
 import (
 	"github.com/streamingfast/substreams/block"

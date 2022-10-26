@@ -3,15 +3,14 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-
+	
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/reqctx"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
-	"go.uber.org/zap"
 )
 
 type Backprocessor struct {
@@ -59,7 +58,7 @@ func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 		return nil, err
 	}
 
-	multiSquasher, err := NewMultiSquasher(ctx, b.runtimeConfig, workPlan, b.storeConfigMap, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
+	multiSquasher, err := NewMultiSquasher(ctx, b.runtimeConfig, workPlan.ModuleStorageState(), b.storeConfigMap, b.upToBlock, scheduler.OnStoreCompletedUntilBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -90,15 +89,12 @@ func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 	return finalStoreMap, nil
 }
 
-func (b *Backprocessor) planWork(ctx context.Context) (out *WorkPlan, err error) {
-	storageState, err := fetchStorageState(ctx, b.storeConfigMap)
-	if err != nil {
-		return nil, fmt.Errorf("fetching stores states: %w", err)
-	}
+func (b *Backprocessor) planWork(ctx context.Context) (out *work.Plan, err error) {
+	workPlan := work.NewPlan()
 
-	workPlan, err := b.buildWorkPlan(ctx, storageState)
+	err := workPlan.Build(ctx, b.storeConfigMap, b.runtimeConfig.StoreSnapshotsSaveInterval, b.runtimeConfig.SubrequestsSplitSize, b.upToBlock, b.graph)
 	if err != nil {
-		return nil, fmt.Errorf("build work plan: %w", err)
+		return nil, err
 	}
 
 	if err := b.sendWorkPlanProgress(workPlan); err != nil {
@@ -108,30 +104,7 @@ func (b *Backprocessor) planWork(ctx context.Context) (out *WorkPlan, err error)
 	return workPlan, nil
 }
 
-func (b *Backprocessor) buildWorkPlan(ctx context.Context, storageState *StorageState) (out *WorkPlan, err error) {
-	logger := reqctx.Logger(ctx)
-	out = &WorkPlan{
-		fileUnitsMap: map[string]*FileUnits{}, // per module
-	}
-	for _, config := range b.storeConfigMap {
-		name := config.Name()
-		snapshot, ok := storageState.Snapshots[name]
-		if !ok {
-			return nil, fmt.Errorf("fatal: storage state not reported for module name %q", name)
-		}
-
-		fileUnits, err := NewFileUnits(name, b.runtimeConfig.StoreSnapshotsSaveInterval, config.ModuleInitialBlock(), b.upToBlock, snapshot)
-		if err != nil {
-			return nil, fmt.Errorf("new file units %q: %w", name, err)
-		}
-
-		out.fileUnitsMap[name] = fileUnits
-	}
-	logger.Info("work plan ready", zap.Stringer("work_plan", out))
-	return
-}
-
-func (b *Backprocessor) sendWorkPlanProgress(workPlan *WorkPlan) (err error) {
+func (b *Backprocessor) sendWorkPlanProgress(workPlan *work.Plan) (err error) {
 	progressMessages := workPlan.InitialProgressMessages()
 	if err := b.respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return err

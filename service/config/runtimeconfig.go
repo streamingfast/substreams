@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/work"
+	"github.com/streamingfast/substreams/orchestrator/work"
 )
 
 type RuntimeConfig struct {

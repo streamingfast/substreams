@@ -10,10 +10,10 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
-	"github.com/streamingfast/substreams/work"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -51,7 +51,7 @@ func TestSchedulerInOut(t *testing.T) {
 			ExecOutputSaveInterval:     10,
 			StoreSnapshotsSaveInterval: 10,
 		},
-		&WorkPlan{fileUnitsMap: map[string]*FileUnits{
+		&work.Plan{modulesStateMap: map[string]*work.ModuleStorageState{
 			"A": {modName: "A"},
 			"B": {
 				modName:         "B",
@@ -100,6 +100,8 @@ func TestSchedulerInOut(t *testing.T) {
 }
 
 func TestNewJobsPlanner(t *testing.T) {
+	// TODO(abourget): this test was tot est the JobsPlanner,
+	// but the Plan::splitWorkIntoJobs takes its place now.
 	t.Skip("abourget: incomplete, untested")
 
 	subreqSplit := uint64(100)
@@ -122,7 +124,7 @@ func TestNewJobsPlanner(t *testing.T) {
 		storeMap.Set(newStore)
 	}
 
-	splitWorkMods := &WorkPlan{fileUnitsMap: map[string]*FileUnits{
+	splitWorkMods := &work.Plan{modulesStateMap: map[string]*work.ModuleStorageState{
 		"A": {modName: "A"},
 		"B": {modName: "B"},
 		"C": {modName: "C"},
@@ -186,8 +188,8 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 	graph, err := manifest.NewModuleGraph(modules)
 	require.NoError(t, err)
 
-	workPlan := &WorkPlan{fileUnitsMap: map[string]*FileUnits{
-		"A": &FileUnits{
+	workPlan := &work.Plan{modulesStateMap: map[string]*work.ModuleStorageState{
+		"A": &work.ModuleStorageState{
 			modName: "A",
 			partialsMissing: block.Ranges{
 				&block.Range{
@@ -212,7 +214,7 @@ func Test_OrderedJobsPlanner(t *testing.T) {
 				},
 			},
 		},
-		"B": &FileUnits{
+		"B": &work.ModuleStorageState{
 			modName: "B",
 			partialsMissing: block.Ranges{
 				&block.Range{

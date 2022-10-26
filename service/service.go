@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"os"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
-	"github.com/streamingfast/substreams/work"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"

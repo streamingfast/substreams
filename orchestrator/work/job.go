@@ -10,6 +10,9 @@ import (
 
 // TODO(abourget): the Job shouldn't be the one prioritizing itself.. an external Scheduler would
 // mutate the WorkPlan and reprioritize properly.
+
+// Job is a single unit of scheduling, meaning it is a request that goes to a
+// remote gRPC service for execution.
 type Job struct {
 	ModuleName   string // target
 	RequestRange *block.Range

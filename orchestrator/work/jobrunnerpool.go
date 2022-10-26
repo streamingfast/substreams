@@ -4,8 +4,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO(abourget): JobRunner instead of Worker everywhere here.
-
 type JobRunnerPool interface {
 	Borrow() JobRunner
 	Return(JobRunner)

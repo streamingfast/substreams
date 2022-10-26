@@ -12,6 +12,7 @@ import (
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
@@ -117,9 +118,9 @@ func TestStoreSquasher_squash(t *testing.T) {
 	}
 }
 func TestStoreSquasher_sortRange(t *testing.T) {
-	s := &StoreSquasher{ranges: parseRanges("10-20,40-50,0-10")}
+	s := &StoreSquasher{ranges: work.parseRanges("10-20,40-50,0-10")}
 	s.sortRange()
-	assert.Equal(t, parseRanges("0-10,10-20,40-50"), s.ranges)
+	assert.Equal(t, work.parseRanges("0-10,10-20,40-50"), s.ranges)
 }
 
 func TestStoreSquasher_getPartialChunks(t *testing.T) {

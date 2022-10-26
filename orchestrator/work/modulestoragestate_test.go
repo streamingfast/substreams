@@ -1,4 +1,4 @@
-package orchestrator
+package work
 
 import (
 	"github.com/streamingfast/substreams/block"
@@ -97,17 +97,16 @@ func TestWorkUnits_init(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			wu := &FileUnits{modName: "mod"}
-			err := wu.init(tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			wu, err := newModuleStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectInitLoad, wu.initialCompleteRange)
+			assert.Equal(t, tt.expectInitLoad, wu.InitialCompleteRange)
 			assert.Equal(t,
 				tt.expectMissing.String(),
-				wu.partialsMissing.String(),
+				wu.PartialsMissing.String(),
 			)
 			assert.Equal(t,
 				tt.expectPresent.String(),
-				wu.partialsPresent.String(),
+				wu.PartialsPresent.String(),
 			)
 		})
 	}

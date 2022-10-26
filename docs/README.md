@@ -31,6 +31,10 @@ Substreams is an open-source community effort, so feel free to suggest new topic
 * [StreamingFast on Twitter](https://twitter.com/streamingfastio)
 * [StreamingFast on YouTube](https://www.youtube.com/c/streamingfast)
 
+### Contributing
+
+Please first refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
+
 ### License
 
 Substreams is currently licensed under [Apache 2.0](../LICENSE/).

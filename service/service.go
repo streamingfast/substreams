@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/streamingfast/substreams/reqctx"
 	"os"
+	"time"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
@@ -168,7 +169,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		this entire `if` is not good, the ctx is from the StreamServer so there
 		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
 	*/
-
 	isSubrequest := false
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
@@ -187,6 +187,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		wid := workerID.Inc()
 		logger = logger.With(zap.Uint64("req", wid))
 		ctx = reqctx.WithLogger(ctx, logger)
+	}
+
+	requestStats := metrics.NewNoopStats()
+	if s.runtimeConfig.WithRequestStats {
+		requestStats = metrics.NewStats(logger)
+		opts = append(opts, pipeline.WithRequestStats(requestStats))
 	}
 
 	responseHandler := func(resp *pbsubstreams.Response) error {
@@ -244,6 +250,9 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}
+
+	requestStats.Start(15 * time.Second)
+	defer requestStats.Shutdown()
 
 	return pipe.Launch(ctx, blockStream, streamSrv)
 }

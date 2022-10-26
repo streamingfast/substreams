@@ -2,8 +2,8 @@ package pipeline
 
 import (
 	"context"
-
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -34,5 +34,11 @@ func WithPostJobHook(f substreams.PostJobHook) Option {
 func WithSyncBlockRangeRestriction(maxRangeSize uint64) Option {
 	return func(p *Pipeline) {
 		p.maxStoreSyncRangeSize = maxRangeSize
+	}
+}
+
+func WithRequestStats(stats metrics.Stats) Option {
+	return func(p *Pipeline) {
+		p.stats = stats
 	}
 }

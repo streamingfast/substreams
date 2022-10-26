@@ -36,3 +36,9 @@ func WithOutCacheSaveInterval(block uint64) Option {
 		s.runtimeConfig.ExecOutputSaveInterval = block
 	}
 }
+
+func WithRequestStats() Option {
+	return func(s *Service) {
+		s.runtimeConfig.WithRequestStats = true
+	}
+}

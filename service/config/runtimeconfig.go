@@ -12,8 +12,9 @@ type RuntimeConfig struct {
 	ParallelSubrequests        uint64 // how many sub-jobs to launch for a given user
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
-	BaseObjectStore dstore.Store
-	WorkerFactory   work.WorkerFactory
+	BaseObjectStore  dstore.Store
+	WorkerFactory    work.WorkerFactory
+	WithRequestStats bool
 }
 
 func NewRuntimeConfig(

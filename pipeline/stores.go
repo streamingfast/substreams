@@ -22,7 +22,9 @@ func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error)
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 	boundaryIntervals := p.bounder.GetStoreFlushRanges(reqDetails.IsSubRequest, reqDetails.Request.StopBlockNum, blockNum)
-	logger.Info("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
+	if len(boundaryIntervals) > 0 {
+		logger.Debug("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
+	}
 	reqctx.Span(ctx).SetAttributes(attribute.Int("pipeline.stores.boundary_reached", len(boundaryIntervals)))
 	for _, boundaryBlock := range boundaryIntervals {
 		if err := p.saveStoresSnapshots(ctx, boundaryBlock); err != nil {

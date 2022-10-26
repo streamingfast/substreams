@@ -3,13 +3,11 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"math"
-	"strings"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -22,6 +20,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"math"
+	"strings"
 )
 
 type backprocessingStore struct {
@@ -66,6 +66,8 @@ type Pipeline struct {
 
 	bounder  *StoreBoundary
 	StoreMap store.Map
+
+	stats metrics.Stats
 }
 
 func New(
@@ -91,6 +93,7 @@ func New(
 		respFunc:              respFunc,
 		bounder:               bounder,
 		forkHandler:           NewForkHandler(),
+		stats:                 metrics.NewNoopStats(),
 	}
 
 	for _, opt := range opts {

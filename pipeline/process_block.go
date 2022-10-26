@@ -155,6 +155,5 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 		}
 	}
 
-	metrics.BlockEndProcess.Inc()
 	return nil
 }

@@ -29,7 +29,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}()
 
-	metrics.BlockBeginProcess.Inc()
+	metrics.BlockProcess.Inc()
 	clock := &pbsubstreams.Clock{
 		Number:    block.Num(),
 		Id:        block.Id,
@@ -44,6 +44,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		attribute.Stringer("block.step", step),
 	)
 
+	p.stats.NewBlock(block.AsRef())
 	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
 		p.runPostJobHooks(ctx, clock)
 		return err

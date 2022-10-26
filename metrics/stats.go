@@ -14,7 +14,7 @@ type Stats interface {
 	Shutdown()
 }
 
-func NewNoopStats() Stats {
+func NewNoopStats() *noopstats {
 	return &noopstats{}
 }
 
@@ -30,7 +30,7 @@ func (n noopstats) Start(each time.Duration) {
 func (n noopstats) NewBlock(ref bstream.BlockRef) {
 }
 
-func NewStats(logger *zap.Logger) Stats {
+func NewStats(logger *zap.Logger) *stats {
 	return &stats{
 		Shutter:   shutter.New(),
 		blockRate: dmetrics.NewLocalRateCounter(1*time.Second, "blocks"),

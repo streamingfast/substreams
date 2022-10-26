@@ -189,7 +189,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		ctx = reqctx.WithLogger(ctx, logger)
 	}
 
-	requestStats := metrics.NewNoopStats()
+	var requestStats metrics.Stats
 	if s.runtimeConfig.WithRequestStats {
 		requestStats = metrics.NewStats(logger)
 		opts = append(opts, pipeline.WithRequestStats(requestStats))
@@ -251,9 +251,11 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
-	requestStats.Start(15 * time.Second)
-	defer requestStats.Shutdown()
-
+	if requestStats != nil {
+		requestStats.Start(15 * time.Second)
+		defer requestStats.Shutdown()
+	}
+	
 	return pipe.Launch(ctx, blockStream, streamSrv)
 }
 

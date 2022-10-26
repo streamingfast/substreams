@@ -12,6 +12,6 @@ Substreams has two perspectives as illustrated in the high-level visual diagram 
 
 Essentially the developer of an end-user application will design and create a data refinement strategy.&#x20;
 
-The Substreams engine will use the data refinement strategy to isolate a very specific data set. Substreams receives data from StreamingFast Firehose in the form of streams.&#x20;
+The Substreams engine will use the data refinement strategy to isolate a very specific data set. Substreams receives data from [StreamingFast Firehose](https://firehose.streamingfast.io/) in the form of streams.&#x20;
 
 The streamed data is passed from Firehose through Substreams, then refined, and finally routed to wherever the developer desires, from relational databases to subgraphs.

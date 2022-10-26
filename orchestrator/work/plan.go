@@ -3,11 +3,12 @@ package work
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
+	"sort"
 	"strings"
 	"sync"
 
@@ -17,35 +18,36 @@ import (
 type Plan struct {
 	ModulesStateMap ModuleStorageStateMap
 
-	//sortedJobDensity []string // storeName or jobs in order of speed / complexity.
+	upToBlock uint64
 
-	jobsCompleted   atomic.Int64
-	prioritizedJobs []*Job
+	waitingJobs []*Job
+	readyJobs   []*Job
+
+	modulesReadyUpToBlock map[string]uint64
 
 	mu sync.Mutex
 }
 
-func NewPlan() *Plan {
-	return &Plan{
+func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, subrequestSplitSize, upToBlock uint64, graph *manifest.ModuleGraph) (*Plan, error) {
+	plan := &Plan{
 		ModulesStateMap: make(ModuleStorageStateMap),
+		upToBlock:       upToBlock,
 	}
-}
-
-func (p *Plan) Build(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, subrequestSplitSize uint64, upToBlock uint64, graph *manifest.ModuleGraph) error {
 	storageState, err := fetchStorageState(ctx, storeConfigMap)
 	if err != nil {
-		return fmt.Errorf("fetching stores states: %w", err)
+		return nil, fmt.Errorf("fetching stores states: %w", err)
 	}
-
-	if err := p.buildPlan(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
-		return fmt.Errorf("build plan: %w", err)
+	if err := plan.buildPlanFromStorageState(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
+		return nil, fmt.Errorf("build plan: %w", err)
 	}
-
-	p.splitWorkIntoJobs()
-	p.sendWorkPlanProgress()
+	plan.initModulesReadyUpToBlock()
+	if err := plan.splitWorkIntoJobs(subrequestSplitSize, graph); err != nil {
+		return nil, fmt.Errorf("split to jobs: %w", err)
+	}
+	return plan, nil
 }
 
-func (p *Plan) buildPlan(ctx context.Context, storageState *StorageState, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, upToBlock uint64) error {
+func (p *Plan) buildPlanFromStorageState(ctx context.Context, storageState *StorageState, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, upToBlock uint64) error {
 	logger := reqctx.Logger(ctx)
 
 	for _, config := range storeConfigMap {
@@ -62,39 +64,44 @@ func (p *Plan) buildPlan(ctx context.Context, storageState *StorageState, storeC
 
 		p.ModulesStateMap[name] = moduleStorageState
 	}
-	logger.Info("work plan ready", zap.Stringer("work_plan", p.ModulesStateMap))
+	logger.Info("work plan ready", zap.Stringer("work_plan", p))
 	return nil
 }
 
 func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.ModuleGraph) error {
+	highestJobOrdinal := p.upToBlock / subrequestSplitSize
 	for storeName, workUnit := range p.ModulesStateMap {
 		requests := workUnit.batchRequests(subrequestSplitSize)
-		rangeLen := len(requests)
-		for idx, requestRange := range requests {
+		for _, requestRange := range requests {
 			// TODO(abourget): figure out a way to do those calls only once. Mind you, in the
 			// future, we might need to re-compute the ancestor graph at different places
 			// during the history of the chain, as "moduleInitialBlock"s evolve with PATCH
 			// modules.
 			ancestorStoreModules, err := graph.AncestorStoresOf(storeName)
 			if err != nil {
-				return fmt.Errorf("getting ancestore stores for %s: %w", storeName, err)
+				return fmt.Errorf("getting ancestor stores for %s: %w", storeName, err)
 			}
 
-			job := NewJob(storeName, requestRange, ancestorStoreModules, rangeLen, idx)
-			p.prioritizedJobs = append(p.prioritizedJobs, job)
+			jobOrdinal := requestRange.StartBlock / subrequestSplitSize
+			requiredModules := moduleNames(ancestorStoreModules)
+			job := NewJob(storeName, requestRange, requiredModules, highestJobOrdinal, jobOrdinal)
+			p.waitingJobs = append(p.waitingJobs, job)
 		}
 	}
-
-	// TODO(abourget): The SCHEDULER is the one
-	// who will sort jobs (call Prioritize()) and then
-	// GetNextJob() in the loop over there.
-	// No reason to have this data-munging function do such
-	// dispatches.
-	planner.sortJobs()
-	planner.AvailableJobs = make(chan *Job, len(planner.jobs))
-	planner.dispatch()
-
 	return nil
+}
+
+func (p *Plan) initModulesReadyUpToBlock() {
+	p.modulesReadyUpToBlock = make(map[string]uint64)
+	for modName, modState := range p.ModulesStateMap {
+		if modState.InitialCompleteRange == nil {
+			p.modulesReadyUpToBlock[modName] = modState.ModuleInitialBlock
+		} else {
+			p.modulesReadyUpToBlock[modName] = modState.InitialCompleteRange.ExclusiveEndBlock
+		}
+	}
+	p.promoteWaitingJobs()
+	p.prioritize()
 }
 
 //
@@ -129,28 +136,84 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.Mod
 //	}
 //}
 
-func (p *Plan) Prioritize(prioritizer Prioritizer) {
+func (p *Plan) prioritize() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	prioritizer.Sort(p.prioritizedJobs)
+	// TODO(abourget): TEST THIS, that the priority calculation is now better
+	sort.Slice(p.readyJobs, func(i, j int) bool {
+		// reverse sorts priority, higher first
+		return p.readyJobs[i].priority > p.readyJobs[j].priority
+	})
 }
 
-func (p *Plan) NextJob() *Job {
+func (p *Plan) MarkDependencyComplete(modName string, upToBlock uint64) {
+	current := p.modulesReadyUpToBlock[modName]
+	if upToBlock > current {
+		p.modulesReadyUpToBlock[modName] = upToBlock
+	}
+	p.promoteWaitingJobs()
+	p.prioritize()
+}
+
+func (p *Plan) promoteWaitingJobs() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	job := p.prioritizedJobs[0]
-	p.prioritizedJobs = p.prioritizedJobs[1:]
-
-	return job
+	removeJobs := map[*Job]bool{}
+	for _, job := range p.waitingJobs {
+		if p.allDependenciesMet(job) {
+			p.readyJobs = append(p.readyJobs, job)
+			removeJobs[job] = true
+		}
+	}
+	if len(removeJobs) != 0 {
+		var newWaitingJobs []*Job
+		for _, job := range p.waitingJobs {
+			if !removeJobs[job] {
+				newWaitingJobs = append(newWaitingJobs, job)
+			}
+		}
+		p.waitingJobs = newWaitingJobs
+	}
 }
 
-func (p *Plan) StoreCount() int {
-	return len(p.ModulesStateMap)
+func (p *Plan) allDependenciesMet(job *Job) bool {
+	startBlock := job.RequestRange.StartBlock
+	for _, dep := range job.requiredModules {
+		if p.modulesReadyUpToBlock[dep] < startBlock {
+			return false
+		}
+	}
+	return true
 }
 
-func (p *Plan) InitialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+func (p *Plan) NextJob() (job *Job, more bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(p.readyJobs) == 0 && len(p.waitingJobs) == 0 {
+		return nil, false
+	}
+
+	if len(p.waitingJobs) != 0 {
+		return nil, true
+	}
+
+	job = p.readyJobs[0]
+	p.readyJobs = p.readyJobs[1:]
+	return job, true
+}
+
+func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) error {
+	progressMessages := p.initialProgressMessages()
+	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *Plan) initialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, unit := range p.ModulesStateMap {
 		if unit.InitialCompleteRange == nil {
 			continue
@@ -189,4 +252,11 @@ func (p *Plan) String() string {
 		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.InitialCompleteRange.String(), v.PartialsMissing, v.PartialsPresent))
 	}
 	return strings.Join(out, ";")
+}
+
+func moduleNames(modules []*pbsubstreams.Module) (out []string) {
+	for _, mod := range modules {
+		out = append(out, mod.Name)
+	}
+	return
 }

@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
@@ -227,7 +226,9 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 	ctx, span := reqctx.WithSpan(ctx, "backprocess")
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
-	orchestra := orchestrator.New(
+
+	backproc, err := orchestrator.BuildBackprocessor(
+		p.ctx,
 		p.runtimeConfig,
 		reqDetails.EffectiveStartBlockNum,
 		p.graph,
@@ -235,28 +236,11 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 		storeConfigs,
 		reqDetails.Request.Modules,
 	)
-
-	plan := work.NewPlan()
-	err = plan.Build(ctx, storeConfigs, p.runtimeConfig.StoreSnapshotsSaveInterval, p.runtimeConfig.SubrequestsSplitSize, reqDetails.EffectiveStartBlockNum, p.graph)
 	if err != nil {
-		return nil, fmt.Errorf("build work plan: %w", err)
+		return nil, fmt.Errorf("building backproc: %w", err)
 	}
 
-	scheduler, err := orchestrator.NewScheduler(ctx, p.runtimeConfig, plan, p.graph, p.respFunc, reqDetails.Request.Modules)
-	if err != nil {
-		return nil, err
-	}
-
-	squasher, err := orchestrator.NewMultiSquasher(ctx, p.runtimeConfig, plan.ModulesStateMap, storeConfigs, reqDetails.EffectiveStartBlockNum, scheduler.OnStoreCompletedUntilBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	scheduler.OnStoreJobTerminated = squasher.Squash
-
-	workerPool := work.NewWorkerPool(p.runtimeConfig.ParallelSubrequests, p.runtimeConfig.WorkerFactory, reqctx.Logger(ctx))
-
-	storeMap, err = orchestra.Run(ctx, plan, scheduler, squasher, workerPool)
+	storeMap, err = backproc.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("backrprocess run: %w", err)
 	}

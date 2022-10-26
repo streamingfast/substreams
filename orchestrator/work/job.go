@@ -8,69 +8,29 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// TODO(abourget): the Job shouldn't be the one prioritizing itself.. an external Scheduler would
-// mutate the WorkPlan and reprioritize properly.
-
 // Job is a single unit of scheduling, meaning it is a request that goes to a
 // remote gRPC service for execution.
 type Job struct {
 	ModuleName   string // target
 	RequestRange *block.Range
-	Priority     int
-	Scheduled    bool
 
-	deps jobDependencies
+	jobOrdinal      uint64   // the order of the job, as a unit of job scheduling, relative to the position in the chain.
+	requiredModules []string // modules that need to be sync'd before this one starts at RequestRange.StartBlockNum}
+	priority        uint64
 }
 
-/*
-
-P:   9 8 7
-1:   A B C
-
-P:   10 9 8
-2:   D  E F
-
-P:   11 10 9
-3:   G  H  I
-
-*/
-
-func NewJob(storeName string, requestRange *block.Range, ancestorStoreModules []*pbsubstreams.Module, totalJobs, myJobIndex int) *Job {
+func NewJob(storeName string, requestRange *block.Range, requiredModules []string, highestJobOrdinal, jobOrdinal uint64) *Job {
+	// TODO(abourget): test that the priority calculations give us what we need
+	// The thing is that the priority wouldn't change.. the readiness is what would
+	// change really. That's handled in the Plan, but priority is constant.
+	// We'll schedule them when we can
 	j := &Job{
-		ModuleName:   storeName,
-		RequestRange: requestRange,
+		ModuleName:      storeName,
+		RequestRange:    requestRange,
+		requiredModules: requiredModules,
+		priority:        highestJobOrdinal - jobOrdinal + uint64(len(requiredModules)),
 	}
-	j.defineDependencies(ancestorStoreModules)
-	j.Priority = len(j.deps)*2 + totalJobs - myJobIndex
 	return j
-}
-
-func (j *Job) defineDependencies(stores []*pbsubstreams.Module) {
-	for _, store := range stores {
-		// Here dependencies do not highlight any block range, so if we have
-		// ranges that are already completed, we'll have suboptimal planning.
-		j.deps = append(j.deps, &jobDependency{
-			storeName: store.Name,
-			resolved:  false,
-		})
-	}
-}
-
-func (j *Job) SignalDependencyResolved(storeName string, blockNum uint64) {
-	for _, dep := range j.deps {
-		if dep.storeName == storeName && blockNum >= j.RequestRange.StartBlock {
-			dep.resolved = true
-		}
-	}
-}
-
-func (j *Job) ReadyForDispatch() bool {
-	for _, dep := range j.deps {
-		if !dep.resolved {
-			return false
-		}
-	}
-	return true
 }
 
 func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
@@ -82,35 +42,6 @@ func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams
 		Modules:       originalModules,
 		OutputModules: []string{j.ModuleName},
 	}
-}
-
-type jobDependency struct {
-	storeName string
-	resolved  bool
-}
-
-type JobList []*Job
-
-func (l JobList) MarshalLogArray(enc zapcore.ArrayEncoder) error {
-	for _, d := range l {
-		enc.AppendObject(d)
-	}
-	return nil
-}
-
-type jobDependencies []*jobDependency
-
-func (l jobDependencies) MarshalLogArray(enc zapcore.ArrayEncoder) error {
-	for _, d := range l {
-		enc.AppendObject(d)
-	}
-	return nil
-}
-
-func (d *jobDependency) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("store", d.storeName)
-	enc.AddBool("resolved", d.resolved)
-	return nil
 }
 
 func (j *Job) String() string {

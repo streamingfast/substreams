@@ -11,9 +11,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type Scheduler struct {
@@ -29,38 +27,18 @@ type Scheduler struct {
 	//jobsPlanner *JobsPlanner
 }
 
-func NewScheduler(
-	ctx context.Context,
-	runtimeConfig config.RuntimeConfig,
-	workPlan *work.Plan,
-	graph *manifest.ModuleGraph,
-	respFunc substreams.ResponseFunc,
-	upstreamRequestModules *pbsubstreams.Modules,
-) (*Scheduler, error) {
-	logger := reqctx.Logger(ctx)
-
-	// TODO(abourget): Have the WorkerPool arrive as an INTERFACE with only Borrow() and Return()
-	// so we don't even know anything about its internals.
-	workerPool := work.NewWorkerPool(runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory, logger)
-
-	// TODO(abourget): rework that jobsPlanner to better fit within the Scheduler, but now at
-	// least it's isolated within, and no one externally knows about it.
-	//jobsPlanner, err := NewJobsPlanner(ctx, workPlan, runtimeConfig.SubrequestsSplitSize)
-	//if err != nil {
-	//	return nil, fmt.Errorf("creating strategy: %w", err)
-	//}
-	//
-	s := &Scheduler{
+func NewScheduler(workPlan *work.Plan, respFunc substreams.ResponseFunc, upstreamRequestModules *pbsubstreams.Modules) *Scheduler {
+	return &Scheduler{
 		workPlan:               workPlan,
 		respFunc:               respFunc,
 		upstreamRequestModules: upstreamRequestModules,
 	}
-	return s, nil
 }
 
 type jobResult struct {
-	job *Job
-	err error
+	job             *work.Job
+	partialsWritten block.Ranges
+	err             error
 }
 
 func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err error) {
@@ -77,7 +55,6 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err 
 	go func() {
 		for s.runOne(ctx, result, pool) {
 		}
-		}
 	}()
 
 	return s.resultGatherer(ctx, result)
@@ -91,57 +68,70 @@ func (s *Scheduler) resultGatherer(ctx context.Context, result chan jobResult) (
 				return err
 			}
 			return nil
-		case err, ok := <-result:
+		case jobResult, ok := <-result:
 			if !ok {
 				return nil
 			}
-			resultCount++
-
-			// TODO(abourget): we've got a result,
-			// do the dispatching of stuff in a single goroutine?
-			// Prioritize() ?
-			// Call the Squasher messaging and all?
-
-			if err != nil {
-				return fmt.Errorf("worker ended in error: %w", err)
+			if err := s.processJobResult(jobResult); err != nil {
+				return fmt.Errorf("process job result: %w", err)
 			}
 		}
 	}
+}
+
+func (s *Scheduler) processJobResult(result jobResult) error {
+	if result.err != nil {
+		return fmt.Errorf("worker ended in error: %w", result.err)
+	}
+	if result.partialsWritten != nil {
+		// This signals back to the Squasher that it can squash this segment
+		if err := s.OnStoreJobTerminated(result.job.ModuleName, result.partialsWritten); err != nil {
+			return fmt.Errorf("on job terminated: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *Scheduler) runOne(ctx context.Context, result chan jobResult, pool work.JobRunnerPool) (moreJobs bool) {
 	jobRunner := pool.Borrow()
 	defer pool.Return(jobRunner)
 
-	nextJob := s.workPlan.NextJob()
+	nextJob, moreJobs := s.workPlan.NextJob()
 	if nextJob == nil {
 		// TODO(colin): who closes the `result` channel?
+		if moreJobs {
+			time.Sleep(1 * time.Second)
+			return true
+		}
 		return false
 	}
 
 	go func() {
 		// TODO: validate this is the right thing..
-		err := s.runSingleJob(ctx, jobRunner, nextJob, s.upstreamRequestModules)
-		result <- jobResult{job: nextJob, err: err}
+		partialsWritten, err := s.runSingleJob(ctx, jobRunner, nextJob, s.upstreamRequestModules)
+		result <- jobResult{job: nextJob, partialsWritten: partialsWritten, err: err}
 		// TODO: signal that this job is finished, `wg.Done()`
 	}()
 	return true
 }
 
+// OnStoreCompletedUntilBlock is called to say the given storeName
+// has snapshots at the `storeSaveIntervals` up to `blockNum` here.
+//
+// This should unlock all jobs that were dependent
 func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64) {
-	// This replaces the JobPlanner's signaling mechanism: allows decoupling from the Squasher and the Scheduler
-	//	func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64) {
-	s.jobsPlanner.SignalCompletionUpUntil(storeName, blockNum)
-
-	// TODO(abourget): is it only for `storeName` or `moduleName` can be used when we want parallel processing of
-	// exec output?
-
+	s.workPlan.MarkDependencyComplete(storeName, blockNum)
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, jobRunner work.JobRunner, job *work.Job, requestModules *pbsubstreams.Modules) (err error) {
-	logger := reqctx.Logger(ctx)
+// SignalCompletionUpUntil is a message received from the Squasher, signaling
+// that the FullKV store is ready, and so scheduling a job that depends
+// on it will be okay.
+func (s *Scheduler) SignalCompletionUpUntil(storeName string, blockNum uint64) {
+	s.workPlan.MarkDependencyComplete(storeName, blockNum)
+}
 
-	var partialsWritten []*block.Range
+func (s *Scheduler) runSingleJob(ctx context.Context, jobRunner work.JobRunner, job *work.Job, requestModules *pbsubstreams.Modules) (partialsWritten block.Ranges, err error) {
+	logger := reqctx.Logger(ctx)
 	newRequest := job.CreateRequest(requestModules)
 
 out:
@@ -161,53 +151,22 @@ out:
 			break out
 		}
 	}
-
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	// TODO(abourget): this ought to be moved to the caller, and perhaps
-	// have `partialsWritten` to be returned, in a `jobResult` object???
-	if partialsWritten != nil {
-		// This is the back signal to the Squasher
-		if err := s.OnStoreJobTerminated(job.ModuleName, partialsWritten); err != nil {
-			return fmt.Errorf("squashing: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// SignalCompletionUpUntil is a message received from the Squasher, signaling
-// that the FullKV store is ready, and so scheduling a job that depends
-// on it will be okay.
-func (p *JobsPlanner) SignalCompletionUpUntil(storeName string, blockNum uint64) {
-	p.Lock()
-	defer p.Unlock()
-
-	// TODO: re-prioritize here, and let the Scheduler
-	// unblock on Borrow()
-
-	for _, job := range p.jobs {
-		if job.Scheduled {
-			continue
-		}
-
-		job.SignalDependencyResolved(storeName, blockNum)
-	}
-
-	p.dispatch()
-}
-
-func (p *JobsPlanner) JobCount() int {
-	return len(p.jobs)
-}
-
-func (p *JobsPlanner) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddArray("jobs", p.jobs)
-	enc.AddBool("completed", p.completed)
-	enc.AddInt("available_jobs", len(p.AvailableJobs))
-	return nil
+	return
 }
 
 //
+//func (p *JobsPlanner) JobCount() int {
+//	return len(p.jobs)
+//}
+//
+//func (p *JobsPlanner) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+//	enc.AddArray("jobs", p.jobs)
+//	enc.AddBool("completed", p.completed)
+//	enc.AddInt("available_jobs", len(p.AvailableJobs))
+//	return nil
+//}
+//
+////

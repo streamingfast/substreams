@@ -3,7 +3,6 @@ package work
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator"
 	"strings"
 	"sync"
 
@@ -42,7 +41,7 @@ func fetchStorageState(ctx context.Context, storeConfigMap store.ConfigMap) (out
 		storeConfig := config
 		eg.Go(func() error {
 
-			snapshots, err := orchestrator.listSnapshots(ctx, storeConfig)
+			snapshots, err := listSnapshots(ctx, storeConfig)
 			if err != nil {
 				return err
 			}

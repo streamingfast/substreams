@@ -78,7 +78,7 @@ func New(
 	zlog.Info("registering substreams metrics")
 	metrics.Metricset.Register()
 
-	// s.workerPool = orchestrator.NewWorkerPool(parallelSubRequests, func() orchestrator.Worker {
+	// s.workerPool = orchestrator.NewJobRunnerPool(parallelSubRequests, func() orchestrator.Worker {
 	// 	return orchestrator.NewRemoteWorker(newSubstreamClientFunc)
 	// })
 

@@ -5,14 +5,8 @@ import (
 	"github.com/streamingfast/substreams/block"
 )
 
-type ModuleJobs []*Job
-type JobUnit struct {
-	partialsToGenerate block.Ranges
-}
-
 type PartialStoreFile = block.Range
 type FullStoreFile = block.Range
-
 type PartialStoreFiles = block.Ranges
 
 type ModuleStorageStateMap map[string]*ModuleStorageState
@@ -20,7 +14,8 @@ type ModuleStorageStateMap map[string]*ModuleStorageState
 // ModuleStorageState contains all the file-related ranges of things we'll want to plan
 // work for, and things that are already available.
 type ModuleStorageState struct {
-	ModuleName string
+	ModuleName         string
+	ModuleInitialBlock uint64
 
 	InitialCompleteRange *FullStoreFile // Points to a complete .kv file, to initialize the store upon getting started.
 	PartialsMissing      PartialStoreFiles
@@ -28,7 +23,7 @@ type ModuleStorageState struct {
 }
 
 func newModuleStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *Snapshots) (out *ModuleStorageState, err error) {
-	out = &ModuleStorageState{ModuleName: modName}
+	out = &ModuleStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
 	if workUpToBlockNum <= modInitBlock {
 		return
 	}

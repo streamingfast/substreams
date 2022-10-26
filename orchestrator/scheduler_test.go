@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,42 +35,22 @@ func TestSchedulerInOut(t *testing.T) {
 	mods := manifest.NewTestModules()
 	graph, err := manifest.NewModuleGraph(mods)
 	require.NoError(t, err)
-	sched, err := NewScheduler(
-		ctx,
-		config.RuntimeConfig{
-			WorkerFactory: func(logger *zap.Logger) work.JobRunner {
-				return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
-					inchan <- in{request, respFunc}
-					out := <-outchan
-					return out.partialsWritten, out.err
-				}
-			},
-			ParallelSubrequests:        2,
-			SubrequestsSplitSize:       20,
-			ExecOutputSaveInterval:     10,
-			StoreSnapshotsSaveInterval: 10,
+	sched := NewScheduler(&work.Plan{modulesStateMap: map[string]*work.ModuleStorageState{
+		"A": {modName: "A"},
+		"B": {
+			modName:         "B",
+			partialsMissing: block.ParseRanges("0-10,10-20"),
 		},
-		&work.Plan{modulesStateMap: map[string]*work.ModuleStorageState{
-			"A": {modName: "A"},
-			"B": {
-				modName:         "B",
-				partialsMissing: block.ParseRanges("0-10,10-20"),
-			},
-			"C": {modName: "C"},
-			"D": {modName: "D"},
-			"E": {modName: "E"},
-			"F": {modName: "F"},
-			"G": {modName: "G"},
-			"H": {modName: "H"},
-			"K": {modName: "K"},
-		}},
-		graph,
-		func(resp *pbsubstreams.Response) error {
-			return nil
-		},
-		zap.NewNop(),
-		&pbsubstreams.Modules{Modules: mods},
-	)
+		"C": {modName: "C"},
+		"D": {modName: "D"},
+		"E": {modName: "E"},
+		"F": {modName: "F"},
+		"G": {modName: "G"},
+		"H": {modName: "H"},
+		"K": {modName: "K"},
+	}}, func(resp *pbsubstreams.Response) error {
+		return nil
+	}, zap.NewNop())
 	require.NoError(t, err)
 	assert.NotNil(t, sched.workerPool)
 	assert.NotNil(t, sched.jobsPlanner)

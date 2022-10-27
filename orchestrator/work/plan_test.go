@@ -7,6 +7,7 @@ import (
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -138,36 +139,57 @@ func TestPlan_MarkDependencyComplete(t *testing.T) {
 }
 
 func TestPlan_NextJob(t *testing.T) {
-	t.Skip("not implemented")
-	type fields struct {
-		ModulesStateMap       ModuleStorageStateMap
-		upToBlock             uint64
-		waitingJobs           []*Job
-		readyJobs             []*Job
-		modulesReadyUpToBlock map[string]uint64
-		mu                    sync.Mutex
-	}
-	tests := []struct {
-		name     string
-		fields   fields
-		wantJob  *Job
-		wantMore bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Plan{
-				ModulesStateMap:       tt.fields.ModulesStateMap,
-				upToBlock:             tt.fields.upToBlock,
-				waitingJobs:           tt.fields.waitingJobs,
-				readyJobs:             tt.fields.readyJobs,
-				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-				mu:                    tt.fields.mu,
+	mkJobs := func(rng string) (out []*Job) {
+		for _, el := range strings.Split(rng, ",") {
+			if el != "" {
+				out = append(out, &Job{ModuleName: el})
 			}
+		}
+		return
+	}
+
+	tests := []struct {
+		waitingJobs []*Job
+		readyJobs   []*Job
+		expectJob   *Job
+		expectMore  bool
+	}{
+		{
+			waitingJobs: mkJobs("A"),
+			readyJobs:   mkJobs("B"),
+			expectJob:   &Job{ModuleName: "B"},
+			expectMore:  true,
+		},
+		{
+			waitingJobs: mkJobs("A"),
+			readyJobs:   mkJobs(""),
+			expectJob:   nil,
+			expectMore:  true,
+		},
+		{
+			waitingJobs: mkJobs(""),
+			readyJobs:   mkJobs("B"),
+			expectJob:   &Job{ModuleName: "B"},
+			expectMore:  false,
+		},
+		{
+			waitingJobs: mkJobs(""),
+			readyJobs:   mkJobs(""),
+			expectJob:   nil,
+			expectMore:  false,
+		},
+	}
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			p := &Plan{
+				waitingJobs: test.waitingJobs,
+				readyJobs:   test.readyJobs,
+			}
+
 			gotJob, gotMore := p.NextJob()
-			assert.Equalf(t, tt.wantJob, gotJob, "NextJob()")
-			assert.Equalf(t, tt.wantMore, gotMore, "NextJob()")
+
+			assert.Equalf(t, test.expectJob, gotJob, "NextJob()")
+			assert.Equalf(t, test.expectMore, gotMore, "NextJob()")
 		})
 	}
 }

@@ -190,17 +190,17 @@ func (p *Plan) NextJob() (job *Job, more bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if len(p.readyJobs) == 0 && len(p.waitingJobs) == 0 {
-		return nil, false
-	}
-
-	if len(p.waitingJobs) != 0 {
-		return nil, true
+	if len(p.readyJobs) == 0 {
+		return nil, p.hasMore()
 	}
 
 	job = p.readyJobs[0]
 	p.readyJobs = p.readyJobs[1:]
-	return job, true
+	return job, p.hasMore()
+}
+
+func (p *Plan) hasMore() bool {
+	return len(p.readyJobs)+len(p.waitingJobs) > 0
 }
 
 func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) error {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
@@ -24,20 +23,23 @@ func BenchmarkFullKV_Marshall(b *testing.B) {
 		return fmt.Sprintf("total:%x:%x", address1, address2)
 	}
 
-	for _, keyCount := range []int{10, 100, 10_000, 100_000} {
+	for _, keyCount := range []int{10, 100, 10_000, 100_000, 1_000_000, 10_000_000} {
 		b.Run(fmt.Sprintf("%d_keys", keyCount), func(bb *testing.B) {
 			s := &FullKV{
 				baseStore: newTestBaseStore(bb, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil),
 			}
 
-			startTime := time.Now()
+			bb.StopTimer()
 			for i := 0; i < keyCount; i++ {
-				s.baseStore.set(uint64(i), keyGen(), []byte(strconv.FormatInt(int64(i), 10)))
+				s.baseStore.kv[keyGen()] = []byte(strconv.FormatInt(int64(i), 10))
+
+				// Not sure why but trying to `set` 1M keys takes more than 11m!
+				// s.baseStore.set(uint64(i), keyGen(), []byte(strconv.FormatInt(int64(i), 10)))
 			}
 
-			if keyCount >= 100_000 {
-				fmt.Printf("\nTime elapsed to bootstrap %d keys is %s\n", keyCount, time.Since(startTime))
-			}
+			bb.ResetTimer()
+			bb.StartTimer()
+			bb.ReportAllocs()
 
 			for n := 0; n < bb.N; n++ {
 				_, _, err := s.Save(uint64(keyCount))

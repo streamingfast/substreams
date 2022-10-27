@@ -124,13 +124,6 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 	s.workPlan.MarkDependencyComplete(storeName, blockNum)
 }
 
-// SignalCompletionUpUntil is a message received from the Squasher, signaling
-// that the FullKV store is ready, and so scheduling a job that depends
-// on it will be okay.
-func (s *Scheduler) SignalCompletionUpUntil(storeName string, blockNum uint64) {
-	s.workPlan.MarkDependencyComplete(storeName, blockNum)
-}
-
 func (s *Scheduler) runSingleJob(ctx context.Context, jobRunner work.JobRunner, job *work.Job, requestModules *pbsubstreams.Modules) (partialsWritten block.Ranges, err error) {
 	logger := reqctx.Logger(ctx)
 	newRequest := job.CreateRequest(requestModules)

@@ -40,10 +40,10 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 	if err := plan.buildPlanFromStorageState(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
 		return nil, fmt.Errorf("build plan: %w", err)
 	}
-	plan.initModulesReadyUpToBlock()
 	if err := plan.splitWorkIntoJobs(subrequestSplitSize, graph); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
+	plan.initModulesReadyUpToBlock()
 	return plan, nil
 }
 

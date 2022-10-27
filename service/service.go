@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
@@ -27,8 +30,6 @@ import (
 	grpccode "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"os"
-	"time"
 )
 
 type Service struct {

@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/reqctx"
 	"sort"
 	"time"
+
+	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams/metrics"
 

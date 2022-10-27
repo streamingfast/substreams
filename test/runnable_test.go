@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
@@ -18,10 +23,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
-	"io"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 type Obj struct {
@@ -66,6 +67,7 @@ func processRequest(
 	responseCollector *responseCollector, isSubRequest bool,
 	blockProcessedCallBack blockProcessedCallBack,
 	testTempDir string,
+	subrequestsSplitSize uint64,
 ) error {
 	t.Helper()
 
@@ -84,7 +86,7 @@ func processRequest(
 	runtimeConfig := config.NewRuntimeConfig(
 		10,
 		10,
-		10,
+		subrequestsSplitSize,
 		1,
 		baseStoreStore,
 		workerFactory,

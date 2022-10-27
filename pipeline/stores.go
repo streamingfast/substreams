@@ -3,17 +3,18 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
-	"time"
 )
 
 func (p *Pipeline) resetStores() {
 	for _, s := range p.StoreMap.All() {
-		if resetableStore, ok := s.(store.Resetable); ok {
+		if resetableStore, ok := s.(store.Resettable); ok {
 			resetableStore.Reset()
 		}
 	}
@@ -50,7 +51,7 @@ func (p *Pipeline) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64
 	reqDetails := reqctx.Details(ctx)
 
 	for name, s := range p.StoreMap.All() {
-		// optimatinz because we know that in a subrequest we are only running throught the last store (output)
+		// optimization because we know that in a subrequest we are only running through the last store (output)
 		// all parent stores should have come from moduleOutput cache
 		if reqDetails.IsSubRequest && !p.isOutputModule(name) {
 			// skip saving snapshot for non-output stores in sub request

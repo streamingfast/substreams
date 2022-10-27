@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
-	"io"
-	"strings"
 )
 
 type Streamable interface {

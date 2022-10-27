@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
+func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, subrequestsSplitSize uint64, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
 	ctx := context.Background()
 	ctx = reqctx.WithLogger(ctx, zlog)
 
@@ -71,7 +71,7 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 		return w.Run
 	}
 
-	if err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir); err != nil {
+	if err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subrequestsSplitSize); err != nil {
 		return nil, fmt.Errorf("running test: %w", err)
 	}
 
@@ -162,7 +162,7 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
@@ -177,7 +177,7 @@ func Test_test_store_proto(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, 10, 12, []string{"test_store_proto"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, 12, []string{"test_store_proto"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -193,7 +193,7 @@ func Test_MultipleModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -216,7 +216,7 @@ func Test_MultipleModule_Batch(t *testing.T) {
 
 	//todo: Need to validate the storage file
 
-	_, err := runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
+	_, err := runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 }
 
@@ -228,7 +228,7 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		}
 	}
 
-	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -248,7 +248,7 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	}
 
 	outputFilesLen := 0
-	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"},
+	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, 10,
 		newBlockGenerator,
 		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 			err := baseStore.Walk(context.Background(), "", func(filename string) (err error) {
@@ -285,7 +285,7 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+	_, err := runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, 10, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		if b.Number == 40 {
 			s, storeFound := stores.Get("test_store_delete_prefix")
 			require.True(t, storeFound)
@@ -338,6 +338,6 @@ func Test_assert_all_test(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, 20, 31, []string{"assert_all_test"}, newBlockGenerator, nil)
+	_, err := runTest(t, 20, 31, []string{"assert_all_test"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 }

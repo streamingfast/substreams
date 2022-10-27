@@ -26,7 +26,7 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 		Config:     s.Config,
 		kv:         make(map[string][]byte),
 		logger:     s.logger,
-		marshaller: &marshaller.Proto{},
+		marshaller: marshaller.Default(),
 	}
 	return &PartialKV{
 		baseStore:    b,

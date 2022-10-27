@@ -44,7 +44,7 @@ func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 		Config:     c,
 		kv:         make(map[string][]byte),
 		logger:     logger.Named("store").With(zap.String("store_name", c.name)),
-		marshaller: &marshaller.Binary{},
+		marshaller: marshaller.Default(),
 	}
 }
 

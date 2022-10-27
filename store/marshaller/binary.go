@@ -9,6 +9,7 @@ import (
 
 type Binary struct{}
 
+// TODO: does not support delimted
 func (k *Binary) Marshal(data *StoreData) ([]byte, error) {
 	content, err := writeMapStringBytes(data.Kv)
 	if err != nil {

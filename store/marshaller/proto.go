@@ -8,7 +8,7 @@ import (
 
 type Proto struct{}
 
-func (p Proto) Unmarshal(in []byte) (*StoreData, error) {
+func (p *Proto) Unmarshal(in []byte) (*StoreData, error) {
 	stateData := &pbsubstreams.StoreData{}
 	if err := proto.Unmarshal(in, stateData); err != nil {
 		return nil, fmt.Errorf("unmarshal store: %w", err)
@@ -19,7 +19,7 @@ func (p Proto) Unmarshal(in []byte) (*StoreData, error) {
 	}, nil
 }
 
-func (p Proto) Marshal(data *StoreData) ([]byte, error) {
+func (p *Proto) Marshal(data *StoreData) ([]byte, error) {
 	stateData := &pbsubstreams.StoreData{
 		Kv:             data.Kv,
 		DeletePrefixes: data.DeletePrefixes,

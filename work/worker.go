@@ -98,6 +98,7 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 		if resp != nil {
 			switch r := resp.Message.(type) {
 			case *pbsubstreams.Response_Progress:
+
 				err := respFunc(resp)
 				if err != nil {
 					span.SetStatus(codes.Error, err.Error())

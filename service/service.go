@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/reqctx"
-	"os"
-	"time"
-
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
@@ -17,6 +13,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/streamingfast/substreams/work"
@@ -30,6 +27,8 @@ import (
 	grpccode "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"os"
+	"time"
 )
 
 type Service struct {
@@ -229,6 +228,11 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		opts...,
 	)
 
+	if requestStats != nil {
+		requestStats.Start(15 * time.Second)
+		defer requestStats.Shutdown()
+	}
+
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
@@ -249,11 +253,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
-	}
-
-	if requestStats != nil {
-		requestStats.Start(2 * time.Second)
-		defer requestStats.Shutdown()
 	}
 
 	return pipe.Launch(ctx, blockStream, streamSrv)

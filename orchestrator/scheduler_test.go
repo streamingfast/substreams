@@ -10,6 +10,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+	"sort"
 	"testing"
 )
 
@@ -25,8 +26,9 @@ type out struct {
 func TestSchedulerInOut(t *testing.T) {
 	runnerPool, inchan, outchan := testRunnerPool(2)
 	mods := manifest.NewTestModules()
-	plan := work.TestPlanReadyJobs([]*Job{
-		work.TestJob(),
+	plan := work.TestPlanReadyJobs([]*work.Job{
+		work.TestJob("B", "0-10", 1),
+		work.TestJob("B", "10-20", 0),
 	})
 	sched := NewScheduler(
 		plan,
@@ -53,14 +55,18 @@ func TestSchedulerInOut(t *testing.T) {
 
 	assert.NoError(t, sched.Schedule(context.Background(), runnerPool))
 
-	assert.Equal(t, "[0, 20)", accumulatedRanges.Merged().String())
+	sort.Sort(accumulatedRanges)
+	assert.Equal(t,
+		block.ParseRanges("0-10,10-20").String(),
+		accumulatedRanges.String(),
+	)
 }
 
 func testRunnerPool(parallelism int) (work.JobRunnerPool, chan in, chan out) {
 	inchan := make(chan in)
 	outchan := make(chan out)
 	ctx := context.Background()
-	runnerPool := work.NewJobRunnerPool(ctx, 2,
+	runnerPool := work.NewJobRunnerPool(ctx, 1,
 		func(logger *zap.Logger) work.JobRunner {
 			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
 				inchan <- in{request, respFunc}
@@ -70,24 +76,4 @@ func testRunnerPool(parallelism int) (work.JobRunnerPool, chan in, chan out) {
 		},
 	)
 	return runnerPool, inchan, outchan
-}
-
-func mkJob(modName string, rng string, prio int) *Job {
-	return work.NewJob(modName, block.ParseRange(rng), nil, prio)
-}
-
-func mkJobDeps(modName string, rng string, prio int, deps string) *Job {
-	return work.NewJob(modName, block.ParseRange(rng), deps, prio)
-}
-
-func mkModState(modName string, rng string) *work.ModuleStorageState {
-	return &work.ModuleStorageState{ModuleName: modName, PartialsMissing: block.ParseRanges(rng)}
-}
-
-func mkModStateMap(modStates ...*work.ModuleStorageState) (out work.ModuleStorageStateMap) {
-	out = make(work.ModuleStorageStateMap)
-	for _, mod := range modStates {
-		out[mod.ModuleName] = mod
-	}
-	return
 }

@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams"
@@ -43,16 +44,17 @@ type jobResult struct {
 func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err error) {
 	logger := reqctx.Logger(ctx)
 	result := make(chan jobResult)
-	done := make(chan error, 1)
-	defer func() {
-		<-done
-		close(result)
-	}()
 
+	wg := &sync.WaitGroup{}
 	logger.Debug("launching scheduler")
 
 	go func() {
-		for s.runOne(ctx, result, pool) {
+		for {
+			if !s.runOne(ctx, wg, result, pool) {
+				wg.Wait()
+				close(result)
+				return
+			}
 		}
 	}()
 
@@ -91,7 +93,7 @@ func (s *Scheduler) processJobResult(result jobResult) error {
 	return nil
 }
 
-func (s *Scheduler) runOne(ctx context.Context, result chan jobResult, pool work.JobRunnerPool) (moreJobs bool) {
+func (s *Scheduler) runOne(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.JobRunnerPool) (moreJobs bool) {
 	jobRunner := pool.Borrow()
 	defer pool.Return(jobRunner)
 
@@ -105,11 +107,11 @@ func (s *Scheduler) runOne(ctx context.Context, result chan jobResult, pool work
 		return false
 	}
 
+	wg.Add(1)
 	go func() {
-		// TODO: validate this is the right thing..
 		partialsWritten, err := s.runSingleJob(ctx, jobRunner, nextJob, s.upstreamRequestModules)
 		result <- jobResult{job: nextJob, partialsWritten: partialsWritten, err: err}
-		// TODO: signal that this job is finished, `wg.Done()`
+		wg.Done()
 	}()
 	return true
 }

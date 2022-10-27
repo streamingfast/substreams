@@ -2,6 +2,7 @@
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
+export SUBSTREAMS_INTEGRATION_TESTS=true
 
 main() {
   pushd "$ROOT" &> /dev/null

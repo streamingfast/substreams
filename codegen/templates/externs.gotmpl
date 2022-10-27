@@ -57,7 +57,7 @@ pub extern "C" fn {{$functionSignature.Name}}(
     {{else}}
     let result = func();
     if result.is_err() {
-        panic!("{}", &result.err().unwrap());
+        panic!("{:?}", &result.err().unwrap());
     }
     substreams::output(result.unwrap());
     {{end}}

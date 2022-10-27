@@ -7,15 +7,15 @@ use substreams::errors::Error;
 impl generated::substreams::SubstreamsTrait for generated::substreams::Substreams{
 {{range $engine.Package.Modules.Modules -}}
 	{{$module := . -}}
-	{{with ($engine.FunctionSignature $module) -}}
-		{{$functionSignature := . -}}
-		{{template "function" $functionSignature -}}
+	{{- with ($engine.FunctionSignature $module) -}}
+		{{- $functionSignature := . -}}
+		{{- template "function" $functionSignature -}}
 	{{end -}}
 {{end -}}
 }
 
 {{define "function"}}
-{{ $functionSignature := .}}
+{{- $functionSignature := . }}
     fn {{$functionSignature.Name}}(
     {{- range $id, $arg := $functionSignature.Arguments }}
         {{ template "arg" $arg }}, {{- end -}}
@@ -24,8 +24,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         _store: {{writableStoreType $m.GetKindStore }},
     {{- end }}
     )
-	{{- if ne $functionSignature.OutputType "" }} -> Result<{{$functionSignature.OutputType}}, Error>{{end}}
-	{
+	{{- if ne $functionSignature.OutputType "" }} -> Result<{{$functionSignature.OutputType}}, Error>{{end}} {
 		todo!()
 	}
 {{end }}

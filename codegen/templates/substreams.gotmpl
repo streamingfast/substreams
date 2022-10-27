@@ -8,15 +8,15 @@ pub struct Substreams{}
 pub trait SubstreamsTrait {
 {{range $engine.Package.Modules.Modules -}}
     {{$module := . -}}
-    {{with ($engine.FunctionSignature $module) -}}
-        {{$functionSignature := . -}}
-        {{template "function" $functionSignature -}}
+    {{- with ($engine.FunctionSignature $module) -}}
+        {{- $functionSignature := . -}}
+        {{- template "function" $functionSignature -}}
     {{end -}}
 {{end -}}
 }
 
 {{define "function"}}
-{{ $functionSignature := .}}
+{{- $functionSignature := .}}
     fn {{$functionSignature.Name}}(
     {{- range $id, $arg := $functionSignature.Arguments }}
         {{ template "arg" $arg }}, {{- end -}}

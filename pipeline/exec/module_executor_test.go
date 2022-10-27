@@ -3,7 +3,6 @@ package exec
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/stretchr/testify/assert"
@@ -95,7 +94,7 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 		cacheMap: make(map[string][]byte),
 	}
 
-	moduleOutput, err := RunModule(ctx, executor, output, metrics.NewNoopStats())
+	moduleOutput, err := RunModule(ctx, executor, output)
 	if err != nil {
 		t.Fatal(err)
 	}

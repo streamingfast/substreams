@@ -22,6 +22,7 @@ func (p *Pipeline) resetStores() {
 func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
+	reqStats := reqctx.ReqStats(ctx)
 	boundaryIntervals := p.bounder.GetStoreFlushRanges(reqDetails.IsSubRequest, reqDetails.Request.StopBlockNum, blockNum)
 	if len(boundaryIntervals) > 0 {
 		logger.Info("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
@@ -32,7 +33,8 @@ func (p *Pipeline) flushStores(ctx context.Context, blockNum uint64) (err error)
 		if err := p.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
 			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
-		p.stats.RecordFlush(time.Since(t0))
+
+		reqStats.RecordFlush(time.Since(t0))
 	}
 	return nil
 }

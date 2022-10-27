@@ -192,7 +192,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	var requestStats metrics.Stats
 	if s.runtimeConfig.WithRequestStats {
 		requestStats = metrics.NewStats(logger)
-		opts = append(opts, pipeline.WithRequestStats(requestStats))
+		ctx = reqctx.WithReqStats(ctx, requestStats)
 	}
 
 	responseHandler := func(resp *pbsubstreams.Response) error {

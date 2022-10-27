@@ -87,6 +87,7 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 
 func (s *StoreSquasher) launch(ctx context.Context) {
 	logger := reqctx.Logger(ctx)
+	reqStats := reqctx.ReqStats(ctx)
 
 	logger.Info("launching store squasher")
 	metrics.SquashersStarted.Inc()
@@ -120,6 +121,8 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 
 		if out.lastExclusiveEndBlock != 0 {
 			s.onStoreCompletedUntilBlock(s.name, out.lastExclusiveEndBlock)
+
+			reqStats.RecordOutputCacheMiss()
 		}
 
 		totalDuration := time.Since(start)

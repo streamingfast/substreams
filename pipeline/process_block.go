@@ -20,6 +20,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	ctx, span := reqctx.WithSpan(p.ctx, "process_block")
 	defer span.EndWithErr(&err)
 
+	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 	defer func() {
 		if r := recover(); r != nil {
@@ -44,7 +45,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		attribute.Stringer("block.step", step),
 	)
 
-	p.stats.RecordBlock(block.AsRef())
+	reqStats.RecordBlock(block.AsRef())
 	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
 		p.runPostJobHooks(ctx, clock)
 		return err

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
@@ -19,6 +20,7 @@ type contextKeyType int
 var detailsKey = contextKeyType(0)
 var tracerKey = contextKeyType(2)
 var spanKey = contextKeyType(3)
+var reqStatsKey = contextKeyType(3)
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())
@@ -36,6 +38,18 @@ func Tracer(ctx context.Context) ttrace.Tracer {
 
 func WithTracer(ctx context.Context, tracer ttrace.Tracer) context.Context {
 	return context.WithValue(ctx, tracerKey, tracer)
+}
+
+func ReqStats(ctx context.Context) metrics.Stats {
+	reqStats := ctx.Value(reqStatsKey)
+	if t, ok := reqStats.(metrics.Stats); ok {
+		return t
+	}
+	return metrics.NewNoopStats()
+}
+
+func WithReqStats(ctx context.Context, stats metrics.Stats) context.Context {
+	return context.WithValue(ctx, reqStatsKey, stats)
 }
 
 func Span(ctx context.Context) ISpan {

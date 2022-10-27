@@ -26,12 +26,11 @@ func (p WorkPlan) ProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 			continue
 		}
 
-		var more []*pbsubstreams.BlockRange
-		if unit.initialCompleteRange != nil {
-			more = append(more, &pbsubstreams.BlockRange{
+		more := []*pbsubstreams.BlockRange{
+			{
 				StartBlock: unit.initialCompleteRange.StartBlock,
 				EndBlock:   unit.initialCompleteRange.ExclusiveEndBlock,
-			})
+			},
 		}
 
 		for _, rng := range unit.initialProcessedPartials() {

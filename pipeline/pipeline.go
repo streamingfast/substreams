@@ -7,7 +7,6 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -66,8 +65,6 @@ type Pipeline struct {
 
 	bounder  *StoreBoundary
 	StoreMap store.Map
-
-	stats metrics.Stats
 }
 
 func New(
@@ -93,7 +90,6 @@ func New(
 		respFunc:              respFunc,
 		bounder:               bounder,
 		forkHandler:           NewForkHandler(),
-		stats:                 metrics.NewNoopStats(),
 	}
 
 	for _, opt := range opts {
@@ -302,7 +298,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	output, runError := exec.RunModule(ctx, executor, execOutput, p.stats)
+	output, runError := exec.RunModule(ctx, executor, execOutput)
 	returnOutput := func() {
 		if output != nil {
 			p.moduleOutputs = append(p.moduleOutputs, output)

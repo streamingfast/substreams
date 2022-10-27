@@ -22,7 +22,7 @@ func TestStoreSetMaxBigInt(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(3),
 			value:         big.NewInt(4),
@@ -30,7 +30,7 @@ func TestStoreSetMaxBigInt(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewInt(5),
 			value:         big.NewInt(4),
@@ -38,7 +38,7 @@ func TestStoreSetMaxBigInt(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewInt(4),
@@ -88,7 +88,7 @@ func TestStoreSetMaxInt64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(3),
 			value:         4,
@@ -96,7 +96,7 @@ func TestStoreSetMaxInt64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: int64ptr(5),
 			value:         4,
@@ -104,7 +104,7 @@ func TestStoreSetMaxInt64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4,
@@ -155,7 +155,7 @@ func TestStoreSetMaxFloat64(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(3.0),
 			value:         4.0,
@@ -163,7 +163,7 @@ func TestStoreSetMaxFloat64(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: float64ptr(5.0),
 			value:         4.0,
@@ -171,7 +171,7 @@ func TestStoreSetMaxFloat64(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         4.0,
@@ -215,7 +215,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 	}{
 		{
 			name:          "found less",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(3),
 			value:         big.NewFloat(4),
@@ -223,7 +223,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 		},
 		{
 			name:          "found greater",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: big.NewFloat(5),
 			value:         big.NewFloat(4),
@@ -231,7 +231,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 		},
 		{
 			name:          "not found",
-			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{}),
+			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
 			value:         big.NewFloat(4),

@@ -3,6 +3,9 @@ package store
 import (
 	"context"
 	"fmt"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/store/marshaller"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
@@ -14,7 +17,7 @@ type FullKV struct {
 	*baseStore
 }
 
-func (s *FullKV) Marshaller() Marshaller {
+func (s *FullKV) Marshaller() marshaller.Marshaller {
 	return s.marshaller
 }
 
@@ -23,7 +26,7 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 		Config:     s.Config,
 		kv:         make(map[string][]byte),
 		logger:     s.logger,
-		marshaller: &BinaryMarshaller{},
+		marshaller: &marshaller.Proto{},
 	}
 	return &PartialKV{
 		baseStore:    b,
@@ -43,11 +46,13 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	if err != nil {
 		return fmt.Errorf("load full store %s at %s: %w", s.name, fileName, err)
 	}
-	kv, err := s.marshaller.Unmarshal(data)
-	if err != nil {
-		return fmt.Errorf("reading data: %w", err)
+
+	stateData := &pbsubstreams.StoreData{}
+	if err := proto.Unmarshal(data, stateData); err != nil {
+		return fmt.Errorf("unmarshal store: %w", err)
 	}
-	s.kv = kv
+
+	s.kv = stateData.GetKv()
 
 	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName))
 	return nil
@@ -59,7 +64,11 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
-	content, err := s.marshaller.Marshal(s.kv)
+	stateData := &pbsubstreams.StoreData{
+		Kv: s.kv,
+	}
+
+	content, err := proto.Marshal(stateData)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal kv state: %w", err)
 	}

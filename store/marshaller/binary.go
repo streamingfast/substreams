@@ -1,4 +1,4 @@
-package store
+package marshaller
 
 import (
 	"encoding/binary"
@@ -7,15 +7,10 @@ import (
 	"unsafe"
 )
 
-type Marshaller interface {
-	Unmarshal(in []byte) (map[string][]byte, error)
-	Marshal(kv map[string][]byte) ([]byte, error)
-}
+type Binary struct{}
 
-type BinaryMarshaller struct{}
-
-func (k *BinaryMarshaller) Marshal(kv map[string][]byte) ([]byte, error) {
-	content, err := writeMapStringBytes(kv)
+func (k *Binary) Marshal(data *StoreData) ([]byte, error) {
+	content, err := writeMapStringBytes(data.Kv)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling map string bytes kv state: %w", err)
 	}
@@ -23,13 +18,16 @@ func (k *BinaryMarshaller) Marshal(kv map[string][]byte) ([]byte, error) {
 	return content, nil
 }
 
-func (k *BinaryMarshaller) Unmarshal(in []byte) (map[string][]byte, error) {
+func (k *Binary) Unmarshal(in []byte) (*StoreData, error) {
 	kv, err := readMapStringBytes(in)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling  map string bytes kv state: %w", err)
 	}
 
-	return kv, nil
+	out := &StoreData{
+		Kv: kv,
+	}
+	return out, nil
 }
 
 func writeMapStringBytes(entries map[string][]byte) ([]byte, error) {

@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/store/marshaller"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -14,7 +15,7 @@ type baseStore struct {
 	kv          map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
 	deltas      []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
 	lastOrdinal uint64
-	marshaller  Marshaller
+	marshaller  marshaller.Marshaller
 
 	logger *zap.Logger
 }

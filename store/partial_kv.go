@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
@@ -24,11 +26,6 @@ func (p *PartialKV) Roll(lastBlock uint64) {
 
 func (p *PartialKV) InitialBlock() uint64 { return p.initialBlock }
 
-type storeData struct {
-	KV              map[string][]byte `json:"kv"`
-	DeletedPrefixes []string          `json:"deleted_prefixes"`
-}
-
 func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	filename := p.storageFilename(exclusiveEndBlock)
 	p.logger.Debug("loading partial store state from file", zap.String("filename", filename))
@@ -38,10 +35,12 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
 	}
 
-	stateData := &storeData{}
-	stateData.KV, err = p.marshaller.Unmarshal(data)
-	p.kv = stateData.KV
-	p.DeletedPrefixes = stateData.DeletedPrefixes
+	stateData := &pbsubstreams.StoreData{}
+	if err := proto.Unmarshal(data, stateData); err != nil {
+		return fmt.Errorf("unmarshal store: %w", err)
+	}
+	p.kv = stateData.GetKv()
+	p.DeletedPrefixes = stateData.GetDeletePrefixes()
 
 	p.logger.Debug("partial store loaded", zap.String("filename", filename))
 	return nil
@@ -50,12 +49,12 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
-	data := &storeData{
-		KV:              p.kv,
-		DeletedPrefixes: p.DeletedPrefixes,
+	stateData := &pbsubstreams.StoreData{
+		Kv:             p.kv,
+		DeletePrefixes: p.DeletedPrefixes,
 	}
 
-	content, err := p.marshaller.Marshal(data.KV)
+	content, err := proto.Marshal(stateData)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}

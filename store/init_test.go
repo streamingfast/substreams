@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/streamingfast/substreams/store/marshaller"
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/dstore"
@@ -13,7 +14,6 @@ func newTestBaseStore(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
-	writer Marshaller,
 ) *baseStore {
 	if store == nil {
 		store = dstore.NewMockStore(nil)
@@ -25,6 +25,6 @@ func newTestBaseStore(
 		Config:     config,
 		kv:         make(map[string][]byte),
 		logger:     zap.NewNop(),
-		marshaller: writer,
+		marshaller: &marshaller.Binary{},
 	}
 }

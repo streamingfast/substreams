@@ -35,7 +35,7 @@ func TestStoreSumBigInt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{})
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 			if test.existingValue != nil {
 				b.kv[test.key] = test.existingValue
 			}
@@ -79,7 +79,7 @@ func TestStoreSumInt64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{})
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 			if test.existingValue != nil {
 				b.kv[test.key] = test.existingValue
 			}
@@ -124,7 +124,7 @@ func TestStoreSumFloat64(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{})
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 			if test.existingValue != nil {
 				b.kv[test.key] = test.existingValue
 			}
@@ -169,7 +169,7 @@ func TestStoreSumBigFloat(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil, &BinaryMarshaller{})
+			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
 			if test.existingValue != nil {
 				b.kv[test.key] = test.existingValue
 			}

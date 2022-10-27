@@ -27,7 +27,7 @@ func BenchmarkFullKV_Marshall(b *testing.B) {
 	for _, keyCount := range []int{10, 100, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("%d_keys", keyCount), func(bb *testing.B) {
 			s := &FullKV{
-				baseStore: newTestBaseStore(bb, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil, &BinaryMarshaller{}),
+				baseStore: newTestBaseStore(bb, pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", nil),
 			}
 
 			startTime := time.Now()

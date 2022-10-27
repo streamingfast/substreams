@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/store/marshaller"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -43,7 +44,7 @@ func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 		Config:     c,
 		kv:         make(map[string][]byte),
 		logger:     logger.Named("store").With(zap.String("store_name", c.name)),
-		marshaller: &BinaryMarshaller{},
+		marshaller: &marshaller.Binary{},
 	}
 }
 

@@ -18,7 +18,7 @@ type RuntimeConfig struct {
 }
 
 func NewRuntimeConfig(
-	blockRangeSizeSubRequests uint64,
+	storeSnapshotsSaveInterval uint64,
 	execOutputSaveInterval uint64,
 	subrequestsSplitSize uint64,
 	parallelSubrequests uint64,
@@ -26,7 +26,7 @@ func NewRuntimeConfig(
 	workerFactory work.WorkerFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
-		StoreSnapshotsSaveInterval: blockRangeSizeSubRequests,
+		StoreSnapshotsSaveInterval: storeSnapshotsSaveInterval,
 		ExecOutputSaveInterval:     execOutputSaveInterval,
 		SubrequestsSplitSize:       subrequestsSplitSize,
 		ParallelSubrequests:        parallelSubrequests,

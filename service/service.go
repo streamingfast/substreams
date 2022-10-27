@@ -60,9 +60,9 @@ func New(
 	clientFactory := client.NewFactory(substreamsClientConfig)
 
 	runtimeConfig := config.NewRuntimeConfig(
+		1000, // overriden by Options
+		1000, // overriden by Options
 		blockRangeSizeSubRequests,
-		0,
-		0,
 		parallelSubRequests,
 		stateStore,
 		func(logger *zap.Logger) work.JobRunner {

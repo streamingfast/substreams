@@ -1,19 +1,30 @@
 {{$engine := . -}}
+use substreams::prelude::*;
+use substreams::errors::Error;
+use crate::pb;
+use crate::generated::substreams::{Substreams, SubstreamsTrait};
 
 {{range $engine.Package.Modules.Modules -}}
 {{$module := . -}}
 {{$functionSignature := $engine.FunctionSignature $module}}
 #[no_mangle]
-pub extern "C" fn {{$functionSignature.Name}}({{range $i, $value := $functionSignature.Arguments}}
+pub extern "C" fn {{$functionSignature.Name}}(
+{{- range $i, $value := $functionSignature.Arguments}}
     {{- if ne $value.ModuleInput.GetStore nil }}
-        {{$value.Name}}_ptr: *mut u8,
+        {{- if isDelta $value.ModuleInput}}
+            {{$value.Name}}_deltas_ptr: *mut u8,
+            {{$value.Name}}_deltas_len: usize,
+        {{else}}
+            {{$value.Name}}_ptr: u32,
+        {{end}}
     {{- else}}
-        {{$value.Name}}_ptr: *mut u8,
-        {{$value.Name}}_len: usize{{end}},
+    {{$value.Name}}_ptr: *mut u8,
+    {{$value.Name}}_len: usize,
+    {{- end -}}
     {{- end }}
 ) {
     substreams::register_panic_hook();
-    let func = || -> Result<{{$functionSignature.OutputType}}}, Error> {
+    let func = || {{- if eq $module.GetKindStore nil}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
         {{if ne $module.GetKindStore nil -}}{{/* This is the store for a store module*/}}
         {{writableStoreDeclaration $module.GetKindStore }}
         {{end -}}
@@ -27,7 +38,7 @@ pub extern "C" fn {{$functionSignature.Name}}({{range $i, $value := $functionSig
             {{end -}}
         {{end }}
 
-        {{.Name}}(
+        Substreams::{{.Name}}(
         {{- range $id, $argument := $functionSignature.Arguments}}
             {{- if isDelta $argument.ModuleInput }}{{/* delta mode */}}
             {{$argument.Name}}_deltas,
@@ -40,15 +51,15 @@ pub extern "C" fn {{$functionSignature.Name}}({{range $i, $value := $functionSig
         {{end -}}
         )
     };
+
+    {{- if ne $module.GetKindStore nil}}
+        func()
+    {{else}}
     let result = func();
     if result.is_err() {
-        {
-            ::std::rt::panic_fmt(::core::fmt::Arguments::new_v1(
-                &[""],
-                &[::core::fmt::ArgumentV1::new_debug(&result.err().unwrap())],
-            ))
-        }
+        panic!("{}", &result.err().unwrap());
     }
     substreams::output(result.unwrap());
+    {{end}}
 }
 {{end -}}

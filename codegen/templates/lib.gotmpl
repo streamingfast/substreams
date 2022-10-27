@@ -1,0 +1,47 @@
+{{$engine := . -}}
+
+mod pb;
+mod generated;
+use substreams::errors::Error;
+
+impl generated::substreams::SubstreamsTrait for generated::substreams::Substreams{
+{{range $engine.Package.Modules.Modules -}}
+	{{$module := . -}}
+	{{with ($engine.FunctionSignature $module) -}}
+		{{$functionSignature := . -}}
+		{{template "function" $functionSignature -}}
+	{{end -}}
+{{end -}}
+}
+
+{{define "function"}}
+{{ $functionSignature := .}}
+    fn {{$functionSignature.Name}}(
+    {{- range $id, $arg := $functionSignature.Arguments }}
+        {{ template "arg" $arg }}, {{- end -}}
+    {{- if ne $functionSignature.StorePolicy "UPDATE_POLICY_UNSET" -}}
+        {{- $m := getEngine.MustModule $functionSignature.Name }}
+        _store: {{writableStoreType $m.GetKindStore }},
+    {{- end }}
+    )
+	{{- if ne $functionSignature.OutputType "" }} -> Result<{{$functionSignature.OutputType}}, Error>{{end}}
+	{
+		todo!()
+	}
+{{end }}
+
+{{define "arg" -}}
+{{- $engine := getEngine -}}
+{{- $argument := . -}}
+	{{- if ne $argument.ModuleInput.GetStore nil  -}}
+		{{- $m := $engine.MustModule $argument.Name -}}
+		{{- if isDelta $argument.ModuleInput -}}
+			_{{$argument.Name}}_deltas
+		{{- else -}}
+			_{{$argument.Name -}}
+		{{- end -}}
+		: {{readableStoreType $m.GetKindStore $argument.ModuleInput.GetStore -}}
+	{{- else -}}
+		_{{$argument.Name}}: {{$argument.Type -}}
+	{{- end -}}
+{{- end -}}

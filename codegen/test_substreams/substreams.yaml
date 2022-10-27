@@ -3,15 +3,18 @@ package:
   name: uniswap_v3
   version: v0.1.0
   url: https://github.com/streamingfast/substreams
-  doc: |
-    These substream modules compose multiple modules for testing purses for the codegen
-    command
-
+  doc: some doc
 ### section added to have the manifest validation work, don't need to build anything
 binaries:
   default:
     type: wasm/rust-v1
-    file: ./target/wasm32-unknown-unknown/release/substreams_uniswap_v3.wasm
+    file: ./bla/bla
+
+protobuf:
+  files:
+    - my/v1/my.proto
+  importPaths:
+    - ./proto
 
 modules:
   - name: map_block
@@ -20,7 +23,7 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:my.type.v1.Tests
+      type: proto:my.types.v1.Tests
 
   - name: map_block_i64
     kind: map
@@ -34,25 +37,24 @@ modules:
     kind: store
     initialBlock: 1
     updatePolicy: set
-    valueType: proto:my.type.v1.Test
+    valueType: proto:my.types.v1.Test
     inputs:
       - source: sf.ethereum.type.v2.Block
       - map: map_block
 
-  - name: store_test
+  - name: store_bigint
     kind: store
     initialBlock: 1
     updatePolicy: set
-    valueType: proto:my.type.v1.Test
+    valueType: bigint
     inputs:
       - source: sf.ethereum.type.v2.Block
-      - map: map_block
 
   - name: store_test2
     kind: store
     initialBlock: 1
     updatePolicy: set
-    valueType: proto:my.type.v1.Test2
+    valueType: proto:my.types.v1.Test
     inputs:
       - source: sf.ethereum.type.v2.Block
       - map: map_block
@@ -60,3 +62,6 @@ modules:
       - store: store_test
         mode: deltas
       - map: map_block_i64
+      - store: store_bigint
+      - store: store_bigint
+        mode: deltas

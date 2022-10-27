@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package my.types.v1;
+
+message Tests {
+  repeated Test tests = 1;
+}
+
+message Test {
+  string field1 = 1;
+}

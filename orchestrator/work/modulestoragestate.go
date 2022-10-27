@@ -57,10 +57,6 @@ func newModuleStorageState(modName string, storeSaveInterval, modInitBlock, work
 	return
 }
 
-func (w *ModuleStorageState) initialProcessedPartials() block.Ranges {
-	return w.PartialsPresent.Merged()
-}
-
 func (w *ModuleStorageState) batchRequests(subreqSplitSize uint64) block.Ranges {
 	return w.PartialsMissing.MergedBuckets(subreqSplitSize)
 }

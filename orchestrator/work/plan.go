@@ -43,6 +43,8 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
 	plan.initModulesReadyUpToBlock()
+	plan.promoteWaitingJobs()
+	plan.prioritize()
 	return plan, nil
 }
 
@@ -99,66 +101,27 @@ func (p *Plan) initModulesReadyUpToBlock() {
 			p.modulesReadyUpToBlock[modName] = modState.InitialCompleteRange.ExclusiveEndBlock
 		}
 	}
+}
+
+func (p *Plan) MarkDependencyComplete(modName string, upToBlock uint64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.bumpModuleUpToBlock(modName, upToBlock)
 	p.promoteWaitingJobs()
 	p.prioritize()
 }
 
-//
-//func (p *orchestrator.JobsPlanner) sortJobs() {
-//	// TODO(abourget): absorb this method in the work.Plan
-//	sort.Slice(p.jobs, func(i, j int) bool {
-//		// reverse sorts priority, higher first
-//		return p.jobs[i].Priority > p.jobs[j].Priority
-//	})
-//}
-//
-//func (p *orchestrator.JobsPlanner) dispatch() {
-//	// TODO(abourget): absorb this method in the work.Plan
-//	if p.completed {
-//		return
-//	}
-//
-//	var scheduled int
-//	for _, job := range p.jobs {
-//		if job.Scheduled {
-//			scheduled++
-//			continue
-//		}
-//		if job.ReadyForDispatch() {
-//			job.Scheduled = true
-//			p.AvailableJobs <- job
-//		}
-//	}
-//	if scheduled == len(p.jobs) {
-//		close(p.AvailableJobs)
-//		p.completed = true
-//	}
-//}
-
-func (p *Plan) prioritize() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// TODO(abourget): TEST THIS, that the priority calculation is now better
-	sort.Slice(p.readyJobs, func(i, j int) bool {
-		// reverse sorts priority, higher first
-		return p.readyJobs[i].priority > p.readyJobs[j].priority
-	})
-}
-
-func (p *Plan) MarkDependencyComplete(modName string, upToBlock uint64) {
+func (p *Plan) bumpModuleUpToBlock(modName string, upToBlock uint64) {
+	// Called with locked mutex
 	current := p.modulesReadyUpToBlock[modName]
 	if upToBlock > current {
 		p.modulesReadyUpToBlock[modName] = upToBlock
 	}
-	p.promoteWaitingJobs()
-	p.prioritize()
 }
 
 func (p *Plan) promoteWaitingJobs() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+	// Called with locked mutex
 	removeJobs := map[*Job]bool{}
 	for _, job := range p.waitingJobs {
 		if p.allDependenciesMet(job) {
@@ -187,6 +150,15 @@ func (p *Plan) allDependenciesMet(job *Job) bool {
 	return true
 }
 
+func (p *Plan) prioritize() {
+	// Called with locked mutex
+	// TODO(abourget): TEST THIS, that the priority calculation is now better
+	sort.Slice(p.readyJobs, func(i, j int) bool {
+		// reverse sorts priority, higher first
+		return p.readyJobs[i].priority > p.readyJobs[j].priority
+	})
+}
+
 func (p *Plan) NextJob() (job *Job, more bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -213,34 +185,32 @@ func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) err
 }
 
 func (p *Plan) initialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
-	for storeName, unit := range p.ModulesStateMap {
-		if unit.InitialCompleteRange == nil {
-			continue
-		}
-
+	for storeName, modState := range p.ModulesStateMap {
 		var more []*pbsubstreams.BlockRange
-		if unit.InitialCompleteRange != nil {
+		if modState.InitialCompleteRange != nil {
 			more = append(more, &pbsubstreams.BlockRange{
-				StartBlock: unit.InitialCompleteRange.StartBlock,
-				EndBlock:   unit.InitialCompleteRange.ExclusiveEndBlock,
+				StartBlock: modState.InitialCompleteRange.StartBlock,
+				EndBlock:   modState.InitialCompleteRange.ExclusiveEndBlock,
 			})
 		}
 
-		for _, rng := range unit.initialProcessedPartials() {
+		for _, rng := range modState.PartialsPresent.Merged() {
 			more = append(more, &pbsubstreams.BlockRange{
 				StartBlock: rng.StartBlock,
 				EndBlock:   rng.ExclusiveEndBlock,
 			})
 		}
 
-		out = append(out, &pbsubstreams.ModuleProgress{
-			Name: storeName,
-			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-					ProcessedRanges: more,
+		if len(more) != 0 {
+			out = append(out, &pbsubstreams.ModuleProgress{
+				Name: storeName,
+				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
+					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+						ProcessedRanges: more,
+					},
 				},
-			},
-		})
+			})
+		}
 	}
 	return
 }

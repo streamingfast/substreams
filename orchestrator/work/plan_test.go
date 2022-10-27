@@ -3,7 +3,9 @@ package work
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -398,4 +400,72 @@ func TestPlan_buildPlanFromStorageState(t *testing.T) {
 			tt.wantErr(t, p.buildPlanFromStorageState(tt.args.ctx, tt.args.storageState, tt.args.storeConfigMap, tt.args.storeSnapshotsSaveInterval, tt.args.upToBlock), fmt.Sprintf("buildPlanFromStorageState(%v, %v, %v, %v, %v)", tt.args.ctx, tt.args.storageState, tt.args.storeConfigMap, tt.args.storeSnapshotsSaveInterval, tt.args.upToBlock))
 		})
 	}
+}
+
+func TestPlan_initialProgressMessages(t *testing.T) {
+	tests := []struct {
+		name             string
+		modState         *ModuleStorageState
+		expectedProgress string
+	}{
+		{
+			modState: &ModuleStorageState{
+				ModuleName:           "A",
+				InitialCompleteRange: block.ParseRange("1-10"),
+				PartialsPresent:      block.ParseRanges("20-30,40-50,50-60"),
+			},
+			expectedProgress: "A:r1-10,20-30,40-60",
+		},
+		{
+			modState: &ModuleStorageState{
+				ModuleName:           "A",
+				InitialCompleteRange: block.ParseRange("1-10"),
+			},
+			expectedProgress: "A:r1-10",
+		},
+		{
+			modState: &ModuleStorageState{
+				ModuleName:      "A",
+				PartialsPresent: block.ParseRanges("10-20"),
+			},
+			expectedProgress: "A:r10-20",
+		},
+		{
+			modState: &ModuleStorageState{
+				ModuleName: "A",
+			},
+			expectedProgress: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			p := &Plan{ModulesStateMap: TestModStateMap(test.modState)}
+
+			out := p.initialProgressMessages()
+
+			assert.Equal(t, test.expectedProgress, reduceProgressMessages(out))
+		})
+	}
+}
+
+func reduceProgressMessages(in []*pbsubstreams.ModuleProgress) string {
+	var out []string
+	for _, prog := range in {
+		entry := fmt.Sprintf("%s:", prog.Name)
+		switch t := prog.Type.(type) {
+		case *pbsubstreams.ModuleProgress_ProcessedRanges:
+			var rngs []string
+			for _, rng := range t.ProcessedRanges.ProcessedRanges {
+				rngs = append(rngs, fmt.Sprintf("%d-%d", rng.StartBlock, rng.EndBlock))
+			}
+			entry += "r" + strings.Join(rngs, ",")
+		case *pbsubstreams.ModuleProgress_InitialState_:
+			entry += "up" + fmt.Sprintf("%d", t.InitialState.AvailableUpToBlock)
+		default:
+			panic("unsupported here")
+		}
+		out = append(out, entry)
+	}
+	return strings.Join(out, ";")
 }

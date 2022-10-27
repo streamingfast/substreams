@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, subrequestsSplitSize uint64, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
+func runTest(t *testing.T, startBlock int64, cursor *bstream.Cursor, exclusiveEndBlock uint64, moduleNames []string, subrequestsSplitSize uint64, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
 	ctx := context.Background()
 	ctx = reqctx.WithLogger(ctx, zlog)
 
@@ -48,9 +48,14 @@ func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNam
 	//todo: compile substreams
 	pkg, moduleGraph := processManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
 
+	opaqueCursor := ""
+	if cursor != nil {
+		opaqueCursor = cursor.ToOpaque()
+	}
 	request := &pbsubstreams.Request{
 		StartBlockNum: startBlock,
 		StopBlockNum:  exclusiveEndBlock,
+		StartCursor:   opaqueCursor,
 		Modules:       pkg.Modules,
 		OutputModules: moduleNames,
 	}
@@ -160,10 +165,51 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, nil, 12, []string{"test_map"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
+		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
+	}, moduleOutputs)
+}
+
+func Test_SimpleMapModuleWithCursor(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	cursor := &bstream.Cursor{
+		Step:      bstream.StepNew,
+		Block:     bstream.NewBlockRef("10a", 10),
+		LIB:       bstream.NewBlockRef("8a", 8),
+		HeadBlock: bstream.NewBlockRef("10a", 10),
+	}
+	moduleOutputs, err := runTest(t, 5, cursor, 12, []string{"test_map"}, 10, newBlockGenerator, nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		//		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`, // we already saw block 10, it is the cursor
+		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
+	}, moduleOutputs)
+}
+func Test_SimpleMapModuleWithCursorUndo(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	cursor := &bstream.Cursor{
+		Step:      bstream.StepUndo,
+		Block:     bstream.NewBlockRef("10a", 10),
+		LIB:       bstream.NewBlockRef("8a", 8),
+		HeadBlock: bstream.NewBlockRef("10a", 10),
+	}
+	moduleOutputs, err := runTest(t, 5, cursor, 12, []string{"test_map"}, 10, newBlockGenerator, nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`, // customer has "undone" block 10, need to send it again
 		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
 	}, moduleOutputs)
 }
@@ -175,7 +221,7 @@ func Test_test_store_proto(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, 10, 12, []string{"test_store_proto"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, nil, 12, []string{"test_store_proto"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -191,7 +237,7 @@ func Test_MultipleModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 10, nil, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -214,7 +260,7 @@ func Test_MultipleModule_Batch(t *testing.T) {
 
 	//todo: Need to validate the storage file
 
-	_, err := runTest(t, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, newBlockGenerator, nil)
+	_, err := runTest(t, 1000, nil, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 }
 
@@ -226,7 +272,7 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		}
 	}
 
-	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, 110, nil, 112, []string{"test_map", "test_store_proto"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -246,7 +292,7 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	}
 
 	outputFilesLen := 0
-	moduleOutputs, err := runTest(t, 110, 112, []string{"test_map", "test_store_proto"}, 10,
+	moduleOutputs, err := runTest(t, 110, nil, 112, []string{"test_map", "test_store_proto"}, 10,
 		newBlockGenerator,
 		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 			err := baseStore.Walk(context.Background(), "", func(filename string) (err error) {
@@ -283,7 +329,7 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, 10, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+	_, err := runTest(t, 30, nil, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, 10, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		if b.Number == 40 {
 			s, storeFound := stores.Get("test_store_delete_prefix")
 			require.True(t, storeFound)
@@ -336,6 +382,6 @@ func Test_assert_all_test(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, 20, 31, []string{"assert_all_test"}, 10, newBlockGenerator, nil)
+	_, err := runTest(t, 20, nil, 31, []string{"assert_all_test"}, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 }

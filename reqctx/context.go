@@ -3,6 +3,9 @@ package reqctx
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
@@ -12,7 +15,6 @@ import (
 	"go.uber.org/zap"
 	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"io"
 )
 
 type contextKeyType int
@@ -140,5 +142,11 @@ func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
 		return 0, status.Errorf(grpccodes.InvalidArgument, "invalid start cursor %q: %s", cursor, err.Error())
 	}
 
-	return cursor.Block.Num(), nil
+	if cursor.Step.Matches(bstream.StepNew) || cursor.Step.Matches(bstream.StepIrreversible) {
+		return cursor.Block.Num() + 1, nil // this block was the last sent to the customer
+	}
+	if cursor.Step.Matches(bstream.StepUndo) {
+		return cursor.Block.Num(), nil
+	}
+	return 0, fmt.Errorf("invalid start cursor step")
 }

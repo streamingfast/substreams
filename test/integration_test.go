@@ -25,9 +25,6 @@ import (
 )
 
 func runTest(t *testing.T, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
-	if os.Getenv("SUBSTREAMS_INTEGRATION_TESTS") == "" {
-		t.Skip("Environment variable SUBSTREAMS_INTEGRATION_TESTS must be set for now to run integration tests")
-	}
 	ctx := context.Background()
 	ctx = reqctx.WithLogger(ctx, zlog)
 

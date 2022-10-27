@@ -15,7 +15,6 @@ import (
 )
 
 type Scheduler struct {
-	workerPool             work.JobRunnerPool
 	workPlan               *work.Plan
 	respFunc               substreams.ResponseFunc
 	graph                  *manifest.ModuleGraph

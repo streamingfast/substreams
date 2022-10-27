@@ -2,6 +2,7 @@ package work
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -13,13 +14,12 @@ import (
 type Job struct {
 	ModuleName   string // target
 	RequestRange *block.Range
-
-	jobOrdinal      uint64   // the order of the job, as a unit of job scheduling, relative to the position in the chain.
+	// the order of the job, as a unit of job scheduling, relative to the position in the chain.
 	requiredModules []string // modules that need to be sync'd before this one starts at RequestRange.StartBlockNum}
-	priority        uint64
+	priority        int
 }
 
-func NewJob(storeName string, requestRange *block.Range, requiredModules []string, highestJobOrdinal, jobOrdinal uint64) *Job {
+func NewJob(storeName string, requestRange *block.Range, requiredModules []string, priority int) *Job {
 	// TODO(abourget): test that the priority calculations give us what we need
 	// The thing is that the priority wouldn't change.. the readiness is what would
 	// change really. That's handled in the Plan, but priority is constant.
@@ -28,7 +28,7 @@ func NewJob(storeName string, requestRange *block.Range, requiredModules []strin
 		ModuleName:      storeName,
 		RequestRange:    requestRange,
 		requiredModules: requiredModules,
-		priority:        highestJobOrdinal - jobOrdinal + uint64(len(requiredModules)),
+		priority:        priority,
 	}
 	return j
 }
@@ -45,7 +45,7 @@ func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams
 }
 
 func (j *Job) String() string {
-	return fmt.Sprintf("job: module=%s range=%s", j.ModuleName, j.RequestRange)
+	return fmt.Sprintf("job: module=%s range=%s deps=%s prio=%d", j.ModuleName, j.RequestRange, strings.Join(j.requiredModules, ","), j.priority)
 }
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {

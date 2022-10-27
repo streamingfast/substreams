@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type JobRunner func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error)
+type JobRunner func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) (partialsWritten []*block.Range, err error)
 
 // The tracer will be provided by the worker pool, on worker creation
 type WorkerFactory = func(logger *zap.Logger) JobRunner

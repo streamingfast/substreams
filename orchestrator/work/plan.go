@@ -69,22 +69,20 @@ func (p *Plan) buildPlanFromStorageState(ctx context.Context, storageState *Stor
 }
 
 func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.ModuleGraph) error {
-	highestJobOrdinal := p.upToBlock / subrequestSplitSize
+	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
 	for storeName, workUnit := range p.ModulesStateMap {
 		requests := workUnit.batchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
-			// TODO(abourget): figure out a way to do those calls only once. Mind you, in the
-			// future, we might need to re-compute the ancestor graph at different places
-			// during the history of the chain, as "moduleInitialBlock"s evolve with PATCH
-			// modules.
 			ancestorStoreModules, err := graph.AncestorStoresOf(storeName)
 			if err != nil {
 				return fmt.Errorf("getting ancestor stores for %s: %w", storeName, err)
 			}
 
-			jobOrdinal := requestRange.StartBlock / subrequestSplitSize
 			requiredModules := moduleNames(ancestorStoreModules)
-			job := NewJob(storeName, requestRange, requiredModules, highestJobOrdinal, jobOrdinal)
+			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
+			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)
+
+			job := NewJob(storeName, requestRange, requiredModules, priority)
 			p.waitingJobs = append(p.waitingJobs, job)
 		}
 	}

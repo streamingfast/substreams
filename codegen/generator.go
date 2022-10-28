@@ -70,29 +70,29 @@ func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescri
 }
 
 func (g *Generator) Generate() (err error) {
-
 	var writer io.Writer
+	srcDir := g.basePath
 
-	if err := os.MkdirAll(g.basePath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(srcDir, os.ModePerm); err != nil {
 		return fmt.Errorf("creating src directory %v: %w", g.basePath, err)
 	}
 
-	generatedFolder := filepath.Join(g.basePath, "generated")
+	generatedFolder := filepath.Join(srcDir, "generated")
 	if err := os.MkdirAll(generatedFolder, os.ModePerm); err != nil {
-		return fmt.Errorf("creating generated directory %v: %w", g.basePath, err)
+		return fmt.Errorf("creating generated directory %v: %w", srcDir, err)
 	}
 
-	pbFolder := filepath.Join(g.basePath, "pb")
+	pbFolder := filepath.Join(srcDir, "pb")
 	if err := os.MkdirAll(pbFolder, os.ModePerm); err != nil {
-		return fmt.Errorf("creating pb directory %v: %w", g.basePath, err)
+		return fmt.Errorf("creating pb directory %v: %w", srcDir, err)
 	}
 
-	libFilePath := filepath.Join(g.basePath, "lib.rs")
+	libFilePath := filepath.Join(srcDir, "lib.rs")
 	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
 		// path/to/whatever does not exist
 		f, err := os.Create(libFilePath)
 		if err != nil {
-			return fmt.Errorf("creating file lib.rs in %q: %w", g.basePath, err)
+			return fmt.Errorf("creating file lib.rs in %q: %w", srcDir, err)
 		}
 		writer = f
 
@@ -275,7 +275,7 @@ func IsDelta(input *pbsubstreams.Module_Input) bool {
 	return false
 }
 
-func ReadableStoreType(store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+func ReadableStoreType(store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
 	t := store.ValueType
 
 	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
@@ -295,7 +295,8 @@ func ReadableStoreType(store pbsubstreams.Module_KindStore, input *pbsubstreams.
 	t = StoreType[t]
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
-func WritableStoreType(store pbsubstreams.Module_KindStore) string {
+
+func WritableStoreType(store *pbsubstreams.Module_KindStore) string {
 	t := store.ValueType
 
 	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
@@ -308,7 +309,7 @@ func WritableStoreType(store pbsubstreams.Module_KindStore) string {
 	return fmt.Sprintf("substreams::store::Store%s%s", p, t)
 }
 
-func WritableStoreDeclaration(store pbsubstreams.Module_KindStore) string {
+func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
 	t := store.ValueType
 	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
 	p = UpdatePoliciesMap[p]
@@ -321,7 +322,7 @@ func WritableStoreDeclaration(store pbsubstreams.Module_KindStore) string {
 	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
 }
 
-func ReadableStoreDeclaration(name string, store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
 	t := store.ValueType
 	isProto := strings.HasPrefix(t, "proto")
 	if isProto {
@@ -403,7 +404,6 @@ func (e *Engine) FunctionSignature(module *pbsubstreams.Module) (*FunctionSignat
 
 func (e *Engine) Arguments(module *pbsubstreams.Module) ([]string, error) {
 	var args []string
-	args = append(args, "salyut")
 	return args, nil
 }
 
@@ -475,12 +475,6 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 		}
 	}
 	return out, nil
-}
-
-func transformOutputType(moduleValueType string) string {
-	outputType := strings.TrimPrefix(moduleValueType, "proto:")
-	elements := strings.Split(outputType, ".")
-	return fmt.Sprintf("crate::pb::%s::%s", elements[0], elements[len(elements)-1])
 }
 
 func transformProtoType(t string) string {

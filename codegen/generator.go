@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/jhump/protoreflect/desc"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -24,6 +26,9 @@ var substreamsTemplate string
 
 //go:embed templates/mod.gotmpl
 var modTemplate string
+
+//go:embed templates/pb_mod.gotmpl
+var pbModTemplate string
 
 const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
 const EthereumBlockRust = "substreams_ethereum::pb::eth::v2::Block"
@@ -51,18 +56,21 @@ var UpdatePoliciesMap = map[string]string{
 }
 
 type Generator struct {
-	pkg      *pbsubstreams.Package
-	basePath string
+	pkg              *pbsubstreams.Package
+	basePath         string
+	protoDefinitions []*desc.FileDescriptor
 }
 
-func NewGenerator(pkg *pbsubstreams.Package, basePath string) *Generator {
+func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, basePath string) *Generator {
 	return &Generator{
-		pkg:      pkg,
-		basePath: basePath,
+		pkg:              pkg,
+		basePath:         basePath,
+		protoDefinitions: protoDefinitions,
 	}
 }
 
 func (g *Generator) Generate() (err error) {
+
 	var writer io.Writer
 
 	if err := os.MkdirAll(g.basePath, os.ModePerm); err != nil {
@@ -72,6 +80,11 @@ func (g *Generator) Generate() (err error) {
 	generatedFolder := filepath.Join(g.basePath, "generated")
 	if err := os.MkdirAll(generatedFolder, os.ModePerm); err != nil {
 		return fmt.Errorf("creating generated directory %v: %w", g.basePath, err)
+	}
+
+	pbFolder := filepath.Join(g.basePath, "pb")
+	if err := os.MkdirAll(pbFolder, os.ModePerm); err != nil {
+		return fmt.Errorf("creating pb directory %v: %w", g.basePath, err)
 	}
 
 	libFilePath := filepath.Join(g.basePath, "lib.rs")
@@ -117,7 +130,17 @@ func (g *Generator) Generate() (err error) {
 	writer = f
 	err = g.GenerateMod(writer)
 	if err != nil {
-		return fmt.Errorf("generating mod.rss: %w", err)
+		return fmt.Errorf("generating mod.rs: %w", err)
+	}
+
+	f, err = os.Create(filepath.Join(pbFolder, "mod.rs"))
+	if err != nil {
+		return fmt.Errorf("creating file pb/mod.rs in %q: %w", pbFolder, err)
+	}
+	writer = f
+	err = g.GeneratePbMod(writer)
+	if err != nil {
+		return fmt.Errorf("generating pb/mod.rs: %w", err)
 	}
 
 	return nil
@@ -196,6 +219,31 @@ func (g *Generator) GenerateMod(writer io.Writer) error {
 	err = tmpl.Execute(
 		writer,
 		engine,
+	)
+
+	if err != nil {
+		return fmt.Errorf("executing mod template: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) GeneratePbMod(writer io.Writer) error {
+
+	protoPackages := map[string]string{}
+	for _, definition := range g.protoDefinitions {
+		p := definition.GetPackage()
+		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
+	}
+
+	tmpl, err := template.New("mod").Funcs(utils).Parse(pbModTemplate)
+	if err != nil {
+		return fmt.Errorf("parsing mod template: %w", err)
+	}
+
+	err = tmpl.Execute(
+		writer,
+		protoPackages,
 	)
 
 	if err != nil {

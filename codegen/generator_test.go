@@ -25,7 +25,7 @@ import (
 //}
 
 func TestGenerator_Generate(t *testing.T) {
-	manifestPath := "./substreams.yaml"
+	manifestPath := "./test_substreams/substreams.yaml"
 	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
 
 	pkg, err := manifestReader.Read()

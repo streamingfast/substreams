@@ -5,6 +5,8 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/jhump/protoreflect/desc"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/manifest"
@@ -24,7 +26,11 @@ func init() {
 
 func runCodeGen(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
-	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
+
+	var protoDefinitions []*desc.FileDescriptor
+	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
+		protoDefinitions = pd
+	}))
 
 	manifestAbsPath, err := filepath.Abs(manifestPath)
 	if err != nil {
@@ -39,49 +45,11 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 
 	srcDir := path.Join(workingDir, "src")
 
-	gen := codegen.NewGenerator(pkg, srcDir)
+	gen := codegen.NewGenerator(pkg, protoDefinitions, srcDir)
 	err = gen.Generate()
 	if err != nil {
 		return fmt.Errorf("generating code: %w", err)
 	}
-
-	//modRs := "mod.rs"
-	//
-	//modRsFile, err := os.Create(filepath.Join(genFolderLocation, filepath.Base(modRs)))
-	//if err != nil {
-	//	panic(err)
-	//}
-	//defer func() {
-	//	if err := modRsFile.Close(); err != nil {
-	//		panic(err)
-	//	}
-	//}()
-	//g := codegen.NewGenerator(pkg, modRsFile)
-	//err = g.GenerateModRs()
-	//
-	//generatedRs := "generated.rs"
-	//
-	//generatedRsFile, err := os.Create(filepath.Join(genFolderLocation, filepath.Base(generatedRs)))
-	//if err != nil {
-	//	panic(err)
-	//}
-	//defer func() {
-	//	if err := generatedRsFile.Close(); err != nil {
-	//		panic(err)
-	//	}
-	//}()
-	//g = codegen.NewGenerator(pkg, generatedRsFile)
-	//err = g.Generate()
-	//
-	////todo:
-	//// 1- create ./gen/generated.rs
-	//// 2- generate code in generated.rs from manifest
-	//// 3- add tests for generator
-	//
-	////generatedRs := "generated.rs"
-	////if err := os.WriteFile(generatedRs, , os.ModePerm); err != nil {
-	////	return fmt.Errorf("writing %v file: %w", generatedRs, err)
-	////}
 
 	return nil
 }

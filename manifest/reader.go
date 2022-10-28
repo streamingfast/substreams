@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jhump/protoreflect/desc"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
@@ -25,9 +27,16 @@ func SkipSourceCodeReader() Options {
 	}
 }
 
-type Reader struct {
-	input string
+func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Options {
+	return func(r *Reader) *Reader {
+		r.collectProtoDefinitionsFunc = f
+		return r
+	}
+}
 
+type Reader struct {
+	input                       string
+	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
 	//options
 	skipSourceCodeImportValidation bool
 }
@@ -47,7 +56,14 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 	}
 
 	if strings.HasSuffix(r.input, ".yaml") {
-		return r.newPkgFromManifest(r.input)
+		pkg, protoDefinitions, err := r.newPkgFromManifest(r.input)
+		if err != nil {
+			return nil, err
+		}
+		if r.collectProtoDefinitionsFunc != nil {
+			r.collectProtoDefinitionsFunc(protoDefinitions)
+		}
+		return pkg, nil
 	}
 
 	return r.newPkgFromFile(r.input)
@@ -82,22 +98,22 @@ func (r *Reader) newPkgFromURL(fileURL string) (pkg *pbsubstreams.Package, err e
 	return r.fromContents(cnt)
 }
 
-func (r *Reader) newPkgFromManifest(inputPath string) (pkg *pbsubstreams.Package, err error) {
+func (r *Reader) newPkgFromManifest(inputPath string) (pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, err error) {
 	manif, err := loadManifestFile(inputPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	pkg, err = r.manifestToPkg(manif)
+	pkg, protoDefinitions, err = r.manifestToPkg(manif)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := r.validate(pkg); err != nil {
-		return nil, fmt.Errorf("failed validation: %w", err)
+		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
 
-	return pkg, nil
+	return pkg, protoDefinitions, nil
 }
 
 func (r *Reader) fromContents(contents []byte) (pkg *pbsubstreams.Package, err error) {
@@ -386,21 +402,22 @@ func mergeProtoFiles(src, dest *pbsubstreams.Package) {
 // manifestToPkg will take a Manifest object, most likely generated from a YAML file, and will create a Proto Pakcage object
 // in some cases we do not want to validate the package and ensure that all the code and dependencies are there fro example
 // when we are using the generated package transitively
-func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, error) {
+func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, error) {
 	pkg, err := r.convertToPkg(m)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
+		return nil, nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
 	}
 
-	if err := loadProtobufs(pkg, m); err != nil {
-		return nil, fmt.Errorf("error loading protobuf: %w", err)
+	protoDefinitions, err := loadProtobufs(pkg, m)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
 
 	if err := loadImports(pkg, m); err != nil {
-		return nil, fmt.Errorf("error loading imports: %w", err)
+		return nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
-	return pkg, nil
+	return pkg, protoDefinitions, nil
 }
 
 func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {

@@ -1,6 +1,14 @@
 syntax = "proto3";
+import "google/protobuf/descriptor.proto";
 
 package my.types.v1;
+
+extend google.protobuf.FileOptions {
+  string my_option = 1111;
+}
+
+  option (my_option) = "Hello world!";
+
 
 message Tests {
   repeated Test tests = 1;

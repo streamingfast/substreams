@@ -96,9 +96,7 @@ func TestScheduler_runOne(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := &Scheduler{
-				workPlan: test.plan,
-			}
+			s := &Scheduler{workPlan: test.plan}
 			wg := &sync.WaitGroup{}
 			result := make(chan jobResult, 100)
 			pool := testNoopRunnerPool(2)

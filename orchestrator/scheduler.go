@@ -50,7 +50,7 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err 
 
 	go func() {
 		for {
-			if !s.runOne(ctx, wg, result, pool) {
+			if finished := s.runOne(ctx, wg, result, pool); finished {
 				wg.Wait()
 				close(result)
 				return
@@ -61,6 +61,43 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err 
 	return s.resultGatherer(ctx, result)
 }
 
+func (s *Scheduler) runOne(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.JobRunnerPool) (finished bool) {
+	jobRunner := pool.Borrow(ctx)
+	if jobRunner == nil {
+		return true
+	}
+
+	nextJob := s.getNextJob(ctx)
+	if nextJob == nil {
+		return true
+	}
+
+	wg.Add(1)
+	go func() {
+		partialsWritten, err := s.runSingleJob(ctx, jobRunner, nextJob, s.upstreamRequestModules)
+		result <- jobResult{job: nextJob, partialsWritten: partialsWritten, err: err}
+		pool.Return(jobRunner)
+		wg.Done()
+	}()
+	return false
+}
+
+func (s *Scheduler) getNextJob(ctx context.Context) (nextJob *work.Job) {
+	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+		nextJob, moreJobs := s.workPlan.NextJob()
+		if nextJob != nil {
+			return nextJob
+		}
+		if moreJobs {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		return nil
+	}
+}
 func (s *Scheduler) resultGatherer(ctx context.Context, result chan jobResult) (err error) {
 	for {
 		select {
@@ -91,29 +128,6 @@ func (s *Scheduler) processJobResult(result jobResult) error {
 		}
 	}
 	return nil
-}
-
-func (s *Scheduler) runOne(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.JobRunnerPool) (moreJobs bool) {
-	jobRunner := pool.Borrow()
-	defer pool.Return(jobRunner)
-
-	nextJob, moreJobs := s.workPlan.NextJob()
-	if nextJob == nil {
-		// TODO(colin): who closes the `result` channel?
-		if moreJobs {
-			time.Sleep(1 * time.Second)
-			return true
-		}
-		return false
-	}
-
-	wg.Add(1)
-	go func() {
-		partialsWritten, err := s.runSingleJob(ctx, jobRunner, nextJob, s.upstreamRequestModules)
-		result <- jobResult{job: nextJob, partialsWritten: partialsWritten, err: err}
-		wg.Done()
-	}()
-	return true
 }
 
 // OnStoreCompletedUntilBlock is called to say the given storeName

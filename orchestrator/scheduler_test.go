@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"sort"
+	"sync"
 	"testing"
 )
 
@@ -76,4 +77,35 @@ func testRunnerPool(parallelism int) (work.JobRunnerPool, chan in, chan out) {
 		},
 	)
 	return runnerPool, inchan, outchan
+}
+
+func TestScheduler_runOne(t *testing.T) {
+	type fields struct {
+	}
+	type args struct {
+		ctx    context.Context
+		wg     *sync.WaitGroup
+		result chan jobResult
+		pool   work.JobRunnerPool
+	}
+	tests := []struct {
+		name             string
+		plan         *work.Plan
+		expectMoreJobs   bool
+		expectPoolLength int
+	}{
+		{
+			plan: &Plan{},
+		}
+	},
+		for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := &Scheduler{
+				workPlan:                   test.plan,
+			}
+			wg := &sync.WaitGroup{}
+			result := make(chan jobResult)
+			assert.Equalf(t, test.expectMoreJobs, s.runOne(context.Background(), wg, test.args.result, test.args.pool), "runOne(%v, %v, %v, %v)", test.args.ctx, test.args.wg, test.args.result, test.args.pool)
+		})
+	}
 }

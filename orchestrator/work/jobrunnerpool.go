@@ -7,7 +7,7 @@ import (
 )
 
 type JobRunnerPool interface {
-	Borrow() JobRunner
+	Borrow(context.Context) JobRunner
 	Return(JobRunner)
 }
 
@@ -28,9 +28,13 @@ func NewJobRunnerPool(ctx context.Context, workerCount uint64, newWorkerFunc Wor
 	return workerPool
 }
 
-func (p *jobRunnerPool) Borrow() JobRunner {
-	w := <-p.workers
-	return w
+func (p *jobRunnerPool) Borrow(ctx context.Context) JobRunner {
+	select {
+	case <-ctx.Done():
+		return nil
+	case w := <-p.workers:
+		return w
+	}
 }
 
 func (p *jobRunnerPool) Return(worker JobRunner) {

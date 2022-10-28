@@ -9,7 +9,7 @@ func TestJob(modName string, rng string, prio int) *Job {
 	return NewJob(modName, block.ParseRange(rng), nil, prio)
 }
 
-func TestPlanReadyJobs(jobs []*Job) *Plan {
+func TestPlanReadyJobs(jobs ...*Job) *Plan {
 	return &Plan{
 		readyJobs: jobs,
 	}

@@ -27,10 +27,10 @@ type out struct {
 func TestSchedulerInOut(t *testing.T) {
 	runnerPool, inchan, outchan := testRunnerPool(2)
 	mods := manifest.NewTestModules()
-	plan := work.TestPlanReadyJobs([]*work.Job{
+	plan := work.TestPlanReadyJobs(
 		work.TestJob("B", "0-10", 1),
 		work.TestJob("B", "10-20", 0),
-	})
+	)
 	sched := NewScheduler(
 		plan,
 		func(resp *pbsubstreams.Response) error {
@@ -80,32 +80,46 @@ func testRunnerPool(parallelism int) (work.JobRunnerPool, chan in, chan out) {
 }
 
 func TestScheduler_runOne(t *testing.T) {
-	type fields struct {
-	}
-	type args struct {
-		ctx    context.Context
-		wg     *sync.WaitGroup
-		result chan jobResult
-		pool   work.JobRunnerPool
-	}
 	tests := []struct {
 		name             string
-		plan         *work.Plan
+		plan             *work.Plan
 		expectMoreJobs   bool
 		expectPoolLength int
 	}{
 		{
-			plan: &Plan{},
-		}
-	},
-		for _, test := range tests {
+			plan: work.TestPlanReadyJobs(
+				work.TestJob("A", "0-10", 1),
+				work.TestJob("A", "10-20", 1),
+				work.TestJob("A", "20-30", 1),
+			),
+		},
+	}
+	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			s := &Scheduler{
-				workPlan:                   test.plan,
+				workPlan: test.plan,
 			}
 			wg := &sync.WaitGroup{}
-			result := make(chan jobResult)
-			assert.Equalf(t, test.expectMoreJobs, s.runOne(context.Background(), wg, test.args.result, test.args.pool), "runOne(%v, %v, %v, %v)", test.args.ctx, test.args.wg, test.args.result, test.args.pool)
+			result := make(chan jobResult, 100)
+			pool := testNoopRunnerPool(2)
+
+			assert.False(t, s.runOne(context.Background(), wg, result, pool))
+			assert.False(t, s.runOne(context.Background(), wg, result, pool))
+			assert.False(t, s.runOne(context.Background(), wg, result, pool))
+			assert.True(t, s.runOne(context.Background(), wg, result, pool))
+			assert.Len(t, result, 3)
 		})
 	}
+}
+
+func testNoopRunnerPool(parallelism int) work.JobRunnerPool {
+	ctx := context.Background()
+	runnerPool := work.NewJobRunnerPool(ctx, 1,
+		func(logger *zap.Logger) work.JobRunner {
+			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+				return nil, nil
+			}
+		},
+	)
+	return runnerPool
 }

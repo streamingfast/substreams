@@ -90,7 +90,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 	logger := reqctx.Logger(ctx)
 	logger = logger.With(zap.String("store_name", s.name))
 	ctx = reqctx.WithLogger(ctx, logger)
-	//reqStats := reqctx.ReqStats(ctx)
+	reqStats := reqctx.ReqStats(ctx)
 
 	logger.Info("launching store squasher")
 	metrics.SquashersStarted.Inc()
@@ -116,7 +116,6 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			return
 		}
 
-		logger.Info("waiting for eg to finish")
 		if err := eg.Wait(); err != nil {
 			s.waitForCompletion <- fmt.Errorf("waiting: %w", err)
 			return
@@ -124,6 +123,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 
 		if out.lastExclusiveEndBlock != 0 {
 			s.onStoreCompletedUntilBlock(s.name, out.lastExclusiveEndBlock)
+			reqStats.RecordStoreSquasherProgress(s.name, out.lastExclusiveEndBlock)
 		}
 
 		totalDuration := time.Since(start)

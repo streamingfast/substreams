@@ -186,7 +186,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	var requestStats metrics.Stats
 	if isSubrequest {
 		wid := workerID.Inc()
-		logger = logger.With(zap.Uint64("req", wid))
+		logger = logger.With(zap.Uint64("worker_id", wid))
 		ctx = reqctx.WithLogger(ctx, logger)
 	} else {
 		// we only want to meaure stats when enabled an on the Main request

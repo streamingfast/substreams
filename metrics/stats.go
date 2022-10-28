@@ -110,7 +110,7 @@ func (s *stats) EndBackProcessing() {
 }
 
 func (s *stats) RecordStoreSquasherProgress(moduleName string, blockNum uint64) {
-
+	s.backprocessing.squashStoreProgress(moduleName, blockNum)
 }
 
 func (s *stats) Start(each time.Duration) {
@@ -215,12 +215,12 @@ func (b *backprocessStats) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	}
 
 	enc.AddTime("stated_at", *b.startAt)
-	if b.stopAt == nil {
-		enc.AddDuration("elapsed", time.Since(*b.startAt))
-	} else {
+	if b.stopAt != nil {
 		enc.AddDuration("elapsed", (*b.stopAt).Sub(*b.startAt))
+		return nil
 	}
 
+	enc.AddDuration("elapsed", time.Since(*b.startAt))
 	b.RLock()
 	defer b.RUnlock()
 	for moduleName, blockNum := range b.storeSquashers {

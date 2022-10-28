@@ -227,7 +227,9 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
 	reqStats := reqctx.ReqStats(ctx)
+	logger := reqctx.Logger(ctx)
 
+	logger.Info("starting back processing")
 	backproc, err := orchestrator.BuildBackprocessor(
 		p.ctx,
 		p.runtimeConfig,
@@ -242,12 +244,11 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 	}
 
 	reqStats.StartBackProcessing()
-	defer reqStats.EndBackProcessing()
-	
 	storeMap, err = backproc.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("backrprocess run: %w", err)
 	}
+	reqStats.EndBackProcessing()
 
 	p.backprocessingStores = nil
 

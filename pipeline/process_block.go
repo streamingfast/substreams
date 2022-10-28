@@ -3,10 +3,11 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/reqctx"
-	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"runtime/debug"
+
+	"github.com/streamingfast/substreams/reqctx"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/metrics"
@@ -104,8 +105,8 @@ func (p *Pipeline) handleStepIrreversible(blockNum uint64) {
 }
 
 func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) error {
-	reqdetails := reqctx.Details(ctx)
-	if isBlockOverStopBlock(clock.Number, reqdetails.Request.StopBlockNum) {
+	reqDetails := reqctx.Details(ctx)
+	if isBlockOverStopBlock(clock.Number, reqDetails.Request.StopBlockNum) {
 		return io.EOF
 	}
 
@@ -127,13 +128,13 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
-	if shouldReturnProgress(reqdetails.IsSubRequest) {
+	if shouldReturnProgress(reqDetails.IsSubRequest) {
 		if err = p.returnModuleProgressOutputs(clock); err != nil {
 			return fmt.Errorf("failed to return modules progress %w", err)
 		}
 	}
 
-	if shouldReturnDataOutputs(clock.Number, reqdetails.EffectiveStartBlockNum, reqdetails.IsSubRequest) {
+	if shouldReturnDataOutputs(clock.Number, reqDetails.EffectiveStartBlockNum, reqDetails.IsSubRequest) {
 		logger.Debug("will return module outputs")
 
 		if err = returnModuleDataOutputs(clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {

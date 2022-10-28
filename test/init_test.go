@@ -13,7 +13,7 @@ import (
 var zlog, _ = logging.PackageLogger("pipe.test", "github.com/streamingfast/substreams/test")
 
 func init() {
-	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
+	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.WarnLevel)) // JULIEN PLEASE DON'T TOUCH (╯°□°)╯︵ ┻━┻
 }
 
 func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, *manifest.ModuleGraph) {

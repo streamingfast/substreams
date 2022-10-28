@@ -6,7 +6,6 @@ option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1/tes
 message Block {
   string id = 1;
   uint64 number = 2;
-  int32 step = 3;
 }
 
 message MapResult {

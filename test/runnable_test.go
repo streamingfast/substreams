@@ -7,7 +7,6 @@ import (
 	"io"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -22,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/protobuf/proto"
 )
 
 type Obj struct {
@@ -142,28 +140,9 @@ type TestRunner struct {
 func (r *TestRunner) Run(context.Context) error {
 	generator := r.blockGeneratorFactory(uint64(r.request.StartBlockNum), r.request.StopBlockNum)
 
-	for _, b := range generator.Generate() {
-		o := &Obj{
-			cursor: bstream.EmptyCursor,
-			step:   bstream.StepType(b.Step),
-		}
-
-		payload, err := proto.Marshal(b)
-		require.NoError(r.t, err)
-
-		bb := &bstream.Block{
-			Id:             b.Id,
-			Number:         b.Number,
-			PreviousId:     "",
-			Timestamp:      time.Time{},
-			LibNum:         0,
-			PayloadKind:    0,
-			PayloadVersion: 0,
-		}
-		_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
-		require.NoError(r.t, err)
-
-		err = r.pipe.ProcessBlock(bb, o)
+	for _, generatedBlock := range generator.Generate() {
+		blk := generatedBlock.block
+		err := r.pipe.ProcessBlock(blk, generatedBlock.obj)
 
 		if err != nil && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("process block: %w", err)
@@ -173,7 +152,7 @@ func (r *TestRunner) Run(context.Context) error {
 		}
 
 		if r.blockProcessedCallBack != nil {
-			r.blockProcessedCallBack(r.pipe, bb, r.pipe.StoreMap, r.baseStoreStore)
+			r.blockProcessedCallBack(r.pipe, blk, r.pipe.StoreMap, r.baseStoreStore)
 		}
 	}
 	return nil

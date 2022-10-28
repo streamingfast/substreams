@@ -32,7 +32,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 		{
 			name:       "executes map",
 			moduleName: "test_map",
-			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10, Step: int32(bstream.StepNewIrreversible)},
+			block:      &pbsubstreamstest.Block{Id: "block-10", Number: 10},
 			testFunc: func(t *testing.T, data []byte) {
 				out := &pbsubstreamstest.MapResult{}
 				err := proto.Unmarshal(data, out)

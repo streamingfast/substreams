@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"math"
 	"testing"
 
@@ -27,8 +28,9 @@ type TestWorker struct {
 
 var workerID atomic.Uint64
 
-func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) (brange []*block.Range, err error) {
+func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) *work.WorkResult {
 	w.t.Helper()
+	var err error
 
 	ctx, span := reqctx.WithSpan(ctx, "running_job_test")
 	defer span.EndWithErr(&err)
@@ -45,7 +47,9 @@ func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ s
 	)
 	subrequestsSplitSize := uint64(10)
 	if err := processRequest(w.t, ctx, request, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize); err != nil {
-		return nil, fmt.Errorf("processing sub request: %w", err)
+		return &work.WorkResult{
+			Error: fmt.Errorf("processing sub request: %w", err),
+		}
 	}
 
 	var blockRanges []*block.Range
@@ -59,7 +63,10 @@ func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ s
 			},
 		}
 	}
-	return blockRanges, nil
+	return &work.WorkResult{
+		PartialsWritten: blockRanges,
+		Error:           nil,
+	}
 }
 
 // splitBlockRanges for example: called when subrequestsSplitSize is 10 and request

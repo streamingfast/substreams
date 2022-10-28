@@ -60,7 +60,7 @@ func processRequest(
 	ctx context.Context,
 	request *pbsubstreams.Request,
 	moduleGraph *manifest.ModuleGraph,
-	workerFactory work.WorkerFactory,
+	workerFactory work.JobRunnerFactory,
 	newGenerator NewTestBlockGenerator,
 	responseCollector *responseCollector, isSubRequest bool,
 	blockProcessedCallBack blockProcessedCallBack,

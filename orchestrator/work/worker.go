@@ -18,10 +18,23 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type JobRunner func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) (partialsWritten []*block.Range, err error)
+type WorkResult struct {
+	PartialsWritten []*block.Range
+	Error           error
+}
+
+type Worker interface {
+	Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult
+}
+
+type WorkerFunc func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult
+
+func (j WorkerFunc) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult {
+	return j(ctx, request, respFunc)
+}
 
 // The tracer will be provided by the worker pool, on worker creation
-type WorkerFactory = func(logger *zap.Logger) JobRunner
+type JobRunnerFactory = func(logger *zap.Logger) WorkerFunc
 
 type RemoteWorker struct {
 	clientFactory client.Factory
@@ -37,8 +50,8 @@ func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWo
 	}
 }
 
-//job *Job, requestModules *pbsubstreams.Modules
-func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) (ranges []*block.Range, err error) {
+func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult {
+	var err error
 	ctx, span := reqctx.WithSpan(ctx, "running_job")
 	defer span.EndWithErr(&err)
 	span.SetAttributes(attribute.StringSlice("module_names", request.OutputModules))
@@ -48,7 +61,9 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
+		return &WorkResult{
+			Error: fmt.Errorf("unable to create grpc client: %w", err),
+		}
 	}
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
@@ -61,10 +76,15 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, err
+			return &WorkResult{
+				Error: ctx.Err(),
+			}
 		}
-		return nil, &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)}
+		return &WorkResult{
+			Error: &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)},
+		}
 	}
+
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
 			logger.Warn("failed to close stream on job termination", zap.Error(err))
@@ -89,11 +109,9 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 	for {
 		select {
 		case <-ctx.Done():
-			err := ctx.Err()
-			if err != nil {
-				return nil, err
+			return &WorkResult{
+				Error: ctx.Err(),
 			}
-			return nil, nil
 		default:
 		}
 
@@ -105,24 +123,20 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 				err := respFunc(resp)
 				if err != nil {
 					span.SetStatus(codes.Error, err.Error())
-					return nil, &RetryableErr{cause: fmt.Errorf("sending progress: %w", err)}
+					return &WorkResult{
+						Error: &RetryableErr{cause: fmt.Errorf("sending progress: %w", err)},
+					}
 				}
 
 				for _, progress := range resp.GetProgress().Modules {
 					if f := progress.GetFailed(); f != nil {
 						err := fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
 						span.SetStatus(codes.Error, err.Error())
-						return nil, err
+						return &WorkResult{
+							Error: err,
+						}
 					}
 				}
-
-				//if len(resp.GetProgress().Modules) > 0 {
-				//	module := resp.GetProgress().Modules[0]
-				//	if rangeCount := len(module.GetProcessedRanges().ProcessedRanges); rangeCount > 0 {
-				//		endBlock := module.GetProcessedRanges().ProcessedRanges[rangeCount-1].EndBlock
-				//	}
-				//}
-
 			case *pbsubstreams.Response_SnapshotData:
 				_ = r.SnapshotData
 			case *pbsubstreams.Response_SnapshotComplete:
@@ -141,9 +155,13 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 					logger.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
-				return partialsWritten, nil
+				return &WorkResult{
+					PartialsWritten: partialsWritten,
+				}
 			}
-			return nil, &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)}
+			return &WorkResult{
+				Error: &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)},
+			}
 		}
 	}
 }

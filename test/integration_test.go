@@ -64,7 +64,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 
 	responseCollector := newResponseCollector()
 
-	workerFactory := func(_ *zap.Logger) work.JobRunner {
+	workerFactory := func(_ *zap.Logger) work.WorkerFunc {
 		w := &TestWorker{
 			t:                      t,
 			moduleGraph:            moduleGraph,
@@ -319,18 +319,18 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	require.NotZero(t, outputFilesLen)
 }
 
-//func Test_test_store_add_bigint(t *testing.T) {
-//	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-//		return &LinearBlockGenerator{
-//			startBlock:         startBlock,
-//			inclusiveStopBlock: inclusiveStopBlock,
+//	func Test_test_store_add_bigint(t *testing.T) {
+//		newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+//			return &LinearBlockGenerator{
+//				startBlock:         startBlock,
+//				inclusiveStopBlock: inclusiveStopBlock,
+//			}
 //		}
-//	}
 //
-//	_, err := runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
-//	require.NoError(t, err)
+//		_, err := runTest(t, 1, 1001, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, newBlockGenerator, nil)
+//		require.NoError(t, err)
 //
-//}
+// }
 func Test_test_store_delete_prefix(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{

@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
@@ -31,11 +31,13 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/streamingfast/dmetrics v0.0.0-20220811180000-3e513057d17c
 	github.com/streamingfast/sf-tracing v0.0.0-20220829120927-5a5d2e0fe525
+	github.com/streamingfast/shutter v1.5.0
 	github.com/test-go/testify v1.1.4
 	github.com/tidwall/pretty v1.2.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.34.0
 	go.opentelemetry.io/otel v1.9.0
 	go.opentelemetry.io/otel/trace v1.9.0
+	go.uber.org/atomic v1.10.0
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2
 	google.golang.org/grpc v1.49.0
@@ -66,7 +68,6 @@ require (
 	github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/fxamacker/cbor/v2 v2.4.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -115,10 +116,8 @@ require (
 	github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 // indirect
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
-	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
-	github.com/x448/float16 v0.8.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.9.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.9.0 // indirect
@@ -129,7 +128,6 @@ require (
 	go.opentelemetry.io/otel/exporters/zipkin v1.9.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.9.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e // indirect

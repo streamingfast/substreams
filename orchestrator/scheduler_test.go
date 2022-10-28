@@ -63,16 +63,19 @@ func TestSchedulerInOut(t *testing.T) {
 	)
 }
 
-func testRunnerPool(parallelism int) (work.JobRunnerPool, chan in, chan out) {
+func testRunnerPool(parallelism int) (work.WorkerPool, chan in, chan out) {
 	inchan := make(chan in)
 	outchan := make(chan out)
 	ctx := context.Background()
-	runnerPool := work.NewJobRunnerPool(ctx, 1,
-		func(logger *zap.Logger) work.JobRunner {
-			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
+	runnerPool := work.NewWorkerPool(ctx, 1,
+		func(logger *zap.Logger) work.WorkerFunc {
+			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.WorkResult {
 				inchan <- in{request, respFunc}
 				out := <-outchan
-				return out.partialsWritten, out.err
+				return &work.WorkResult{
+					PartialsWritten: out.partialsWritten,
+					Error:           out.err,
+				}
 			}
 		},
 	)
@@ -101,21 +104,21 @@ func TestScheduler_runOne(t *testing.T) {
 			result := make(chan jobResult, 100)
 			pool := testNoopRunnerPool(2)
 
-			assert.False(t, s.runOne(context.Background(), wg, result, pool))
-			assert.False(t, s.runOne(context.Background(), wg, result, pool))
-			assert.False(t, s.runOne(context.Background(), wg, result, pool))
-			assert.True(t, s.runOne(context.Background(), wg, result, pool))
+			assert.False(t, s.run(context.Background(), wg, result, pool))
+			assert.False(t, s.run(context.Background(), wg, result, pool))
+			assert.False(t, s.run(context.Background(), wg, result, pool))
+			assert.True(t, s.run(context.Background(), wg, result, pool))
 			assert.Len(t, result, 3)
 		})
 	}
 }
 
-func testNoopRunnerPool(parallelism int) work.JobRunnerPool {
+func testNoopRunnerPool(parallelism int) work.WorkerPool {
 	ctx := context.Background()
-	runnerPool := work.NewJobRunnerPool(ctx, 1,
-		func(logger *zap.Logger) work.JobRunner {
-			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) ([]*block.Range, error) {
-				return nil, nil
+	runnerPool := work.NewWorkerPool(ctx, 1,
+		func(logger *zap.Logger) work.WorkerFunc {
+			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.WorkResult {
+				return &work.WorkResult{}
 			}
 		},
 	)

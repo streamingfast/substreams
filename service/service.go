@@ -65,8 +65,8 @@ func New(
 		blockRangeSizeSubRequests,
 		parallelSubRequests,
 		stateStore,
-		func(logger *zap.Logger) work.JobRunner {
-			return work.NewRemoteWorker(clientFactory, logger).Run
+		func(logger *zap.Logger) work.WorkerFunc {
+			return work.NewRemoteWorker(clientFactory, logger).Work
 		},
 	)
 	s = &Service{
@@ -77,10 +77,6 @@ func New(
 
 	zlog.Info("registering substreams metrics")
 	metrics.Metricset.Register()
-
-	// s.workerPool = orchestrator.NewJobRunnerPool(parallelSubRequests, func() orchestrator.Worker {
-	// 	return orchestrator.NewRemoteWorker(newSubstreamClientFunc)
-	// })
 
 	for _, opt := range opts {
 		opt(s)

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -22,9 +23,6 @@ type Scheduler struct {
 	upstreamRequestModules *pbsubstreams.Modules
 
 	OnStoreJobTerminated func(moduleName string, partialsWritten block.Ranges) error
-
-	// TODO(abourget): deprecate this, and fuse it inside the Scheduler
-	//jobsPlanner *JobsPlanner
 }
 
 func NewScheduler(workPlan *work.Plan, respFunc substreams.ResponseFunc, upstreamRequestModules *pbsubstreams.Modules) *Scheduler {
@@ -41,7 +39,7 @@ type jobResult struct {
 	err             error
 }
 
-func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err error) {
+func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err error) {
 	logger := reqctx.Logger(ctx)
 	result := make(chan jobResult)
 
@@ -50,9 +48,15 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err 
 
 	go func() {
 		for {
-			if finished := s.runOne(ctx, wg, result, pool); finished {
+			if finished := s.run(ctx, wg, result, pool); finished {
+				logger.Info("scheduler finished scheduling jobs. waiting for jobs to complete")
+
 				wg.Wait()
+				logger.Info("all jobs completed")
+				logger.Debug("closing result channel")
 				close(result)
+				logger.Debug("result channel closed")
+
 				return
 			}
 		}
@@ -61,7 +65,7 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.JobRunnerPool) (err 
 	return s.resultGatherer(ctx, result)
 }
 
-func (s *Scheduler) runOne(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.JobRunnerPool) (finished bool) {
+func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.WorkerPool) (finished bool) {
 	jobRunner := pool.Borrow(ctx)
 	if jobRunner == nil {
 		return true
@@ -79,6 +83,7 @@ func (s *Scheduler) runOne(ctx context.Context, wg *sync.WaitGroup, result chan 
 		pool.Return(jobRunner)
 		wg.Done()
 	}()
+
 	return false
 }
 
@@ -138,42 +143,37 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 	s.workPlan.MarkDependencyComplete(storeName, blockNum)
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, jobRunner work.JobRunner, job *work.Job, requestModules *pbsubstreams.Modules) (partialsWritten block.Ranges, err error) {
+func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) (partialsWritten block.Ranges, err error) {
 	logger := reqctx.Logger(ctx)
 	newRequest := job.CreateRequest(requestModules)
 
-out:
-	for i := 0; uint64(i) < 3; i++ {
-		t0 := time.Now()
-		partialsWritten, err = jobRunner(ctx, newRequest, s.respFunc)
-		logger.Debug("job completed", zap.Object("job", job), zap.Duration("in", time.Since(t0)))
+	var nonRetryableError error
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		workResult := worker.Work(ctx, newRequest, s.respFunc)
+		partialsWritten = workResult.PartialsWritten
+		err = workResult.Error
+
 		switch err.(type) {
 		case *work.RetryableErr:
 			logger.Debug("retryable error", zap.Error(err))
-			continue
+			return err
 		default:
 			if err != nil {
 				logger.Debug("not a retryable error", zap.Error(err))
 			}
-			break out
+			nonRetryableError = err
+			return nil
 		}
-	}
-	if err != nil {
-		return nil, err
-	}
-	return
-}
+		return nil
+	})
 
-//
-//func (p *JobsPlanner) JobCount() int {
-//	return len(p.jobs)
-//}
-//
-//func (p *JobsPlanner) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-//	enc.AddArray("jobs", p.jobs)
-//	enc.AddBool("completed", p.completed)
-//	enc.AddInt("available_jobs", len(p.AvailableJobs))
-//	return nil
-//}
-//
-////
+	if nonRetryableError != nil {
+		err = nonRetryableError
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("job runner: %w", err)
+	}
+
+	return partialsWritten, nil
+}

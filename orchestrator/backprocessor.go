@@ -3,7 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
-	
+
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -15,7 +15,7 @@ type Backprocessor struct {
 	plan       *work.Plan
 	scheduler  *Scheduler
 	squasher   *MultiSquasher
-	runnerPool work.JobRunnerPool
+	runnerPool work.WorkerPool
 }
 
 func BuildBackprocessor(
@@ -48,7 +48,7 @@ func BuildBackprocessor(
 
 	scheduler.OnStoreJobTerminated = squasher.Squash
 
-	runnerPool := work.NewJobRunnerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
+	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
 
 	return &Backprocessor{
 		plan:       plan,

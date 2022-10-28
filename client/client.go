@@ -68,8 +68,6 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreams.Strea
 	usePlainTextConnection := config.plaintext
 	useInsecureTLSConnection := config.insecure
 
-	zlog.Info("creating new client", zap.String("endpoint", endpoint), zap.Bool("jwt_present", jwt != ""), zap.Bool("plaintext", usePlainTextConnection), zap.Bool("insecure", useInsecureTLSConnection))
-
 	if !portSuffixRegex.MatchString(endpoint) {
 		return nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"sync"
 	"time"
 )
@@ -22,7 +23,7 @@ type Stats interface {
 	Shutdown()
 }
 
-func NewNoopStats() *noopstats {
+func NewNoopStats() Stats {
 	return &noopstats{}
 }
 
@@ -56,7 +57,7 @@ func (n noopstats) RecordOutputCacheMiss() {
 func (n noopstats) RecordStoreSquasherProgress(module string, blockNum uint64) {
 }
 
-func NewStats(logger *zap.Logger) *stats {
+func NewReqStats(logger *zap.Logger) Stats {
 	return &stats{
 		Shutter:           shutter.New(),
 		blockRate:         dmetrics.NewAvgLocalRateCounter(1*time.Second, "blocks"),
@@ -64,27 +65,22 @@ func NewStats(logger *zap.Logger) *stats {
 		flushCountRate:    dmetrics.NewAvgLocalRateCounter(1*time.Second, "flush count"),
 		outputCacheHit:    uint64(0),
 		outputCacheMiss:   uint64(0),
-		backprocessing:    false,
-		storeSquashers:    map[string]uint64{},
+		backprocessing:    newBackprocessStats(),
 		logger:            logger,
 	}
 }
 
 type stats struct {
-	sync.RWMutex
 	*shutter.Shutter
-	blockRate               *dmetrics.LocalCounter
-	flushDurationRate       *dmetrics.LocalCounter
-	flushCountRate          *dmetrics.LocalCounter
-	lastBlock               bstream.BlockRef
-	outputCacheMiss         uint64
-	outputCacheHit          uint64
-	backprocessing          bool
-	backprocessingStartedAt time.Time
-	backProcessingDuration  time.Duration
+	blockRate         *dmetrics.LocalCounter
+	flushDurationRate *dmetrics.LocalCounter
+	flushCountRate    *dmetrics.LocalCounter
+	lastBlock         bstream.BlockRef
+	outputCacheMiss   uint64
+	outputCacheHit    uint64
+	backprocessing    *backprocessStats
 
-	storeSquashers map[string]uint64
-	logger         *zap.Logger
+	logger *zap.Logger
 }
 
 func (s *stats) RecordBlock(ref bstream.BlockRef) {
@@ -106,20 +102,15 @@ func (s *stats) RecordOutputCacheMiss() {
 }
 
 func (s *stats) StartBackProcessing() {
-	s.backprocessing = true
-	s.backprocessingStartedAt = time.Now()
+	s.backprocessing.start(time.Now())
 }
 
 func (s *stats) EndBackProcessing() {
-	s.backprocessing = false
-	s.backProcessingDuration = time.Since(s.backprocessingStartedAt)
+	s.backprocessing.stop(time.Now())
 }
 
 func (s *stats) RecordStoreSquasherProgress(moduleName string, blockNum uint64) {
-	s.Lock()
-	defer s.Unlock()
 
-	s.storeSquashers[moduleName] = blockNum
 }
 
 func (s *stats) Start(each time.Duration) {
@@ -145,8 +136,6 @@ func (s *stats) Start(each time.Duration) {
 }
 
 func (s *stats) getZapFields() []zap.Field {
-	s.RLock()
-	defer s.RUnlock()
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
 	// them so the development logs looks nicer.
 	fields := []zap.Field{
@@ -163,16 +152,8 @@ func (s *stats) getZapFields() []zap.Field {
 		zap.Stringer("flush_duration", s.flushDurationRate),
 		zap.Uint64("output_cache_hit", s.outputCacheHit),
 		zap.Uint64("output_cache_miss", s.outputCacheMiss),
-		zap.Bool("backprocessing", s.backprocessing),
-		zap.Duration("backprocessing_duration", s.backProcessingDuration),
+		zap.Object("backprocessing", s.backprocessing),
 	)
-
-	if s.backprocessing {
-		for moduleName, blockNum := range s.storeSquashers {
-			key := fmt.Sprintf("store_squash_%s", moduleName)
-			fields = append(fields, zap.Uint64(key, blockNum))
-		}
-	}
 
 	return fields
 }
@@ -180,4 +161,71 @@ func (s *stats) getZapFields() []zap.Field {
 func (s *stats) Shutdown() {
 	s.logger.Info("shutting down request stats")
 	s.Shutter.Shutdown(nil)
+}
+
+type backprocessStats struct {
+	sync.RWMutex
+
+	startOnce      sync.Once
+	stopOnce       sync.Once
+	storeSquashers map[string]uint64
+
+	startAt *time.Time
+	stopAt  *time.Time
+}
+
+func newBackprocessStats() *backprocessStats {
+	return &backprocessStats{
+		storeSquashers: map[string]uint64{},
+	}
+}
+
+func (b *backprocessStats) start(t0 time.Time) {
+	b.startOnce.Do(func() {
+		b.startAt = &t0
+	})
+}
+
+func (b *backprocessStats) stop(t1 time.Time) {
+	b.startOnce.Do(func() {
+		b.stopAt = &t1
+	})
+}
+
+func (b *backprocessStats) squashStoreProgress(moduleName string, blockNum uint64) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.storeSquashers[moduleName] = blockNum
+}
+func (b *backprocessStats) status() string {
+	if b.stopAt != nil {
+		return "ran"
+	}
+	if b.startAt != nil {
+		return "running"
+	}
+	return "not_started"
+}
+func (b *backprocessStats) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	status := b.status()
+	enc.AddString("status", status)
+	if status == "not_stated" {
+		return nil
+	}
+
+	enc.AddTime("stated_at", *b.startAt)
+	if b.stopAt == nil {
+		enc.AddDuration("elapsed", time.Since(*b.startAt))
+	} else {
+		enc.AddDuration("elapsed", (*b.stopAt).Sub(*b.startAt))
+	}
+
+	b.RLock()
+	defer b.RUnlock()
+	for moduleName, blockNum := range b.storeSquashers {
+		key := fmt.Sprintf("store_squash_%s", moduleName)
+		enc.AddUint64(key, blockNum)
+	}
+	return nil
 }

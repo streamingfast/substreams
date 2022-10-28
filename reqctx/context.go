@@ -22,7 +22,7 @@ type contextKeyType int
 var detailsKey = contextKeyType(0)
 var tracerKey = contextKeyType(2)
 var spanKey = contextKeyType(3)
-var reqStatsKey = contextKeyType(3)
+var reqStatsKey = contextKeyType(4)
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())

@@ -9,7 +9,6 @@ import (
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 	"sort"
-	"strings"
 	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -63,8 +62,10 @@ func (p *Plan) buildPlanFromStorageState(ctx context.Context, storageState *Stor
 		}
 
 		p.ModulesStateMap[name] = moduleStorageState
+
+		logger.Info("work plan for store module", zap.Object("work", moduleStorageState))
 	}
-	logger.Info("work plan ready", zap.Stringer("work_plan", p))
+
 	return nil
 }
 
@@ -243,15 +244,6 @@ func (p *Plan) initialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	}
 	return
 }
-
-func (p *Plan) String() string {
-	var out []string
-	for k, v := range p.ModulesStateMap {
-		out = append(out, fmt.Sprintf("mod=%q, initial=%s, partials missing=%v, present=%v", k, v.InitialCompleteRange.String(), v.PartialsMissing, v.PartialsPresent))
-	}
-	return strings.Join(out, ";")
-}
-
 func moduleNames(modules []*pbsubstreams.Module) (out []string) {
 	for _, mod := range modules {
 		out = append(out, mod.Name)

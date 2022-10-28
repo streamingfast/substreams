@@ -183,16 +183,17 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		}
 	}
 
+	var requestStats metrics.Stats
 	if isSubrequest {
 		wid := workerID.Inc()
 		logger = logger.With(zap.Uint64("req", wid))
 		ctx = reqctx.WithLogger(ctx, logger)
-	}
-
-	var requestStats metrics.Stats
-	if s.runtimeConfig.WithRequestStats {
-		requestStats = metrics.NewStats(logger)
-		ctx = reqctx.WithReqStats(ctx, requestStats)
+	} else {
+		// we only want to meaure stats when enabled an on the Main request
+		if s.runtimeConfig.WithRequestStats {
+			requestStats = metrics.NewReqStats(logger)
+			ctx = reqctx.WithReqStats(ctx, requestStats)
+		}
 	}
 
 	responseHandler := func(resp *pbsubstreams.Response) error {
@@ -241,10 +242,10 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	// It's ok to use `StartBlockNum` directly here (instead of `requestCtx.EffectiveStartBlockNum`)
 	// and in the constructor we also pass `StartCursor` which will be handled by `streamFactory.New`
 	// and will be used to bootstrap the stream correctly from it if set.
-	zlog.Info("creating firehose stream",
+	logger.Info("creating firehose stream",
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("end_block", request.StopBlockNum),
-		zap.String("start_block", request.StartCursor),
+		zap.String("cursor", request.StartCursor),
 	)
 	blockStream, err := s.streamFactory.New(
 		pipe,

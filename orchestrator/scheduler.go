@@ -131,9 +131,8 @@ func (s *Scheduler) runSingleJob(ctx context.Context, jobRunner work.JobRunner, 
 out:
 	for i := 0; uint64(i) < 3; i++ {
 		t0 := time.Now()
-		logger.Info("running job", zap.Object("job", job))
 		partialsWritten, err = jobRunner(ctx, newRequest, s.respFunc)
-		logger.Info("job completed", zap.Object("job", job), zap.Duration("in", time.Since(t0)))
+		logger.Debug("job completed", zap.Object("job", job), zap.Duration("in", time.Since(t0)))
 		switch err.(type) {
 		case *work.RetryableErr:
 			logger.Debug("retryable error", zap.Error(err))

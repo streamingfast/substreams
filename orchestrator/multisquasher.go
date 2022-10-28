@@ -38,8 +38,6 @@ func NewMultiSquasher(
 ) (*MultiSquasher, error) {
 	logger := reqctx.Logger(ctx)
 	storeSquashers := map[string]*StoreSquasher{}
-	logger.Info("creating a new squasher")
-
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
 		storeConfig, found := storeConfigs[storeModuleName]
 		if !found {
@@ -53,13 +51,13 @@ func NewMultiSquasher(
 		// one is derived?
 		var storeSquasher *StoreSquasher
 		if moduleStorageState.InitialCompleteRange == nil {
-			logger.Info("setting up initial store",
+			logger.Debug("setting up initial store",
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", moduleStorageState.InitialCompleteRange),
 			)
 			storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 		} else {
-			logger.Info("loading initial store",
+			logger.Debug("loading initial store",
 				zap.String("store", storeModuleName),
 				zap.Object("initial_store_file", moduleStorageState.InitialCompleteRange),
 			)
@@ -80,6 +78,10 @@ func NewMultiSquasher(
 		}
 
 		storeSquashers[storeModuleName] = storeSquasher
+
+		logger.Info("store squasher initialized",
+			zap.String("module_name", storeModuleName),
+		)
 	}
 
 	squasher := &MultiSquasher{

@@ -3,6 +3,7 @@ package work
 import (
 	"fmt"
 	"github.com/streamingfast/substreams/block"
+	"go.uber.org/zap/zapcore"
 )
 
 type PartialStoreFile = block.Range
@@ -62,6 +63,14 @@ func (w *ModuleStorageState) initialProcessedPartials() block.Ranges {
 
 func (w *ModuleStorageState) batchRequests(subreqSplitSize uint64) block.Ranges {
 	return w.PartialsMissing.MergedBuckets(subreqSplitSize)
+}
+
+func (w *ModuleStorageState) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("store_name", w.ModuleName)
+	enc.AddString("intial_range", w.InitialCompleteRange.String())
+	enc.AddInt("partial_missing", len(w.PartialsMissing))
+	enc.AddInt("partial_present", len(w.PartialsPresent))
+	return nil
 }
 
 func minOf(a, b uint64) uint64 {

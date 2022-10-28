@@ -46,14 +46,17 @@ func (w *RemoteWorker) Run(ctx context.Context, request *pbsubstreams.Request, r
 	span.SetAttributes(attribute.Int64("stop_block", int64(request.StopBlockNum)))
 	logger := w.logger
 
-	logger.Info("creating gprc client")
-	w.logger.Info("creating gprc client")
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Substreams client: %w", err)
 	}
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
+
+	w.logger.Info("launching remote worker",
+		zap.Int64("start_block_num", request.StartBlockNum),
+		zap.Uint64("stop_block_num", request.StopBlockNum),
+	)
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {

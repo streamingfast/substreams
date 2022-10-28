@@ -139,7 +139,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		return fmt.Errorf("module failed validation: %w", err)
 	}
 
-	logger.Info("priming caching engine")
+	logger.Info("initializing exec output cache")
 	if err := p.execOutputCache.Init(p.moduleHashes); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}

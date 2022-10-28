@@ -15,12 +15,6 @@ type StorageState struct {
 	Snapshots map[string]*Snapshots
 }
 
-func NewStorageState() *StorageState {
-	return &StorageState{
-		Snapshots: map[string]*Snapshots{},
-	}
-}
-
 func (s *StorageState) String() string {
 	var out []string
 	for k, v := range s.Snapshots {
@@ -29,31 +23,36 @@ func (s *StorageState) String() string {
 	return strings.Join(out, ", ")
 }
 
-func fetchStorageState(ctx context.Context, storeConfigMap store.ConfigMap) (out *StorageState, err error) {
-	out = NewStorageState()
+func fetchStorageState(ctx context.Context, storeConfigMap store.ConfigMap) (*StorageState, error) {
+	state := &StorageState{
+		Snapshots: map[string]*Snapshots{},
+	}
+
 	eg := llerrgroup.New(10)
 
 	for _, config := range storeConfigMap {
 		if eg.Stop() {
 			break
 		}
+
 		storeName := config.Name()
 		storeConfig := config
-		eg.Go(func() error {
 
+		eg.Go(func() error {
 			snapshots, err := listSnapshots(ctx, storeConfig)
 			if err != nil {
 				return err
 			}
-			out.Lock()
-			out.Snapshots[storeName] = snapshots
-			out.Unlock()
+			state.Lock()
+			state.Snapshots[storeName] = snapshots
+			state.Unlock()
 			return nil
 		})
 	}
 
-	if err = eg.Wait(); err != nil {
+	if err := eg.Wait(); err != nil {
 		return nil, fmt.Errorf("running list snapshots: %w", err)
 	}
-	return
+
+	return state, nil
 }

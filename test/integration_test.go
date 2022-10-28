@@ -64,7 +64,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 
 	responseCollector := newResponseCollector()
 
-	workerFactory := func(_ *zap.Logger) work.WorkerFunc {
+	workerFactory := func(_ *zap.Logger) work.Worker {
 		w := &TestWorker{
 			t:                      t,
 			moduleGraph:            moduleGraph,
@@ -73,7 +73,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 			blockProcessedCallBack: blockProcessedCallBack,
 			testTempDir:            testTempDir,
 		}
-		return w.Run
+		return w
 	}
 
 	if err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subrequestsSplitSize); err != nil {

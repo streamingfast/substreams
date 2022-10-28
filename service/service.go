@@ -65,8 +65,8 @@ func New(
 		blockRangeSizeSubRequests,
 		parallelSubRequests,
 		stateStore,
-		func(logger *zap.Logger) work.WorkerFunc {
-			return work.NewRemoteWorker(clientFactory, logger).Work
+		func(logger *zap.Logger) work.Worker {
+			return work.NewRemoteWorker(clientFactory, logger)
 		},
 	)
 	s = &Service{

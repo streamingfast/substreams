@@ -13,7 +13,7 @@ type RuntimeConfig struct {
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
 	BaseObjectStore  dstore.Store
-	WorkerFactory    work.JobRunnerFactory
+	WorkerFactory    work.WorkerFactory
 	WithRequestStats bool
 }
 
@@ -23,7 +23,7 @@ func NewRuntimeConfig(
 	subrequestsSplitSize uint64,
 	parallelSubrequests uint64,
 	baseObjectStore dstore.Store,
-	workerFactory work.JobRunnerFactory,
+	workerFactory work.WorkerFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
 		StoreSnapshotsSaveInterval: storeSnapshotsSaveInterval,

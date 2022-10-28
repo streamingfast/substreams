@@ -66,8 +66,8 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err err
 }
 
 func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.WorkerPool) (finished bool) {
-	jobRunner := pool.Borrow(ctx)
-	if jobRunner == nil {
+	worker := pool.Borrow(ctx)
+	if worker == nil {
 		return true
 	}
 
@@ -78,9 +78,9 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 
 	wg.Add(1)
 	go func() {
-		partialsWritten, err := s.runSingleJob(ctx, jobRunner, nextJob, s.upstreamRequestModules)
+		partialsWritten, err := s.runSingleJob(ctx, worker, nextJob, s.upstreamRequestModules)
 		result <- jobResult{job: nextJob, partialsWritten: partialsWritten, err: err}
-		pool.Return(jobRunner)
+		pool.Return(worker)
 		wg.Done()
 	}()
 

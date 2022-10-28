@@ -7,12 +7,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/streamingfast/substreams/reqctx"
-
-	"github.com/streamingfast/substreams/metrics"
-
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )

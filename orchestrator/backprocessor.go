@@ -15,7 +15,7 @@ type Backprocessor struct {
 	plan       *work.Plan
 	scheduler  *Scheduler
 	squasher   *MultiSquasher
-	runnerPool work.WorkerPool
+	workerPool work.WorkerPool
 }
 
 func BuildBackprocessor(
@@ -54,7 +54,7 @@ func BuildBackprocessor(
 		plan:       plan,
 		scheduler:  scheduler,
 		squasher:   squasher,
-		runnerPool: runnerPool,
+		workerPool: runnerPool,
 	}, nil
 }
 
@@ -65,7 +65,7 @@ func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 	// go parallelDownloader.Launch()
 	b.squasher.Launch(ctx)
 
-	if err := b.scheduler.Schedule(ctx, b.runnerPool); err != nil {
+	if err := b.scheduler.Schedule(ctx, b.workerPool); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 

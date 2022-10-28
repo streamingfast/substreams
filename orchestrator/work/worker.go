@@ -18,23 +18,23 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type WorkResult struct {
+type Result struct {
 	PartialsWritten []*block.Range
 	Error           error
 }
 
 type Worker interface {
-	Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult
+	Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
 }
 
-type WorkerFunc func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult
+type WorkerFunc func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
 
-func (j WorkerFunc) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult {
-	return j(ctx, request, respFunc)
+func (f WorkerFunc) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
+	return f(ctx, request, respFunc)
 }
 
 // The tracer will be provided by the worker pool, on worker creation
-type JobRunnerFactory = func(logger *zap.Logger) WorkerFunc
+type WorkerFactory = func(logger *zap.Logger) Worker
 
 type RemoteWorker struct {
 	clientFactory client.Factory
@@ -50,7 +50,7 @@ func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWo
 	}
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *WorkResult {
+func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
 	var err error
 	ctx, span := reqctx.WithSpan(ctx, "running_job")
 	defer span.EndWithErr(&err)
@@ -61,7 +61,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
-		return &WorkResult{
+		return &Result{
 			Error: fmt.Errorf("unable to create grpc client: %w", err),
 		}
 	}
@@ -76,11 +76,11 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
-			return &WorkResult{
+			return &Result{
 				Error: ctx.Err(),
 			}
 		}
-		return &WorkResult{
+		return &Result{
 			Error: &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)},
 		}
 	}
@@ -109,7 +109,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	for {
 		select {
 		case <-ctx.Done():
-			return &WorkResult{
+			return &Result{
 				Error: ctx.Err(),
 			}
 		default:
@@ -123,7 +123,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 				err := respFunc(resp)
 				if err != nil {
 					span.SetStatus(codes.Error, err.Error())
-					return &WorkResult{
+					return &Result{
 						Error: &RetryableErr{cause: fmt.Errorf("sending progress: %w", err)},
 					}
 				}
@@ -132,7 +132,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 					if f := progress.GetFailed(); f != nil {
 						err := fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
 						span.SetStatus(codes.Error, err.Error())
-						return &WorkResult{
+						return &Result{
 							Error: err,
 						}
 					}
@@ -155,11 +155,11 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 					logger.Info("partial written", zap.String("trailer", trailers[0]))
 					partialsWritten = block.ParseRanges(trailers[0])
 				}
-				return &WorkResult{
+				return &Result{
 					PartialsWritten: partialsWritten,
 				}
 			}
-			return &WorkResult{
+			return &Result{
 				Error: &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)},
 			}
 		}

@@ -68,15 +68,15 @@ func testRunnerPool(parallelism int) (work.WorkerPool, chan in, chan out) {
 	outchan := make(chan out)
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, 1,
-		func(logger *zap.Logger) work.WorkerFunc {
-			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.WorkResult {
+		func(logger *zap.Logger) work.Worker {
+			return work.WorkerFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
 				inchan <- in{request, respFunc}
 				out := <-outchan
-				return &work.WorkResult{
+				return &work.Result{
 					PartialsWritten: out.partialsWritten,
 					Error:           out.err,
 				}
-			}
+			})
 		},
 	)
 	return runnerPool, inchan, outchan
@@ -116,10 +116,10 @@ func TestScheduler_runOne(t *testing.T) {
 func testNoopRunnerPool(parallelism int) work.WorkerPool {
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, 1,
-		func(logger *zap.Logger) work.WorkerFunc {
-			return func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.WorkResult {
-				return &work.WorkResult{}
-			}
+		func(logger *zap.Logger) work.Worker {
+			return work.WorkerFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
+				return &work.Result{}
+			})
 		},
 	)
 	return runnerPool

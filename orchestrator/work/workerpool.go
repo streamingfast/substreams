@@ -17,7 +17,7 @@ type workerPool struct {
 	workers chan Worker
 }
 
-func NewWorkerPool(ctx context.Context, workerCount uint64, newRunnerFunc JobRunnerFactory) WorkerPool {
+func NewWorkerPool(ctx context.Context, workerCount uint64, newRunnerFunc WorkerFactory) WorkerPool {
 	logger := reqctx.Logger(ctx)
 
 	logger.Info("initializing job runner pool", zap.Uint64("worker_count", workerCount))

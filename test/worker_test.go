@@ -28,7 +28,7 @@ type TestWorker struct {
 
 var workerID atomic.Uint64
 
-func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) *work.WorkResult {
+func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) *work.Result {
 	w.t.Helper()
 	var err error
 
@@ -47,7 +47,7 @@ func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ s
 	)
 	subrequestsSplitSize := uint64(10)
 	if err := processRequest(w.t, ctx, request, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize); err != nil {
-		return &work.WorkResult{
+		return &work.Result{
 			Error: fmt.Errorf("processing sub request: %w", err),
 		}
 	}
@@ -63,7 +63,7 @@ func (w *TestWorker) Run(ctx context.Context, request *pbsubstreams.Request, _ s
 			},
 		}
 	}
-	return &work.WorkResult{
+	return &work.Result{
 		PartialsWritten: blockRanges,
 		Error:           nil,
 	}

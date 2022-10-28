@@ -133,7 +133,6 @@ func TestPlan_MarkDependencyComplete(t *testing.T) {
 				waitingJobs:           tt.fields.waitingJobs,
 				readyJobs:             tt.fields.readyJobs,
 				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-				mu:                    tt.fields.mu,
 			}
 			p.MarkDependencyComplete(tt.args.modName, tt.args.upToBlock)
 		})
@@ -151,38 +150,50 @@ func TestPlan_NextJob(t *testing.T) {
 	}
 
 	tests := []struct {
+		name        string
 		waitingJobs []*Job
 		readyJobs   []*Job
 		expectJob   *Job
 		expectMore  bool
 	}{
 		{
+			name:        "one ready,one waiting",
 			waitingJobs: mkJobs("A"),
 			readyJobs:   mkJobs("B"),
 			expectJob:   &Job{ModuleName: "B"},
 			expectMore:  true,
 		},
 		{
+			name:        "none ready,one waiting",
 			waitingJobs: mkJobs("A"),
 			readyJobs:   mkJobs(""),
 			expectJob:   nil,
 			expectMore:  true,
 		},
 		{
+			name:        "one ready,none waiting",
 			waitingJobs: mkJobs(""),
-			readyJobs:   mkJobs("B"),
-			expectJob:   &Job{ModuleName: "B"},
+			readyJobs:   mkJobs("A"),
+			expectJob:   &Job{ModuleName: "A"},
 			expectMore:  false,
 		},
 		{
+			name:        "none ready,none waiting",
 			waitingJobs: mkJobs(""),
 			readyJobs:   mkJobs(""),
 			expectJob:   nil,
 			expectMore:  false,
+		},
+		{
+			name:        "two ready,none waiting",
+			waitingJobs: mkJobs(""),
+			readyJobs:   mkJobs("A,B,C"),
+			expectJob:   &Job{ModuleName: "A"},
+			expectMore:  true,
 		},
 	}
 	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			p := &Plan{
 				waitingJobs: test.waitingJobs,
 				readyJobs:   test.readyJobs,

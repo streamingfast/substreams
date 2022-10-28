@@ -12,7 +12,7 @@ import (
 
 type Stats interface {
 	StartBackProcessing()
-	FinishBackProcessing()
+	EndBackProcessing()
 	RecordBlock(ref bstream.BlockRef)
 	RecordFlush(elapsed time.Duration)
 	RecordStoreSquasherProgress(module string, blockNum uint64)
@@ -32,7 +32,7 @@ type noopstats struct {
 func (n noopstats) StartBackProcessing() {
 }
 
-func (n noopstats) FinishBackProcessing() {
+func (n noopstats) EndBackProcessing() {
 }
 
 func (n noopstats) Shutdown() {
@@ -73,13 +73,15 @@ func NewStats(logger *zap.Logger) *stats {
 type stats struct {
 	sync.RWMutex
 	*shutter.Shutter
-	blockRate         *dmetrics.LocalCounter
-	flushDurationRate *dmetrics.LocalCounter
-	flushCountRate    *dmetrics.LocalCounter
-	lastBlock         bstream.BlockRef
-	outputCacheMiss   uint64
-	outputCacheHit    uint64
-	backprocessing    bool
+	blockRate               *dmetrics.LocalCounter
+	flushDurationRate       *dmetrics.LocalCounter
+	flushCountRate          *dmetrics.LocalCounter
+	lastBlock               bstream.BlockRef
+	outputCacheMiss         uint64
+	outputCacheHit          uint64
+	backprocessing          bool
+	backprocessingStartedAt time.Time
+	backProcessingDuration  time.Duration
 
 	storeSquashers map[string]uint64
 	logger         *zap.Logger
@@ -105,10 +107,12 @@ func (s *stats) RecordOutputCacheMiss() {
 
 func (s *stats) StartBackProcessing() {
 	s.backprocessing = true
+	s.backprocessingStartedAt = time.Now()
 }
 
-func (s *stats) FinishBackProcessing() {
+func (s *stats) EndBackProcessing() {
 	s.backprocessing = false
+	s.backProcessingDuration = time.Since(s.backprocessingStartedAt)
 }
 
 func (s *stats) RecordStoreSquasherProgress(moduleName string, blockNum uint64) {
@@ -160,6 +164,7 @@ func (s *stats) getZapFields() []zap.Field {
 		zap.Uint64("output_cache_hit", s.outputCacheHit),
 		zap.Uint64("output_cache_miss", s.outputCacheMiss),
 		zap.Bool("backprocessing", s.backprocessing),
+		zap.Duration("backprocessing_duration", s.backProcessingDuration),
 	)
 
 	if s.backprocessing {

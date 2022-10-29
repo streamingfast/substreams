@@ -39,6 +39,14 @@ type jobResult struct {
 	err             error
 }
 
+func fromWorkResult(job *work.Job, wr *work.Result) jobResult {
+	return jobResult{
+		job:             job,
+		partialsWritten: wr.PartialsWritten,
+		err:             wr.Error,
+	}
+}
+
 func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err error) {
 	logger := reqctx.Logger(ctx)
 	result := make(chan jobResult)
@@ -149,16 +157,18 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 
 func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) jobResult {
 	logger := reqctx.Logger(ctx)
-	newRequest := job.CreateRequest(requestModules)
+	request := job.CreateRequest(requestModules)
 
-	var err error
-	var partialsWritten block.Ranges
-
+	var workResult *work.Result
 	var nonRetryableError error
-	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		workResult := worker.Work(ctx, newRequest, s.respFunc)
-		partialsWritten = workResult.PartialsWritten
-		err = workResult.Error
+
+	_ = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		if nonRetryableError != nil {
+			return nonRetryableError
+		}
+
+		workResult = worker.Work(ctx, request, s.respFunc)
+		err := workResult.Error
 
 		switch err.(type) {
 		case *work.RetryableErr:
@@ -174,17 +184,6 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 		return nil
 	})
 
-	if nonRetryableError != nil {
-		err = nonRetryableError
-	}
-
-	if err != nil {
-		return jobResult{job: job, err: fmt.Errorf("job runner: %w", err)}
-	}
-
-	return jobResult{
-		job:             job,
-		partialsWritten: partialsWritten,
-		err:             nil,
-	}
+	jr := fromWorkResult(job, workResult)
+	return jr
 }

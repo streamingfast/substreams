@@ -13,6 +13,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"time"
 )
 
 type in struct {
@@ -86,14 +87,17 @@ func TestScheduler_runOne(t *testing.T) {
 	tests := []struct {
 		name             string
 		plan             *work.Plan
+		parallelism      uint64
 		expectMoreJobs   bool
 		expectPoolLength int
 	}{
 		{
+			name:        "3 jobs,3 workers",
+			parallelism: 3,
 			plan: work.TestPlanReadyJobs(
 				work.TestJob("A", "0-10", 1),
-				work.TestJob("A", "10-20", 1),
-				work.TestJob("A", "20-30", 1),
+				work.TestJob("A", "10-20", 2),
+				work.TestJob("A", "20-30", 3),
 			),
 		},
 	}
@@ -102,20 +106,22 @@ func TestScheduler_runOne(t *testing.T) {
 			s := &Scheduler{workPlan: test.plan}
 			wg := &sync.WaitGroup{}
 			result := make(chan jobResult, 100)
-			pool := testNoopRunnerPool(2)
+			pool := testNoopRunnerPool(test.parallelism)
 
 			assert.False(t, s.run(context.Background(), wg, result, pool))
 			assert.False(t, s.run(context.Background(), wg, result, pool))
 			assert.False(t, s.run(context.Background(), wg, result, pool))
 			assert.True(t, s.run(context.Background(), wg, result, pool))
+
+			time.Sleep(10 * time.Millisecond) // give small amount of time to the goroutine to finish
 			assert.Len(t, result, 3)
 		})
 	}
 }
 
-func testNoopRunnerPool(parallelism int) work.WorkerPool {
+func testNoopRunnerPool(parallelism uint64) work.WorkerPool {
 	ctx := context.Background()
-	runnerPool := work.NewWorkerPool(ctx, 1,
+	runnerPool := work.NewWorkerPool(ctx, parallelism,
 		func(logger *zap.Logger) work.Worker {
 			return work.WorkerFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
 				return &work.Result{}

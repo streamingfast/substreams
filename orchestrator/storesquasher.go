@@ -95,9 +95,8 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 	defer metrics.SquashersEnded.Inc()
 
 	for {
-
 		if err := s.getPartialChunks(ctx); err != nil {
-			if err == PartialChunksDone {
+			if errors.Is(err, PartialChunksDone) {
 				close(s.waitForCompletion)
 				return
 			}

@@ -275,32 +275,34 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 }
 
 func TestPlan_prioritize(t *testing.T) {
-	t.Skip("not implemented")
-	type fields struct {
-		ModulesStateMap       ModuleStorageStateMap
-		upToBlock             uint64
-		waitingJobs           []*Job
-		readyJobs             []*Job
-		modulesReadyUpToBlock map[string]uint64
-		mu                    sync.Mutex
-	}
 	tests := []struct {
-		name   string
-		fields fields
+		name      string
+		readyJobs []*Job
+		expected  []*Job
 	}{
-		// TODO: Add test cases.
+		{
+			name:      "no jobs",
+			readyJobs: []*Job{},
+			expected:  []*Job{},
+		},
+		{
+			name:      "one job",
+			readyJobs: []*Job{{ModuleName: "A", priority: 1}},
+			expected:  []*Job{{ModuleName: "A", priority: 1}},
+		},
+		{
+			name:      "sorted highest priority to lowest",
+			readyJobs: []*Job{{ModuleName: "B", priority: 2}, {ModuleName: "C", priority: 1}, {ModuleName: "A", priority: 3}},
+			expected:  []*Job{{ModuleName: "A", priority: 3}, {ModuleName: "B", priority: 2}, {ModuleName: "C", priority: 1}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Plan{
-				ModulesStateMap:       tt.fields.ModulesStateMap,
-				upToBlock:             tt.fields.upToBlock,
-				waitingJobs:           tt.fields.waitingJobs,
-				readyJobs:             tt.fields.readyJobs,
-				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-				mu:                    tt.fields.mu,
+				readyJobs: tt.readyJobs,
 			}
 			p.prioritize()
+			assert.Equalf(t, tt.expected, p.readyJobs, "prioritize()")
 		})
 	}
 }

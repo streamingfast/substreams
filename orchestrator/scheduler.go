@@ -47,22 +47,23 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err err
 	logger.Debug("launching scheduler")
 
 	go func() {
-		for {
-			if finished := s.run(ctx, wg, result, pool); finished {
-				logger.Info("scheduler finished scheduling jobs. waiting for jobs to complete")
-
-				wg.Wait()
-				logger.Info("all jobs completed")
-				logger.Debug("closing result channel")
-				close(result)
-				logger.Debug("result channel closed")
-
-				return
-			}
+		finished := false
+		for !finished {
+			finished = s.run(ctx, wg, result, pool)
 		}
+		logger.Info("scheduler finished scheduling jobs. waiting for jobs to complete")
+
+		wg.Wait()
+		logger.Info("all jobs completed")
+
+		close(result)
+		logger.Debug("result channel closed")
+
+		return
+
 	}()
 
-	return s.resultGatherer(ctx, result)
+	return s.gatherResults(ctx, result)
 }
 
 func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.WorkerPool) (finished bool) {
@@ -78,8 +79,9 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 
 	wg.Add(1)
 	go func() {
-		partialsWritten, err := s.runSingleJob(ctx, worker, nextJob, s.upstreamRequestModules)
-		result <- jobResult{job: nextJob, partialsWritten: partialsWritten, err: err}
+		jr := s.runSingleJob(ctx, worker, nextJob, s.upstreamRequestModules)
+		result <- jr
+
 		pool.Return(worker)
 		wg.Done()
 	}()
@@ -103,7 +105,7 @@ func (s *Scheduler) getNextJob(ctx context.Context) (nextJob *work.Job) {
 		return nil
 	}
 }
-func (s *Scheduler) resultGatherer(ctx context.Context, result chan jobResult) (err error) {
+func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (err error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -126,16 +128,18 @@ func (s *Scheduler) processJobResult(result jobResult) error {
 	if result.err != nil {
 		return fmt.Errorf("worker ended in error: %w", result.err)
 	}
+
 	if result.partialsWritten != nil {
 		// This signals back to the Squasher that it can squash this segment
 		if err := s.OnStoreJobTerminated(result.job.ModuleName, result.partialsWritten); err != nil {
 			return fmt.Errorf("on job terminated: %w", err)
 		}
 	}
+
 	return nil
 }
 
-// OnStoreCompletedUntilBlock is called to say the given storeName
+// OnStoreCompletedUntilBlock is called to indicate that the given storeName
 // has snapshots at the `storeSaveIntervals` up to `blockNum` here.
 //
 // This should unlock all jobs that were dependent
@@ -143,9 +147,12 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 	s.workPlan.MarkDependencyComplete(storeName, blockNum)
 }
 
-func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) (partialsWritten block.Ranges, err error) {
+func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) jobResult {
 	logger := reqctx.Logger(ctx)
 	newRequest := job.CreateRequest(requestModules)
+
+	var err error
+	var partialsWritten block.Ranges
 
 	var nonRetryableError error
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -172,8 +179,12 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("job runner: %w", err)
+		return jobResult{job: job, err: fmt.Errorf("job runner: %w", err)}
 	}
 
-	return partialsWritten, nil
+	return jobResult{
+		job:             job,
+		partialsWritten: partialsWritten,
+		err:             nil,
+	}
 }

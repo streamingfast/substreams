@@ -32,6 +32,7 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 		ModulesStateMap: make(ModuleStorageStateMap),
 		upToBlock:       upToBlock,
 	}
+
 	storageState, err := fetchStorageState(ctx, storeConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)
@@ -42,9 +43,11 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 	if err := plan.splitWorkIntoJobs(subrequestSplitSize, graph); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
+
 	plan.initModulesReadyUpToBlock()
 	plan.promoteWaitingJobs()
 	plan.prioritize()
+
 	return plan, nil
 }
 
@@ -152,7 +155,6 @@ func (p *Plan) allDependenciesMet(job *Job) bool {
 
 func (p *Plan) prioritize() {
 	// Called with locked mutex
-	// TODO(abourget): TEST THIS, that the priority calculation is now better
 	sort.Slice(p.readyJobs, func(i, j int) bool {
 		// reverse sorts priority, higher first
 		return p.readyJobs[i].priority > p.readyJobs[j].priority

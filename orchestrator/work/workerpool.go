@@ -17,13 +17,13 @@ type workerPool struct {
 	workers chan Worker
 }
 
-func NewWorkerPool(ctx context.Context, workerCount uint64, newRunnerFunc WorkerFactory) WorkerPool {
+func NewWorkerPool(ctx context.Context, workerCount uint64, newWorkerFunc WorkerFactory) WorkerPool {
 	logger := reqctx.Logger(ctx)
 
-	logger.Info("initializing job runner pool", zap.Uint64("worker_count", workerCount))
+	logger.Info("initializing worker pool", zap.Uint64("worker_count", workerCount))
 	workers := make(chan Worker, workerCount)
 	for i := uint64(0); i < workerCount; i++ {
-		workers <- newRunnerFunc(logger)
+		workers <- newWorkerFunc(logger)
 	}
 
 	return &workerPool{

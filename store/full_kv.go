@@ -3,12 +3,12 @@ package store
 import (
 	"context"
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store/marshaller"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/store/marshaller"
+	pbsubstreams "github.com/streamingfast/substreams/store/marshaller/pb"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 var _ Store = (*FullKV)(nil)

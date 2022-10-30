@@ -16,8 +16,11 @@ var marshallers = []struct {
 }{
 	{"binary", &Binary{}},
 	{"proto", &Proto{}},
-	{"ProtoingFast", &ProtoingFast{}},
+	{"protoingFast", &ProtoingFast{}},
+	{"vtproto", &VTproto{}},
 }
+
+var ranges = []int{10_000, 100_000, 1_000_000, 10_000_000}
 
 func Benchmark_Marshall(b *testing.B) {
 	counter := atomic.NewUint64(0)
@@ -32,7 +35,7 @@ func Benchmark_Marshall(b *testing.B) {
 	}
 
 	for _, m := range marshallers {
-		for _, keyCount := range []int{10, 100, 10_000, 100_000, 1_000_000, 10_000_000} {
+		for _, keyCount := range ranges {
 			runKey := fmt.Sprintf("%d_keys_%s", keyCount, m.name)
 			b.Run(runKey, func(bb *testing.B) {
 				s := &StoreData{Kv: map[string][]byte{}}
@@ -71,7 +74,7 @@ func Benchmark_Unmarshall(b *testing.B) {
 	}
 
 	for _, m := range marshallers {
-		for _, keyCount := range []int{10, 100, 10_000, 100_000, 1_000_000, 10_000_000} {
+		for _, keyCount := range ranges {
 			runKey := fmt.Sprintf("%d_keys_%s", keyCount, m.name)
 			b.Run(runKey, func(bb *testing.B) {
 				s := &StoreData{Kv: map[string][]byte{}}
@@ -84,7 +87,6 @@ func Benchmark_Unmarshall(b *testing.B) {
 				}
 
 				data, err := m.m.Marshal(s)
-				fmt.Println(runKey, len(data))
 				require.NoError(bb, err)
 
 				bb.ResetTimer()

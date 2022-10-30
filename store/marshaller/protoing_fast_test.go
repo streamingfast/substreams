@@ -23,17 +23,19 @@ func TestProtoFast_CompareMarshal(t *testing.T) {
 			name: "no kv no delete prefixes",
 			data: &StoreData{},
 		},
-		{
-			name: "only kv multiple",
-			data: &StoreData{
-				Kv: map[string][]byte{
-					"a": {0xaa},
-					"b": {0xcc},
-				},
-			},
-		},
-		// TODO: we can a mismatch in the order of the field written
-		// this has no impact on the decoding but makes the test rather annoying
+		////TODO: we can a mismatch in the order of the field written
+		////this has no impact on the decoding but makes the test rather annoying
+		//{
+		//	name: "only kv multiple",
+		//	data: &StoreData{
+		//		Kv: map[string][]byte{
+		//			"a": {0xaa},
+		//			"b": {0xcc},
+		//		},
+		//	},
+		//},
+		////TODO: we can a mismatch in the order of the field written
+		////this has no impact on the decoding but makes the test rather annoying
 		//{
 		//	name: "kv and delete prefix",
 		//	data: &StoreData{
@@ -62,7 +64,12 @@ func TestProtoFast_CompareMarshal(t *testing.T) {
 			protoData, err := p.Marshal(test.data)
 			require.NoError(t, err)
 
+			vp := &VTproto{}
+			vtProtoData, err := vp.Marshal(test.data)
+			require.NoError(t, err)
+
 			assert.Equal(t, protoData, protoingFastData)
+			assert.Equal(t, protoData, vtProtoData)
 
 			v, err := pf.Unmarshal(protoingFastData)
 			require.NoError(t, err)

@@ -2,7 +2,7 @@ package marshaller
 
 import (
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreams "github.com/streamingfast/substreams/store/marshaller/pb"
 	"google.golang.org/protobuf/proto"
 )
 

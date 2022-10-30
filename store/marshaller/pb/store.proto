@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package sf.substreams.store.v1;
+
+option go_package = "github.com/streamingfast/substreams/store/marshaller/pb;pbstore";
+
+message StoreData {
+  map<string, bytes> kv = 1;
+  repeated string delete_prefixes = 2;
+}

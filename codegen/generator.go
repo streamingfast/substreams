@@ -89,6 +89,12 @@ func (g *Generator) Generate() (err error) {
 		return fmt.Errorf("creating pb directory %v: %w", g.srcPath, err)
 	}
 
+	protoGenerator := NewProtoGenerator(pbFolder, nil)
+	err = protoGenerator.Generate(g.pkg)
+	if err != nil {
+		return fmt.Errorf("generating protobuf code: %w", err)
+	}
+
 	err = g.generate("externs", tplExterns, engine, filepath.Join(generatedFolder, "externs.rs"))
 	if err != nil {
 		return fmt.Errorf("generating externs.rs: %w", err)
@@ -115,7 +121,7 @@ func (g *Generator) Generate() (err error) {
 	libFilePath := filepath.Join(g.srcPath, "lib.rs")
 	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Generating src/lib.rs\n")
-		err = g.generate("lib", tplExterns, engine, filepath.Join(g.srcPath, "lib.rs"))
+		err = g.generate("lib", libRsTemplate, engine, filepath.Join(g.srcPath, "lib.rs"))
 		if err != nil {
 			return fmt.Errorf("generating lib.rs: %w", err)
 		}

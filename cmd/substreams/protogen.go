@@ -1,19 +1,14 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/manifest"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 var protogenCmd = &cobra.Command{
@@ -60,61 +55,6 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
-	defaultFilename := filepath.Join(os.TempDir(), "tmp.spkg")
-	cnt, err := proto.Marshal(pkg)
-	if err != nil {
-		return fmt.Errorf("marshalling package: %w", err)
-	}
-
-	if err := ioutil.WriteFile(defaultFilename, cnt, 0644); err != nil {
-		fmt.Println("")
-		return fmt.Errorf("writing %q: %w", defaultFilename, err)
-	}
-
-	_, err = os.Stat("buf.gen.yaml")
-	bufFileNotFound := errors.Is(err, os.ErrNotExist)
-
-	if bufFileNotFound {
-		content := `
-version: v1
-plugins:
-  - remote: buf.build/prost/plugins/prost:v0.1.3-2
-    out: ` + outputPath + `
-    opt:
-`
-		fmt.Println(`Writing to temporary 'buf.gen.yaml':
----
-` + content + `
----`)
-		if err := ioutil.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
-			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
-		}
-	}
-
-	spkgFilepath := filepath.Join(os.TempDir(), "tmp.spkg#format=bin")
-	cmdArgs := []string{
-		"generate", spkgFilepath,
-	}
-	for _, excludePath := range excludePaths {
-		cmdArgs = append(cmdArgs, "--exclude-path", excludePath)
-	}
-	fmt.Printf("Running: buf %s\n", strings.Join(cmdArgs, " "))
-	c := exec.Command("buf", cmdArgs...)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	if err := c.Run(); err != nil {
-		return fmt.Errorf("error executing 'buf':: %w", err)
-	}
-
-	if bufFileNotFound {
-		fmt.Println("Removing temporary 'buf.gen.yaml'")
-		if err := os.Remove("buf.gen.yaml"); err != nil {
-			return fmt.Errorf("error deleting buf.gen.yaml: %w", err)
-		}
-	}
-
-	fmt.Println("Done")
-
-	return nil
+	generator := codegen.NewProtoGenerator(outputPath, excludePaths)
+	return generator.Generate(pkg)
 }

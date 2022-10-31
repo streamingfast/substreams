@@ -193,6 +193,8 @@ var utils = map[string]any{
 	"hasPrefix":                strings.HasPrefix,
 	"hasSuffix":                strings.HasSuffix,
 	"isDelta":                  IsDelta,
+	"isStore":                  IsStore,
+	"isMap":                    IsMap,
 	"writableStoreDeclaration": WritableStoreDeclaration,
 	"writableStoreType":        WritableStoreType,
 	"readableStoreDeclaration": ReadableStoreDeclaration,
@@ -339,7 +341,28 @@ func IsDelta(input *pbsubstreams.Module_Input) bool {
 	return false
 }
 
-func ReadableStoreType(store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+func IsStore(module *pbsubstreams.Module) bool {
+	switch module.Kind.(type) {
+	case *pbsubstreams.Module_KindStore_:
+		return true
+	case *pbsubstreams.Module_KindMap_:
+		return false
+	default:
+		return false
+	}
+}
+func IsMap(module *pbsubstreams.Module) bool {
+	switch module.Kind.(type) {
+	case *pbsubstreams.Module_KindStore_:
+		return false
+	case *pbsubstreams.Module_KindMap_:
+		return true
+	default:
+		return false
+	}
+}
+
+func ReadableStoreType(store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
 	t := store.ValueType
 
 	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
@@ -359,7 +382,7 @@ func ReadableStoreType(store pbsubstreams.Module_KindStore, input *pbsubstreams.
 	t = StoreType[t]
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
-func WritableStoreType(store pbsubstreams.Module_KindStore) string {
+func WritableStoreType(store *pbsubstreams.Module_KindStore) string {
 	t := store.ValueType
 
 	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
@@ -372,7 +395,7 @@ func WritableStoreType(store pbsubstreams.Module_KindStore) string {
 	return fmt.Sprintf("substreams::store::Store%s%s", p, t)
 }
 
-func WritableStoreDeclaration(store pbsubstreams.Module_KindStore) string {
+func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
 	t := store.ValueType
 	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
 	p = UpdatePoliciesMap[p]
@@ -385,7 +408,7 @@ func WritableStoreDeclaration(store pbsubstreams.Module_KindStore) string {
 	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
 }
 
-func ReadableStoreDeclaration(name string, store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
 	t := store.ValueType
 	isProto := strings.HasPrefix(t, "proto")
 	if isProto {

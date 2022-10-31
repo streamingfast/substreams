@@ -24,8 +24,8 @@ pub extern "C" fn {{$functionSignature.Name}}(
     {{- end }}
 ) {
     substreams::register_panic_hook();
-    let func = || {{- if eq $module.GetKindStore nil}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
-        {{if ne $module.GetKindStore nil -}}{{/* This is the store for a store module*/}}
+    let func = || {{- if isMap $module}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
+        {{if isStore $module -}}{{/* This is the store for a store module*/}}
         {{writableStoreDeclaration $module.GetKindStore }}
         {{end -}}
 
@@ -46,13 +46,13 @@ pub extern "C" fn {{$functionSignature.Name}}(
             {{$argument.Name}},
             {{end -}}
         {{end}}
-        {{- if ne $module.GetKindStore nil}}
+        {{- if isStore $module}}
             store,
         {{end -}}
         )
     };
 
-    {{- if ne $module.GetKindStore nil}}
+    {{- if isStore $module}}
         func()
     {{else}}
     let result = func();

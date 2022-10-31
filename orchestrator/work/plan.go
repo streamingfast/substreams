@@ -75,16 +75,28 @@ func (p *Plan) buildPlanFromStorageState(ctx context.Context, storageState *Stor
 }
 
 func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.ModuleGraph) error {
+	moduleAncestors := map[string][]string{}
+	for storeName, _ := range p.ModulesStateMap {
+		ancestors, err := graph.AncestorStoresOf(storeName)
+		if err != nil {
+			return fmt.Errorf("getting ancestor stores for %s: %w", storeName, err)
+		}
+		moduleAncestors[storeName] = moduleNames(ancestors)
+	}
+
+	mods := make([]string, 0, len(p.ModulesStateMap))
+	for modName, _ := range p.ModulesStateMap {
+		mods = append(mods, modName)
+	}
+	sort.Strings(mods)
+
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
-	for storeName, workUnit := range p.ModulesStateMap {
+	for _, storeName := range mods {
+		workUnit := p.ModulesStateMap[storeName]
 		requests := workUnit.batchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
-			ancestorStoreModules, err := graph.AncestorStoresOf(storeName)
-			if err != nil {
-				return fmt.Errorf("getting ancestor stores for %s: %w", storeName, err)
-			}
+			requiredModules := moduleAncestors[storeName]
 
-			requiredModules := moduleNames(ancestorStoreModules)
 			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
 			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)
 

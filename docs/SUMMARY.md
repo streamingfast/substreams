@@ -1,13 +1,14 @@
 # Table of contents
 
-* [🔀 Substreams](README.md)
+* [Substreams](README.md)
 
 ## Concept & Fundamentals
 
+* [Introduction Video](concept-and-fundamentals/introduction-video.md)
 * [What is Substreams](concepts/definition.md)
-* [Visual Diagram](concept-and-fundamentals/visual-diagram.md)
+* [Conceptual Diagram](concept-and-fundamentals/visual-diagram.md)
 * [Fundamentals](concept-and-fundamentals/fundamentals.md)
-* [Modules](concepts/modules.md)
+* [Modules Overview](concepts/modules.md)
   * [Module Types](concept-and-fundamentals/modules/module-types.md)
   * [Inputs](concept-and-fundamentals/modules/inputs.md)
   * [Outputs](concept-and-fundamentals/modules/outputs.md)
@@ -36,6 +37,7 @@
 * [Authentication](reference-and-specs/authentication.md)
 * [Rust APIs](reference-and-specs/rust-api.md)
 * [Graph-Node Setup](reference-and-specs/graph-node-setup.md)
+* [Examples](reference-and-specs/examples.md)
 * [Advanced](advanced/README.md)
   * [Running Substreams locally](advanced/running-locally.md)
 * [FAQ](reference-and-specs/faq.md)

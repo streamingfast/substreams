@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -130,7 +131,7 @@ func searchMapModule(
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog)
+	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog, &sync.WaitGroup{})
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)
 	if err != nil {
@@ -148,7 +149,7 @@ func searchMapModule(
 	}
 
 	if len(outputBytes) == 0 {
-		fmt.Printf("Block %d found but payload is empty. Module did not produce data at block num.", blockNumber)
+		fmt.Printf("RecordBlock %d found but payload is empty. Module did not produce data at block num.", blockNumber)
 		return nil
 	}
 

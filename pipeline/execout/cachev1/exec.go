@@ -1,6 +1,7 @@
 package cachev1
 
 import (
+	"fmt"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/pipeline/execout"
 )
@@ -12,10 +13,11 @@ type ExecOutputCache struct {
 	cursor *bstream.Cursor
 }
 
+// assert_test_store_delete_prefix
 func (e *ExecOutputCache) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, _, err := e.ExecOutputMap.Get(moduleName)
 	if err != nil && err != execout.NotFound {
-		return nil, false, err
+		return nil, false, fmt.Errorf("get from memory: %w", err)
 	}
 	if err == nil {
 		return val, false, nil
@@ -23,7 +25,7 @@ func (e *ExecOutputCache) Get(moduleName string) (value []byte, cached bool, err
 
 	val, found, err := e.engine.get(moduleName, e.Clock())
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("get from cache: %w", err)
 	}
 	if found {
 		return val, true, nil

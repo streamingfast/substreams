@@ -30,7 +30,6 @@ func recurseCommands(root *cobra.Command, prefix string, segments []string) {
 		varName := prefix + "_" + segmentPrefix + "GLOBAL_" + newName
 		if val := os.Getenv(varName); val != "" {
 			f.Usage += " [LOADED FROM ENV]" // Until we have a better template for our usage.
-			fmt.Println("SET PERSISTENT FLAG:", varName, val)
 			if !f.Changed {
 				f.Value.Set(val)
 			}
@@ -42,7 +41,6 @@ func recurseCommands(root *cobra.Command, prefix string, segments []string) {
 		varName := prefix + "_" + segmentPrefix + "CMD_" + newName
 		if val := os.Getenv(varName); val != "" {
 			f.Usage += " [LOADED FROM ENV]"
-			//fmt.Println("SET FLAG:", varName, val, f.Changed)
 			if !f.Changed {
 				f.Value.Set(val)
 			}

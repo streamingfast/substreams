@@ -2,14 +2,14 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/streamingfast/substreams/block"
+	pbsubstreams "github.com/streamingfast/substreams/store/marshaller/pb"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
-// compile-time check that baseStore implements all interfaces
 var _ Store = (*PartialKV)(nil)
 
 type PartialKV struct {
@@ -24,12 +24,7 @@ func (p *PartialKV) Roll(lastBlock uint64) {
 	p.baseStore.kv = map[string][]byte{}
 }
 
-func (s *PartialKV) InitialBlock() uint64 { return s.initialBlock }
-
-type storeData struct {
-	KV              map[string][]byte `json:"kv"`
-	DeletedPrefixes []string          `json:"deleted_prefixes"`
-}
+func (p *PartialKV) InitialBlock() uint64 { return p.initialBlock }
 
 func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	filename := p.storageFilename(exclusiveEndBlock)
@@ -40,43 +35,45 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
 	}
 
-	stateData := &storeData{}
-	if err = json.Unmarshal(data, &stateData); err != nil {
-		return fmt.Errorf("unmarshal data: %w", err)
+	stateData := &pbsubstreams.StoreData{}
+	if err := proto.Unmarshal(data, stateData); err != nil {
+		return fmt.Errorf("unmarshal store: %w", err)
 	}
-	p.kv = stateData.KV
-	p.DeletedPrefixes = stateData.DeletedPrefixes
+	p.kv = stateData.GetKv()
+	p.DeletedPrefixes = stateData.GetDeletePrefixes()
 
 	p.logger.Debug("partial store loaded", zap.String("filename", filename))
 	return nil
 }
 
-func (p *PartialKV) Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error) {
+func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
-	data := &storeData{
-		KV:              p.kv,
-		DeletedPrefixes: p.DeletedPrefixes,
+	stateData := &pbsubstreams.StoreData{
+		Kv:             p.kv,
+		DeletePrefixes: p.DeletedPrefixes,
 	}
 
-	content, err := json.MarshalIndent(data, "", "  ")
+	content, err := proto.Marshal(stateData)
 	if err != nil {
-		return nil, fmt.Errorf("marshal partial data: %w", err)
+		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}
 
 	filename := p.storageFilename(endBoundaryBlock)
-	if err := saveStore(ctx, p.store, filename, content); err != nil {
-		return nil, fmt.Errorf("write partial store %q in file %q: %w", p.name, filename, err)
-	}
 
 	brange := block.NewRange(p.initialBlock, endBoundaryBlock)
-	p.logger.Info("partial store state written",
-		zap.String("store", p.name),
+	p.logger.Info("partial store save written",
 		zap.String("file_name", filename),
 		zap.Object("block_range", brange),
 	)
 
-	return brange, nil
+	fw := &FileWriter{
+		store:    p.store,
+		filename: filename,
+		content:  content,
+	}
+
+	return brange, fw, nil
 }
 
 func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {

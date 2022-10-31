@@ -14,7 +14,7 @@ import (
 
 // Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
 func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
-	zlog.Debug("merging store", zap.Object("current_store", b), zap.Object("partial_store", kvPartialStore))
+	b.logger.Debug("merging store", zap.Int("current_key_count", len(b.kv)), zap.String("current_hash", b.moduleHash), zap.Uint64("mod_init_block", b.moduleInitialBlock), zap.Int("partial_key_count", len(kvPartialStore.kv)), zap.Uint64("partial_start_block", kvPartialStore.initialBlock))
 
 	if kvPartialStore.updatePolicy != b.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", b.updatePolicy, kvPartialStore.updatePolicy)
@@ -56,13 +56,13 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		// check valueType to do the right thing
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			sum := func(a, b uint64) uint64 {
+			sum := func(a, b int64) int64 {
 				return a + b
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
-				v0 := foundOrZeroUint64(v0b, fv0)
-				v1 := foundOrZeroUint64(v, true)
+				v0 := foundOrZeroInt64(v0b, fv0)
+				v1 := foundOrZeroInt64(v, true)
 				b.kv[k] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
 		case manifest.OutputValueTypeFloat64:
@@ -73,11 +73,11 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v0b, fv0 := b.kv[k]
 				v0 := foundOrZeroFloat(v0b, fv0)
 				v1 := foundOrZeroFloat(v, true)
-				b.kv[k] = []byte(floatToStr(sum(v0, v1)))
+				b.kv[k] = floatToBytes(sum(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			sum := func(a, b *big.Int) *big.Int {
-				return bi().Add(a, b)
+				return new(big.Int).Add(a, b)
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
@@ -89,13 +89,13 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
 			sum := func(a, b *big.Float) *big.Float {
-				return bf().Add(a, b).SetPrec(100)
+				return new(big.Float).SetPrec(100).Add(a, b).SetPrec(100)
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
 				v0 := foundOrZeroBigFloat(v0b, fv0)
 				v1 := foundOrZeroBigFloat(v, true)
-				b.kv[k] = []byte(bigFloatToStr(sum(v0, v1)))
+				b.kv[k] = bigFloatToBytes(sum(v0, v1))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -103,20 +103,20 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			max := func(a, b uint64) uint64 {
+			max := func(a, b int64) int64 {
 				if a >= b {
 					return a
 				}
 				return b
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroUint64(v, true)
+				v1 := foundOrZeroInt64(v, true)
 				v, found := b.kv[k]
 				if !found {
 					b.kv[k] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
-				v0 := foundOrZeroUint64(v, true)
+				v0 := foundOrZeroInt64(v, true)
 
 				b.kv[k] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
@@ -131,12 +131,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(floatToStr(v1))
+					b.kv[k] = floatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroFloat(v, true)
 
-				b.kv[k] = []byte(floatToStr(max(v0, v1)))
+				b.kv[k] = floatToBytes(max(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			max := func(a, b *big.Int) *big.Int {
@@ -169,12 +169,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroBigFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(bigFloatToStr(v1))
+					b.kv[k] = bigFloatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroBigFloat(v, true)
 
-				b.kv[k] = []byte(bigFloatToStr(max(v0, v1)))
+				b.kv[k] = bigFloatToBytes(max(v0, v1))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
@@ -182,20 +182,20 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			min := func(a, b uint64) uint64 {
+			min := func(a, b int64) int64 {
 				if a <= b {
 					return a
 				}
 				return b
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroUint64(v, true)
+				v1 := foundOrZeroInt64(v, true)
 				v, found := b.kv[k]
 				if !found {
 					b.kv[k] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
-				v0 := foundOrZeroUint64(v, true)
+				v0 := foundOrZeroInt64(v, true)
 
 				b.kv[k] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
@@ -210,12 +210,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(floatToStr(v1))
+					b.kv[k] = floatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroFloat(v, true)
 
-				b.kv[k] = []byte(floatToStr(min(v0, v1)))
+				b.kv[k] = floatToBytes(min(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			min := func(a, b *big.Int) *big.Int {
@@ -248,12 +248,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				v1 := foundOrZeroBigFloat(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.kv[k] = []byte(bigFloatToStr(v1))
+					b.kv[k] = bigFloatToBytes(v1)
 					continue
 				}
 				v0 := foundOrZeroBigFloat(v, true)
 
-				b.kv[k] = []byte(bigFloatToStr(min(v0, v1)))
+				b.kv[k] = bigFloatToBytes(min(v0, v1))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -265,7 +265,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	return nil
 }
 
-func foundOrZeroUint64(in []byte, found bool) uint64 {
+func foundOrZeroInt64(in []byte, found bool) int64 {
 	if !found {
 		return 0
 	}
@@ -273,19 +273,19 @@ func foundOrZeroUint64(in []byte, found bool) uint64 {
 	if err != nil {
 		return 0
 	}
-	return uint64(val)
+	return int64(val)
 }
 
 func foundOrZeroBigFloat(in []byte, found bool) *big.Float {
 	if !found {
-		return bf()
+		return new(big.Float).SetPrec(100)
 	}
 	return bytesToBigFloat(in)
 }
 
 func foundOrZeroBigInt(in []byte, found bool) *big.Int {
 	if !found {
-		return bi()
+		return new(big.Int)
 	}
 	return bytesToBigInt(in)
 }
@@ -344,18 +344,6 @@ func floatToBytes(f float64) []byte {
 	return []byte(floatToStr(f))
 }
 
-func intToBytes(i int) []byte {
-	return []byte(strconv.Itoa(i))
-}
-
-func bytesToInt(b []byte) int {
-	i, err := strconv.Atoi(string(b))
-	if err != nil {
-		panic(fmt.Sprintf("cannot convert string %s to int: %s", string(b), err.Error()))
-	}
-	return i
-}
-
 func bigFloatToStr(f *big.Float) string {
 	return f.Text('g', -1)
 }
@@ -363,6 +351,3 @@ func bigFloatToStr(f *big.Float) string {
 func bigFloatToBytes(f *big.Float) []byte {
 	return []byte(bigFloatToStr(f))
 }
-
-var bf = func() *big.Float { return new(big.Float).SetPrec(100) }
-var bi = func() *big.Int { return new(big.Int) }

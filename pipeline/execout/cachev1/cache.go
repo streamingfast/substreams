@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
@@ -35,16 +34,20 @@ type outputKV map[string]*CacheItem
 type OutputCache struct {
 	sync.RWMutex
 
+	wg                *sync.WaitGroup
 	moduleName        string
 	currentBlockRange *block.Range
 	kv                outputKV
 	store             dstore.Store
 	saveBlockInterval uint64
 	logger            *zap.Logger
+
+	initialized bool
 }
 
-func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *OutputCache {
+func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger, wg *sync.WaitGroup) *OutputCache {
 	return &OutputCache{
+		wg:                wg,
 		moduleName:        moduleName,
 		store:             store,
 		saveBlockInterval: saveBlockInterval,
@@ -66,14 +69,14 @@ func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 	return
 }
 
-func (c *OutputCache) IsOutOfRange(ref bstream.BlockRef) bool {
-	return !c.currentBlockRange.ContainsBlockRef(ref)
+func (c *OutputCache) isOutOfRange(blockNum uint64) bool {
+	return !c.currentBlockRange.Contains(blockNum)
 }
 
-func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {
-	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
-	return c.IsOutOfRange(incRef)
-}
+//func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {
+//	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
+//	return c.isOutOfRange(incRef)
+//}
 
 func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
 	c.Lock()
@@ -184,7 +187,10 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 	}
 	cnt := buffer.Bytes()
 
+	c.wg.Add(1)
 	go func() {
+		defer c.wg.Done()
+
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
 			err := c.store.WriteObject(ctx, filename, reader)

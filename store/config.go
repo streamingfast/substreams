@@ -3,11 +3,15 @@ package store
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/store/marshaller"
+
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
+
+type ConfigMap map[string]*Config
 
 type Config struct {
 	name       string
@@ -37,9 +41,10 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 	return &baseStore{
-		Config: c,
-		kv:     make(map[string][]byte),
-		logger: logger.Named("store").With(zap.String("store_name", c.name)),
+		Config:     c,
+		kv:         make(map[string][]byte),
+		logger:     logger.Named("store").With(zap.String("store_name", c.name)),
+		marshaller: marshaller.Default(),
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"github.com/streamingfast/substreams/store"
 )
 
+const CLOCK_TYPE = "sf.substreams.v1.Clock"
+
 type InputType int
 
 type Argument interface {
@@ -34,13 +36,13 @@ type BaseValueArgument struct {
 func (b *BaseValueArgument) Value() []byte        { return b.value }
 func (b *BaseValueArgument) SetValue(data []byte) { b.value = data }
 
-type BlockInput struct {
+type SourceInput struct {
 	BaseArgument
 	BaseValueArgument
 }
 
-func NewBlockInput(name string) *BlockInput {
-	return &BlockInput{
+func NewSourceInput(name string) *SourceInput {
+	return &SourceInput{
 		BaseArgument: BaseArgument{
 			name: name,
 		},

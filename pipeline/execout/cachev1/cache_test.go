@@ -1,6 +1,7 @@
 package cachev1
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/streamingfast/substreams/block"
@@ -111,7 +112,7 @@ func TestOutputCache_Delete(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			outputCache := NewOutputCache("module1", nil, 10, zlog)
+			outputCache := NewOutputCache("module1", nil, 10, zlog, &sync.WaitGroup{})
 			outputCache.kv = test.kv
 			for _, key := range test.keysToDelete {
 				outputCache.Delete(key)

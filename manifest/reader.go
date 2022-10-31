@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -9,14 +10,20 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jhump/protoreflect/desc"
 
+	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 )
+
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 type Options func(r *Reader) *Reader
 
@@ -51,7 +58,7 @@ func NewReader(input string, opts ...Options) *Reader {
 }
 
 func (r *Reader) Read() (*pbsubstreams.Package, error) {
-	if u, err := url.Parse(r.input); err == nil && u.Scheme == "http" || u.Scheme == "https" {
+	if r.IsRemotePackage() {
 		return r.newPkgFromURL(r.input)
 	}
 
@@ -69,8 +76,21 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 	return r.newPkgFromFile(r.input)
 }
 
+// IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over
+// HTTP/HTTPS, Google Cloud Storage, S3 or Azure Storage.
+func (r *Reader) IsRemotePackage() bool {
+	u, err := url.Parse(r.input)
+	if err != nil {
+		return false
+	}
+
+	return u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az"
+}
+
+// IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
+// by ensure it's not a remote package and if the file end with `.yaml`.
 func (r *Reader) IsLocalManifest() bool {
-	if u, err := url.Parse(r.input); err == nil && u.Scheme == "http" || u.Scheme == "https" {
+	if r.IsRemotePackage() {
 		return false
 	}
 
@@ -87,14 +107,37 @@ func (r *Reader) newPkgFromFile(inputFilePath string) (pkg *pbsubstreams.Package
 }
 
 func (r *Reader) newPkgFromURL(fileURL string) (pkg *pbsubstreams.Package, err error) {
-	resp, err := http.DefaultClient.Get(fileURL)
+	u, err := url.Parse(fileURL)
+	if err != nil {
+		panic(fmt.Errorf("fileURL %q should have been valid by that execution point but it seems it was not: %w", fileURL, err))
+	}
+
+	if u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az" {
+		return r.newPkgFromStore(fileURL)
+	}
+
+	resp, err := httpClient.Get(fileURL)
 	if err != nil {
 		return nil, fmt.Errorf("error downloading %q: %w", fileURL, err)
 	}
+
 	cnt, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %q: %w", fileURL, err)
 	}
+
+	return r.fromContents(cnt)
+}
+
+func (r *Reader) newPkgFromStore(fileURL string) (pkg *pbsubstreams.Package, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cnt, err := dstore.ReadObject(ctx, fileURL)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %q: %w", fileURL, err)
+	}
+
 	return r.fromContents(cnt)
 }
 

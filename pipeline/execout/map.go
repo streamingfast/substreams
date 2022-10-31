@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,8 +26,8 @@ func NewExecOutputMap(blockType string, block *bstream.Block, clock *pbsubstream
 	return &ExecOutputMap{
 		clock: clock,
 		values: map[string][]byte{
-			blockType:                blkBytes,
-			"sf.substreams.v1.Clock": clockBytes,
+			blockType:       blkBytes,
+			wasm.CLOCK_TYPE: clockBytes,
 		},
 	}, nil
 }

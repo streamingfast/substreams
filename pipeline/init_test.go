@@ -2,17 +2,22 @@ package pipeline
 
 import (
 	"encoding/json"
-	"github.com/streamingfast/bstream"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"testing"
 
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/logging"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
+func init() {
+	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
+}
 func assertProtoEqual(t *testing.T, expected proto.Message, actual proto.Message) {
 	t.Helper()
 

@@ -13,10 +13,10 @@ type Store interface {
 	InitialBlock() uint64
 
 	Loadable
-	Saveable
+	Savable
 	Iterable
 	DeltaAccessor
-	Resetable
+	Resettable
 
 	// intrinsics
 	Reader
@@ -50,11 +50,11 @@ type Loadable interface {
 	Load(ctx context.Context, atBlock uint64) error
 }
 
-type Saveable interface {
-	Save(ctx context.Context, endBoundaryBlock uint64) (*block.Range, error)
+type Savable interface {
+	Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error)
 }
 
-type Resetable interface {
+type Resettable interface {
 	Reset()
 }
 

@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/bstream"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -38,6 +37,9 @@ func NewRange(startBlock, exclusiveEndBlock uint64) *Range {
 }
 
 func (r *Range) String() string {
+	if r == nil {
+		return fmt.Sprintf("[nil)")
+	}
 	return fmt.Sprintf("[%d, %d)", r.StartBlock, r.ExclusiveEndBlock)
 }
 
@@ -49,10 +51,6 @@ func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		enc.AddUint64("exclusive_end_block", r.ExclusiveEndBlock)
 	}
 	return nil
-}
-
-func (r *Range) ContainsBlockRef(blockRef bstream.BlockRef) bool {
-	return r.Contains(blockRef.Num())
 }
 
 func (r *Range) Contains(blockNum uint64) bool {

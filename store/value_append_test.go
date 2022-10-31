@@ -8,12 +8,31 @@ import (
 )
 
 func TestValueAppend(t *testing.T) {
-	s := NewTestKVStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil)
+	tests := []struct {
+		name           string
+		store          *baseStore
+		key            string
+		values         [][]byte
+		expectedValues []byte
+	}{
+		{
+			name:           "golden path",
+			store:          newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
+			key:            "key",
+			values:         [][]byte{{0x00, 0x01, 0x02}, {0x03, 0x04, 0x05}, {0x06}},
+			expectedValues: []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+		},
+	}
 
-	s.Append(0, "key", []byte{0x00, 0x01, 0x02})
-	s.Append(1, "key", []byte{0x03, 0x04, 0x05})
-	s.Append(1, "key", []byte{0x06})
-	res, found := s.GetLast("key")
-	assert.True(t, found)
-	assert.Equal(t, []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06}, res)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for _, v := range test.values {
+				test.store.Append(0, test.key, v)
+			}
+			res, found := test.store.GetLast(test.key)
+			assert.True(t, found)
+			assert.Equal(t, test.expectedValues, res)
+		})
+	}
+
 }

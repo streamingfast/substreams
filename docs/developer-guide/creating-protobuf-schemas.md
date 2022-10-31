@@ -23,7 +23,7 @@ __**Google Protobuf Documentation**
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 {% endhint %}
 
-### Protofuf Definition
+### Protobuf Definition
 
 Define a protobuf model as `proto:eth.erc721.v1.Transfers` representing a list of ERC721 transfers.
 
@@ -49,6 +49,10 @@ message Transfer {
 ```
 {% endcode %}
 
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
+
 {% hint style="success" %}
 _Tip: using a fully qualified path for protobuf files reduces the risk of conflicts when other community members build their own_ [_Substreams Packages_](../reference-and-specs/packages.md#dependencies)_._
 {% endhint %}
@@ -70,3 +74,7 @@ Next, add a `mod.rs` file in the `src/pb` directory to export the newly generate
 pub mod erc721;
 ```
 {% endcode %}
+
+View this file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)

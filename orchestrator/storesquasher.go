@@ -4,30 +4,34 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/metrics"
 	"sort"
 	"time"
 
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
+
+var SkipRange = errors.New("skip range")
+var PartialChunksDone = errors.New("partial chunks done")
 
 type StoreSquasher struct {
 	name                         string
 	store                        *store.FullKV
 	requestRange                 *block.Range
 	ranges                       block.Ranges
-	targetStartBlock             uint64 // FIXME: THIS ISN'T USED
-	targetExclusiveEndBlock      uint64 // FIXME: The value we receive in this is the `request.EffectiveStartBlock()` .. and its received as `targetExclusiveBlock` and assigned to `targetExclusiveEndBlock`. What's happening?
-	nextExpectedStartBlock       uint64
-	log                          *zap.Logger
-	jobsPlanner                  *JobsPlanner
+	targetExclusiveEndBlock      uint64 // The upper bound of this Squasher's responsibility
 	targetExclusiveEndBlockReach bool
-	partialsChunks               chan block.Ranges
-	waitForCompletion            chan error
-	storeSaveInterval            uint64
+	nextExpectedStartBlock       uint64 // This goes from a lower number up to `targetExclusiveEndBlock`
+	//log                          *zap.Logger
+	partialsChunks    chan block.Ranges
+	waitForCompletion chan error
+	storeSaveInterval uint64
+
+	onStoreCompletedUntilBlock func(storeName string, blockNum uint64)
 }
 
 func NewStoreSquasher(
@@ -35,28 +39,29 @@ func NewStoreSquasher(
 	targetExclusiveBlock,
 	nextExpectedStartBlock uint64,
 	storeSaveInterval uint64,
-	jobsPlanner *JobsPlanner,
+	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) *StoreSquasher {
 	s := &StoreSquasher{
-		name:                    initialStore.Name(),
-		store:                   initialStore,
-		targetExclusiveEndBlock: targetExclusiveBlock,
-		nextExpectedStartBlock:  nextExpectedStartBlock,
-		jobsPlanner:             jobsPlanner,
-		storeSaveInterval:       storeSaveInterval,
-		partialsChunks:          make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
-		waitForCompletion:       make(chan error),
-		log:                     zlog.With(zap.Object("initial_store", initialStore)),
+		name:                       initialStore.Name(),
+		store:                      initialStore,
+		targetExclusiveEndBlock:    targetExclusiveBlock,
+		nextExpectedStartBlock:     nextExpectedStartBlock,
+		onStoreCompletedUntilBlock: onStoreCompletedUntilBlock,
+		storeSaveInterval:          storeSaveInterval,
+		partialsChunks:             make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
+		waitForCompletion:          make(chan error),
 	}
 	return s
 }
 
 func (s *StoreSquasher) WaitForCompletion(ctx context.Context) error {
+	logger := reqctx.Logger(ctx)
+
 	// TODO(abourget): unsure what this line means, a `close()` doesn't wait?
-	s.log.Info("waiting form terminate after partials chucks chan empty")
+	logger.Info("waiting form terminate after partials chucks chan empty")
 	close(s.partialsChunks)
 
-	s.log.Info("waiting for completion")
+	logger.Info("waiting for completion")
 
 	select {
 	case <-ctx.Done():
@@ -65,7 +70,7 @@ func (s *StoreSquasher) WaitForCompletion(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("store squasher waiting for completion: %w", err)
 		}
-		s.log.Info("squasher completed")
+		logger.Info("squasher completed")
 		return nil
 	}
 }
@@ -75,37 +80,28 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
 	}
 
-	s.log.Info("cumulating squash request range", zap.Stringer("req_chunk", partialsChunks))
 	s.partialsChunks <- partialsChunks
 	return nil
 }
 
 func (s *StoreSquasher) launch(ctx context.Context) {
-	s.log.Info("launching store squasher")
+	logger := reqctx.Logger(ctx)
+	logger = logger.With(zap.String("store_name", s.name))
+	ctx = reqctx.WithLogger(ctx, logger)
+	reqStats := reqctx.ReqStats(ctx)
+
+	logger.Info("launching store squasher")
 	metrics.SquashersStarted.Inc()
 	defer metrics.SquashersEnded.Inc()
 
 	for {
-		select {
-		case <-ctx.Done():
-			s.log.Info("quitting on a close context")
-			// TODO(abourget): don't write anything here?
-			// the goroutine waiting on this one will ALSO trigger on `ctx.Done()`
-			// and exit properly... so no need to clog that channel.
-			s.waitForCompletion <- ctx.Err()
-			return
-
-		case partialsChunks, ok := <-s.partialsChunks:
-			if !ok {
-				s.log.Info("squashing done, no more partial chunks to squash")
+		if err := s.getPartialChunks(ctx); err != nil {
+			if errors.Is(err, PartialChunksDone) {
 				close(s.waitForCompletion)
 				return
 			}
-			s.log.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
-			s.ranges = append(s.ranges, partialsChunks...)
-			sort.Slice(s.ranges, func(i, j int) bool {
-				return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
-			})
+			s.waitForCompletion <- err
+			return
 		}
 
 		eg := llerrgroup.New(250)
@@ -114,22 +110,17 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 		out, err := s.processRanges(ctx, eg)
 		if err != nil {
 			s.waitForCompletion <- err
-			// FIXME (abourget): shouldn't we return here?
-			// there are risks we're not waiting for all threads in `eg.Wait()`, and
-			// another risk that we block upon writing to `s.waitForCompletion` 5 lines
-			// below.
 			return
 		}
 
-		s.log.Info("waiting for eg to finish")
 		if err := eg.Wait(); err != nil {
-			// eg.Wait() will block until everything is done, and return the first error.
 			s.waitForCompletion <- fmt.Errorf("waiting: %w", err)
 			return
 		}
 
 		if out.lastExclusiveEndBlock != 0 {
-			s.jobsPlanner.SignalCompletionUpUntil(s.name, out.lastExclusiveEndBlock)
+			s.onStoreCompletedUntilBlock(s.name, out.lastExclusiveEndBlock)
+			reqStats.RecordStoreSquasherProgress(s.name, out.lastExclusiveEndBlock)
 		}
 
 		totalDuration := time.Since(start)
@@ -138,7 +129,7 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 			metrics.SquashCount.AddUint64(out.squashCount)
 			avgDuration = totalDuration / time.Duration(out.squashCount)
 		}
-		s.log.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
+		logger.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
 	}
 }
 
@@ -147,8 +138,36 @@ type rangeProgress struct {
 	lastExclusiveEndBlock uint64
 }
 
+func (s *StoreSquasher) sortRange() {
+	sort.Slice(s.ranges, func(i, j int) bool {
+		return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
+	})
+}
+
+func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
+	logger := reqctx.Logger(ctx)
+
+	select {
+	case <-ctx.Done():
+		logger.Info("quitting on a close context")
+		return ctx.Err()
+
+	case partialsChunks, ok := <-s.partialsChunks:
+		if !ok {
+			logger.Info("squashing done, no more partial chunks to squash")
+			return PartialChunksDone
+		}
+		logger.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
+		s.ranges = append(s.ranges, partialsChunks...)
+		s.sortRange()
+	}
+	return nil
+}
+
 func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rangeProgress, error) {
-	s.log.Info("processing range", zap.Int("range_count", len(s.ranges)))
+	logger := reqctx.Logger(ctx)
+
+	logger.Info("processing range", zap.Int("range_count", len(s.ranges)))
 	out := &rangeProgress{}
 	for {
 		if eg.Stop() {
@@ -156,7 +175,7 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 		}
 
 		if len(s.ranges) == 0 {
-			s.log.Info("no more ranges to squash")
+			logger.Info("no more ranges to squash")
 			return out, nil
 		}
 
@@ -177,16 +196,16 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 		if squashableRange.ExclusiveEndBlock == s.targetExclusiveEndBlock {
 			s.targetExclusiveEndBlockReach = true
 		}
-		s.log.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
+		logger.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
 		out.lastExclusiveEndBlock = squashableRange.ExclusiveEndBlock
 	}
 	return out, nil
 }
 
-var SkipRange = errors.New("skip range")
-
 func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, squashableRange *block.Range) error {
-	s.log.Info("testing squashable range",
+	logger := reqctx.Logger(ctx)
+
+	logger.Info("testing squashable range",
 		zap.Object("range", squashableRange),
 		zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock),
 	)
@@ -198,7 +217,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 		return SkipRange
 	}
 
-	s.log.Debug("found range to merge",
+	logger.Debug("found range to merge",
 		zap.Stringer("squashable", s),
 		zap.Stringer("squashable_range", squashableRange),
 	)
@@ -208,48 +227,44 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 	}
 
-	s.log.Debug("merging next store loaded", zap.Object("store", nextStore))
+	logger.Debug("merging next store loaded", zap.Object("store", nextStore))
 	if err := s.store.Merge(nextStore); err != nil {
-		return fmt.Errorf("merging: %s", err)
+		return fmt.Errorf("merging: %w", err)
 	}
 
-	zlog.Debug("store merge", zap.Object("store", s.store))
+	logger.Debug("store merge", zap.Object("store", s.store))
 	s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 
-	zlog.Info("deleting store", zap.Object("store", nextStore))
+	logger.Info("deleting store", zap.Object("store", nextStore))
 	eg.Go(func() error {
 		_ = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 		return nil
 	})
 
 	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {
+		_, writer, err := s.store.Save(squashableRange.ExclusiveEndBlock)
+		if err != nil {
+			return fmt.Errorf("save full store: %w", err)
+		}
+
 		eg.Go(func() error {
-			_, err := s.store.Save(ctx, squashableRange.ExclusiveEndBlock)
-			return err
+			return writer.Write(ctx)
 		})
 	}
 	return nil
 }
 
 func (s *StoreSquasher) shouldSaveFullKV(storeInitialBlock uint64, squashableRange *block.Range) bool {
-	// TODO(abourget): beautiful opportunity to create a table-driven tests function
-	// called `shouldSaveFullKV(...)` .. and wrap the `Save()` call in it.
-	// These are crazy conditions that are unreadable.. don't force us to dig into this
-	// at this level, if the only question is "should I save or not?"
-	// we'll dig in the conditions if we need
 
+	// we check if the squashableRange we just merged into our FullKV store, ends on a storeInterval boundary block
+	// If someone the storeSaveInterval
+
+	// squashable range must end on a store boundary block
 	isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
+	// we expect the range to be euqal to the store save interval, except if the range start block
+	// is the same as the store initial block
 	isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == storeInitialBlock
 	isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.storeSaveInterval == 0
-	// This log was for debugging/testing in prod
-	zlog.Info("should write full store?",
-		zap.Uint64("exclusiveEndBlock", squashableRange.ExclusiveEndBlock),
-		zap.Uint64("store_interval", s.storeSaveInterval),
-		zap.Bool("is_save_interval_reached", isSaveIntervalReached),
-		zap.Bool("is_first_kv_for_module", isFirstKvForModule),
-		zap.Bool("is_completed_kv", isCompletedKv),
-	)
-
 	return isFirstKvForModule || isCompletedKv
 }
 

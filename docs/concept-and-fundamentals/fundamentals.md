@@ -14,14 +14,15 @@ This documentation aims to outline information to further help developers workin
 
 ### Building a Substream Key Steps
 
-* Identify smart contract addresses of interest (wallets, decentralized exchanges (DEXs), etc.).
+* Identify smart contract addresses of interest including wallets, decentralized exchanges (DEXs), etc.
 * Identify data, and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update substreams manifest, point to protobufs and handlers.
+* Issue command to Substreams CLI passing manifest.
 
 ### **The Substreams Engine**
 
-The Substreams engine basically is the CPU, or brain, of the Substreams system. The engine handles requests, communication and orchestrates the transformation of blockchain data.
+The Substreams engine basically is the CPU, or brain, of the Substreams system. The engine handles requests, **and** communication and orchestrates the transformation of blockchain data.
 
 {% hint style="info" %}
 Note: _The Substreams engine is responsible for running data transformations defined by developers to process targeted blockchain data._&#x20;
@@ -33,7 +34,11 @@ Developers create the data transformation strategies in Substreams “[module ha
 
 ### **How Substreams Modules Communicate**
 
-The Substreams engine runs the code defined by developers in the Rust-based module handlers. _**Substreams modules have a uni-directional flow of data**_. The data can be passed from one module to another, but only in a single direction.&#x20;
+The Substreams engine runs the code defined by developers in the Rust-based module handlers.&#x20;
+
+{% hint style="info" %}
+**Note**: _**Substreams modules have a uni-directional flow of data**_. The data can be passed from one module to another, but only in a single direction.&#x20;
+{% endhint %}
 
 The flow of data is defined in the [Substreams manifest](../reference-and-specs/manifests.md) through the “inputs” and “outputs” fields of the configuration file. These fields generally reference the protobuf definitions for the targeted blockchain data. The flow of data can also be defined using the “inputs” field to send data directly from one module to another.
 
@@ -53,6 +58,16 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 ### **Protobufs for Substreams**
 
+<figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
+
+View the protobuf file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
+
+View the Rust module handlers in the lib.rs file in the repo by visiting the following link.
+
+[https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
+
 [Protocol buffers](https://developers.google.com/protocol-buffers), or protobufs, are the data models operated on by the [Rust-based module handler functions](../developer-guide/writing-module-handlers.md). Data models are defined and outlined in the protobufs.&#x20;
 
 {% hint style="info" %}
@@ -61,7 +76,7 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 Many of the protobuf definitions have already been created, such as the [erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), that can be used by developers creating Substreams data transformation strategies.
 
-Custom smart contracts targeted by developers, such as [UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), can have protobuf definitions that have already been created for them by others. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
+Custom smart contracts targeted by developers, such as [UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), will have protobuf definitions that have already been created for them by others. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
 
 In object-oriented programming terminology, the protobufs are the objects or object models. In front-end web development terms, protobufs are similar to the REST, or other data access API.&#x20;
 

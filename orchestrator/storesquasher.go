@@ -164,6 +164,15 @@ func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
 	return nil
 }
 
+// store_save_interval = 1K
+// 0 -> 10K
+
+//j2 0 -> 2		pw => 0-1, 1-2
+//j3 2 -> 4 	pw => 2-3, 3-4
+//j4 4 -> 6
+//j5 6 -> 8
+//j6 8 -> 10
+
 func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rangeProgress, error) {
 	logger := reqctx.Logger(ctx)
 
@@ -237,8 +246,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 
 	logger.Info("deleting store", zap.Object("store", nextStore))
 	eg.Go(func() error {
-		_ = nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
-		return nil
+		return nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 	})
 
 	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {

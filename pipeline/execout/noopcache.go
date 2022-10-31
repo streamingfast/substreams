@@ -8,10 +8,11 @@ import (
 )
 
 type NoOpCache struct {
+	blockType string
 }
 
-func NewNoOpCache() CacheEngine {
-	return &NoOpCache{}
+func NewNoOpCache(blockType string) CacheEngine {
+	return &NoOpCache{blockType: blockType}
 }
 
 func (n *NoOpCache) Init(modules *manifest.ModuleHashes) error {
@@ -34,8 +35,8 @@ func (n *NoOpCache) HandleUndo(clock *pbsubstreams.Clock, moduleName string) {
 	return
 }
 
-func (n *NoOpCache) NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (ExecutionOutput, error) {
-	execOutMap, err := NewExecOutputMap(blockType, block, clock)
+func (n *NoOpCache) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (ExecutionOutput, error) {
+	execOutMap, err := NewExecOutputMap(n.blockType, block, clock)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}

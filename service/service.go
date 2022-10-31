@@ -142,16 +142,30 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
-	graph, err := validateGraph(request, s.blockType)
+
+	moduleTree, err := pipeline.NewModuleTree(request, s.blockType)
 	if err != nil {
-		return status.Error(grpccode.InvalidArgument, err.Error())
+		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	isSubrequest, err := s.isSubrequest(ctx)
+	isSubRequest, err := s.isSubRequest(ctx)
 	if err != nil {
 		return err
 	}
-	logger.Debug("set is_subrequest", zap.Bool("is_subrequest", isSubrequest))
+	logger.Debug("set is_subrequest", zap.Bool("is_subrequest", isSubRequest))
+
+	var requestStats metrics.Stats
+	if isSubRequest {
+		wid := workerID.Inc()
+		logger = logger.With(zap.Uint64("worker_id", wid))
+		ctx = reqctx.WithLogger(ctx, logger)
+	} else {
+		// we only want to meaure stats when enabled an on the Main request
+		if s.runtimeConfig.WithRequestStats {
+			requestStats = metrics.NewReqStats(logger)
+			ctx = reqctx.WithReqStats(ctx, requestStats)
+		}
+	}
 
 	// request is: start_block: 0, stop_block: 15M
 	// * find the HIGHEST finalized blocks close to stop_block
@@ -166,27 +180,14 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	///        Eventually, we have a first process that corrects the live segment
 	///        joining on a final segment, and then kick off parallel processing
 	///        until a new, more recent, live block.
-
-	var requestStats metrics.Stats
-	if isSubrequest {
-		wid := workerID.Inc()
-		logger = logger.With(zap.Uint64("worker_id", wid))
-		ctx = reqctx.WithLogger(ctx, logger)
-	} else {
-		// we only want to meaure stats when enabled an on the Main request
-		if s.runtimeConfig.WithRequestStats {
-			requestStats = metrics.NewReqStats(logger)
-			ctx = reqctx.WithReqStats(ctx, requestStats)
-		}
-	}
-
-	// TODO(abourget): Resolve start block, prepare new request.
-	reqctx.Request{}
-
-	// THEN wrapp it in a context
-	ctx, err = reqctx.WithRequest(ctx, request, isSubrequest)
+	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest)
 	if err != nil {
-		return fmt.Errorf("context with request: %w", err)
+		return fmt.Errorf("build request details: %w", err)
+	}
+	ctx = reqctx.WithRequest(ctx, requestDetails)
+
+	if err := moduleTree.ValidateEffectiveStartBlock(requestDetails.EffectiveStartBlockNum); err != nil {
+		return stream.NewErrInvalidArg(err.Error())
 	}
 
 	responseHandler := func(resp *pbsubstreams.Response) error {
@@ -197,7 +198,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return nil
 	}
 
-	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, reqctx.Logger(ctx))
+	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, s.blockType, reqctx.Logger(ctx))
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -212,7 +213,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	}
 	pipe := pipeline.New(
 		ctx,
-		graph,
+		moduleTree,
 		s.blockType,
 		wasmRuntime,
 		execOutputCacheEngine,
@@ -251,7 +252,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	return pipe.Launch(ctx, blockStream, streamSrv)
 }
 
-func (s *Service) isSubrequest(ctx context.Context) (bool, error) {
+func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
 	/*
 		this entire `if` is not good, the ctx is from the StreamServer so there
 		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled

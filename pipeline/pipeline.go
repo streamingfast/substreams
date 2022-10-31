@@ -6,7 +6,6 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -28,24 +27,17 @@ type backprocessingStore struct {
 }
 
 type Pipeline struct {
-	// storing context since the processBlock interface
-	// does not have context. For consistency, it should only be read in the processBlock function
-	ctx context.Context
+	ctx           context.Context
+	runtimeConfig config.RuntimeConfig
 
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
 	postJobHooks   []substreams.PostJobHook
 
-	vmType      string // wasm/rust-v1, native
-	blockType   string
-	wasmRuntime *wasm.Runtime
-
-	// ModuleTree, ModuleGraph
-	graph           *manifest.ModuleGraph
-	moduleHashes    *manifest.ModuleHashes
-	moduleOutputs   []*pbsubstreams.ModuleOutput
-	outputModuleMap map[string]bool
+	wasmRuntime     *wasm.Runtime
+	moduleTree      *ModuleTree
 	moduleExecutors []exec.ModuleExecutor
+	moduleOutputs   []*pbsubstreams.ModuleOutput
 
 	respFunc func(resp *pbsubstreams.Response) error
 
@@ -57,51 +49,32 @@ type Pipeline struct {
 
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 
-	runtimeConfig config.RuntimeConfig
-
-	// StoreProvider
-	bounder  *storeBoundary
-	StoreMap store.Map
-
-	//
-	// Store progress tracker, in-memory, syncer
-	// with bound checks,
-	// that gets initialized through snapshots or from
-	// the fruits of a parallel execution.
-
+	stores *Stores
 }
 
 func New(
 	ctx context.Context,
-	graph *manifest.ModuleGraph,
-	blockType string,
+	moduleTree *ModuleTree,
+	stores *Stores,
 	wasmRuntime *wasm.Runtime,
 	execOutputCache execout.CacheEngine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option,
 ) *Pipeline {
-	bounder := NewStoreBoundary(
-		runtimeConfig.StoreSnapshotsSaveInterval,
-		reqctx.Details(ctx).Request.StopBlockNum,
-	)
 	pipe := &Pipeline{
 		ctx:             ctx,
 		execOutputCache: execOutputCache,
 		runtimeConfig:   runtimeConfig,
-		graph:           graph,
-		outputModuleMap: map[string]bool{},
-		blockType:       blockType,
+		moduleTree:      moduleTree,
 		wasmRuntime:     wasmRuntime,
 		respFunc:        respFunc,
-		bounder:         bounder,
+		stores:          stores,
 		forkHandler:     NewForkHandler(),
 	}
-
 	for _, opt := range opts {
 		opt(pipe)
 	}
-
 	return pipe
 }
 
@@ -110,12 +83,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	logger := reqctx.Logger(ctx)
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
 	defer span.EndWithErr(&err)
-
-	// Sets somewhere the output modules.
-
-	for _, name := range reqDetails.Request.OutputModules {
-		p.outputModuleMap[name] = true
-	}
 
 	// Registers some ForkHandlers (to adjust exec output, and stores states)
 	p.forkHandler.registerHandler(func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput) {
@@ -134,29 +101,15 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		zap.Strings("outputs", reqDetails.Request.OutputModules),
 	)
 
-	// Validation of all the module tree, hashes, computing graph (MODULE TREE)
-	if err := p.validateBinaries(ctx); err != nil {
-		return fmt.Errorf("binary validation failed: %w", err)
-	}
-
-	modules, storeModules, err := p.getModules(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve modules: %w", err)
-	}
-
-	if err := p.validateAndHashModules(ctx, modules); err != nil {
-		return fmt.Errorf("module failed validation: %w", err)
-	}
-
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
 	logger.Info("initializing exec output cache")
-	if err := p.execOutputCache.Init(p.moduleHashes); err != nil {
+	if err := p.execOutputCache.Init(p.moduleTree.moduleHashes); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
-	logger.Info("initializing store configurations", zap.Int("store_count", len(storeModules)))
-	storeConfigs, err := p.initializeStoreConfigs(storeModules)
+	logger.Info("initializing store configurations", zap.Int("store_count", len(p.moduleTree.storeModules)))
+	storeConfigs, err := p.initializeStoreConfigs(p.moduleTree.storeModules)
 	if err != nil {
 		return fmt.Errorf("initialize store config map: %w", err)
 	}
@@ -186,7 +139,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	// and cache the latest if all block boundaries
 	// are still clear.
 
-	if err = p.buildWASM(ctx, modules); err != nil {
+	if err = p.buildWASM(ctx, p.moduleTree.processModules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
@@ -254,7 +207,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 		p.ctx,
 		p.runtimeConfig,
 		reqDetails.EffectiveStartBlockNum,
-		p.graph,
+		p.moduleTree.graph,
 		p.respFunc,
 		storeConfigs,
 		reqDetails.Request.Modules,
@@ -280,24 +233,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 }
 
 func (p *Pipeline) isOutputModule(name string) bool {
-	_, found := p.outputModuleMap[name]
-	return found
-}
-
-func (p *Pipeline) validateAndHashModules(ctx context.Context, modules []*pbsubstreams.Module) error {
-	reqDetails := reqctx.Details(ctx)
-
-	p.moduleHashes = manifest.NewModuleHashes()
-
-	for _, module := range modules {
-		isOutput := p.outputModuleMap[module.Name]
-		if isOutput && reqDetails.EffectiveStartBlockNum < module.InitialBlock {
-			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", reqDetails.EffectiveStartBlockNum, module.Name, module.InitialBlock)
-		}
-		p.moduleHashes.HashModule(reqDetails.Request.Modules, module, p.graph)
-	}
-
-	return nil
+	return p.moduleTree.IsOutputModule(name)
 }
 
 func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
@@ -385,28 +321,6 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 	return nil
 }
 
-func (p *Pipeline) validateBinaries(ctx context.Context) error {
-	reqDetails := reqctx.Details(ctx)
-	for _, binary := range reqDetails.Request.Modules.Binaries {
-		if binary.Type != "wasm/rust-v1" {
-			return fmt.Errorf("unsupported binary type: %q, supported: %q", binary.Type, p.vmType)
-		}
-		p.vmType = binary.Type
-	}
-	return nil
-}
-
-func (p *Pipeline) getModules(ctx context.Context) (modules []*pbsubstreams.Module, storeModules []*pbsubstreams.Module, err error) {
-	reqDetails := reqctx.Details(ctx)
-	if modules, err = p.graph.ModulesDownTo(reqDetails.Request.OutputModules); err != nil {
-		return nil, nil, fmt.Errorf("building execution moduleGraph: %w", err)
-	}
-	if storeModules, err = p.graph.StoresDownTo(reqDetails.Request.OutputModules); err != nil {
-		return nil, nil, err
-	}
-	return modules, storeModules, nil
-}
-
 func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module) error {
 	request := reqctx.Details(ctx).Request
 	tracer := otel.GetTracerProvider().Tracer("executor")
@@ -472,7 +386,7 @@ func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (
 		c, err := store.NewConfig(
 			storeModule.Name,
 			storeModule.InitialBlock,
-			p.moduleHashes.Get(storeModule.Name),
+			p.moduleTree.moduleHashes.Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			p.runtimeConfig.BaseObjectStore,

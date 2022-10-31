@@ -22,19 +22,21 @@ func init() {
 
 type Engine struct {
 	ctx           context.Context
+	blockType     string
 	caches        map[string]*OutputCache
 	runtimeConfig config.RuntimeConfig
 	logger        *zap.Logger
 	wg            *sync.WaitGroup
 }
 
-func NewEngine(runtimeConfig config.RuntimeConfig, logger *zap.Logger) (execout.CacheEngine, error) {
+func NewEngine(runtimeConfig config.RuntimeConfig, blockType string, logger *zap.Logger) (execout.CacheEngine, error) {
 	e := &Engine{
 		ctx:           context.Background(),
 		runtimeConfig: runtimeConfig,
 		caches:        make(map[string]*OutputCache),
 		logger:        logger,
 		wg:            &sync.WaitGroup{},
+		blockType:     blockType,
 	}
 	return e, nil
 }
@@ -76,8 +78,8 @@ func (e *Engine) HandleUndo(clock *pbsubstreams.Clock, moduleName string) {
 	}
 }
 
-func (e *Engine) NewExecOutput(blockType string, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
-	execOutMap, err := execout.NewExecOutputMap(blockType, block, clock)
+func (e *Engine) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
+	execOutMap, err := execout.NewExecOutputMap(e.blockType, block, clock)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}

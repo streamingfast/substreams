@@ -115,7 +115,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 	}
 
 	logger := reqctx.Logger(ctx)
-	execOutput, err := p.execOutputCache.NewExecOutput(p.blockType, block, clock, cursor)
+	execOutput, err := p.execOutputCache.NewExecOutput(block, clock, cursor)
 	if err != nil {
 		return fmt.Errorf("setting up exec output: %w", err)
 	}

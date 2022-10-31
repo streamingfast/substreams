@@ -8,7 +8,7 @@ import (
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name                string
-		isSubrequest        bool
+		isSubRequest        bool
 		blockNum            uint64
 		reqStopBlock        uint64
 		currentBoundary     uint64
@@ -72,7 +72,7 @@ func TestNew(t *testing.T) {
 		// Subrequest
 		{
 			name:                "request, receive block pre boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            9,
 			reqStopBlock:        30, // has no impact on the flow
 			currentBoundary:     10,
@@ -80,7 +80,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, receive block on boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            30,
 			reqStopBlock:        42, // has no impact on the flow
 			currentBoundary:     30,
@@ -88,7 +88,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, receive block post boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            25,
 			reqStopBlock:        45, // has no impact on the flow
 			currentBoundary:     20,
@@ -96,7 +96,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, receive block much past boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            58,
 			reqStopBlock:        76, // has no impact on the flow
 			currentBoundary:     20,
@@ -104,7 +104,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, hit stop block pre boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            18,
 			reqStopBlock:        18,
 			currentBoundary:     20,
@@ -112,7 +112,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, hit stop block on boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            30,
 			reqStopBlock:        30,
 			currentBoundary:     30,
@@ -120,7 +120,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, hit stop block post boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            22,
 			reqStopBlock:        22,
 			currentBoundary:     20,
@@ -128,7 +128,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, pass stop block post boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            36,
 			reqStopBlock:        34,
 			currentBoundary:     20,
@@ -136,7 +136,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:                "request, passed stop blockmuch past boundary",
-			isSubrequest:        true,
+			isSubRequest:        true,
 			blockNum:            58,
 			reqStopBlock:        22,
 			currentBoundary:     20,
@@ -149,7 +149,7 @@ func TestNew(t *testing.T) {
 				interval:     10,
 				nextBoundary: test.currentBoundary,
 			}
-			assert.Equal(t, test.expectedFlushRanges, b.GetStoreFlushRanges(test.isSubrequest, test.reqStopBlock, test.blockNum))
+			assert.Equal(t, test.expectedFlushRanges, b.GetStoreFlushRanges(test.isSubRequest, test.reqStopBlock, test.blockNum))
 		})
 	}
 }

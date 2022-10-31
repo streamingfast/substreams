@@ -20,6 +20,13 @@ type Stores struct {
 	StoreMap store.Map
 }
 
+func NewStores(storeSnapshotSaveInterval, stopBlockNum uint64) *Stores {
+	bounder := NewStoreBoundary(storeSnapshotSaveInterval, stopBlockNum)
+	return &Stores{
+		bounder: bounder,
+	}
+}
+
 func (p *Pipeline) resetStores() {
 	for _, s := range p.StoreMap.All() {
 		if resetableStore, ok := s.(store.Resettable); ok {

@@ -6,9 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/store/marshaller"
-	pbsubstreams "github.com/streamingfast/substreams/store/marshaller/pb"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 var _ Store = (*FullKV)(nil)
@@ -47,12 +45,12 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		return fmt.Errorf("load full store %s at %s: %w", s.name, fileName, err)
 	}
 
-	stateData := &pbsubstreams.StoreData{}
-	if err := proto.Unmarshal(data, stateData); err != nil {
+	storeData, err := s.marshaller.Unmarshal(data)
+	if err != nil {
 		return fmt.Errorf("unmarshal store: %w", err)
 	}
 
-	s.kv = stateData.GetKv()
+	s.kv = storeData.Kv
 
 	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName))
 	return nil
@@ -64,11 +62,11 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
-	stateData := &pbsubstreams.StoreData{
+	stateData := &marshaller.StoreData{
 		Kv: s.kv,
 	}
 
-	content, err := proto.Marshal(stateData)
+	content, err := s.marshaller.Marshal(stateData)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal kv state: %w", err)
 	}

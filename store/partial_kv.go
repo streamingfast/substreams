@@ -3,11 +3,10 @@ package store
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/store/marshaller"
 
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/store/marshaller/pb"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 var _ Store = (*PartialKV)(nil)
@@ -35,12 +34,12 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
 	}
 
-	stateData := &pbsubstreams.StoreData{}
-	if err := proto.Unmarshal(data, stateData); err != nil {
+	storeData, err := p.marshaller.Unmarshal(data)
+	if err != nil {
 		return fmt.Errorf("unmarshal store: %w", err)
 	}
-	p.kv = stateData.GetKv()
-	p.DeletedPrefixes = stateData.GetDeletePrefixes()
+	p.kv = storeData.Kv
+	p.DeletedPrefixes = storeData.DeletePrefixes
 
 	p.logger.Debug("partial store loaded", zap.String("filename", filename))
 	return nil
@@ -49,12 +48,12 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
-	stateData := &pbsubstreams.StoreData{
+	stateData := &marshaller.StoreData{
 		Kv:             p.kv,
 		DeletePrefixes: p.DeletedPrefixes,
 	}
 
-	content, err := proto.Marshal(stateData)
+	content, err := p.marshaller.Marshal(stateData)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}

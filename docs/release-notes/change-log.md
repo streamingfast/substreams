@@ -4,15 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 
 * Moved Rust modules to `github.com/streamingfast/substreams-rs`
 
+### Library
+
+* Gained significant execution time improvement when saving and loading stores, during the squashing process by leveraging [vtprotobuf](https://github.com/planetscale/vtprotobuf)
+
+* Added XDS support for tier 2s
+
+* Added intrinsic support for type `bigdecimal`, will deprecate `bigfloat`
+
+* Significant improvements in code-coverage and full integration tests.
+
 ### CLI
+
+* Lowered GRPC client keep alive frequency, to prevent "Too Many Pings" disconnection issue.
+
+* Added a fast failure when attempting to connect to an unreachable substreams endpoint.
 
 * CLI is now able to read `.spkg` from `gs://`, `s3://` and `az://` URLs, the URL format must be supported by our [dstore](https://github.com/streamingfast/dstore) library).
 
 * Command `substreams pack` is now restricted to local manifest file.
+
+* Added command `substreams tools module` to introspect a store state in storage.
 
 * Made changes to allow for `substreams` CLI to run on Windows OS (thanks @robinbernon).
 
@@ -25,12 +41,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * `substreams protogen <package> --output-path <path>` flag is now relative to `<package>` if `<package>` is a local manifest file ending with `.yaml`.
 
 * Endpoint's port is now validated otherwise when unspecified, it creates an infinite 'Connecting...' message that will never resolves.
-
-## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
-
-### CLI
-
-* Added an optional flag to specify output-dir for pack command. Also made changes to allow for client to be run on windows OS.
 
 ## [0.0.20](https://github.com/streamingfast/substreams/releases/tag/v0.0.20)
 

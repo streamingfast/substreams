@@ -10,14 +10,14 @@ builds:
     - arm64
     - amd64
     targets:
-    - linux_amd64
-    - darwin_amd64
+    #- linux_amd64
+    #- darwin_amd64
     - darwin_arm64
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     main: ./cmd/substreams
     binary: substreams
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
 
 archives:
   - id: substreams
@@ -59,6 +59,9 @@ signs:
   - --detached
   signature: ${artifact}.sig
   artifacts: checksum
+
+release:
+  draft: true
 
 brews:
   - name: substreams

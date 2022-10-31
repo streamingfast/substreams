@@ -96,6 +96,11 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 
 	meta, err := stream.Header()
 	if err != nil {
+		if ctx.Err() != nil {
+			return &Result{
+				Error: ctx.Err(),
+			}
+		}
 		logger.Warn("error getting stream header", zap.Error(err))
 	}
 	remoteHostname := "unknown"

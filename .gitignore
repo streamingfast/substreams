@@ -6,3 +6,4 @@ target
 /dist
 /substreams
 .fleet
+/codegen/test_substreams/src/

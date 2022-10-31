@@ -11,7 +11,7 @@ builds:
     - amd64
     targets:
     #- linux_amd64
-    #- darwin_amd64
+    - darwin_amd64
     - darwin_arm64
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     main: ./cmd/substreams

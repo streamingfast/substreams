@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -52,15 +53,23 @@ func TestGenerate_GenerateMod(t *testing.T) {
 		require.NoError(t, err)
 		close(done)
 	}()
+	g.writer = w
 
-	err = g.GenerateMod(w)
+	protoPackages := map[string]string{}
+	for _, definition := range g.protoDefinitions {
+		p := definition.GetPackage()
+		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
+	}
+
+	err = generate("", tplMod, protoPackages, "", WithTestWriter(w))
+
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
 
 	<-done
 
-	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/generated_rust_files/expected_mod.rs"))
+	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/expected_test_outputs/generated/mod.rs"))
 	require.NoError(t, err)
 	require.Equal(t, string(expectedMod), string(out))
 }
@@ -80,15 +89,20 @@ func TestGenerate_GeneratePbMod(t *testing.T) {
 		require.NoError(t, err)
 		close(done)
 	}()
+	protoPackages := map[string]string{}
+	for _, definition := range g.protoDefinitions {
+		p := definition.GetPackage()
+		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
+	}
 
-	err = g.GeneratePbMod(w)
+	err = generate("", tplPbMod, protoPackages, "use std.out", WithTestWriter(w))
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
 
 	<-done
 
-	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/generated_rust_files/expected_pb_mod.rs"))
+	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/expected_test_outputs/pb/mod.rs"))
 	require.NoError(t, err)
 	require.Equal(t, string(expectedMod), string(out))
 }
@@ -109,14 +123,15 @@ func TestGenerate_GenerateExterns(t *testing.T) {
 		close(done)
 	}()
 
-	err = g.GenerateExterns(w)
+	err = generate("GenerateExterns", tplExterns, g.engine, "use std.out", WithTestWriter(w))
+
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
 
 	<-done
 
-	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/generated_rust_files/expected_pb_mod.rs"))
+	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/expected_test_outputs/generated/externs.rs"))
 	require.NoError(t, err)
 	require.Equal(t, string(expectedMod), string(out))
 }
@@ -137,14 +152,15 @@ func TestGenerate_GenerateLib(t *testing.T) {
 		close(done)
 	}()
 
-	err = g.GenerateLib(w)
+	err = generate("Lib", tplLibRs, g.engine, "use std.out", WithTestWriter(w))
+
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
 
 	<-done
 
-	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/generated_rust_files/expected_pb_mod.rs"))
+	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/expected_test_outputs/lib.rs"))
 	require.NoError(t, err)
 	require.Equal(t, string(expectedMod), string(out))
 }
@@ -165,14 +181,15 @@ func TestGenerate_GenerateSubstreams(t *testing.T) {
 		close(done)
 	}()
 
-	err = g.GenerateSubstreams(w)
+	err = generate("Substreams", tplSubstreams, g.engine, "use std.out", WithTestWriter(w))
+
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
 
 	<-done
 
-	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/generated_rust_files/expected_pb_mod.rs"))
+	expectedMod, err := os.ReadFile(filepath.Join("./test_substreams/expected_test_outputs/generated/substreams.rs"))
 	require.NoError(t, err)
 	require.Equal(t, string(expectedMod), string(out))
 }

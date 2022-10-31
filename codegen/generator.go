@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 //go:embed templates/lib.gotmpl
-var libRsTemplate string
+var tplLibRs string
 
 //go:embed templates/externs.gotmpl
 var tplExterns string
@@ -57,19 +58,22 @@ type Generator struct {
 	pkg              *pbsubstreams.Package
 	srcPath          string
 	protoDefinitions []*desc.FileDescriptor
+	writer           io.Writer
+	engine           *Engine
 }
 
 func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, srcPath string) *Generator {
+	engine := &Engine{Package: pkg}
+	utils["getEngine"] = engine.GetEngine
 	return &Generator{
 		pkg:              pkg,
 		srcPath:          srcPath,
 		protoDefinitions: protoDefinitions,
+		engine:           engine,
 	}
 }
 
 func (g *Generator) Generate() (err error) {
-	engine := &Engine{Package: g.pkg}
-	utils["getEngine"] = engine.GetEngine
 
 	if _, err := os.Stat(g.srcPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Creating missing %q folder\n", g.srcPath)
@@ -95,24 +99,30 @@ func (g *Generator) Generate() (err error) {
 		return fmt.Errorf("generating protobuf code: %w", err)
 	}
 
-	err = g.generate("externs", tplExterns, engine, filepath.Join(generatedFolder, "externs.rs"))
+	err = generate("externs", tplExterns, g.engine, filepath.Join(generatedFolder, "externs.rs"))
 	if err != nil {
 		return fmt.Errorf("generating externs.rs: %w", err)
 	}
 	fmt.Println("Externs generated")
 
-	err = g.generate("Substream", tplSubstreams, engine, filepath.Join(generatedFolder, "substreams.rs"))
+	err = generate("Substream", tplSubstreams, g.engine, filepath.Join(generatedFolder, "substreams.rs"))
 	if err != nil {
 		return fmt.Errorf("generating substreams.rs: %w", err)
 	}
 
-	err = g.generate("mod", tplMod, engine, filepath.Join(generatedFolder, "mod.rs"))
+	err = generate("mod", tplMod, g.engine, filepath.Join(generatedFolder, "mod.rs"))
 	if err != nil {
 		return fmt.Errorf("generating mod.rs: %w", err)
 	}
 	fmt.Println("Substreams Trait and base struct generated")
 
-	err = g.generatePbMod(filepath.Join(pbFolder, "mod.rs"))
+	protoPackages := map[string]string{}
+	for _, definition := range g.protoDefinitions {
+		p := definition.GetPackage()
+		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
+	}
+
+	err = generate("pb/mod", tplPbMod, protoPackages, filepath.Join(pbFolder, "mod.rs"))
 	if err != nil {
 		return fmt.Errorf("generating pb/mod.rs: %w", err)
 	}
@@ -121,7 +131,7 @@ func (g *Generator) Generate() (err error) {
 	libFilePath := filepath.Join(g.srcPath, "lib.rs")
 	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Generating src/lib.rs\n")
-		err = g.generate("lib", libRsTemplate, engine, filepath.Join(g.srcPath, "lib.rs"))
+		err = generate("lib", tplLibRs, g.engine, filepath.Join(g.srcPath, "lib.rs"))
 		if err != nil {
 			return fmt.Errorf("generating lib.rs: %w", err)
 		}
@@ -132,10 +142,31 @@ func (g *Generator) Generate() (err error) {
 	return nil
 }
 
-func (g *Generator) generate(name, tpl string, data any, outputFile string) error {
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("creating file %s: %w", outputFile, err)
+type GenerationOptions func(options *generateOptions)
+type generateOptions struct {
+	w io.Writer
+}
+
+func WithTestWriter(w io.Writer) GenerationOptions {
+	return func(options *generateOptions) {
+		options.w = w
+	}
+}
+func generate(name, tpl string, data any, outputFile string, options ...GenerationOptions) (err error) {
+	var w io.Writer
+
+	opts := &generateOptions{}
+	for _, option := range options {
+		option(opts)
+	}
+
+	if opts.w != nil {
+		w = opts.w
+	} else {
+		w, err = os.Create(outputFile)
+		if err != nil {
+			return fmt.Errorf("creating file %s: %w", outputFile, err)
+		}
 	}
 
 	tmpl, err := template.New(name).Funcs(utils).Parse(tpl)
@@ -144,27 +175,13 @@ func (g *Generator) generate(name, tpl string, data any, outputFile string) erro
 	}
 
 	err = tmpl.Execute(
-		f,
+		w,
 		data,
 	)
 	if err != nil {
 		return fmt.Errorf("executing %q template: %w", name, err)
 	}
 
-	return nil
-}
-
-func (g *Generator) generatePbMod(pbModFilePath string) error {
-	protoPackages := map[string]string{}
-	for _, definition := range g.protoDefinitions {
-		p := definition.GetPackage()
-		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
-	}
-
-	err := g.generate("pb/mod", tplPbMod, protoPackages, pbModFilePath)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

@@ -11,5 +11,5 @@ type Marshaller interface {
 }
 
 func Default() Marshaller {
-	return &ProtoingFast{}
+	return &VTproto{}
 }

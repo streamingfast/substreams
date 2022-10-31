@@ -3,9 +3,9 @@ package store
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/utils"
 )
 
 var stateFileRegex *regexp.Regexp
@@ -27,8 +27,8 @@ func parseFileName(filename string) (*FileInfo, bool) {
 		return nil, false
 	}
 
-	end := uint64(utils.MustAtoi(res[0][1]))
-	start := uint64(utils.MustAtoi(res[0][2]))
+	end := uint64(mustAtoi(res[0][1]))
+	start := uint64(mustAtoi(res[0][2]))
 	partial := res[0][3] == "partial"
 
 	return &FileInfo{
@@ -49,4 +49,12 @@ func partialFileName(r *block.Range) string {
 
 func fullStateFileName(r *block.Range) string {
 	return fmt.Sprintf("%010d-%010d.kv", r.ExclusiveEndBlock, r.StartBlock)
+}
+
+func mustAtoi(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		panic(err)
+	}
+	return i
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/utils"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -281,8 +280,8 @@ func fileNameToRange(filename string) (*block.Range, error) {
 		return nil, fmt.Errorf("invalid output cache filename, %q", filename)
 	}
 
-	start := uint64(utils.MustAtoi(res[0][1]))
-	end := uint64(utils.MustAtoi(res[0][2]))
+	start := uint64(mustAtoi(res[0][1]))
+	end := uint64(mustAtoi(res[0][2]))
 
 	return &block.Range{
 		StartBlock:        start,
@@ -346,4 +345,12 @@ func getExclusiveEndBlock(filename string) (uint64, error) {
 	}
 
 	return uint64(parsedInt), nil
+}
+
+func mustAtoi(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		panic(err)
+	}
+	return i
 }

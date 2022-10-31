@@ -20,6 +20,11 @@ pub trait SubstreamsTrait {
         store: substreams::store::StoreSetProto<pb::my_types_v1::Test>,
     );
 
+    fn store_append_string(
+        block: substreams_ethereum::pb::eth::v2::Block,
+        store: substreams::store::StoreAppend<String>,
+    );
+
     fn store_bigint(
         block: substreams_ethereum::pb::eth::v2::Block,
         store: substreams::store::StoreSetBigInt,
@@ -33,6 +38,8 @@ pub trait SubstreamsTrait {
         map_block_i64: i64,
         store_bigint: substreams::store::StoreGetBigInt,
         store_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
+        store_append_string: substreams::store::StoreGetRaw,
+        store_append_string_deltas: substreams::store::Deltas<substreams::store::DeltaArray<String>>,
         store: substreams::store::StoreSetProto<pb::my_types_v1::Test>,
     );
 }

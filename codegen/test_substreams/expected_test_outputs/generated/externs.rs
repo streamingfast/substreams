@@ -70,6 +70,25 @@ pub extern "C" fn store_test(
 }
 
 #[no_mangle]
+pub extern "C" fn store_append_string(
+    block_ptr: *mut u8,
+    block_len: usize,
+) {
+    substreams::register_panic_hook();
+    let func = ||{
+        
+        let store: substreams::store::StoreAppend<String> = substreams::store::StoreAppend::new();
+        
+        let block: substreams_ethereum::pb::eth::v2::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
+
+        Substreams::store_append_string(block,
+            store,
+        )
+    };
+    func()
+}
+
+#[no_mangle]
 pub extern "C" fn store_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -102,6 +121,9 @@ pub extern "C" fn store_test2(
     store_bigint_ptr: u32,
     store_bigint_deltas_ptr: *mut u8,
     store_bigint_deltas_len: usize,
+    store_append_string_ptr: u32,
+    store_append_string_deltas_ptr: *mut u8,
+    store_append_string_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
     let func = ||{
@@ -117,6 +139,9 @@ pub extern "C" fn store_test2(
         let store_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(store_bigint_ptr);
         let raw_store_bigint_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(store_bigint_deltas_ptr, store_bigint_deltas_len).unwrap().deltas;
 		let store_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt> = substreams::store::Deltas::new(raw_store_bigint_deltas);
+        let store_append_string: substreams::store::StoreGetRaw = substreams::store::StoreGetRaw::new(store_append_string_ptr);
+        let raw_store_append_string_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(store_append_string_deltas_ptr, store_append_string_deltas_len).unwrap().deltas;
+		let store_append_string_deltas: substreams::store::Deltas<substreams::store::DeltaArray<String>> = substreams::store::Deltas::new(raw_store_append_string_deltas);
 
         Substreams::store_test2(block,
             map_block,
@@ -125,6 +150,8 @@ pub extern "C" fn store_test2(
             map_block_i64,
             store_bigint,
             store_bigint_deltas,
+            store_append_string,
+            store_append_string_deltas,
             store,
         )
     };

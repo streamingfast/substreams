@@ -25,6 +25,13 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
 		todo!()
 	}
 
+    fn store_append_string(
+        _block: substreams_ethereum::pb::eth::v2::Block,
+        _store: substreams::store::StoreAppend<String>,
+    ) {
+		todo!()
+	}
+
     fn store_bigint(
         _block: substreams_ethereum::pb::eth::v2::Block,
         _store: substreams::store::StoreSetBigInt,
@@ -40,6 +47,8 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         _map_block_i64: i64,
         _store_bigint: substreams::store::StoreGetBigInt,
         _store_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
+        _store_append_string: substreams::store::StoreGetRaw,
+        _store_append_string_deltas: substreams::store::Deltas<substreams::store::DeltaArray<String>>,
         _store: substreams::store::StoreSetProto<pb::my_types_v1::Test>,
     ) {
 		todo!()

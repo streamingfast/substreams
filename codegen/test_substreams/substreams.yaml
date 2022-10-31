@@ -42,6 +42,14 @@ modules:
       - source: sf.ethereum.type.v2.Block
       - map: map_block
 
+  - name: store_append_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: append
+    valueType: string
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+
   - name: store_bigint
     kind: store
     initialBlock: 1
@@ -64,4 +72,7 @@ modules:
       - map: map_block_i64
       - store: store_bigint
       - store: store_bigint
+        mode: deltas
+      - store: store_append_string
+      - store: store_append_string
         mode: deltas

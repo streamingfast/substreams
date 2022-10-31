@@ -389,21 +389,30 @@ func IsMapInput(input *pbsubstreams.Module_Input) bool {
 
 func ReadableStoreType(store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
 	t := store.ValueType
+	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
 
 	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
 		if strings.HasPrefix(t, "proto") {
 			t = transformProtoType(t)
 			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaProto<%s>>", t)
 		}
+		if p == "UPDATE_POLICY_APPEND" {
+			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaArray<%s>>", StoreType[t])
+		}
+
 		t = StoreType[t]
 		return fmt.Sprintf("substreams::store::Deltas<substreams::store::Delta%s>", t)
-
 	}
 
 	if strings.HasPrefix(t, "proto") {
 		t = transformProtoType(t)
 		return fmt.Sprintf("substreams::store::StoreGetProto<%s>", t)
 	}
+
+	if p == "UPDATE_POLICY_APPEND" {
+		return fmt.Sprintf("substreams::store::StoreGetRaw")
+	}
+
 	t = StoreType[t]
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
@@ -411,18 +420,29 @@ func WritableStoreType(store *pbsubstreams.Module_KindStore) string {
 	t := store.ValueType
 
 	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+
+	if p == "UPDATE_POLICY_APPEND" {
+		return fmt.Sprintf("substreams::store::StoreAppend<%s>", StoreType[t])
+	}
+
 	p = UpdatePoliciesMap[p]
 	if strings.HasPrefix(t, "proto") {
 		t = transformProtoType(t)
 		return fmt.Sprintf("substreams::store::Store%sProto<%s>", p, t)
 	}
-	t = StoreType[t]
-	return fmt.Sprintf("substreams::store::Store%s%s", p, t)
+
+	return fmt.Sprintf("substreams::store::Store%s%s", p, StoreType[t])
 }
 
 func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
 	t := store.ValueType
 	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+
+	if p == "UPDATE_POLICY_APPEND" {
+		//delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaArray<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+		return fmt.Sprintf("let store: substreams::store::StoreAppend<%s> = substreams::store::StoreAppend::new();", StoreType[t])
+	}
+
 	p = UpdatePoliciesMap[p]
 
 	if strings.HasPrefix(t, "proto") {
@@ -435,17 +455,21 @@ func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
 
 func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
 	t := store.ValueType
+	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
 	isProto := strings.HasPrefix(t, "proto")
 	if isProto {
 		t = transformProtoType(t)
 	}
 
 	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
-		p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
-		p = UpdatePoliciesMap[p]
 
 		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(%s_deltas_ptr, %s_deltas_len).unwrap().deltas;", name, name, name)
 		delta := fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+
+		if p == "UPDATE_POLICY_APPEND" {
+			delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaArray<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+		}
+
 		if isProto {
 			delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaProto<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, t, name)
 		}
@@ -457,6 +481,10 @@ func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore,
 	}
 
 	t = StoreType[t]
+	if p == "UPDATE_POLICY_APPEND" {
+		return fmt.Sprintf("let %s: substreams::store::StoreGetRaw = substreams::store::StoreGetRaw::new(%s_ptr);", name, name)
+	}
+
 	return fmt.Sprintf("let %s: substreams::store::StoreGet%s = substreams::store::StoreGet%s::new(%s_ptr);", name, t, t, name)
 
 }

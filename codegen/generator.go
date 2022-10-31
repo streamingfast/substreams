@@ -124,11 +124,14 @@ func (g *Generator) Generate() (err error) {
 		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
 	}
 
-	err = generate("pb/mod", tplPbMod, protoPackages, filepath.Join(pbFolder, "mod.rs"))
-	if err != nil {
-		return fmt.Errorf("generating pb/mod.rs: %w", err)
+	pbModFilePath := filepath.Join(filepath.Join(pbFolder, "mod.rs"))
+	if _, err := os.Stat(pbModFilePath); errors.Is(err, os.ErrNotExist) {
+		err = generate("pb/mod", tplPbMod, protoPackages, pbModFilePath)
+		if err != nil {
+			return fmt.Errorf("generating pb/mod.rs: %w", err)
+		}
+		fmt.Println("Protobuf pb/mod.rs generated")
 	}
-	fmt.Println("Protobuf pb/mod.rs generated")
 
 	libFilePath := filepath.Join(g.srcPath, "lib.rs")
 	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {

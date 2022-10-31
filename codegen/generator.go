@@ -41,8 +41,8 @@ var StoreType = map[string]string{
 	"bigint":     "BigInt",
 	"bigdecimal": "BigDecimal",
 	"bigfloat":   "BigDecimal",
-	"int64":      "Int64",
-	"i64":        "Int64",
+	"int64":      "I64",
+	"i64":        "I64",
 	"float64":    "Float64",
 }
 
@@ -54,7 +54,6 @@ var UpdatePoliciesMap = map[string]string{
 	"UPDATE_POLICY_MIN":               "Min",
 	"UPDATE_POLICY_MAX":               "Max",
 	"UPDATE_POLICY_APPEND":            "Append",
-	"float64":                         "Float64",
 }
 
 type Generator struct {

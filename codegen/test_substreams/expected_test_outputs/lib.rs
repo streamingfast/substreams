@@ -1,5 +1,6 @@
 mod pb;
 mod generated;
+use substreams::prelude::*;
 use substreams::errors::Error;
 
 impl generated::substreams::SubstreamsTrait for generated::substreams::Substreams{

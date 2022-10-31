@@ -1,0 +1,6 @@
+{{- range $k, $v := . -}}
+#[allow(unused_imports)]
+#[allow(dead_code)]
+#[path = "./{{$k}}.rs"]
+pub mod {{$v}};
+{{end}}

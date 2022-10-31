@@ -15,6 +15,7 @@
 
 ## Getting Started
 
+* [Prerequisites](getting-started/prerequisites.md)
 * [Installing the CLI](getting-started/installing-the-cli.md)
 * [Start Streaming](getting-started/your-first-stream.md)
 

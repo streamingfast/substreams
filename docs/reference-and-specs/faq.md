@@ -109,7 +109,3 @@ The first unknown is the system that you are compiling on, and the second is the
 Additional information is available at the following link.
 
 [https://github.com/rustwasm/wasm-bindgen/issues/979](https://github.com/rustwasm/wasm-bindgen/issues/979)
-
-### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
-
-Check that the module's output type fits with the `protobuf` definition. Sometimes the renamed the `protobuf` package isn't updated in the `substreams.yaml` manifest's `module.output.type` field for correct alignment.

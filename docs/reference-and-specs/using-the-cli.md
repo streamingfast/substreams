@@ -8,6 +8,8 @@ The Substreams command line interface (CLI) is the user interface and central ac
 
 The Substreams CLI exposes many commands to developers enabling a range of functionality. Each command is explained in further detail.
 
+<figure><img src="../.gitbook/assets/Screen Shot 2022-10-31 at 2.40.08 PM.png" alt=""><figcaption><p>Substreams command-line interface screenshot</p></figcaption></figure>
+
 {% hint style="info" %}
 _Note: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL._
 {% endhint %}

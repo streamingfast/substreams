@@ -108,7 +108,6 @@ func TestGenerate_GeneratePbMod(t *testing.T) {
 }
 
 func TestGenerate_GenerateExterns(t *testing.T) {
-	t.Skip("test broken, charlie is working on it")
 	g := Init()
 
 	r, w := io.Pipe()
@@ -138,7 +137,6 @@ func TestGenerate_GenerateExterns(t *testing.T) {
 }
 
 func TestGenerate_GenerateLib(t *testing.T) {
-	t.Skip("test broken, charlie is working on it")
 	g := Init()
 
 	r, w := io.Pipe()
@@ -168,7 +166,6 @@ func TestGenerate_GenerateLib(t *testing.T) {
 }
 
 func TestGenerate_GenerateSubstreams(t *testing.T) {
-	t.Skip("test broken, charlie is working on it")
 	g := Init()
 
 	r, w := io.Pipe()

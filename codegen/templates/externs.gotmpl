@@ -10,13 +10,13 @@ use crate::generated::substreams::{Substreams, SubstreamsTrait};
 #[no_mangle]
 pub extern "C" fn {{$functionSignature.Name}}(
 {{- range $i, $value := $functionSignature.Arguments}}
-    {{- if ne $value.ModuleInput.GetStore nil }}
+    {{- if isStoreInput $value.ModuleInput }}
         {{- if isDelta $value.ModuleInput}}
-            {{$value.Name}}_deltas_ptr: *mut u8,
-            {{$value.Name}}_deltas_len: usize,
-        {{else}}
-            {{$value.Name}}_ptr: u32,
-        {{end}}
+    {{$value.Name}}_deltas_ptr: *mut u8,
+    {{$value.Name}}_deltas_len: usize,
+        {{- else}}
+    {{$value.Name}}_ptr: u32,
+        {{- end}}
     {{- else}}
     {{$value.Name}}_ptr: *mut u8,
     {{$value.Name}}_len: usize,
@@ -24,42 +24,42 @@ pub extern "C" fn {{$functionSignature.Name}}(
     {{- end }}
 ) {
     substreams::register_panic_hook();
-    let func = || {{- if isMap $module}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
-        {{if isStore $module -}}{{/* This is the store for a store module*/}}
+    let func = || {{- if isMapModule $module}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
+        {{if isStoreModule $module -}}{{/* This is the store for a store module*/}}
         {{writableStoreDeclaration $module.GetKindStore }}
-        {{end -}}
+        {{ end -}}
 
-        {{ range $id, $argument := $functionSignature.Arguments }}
-            {{- if eq $argument.ModuleInput.GetStore nil }}
+        {{ range $id, $argument := $functionSignature.Arguments -}}
+            {{- if isStoreInput $argument.ModuleInput -}}
+        {{- $m := $engine.MustModule $argument.Name }}
+        {{ readableStoreDeclaration $argument.Name $m.GetKindStore $argument.ModuleInput.GetStore }}
+            {{- else }}
         let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
-            {{- else}}
-            {{- $m := $engine.MustModule $argument.Name }}
-        {{readableStoreDeclaration $argument.Name $m.GetKindStore $argument.ModuleInput.GetStore}}
-            {{end -}}
-        {{end }}
+            {{- end -}}
+        {{ end }}
 
         Substreams::{{.Name}}(
-        {{- range $id, $argument := $functionSignature.Arguments}}
-            {{- if isDelta $argument.ModuleInput }}{{/* delta mode */}}
+        {{- range $id, $argument := $functionSignature.Arguments -}}
+            {{- if isDelta $argument.ModuleInput -}}
             {{$argument.Name}}_deltas,
-            {{- else}}
+            {{ else -}}
             {{$argument.Name}},
-            {{end -}}
+            {{ end -}}
         {{end}}
-        {{- if isStore $module}}
+        {{- if isStoreModule $module -}}
             store,
-        {{end -}}
+        {{- end }}
         )
     };
 
-    {{- if isStore $module}}
-        func()
-    {{else}}
+    {{- if isStoreModule $module}}
+    func()
+    {{- else}}
     let result = func();
     if result.is_err() {
         panic!("{:?}", &result.err().unwrap());
     }
     substreams::output(result.unwrap());
-    {{end}}
+    {{- end}}
 }
 {{end -}}

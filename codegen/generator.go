@@ -193,8 +193,10 @@ var utils = map[string]any{
 	"hasPrefix":                strings.HasPrefix,
 	"hasSuffix":                strings.HasSuffix,
 	"isDelta":                  IsDelta,
-	"isStore":                  IsStore,
-	"isMap":                    IsMap,
+	"isStoreModule":            IsStoreModule,
+	"isMapModule":              IsMapModule,
+	"isStoreInput":             IsStoreInput,
+	"isMapInput":               IsMapInput,
 	"writableStoreDeclaration": WritableStoreDeclaration,
 	"writableStoreType":        WritableStoreType,
 	"readableStoreDeclaration": ReadableStoreDeclaration,
@@ -341,7 +343,7 @@ func IsDelta(input *pbsubstreams.Module_Input) bool {
 	return false
 }
 
-func IsStore(module *pbsubstreams.Module) bool {
+func IsStoreModule(module *pbsubstreams.Module) bool {
 	switch module.Kind.(type) {
 	case *pbsubstreams.Module_KindStore_:
 		return true
@@ -351,11 +353,32 @@ func IsStore(module *pbsubstreams.Module) bool {
 		return false
 	}
 }
-func IsMap(module *pbsubstreams.Module) bool {
+func IsMapModule(module *pbsubstreams.Module) bool {
 	switch module.Kind.(type) {
 	case *pbsubstreams.Module_KindStore_:
 		return false
 	case *pbsubstreams.Module_KindMap_:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsStoreInput(input *pbsubstreams.Module_Input) bool {
+	switch input.Input.(type) {
+	case *pbsubstreams.Module_Input_Store_:
+		return true
+	case *pbsubstreams.Module_Input_Map_:
+		return false
+	default:
+		return false
+	}
+}
+func IsMapInput(input *pbsubstreams.Module_Input) bool {
+	switch input.Input.(type) {
+	case *pbsubstreams.Module_Input_Store_:
+		return false
+	case *pbsubstreams.Module_Input_Map_:
 		return true
 	default:
 		return false
@@ -420,11 +443,11 @@ func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore,
 		p = UpdatePoliciesMap[p]
 
 		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(%s_deltas_ptr, %s_deltas_len).unwrap().deltas;", name, name, name)
-		delta := fmt.Sprintf("\t\tlet %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+		delta := fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
 		if isProto {
-			delta = fmt.Sprintf("\t\tlet %s_deltas: substreams::store::Deltas<substreams::store::DeltaProto<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, t, name)
+			delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaProto<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, t, name)
 		}
-		return raw + "\n" + delta
+		return raw + "\n\t\t" + delta
 	}
 
 	if isProto {

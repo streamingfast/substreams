@@ -32,7 +32,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
 {{define "arg" -}}
 {{- $engine := getEngine -}}
 {{- $argument := . -}}
-	{{- if ne $argument.ModuleInput.GetStore nil  -}}
+	{{- if isStoreInput $argument.ModuleInput -}}
 		{{- $m := $engine.MustModule $argument.Name -}}
 		{{- if isDelta $argument.ModuleInput -}}
 			_{{$argument.Name}}_deltas

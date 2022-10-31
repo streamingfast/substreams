@@ -7,7 +7,6 @@
 package pbsubstreams
 
 import (
-	"fmt"
 	reflect "reflect"
 	sync "sync"
 
@@ -320,12 +319,9 @@ func (x *Module) GetKindMap() *Module_KindMap {
 }
 
 func (x *Module) GetKindStore() *Module_KindStore {
-	name := x.Name
 	if x, ok := x.GetKind().(*Module_KindStore_); ok {
-		fmt.Println("je suis un store", name)
 		return x.KindStore
 	}
-	fmt.Println("je suis une map", name)
 	return nil
 }
 

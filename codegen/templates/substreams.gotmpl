@@ -31,7 +31,7 @@ pub trait SubstreamsTrait {
 {{define "arg" -}}
     {{- $engine := getEngine -}}
     {{- $argument := . -}}
-    {{- if ne $argument.ModuleInput.GetStore nil -}}
+    {{- if isStoreInput $argument.ModuleInput -}}
         {{- $m := $engine.MustModule $argument.Name -}}
         {{- if isDelta $argument.ModuleInput -}}
             {{$argument.Name}}_deltas

@@ -4,14 +4,12 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/jhump/protoreflect/desc"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -19,16 +17,16 @@ import (
 var libRsTemplate string
 
 //go:embed templates/externs.gotmpl
-var externsTemplate string
+var tplExterns string
 
 //go:embed templates/substreams.gotmpl
-var substreamsTemplate string
+var tplSubstreams string
 
 //go:embed templates/mod.gotmpl
-var modTemplate string
+var tplMod string
 
 //go:embed templates/pb_mod.gotmpl
-var pbModTemplate string
+var tplPbMod string
 
 const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
 const EthereumBlockRust = "substreams_ethereum::pb::eth::v2::Block"
@@ -57,199 +55,110 @@ var UpdatePoliciesMap = map[string]string{
 
 type Generator struct {
 	pkg              *pbsubstreams.Package
-	basePath         string
+	srcPath          string
 	protoDefinitions []*desc.FileDescriptor
 }
 
-func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, basePath string) *Generator {
+func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, srcPath string) *Generator {
 	return &Generator{
 		pkg:              pkg,
-		basePath:         basePath,
+		srcPath:          srcPath,
 		protoDefinitions: protoDefinitions,
 	}
 }
 
 func (g *Generator) Generate() (err error) {
-	var writer io.Writer
-	srcDir := g.basePath
+	engine := &Engine{Package: g.pkg}
+	utils["getEngine"] = engine.GetEngine
 
-	if err := os.MkdirAll(srcDir, os.ModePerm); err != nil {
-		return fmt.Errorf("creating src directory %v: %w", g.basePath, err)
+	if _, err := os.Stat(g.srcPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("Creating missing %q folder\n", g.srcPath)
+		if err := os.MkdirAll(g.srcPath, os.ModePerm); err != nil {
+			return fmt.Errorf("creating src directory %v: %w", g.srcPath, err)
+		}
 	}
+	fmt.Printf("Generating files in %q\n", g.srcPath)
 
-	generatedFolder := filepath.Join(srcDir, "generated")
+	generatedFolder := filepath.Join(g.srcPath, "generated")
 	if err := os.MkdirAll(generatedFolder, os.ModePerm); err != nil {
-		return fmt.Errorf("creating generated directory %v: %w", srcDir, err)
+		return fmt.Errorf("creating generated directory %v: %w", g.srcPath, err)
 	}
 
-	pbFolder := filepath.Join(srcDir, "pb")
+	pbFolder := filepath.Join(g.srcPath, "pb")
 	if err := os.MkdirAll(pbFolder, os.ModePerm); err != nil {
-		return fmt.Errorf("creating pb directory %v: %w", srcDir, err)
+		return fmt.Errorf("creating pb directory %v: %w", g.srcPath, err)
 	}
 
-	libFilePath := filepath.Join(srcDir, "lib.rs")
-	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
-		// path/to/whatever does not exist
-		f, err := os.Create(libFilePath)
-		if err != nil {
-			return fmt.Errorf("creating file lib.rs in %q: %w", srcDir, err)
-		}
-		writer = f
-
-		err = g.GenerateLib(writer)
-		if err != nil {
-			return fmt.Errorf("generating lib.ts: %w", err)
-		}
-	}
-
-	f, err := os.Create(filepath.Join(generatedFolder, "externs.rs"))
+	err = g.generate("externs", tplExterns, engine, filepath.Join(generatedFolder, "externs.rs"))
 	if err != nil {
-		return fmt.Errorf("creating file externs.rs in %q: %w", generatedFolder, err)
+		return fmt.Errorf("generating externs.rs: %w", err)
 	}
-	writer = f
+	fmt.Println("Externs generated")
 
-	err = g.GenerateExterns(writer)
-	if err != nil {
-		return fmt.Errorf("generating externs.ts: %w", err)
-	}
-
-	f, err = os.Create(filepath.Join(generatedFolder, "substreams.rs"))
-	if err != nil {
-		return fmt.Errorf("creating file substreams.rs in %q: %w", generatedFolder, err)
-	}
-	writer = f
-	err = g.GenerateSubstreams(writer)
+	err = g.generate("Substream", tplSubstreams, engine, filepath.Join(generatedFolder, "substreams.rs"))
 	if err != nil {
 		return fmt.Errorf("generating substreams.rs: %w", err)
 	}
 
-	f, err = os.Create(filepath.Join(generatedFolder, "mod.rs"))
-	if err != nil {
-		return fmt.Errorf("creating file mod.rs in %q: %w", generatedFolder, err)
-	}
-	writer = f
-	err = g.GenerateMod(writer)
+	err = g.generate("mod", tplMod, engine, filepath.Join(generatedFolder, "mod.rs"))
 	if err != nil {
 		return fmt.Errorf("generating mod.rs: %w", err)
 	}
+	fmt.Println("Substreams Trait and base struct generated")
 
-	f, err = os.Create(filepath.Join(pbFolder, "mod.rs"))
-	if err != nil {
-		return fmt.Errorf("creating file pb/mod.rs in %q: %w", pbFolder, err)
-	}
-	writer = f
-	err = g.GeneratePbMod(writer)
+	err = g.generatePbMod(filepath.Join(pbFolder, "mod.rs"))
 	if err != nil {
 		return fmt.Errorf("generating pb/mod.rs: %w", err)
 	}
+	fmt.Println("Protobuf pb/mod.rs generated")
+
+	libFilePath := filepath.Join(g.srcPath, "lib.rs")
+	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("Generating src/lib.rs\n")
+		err = g.generate("lib", tplExterns, engine, filepath.Join(g.srcPath, "lib.rs"))
+		if err != nil {
+			return fmt.Errorf("generating lib.rs: %w", err)
+		}
+	} else {
+		fmt.Printf("Skipping existing src/lib.rs\n")
+	}
 
 	return nil
 }
 
-func (g *Generator) GenerateExterns(writer io.Writer) error {
-	engine := &Engine{Package: g.pkg}
-	utils["getEngine"] = engine.GetEngine
-
-	tmpl, err := template.New("externs").Funcs(utils).Parse(externsTemplate)
+func (g *Generator) generate(name, tpl string, data any, outputFile string) error {
+	f, err := os.Create(outputFile)
 	if err != nil {
-		return fmt.Errorf("parsing externs template: %w", err)
+		return fmt.Errorf("creating file %s: %w", outputFile, err)
+	}
+
+	tmpl, err := template.New(name).Funcs(utils).Parse(tpl)
+	if err != nil {
+		return fmt.Errorf("parsing %q template: %w", name, err)
 	}
 
 	err = tmpl.Execute(
-		writer,
-		engine,
+		f,
+		data,
 	)
 	if err != nil {
-		return fmt.Errorf("executing externs template: %w", err)
+		return fmt.Errorf("executing %q template: %w", name, err)
 	}
 
 	return nil
 }
 
-func (g *Generator) GenerateLib(writer io.Writer) error {
-	engine := &Engine{Package: g.pkg}
-	utils["getEngine"] = engine.GetEngine
-	tmplGeneratedRs, err := template.New("lib").Funcs(utils).Parse(libRsTemplate)
-	if err != nil {
-		return fmt.Errorf("parsing lib template: %w", err)
-	}
-
-	err = tmplGeneratedRs.Execute(
-		writer,
-		engine,
-	)
-
-	if err != nil {
-		return fmt.Errorf("executing lib template: %w", err)
-	}
-
-	return nil
-}
-
-func (g *Generator) GenerateSubstreams(writer io.Writer) error {
-	engine := &Engine{Package: g.pkg}
-	utils["getEngine"] = engine.GetEngine
-
-	tmpl, err := template.New("substreams").Funcs(utils).Parse(substreamsTemplate)
-	if err != nil {
-		return fmt.Errorf("parsing substreams template: %w", err)
-	}
-
-	err = tmpl.Execute(
-		writer,
-		engine,
-	)
-
-	if err != nil {
-		return fmt.Errorf("executing substreams template: %w", err)
-	}
-
-	return nil
-}
-
-func (g *Generator) GenerateMod(writer io.Writer) error {
-	engine := &Engine{Package: g.pkg}
-	utils["getEngine"] = engine.GetEngine
-
-	tmpl, err := template.New("mod").Funcs(utils).Parse(modTemplate)
-	if err != nil {
-		return fmt.Errorf("parsing mod template: %w", err)
-	}
-
-	err = tmpl.Execute(
-		writer,
-		engine,
-	)
-
-	if err != nil {
-		return fmt.Errorf("executing mod template: %w", err)
-	}
-
-	return nil
-}
-
-func (g *Generator) GeneratePbMod(writer io.Writer) error {
-
+func (g *Generator) generatePbMod(pbModFilePath string) error {
 	protoPackages := map[string]string{}
 	for _, definition := range g.protoDefinitions {
 		p := definition.GetPackage()
 		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
 	}
 
-	tmpl, err := template.New("mod").Funcs(utils).Parse(pbModTemplate)
+	err := g.generate("pb/mod", tplPbMod, protoPackages, pbModFilePath)
 	if err != nil {
-		return fmt.Errorf("parsing mod template: %w", err)
+		return err
 	}
-
-	err = tmpl.Execute(
-		writer,
-		protoPackages,
-	)
-
-	if err != nil {
-		return fmt.Errorf("executing mod template: %w", err)
-	}
-
 	return nil
 }
 
@@ -264,94 +173,12 @@ var utils = map[string]any{
 	"readableStoreType":        ReadableStoreType,
 }
 
-func (e *Engine) GetEngine() *Engine {
-	return e
-}
-
-func IsDelta(input *pbsubstreams.Module_Input) bool {
-	if storeInput := input.GetStore(); storeInput != nil {
-		return storeInput.Mode == pbsubstreams.Module_Input_Store_DELTAS
-	}
-	return false
-}
-
-func ReadableStoreType(store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
-	t := store.ValueType
-
-	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
-		if strings.HasPrefix(t, "proto") {
-			t = transformProtoType(t)
-			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaProto<%s>>", t)
-		}
-		t = StoreType[t]
-		return fmt.Sprintf("substreams::store::Deltas<substreams::store::Delta%s>", t)
-
-	}
-
-	if strings.HasPrefix(t, "proto") {
-		t = transformProtoType(t)
-		return fmt.Sprintf("substreams::store::StoreGetProto<%s>", t)
-	}
-	t = StoreType[t]
-	return fmt.Sprintf("substreams::store::StoreGet%s", t)
-}
-
-func WritableStoreType(store *pbsubstreams.Module_KindStore) string {
-	t := store.ValueType
-
-	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
-	p = UpdatePoliciesMap[p]
-	if strings.HasPrefix(t, "proto") {
-		t = transformProtoType(t)
-		return fmt.Sprintf("substreams::store::Store%sProto<%s>", p, t)
-	}
-	t = StoreType[t]
-	return fmt.Sprintf("substreams::store::Store%s%s", p, t)
-}
-
-func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
-	t := store.ValueType
-	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
-	p = UpdatePoliciesMap[p]
-
-	if strings.HasPrefix(t, "proto") {
-		t = transformProtoType(t)
-		return fmt.Sprintf("let store: substreams::store::Store%sProto<%s> = substreams::store::StoreSetProto::new();", p, t)
-	}
-	t = StoreType[t]
-	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
-}
-
-func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
-	t := store.ValueType
-	isProto := strings.HasPrefix(t, "proto")
-	if isProto {
-		t = transformProtoType(t)
-	}
-
-	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
-		p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
-		p = UpdatePoliciesMap[p]
-
-		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(%s_deltas_ptr, %s_deltas_len).unwrap().deltas;", name, name, name)
-		delta := fmt.Sprintf("\t\tlet %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
-		if isProto {
-			delta = fmt.Sprintf("\t\tlet %s_deltas: substreams::store::Deltas<substreams::store::DeltaProto<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, t, name)
-		}
-		return raw + "\n" + delta
-	}
-
-	if isProto {
-		return fmt.Sprintf("let %s: substreams::store::StoreGetProto<%s>  = substreams::store::StoreGetProto::new(%s_ptr);", name, t, name)
-	}
-
-	t = StoreType[t]
-	return fmt.Sprintf("let %s: substreams::store::StoreGet%s = substreams::store::StoreGet%s::new(%s_ptr);", name, t, t, name)
-
-}
-
 type Engine struct {
 	Package *pbsubstreams.Package
+}
+
+func (e *Engine) GetEngine() *Engine {
+	return e
 }
 
 func (e *Engine) MustModule(moduleName string) *pbsubstreams.Module {
@@ -475,6 +302,87 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 		}
 	}
 	return out, nil
+}
+
+func IsDelta(input *pbsubstreams.Module_Input) bool {
+	if storeInput := input.GetStore(); storeInput != nil {
+		return storeInput.Mode == pbsubstreams.Module_Input_Store_DELTAS
+	}
+	return false
+}
+
+func ReadableStoreType(store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+	t := store.ValueType
+
+	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
+		if strings.HasPrefix(t, "proto") {
+			t = transformProtoType(t)
+			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaProto<%s>>", t)
+		}
+		t = StoreType[t]
+		return fmt.Sprintf("substreams::store::Deltas<substreams::store::Delta%s>", t)
+
+	}
+
+	if strings.HasPrefix(t, "proto") {
+		t = transformProtoType(t)
+		return fmt.Sprintf("substreams::store::StoreGetProto<%s>", t)
+	}
+	t = StoreType[t]
+	return fmt.Sprintf("substreams::store::StoreGet%s", t)
+}
+func WritableStoreType(store pbsubstreams.Module_KindStore) string {
+	t := store.ValueType
+
+	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+	p = UpdatePoliciesMap[p]
+	if strings.HasPrefix(t, "proto") {
+		t = transformProtoType(t)
+		return fmt.Sprintf("substreams::store::Store%sProto<%s>", p, t)
+	}
+	t = StoreType[t]
+	return fmt.Sprintf("substreams::store::Store%s%s", p, t)
+}
+
+func WritableStoreDeclaration(store pbsubstreams.Module_KindStore) string {
+	t := store.ValueType
+	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+	p = UpdatePoliciesMap[p]
+
+	if strings.HasPrefix(t, "proto") {
+		t = transformProtoType(t)
+		return fmt.Sprintf("let store: substreams::store::Store%sProto<%s> = substreams::store::StoreSetProto::new();", p, t)
+	}
+	t = StoreType[t]
+	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
+}
+
+func ReadableStoreDeclaration(name string, store pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+	t := store.ValueType
+	isProto := strings.HasPrefix(t, "proto")
+	if isProto {
+		t = transformProtoType(t)
+	}
+
+	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
+		p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+		p = UpdatePoliciesMap[p]
+
+		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(%s_deltas_ptr, %s_deltas_len).unwrap().deltas;", name, name, name)
+		delta := fmt.Sprintf("\t\tlet %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+		if isProto {
+			delta = fmt.Sprintf("\t\tlet %s_deltas: substreams::store::Deltas<substreams::store::DeltaProto<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, t, name)
+		}
+		return raw + "\n" + delta
+	}
+
+	if isProto {
+		return fmt.Sprintf("let %s: substreams::store::StoreGetProto<%s>  = substreams::store::StoreGetProto::new(%s_ptr);", name, t, name)
+	}
+
+	t = StoreType[t]
+	return fmt.Sprintf("let %s: substreams::store::StoreGet%s = substreams::store::StoreGet%s::new(%s_ptr);", name, t, t, name)
+
 }
 
 func transformProtoType(t string) string {

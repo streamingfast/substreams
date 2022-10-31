@@ -2,7 +2,7 @@ package pipeline
 
 import "sort"
 
-type StoreBoundary struct {
+type storeBoundary struct {
 	nextBoundary     uint64
 	interval         uint64
 	isSubRequest     bool
@@ -13,33 +13,33 @@ type StoreBoundary struct {
 func NewStoreBoundary(
 	interval uint64,
 	requestStopBlock uint64,
-) *StoreBoundary {
-	return &StoreBoundary{
+) *storeBoundary {
+	return &storeBoundary{
 		interval:         interval,
 		requestStopBlock: requestStopBlock,
 	}
 }
 
-func (r *StoreBoundary) OverBoundary(blockNUm uint64) bool {
+func (r *storeBoundary) OverBoundary(blockNUm uint64) bool {
 	return blockNUm >= r.nextBoundary
 }
 
-func (r *StoreBoundary) BumpBoundary() {
+func (r *storeBoundary) BumpBoundary() {
 	if r.stopBlockReached {
 		panic("should not be calling bump when stop block has been reached")
 	}
 	r.nextBoundary = r.computeBoundaryBlock(r.nextBoundary)
 }
 
-func (r *StoreBoundary) computeBoundaryBlock(atBlockNum uint64) uint64 {
+func (r *storeBoundary) computeBoundaryBlock(atBlockNum uint64) uint64 {
 	return atBlockNum - atBlockNum%r.interval + r.interval
 }
 
-func (r *StoreBoundary) InitBoundary(blockNum uint64) {
+func (r *storeBoundary) InitBoundary(blockNum uint64) {
 	r.nextBoundary = r.computeBoundaryBlock(blockNum)
 }
 
-func (r *StoreBoundary) GetStoreFlushRanges(isSubrequest bool, reqStopBlockNum uint64, blockNum uint64) []uint64 {
+func (r *storeBoundary) GetStoreFlushRanges(isSubrequest bool, reqStopBlockNum uint64, blockNum uint64) []uint64 {
 	boundaries := map[uint64]bool{}
 
 	for r.OverBoundary(blockNum) {

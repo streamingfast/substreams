@@ -93,10 +93,6 @@ func (s *Service) BlockType() string {
 	return s.blockType
 }
 
-func (s *Service) WasmExtensions() []wasm.WASMExtensioner {
-	return s.wasmExtensions
-}
-
 func (s *Service) Register(
 	server dgrpcserver.Server,
 	mergedBlocksStore dstore.Store,
@@ -151,33 +147,25 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return status.Error(grpccode.InvalidArgument, err.Error())
 	}
 
-	// TODO: missing dmetering hook that was present for each output
-	// payload, we'd send the increment in EgressBytes sent.  We'll
-	// want to review that anyway.
-	var opts []pipeline.Option
-	for _, pipeOpts := range s.pipelineOptions {
-		for _, opt := range pipeOpts.PipelineOptions(ctx, request) {
-			opts = append(opts, opt)
-		}
+	isSubrequest, err := s.isSubrequest(ctx)
+	if err != nil {
+		return err
 	}
+	logger.Debug("set is_subrequest", zap.Bool("is_subrequest", isSubrequest))
 
-	/*
-		this entire `if` is not good, the ctx is from the StreamServer so there
-		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
-	*/
-	isSubrequest := false
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		partialMode := md.Get("substreams-partial-mode")
-		logger.Debug("extracting meta data", zap.Strings("partial_mode", partialMode))
-		if len(partialMode) == 1 && partialMode[0] == "true" {
-			// TODO: only allow partial-mode if the AUTHORIZATION layer permits it
-			// partial-mode should be
-			if !s.partialModeEnabled {
-				return status.Error(grpccode.InvalidArgument, "substreams-partial-mode not enabled on this instance")
-			}
-			isSubrequest = true
-		}
-	}
+	// request is: start_block: 0, stop_block: 15M
+	// * find the HIGHEST finalized blocks close to stop_block
+	//   (and the highest of all if stop_block is 0)
+	// * we create a new `pbsubstreams.Request{start_block: 15M, stop_block: 15M}
+	//   we create an internal representation of a Request, because we need a new field:
+	//      * output historical data
+	//   we kick off our engine this way, and make sure we pipe
+	//   all the BlockScopedData through, from caches produced.
+	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
+	//         process directly, even if that's realllly in the past.
+	///        Eventually, we have a first process that corrects the live segment
+	///        joining on a final segment, and then kick off parallel processing
+	///        until a new, more recent, live block.
 
 	var requestStats metrics.Stats
 	if isSubrequest {
@@ -192,6 +180,15 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		}
 	}
 
+	// TODO(abourget): Resolve start block, prepare new request.
+	reqctx.Request{}
+
+	// THEN wrapp it in a context
+	ctx, err = reqctx.WithRequest(ctx, request, isSubrequest)
+	if err != nil {
+		return fmt.Errorf("context with request: %w", err)
+	}
+
 	responseHandler := func(resp *pbsubstreams.Response) error {
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
@@ -200,28 +197,26 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return nil
 	}
 
-	ctx, err = reqctx.WithRequest(ctx, request, isSubrequest)
-	if err != nil {
-		return fmt.Errorf("context with request: %w", err)
-	}
-
-	storeBoundary := pipeline.NewStoreBoundary(
-		s.runtimeConfig.StoreSnapshotsSaveInterval,
-		request.StopBlockNum,
-	)
 	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, reqctx.Logger(ctx))
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
+	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
+
+	var opts []pipeline.Option
+	for _, pipeOpts := range s.pipelineOptions {
+		for _, opt := range pipeOpts.PipelineOptions(ctx, request) {
+			opts = append(opts, opt)
+		}
+	}
 	pipe := pipeline.New(
 		ctx,
 		graph,
 		s.blockType,
-		s.wasmExtensions,
+		wasmRuntime,
 		execOutputCacheEngine,
 		s.runtimeConfig,
-		storeBoundary,
 		responseHandler,
 		opts...,
 	)
@@ -254,6 +249,25 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	}
 
 	return pipe.Launch(ctx, blockStream, streamSrv)
+}
+
+func (s *Service) isSubrequest(ctx context.Context) (bool, error) {
+	/*
+		this entire `if` is not good, the ctx is from the StreamServer so there
+		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
+	*/
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		partialMode := md.Get("substreams-partial-mode")
+		if len(partialMode) == 1 && partialMode[0] == "true" {
+			// TODO: only allow partial-mode if the AUTHORIZATION layer permits it
+			// partial-mode should be
+			if !s.partialModeEnabled {
+				return false, status.Error(grpccode.InvalidArgument, "substreams-partial-mode not enabled on this instance")
+			}
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) string {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/wasm"
 	"io"
 	"path/filepath"
 	"testing"
@@ -77,10 +78,6 @@ func processRequest(
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
 
-	cachingEngine, err := cachev1.NewEngine(config.RuntimeConfig{StoreSnapshotsSaveInterval: 10, BaseObjectStore: baseStoreStore}, zap.NewNop())
-	require.NoError(t, err)
-	storeBoundary := pipeline.NewStoreBoundary(10, request.StopBlockNum)
-
 	runtimeConfig := config.NewRuntimeConfig(
 		10,
 		10,
@@ -89,11 +86,16 @@ func processRequest(
 		baseStoreStore,
 		workerFactory,
 	)
+
+	cachingEngine, err := cachev1.NewEngine(runtimeConfig, zap.NewNop())
+	require.NoError(t, err)
+	storeBoundary := pipeline.NewStoreBoundary(runtimeConfig.StoreSnapshotsSaveInterval, request.StopBlockNum)
+
 	pipe := pipeline.New(
 		ctx,
 		moduleGraph,
 		"sf.substreams.v1.test.Block",
-		nil,
+		wasm.NewRuntime(nil),
 		cachingEngine,
 		runtimeConfig,
 		storeBoundary,

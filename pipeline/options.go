@@ -29,9 +29,3 @@ func WithPostJobHook(f substreams.PostJobHook) Option {
 		p.postJobHooks = append(p.postJobHooks, f)
 	}
 }
-
-func WithSyncBlockRangeRestriction(maxRangeSize uint64) Option {
-	return func(p *Pipeline) {
-		p.maxStoreSyncRangeSize = maxRangeSize
-	}
-}

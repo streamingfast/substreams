@@ -13,6 +13,7 @@ import (
 
 func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (*pbsubstreams.ModuleOutput, error) {
 	logger := reqctx.Logger(ctx)
+	modName := executor.Name()
 
 	reqStats := reqctx.ReqStats(ctx)
 
@@ -21,8 +22,8 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	ctx, span := reqctx.WithSpan(ctx, "module_execution")
 	defer span.EndWithErr(&err)
 
-	logger = logger.With(zap.String("module_name", executor.Name()))
-	span.SetAttributes(attribute.String("module.name", executor.Name()))
+	logger = logger.With(zap.String("module_name", modName))
+	span.SetAttributes(attribute.String("module.name", modName))
 
 	logger.Debug("running module")
 
@@ -48,7 +49,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	hasValidOutput := moduleOutput != nil
 	if hasValidOutput {
-		if err = setOutputCache(executor.Name(), execOutput, outputBytes); err != nil {
+		if err = setOutputCache(modName, execOutput, outputBytes); err != nil {
 			return moduleOutput, fmt.Errorf("set output cache: %w", err)
 		}
 	}

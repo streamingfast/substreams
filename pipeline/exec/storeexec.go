@@ -26,7 +26,7 @@ func (e *StoreModuleExecutor) Name() string { return e.moduleName }
 
 func (e *StoreModuleExecutor) String() string { return e.Name() }
 
-func (e *StoreModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
+func (e *StoreModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 	deltas := &pbsubstreams.StoreDeltas{}

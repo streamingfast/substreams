@@ -12,6 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO(abourget): eat away all these methods on the Pipeline here
+// and turn them into `Stores` methods.
+// Make THAT the Return value for the backprocessor and the
+type Stores struct {
+	bounder  *storeBoundary
+	StoreMap store.Map
+}
+
 func (p *Pipeline) resetStores() {
 	for _, s := range p.StoreMap.All() {
 		if resetableStore, ok := s.(store.Resettable); ok {

@@ -19,7 +19,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"math"
 	"strings"
 )
 
@@ -33,63 +32,70 @@ type Pipeline struct {
 	// does not have context. For consistency, it should only be read in the processBlock function
 	ctx context.Context
 
-	vmType    string // wasm/rust-v1, native
-	blockType string
-
-	maxStoreSyncRangeSize uint64
-
 	preBlockHooks  []substreams.BlockHook
 	postBlockHooks []substreams.BlockHook
 	postJobHooks   []substreams.PostJobHook
 
-	wasmRuntime    *wasm.Runtime
-	wasmExtensions []wasm.WASMExtensioner
+	vmType      string // wasm/rust-v1, native
+	blockType   string
+	wasmRuntime *wasm.Runtime
 
-	graph        *manifest.ModuleGraph
-	moduleHashes *manifest.ModuleHashes
-	respFunc     func(resp *pbsubstreams.Response) error
-
-	outputModuleMap      map[string]bool
-	backprocessingStores []*backprocessingStore
-
+	// ModuleTree, ModuleGraph
+	graph           *manifest.ModuleGraph
+	moduleHashes    *manifest.ModuleHashes
+	moduleOutputs   []*pbsubstreams.ModuleOutput
+	outputModuleMap map[string]bool
 	moduleExecutors []exec.ModuleExecutor
+
+	respFunc func(resp *pbsubstreams.Response) error
+
+	backprocessingStores []*backprocessingStore
 
 	execOutputCache execout.CacheEngine
 
-	moduleOutputs []*pbsubstreams.ModuleOutput
-	forkHandler   *ForkHandler
+	forkHandler *ForkHandler
 
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 
 	runtimeConfig config.RuntimeConfig
 
-	bounder  *StoreBoundary
+	// StoreProvider
+	bounder  *storeBoundary
 	StoreMap store.Map
+
+	//
+	// Store progress tracker, in-memory, syncer
+	// with bound checks,
+	// that gets initialized through snapshots or from
+	// the fruits of a parallel execution.
+
 }
 
 func New(
 	ctx context.Context,
 	graph *manifest.ModuleGraph,
 	blockType string,
-	wasmExtensions []wasm.WASMExtensioner,
+	wasmRuntime *wasm.Runtime,
 	execOutputCache execout.CacheEngine,
 	runtimeConfig config.RuntimeConfig,
-	bounder *StoreBoundary,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option,
 ) *Pipeline {
+	bounder := NewStoreBoundary(
+		runtimeConfig.StoreSnapshotsSaveInterval,
+		reqctx.Details(ctx).Request.StopBlockNum,
+	)
 	pipe := &Pipeline{
-		ctx:                   ctx,
-		execOutputCache:       execOutputCache,
-		runtimeConfig:         runtimeConfig,
-		graph:                 graph,
-		outputModuleMap:       map[string]bool{},
-		blockType:             blockType,
-		wasmExtensions:        wasmExtensions,
-		maxStoreSyncRangeSize: math.MaxUint64,
-		respFunc:              respFunc,
-		bounder:               bounder,
-		forkHandler:           NewForkHandler(),
+		ctx:             ctx,
+		execOutputCache: execOutputCache,
+		runtimeConfig:   runtimeConfig,
+		graph:           graph,
+		outputModuleMap: map[string]bool{},
+		blockType:       blockType,
+		wasmRuntime:     wasmRuntime,
+		respFunc:        respFunc,
+		bounder:         bounder,
+		forkHandler:     NewForkHandler(),
 	}
 
 	for _, opt := range opts {
@@ -105,14 +111,16 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
 	defer span.EndWithErr(&err)
 
+	// Sets somewhere the output modules.
+
 	for _, name := range reqDetails.Request.OutputModules {
 		p.outputModuleMap[name] = true
 	}
 
+	// Registers some ForkHandlers (to adjust exec output, and stores states)
 	p.forkHandler.registerHandler(func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput) {
 		p.execOutputCache.HandleUndo(clock, moduleOutput.Name)
 	})
-
 	p.forkHandler.registerHandler(func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput) {
 		p.storesHandleUndo(moduleOutput)
 	})
@@ -126,6 +134,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		zap.Strings("outputs", reqDetails.Request.OutputModules),
 	)
 
+	// Validation of all the module tree, hashes, computing graph (MODULE TREE)
 	if err := p.validateBinaries(ctx); err != nil {
 		return fmt.Errorf("binary validation failed: %w", err)
 	}
@@ -139,6 +148,8 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		return fmt.Errorf("module failed validation: %w", err)
 	}
 
+	// Initialization of the Store Provider, ExecOut Cache Engine?
+
 	logger.Info("initializing exec output cache")
 	if err := p.execOutputCache.Init(p.moduleHashes); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
@@ -150,6 +161,10 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		return fmt.Errorf("initialize store config map: %w", err)
 	}
 
+	// Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
+	// This clearly doesn't belong in the Init() function.
+	// TODO(abourget): have this return a `pipeline.Stores`,
+	// with a bounder already adjusted.
 	var storeMap store.Map
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.StoreMap))
@@ -161,14 +176,19 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 			return fmt.Errorf("failed setup request: %w", err)
 		}
 	}
-
 	p.StoreMap = storeMap
+	// TODO(abourget): much too far, who knows about the reason for this? Probably `runBackProcessAndSetupStores` or
+	// the other method above.. who dealt with those start block, end block stuff.
+	p.bounder.InitBoundary(reqDetails.EffectiveStartBlockNum)
+
+	// Build the Module Executor list
+	// TODO(abourget): this could be done lazily, but the ModuleTree,
+	// and cache the latest if all block boundaries
+	// are still clear.
 
 	if err = p.buildWASM(ctx, modules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
-
-	p.bounder.InitBoundary(reqDetails.EffectiveStartBlockNum)
 
 	logger.Info("initialized store boundary block",
 		zap.Uint64("effective_start_block", reqDetails.EffectiveStartBlockNum),
@@ -304,7 +324,7 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
 
-	executor.Reset()
+	executor.ResetWASMInstance()
 
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
@@ -347,7 +367,6 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 		progress = append(progress, &pbsubstreams.ModuleProgress{
 			Name: backprocessStore.name,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-				// TODO charles: add p.hostname
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
@@ -390,7 +409,6 @@ func (p *Pipeline) getModules(ctx context.Context) (modules []*pbsubstreams.Modu
 
 func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module) error {
 	request := reqctx.Details(ctx).Request
-	p.wasmRuntime = wasm.NewRuntime(p.wasmExtensions)
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	for _, module := range modules {
@@ -410,7 +428,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 		switch kind := module.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
-
 			baseExecutor := exec.NewBaseExecutor(
 				module.Name,
 				wasmModule,
@@ -418,11 +435,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 				entrypoint,
 				tracer,
 			)
-
 			executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
-
 			p.moduleExecutors = append(p.moduleExecutors, executor)
-			continue
+
 		case *pbsubstreams.Module_KindStore_:
 			updatePolicy := kind.KindStore.UpdatePolicy
 			valueType := kind.KindStore.ValueType
@@ -440,16 +455,13 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 				entrypoint,
 				tracer,
 			)
-
 			s := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
-
 			p.moduleExecutors = append(p.moduleExecutors, s)
-			continue
+
 		default:
-			return fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name)
+			panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))
 		}
 	}
-
 	return nil
 }
 
@@ -507,17 +519,12 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore))
 			}
 		case *pbsubstreams.Module_Input_Source_:
-			if !p.isValidWasmSourceInputType(in.Source.Type) {
-				return nil, fmt.Errorf("input source has an unknown type: %q", in.Source.Type)
-			}
+			// in.Source.Type checking against `blockType` is already done
+			// upfront in `validateGraph`.
 			out = append(out, wasm.NewSourceInput(in.Source.Type))
 		default:
 			return nil, fmt.Errorf("invalid input struct for module %q", module.Name)
 		}
 	}
 	return out, nil
-}
-
-func (p *Pipeline) isValidWasmSourceInputType(inputType string) bool {
-	return (p.blockType == inputType) || (wasm.CLOCK_TYPE == inputType)
 }

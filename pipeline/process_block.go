@@ -143,7 +143,6 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 	}
 
 	p.resetStores()
-	p.moduleOutputs = nil
 	logger.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
 }
@@ -152,6 +151,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, span := reqctx.WithSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
+	// TODO(abourget): get the module executors from the
+	// module tree
+	// GraphExecutor
+	// ModuleGraph
+
+	p.moduleOutputs = nil
 	for _, executor := range p.moduleExecutors {
 		if err := p.execute(ctx, executor, execOutput); err != nil {
 			return fmt.Errorf("running executor %q: %w", executor.Name(), err)

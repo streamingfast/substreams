@@ -145,7 +145,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b := &StoreBoundary{
+			b := &storeBoundary{
 				interval:     10,
 				nextBoundary: test.currentBoundary,
 			}

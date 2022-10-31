@@ -9,16 +9,11 @@ import (
 type ModuleExecutor interface {
 	// Name returns the name of the module as defined in the manifest.
 	Name() string
-
-	// String returns the module executor representation, usually its name directly.
 	String() string
-
-	// Reset the wasm instance, avoid propagating logs.
-	Reset()
+	ResetWASMInstance()
 
 	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
 	applyCachedOutput(value []byte) error
-
 	toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error)
 
 	moduleLogs() (logs []string, truncated bool)

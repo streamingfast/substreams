@@ -28,7 +28,7 @@ func (e *MapperModuleExecutor) Name() string { return e.moduleName }
 
 func (e *MapperModuleExecutor) String() string { return e.Name() }
 
-func (e *MapperModuleExecutor) Reset() { e.wasmModule.CurrentInstance = nil }
+func (e *MapperModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
 
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 

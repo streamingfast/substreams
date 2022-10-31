@@ -32,6 +32,9 @@ var tplPbMod string
 const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
 const EthereumBlockRust = "substreams_ethereum::pb::eth::v2::Block"
 
+const SubstreamsClock = "sf.substreams.v1.Clock"
+const SubstreamsClockRust = "substreams::pb::substreams::Clock"
+
 var StoreType = map[string]string{
 	"bytes":      "Raw",
 	"string":     "String",
@@ -317,6 +320,8 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 			switch in.Source.Type {
 			case EthereumBlockManifest:
 				out = append(out, NewArgument(name, EthereumBlockRust, input))
+			case SubstreamsClock:
+				out = append(out, NewArgument(name, SubstreamsClockRust, input))
 			default:
 				panic(fmt.Sprintf("unsupported source %q", in.Source.Type))
 			}

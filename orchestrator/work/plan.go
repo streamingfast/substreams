@@ -88,7 +88,7 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.Mod
 	for modName, _ := range p.ModulesStateMap {
 		mods = append(mods, modName)
 	}
-	sort.Strings(mods)
+	mods = manifest.SortModuleNamesByGraphTopology(mods, graph)
 
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
 	for _, storeName := range mods {

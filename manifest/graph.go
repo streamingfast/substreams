@@ -351,3 +351,13 @@ func (m ModuleMarshaler) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(l)
 }
+
+func SortModuleNamesByGraphTopology(mods []string, g *ModuleGraph) []string {
+	g.TopologicalSort()
+
+	sort.Slice(mods, func(i, j int) bool {
+		return g.moduleIndex[mods[i]] < g.moduleIndex[mods[j]]
+	})
+
+	return mods
+}

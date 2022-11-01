@@ -43,9 +43,9 @@ func TestWorkPlanning(t *testing.T) {
 			plan: &Plan{
 				upToBlock: 60,
 				ModulesStateMap: TestModStateMap(
+					TestModState("G", "0-10,50-60"),
 					TestModState("A", "0-10,30-40,50-60"),
 					TestModState("D", "10-20,50-60"),
-					TestModState("G", "0-10,50-60"),
 				),
 			},
 			subreqSplit: 10,

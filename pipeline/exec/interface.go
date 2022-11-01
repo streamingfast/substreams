@@ -19,6 +19,8 @@ type ModuleExecutor interface {
 	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
 	applyCachedOutput(value []byte) error
 
+	toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error)
+
 	moduleLogs() (logs []string, truncated bool)
 	currentExecutionStack() []string
 }

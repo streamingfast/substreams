@@ -41,6 +41,8 @@ type MockModuleExecutor struct {
 	StackFunc func() []string
 }
 
+var _ ModuleExecutor = (*MockModuleExecutor)(nil)
+
 func (t *MockModuleExecutor) Name() string {
 	return t.name
 }
@@ -101,4 +103,9 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, moduleOutput)
+}
+
+func (t *MockModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
+	//TODO implement me
+	panic("implement me")
 }

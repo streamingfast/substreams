@@ -37,7 +37,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		if err = executor.applyCachedOutput(output); err != nil {
 			return nil, fmt.Errorf("apply cached output: %w", err)
 		}
-		return nil, nil
+		return executor.toModuleOutput(output)
 	}
 	reqStats.RecordOutputCacheMiss()
 

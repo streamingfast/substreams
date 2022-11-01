@@ -16,6 +16,8 @@ type StoreModuleExecutor struct {
 	outputStore store.DeltaAccessor
 }
 
+var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
+
 func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store.DeltaAccessor) *StoreModuleExecutor {
 	return &StoreModuleExecutor{BaseExecutor: *baseExecutor, outputStore: outputStore}
 }
@@ -70,4 +72,15 @@ func (e *StoreModuleExecutor) wrapDeltas() (out []byte, moduleOutput pbsubstream
 		StoreDeltas: deltas,
 	}
 	return data, moduleOutput, nil
+}
+
+func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
+	deltas := &pbsubstreams.StoreDeltas{}
+	err := proto.Unmarshal(data, deltas)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling output deltas: %w", err)
+	}
+	return toModuleOutput(e, &pbsubstreams.ModuleOutput_StoreDeltas{
+		StoreDeltas: deltas,
+	}), nil
 }

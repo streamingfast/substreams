@@ -10,12 +10,12 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-var _ ModuleExecutor = (*MapperModuleExecutor)(nil)
-
 type MapperModuleExecutor struct {
 	BaseExecutor
 	outputType string
 }
+
+var _ ModuleExecutor = (*MapperModuleExecutor)(nil)
 
 func NewMapperModuleExecutor(baseExecutor *BaseExecutor, outputType string) *MapperModuleExecutor {
 	return &MapperModuleExecutor{BaseExecutor: *baseExecutor, outputType: outputType}
@@ -52,4 +52,10 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	}
 
 	return out, moduleOutput, nil
+}
+
+func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
+	return toModuleOutput(e, &pbsubstreams.ModuleOutput_MapOutput{
+		MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: data},
+	}), nil
 }

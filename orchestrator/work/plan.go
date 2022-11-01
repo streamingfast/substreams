@@ -158,7 +158,8 @@ func (p *Plan) promoteWaitingJobs() {
 func (p *Plan) allDependenciesMet(job *Job) bool {
 	startBlock := job.RequestRange.StartBlock
 	for _, dep := range job.requiredModules {
-		if p.modulesReadyUpToBlock[dep] < startBlock {
+		depUpTo, ok := p.modulesReadyUpToBlock[dep]
+		if !ok || depUpTo < startBlock {
 			return false
 		}
 	}

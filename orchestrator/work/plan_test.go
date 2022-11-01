@@ -208,14 +208,8 @@ func TestPlan_NextJob(t *testing.T) {
 }
 
 func TestPlan_allDependenciesMet(t *testing.T) {
-	t.Skip("not implemented")
 	type fields struct {
-		ModulesStateMap       ModuleStorageStateMap
-		upToBlock             uint64
-		waitingJobs           []*Job
-		readyJobs             []*Job
 		modulesReadyUpToBlock map[string]uint64
-		mu                    sync.Mutex
 	}
 	type args struct {
 		job *Job
@@ -226,50 +220,82 @@ func TestPlan_allDependenciesMet(t *testing.T) {
 		args   args
 		want   bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "all deps met",
+			fields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"foo": 100,
+					"bar": 50,
+				},
+			},
+			args: args{
+				job: &Job{
+					ModuleName: "foo",
+					RequestRange: &block.Range{
+						StartBlock:        10,
+						ExclusiveEndBlock: 20,
+					},
+					requiredModules: []string{
+						"foo",
+						"bar",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "some deps met",
+			fields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"foo": 100,
+					"bar": 0,
+				},
+			},
+			args: args{
+				job: &Job{
+					ModuleName: "foo",
+					RequestRange: &block.Range{
+						StartBlock:        10,
+						ExclusiveEndBlock: 20,
+					},
+					requiredModules: []string{
+						"foo",
+						"bar",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "no deps met",
+			fields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"foo": 0,
+					"bar": 0,
+				},
+			},
+			args: args{
+				job: &Job{
+					ModuleName: "foo",
+					RequestRange: &block.Range{
+						StartBlock:        10,
+						ExclusiveEndBlock: 20,
+					},
+					requiredModules: []string{
+						"foo",
+						"bar",
+					},
+				},
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Plan{
-				ModulesStateMap:       tt.fields.ModulesStateMap,
-				upToBlock:             tt.fields.upToBlock,
-				waitingJobs:           tt.fields.waitingJobs,
-				readyJobs:             tt.fields.readyJobs,
 				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-				mu:                    tt.fields.mu,
 			}
 			assert.Equalf(t, tt.want, p.allDependenciesMet(tt.args.job), "allDependenciesMet(%v)", tt.args.job)
-		})
-	}
-}
-
-func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
-	t.Skip("not implemented")
-	type fields struct {
-		ModulesStateMap       ModuleStorageStateMap
-		upToBlock             uint64
-		waitingJobs           []*Job
-		readyJobs             []*Job
-		modulesReadyUpToBlock map[string]uint64
-		mu                    sync.Mutex
-	}
-	tests := []struct {
-		name   string
-		fields fields
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Plan{
-				ModulesStateMap:       tt.fields.ModulesStateMap,
-				upToBlock:             tt.fields.upToBlock,
-				waitingJobs:           tt.fields.waitingJobs,
-				readyJobs:             tt.fields.readyJobs,
-				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-				mu:                    tt.fields.mu,
-			}
-			p.initModulesReadyUpToBlock()
 		})
 	}
 }
@@ -307,33 +333,220 @@ func TestPlan_prioritize(t *testing.T) {
 	}
 }
 
-func TestPlan_promoteWaitingJobs(t *testing.T) {
-	t.Skip("not implemented")
+func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 	type fields struct {
 		ModulesStateMap       ModuleStorageStateMap
-		upToBlock             uint64
-		waitingJobs           []*Job
-		readyJobs             []*Job
 		modulesReadyUpToBlock map[string]uint64
-		mu                    sync.Mutex
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name     string
+		fields   fields
+		expected map[string]uint64
 	}{
-		// TODO: Add test cases.
+		{
+			name: "no modules",
+			fields: fields{
+				ModulesStateMap: ModuleStorageStateMap{},
+			},
+			expected: map[string]uint64{},
+		},
+		{
+			name: "one module,initial block",
+			fields: fields{
+				ModulesStateMap: ModuleStorageStateMap{
+					"A": &ModuleStorageState{
+						ModuleInitialBlock: 1,
+					},
+				},
+			},
+			expected: map[string]uint64{
+				"A": 1,
+			},
+		},
+		{
+			name: "one module,complete range",
+			fields: fields{
+				ModulesStateMap: ModuleStorageStateMap{
+					"A": &ModuleStorageState{
+						InitialCompleteRange: &FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
+					},
+				},
+			},
+			expected: map[string]uint64{
+				"A": 20,
+			},
+		},
+		{
+			name: "mixed modules",
+			fields: fields{
+				ModulesStateMap: ModuleStorageStateMap{
+					"A": &ModuleStorageState{
+						InitialCompleteRange: &FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
+					},
+					"B": &ModuleStorageState{
+						ModuleInitialBlock: 1,
+					},
+				},
+			},
+			expected: map[string]uint64{
+				"A": 20,
+				"B": 1,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Plan{
 				ModulesStateMap:       tt.fields.ModulesStateMap,
-				upToBlock:             tt.fields.upToBlock,
+				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
+			}
+			p.initModulesReadyUpToBlock()
+			assert.Equalf(t, tt.expected, p.modulesReadyUpToBlock, "initModulesReadyUpToBlock()")
+		})
+	}
+}
+
+func TestPlan_bumpModuleUpToBlock(t *testing.T) {
+	type fields struct {
+		modulesReadyUpToBlock map[string]uint64
+	}
+	type args struct {
+		modName   string
+		upToBlock uint64
+	}
+	tests := []struct {
+		name          string
+		initialFields fields
+		expected      map[string]uint64
+		args          args
+	}{
+		{
+			name: "bump up to block",
+			initialFields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"A": 10,
+				},
+			},
+			args: args{
+				modName:   "A",
+				upToBlock: 20,
+			},
+			expected: map[string]uint64{
+				"A": 20,
+			},
+		},
+		{
+			name: "bump up to block, no existing",
+			initialFields: fields{
+				modulesReadyUpToBlock: map[string]uint64{},
+			},
+			args: args{
+				modName:   "A",
+				upToBlock: 20,
+			},
+			expected: map[string]uint64{
+				"A": 20,
+			},
+		},
+		{
+			name: "bump less than current",
+			initialFields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"A": 20,
+				},
+			},
+			args: args{
+				modName:   "A",
+				upToBlock: 10,
+			},
+			expected: map[string]uint64{
+				"A": 20,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Plan{
+				modulesReadyUpToBlock: tt.initialFields.modulesReadyUpToBlock,
+			}
+			p.bumpModuleUpToBlock(tt.args.modName, tt.args.upToBlock)
+			assert.Equal(t, tt.expected, p.modulesReadyUpToBlock)
+		})
+	}
+}
+
+func TestPlan_promoteWaitingJobs(t *testing.T) {
+	type fields struct {
+		waitingJobs           []*Job
+		readyJobs             []*Job
+		modulesReadyUpToBlock map[string]uint64
+	}
+	tests := []struct {
+		name                   string
+		fields                 fields
+		expectedReadyJobsLen   int
+		expectedWaitingJobsLen int
+	}{
+		{
+			name: "one job,ready",
+			fields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"B": 10,
+				},
+				waitingJobs: []*Job{
+					{
+						ModuleName: "A",
+						RequestRange: &block.Range{
+							StartBlock:        10,
+							ExclusiveEndBlock: 20,
+						},
+						requiredModules: []string{"B"},
+					},
+				},
+			},
+			expectedReadyJobsLen:   1,
+			expectedWaitingJobsLen: 0,
+		},
+		{
+			name: "two jobs,one ready",
+			fields: fields{
+				modulesReadyUpToBlock: map[string]uint64{
+					"B": 10,
+					"C": 0,
+				},
+				waitingJobs: []*Job{
+					{
+						ModuleName: "A",
+						RequestRange: &block.Range{
+							StartBlock:        10,
+							ExclusiveEndBlock: 20,
+						},
+						requiredModules: []string{"B"},
+					},
+					{
+						ModuleName: "B",
+						RequestRange: &block.Range{
+							StartBlock:        10,
+							ExclusiveEndBlock: 20,
+						},
+						requiredModules: []string{"C"},
+					},
+				},
+			},
+			expectedReadyJobsLen:   1,
+			expectedWaitingJobsLen: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Plan{
 				waitingJobs:           tt.fields.waitingJobs,
 				readyJobs:             tt.fields.readyJobs,
 				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-				mu:                    tt.fields.mu,
 			}
 			p.promoteWaitingJobs()
+			assert.Equal(t, tt.expectedReadyJobsLen, len(p.readyJobs))
+			assert.Equal(t, tt.expectedWaitingJobsLen, len(p.waitingJobs))
 		})
 	}
 }

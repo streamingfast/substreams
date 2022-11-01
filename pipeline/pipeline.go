@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -46,8 +45,6 @@ type Pipeline struct {
 	execOutputCache execout.CacheEngine
 
 	forkHandler *ForkHandler
-
-	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 
 	stores *Stores
 }
@@ -92,15 +89,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		p.storesHandleUndo(moduleOutput)
 	})
 
-	logger.Info("initializing pipeline",
-		zap.Int64("requested_start_block", reqDetails.Request.StartBlockNum),
-		zap.Uint64("effective_start_block", reqDetails.EffectiveStartBlockNum),
-		zap.Uint64("requested_stop_block", reqDetails.Request.StopBlockNum),
-		zap.String("requested_start_cursor", reqDetails.Request.StartCursor),
-		zap.Bool("is_back_processing", reqDetails.IsSubRequest),
-		zap.Strings("outputs", reqDetails.Request.OutputModules),
-	)
-
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
 	logger.Info("initializing exec output cache")
@@ -142,11 +130,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	if err = p.buildWASM(ctx, p.moduleTree.processModules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
-
-	logger.Info("initialized store boundary block",
-		zap.Uint64("effective_start_block", reqDetails.EffectiveStartBlockNum),
-		zap.Uint64("next_boundary_block", p.bounder.nextBoundary),
-	)
 
 	return nil
 }
@@ -285,16 +268,16 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	return nil
 }
 
-func shouldReturn(blockNum, effectiveStartBlockNum uint64) bool {
-	return blockNum >= effectiveStartBlockNum
-}
-
 func shouldReturnProgress(isSubRequest bool) bool {
 	return isSubRequest
 }
 
 func shouldReturnDataOutputs(blockNum, effectiveStartBlockNum uint64, isSubRequest bool) bool {
 	return shouldReturn(blockNum, effectiveStartBlockNum) && !isSubRequest
+}
+
+func shouldReturn(blockNum, effectiveStartBlockNum uint64) bool {
+	return blockNum >= effectiveStartBlockNum
 }
 
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {
@@ -314,7 +297,6 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 			},
 		})
 	}
-
 	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}

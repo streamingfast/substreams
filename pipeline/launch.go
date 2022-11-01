@@ -42,17 +42,18 @@ func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, 
 			return fmt.Errorf("step new irr: exec out end of stream: %w", err)
 		}
 
-		if err := p.flushStores(ctx, reqDetails.Request.StopBlockNum); err != nil {
+		if err := p.stores.flushStores(ctx, reqDetails.Request.StopBlockNum); err != nil {
 			return fmt.Errorf("step new irr: stores end of stream: %w", err)
 		}
 
-		partialRanges := make([]string, len(p.partialsWritten))
-		for i, rng := range p.partialsWritten {
-			partialRanges[i] = fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock)
+		if p.stores.partialsWritten != nil {
+			partialRanges := make([]string, len(p.stores.partialsWritten))
+			for i, rng := range p.stores.partialsWritten {
+				partialRanges[i] = fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock)
+			}
+			logger.Info("setting trailer", zap.Strings("ranges", partialRanges))
+			streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": []string{strings.Join(partialRanges, ",")}})
 		}
-
-		logger.Info("setting trailer", zap.Strings("ranges", partialRanges))
-		streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": []string{strings.Join(partialRanges, ",")}})
 
 		// It was an ok error, so let's
 		return nil

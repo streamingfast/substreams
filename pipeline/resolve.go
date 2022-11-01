@@ -15,10 +15,16 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool) (*req
 		return nil, err
 	}
 
+	outMap := map[string]bool{}
+	for _, modName := range request.OutputModules {
+		outMap[modName] = true
+	}
+
 	return &reqctx.RequestDetails{
 		Request:                request,
 		EffectiveStartBlockNum: effectiveStartBlock,
 		IsSubRequest:           isSubRequest,
+		IsOutputModule:         outMap,
 	}, nil
 }
 

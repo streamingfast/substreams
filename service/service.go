@@ -227,6 +227,14 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		defer requestStats.Shutdown()
 	}
 
+	logger.Info("initializing pipeline",
+		zap.Int64("requested_start_block", request.StartBlockNum),
+		zap.Uint64("effective_start_block", requestDetails.EffectiveStartBlockNum),
+		zap.Uint64("requested_stop_block", request.StopBlockNum),
+		zap.String("requested_start_cursor", request.StartCursor),
+		zap.Bool("is_back_processing", requestDetails.IsSubRequest),
+		zap.Strings("outputs", request.OutputModules),
+	)
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}

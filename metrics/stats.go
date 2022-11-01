@@ -27,35 +27,17 @@ func NewNoopStats() Stats {
 	return &noopstats{}
 }
 
-type noopstats struct {
-}
+type noopstats struct{}
 
-func (n noopstats) StartBackProcessing() {
-}
-
-func (n noopstats) EndBackProcessing() {
-}
-
-func (n noopstats) Shutdown() {
-}
-
-func (n noopstats) Start(each time.Duration) {
-}
-
-func (n noopstats) RecordBlock(ref bstream.BlockRef) {
-}
-
-func (n noopstats) RecordFlush(elapsed time.Duration) {
-}
-
-func (n noopstats) RecordOutputCacheHit() {
-}
-
-func (n noopstats) RecordOutputCacheMiss() {
-}
-
-func (n noopstats) RecordStoreSquasherProgress(module string, blockNum uint64) {
-}
+func (n noopstats) StartBackProcessing()                                       {}
+func (n noopstats) EndBackProcessing()                                         {}
+func (n noopstats) Shutdown()                                                  {}
+func (n noopstats) Start(each time.Duration)                                   {}
+func (n noopstats) RecordBlock(ref bstream.BlockRef)                           {}
+func (n noopstats) RecordFlush(elapsed time.Duration)                          {}
+func (n noopstats) RecordOutputCacheHit()                                      {}
+func (n noopstats) RecordOutputCacheMiss()                                     {}
+func (n noopstats) RecordStoreSquasherProgress(module string, blockNum uint64) {}
 
 func NewReqStats(logger *zap.Logger) Stats {
 	return &stats{

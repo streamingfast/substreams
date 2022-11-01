@@ -110,7 +110,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		return io.EOF
 	}
 
-	if err := p.flushStores(ctx, block.Number); err != nil {
+	if err := p.stores.flushStores(ctx, block.Number); err != nil {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
@@ -128,7 +128,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
-	if shouldReturnProgress(reqDetails.IsSubRequest) {
+	if reqDetails.ShouldReturnProgressMessages() {
 		if err = p.returnModuleProgressOutputs(clock); err != nil {
 			return fmt.Errorf("failed to return modules progress %w", err)
 		}
@@ -152,9 +152,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	defer span.EndWithErr(&err)
 
 	// TODO(abourget): get the module executors from the
-	// module tree
-	// GraphExecutor
-	// ModuleGraph
+	// ModuleTree
 
 	p.moduleOutputs = nil
 	for _, executor := range p.moduleExecutors {

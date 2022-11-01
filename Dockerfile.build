@@ -1,0 +1,9 @@
+# syntax=docker/dockerfile:1.2
+
+FROM golang:1.19.2-bullseye AS builder
+
+COPY . /work/src
+
+WORKDIR /work/src
+
+RUN go build -ldflags '-s -w -X main.version="0.0.21" -X main.commit="0fb6f5559a4ccf4011edc8542a02197cb3585224" -X main.date="2022-10-31T15:05:37.028115-04:00"' ./cmd/substreams

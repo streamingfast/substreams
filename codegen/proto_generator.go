@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,7 +26,8 @@ func NewProtoGenerator(outputPath string, excludedPaths []string) *ProtoGenerato
 	}
 }
 
-func (g *ProtoGenerator) Generate(pkg *pbsubstreams.Package) error {
+func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
+
 	defaultFilename := filepath.Join(os.TempDir(), "tmp.spkg")
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {

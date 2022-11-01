@@ -2,13 +2,16 @@ package codegen
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/jhump/protoreflect/desc"
-
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/stretchr/testify/require"
 )
 
-func Init() *Generator {
+func InitTestGenerator(t *testing.T) *Generator {
+	t.Helper()
+
 	var protoDefinitions []*desc.FileDescriptor
 	manifestPath := "./test_substreams/substreams.yaml"
 	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
@@ -19,5 +22,9 @@ func Init() *Generator {
 	if err != nil {
 		panic(fmt.Errorf("reading manifest file %s :%w", manifestPath, err))
 	}
-	return NewGenerator(pkg, protoDefinitions, "")
+
+	manif, err := manifest.LoadManifestFile(manifestPath)
+	require.NoError(t, err)
+
+	return NewGenerator(pkg, manif, protoDefinitions, "")
 }

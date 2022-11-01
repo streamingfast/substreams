@@ -109,7 +109,7 @@ func (g *ForkBlockGenerator) Generate() []*GeneratedBlock {
 //   ,- E ,- H
 // A <- B <- C <- D <- I
 //   `- F <- G
-//func (g *ForkBlockGenerator) Generate() []*GeneratedBlock {
+//func (g *ForkBlockGenerator) GenerateProto() []*GeneratedBlock {
 //	var generatedBlocks []*GeneratedBlock
 //	forkDB := forkable.NewForkDB()
 //	forkDB.InitLIB(g.initialLIB)

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/streamingfast/substreams/manifest"
+
 	"github.com/jhump/protoreflect/desc"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -48,28 +50,30 @@ var StoreType = map[string]string{
 }
 
 var UpdatePoliciesMap = map[string]string{
-	"UPDATE_POLICY_UNSET":             "Unset",
-	"UPDATE_POLICY_SET":               "Set",
-	"UPDATE_POLICY_SET_IF_NOT_EXISTS": "SetIfNotExist",
-	"UPDATE_POLICY_ADD":               "Add",
-	"UPDATE_POLICY_MIN":               "Min",
-	"UPDATE_POLICY_MAX":               "Max",
-	"UPDATE_POLICY_APPEND":            "Append",
+	"":                                  "Unset",
+	manifest.UpdatePolicySet:            "Set",
+	manifest.UpdatePolicySetIfNotExists: "SetIfNotExist",
+	manifest.UpdatePolicyAdd:            "Add",
+	manifest.UpdatePolicyMin:            "Min",
+	manifest.UpdatePolicyMax:            "Max",
+	manifest.UpdatePolicyAppend:         "Append",
 }
 
 type Generator struct {
 	pkg              *pbsubstreams.Package
+	manifest         *manifest.Manifest
 	srcPath          string
 	protoDefinitions []*desc.FileDescriptor
 	writer           io.Writer
 	engine           *Engine
 }
 
-func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, srcPath string) *Generator {
-	engine := &Engine{Package: pkg}
+func NewGenerator(pkg *pbsubstreams.Package, manifest *manifest.Manifest, protoDefinitions []*desc.FileDescriptor, srcPath string) *Generator {
+	engine := &Engine{Manifest: manifest}
 	utils["getEngine"] = engine.GetEngine
 	return &Generator{
 		pkg:              pkg,
+		manifest:         manifest,
 		srcPath:          srcPath,
 		protoDefinitions: protoDefinitions,
 		engine:           engine,
@@ -77,7 +81,6 @@ func NewGenerator(pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescri
 }
 
 func (g *Generator) Generate() (err error) {
-
 	if _, err := os.Stat(g.srcPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Creating missing %q folder\n", g.srcPath)
 		if err := os.MkdirAll(g.srcPath, os.ModePerm); err != nil {
@@ -97,7 +100,7 @@ func (g *Generator) Generate() (err error) {
 	}
 
 	protoGenerator := NewProtoGenerator(pbFolder, nil)
-	err = protoGenerator.Generate(g.pkg)
+	err = protoGenerator.GenerateProto(g.pkg)
 	if err != nil {
 		return fmt.Errorf("generating protobuf code: %w", err)
 	}
@@ -192,14 +195,14 @@ func generate(name, tpl string, data any, outputFile string, options ...Generati
 }
 
 var utils = map[string]any{
-	"contains":                 strings.Contains,
-	"hasPrefix":                strings.HasPrefix,
-	"hasSuffix":                strings.HasSuffix,
-	"isDelta":                  IsDelta,
-	"isStoreModule":            IsStoreModule,
-	"isMapModule":              IsMapModule,
-	"isStoreInput":             IsStoreInput,
-	"isMapInput":               IsMapInput,
+	"contains":  strings.Contains,
+	"hasPrefix": strings.HasPrefix,
+	"hasSuffix": strings.HasSuffix,
+	//"isDelta":                  IsDelta,
+	//"isStoreModule":            IsStoreModule,
+	//"isMapModule":              IsMapModule,
+	//"isStoreInput":             IsStoreInput,
+	//"isMapInput":               IsMapInput,
 	"writableStoreDeclaration": WritableStoreDeclaration,
 	"writableStoreType":        WritableStoreType,
 	"readableStoreDeclaration": ReadableStoreDeclaration,
@@ -207,15 +210,15 @@ var utils = map[string]any{
 }
 
 type Engine struct {
-	Package *pbsubstreams.Package
+	Manifest *manifest.Manifest
 }
 
 func (e *Engine) GetEngine() *Engine {
 	return e
 }
 
-func (e *Engine) MustModule(moduleName string) *pbsubstreams.Module {
-	for _, module := range e.Package.Modules.Modules {
+func (e *Engine) MustModule(moduleName string) *manifest.Module {
+	for _, module := range e.Manifest.Modules {
 		if module.Name == moduleName {
 			return module
 		}
@@ -225,177 +228,99 @@ func (e *Engine) MustModule(moduleName string) *pbsubstreams.Module {
 
 func (e *Engine) moduleOutputForName(moduleName string) (string, error) {
 	//todo: call MustModule ...
-	for _, module := range e.Package.Modules.Modules {
+	for _, module := range e.Manifest.Modules {
 		if module.Name == moduleName {
-			outputType := ""
-			if storeModule := module.GetKindStore(); storeModule != nil {
-				outputType = storeModule.ValueType
-			}
-			if mapModule := module.GetKindMap(); mapModule != nil {
-				outputType = mapModule.OutputType
-			}
-			return outputType, nil
+			return module.Output.Type, nil
 		}
 	}
 	return "", fmt.Errorf("MustModule %q not found", moduleName)
 }
 
-func (e *Engine) moduleOutput(module *pbsubstreams.Module) string {
-	outputType := ""
-	if storeModule := module.GetKindStore(); storeModule != nil {
-		outputType = storeModule.ValueType
-	}
-	if mapModule := module.GetKindMap(); mapModule != nil {
-		outputType = mapModule.OutputType
-	}
-	return outputType
-}
-
-func (e *Engine) FunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
-	switch module.Kind.(type) {
-	case *pbsubstreams.Module_KindMap_:
+func (e *Engine) FunctionSignature(module *manifest.Module) (*FunctionSignature, error) {
+	switch module.Kind {
+	case manifest.ModuleKindMap:
 		return e.mapFunctionSignature(module)
-	case *pbsubstreams.Module_KindStore_:
+	case manifest.ModuleKindStore:
 		return e.storeFunctionSignature(module)
 	default:
 		return nil, fmt.Errorf("unknown MustModule kind: %T", module.Kind)
 	}
 }
 
-func (e *Engine) Arguments(module *pbsubstreams.Module) ([]string, error) {
-	var args []string
-	return args, nil
-}
-
-func (e *Engine) mapFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
-	mapModule := module.GetKindMap()
-
+func (e *Engine) mapFunctionSignature(module *manifest.Module) (*FunctionSignature, error) {
 	inputs, err := e.ModuleArgument(module.Inputs)
 	if err != nil {
 		return nil, fmt.Errorf("generating MustModule intputs: %w", err)
 	}
 
-	outType := mapModule.OutputType
+	outType := module.Output.Type
 	if strings.HasPrefix(outType, "proto:") {
 		outType = transformProtoType(outType)
 	}
 
-	fn := NewFunctionSignature(module.Name, "map", outType, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, inputs)
+	fn := NewFunctionSignature(module.Name, "map", outType, "", inputs)
 
 	return fn, nil
 }
 
-func (e *Engine) storeFunctionSignature(module *pbsubstreams.Module) (*FunctionSignature, error) {
-	storeModule := module.GetKindStore()
-
+func (e *Engine) storeFunctionSignature(module *manifest.Module) (*FunctionSignature, error) {
 	arguments, err := e.ModuleArgument(module.Inputs)
 	if err != nil {
 		return nil, fmt.Errorf("generating MustModule intputs: %w", err)
 	}
 
-	fn := NewFunctionSignature(module.Name, "store", "", storeModule.UpdatePolicy, arguments)
+	fn := NewFunctionSignature(module.Name, "store", "", module.UpdatePolicy, arguments)
 
 	return fn, nil
 }
 
-func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments, error) {
+func (e *Engine) ModuleArgument(inputs []*manifest.Input) (Arguments, error) {
 	var out Arguments
 	for _, input := range inputs {
-		switch in := input.Input.(type) {
-		case *pbsubstreams.Module_Input_Map_:
-			inputType, err := e.moduleOutputForName(in.Map.ModuleName)
+		switch {
+		case input.IsMap():
+			inputType, err := e.moduleOutputForName(input.Map)
 			if err != nil {
 				return nil, fmt.Errorf("getting map type: %w", err)
 			}
 			if strings.HasPrefix(inputType, "proto:") {
 				inputType = transformProtoType(inputType)
 			}
-			out = append(out, NewArgument(in.Map.ModuleName, inputType, input))
-		case *pbsubstreams.Module_Input_Store_:
-			mod := e.MustModule(in.Store.ModuleName)
-			inputType := e.moduleOutput(mod)
+			out = append(out, NewArgument(input.Map, inputType, input))
+		case input.IsStore():
+			inputType := e.MustModule(input.Store).ValueType
 			if strings.HasPrefix(inputType, "proto:") {
 				inputType = transformProtoType(inputType)
 			}
-
-			out = append(out, NewArgument(in.Store.ModuleName, inputType, input))
-		case *pbsubstreams.Module_Input_Source_:
-			parts := strings.Split(in.Source.Type, ".")
+			out = append(out, NewArgument(input.Store, inputType, input))
+		case input.IsSource():
+			parts := strings.Split(input.Source, ".")
 			name := parts[len(parts)-1]
 			name = strings.ToLower(name)
 
-			resolved, ok := protoMapping[in.Source.Type]
+			resolved, ok := protoMapping[input.Source]
 			if !ok {
-				panic(fmt.Sprintf("unsupported source %q", in.Source.Type))
+				panic(fmt.Sprintf("unsupported source %q", input.Source))
 			}
 			out = append(out, NewArgument(name, resolved, input))
 
 		default:
-			return nil, fmt.Errorf("unknown MustModule kind: %T", in)
+			return nil, fmt.Errorf("unknown MustModule kind: %T", input)
 		}
 	}
 	return out, nil
 }
 
-func IsDelta(input *pbsubstreams.Module_Input) bool {
-	if storeInput := input.GetStore(); storeInput != nil {
-		return storeInput.Mode == pbsubstreams.Module_Input_Store_DELTAS
-	}
-	return false
-}
-
-func IsStoreModule(module *pbsubstreams.Module) bool {
-	switch module.Kind.(type) {
-	case *pbsubstreams.Module_KindStore_:
-		return true
-	case *pbsubstreams.Module_KindMap_:
-		return false
-	default:
-		return false
-	}
-}
-func IsMapModule(module *pbsubstreams.Module) bool {
-	switch module.Kind.(type) {
-	case *pbsubstreams.Module_KindStore_:
-		return false
-	case *pbsubstreams.Module_KindMap_:
-		return true
-	default:
-		return false
-	}
-}
-
-func IsStoreInput(input *pbsubstreams.Module_Input) bool {
-	switch input.Input.(type) {
-	case *pbsubstreams.Module_Input_Store_:
-		return true
-	case *pbsubstreams.Module_Input_Map_:
-		return false
-	default:
-		return false
-	}
-}
-func IsMapInput(input *pbsubstreams.Module_Input) bool {
-	switch input.Input.(type) {
-	case *pbsubstreams.Module_Input_Store_:
-		return false
-	case *pbsubstreams.Module_Input_Map_:
-		return true
-	default:
-		return false
-	}
-}
-
-func ReadableStoreType(store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+func ReadableStoreType(store *manifest.Module, input *manifest.Input) string {
 	t := store.ValueType
-	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+	p := store.UpdatePolicy
 
-	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
+	if input.Mode == "deltas" {
 		if strings.HasPrefix(t, "proto") {
 			t = transformProtoType(t)
 			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaProto<%s>>", t)
 		}
-		if p == "UPDATE_POLICY_APPEND" {
+		if p == manifest.UpdatePolicyAppend {
 			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaArray<%s>>", StoreType[t])
 		}
 
@@ -408,19 +333,18 @@ func ReadableStoreType(store *pbsubstreams.Module_KindStore, input *pbsubstreams
 		return fmt.Sprintf("substreams::store::StoreGetProto<%s>", t)
 	}
 
-	if p == "UPDATE_POLICY_APPEND" {
+	if p == manifest.UpdatePolicyAppend {
 		return fmt.Sprintf("substreams::store::StoreGetRaw")
 	}
 
 	t = StoreType[t]
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
-func WritableStoreType(store *pbsubstreams.Module_KindStore) string {
+func WritableStoreType(store *manifest.Module) string {
 	t := store.ValueType
+	p := store.UpdatePolicy
 
-	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
-
-	if p == "UPDATE_POLICY_APPEND" {
+	if p == manifest.UpdatePolicyAppend {
 		return fmt.Sprintf("substreams::store::StoreAppend<%s>", StoreType[t])
 	}
 
@@ -433,12 +357,11 @@ func WritableStoreType(store *pbsubstreams.Module_KindStore) string {
 	return fmt.Sprintf("substreams::store::Store%s%s", p, StoreType[t])
 }
 
-func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
+func WritableStoreDeclaration(store *manifest.Module) string {
 	t := store.ValueType
-	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+	p := store.UpdatePolicy
 
-	if p == "UPDATE_POLICY_APPEND" {
-		//delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaArray<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+	if p == manifest.UpdatePolicyAppend {
 		return fmt.Sprintf("let store: substreams::store::StoreAppend<%s> = substreams::store::StoreAppend::new();", StoreType[t])
 	}
 
@@ -452,20 +375,20 @@ func WritableStoreDeclaration(store *pbsubstreams.Module_KindStore) string {
 	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
 }
 
-func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore, input *pbsubstreams.Module_Input_Store) string {
+func ReadableStoreDeclaration(name string, store *manifest.Module, input *manifest.Input) string {
 	t := store.ValueType
-	p := pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(store.UpdatePolicy)]
+	p := store.UpdatePolicy
 	isProto := strings.HasPrefix(t, "proto")
 	if isProto {
 		t = transformProtoType(t)
 	}
 
-	if input.Mode == pbsubstreams.Module_Input_Store_DELTAS {
+	if input.Mode == "deltas" {
 
 		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(%s_deltas_ptr, %s_deltas_len).unwrap().deltas;", name, name, name)
 		delta := fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
 
-		if p == "UPDATE_POLICY_APPEND" {
+		if p == manifest.UpdatePolicyAppend {
 			delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaArray<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
 		}
 
@@ -480,7 +403,7 @@ func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore,
 	}
 
 	t = StoreType[t]
-	if p == "UPDATE_POLICY_APPEND" {
+	if p == manifest.UpdatePolicyAppend {
 		return fmt.Sprintf("let %s: substreams::store::StoreGetRaw = substreams::store::StoreGetRaw::new(%s_ptr);", name, name)
 	}
 
@@ -510,12 +433,12 @@ type FunctionSignature struct {
 	Arguments   Arguments
 }
 
-func NewFunctionSignature(name string, t string, outType string, storePolicy pbsubstreams.Module_KindStore_UpdatePolicy, arguments Arguments) *FunctionSignature {
+func NewFunctionSignature(name string, t string, outType string, storePolicy string, arguments Arguments) *FunctionSignature {
 	return &FunctionSignature{
 		Name:        name,
 		Type:        t,
 		OutputType:  outType,
-		StorePolicy: pbsubstreams.Module_KindStore_UpdatePolicy_name[int32(storePolicy)],
+		StorePolicy: storePolicy,
 		Arguments:   arguments,
 	}
 }
@@ -525,10 +448,10 @@ type Arguments []*Argument
 type Argument struct {
 	Name        string
 	Type        string
-	ModuleInput *pbsubstreams.Module_Input
+	ModuleInput *manifest.Input
 }
 
-func NewArgument(name string, argType string, moduleInput *pbsubstreams.Module_Input) *Argument {
+func NewArgument(name string, argType string, moduleInput *manifest.Input) *Argument {
 	return &Argument{
 		Name:        name,
 		Type:        argType,

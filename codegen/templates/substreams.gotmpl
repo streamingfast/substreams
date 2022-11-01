@@ -6,7 +6,7 @@ use substreams::errors::Error;
 pub struct Substreams{}
 
 pub trait SubstreamsTrait {
-{{range $engine.Package.Modules.Modules -}}
+{{range $engine.Manifest.Modules -}}
     {{$module := . -}}
     {{- with ($engine.FunctionSignature $module) -}}
         {{- $functionSignature := . -}}
@@ -20,9 +20,9 @@ pub trait SubstreamsTrait {
     fn {{$functionSignature.Name}}(
     {{- range $id, $arg := $functionSignature.Arguments }}
         {{ template "arg" $arg }}, {{- end -}}
-    {{- if ne $functionSignature.StorePolicy "UPDATE_POLICY_UNSET" -}}
+    {{- if ne $functionSignature.StorePolicy "" -}}
         {{- $m := getEngine.MustModule $functionSignature.Name }}
-        store: {{writableStoreType $m.GetKindStore }},
+        store: {{writableStoreType $m }},
     {{- end }}
     )
     {{- if ne .OutputType "" }} -> Result<{{.OutputType}}, Error>{{end}};
@@ -31,14 +31,14 @@ pub trait SubstreamsTrait {
 {{define "arg" -}}
     {{- $engine := getEngine -}}
     {{- $argument := . -}}
-    {{- if isStoreInput $argument.ModuleInput -}}
+    {{- if  $argument.ModuleInput.IsStore -}}
         {{- $m := $engine.MustModule $argument.Name -}}
-        {{- if isDelta $argument.ModuleInput -}}
+        {{- if eq $argument.ModuleInput.Mode "deltas" -}}
             {{$argument.Name}}_deltas
         {{- else -}}
             {{$argument.Name -}}
         {{- end -}}
-        : {{readableStoreType $m.GetKindStore $argument.ModuleInput.GetStore -}}
+        : {{readableStoreType $m $argument.ModuleInput -}}
     {{- else -}}
         {{$argument.Name}}: {{$argument.Type -}}
     {{- end -}}

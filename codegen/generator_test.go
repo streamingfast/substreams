@@ -33,13 +33,13 @@ import (
 
 func TestGenerator_Generate(t *testing.T) {
 	t.Skip()
-	g := Init()
+	g := InitTestGenerator(t)
 	err := g.Generate()
 	require.NoError(t, err)
 }
 
 func TestGenerate_GenerateMod(t *testing.T) {
-	g := Init()
+	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
 	var out []byte
@@ -75,7 +75,7 @@ func TestGenerate_GenerateMod(t *testing.T) {
 }
 
 func TestGenerate_GeneratePbMod(t *testing.T) {
-	g := Init()
+	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
 	var out []byte
@@ -108,7 +108,7 @@ func TestGenerate_GeneratePbMod(t *testing.T) {
 }
 
 func TestGenerate_GenerateExterns(t *testing.T) {
-	g := Init()
+	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
 	var out []byte
@@ -137,7 +137,7 @@ func TestGenerate_GenerateExterns(t *testing.T) {
 }
 
 func TestGenerate_GenerateLib(t *testing.T) {
-	g := Init()
+	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
 	var out []byte
@@ -166,7 +166,7 @@ func TestGenerate_GenerateLib(t *testing.T) {
 }
 
 func TestGenerate_GenerateSubstreams(t *testing.T) {
-	g := Init()
+	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
 	var out []byte

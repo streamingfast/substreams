@@ -142,7 +142,7 @@ func (r *Reader) newPkgFromStore(fileURL string) (pkg *pbsubstreams.Package, err
 }
 
 func (r *Reader) newPkgFromManifest(inputPath string) (pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, err error) {
-	manif, err := loadManifestFile(inputPath)
+	manif, err := LoadManifestFile(inputPath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -304,7 +304,7 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 	return nil
 }
 
-func loadManifestFile(inputPath string) (*Manifest, error) {
+func LoadManifestFile(inputPath string) (*Manifest, error) {
 	m, err := decodeYamlManifestFromFile(inputPath)
 	if err != nil {
 		return nil, fmt.Errorf("decoding yaml: %w", err)

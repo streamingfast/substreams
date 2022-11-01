@@ -109,21 +109,21 @@ func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) 
 	}
 	return
 }
-func (i *Input) isMap() bool {
+func (i *Input) IsMap() bool {
 	return i.Map != "" && i.Store == "" && i.Source == ""
 }
-func (i *Input) isStore() bool {
+func (i *Input) IsStore() bool {
 	return i.Store != "" && i.Map == "" && i.Source == ""
 }
-func (i *Input) isSource() bool {
+func (i *Input) IsSource() bool {
 	return i.Source != "" && i.Map == "" && i.Store == ""
 }
 func (i *Input) parse() error {
-	if i.isMap() {
+	if i.IsMap() {
 		i.Name = fmt.Sprintf("map:%s", i.Map)
 		return nil
 	}
-	if i.isStore() {
+	if i.IsStore() {
 		i.Name = fmt.Sprintf("store:%s", i.Store)
 		if i.Mode == "" {
 			i.Mode = "get"
@@ -133,7 +133,7 @@ func (i *Input) parse() error {
 		}
 		return nil
 	}
-	if i.isSource() {
+	if i.IsSource() {
 		i.Name = fmt.Sprintf("source:%s", i.Source)
 		return nil
 	}

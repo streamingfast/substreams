@@ -13,7 +13,7 @@ import (
 
 var protogenCmd = &cobra.Command{
 	Use:          "protogen <package>",
-	Short:        "Generate Rust bindings from a package",
+	Short:        "GenerateProto Rust bindings from a package",
 	RunE:         runProtogen,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
@@ -56,5 +56,5 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths)
-	return generator.Generate(pkg)
+	return generator.GenerateProto(pkg)
 }

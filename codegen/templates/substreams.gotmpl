@@ -22,7 +22,7 @@ pub trait SubstreamsTrait {
         {{ template "arg" $arg }}, {{- end -}}
     {{- if ne $functionSignature.StorePolicy "" -}}
         {{- $m := getEngine.MustModule $functionSignature.Name }}
-        store: {{writableStoreType $m }},
+        store: {{ getEngine.WritableStoreType $m }},
     {{- end }}
     )
     {{- if ne .OutputType "" }} -> Result<{{.OutputType}}, Error>{{end}};
@@ -38,7 +38,7 @@ pub trait SubstreamsTrait {
         {{- else -}}
             {{$argument.Name -}}
         {{- end -}}
-        : {{readableStoreType $m $argument.ModuleInput -}}
+        : {{ $engine.ReadableStoreType $m $argument.ModuleInput -}}
     {{- else -}}
         {{$argument.Name}}: {{$argument.Type -}}
     {{- end -}}

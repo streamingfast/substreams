@@ -9,6 +9,10 @@ binaries:
   default:
     type: wasm/rust-v1
     file: ./bla/bla
+    protoPackageMapping:
+      sf.ethereum.type.v2: "substreams_ethereum::pb::eth::v2"
+      sf.substreams.v1: "substreams::pb::substreams"
+      my.types.v1: "pb::my_types_v1"
 
 protobuf:
   files:

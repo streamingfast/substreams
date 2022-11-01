@@ -26,13 +26,13 @@ pub extern "C" fn {{$functionSignature.Name}}(
     substreams::register_panic_hook();
     let func = || {{- if eq $module.Kind "map"}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
         {{if eq $module.Kind "store" -}}{{/* This is the store for a store module*/}}
-        {{writableStoreDeclaration $module }}
+        {{$engine.WritableStoreDeclaration $module }}
         {{ end -}}
 
         {{ range $id, $argument := $functionSignature.Arguments -}}
             {{- if $argument.ModuleInput.IsStore -}}
         {{- $m := $engine.MustModule $argument.Name }}
-        {{ readableStoreDeclaration $argument.Name $m $argument.ModuleInput }}
+        {{ $engine.ReadableStoreDeclaration $argument.Name $m $argument.ModuleInput }}
             {{- else }}
         let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
             {{- end -}}

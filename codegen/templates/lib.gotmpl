@@ -21,7 +21,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         {{ template "arg" $arg }}, {{- end -}}
     {{- if ne $functionSignature.StorePolicy "" -}}
         {{- $m := getEngine.MustModule $functionSignature.Name }}
-        _store: {{writableStoreType $m }},
+        _store: {{ getEngine.WritableStoreType $m }},
     {{- end }}
     )
 	{{- if ne $functionSignature.OutputType "" }} -> Result<{{$functionSignature.OutputType}}, Error>{{end}} {
@@ -39,7 +39,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
 		{{- else -}}
 			_{{$argument.Name -}}
 		{{- end -}}
-		: {{readableStoreType $m $argument.ModuleInput -}}
+		: {{ getEngine.ReadableStoreType $m $argument.ModuleInput -}}
 	{{- else -}}
 		_{{$argument.Name}}: {{$argument.Type -}}
 	{{- end -}}

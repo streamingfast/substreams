@@ -31,12 +31,12 @@ var tplMod string
 //go:embed templates/pb_mod.gotmpl
 var tplPbMod string
 
-var protoMapping = map[string]string{
-	"sf.ethereum.type.v2.Block":          "substreams_ethereum::pb::eth::v2::Block",
-	"sf.substreams.v1.Clock":             "substreams::pb::substreams::Clock",
-	"substreams.entity.v1.EntityChanges": "substreams_entity_change::pb::entity::EntityChanges",
-	"substreams.entity.v1.EntityChange":  "substreams_entity_change::pb::entity::EntityChange",
-}
+//var protoMapping = map[string]string{
+//	"sf.ethereum.type.v2.Block":          "substreams_ethereum::pb::eth::v2::Block",
+//	"sf.substreams.v1.Clock":             "substreams::pb::substreams::Clock",
+//	"substreams.entity.v1.EntityChanges": "substreams_entity_change::pb::entity::EntityChanges",
+//	"substreams.entity.v1.EntityChange":  "substreams_entity_change::pb::entity::EntityChange",
+//}
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",
@@ -198,15 +198,6 @@ var utils = map[string]any{
 	"contains":  strings.Contains,
 	"hasPrefix": strings.HasPrefix,
 	"hasSuffix": strings.HasSuffix,
-	//"isDelta":                  IsDelta,
-	//"isStoreModule":            IsStoreModule,
-	//"isMapModule":              IsMapModule,
-	//"isStoreInput":             IsStoreInput,
-	//"isMapInput":               IsMapInput,
-	"writableStoreDeclaration": WritableStoreDeclaration,
-	"writableStoreType":        WritableStoreType,
-	"readableStoreDeclaration": ReadableStoreDeclaration,
-	"readableStoreType":        ReadableStoreType,
 }
 
 type Engine struct {
@@ -255,7 +246,7 @@ func (e *Engine) mapFunctionSignature(module *manifest.Module) (*FunctionSignatu
 
 	outType := module.Output.Type
 	if strings.HasPrefix(outType, "proto:") {
-		outType = transformProtoType(outType)
+		outType = mustTransformProtoType(outType, e.Manifest)
 	}
 
 	fn := NewFunctionSignature(module.Name, "map", outType, "", inputs)
@@ -284,25 +275,23 @@ func (e *Engine) ModuleArgument(inputs []*manifest.Input) (Arguments, error) {
 				return nil, fmt.Errorf("getting map type: %w", err)
 			}
 			if strings.HasPrefix(inputType, "proto:") {
-				inputType = transformProtoType(inputType)
+				inputType = mustTransformProtoType(inputType, e.Manifest)
 			}
 			out = append(out, NewArgument(input.Map, inputType, input))
 		case input.IsStore():
 			inputType := e.MustModule(input.Store).ValueType
 			if strings.HasPrefix(inputType, "proto:") {
-				inputType = transformProtoType(inputType)
+				inputType = mustTransformProtoType(inputType, e.Manifest)
 			}
 			out = append(out, NewArgument(input.Store, inputType, input))
 		case input.IsSource():
+			inputType := mustTransformProtoType(input.Source, e.Manifest)
+
 			parts := strings.Split(input.Source, ".")
 			name := parts[len(parts)-1]
 			name = strings.ToLower(name)
 
-			resolved, ok := protoMapping[input.Source]
-			if !ok {
-				panic(fmt.Sprintf("unsupported source %q", input.Source))
-			}
-			out = append(out, NewArgument(name, resolved, input))
+			out = append(out, NewArgument(name, inputType, input))
 
 		default:
 			return nil, fmt.Errorf("unknown MustModule kind: %T", input)
@@ -311,13 +300,13 @@ func (e *Engine) ModuleArgument(inputs []*manifest.Input) (Arguments, error) {
 	return out, nil
 }
 
-func ReadableStoreType(store *manifest.Module, input *manifest.Input) string {
+func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input) string {
 	t := store.ValueType
 	p := store.UpdatePolicy
 
 	if input.Mode == "deltas" {
 		if strings.HasPrefix(t, "proto") {
-			t = transformProtoType(t)
+			t = mustTransformProtoType(t, e.Manifest)
 			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaProto<%s>>", t)
 		}
 		if p == manifest.UpdatePolicyAppend {
@@ -329,7 +318,7 @@ func ReadableStoreType(store *manifest.Module, input *manifest.Input) string {
 	}
 
 	if strings.HasPrefix(t, "proto") {
-		t = transformProtoType(t)
+		t = mustTransformProtoType(t, e.Manifest)
 		return fmt.Sprintf("substreams::store::StoreGetProto<%s>", t)
 	}
 
@@ -340,7 +329,7 @@ func ReadableStoreType(store *manifest.Module, input *manifest.Input) string {
 	t = StoreType[t]
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
-func WritableStoreType(store *manifest.Module) string {
+func (e *Engine) WritableStoreType(store *manifest.Module) string {
 	t := store.ValueType
 	p := store.UpdatePolicy
 
@@ -350,14 +339,14 @@ func WritableStoreType(store *manifest.Module) string {
 
 	p = UpdatePoliciesMap[p]
 	if strings.HasPrefix(t, "proto") {
-		t = transformProtoType(t)
+		t = mustTransformProtoType(t, e.Manifest)
 		return fmt.Sprintf("substreams::store::Store%sProto<%s>", p, t)
 	}
 
 	return fmt.Sprintf("substreams::store::Store%s%s", p, StoreType[t])
 }
 
-func WritableStoreDeclaration(store *manifest.Module) string {
+func (e *Engine) WritableStoreDeclaration(store *manifest.Module) string {
 	t := store.ValueType
 	p := store.UpdatePolicy
 
@@ -368,19 +357,19 @@ func WritableStoreDeclaration(store *manifest.Module) string {
 	p = UpdatePoliciesMap[p]
 
 	if strings.HasPrefix(t, "proto") {
-		t = transformProtoType(t)
+		t = mustTransformProtoType(t, e.Manifest)
 		return fmt.Sprintf("let store: substreams::store::Store%sProto<%s> = substreams::store::StoreSetProto::new();", p, t)
 	}
 	t = StoreType[t]
 	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
 }
 
-func ReadableStoreDeclaration(name string, store *manifest.Module, input *manifest.Input) string {
+func (e *Engine) ReadableStoreDeclaration(name string, store *manifest.Module, input *manifest.Input) string {
 	t := store.ValueType
 	p := store.UpdatePolicy
 	isProto := strings.HasPrefix(t, "proto")
 	if isProto {
-		t = transformProtoType(t)
+		t = mustTransformProtoType(t, e.Manifest)
 	}
 
 	if input.Mode == "deltas" {
@@ -411,18 +400,22 @@ func ReadableStoreDeclaration(name string, store *manifest.Module, input *manife
 
 }
 
-func transformProtoType(t string) string {
+func mustTransformProtoType(t string, manif *manifest.Manifest) string {
 	t = strings.TrimPrefix(t, "proto:")
 
-	if resolved, ok := protoMapping[t]; ok {
-		return resolved
+	parts := strings.Split(t, ".")
+	entityName := parts[len(parts)-1]
+
+	if len(parts) == 1 {
+		return entityName
+	}
+	protoPackage := strings.Join(parts[:len(parts)-1], ".")
+	if resolved, ok := manif.Binaries["default"].ProtoPackageMapping[protoPackage]; ok {
+		protoPackage = resolved + "::" + parts[len(parts)-1]
+		return protoPackage
 	}
 
-	parts := strings.Split(t, ".")
-	if len(parts) >= 2 {
-		t = strings.Join(parts[:len(parts)-1], "_")
-	}
-	return "pb::" + t + "::" + parts[len(parts)-1]
+	panic(fmt.Errorf("missing binaries.default.protoPackageMapping value for %q", protoPackage))
 }
 
 type FunctionSignature struct {

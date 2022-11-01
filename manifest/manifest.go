@@ -87,11 +87,12 @@ type Input struct {
 }
 
 type Binary struct {
-	File       string `yaml:"file"`
-	Type       string `yaml:"type"`
-	Native     string `yaml:"native"`
-	Content    []byte `yaml:"-"`
-	Entrypoint string `yaml:"entrypoint"`
+	File                string            `yaml:"file"`
+	Type                string            `yaml:"type"`
+	Native              string            `yaml:"native"`
+	Content             []byte            `yaml:"-"`
+	Entrypoint          string            `yaml:"entrypoint"`
+	ProtoPackageMapping map[string]string `yaml:"protoPackageMapping"`
 }
 
 type StreamOutput struct {

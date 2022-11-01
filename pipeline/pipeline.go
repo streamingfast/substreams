@@ -252,7 +252,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 
 	p.backprocessingStores = nil
 
-	if err := p.sendSnapshots(ctx); err != nil {
+	if err := p.sendSnapshots(ctx, storeMap); err != nil {
 		return nil, fmt.Errorf("send initial snapshots: %w", err)
 	}
 

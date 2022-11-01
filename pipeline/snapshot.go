@@ -3,19 +3,21 @@ package pipeline
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/store"
 )
 
-func (p *Pipeline) sendSnapshots(ctx context.Context) error {
+func (p *Pipeline) sendSnapshots(ctx context.Context, storeMap store.Map) error {
 	snapshotModules := reqctx.Details(ctx).Request.InitialStoreSnapshotForModules
 	if len(snapshotModules) == 0 {
 		return nil
 	}
 
 	for _, modName := range snapshotModules {
-		store, found := p.StoreMap.Get(modName)
+		store, found := storeMap.Get(modName)
 		if !found {
 			return fmt.Errorf("store %q not found", modName)
 		}

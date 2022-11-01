@@ -35,10 +35,11 @@ func (t *MockExecOutput) Set(name string, value []byte) (err error) {
 type MockModuleExecutor struct {
 	name string
 
-	RunFunc   func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
-	ApplyFunc func(value []byte) error
-	LogsFunc  func() (logs []string, truncated bool)
-	StackFunc func() []string
+	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
+	ApplyFunc    func(value []byte) error
+	ToOutputFunc func(data []byte) (*pbsubstreams.ModuleOutput, error)
+	LogsFunc     func() (logs []string, truncated bool)
+	StackFunc    func() []string
 }
 
 var _ ModuleExecutor = (*MockModuleExecutor)(nil)
@@ -65,6 +66,13 @@ func (t *MockModuleExecutor) applyCachedOutput(value []byte) error {
 		return t.ApplyFunc(value)
 	}
 	return fmt.Errorf("not implemented")
+}
+
+func (t *MockModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
+	if t.ToOutputFunc != nil {
+		return t.ToOutputFunc(data)
+	}
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (t *MockModuleExecutor) moduleLogs() (logs []string, truncated bool) {
@@ -105,7 +113,41 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 	assert.NotEmpty(t, moduleOutput)
 }
 
-func (t *MockModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
-	//TODO implement me
-	panic("implement me")
+func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
+	ctx := context.Background()
+
+	applied := false
+
+	executor := &MockModuleExecutor{
+		name: "test",
+		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error) {
+			return []byte("test"), &pbsubstreams.ModuleOutput_MapOutput{}, nil
+		},
+		ToOutputFunc: func(data []byte) (*pbsubstreams.ModuleOutput, error) {
+			return &pbsubstreams.ModuleOutput{
+				Data: &pbsubstreams.ModuleOutput_MapOutput{},
+			}, nil
+		},
+		ApplyFunc: func(value []byte) error {
+			applied = true
+			return nil
+		},
+		LogsFunc: func() (logs []string, truncated bool) {
+			return []string{"test"}, false
+		},
+	}
+	output := &MockExecOutput{
+		cacheMap: map[string][]byte{
+			"test": []byte("cached"),
+		},
+	}
+
+	moduleOutput, err := RunModule(ctx, executor, output)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NoError(t, err)
+	assert.True(t, applied)
+	assert.NotEmpty(t, moduleOutput)
 }

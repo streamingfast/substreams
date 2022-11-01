@@ -29,11 +29,12 @@ var tplMod string
 //go:embed templates/pb_mod.gotmpl
 var tplPbMod string
 
-const EthereumBlockManifest = "sf.ethereum.type.v2.Block"
-const EthereumBlockRust = "substreams_ethereum::pb::eth::v2::Block"
-
-const SubstreamsClock = "sf.substreams.v1.Clock"
-const SubstreamsClockRust = "substreams::pb::substreams::Clock"
+var protoMapping = map[string]string{
+	"sf.ethereum.type.v2.Block":          "substreams_ethereum::pb::eth::v2::Block",
+	"sf.substreams.v1.Clock":             "substreams::pb::substreams::Clock",
+	"substreams.entity.v1.EntityChanges": "substreams_entity_change::pb::entity::EntityChanges",
+	"substreams.entity.v1.EntityChange":  "substreams_entity_change::pb::entity::EntityChange",
+}
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",
@@ -41,8 +42,8 @@ var StoreType = map[string]string{
 	"bigint":     "BigInt",
 	"bigdecimal": "BigDecimal",
 	"bigfloat":   "BigDecimal",
-	"int64":      "I64",
-	"i64":        "I64",
+	"int64":      "BigInt",
+	"i64":        "BigInt",
 	"float64":    "Float64",
 }
 
@@ -323,14 +324,12 @@ func (e *Engine) ModuleArgument(inputs []*pbsubstreams.Module_Input) (Arguments,
 			name := parts[len(parts)-1]
 			name = strings.ToLower(name)
 
-			switch in.Source.Type {
-			case EthereumBlockManifest:
-				out = append(out, NewArgument(name, EthereumBlockRust, input))
-			case SubstreamsClock:
-				out = append(out, NewArgument(name, SubstreamsClockRust, input))
-			default:
+			resolved, ok := protoMapping[in.Source.Type]
+			if !ok {
 				panic(fmt.Sprintf("unsupported source %q", in.Source.Type))
 			}
+			out = append(out, NewArgument(name, resolved, input))
+
 		default:
 			return nil, fmt.Errorf("unknown MustModule kind: %T", in)
 		}
@@ -491,6 +490,11 @@ func ReadableStoreDeclaration(name string, store *pbsubstreams.Module_KindStore,
 
 func transformProtoType(t string) string {
 	t = strings.TrimPrefix(t, "proto:")
+
+	if resolved, ok := protoMapping[t]; ok {
+		return resolved
+	}
+
 	parts := strings.Split(t, ".")
 	if len(parts) >= 2 {
 		t = strings.Join(parts[:len(parts)-1], "_")

@@ -96,7 +96,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
-	// Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
+	// FIXME(abourget): Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
 	// This clearly doesn't belong in the Init() function.
 	var storeMap store.Map
 	if reqDetails.IsSubRequest {
@@ -112,11 +112,8 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		if err := p.sendSnapshots(ctx, storeMap); err != nil {
 			return fmt.Errorf("send initial snapshots: %w", err)
 		}
-
 	}
 	p.stores.SetStoreMap(storeMap)
-	// TODO(abourget): much too far, who knows about the reason for this? Probably `runBackProcessAndSetupStores` or
-	// the other method above.. who dealt with those start block, end block stuff.
 
 	// Build the Module Executor list
 	// TODO(abourget): this could be done lazily, but the ModuleTree,
@@ -167,7 +164,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 
 			if fullStore.InitialBlock() != reqDetails.EffectiveStartBlockNum {
 				if err := fullStore.Load(ctx, reqDetails.EffectiveStartBlockNum); err != nil {
-					return nil, fmt.Errorf("load partial store: %w", err)
+					return nil, fmt.Errorf("load full store: %w", err)
 				}
 			}
 

@@ -18,10 +18,12 @@ type RequestDetails struct {
 	IsOutputModule map[string]bool
 }
 
+// Called to determine if we *really* need to save this store snapshot. We don't need
+// when we're doing parallel processing and we are concerned only with writing the
+// leaf stores we've been asked to produce.  We know the scheduler will have
+// created jobs to produce those stores we're skipping here.
 func (d *RequestDetails) SkipSnapshotSave(modName string) bool {
-	// optimization because we know that in a subrequest we are only running through the last store (output)
-	// all parent stores should have come from moduleOutput cache
-	return d.IsSubRequest && d.IsOutputModule[modName]
+	return d.IsSubRequest && !d.IsOutputModule[modName]
 }
 
 func (d *RequestDetails) ShouldReturnWrittenPartialsInTrailer(modName string) bool {

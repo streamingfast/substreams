@@ -27,7 +27,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEndBlock uint64, moduleNames []string, subrequestsSplitSize uint64, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack) (moduleOutputs []string, err error) {
+func runTest(
+	t *testing.T,
+	cursor *bstream.Cursor,
+	startBlock int64,
+	exclusiveEndBlock uint64,
+	moduleNames []string,
+	subRequestsSplitSize uint64,
+	newBlockGenerator NewTestBlockGenerator,
+	blockProcessedCallBack blockProcessedCallBack,
+) (moduleOutputs []string, err error) {
 	ctx := context.Background()
 	ctx = reqctx.WithLogger(ctx, zlog)
 
@@ -41,7 +50,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 		ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
 		spanCtx, span := reqctx.WithSpan(ctx, "substreams_request_test")
 		defer func() {
-			span.EndWithErr(nil)
+			span.End()
 			fmt.Println("Test complete waiting 20s for tracing to be sent")
 			time.Sleep(20 * time.Second)
 		}()
@@ -76,7 +85,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 		return w
 	}
 
-	if err = processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subrequestsSplitSize); err != nil {
+	if err = processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subRequestsSplitSize); err != nil {
 		return nil, fmt.Errorf("running test: %w", err)
 	}
 
@@ -338,13 +347,22 @@ func Test_test_store_delete_prefix(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, nil, 30, 41, []string{"test_store_delete_prefix", "assert_test_store_delete_prefix"}, 10, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-		if b.Number == 40 {
-			s, storeFound := stores.Get("test_store_delete_prefix")
-			require.True(t, storeFound)
-			require.Equal(t, uint64(1), s.Length())
-		}
-	})
+	_, err := runTest(
+		t,
+		nil,
+		30,
+		41,
+		[]string{"test_store_delete_prefix", "assert_test_store_delete_prefix"},
+		10,
+		newBlockGenerator,
+		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+			if b.Number == 40 {
+				s, storeFound := stores.Get("test_store_delete_prefix")
+				require.True(t, storeFound)
+				require.Equal(t, uint64(1), s.Length())
+			}
+		},
+	)
 	require.NoError(t, err)
 }
 

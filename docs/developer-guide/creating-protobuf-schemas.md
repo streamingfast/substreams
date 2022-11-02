@@ -53,6 +53,20 @@ View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 
+#### Identifying Data types
+
+The ERC721 smart contract contains a Transfer event. The event is targeted by creating a matching protobuf.&#x20;
+
+Protobufs are simple data types defined using the message keyword followed by the name of the data type of interest. As mentioned, the ERC721 contains a Transfer event that has been selected to pick out of the stream of blockchain data.&#x20;
+
+A matching Transfer message including the data type’s fields is defined within the protobuf file. The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.&#x20;
+
+ERC721 smart contracts are generic contracts used across many different Ethereum applications.&#x20;
+
+Transfer events in this example can be targeted for a specific smart contract stored in the Ethereum blockchain, such as Bored Ape Yacht Club.&#x20;
+
+Multitudes of more specific data types exist in the smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers can create more refined and complex profobufs based on the many custom data types that exist.
+
 {% hint style="success" %}
 _Tip: using a fully qualified path for protobuf files reduces the risk of conflicts when other community members build their own_ [_Substreams Packages_](../reference-and-specs/packages.md#dependencies)_._
 {% endhint %}

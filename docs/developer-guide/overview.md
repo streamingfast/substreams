@@ -15,3 +15,9 @@ The Substreams Developer Guide explains the process of building a Substream that
 #### Substreams Template for Dev Guide
 
 The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+
+### StreamingFast Discord for Substreams
+
+Connect with the StreamingFast core developers on Discord to answers questions and provide assistance.
+
+[https://discord.gg/mYPcRAzeVN](https://discord.gg/mYPcRAzeVN)

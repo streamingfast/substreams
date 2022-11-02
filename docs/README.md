@@ -26,7 +26,7 @@ _**Need help? Reach out!**_
 
 Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 
-* [StreamingFast Discord](https://discord.gg/jZwqxJAvRs)
+* [StreamingFast Discord](https://discord.gg/mYPcRAzeVN)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
 * [StreamingFast on Twitter](https://twitter.com/streamingfastio)
 * [StreamingFast on YouTube](https://www.youtube.com/c/streamingfast)

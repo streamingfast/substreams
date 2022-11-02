@@ -78,7 +78,7 @@ Specifying a stop block value of zero (0), the default, enables transparent hand
 
 Yes! Join the StreamingFast Discord by clicking the link below.
 
-[https://discord.gg/Ugc7KtkA](https://discord.gg/Ugc7KtkA)
+[https://discord.gg/Ugc7KtkA](https://discord.gg/mYPcRAzeVN)
 
 ### **Is StreamingFast on Twitter?**
 

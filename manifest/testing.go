@@ -1,6 +1,10 @@
 package manifest
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import (
+	"github.com/mitchellh/go-testing-interface"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/require"
+)
 
 var zero = uint64(0)
 var five = uint64(5)
@@ -108,4 +112,13 @@ func NewTestModules() []*pbsubstreams.Module {
 		},
 	}
 
+}
+
+func TestReadManifest(t testing.T, manifestPath string) *pbsubstreams.Package {
+	t.Helper()
+
+	manifestReader := NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
+	require.NoError(t, err)
+	return pkg
 }

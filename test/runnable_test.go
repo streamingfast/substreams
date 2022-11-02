@@ -11,7 +11,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
@@ -60,10 +59,10 @@ func processRequest(
 	t *testing.T,
 	ctx context.Context,
 	request *pbsubstreams.Request,
-	moduleGraph *manifest.ModuleGraph,
 	workerFactory work.WorkerFactory,
 	newGenerator NewTestBlockGenerator,
-	responseCollector *responseCollector, isSubRequest bool,
+	responseCollector *responseCollector,
+	isSubRequest bool,
 	blockProcessedCallBack blockProcessedCallBack,
 	testTempDir string,
 	subrequestsSplitSize uint64,
@@ -72,8 +71,9 @@ func processRequest(
 
 	var opts []pipeline.Option
 
-	ctx, err := reqctx.WithRequest(ctx, request, isSubRequest)
-	require.Nil(t, err)
+	reqDetails, err := pipeline.BuildRequestDetails(request, isSubRequest)
+	require.NoError(t, err)
+	ctx = reqctx.WithRequest(ctx, reqDetails)
 
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
@@ -87,18 +87,24 @@ func processRequest(
 		workerFactory,
 	)
 
-	cachingEngine, err := cachev1.NewEngine(runtimeConfig, zap.NewNop())
+	cachingEngine, err := cachev1.NewEngine(runtimeConfig, "sf.substreams.v1.test.Block", zap.NewNop())
 	require.NoError(t, err)
-	storeBoundary := pipeline.NewStoreBoundary(runtimeConfig.StoreSnapshotsSaveInterval, request.StopBlockNum)
+
+	moduleTree, err := pipeline.NewModuleTree(request, "sf.substreams.v1.test.Block")
+	require.NoError(t, err)
+
+	storeConfigs, err := pipeline.InitializeStoreConfigs(moduleTree, runtimeConfig.BaseObjectStore)
+	require.NoError(t, err)
+
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, reqDetails.EffectiveStartBlockNum, request.StopBlockNum, isSubRequest)
 
 	pipe := pipeline.New(
 		ctx,
-		moduleGraph,
-		"sf.substreams.v1.test.Block",
+		moduleTree,
+		stores,
 		wasm.NewRuntime(nil),
 		cachingEngine,
 		runtimeConfig,
-		storeBoundary,
 		responseCollector.Collect,
 		opts...,
 	)
@@ -154,7 +160,7 @@ func (r *TestRunner) Run(context.Context) error {
 		}
 
 		if r.blockProcessedCallBack != nil {
-			r.blockProcessedCallBack(r.pipe, blk, r.pipe.StoreMap, r.baseStoreStore)
+			r.blockProcessedCallBack(r.pipe, blk, r.pipe.GetStoreMap(), r.baseStoreStore)
 		}
 	}
 	return nil

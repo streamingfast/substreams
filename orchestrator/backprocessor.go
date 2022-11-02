@@ -58,7 +58,6 @@ func BuildBackprocessor(
 	}, nil
 }
 
-// TODO(abourget): WARN: this function should NOT GROW in functionality, or abstraction levels.
 func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 
 	// parallelDownloader := NewLinearExecOutputReader()

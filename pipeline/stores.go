@@ -3,9 +3,10 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/block"
 	"time"
 
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
@@ -17,22 +18,44 @@ import (
 // and turn them into `Stores` methods.
 // Make THAT the Return value for the backprocessor and the
 type Stores struct {
+	isSubRequest    bool
 	bounder         *storeBoundary
+	configs         store.ConfigMap
 	StoreMap        store.Map
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 }
 
-func NewStores(storeSnapshotSaveInterval, stopBlockNum uint64) *Stores {
-	bounder := NewStoreBoundary(storeSnapshotSaveInterval, stopBlockNum)
+func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, effectiveStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
+	bounder := NewStoreBoundary(storeSnapshotSaveInterval, effectiveStartBlockNum, stopBlockNum)
 	return &Stores{
-		bounder: bounder,
+		configs:      storeConfigs,
+		isSubRequest: isSubRequest,
+		bounder:      bounder,
 	}
 }
 
-func (s *Stores) SetStoreMap(storeMap *store.StoreMap, isSubRequest bool, outputModules map[string]bool) {
-	// TODO(abourget): assign vars
+func (s *Stores) SetStoreMap(storeMap store.Map) {
+	s.StoreMap = storeMap
 }
 
+func InitializeStoreConfigs(moduleTree *ModuleTree, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
+	out = make(store.ConfigMap)
+	for _, storeModule := range moduleTree.storeModules {
+		c, err := store.NewConfig(
+			storeModule.Name,
+			storeModule.InitialBlock,
+			moduleTree.moduleHashes.Get(storeModule.Name),
+			storeModule.GetKindStore().UpdatePolicy,
+			storeModule.GetKindStore().ValueType,
+			baseObjectStore,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)
+		}
+		out[storeModule.Name] = c
+	}
+	return out, nil
+}
 func (s *Stores) resetStores() {
 	for _, s := range s.StoreMap.All() {
 		if resetableStore, ok := s.(store.Resettable); ok {
@@ -42,10 +65,9 @@ func (s *Stores) resetStores() {
 }
 
 func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
-	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 	reqStats := reqctx.ReqStats(ctx)
-	boundaryIntervals := s.bounder.GetStoreFlushRanges(reqDetails.IsSubRequest, reqDetails.Request.StopBlockNum, blockNum)
+	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isSubRequest, s.bounder.requestStopBlock, blockNum)
 	if len(boundaryIntervals) > 0 {
 		logger.Info("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
 	}
@@ -60,8 +82,8 @@ func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	}
 	return nil
 }
-func (p *Pipeline) storesHandleUndo(moduleOutput *pbsubstreams.ModuleOutput) {
-	if s, found := p.StoreMap.Get(moduleOutput.Name); found {
+func (s *Stores) storesHandleUndo(moduleOutput *pbsubstreams.ModuleOutput) {
+	if s, found := s.StoreMap.Get(moduleOutput.Name); found {
 		if deltaStore, ok := s.(store.DeltaAccessor); ok {
 			deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().GetDeltas())
 		}

@@ -142,7 +142,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		}
 	}
 
-	p.resetStores()
+	p.stores.resetStores()
 	logger.Debug("block processed", zap.Uint64("block_num", block.Number))
 	return nil
 }
@@ -151,8 +151,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, span := reqctx.WithSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
-	// TODO(abourget): get the module executors from the
-	// ModuleTree
+	// TODO(abourget): get the module executors from the ModuleTree
 
 	p.moduleOutputs = nil
 	for _, executor := range p.moduleExecutors {

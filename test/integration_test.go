@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/streamingfast/substreams/manifest"
 	"math/big"
 	"os"
 	"strings"
@@ -48,7 +49,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 	}
 
 	//todo: compile substreams
-	pkg, moduleGraph := processManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
+	pkg := manifest.TestReadManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
 
 	opaqueCursor := ""
 	if cursor != nil {
@@ -67,7 +68,6 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 	workerFactory := func(_ *zap.Logger) work.Worker {
 		w := &TestWorker{
 			t:                      t,
-			moduleGraph:            moduleGraph,
 			responseCollector:      newResponseCollector(),
 			newBlockGenerator:      newBlockGenerator,
 			blockProcessedCallBack: blockProcessedCallBack,
@@ -76,7 +76,7 @@ func runTest(t *testing.T, cursor *bstream.Cursor, startBlock int64, exclusiveEn
 		return w
 	}
 
-	if err = processRequest(t, ctx, request, moduleGraph, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subrequestsSplitSize); err != nil {
+	if err = processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subrequestsSplitSize); err != nil {
 		return nil, fmt.Errorf("running test: %w", err)
 	}
 

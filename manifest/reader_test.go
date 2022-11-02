@@ -26,7 +26,6 @@ func TestReader_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		// FIXME: Handle more "spkgX" path if required
 		w.Write(spkg1Content)
 	}))
 	defer remoteServer.Close()

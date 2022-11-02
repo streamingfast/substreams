@@ -11,7 +11,6 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
@@ -19,7 +18,6 @@ import (
 
 type TestWorker struct {
 	t                      *testing.T
-	moduleGraph            *manifest.ModuleGraph
 	responseCollector      *responseCollector
 	newBlockGenerator      NewTestBlockGenerator
 	blockProcessedCallBack blockProcessedCallBack
@@ -46,7 +44,7 @@ func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ 
 		zap.Uint64("stop_block_num", request.StopBlockNum),
 	)
 	subrequestsSplitSize := uint64(10)
-	if err := processRequest(w.t, ctx, request, w.moduleGraph, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize); err != nil {
+	if err := processRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize); err != nil {
 		return &work.Result{
 			Error: fmt.Errorf("processing sub request: %w", err),
 		}

@@ -1,12 +1,7 @@
 package integration
 
 import (
-	"testing"
-
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -14,17 +9,4 @@ var zlog, _ = logging.PackageLogger("pipe.test", "github.com/streamingfast/subst
 
 func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.WarnLevel)) // JULIEN PLEASE DON'T TOUCH (╯°□°)╯︵ ┻━┻
-}
-
-func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, *manifest.ModuleGraph) {
-	t.Helper()
-
-	manifestReader := manifest.NewReader(manifestPath)
-	pkg, err := manifestReader.Read()
-	require.NoError(t, err)
-
-	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	require.NoError(t, err)
-
-	return pkg, moduleGraph
 }

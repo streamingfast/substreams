@@ -43,7 +43,7 @@ func NewModuleTree(request *pbsubstreams.Request, blockType string) (out *Module
 
 func validateRequest(request *pbsubstreams.Request, blockType string) error {
 	if request.StartBlockNum < 0 {
-		// TODO(abourget) start block resolving is an art, it should be handled here
+		// TODO(abourget): remove this check once we support StartBlockNum being negative
 		return fmt.Errorf("negative start block %d is not accepted", request.StartBlockNum)
 	}
 

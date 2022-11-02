@@ -12,12 +12,15 @@ type storeBoundary struct {
 
 func NewStoreBoundary(
 	interval uint64,
+	effectiveStartBlockNum uint64,
 	requestStopBlock uint64,
 ) *storeBoundary {
-	return &storeBoundary{
+	b := &storeBoundary{
 		interval:         interval,
 		requestStopBlock: requestStopBlock,
 	}
+	b.InitNextBoundary(effectiveStartBlockNum)
+	return b
 }
 
 func (r *storeBoundary) OverBoundary(blockNUm uint64) bool {
@@ -35,7 +38,7 @@ func (r *storeBoundary) computeBoundaryBlock(atBlockNum uint64) uint64 {
 	return atBlockNum - atBlockNum%r.interval + r.interval
 }
 
-func (r *storeBoundary) InitBoundary(blockNum uint64) {
+func (r *storeBoundary) InitNextBoundary(blockNum uint64) {
 	r.nextBoundary = r.computeBoundaryBlock(blockNum)
 }
 

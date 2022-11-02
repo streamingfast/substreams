@@ -86,7 +86,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		p.execOutputCache.HandleUndo(clock, moduleOutput.Name)
 	})
 	p.forkHandler.registerHandler(func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput) {
-		p.storesHandleUndo(moduleOutput)
+		p.stores.storesHandleUndo(moduleOutput)
 	})
 
 	// Initialization of the Store Provider, ExecOut Cache Engine?
@@ -96,31 +96,27 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
-	logger.Info("initializing store configurations", zap.Int("store_count", len(p.moduleTree.storeModules)))
-	storeConfigs, err := p.initializeStoreConfigs(p.moduleTree.storeModules)
-	if err != nil {
-		return fmt.Errorf("initialize store config map: %w", err)
-	}
-
 	// Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
 	// This clearly doesn't belong in the Init() function.
-	// TODO(abourget): have this return a `pipeline.Stores`,
-	// with a bounder already adjusted.
 	var storeMap store.Map
 	if reqDetails.IsSubRequest {
-		logger.Info("stores loaded", zap.Object("stores", p.StoreMap))
-		if storeMap, err = p.setupSubrequestStores(ctx, storeConfigs); err != nil {
+		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
+		if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
 			return fmt.Errorf("faile to setup backprocessings: %w", err)
 		}
 	} else {
-		if storeMap, err = p.runBackProcessAndSetupStores(ctx, storeConfigs); err != nil {
+		if storeMap, err = p.runBackProcessAndSetupStores(ctx); err != nil {
 			return fmt.Errorf("failed setup request: %w", err)
 		}
+
+		if err := p.sendSnapshots(ctx, storeMap); err != nil {
+			return fmt.Errorf("send initial snapshots: %w", err)
+		}
+
 	}
-	p.StoreMap = storeMap
+	p.stores.SetStoreMap(storeMap)
 	// TODO(abourget): much too far, who knows about the reason for this? Probably `runBackProcessAndSetupStores` or
 	// the other method above.. who dealt with those start block, end block stuff.
-	p.bounder.InitBoundary(reqDetails.EffectiveStartBlockNum)
 
 	// Build the Module Executor list
 	// TODO(abourget): this could be done lazily, but the ModuleTree,
@@ -134,7 +130,11 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	return nil
 }
 
-func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store.ConfigMap) (store.Map, error) {
+func (p *Pipeline) GetStoreMap() store.Map {
+	return p.stores.StoreMap
+}
+
+func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 	outputStoreCount := len(reqDetails.Request.OutputModules)
@@ -146,14 +146,14 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store
 	outputModuleName := reqDetails.Request.OutputModules[0]
 
 	// there is an assumption that in backgprocess mode the outputModule is a store
-	if _, found := storeConfigs[outputModuleName]; !found {
+	if _, found := p.stores.configs[outputModuleName]; !found {
 		return nil, fmt.Errorf("requested output module %q is not found in store configurations", outputModuleName)
 	}
 
 	ttrace.SpanContextFromContext(context.Background())
 	storeMap := store.NewMap()
 
-	for name, storeConfig := range storeConfigs {
+	for name, storeConfig := range p.stores.configs {
 		if name == outputModuleName {
 			partialStore := storeConfig.NewPartialKV(reqDetails.EffectiveStartBlockNum, logger)
 			storeMap.Set(partialStore)
@@ -178,7 +178,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context, storeConfigs store
 	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfigs store.ConfigMap) (storeMap store.Map, err error) {
+func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "backprocess")
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
@@ -192,7 +192,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 		reqDetails.EffectiveStartBlockNum,
 		p.moduleTree.graph,
 		p.respFunc,
-		storeConfigs,
+		p.stores.configs,
 		reqDetails.Request.Modules,
 	)
 	if err != nil {
@@ -207,10 +207,6 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context, storeConfig
 	reqStats.EndBackProcessing()
 
 	p.backprocessingStores = nil
-
-	if err := p.sendSnapshots(ctx, storeMap); err != nil {
-		return nil, fmt.Errorf("send initial snapshots: %w", err)
-	}
 
 	return storeMap, nil
 }
@@ -338,7 +334,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 			updatePolicy := kind.KindStore.UpdatePolicy
 			valueType := kind.KindStore.ValueType
 
-			outputStore, found := p.StoreMap.Get(modName)
+			outputStore, found := p.stores.StoreMap.Get(modName)
 			if !found {
 				return fmt.Errorf(" store %q not found", modName)
 			}
@@ -361,26 +357,6 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 	return nil
 }
 
-func (p *Pipeline) initializeStoreConfigs(storeModules []*pbsubstreams.Module) (out store.ConfigMap, err error) {
-	out = make(store.ConfigMap)
-	for _, storeModule := range storeModules {
-
-		c, err := store.NewConfig(
-			storeModule.Name,
-			storeModule.InitialBlock,
-			p.moduleTree.moduleHashes.Get(storeModule.Name),
-			storeModule.GetKindStore().UpdatePolicy,
-			storeModule.GetKindStore().ValueType,
-			p.runtimeConfig.BaseObjectStore,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)
-		}
-		out[storeModule.Name] = c
-	}
-	return out, nil
-}
-
 func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
 	protoStep, _ := pbsubstreams.StepToProto(step, false)
 	out := &pbsubstreams.BlockScopedData{
@@ -398,7 +374,7 @@ func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, c
 }
 
 func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Argument, err error) {
-	storeAccessor := p.StoreMap
+	storeAccessor := p.stores.StoreMap
 	for _, input := range module.Inputs {
 		switch in := input.Input.(type) {
 		case *pbsubstreams.Module_Input_Map_:

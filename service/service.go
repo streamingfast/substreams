@@ -154,32 +154,8 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	}
 	logger.Debug("set is_subrequest", zap.Bool("is_subrequest", isSubRequest))
 
-	var requestStats metrics.Stats
-	if isSubRequest {
-		wid := workerID.Inc()
-		logger = logger.With(zap.Uint64("worker_id", wid))
-		ctx = reqctx.WithLogger(ctx, logger)
-	} else {
-		// we only want to meaure stats when enabled an on the Main request
-		if s.runtimeConfig.WithRequestStats {
-			requestStats = metrics.NewReqStats(logger)
-			ctx = reqctx.WithReqStats(ctx, requestStats)
-		}
-	}
+	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, isSubRequest)
 
-	// request is: start_block: 0, stop_block: 15M
-	// * find the HIGHEST finalized blocks close to stop_block
-	//   (and the highest of all if stop_block is 0)
-	// * we create a new `pbsubstreams.Request{start_block: 15M, stop_block: 15M}
-	//   we create an internal representation of a Request, because we need a new field:
-	//      * output historical data
-	//   we kick off our engine this way, and make sure we pipe
-	//   all the BlockScopedData through, from caches produced.
-	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
-	//         process directly, even if that's realllly in the past.
-	///        Eventually, we have a first process that corrects the live segment
-	///        joining on a final segment, and then kick off parallel processing
-	///        until a new, more recent, live block.
 	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
@@ -190,14 +166,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	responseHandler := func(resp *pbsubstreams.Response) error {
-		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
-			return status.Error(codes.Unavailable, err.Error())
-		}
-		return nil
-	}
-
 	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, s.blockType, reqctx.Logger(ctx))
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
@@ -205,20 +173,22 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	var opts []pipeline.Option
-	for _, pipeOpts := range s.pipelineOptions {
-		for _, opt := range pipeOpts.PipelineOptions(ctx, request) {
-			opts = append(opts, opt)
-		}
+	storeConfigs, err := pipeline.InitializeStoreConfigs(moduleTree, s.runtimeConfig.BaseObjectStore)
+	if err != nil {
+		return fmt.Errorf("configuring stores: %w", err)
 	}
+	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.EffectiveStartBlockNum, request.StopBlockNum, isSubRequest)
+
+	respFunc := responseHandler(logger, streamSrv)
+	opts := s.buildPipelineOptions(ctx, request)
 	pipe := pipeline.New(
 		ctx,
 		moduleTree,
-		s.blockType,
+		stores,
 		wasmRuntime,
 		execOutputCacheEngine,
 		s.runtimeConfig,
-		responseHandler,
+		respFunc,
 		opts...,
 	)
 
@@ -226,7 +196,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		requestStats.Start(15 * time.Second)
 		defer requestStats.Shutdown()
 	}
-
 	logger.Info("initializing pipeline",
 		zap.Int64("requested_start_block", request.StartBlockNum),
 		zap.Uint64("effective_start_block", requestDetails.EffectiveStartBlockNum),
@@ -260,6 +229,40 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	return pipe.Launch(ctx, blockStream, streamSrv)
 }
 
+func (s *Service) buildPipelineOptions(ctx context.Context, request *pbsubstreams.Request) (opts []pipeline.Option) {
+	for _, pipeOpts := range s.pipelineOptions {
+		for _, opt := range pipeOpts.PipelineOptions(ctx, request) {
+			opts = append(opts, opt)
+		}
+	}
+	return
+}
+
+func responseHandler(logger *zap.Logger, streamSrv pbsubstreams.Stream_BlocksServer) func(resp *pbsubstreams.Response) error {
+	return func(resp *pbsubstreams.Response) error {
+		if err := streamSrv.Send(resp); err != nil {
+			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
+			return status.Error(codes.Unavailable, err.Error())
+		}
+		return nil
+	}
+}
+
+func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats, isSubRequest bool) (context.Context, metrics.Stats) {
+	if isSubRequest {
+		wid := workerID.Inc()
+		logger = logger.With(zap.Uint64("worker_id", wid))
+		return reqctx.WithLogger(ctx, logger), metrics.NewNoopStats()
+	}
+
+	// we only want to meaure stats when enabled an on the Main request
+	if withRequestStats {
+		stats := metrics.NewReqStats(logger)
+		return reqctx.WithReqStats(ctx, stats), stats
+	}
+	return ctx, metrics.NewNoopStats()
+}
+
 func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
 	/*
 		this entire `if` is not good, the ctx is from the StreamServer so there
@@ -268,8 +271,6 @@ func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
 		if len(partialMode) == 1 && partialMode[0] == "true" {
-			// TODO: only allow partial-mode if the AUTHORIZATION layer permits it
-			// partial-mode should be
 			if !s.partialModeEnabled {
 				return false, status.Error(grpccode.InvalidArgument, "substreams-partial-mode not enabled on this instance")
 			}

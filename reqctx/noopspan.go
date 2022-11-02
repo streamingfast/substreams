@@ -10,7 +10,6 @@ import (
 type noopSpan struct{}
 
 func (n *noopSpan) EndWithErr(e *error) {
-	//TODO implement me
 	panic("implement me")
 }
 

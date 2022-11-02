@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"go.uber.org/zap"
 	"strings"
 	"testing"
 	"time"
@@ -49,6 +50,9 @@ func TestPipeline_runExecutor(t *testing.T) {
 			ctx := context.Background()
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
+				moduleTree: &ModuleTree{
+					outputModuleMap: map[string]bool{},
+				},
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
@@ -63,7 +67,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 }
 
 func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
-	pkg, _ := processManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
+	pkg := manifest.TestReadManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
 
 	binayrIndex := uint32(0)
 	for _, module := range pkg.Modules.Modules {
@@ -129,34 +133,18 @@ func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *bstream.Block {
 	return bb
 }
 
-func processManifest(t *testing.T, manifestPath string) (*pbsubstreams.Package, *manifest.ModuleGraph) {
-	t.Helper()
-
-	manifestReader := manifest.NewReader(manifestPath)
-	pkg, err := manifestReader.Read()
-	require.NoError(t, err)
-
-	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	require.NoError(t, err)
-
-	return pkg, moduleGraph
-}
-
 func TestSetupSubrequestStores(t *testing.T) {
-	t.Skip("file format change")
-	p := Pipeline{}
-
 	t.Run("test store types depending on input", func(t *testing.T) {
-		confMap := testConfigMap(t, []string{
-			"mod2/states/0000000010-0000000001.kv",
-		}, []testStoreConfig{
-			{"mod1", 10},
-			{"mod2", 1},
-			{"mod3", 5},
-		})
-		ctx := withTestRequest("mod3", 10)
 
-		storeMap, err := p.setupSubrequestStores(ctx, confMap)
+		confMap := testConfigMap(t, []testStoreConfig{
+			{name: "mod1", initBlock: 10, writtenUpTo: 0},
+			{name: "mod2", initBlock: 1, writtenUpTo: 10},
+			{name: "mod3", initBlock: 5, writtenUpTo: 0},
+		})
+		p := Pipeline{stores: &Stores{configs: confMap}}
+		ctx := withTestRequest(t, "mod3", 10)
+
+		storeMap, err := p.setupSubrequestStores(ctx)
 
 		require.NoError(t, err)
 		assert.Len(t, storeMap, 3)
@@ -170,39 +158,48 @@ func TestSetupSubrequestStores(t *testing.T) {
 	})
 
 	t.Run("fail with multiple output modules", func(t *testing.T) {
-		ctx := withTestRequest("mod1,mod2", 10)
+		ctx := withTestRequest(t, "mod1,mod2", 10)
+		p := Pipeline{stores: &Stores{configs: nil}}
 
-		_, err := p.setupSubrequestStores(ctx, nil)
+		_, err := p.setupSubrequestStores(ctx)
 
 		assert.Equal(t, "invalid number of backprocess leaf store: 2", err.Error())
 	})
 }
 
-func testConfigMap(t *testing.T, files []string, configs []testStoreConfig) store.ConfigMap {
+func testConfigMap(t *testing.T, configs []testStoreConfig) store.ConfigMap {
 	t.Helper()
 	confMap := make(store.ConfigMap)
 	objStore := dstore.NewMockStore(nil)
-	bytes := []byte{1, 1, 107, 1, 118} // {"k": "v"}
-	for _, file := range files {
-		objStore.SetFile(file, bytes)
-	}
+
 	for _, conf := range configs {
 		newStore, err := store.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
+
+		if conf.writtenUpTo != 0 {
+			fullKV := newStore.NewFullKV(zap.NewNop())
+			fullKV.Set(0, "k", "v")
+			_, writer, err := fullKV.Save(conf.writtenUpTo)
+			require.NoError(t, err)
+			writer.Write(context.Background())
+		}
 	}
 	return confMap
 }
 
 type testStoreConfig struct {
-	name      string
-	initBlock uint64
+	name        string
+	initBlock   uint64
+	writtenUpTo uint64
 }
 
-func withTestRequest(outputModule string, startBlock uint64) context.Context {
-	ctx, _ := reqctx.WithRequest(context.Background(), &pbsubstreams.Request{
+func withTestRequest(t *testing.T, outputModule string, startBlock uint64) context.Context {
+	t.Helper()
+	req, err := BuildRequestDetails(&pbsubstreams.Request{
 		OutputModules: strings.Split(outputModule, ","),
 		StartBlockNum: int64(startBlock),
 	}, false)
-	return ctx
+	require.NoError(t, err)
+	return reqctx.WithRequest(context.Background(), req)
 }

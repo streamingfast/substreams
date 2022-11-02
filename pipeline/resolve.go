@@ -10,6 +10,21 @@ import (
 )
 
 func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool) (*reqctx.RequestDetails, error) {
+	// TODO: fill in this method
+	// TODO: move to `reqctx` ?
+	// request is: start_block: 0, stop_block: 15M
+	// * find the HIGHEST finalized blocks close to stop_block
+	//   (and the highest of all if stop_block is 0)
+	// * we create a new `pbsubstreams.Request{start_block: 15M, stop_block: 15M}
+	//   we create an internal representation of a Request, because we need a new field:
+	//      * output historical data
+	//   we kick off our engine this way, and make sure we pipe
+	//   all the BlockScopedData through, from caches produced.
+	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
+	//         process directly, even if that's realllly in the past.
+	///        Eventually, we have a first process that corrects the live segment
+	///        joining on a final segment, and then kick off parallel processing
+	///        until a new, more recent, live block.
 	effectiveStartBlock, err := resolveStartBlockNum(request)
 	if err != nil {
 		return nil, err

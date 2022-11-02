@@ -1,7 +1,7 @@
 version: v1
 name: buf.build/streamingfast/substreams
 
-# TODO: Install google protobufs as deps
+# Install google protobufs as deps
 deps: []
 
 lint:

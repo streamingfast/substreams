@@ -608,7 +608,7 @@ message FieldOptions {
   // parsing.  This may lead to crashes if and when an invalid byte stream is
   // finally parsed upon access.
   //
-  // TODO(b/211906113):  Enable validation on lazy fields.
+  // NODO(b/211906113):  Enable validation on lazy fields.
   optional bool lazy = 5 [default = false];
 
   // unverified_lazy does no correctness checks on the byte stream. This should

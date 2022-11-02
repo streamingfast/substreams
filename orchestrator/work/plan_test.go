@@ -66,6 +66,8 @@ func TestWorkPlanning(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			err := test.plan.sortModules(graph)
+			require.NoError(t, err)
 			require.NoError(t, test.plan.splitWorkIntoJobs(uint64(test.subreqSplit), graph))
 			assert.Equal(t, len(test.expectWaitingJobs), len(test.plan.waitingJobs))
 			for i, job := range test.expectWaitingJobs {

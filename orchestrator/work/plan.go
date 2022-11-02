@@ -17,6 +17,9 @@ import (
 type Plan struct {
 	ModulesStateMap ModuleStorageStateMap
 
+	sortedModules   []string
+	moduleAncestors map[string][]string
+
 	upToBlock uint64
 
 	waitingJobs []*Job
@@ -39,6 +42,9 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 	}
 	if err := plan.buildPlanFromStorageState(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
 		return nil, fmt.Errorf("build plan: %w", err)
+	}
+	if err := plan.sortModules(graph); err != nil {
+		return nil, fmt.Errorf("sorting modules: %w", err)
 	}
 	if err := plan.splitWorkIntoJobs(subrequestSplitSize, graph); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
@@ -74,7 +80,7 @@ func (p *Plan) buildPlanFromStorageState(ctx context.Context, storageState *Stor
 	return nil
 }
 
-func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.ModuleGraph) error {
+func (p *Plan) sortModules(graph *manifest.ModuleGraph) error {
 	moduleAncestors := map[string][]string{}
 	for storeName, _ := range p.ModulesStateMap {
 		ancestors, err := graph.AncestorStoresOf(storeName)
@@ -90,12 +96,19 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.Mod
 	}
 	mods = manifest.SortModuleNamesByGraphTopology(mods, graph)
 
+	p.sortedModules = mods
+	p.moduleAncestors = moduleAncestors
+
+	return nil
+}
+
+func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.ModuleGraph) error {
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
-	for _, storeName := range mods {
+	for _, storeName := range p.sortedModules {
 		workUnit := p.ModulesStateMap[storeName]
 		requests := workUnit.batchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
-			requiredModules := moduleAncestors[storeName]
+			requiredModules := p.moduleAncestors[storeName]
 
 			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
 			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)

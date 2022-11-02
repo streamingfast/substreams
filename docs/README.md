@@ -38,3 +38,7 @@ Please first refer to the general [StreamingFast contribution guide](https://git
 ### License
 
 Substreams is currently licensed under [Apache 2.0](../LICENSE/).
+
+### Disclaimer
+
+The content described in this documentation was created with the author's absolute best effort. It is up to the reader to validate the accuracy of all content presented. Substreams is currently in development and the associated documentation may become outdated in some areas. Please feel free to reach out to report issues or outages.

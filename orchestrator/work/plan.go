@@ -46,7 +46,7 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 	if err := plan.sortModules(graph); err != nil {
 		return nil, fmt.Errorf("sorting modules: %w", err)
 	}
-	if err := plan.splitWorkIntoJobs(subrequestSplitSize, graph); err != nil {
+	if err := plan.splitWorkIntoJobs(subrequestSplitSize); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
 
@@ -102,7 +102,7 @@ func (p *Plan) sortModules(graph *manifest.ModuleGraph) error {
 	return nil
 }
 
-func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, graph *manifest.ModuleGraph) error {
+func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
 	for _, storeName := range p.sortedModules {
 		workUnit := p.ModulesStateMap[storeName]

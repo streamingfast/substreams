@@ -68,7 +68,8 @@ func TestWorkPlanning(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.plan.sortModules(graph)
 			require.NoError(t, err)
-			require.NoError(t, test.plan.splitWorkIntoJobs(uint64(test.subreqSplit), graph))
+			require.NoError(t, test.plan.sortModules(graph))
+			require.NoError(t, test.plan.splitWorkIntoJobs(uint64(test.subreqSplit)))
 			assert.Equal(t, len(test.expectWaitingJobs), len(test.plan.waitingJobs))
 			for i, job := range test.expectWaitingJobs {
 				assert.Equal(t, test.plan.waitingJobs[i].String(), job.String())
@@ -107,14 +108,12 @@ func TestWorkPlanning(t *testing.T) {
 //}
 
 func TestPlan_MarkDependencyComplete(t *testing.T) {
-	t.Skip("not implemented")
 	type fields struct {
 		ModulesStateMap       ModuleStorageStateMap
 		upToBlock             uint64
 		waitingJobs           []*Job
 		readyJobs             []*Job
 		modulesReadyUpToBlock map[string]uint64
-		mu                    sync.Mutex
 	}
 	type args struct {
 		modName   string
@@ -585,7 +584,7 @@ func TestPlan_splitWorkIntoJobs(t *testing.T) {
 				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
 				mu:                    tt.fields.mu,
 			}
-			tt.wantErr(t, p.splitWorkIntoJobs(tt.args.subrequestSplitSize, tt.args.graph), fmt.Sprintf("splitWorkIntoJobs(%v, %v)", tt.args.subrequestSplitSize, tt.args.graph))
+			tt.wantErr(t, p.splitWorkIntoJobs(tt.args.subrequestSplitSize), fmt.Sprintf("splitWorkIntoJobs(%v, %v)", tt.args.subrequestSplitSize, tt.args.graph))
 		})
 	}
 }

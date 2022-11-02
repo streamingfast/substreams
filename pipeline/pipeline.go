@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -17,7 +19,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"strings"
 )
 
 type backprocessingStore struct {
@@ -142,7 +143,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 
 	outputModuleName := reqDetails.Request.OutputModules[0]
 
-	// there is an assumption that in backgprocess mode the outputModule is a store
+	// there is an assumption that in backprocess mode the outputModule is a store
 	if _, found := p.stores.configs[outputModuleName]; !found {
 		return nil, fmt.Errorf("requested output module %q is not found in store configurations", outputModuleName)
 	}

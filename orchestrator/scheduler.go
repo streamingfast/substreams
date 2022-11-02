@@ -18,6 +18,7 @@ import (
 
 type Scheduler struct {
 	workPlan               *work.Plan
+	submittedJobs          []*work.Job
 	respFunc               substreams.ResponseFunc
 	graph                  *manifest.ModuleGraph
 	upstreamRequestModules *pbsubstreams.Modules
@@ -86,6 +87,7 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 	}
 
 	wg.Add(1)
+	s.submittedJobs = append(s.submittedJobs, nextJob)
 	go func() {
 		jr := s.runSingleJob(ctx, worker, nextJob, s.upstreamRequestModules)
 		result <- jr
@@ -134,7 +136,12 @@ func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (e
 
 func (s *Scheduler) processJobResult(result jobResult) error {
 	if result.err != nil {
-		return fmt.Errorf("worker ended in error: %w", result.err)
+		wp := s.workPlan.String()
+		submittedJobs := "submitted jobs: \n"
+		for _, sj := range s.submittedJobs {
+			submittedJobs += sj.String() + "\n"
+		}
+		return fmt.Errorf("worker ended in error: %w\n%s\n%s", result.err, wp, submittedJobs)
 	}
 
 	if result.partialsWritten != nil {
@@ -181,7 +188,6 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 			nonRetryableError = err
 			return nil
 		}
-		return nil
 	})
 
 	jr := fromWorkResult(job, workResult)

@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
@@ -27,7 +28,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	logger.Debug("running module")
 
-	cached, output, err := cacheOutputExists(execOutput, executor)
+	cached, output, err := getCachedOutput(execOutput, executor)
 	if err != nil {
 		return nil, fmt.Errorf("check cache output exists: %w", err)
 	}
@@ -57,7 +58,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	return moduleOutput, nil
 }
 
-func cacheOutputExists(execOutput execout.ExecutionOutput, executor ModuleExecutor) (bool, []byte, error) {
+func getCachedOutput(execOutput execout.ExecutionOutput, executor ModuleExecutor) (bool, []byte, error) {
 	output, cached, err := execOutput.Get(executor.Name())
 	if err != nil && err != execout.NotFound {
 		return false, nil, fmt.Errorf("get cached output: %w", err)

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/streamingfast/substreams/block"
@@ -17,6 +18,8 @@ type Store interface {
 	Iterable
 	DeltaAccessor
 	Resettable
+	Nameable
+	// todoo: add fmt.Stringer ??
 
 	// intrinsics
 	Reader
@@ -58,6 +61,10 @@ type Resettable interface {
 	Reset()
 }
 
+type Nameable interface {
+	Name() string
+}
+
 type Iterable interface {
 	Length() uint64
 	Iter(func(key string, value []byte) error) error
@@ -67,9 +74,14 @@ type DeltaAccessor interface {
 	SetDeltas([]*pbsubstreams.StoreDelta)
 	GetDeltas() []*pbsubstreams.StoreDelta
 	ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta)
+	ApplyDelta(delta *pbsubstreams.StoreDelta)
 }
 
 type Reader interface {
+	fmt.Stringer
+
+	Nameable
+
 	GetFirst(key string) ([]byte, bool)
 	GetLast(key string) ([]byte, bool)
 	GetAt(ord uint64, key string) ([]byte, bool)

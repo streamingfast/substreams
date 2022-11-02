@@ -59,8 +59,7 @@ func (e *Engine) EndOfStream(blockNum uint64) error {
 }
 
 func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
-	for name, cache := range e.caches {
-		fmt.Println("Flushing Output: ", name, clock.Number, cache.currentBlockRange.String())
+	for _, cache := range e.caches {
 		if !cache.isOutOfRange(clock.Number) {
 			continue
 		}

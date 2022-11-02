@@ -3,13 +3,14 @@ package work
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
-	"sort"
-	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -242,6 +243,21 @@ func (p *Plan) initialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	}
 	return
 }
+
+func (p *Plan) String() string {
+	workingPlan := "working plan: \n"
+	waitingJobs := "waiting jobs: \n"
+	readyJobs := "ready jobs: \n"
+	for _, w := range p.waitingJobs {
+		waitingJobs += w.String() + "\n"
+	}
+	for _, r := range p.readyJobs {
+		readyJobs += r.String() + "\n"
+	}
+
+	return workingPlan + waitingJobs + readyJobs
+}
+
 func moduleNames(modules []*pbsubstreams.Module) (out []string) {
 	for _, mod := range modules {
 		out = append(out, mod.Name)

@@ -133,6 +133,23 @@ modules:
     output:
       type: boolean
 
+  - name: store_root
+    kind: store
+    initialBlock: 3
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: store_depend
+    kind: store
+    initialBlock: 3
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: store_root
+
   - name: assert_all_test
     kind: store
     initialBlock: 1

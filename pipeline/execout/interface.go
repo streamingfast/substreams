@@ -2,6 +2,7 @@ package execout
 
 import (
 	"errors"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"

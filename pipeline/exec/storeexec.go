@@ -35,6 +35,9 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 		return fmt.Errorf("unmarshalling output deltas: %w", err)
 	}
 	e.outputStore.SetDeltas(deltas.Deltas)
+	//for _, delta := range deltas.Deltas {
+	//	e.outputStore.ApplyDelta(delta)
+	//}
 	return nil
 }
 

@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/streamingfast/substreams/manifest"
 	"math/big"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/substreams/manifest"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
 
@@ -33,9 +34,8 @@ func runTest(
 	startBlock int64,
 	exclusiveEndBlock uint64,
 	moduleNames []string,
-	subRequestsSplitSize uint64,
-	newBlockGenerator NewTestBlockGenerator,
-	blockProcessedCallBack blockProcessedCallBack,
+	subrequestsSplitSize uint64,
+	parallelSubrequests uint64, newBlockGenerator NewTestBlockGenerator, blockProcessedCallBack blockProcessedCallBack,
 ) (moduleOutputs []string, err error) {
 	ctx := context.Background()
 	ctx = reqctx.WithLogger(ctx, zlog)
@@ -85,7 +85,7 @@ func runTest(
 		return w
 	}
 
-	if err = processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subRequestsSplitSize); err != nil {
+	if err = processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, blockProcessedCallBack, testTempDir, subrequestsSplitSize, parallelSubrequests); err != nil {
 		return nil, fmt.Errorf("running test: %w", err)
 	}
 
@@ -176,7 +176,7 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_map"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_map"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
@@ -211,7 +211,7 @@ func Test_AddBigIntWithCursorGeneratorStepNew(t *testing.T) { // todo: change te
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return forkDbGenerator
 	}
-	_, err := runTest(t, nil, 1, 7, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+	_, err := runTest(t, nil, 1, 7, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, 1, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		if b.Number == 6 {
 			s, found := stores.Get("test_store_add_bigint")
 			require.True(t, found)
@@ -239,7 +239,7 @@ func Test_test_store_proto(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_store_proto"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_store_proto"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -255,7 +255,7 @@ func Test_MultipleModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_map", "test_store_add_int64", "test_store_proto"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -278,7 +278,7 @@ func Test_MultipleModule_Batch(t *testing.T) {
 
 	//todo: Need to validate the storage file
 
-	_, err := runTest(t, nil, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, newBlockGenerator, nil)
+	_, err := runTest(t, nil, 1000, 1021, []string{"test_store_add_bigint", "assert_test_store_add_bigint"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 }
 
@@ -290,7 +290,7 @@ func Test_MultipleModule_Batch_2(t *testing.T) {
 		}
 	}
 
-	moduleOutputs, err := runTest(t, nil, 110, 112, []string{"test_map", "test_store_proto"}, 10, newBlockGenerator, nil)
+	moduleOutputs, err := runTest(t, nil, 110, 112, []string{"test_map", "test_store_proto"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -310,7 +310,7 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	}
 
 	outputFilesLen := 0
-	moduleOutputs, err := runTest(t, nil, 110, 112, []string{"test_map", "test_store_proto"}, 10,
+	moduleOutputs, err := runTest(t, nil, 110, 112, []string{"test_map", "test_store_proto"}, 10, 1,
 		newBlockGenerator,
 		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 			err := baseStore.Walk(context.Background(), "", func(filename string) (err error) {
@@ -354,8 +354,7 @@ func Test_test_store_delete_prefix(t *testing.T) {
 		41,
 		[]string{"test_store_delete_prefix", "assert_test_store_delete_prefix"},
 		10,
-		newBlockGenerator,
-		func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
+		1, newBlockGenerator, func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 			if b.Number == 40 {
 				s, storeFound := stores.Get("test_store_delete_prefix")
 				require.True(t, storeFound)
@@ -366,41 +365,52 @@ func Test_test_store_delete_prefix(t *testing.T) {
 	require.NoError(t, err)
 }
 
-//
-//// -------------------- StoreAddI64 -------------------- //
-//func Test_test_store_add_i64(t *testing.T) {
-//	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-//		return &LinearBlockGenerator{
-//			startBlock:         startBlock,
-//			inclusiveStopBlock: inclusiveStopBlock,
-//		}
-//	}
-//	_, err := runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64"}, newBlockGenerator, nil)
-//	require.NoError(t, err)
-//}
-//
-//func Test_test_store_add_i64_deltas(t *testing.T) {
-//	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-//		return &LinearBlockGenerator{
-//			startBlock:         startBlock,
-//			inclusiveStopBlock: inclusiveStopBlock,
-//		}
-//	}
-//	_, err := runTest(t, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64_deltas"}, newBlockGenerator, nil)
-//	require.NoError(t, err)
-//}
-//
-//// -------------------- StoreSetI64/StoreGetI64 -------------------- //
-//func Test_test_store_set_i64(t *testing.T) {
-//	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-//		return &LinearBlockGenerator{
-//			startBlock:         startBlock,
-//			inclusiveStopBlock: inclusiveStopBlock,
-//		}
-//	}
-//	_, err := runTest(t, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64"}, newBlockGenerator, nil)
-//	require.NoError(t, err)
-//}
+// -------------------- StoreAddI64 -------------------- //
+func Test_test_store_add_i64(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	_, err := runTest(t, nil, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64"}, 10, 1, newBlockGenerator, nil)
+	require.NoError(t, err)
+}
+
+func Test_test_store_add_i64_deltas(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	_, err := runTest(t, nil, 1, 2, []string{"setup_test_store_add_i64", "assert_test_store_add_i64_deltas"}, 10, 1, newBlockGenerator, nil)
+	require.NoError(t, err)
+}
+
+// -------------------- StoreSetI64/StoreGetI64 -------------------- //
+func Test_test_store_set_i64(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	_, err := runTest(t, nil, 20, 31, []string{"setup_test_store_set_i64", "assert_test_store_set_i64"}, 10, 1, newBlockGenerator, nil)
+	require.NoError(t, err)
+}
+
+func Test_test_store_root_depend(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	_, err := runTest(t, nil, 200, 201, []string{"store_root", "store_depend"}, 10, 10, newBlockGenerator, nil)
+	//_, err = runTest(t, nil, 12, 201, []string{"store_root", "store_depend"}, 10, 5, newBlockGenerator, nil)
+	require.NoError(t, err)
+}
 
 func Test_assert_all_test(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
@@ -409,6 +419,6 @@ func Test_assert_all_test(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, nil, 20, 31, []string{"assert_all_test"}, 10, newBlockGenerator, nil)
+	_, err := runTest(t, nil, 20, 31, []string{"assert_all_test"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 }

@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/substreams/store/marshaller"
 
 	"github.com/streamingfast/substreams/block"
@@ -16,6 +17,8 @@ type PartialKV struct {
 
 	initialBlock    uint64 // block at which we initialized this store
 	DeletedPrefixes []string
+
+	loadedFrom string
 }
 
 func (p *PartialKV) Roll(lastBlock uint64) {
@@ -27,6 +30,7 @@ func (p *PartialKV) InitialBlock() uint64 { return p.initialBlock }
 
 func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	filename := p.storageFilename(exclusiveEndBlock)
+	p.loadedFrom = filename
 	p.logger.Debug("loading partial store state from file", zap.String("filename", filename))
 
 	data, err := loadStore(ctx, p.store, filename)
@@ -93,4 +97,8 @@ func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error
 
 func (p *PartialKV) storageFilename(exclusiveEndBlock uint64) string {
 	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock))
+}
+
+func (p *PartialKV) String() string {
+	return fmt.Sprintf("partialKV name %s moduleInitialBlock %d  keyCount %d deltasCount %d loadFrom %s", p.Name(), p.moduleInitialBlock, len(p.kv), len(p.deltas), p.loadedFrom)
 }

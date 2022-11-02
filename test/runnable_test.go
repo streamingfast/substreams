@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/wasm"
 	"io"
 	"path/filepath"
 	"testing"
+
+	"github.com/streamingfast/substreams/wasm"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -66,6 +67,7 @@ func processRequest(
 	blockProcessedCallBack blockProcessedCallBack,
 	testTempDir string,
 	subrequestsSplitSize uint64,
+	parallelSubrequests uint64,
 ) error {
 	t.Helper()
 
@@ -82,7 +84,7 @@ func processRequest(
 		10,
 		10,
 		subrequestsSplitSize,
-		1,
+		parallelSubrequests,
 		baseStoreStore,
 		workerFactory,
 	)
@@ -127,6 +129,10 @@ func processRequest(
 	}
 
 	return err
+}
+
+func funcName(t *testing.T, err error) {
+	require.Nil(t, err)
 }
 
 type nooptrailable struct {

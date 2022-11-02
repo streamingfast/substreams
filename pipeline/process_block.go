@@ -72,16 +72,22 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
+
 	case bstream.StepNewIrreversible:
 		err := p.handlerStepNew(ctx, block, clock, cursor, step)
 		if err != nil {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
 		}
+		err = p.handleStepIrreversible(clock)
+		if err != nil {
+			return fmt.Errorf("handling step irreversible: %w", err)
+		}
 
-		p.handleStepIrreversible(block.Number)
 	case bstream.StepIrreversible:
-
-		p.handleStepIrreversible(block.Number)
+		err = p.handleStepIrreversible(clock)
+		if err != nil {
+			return fmt.Errorf("handling step irreversible: %w", err)
+		}
 	}
 
 	return nil
@@ -100,8 +106,12 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock
 	return nil
 }
 
-func (p *Pipeline) handleStepIrreversible(blockNum uint64) {
-	p.forkHandler.removeReversibleOutput(blockNum)
+func (p *Pipeline) handleStepIrreversible(clock *pbsubstreams.Clock) error {
+	if err := p.execOutputCache.HandleFinal(clock); err != nil {
+		return fmt.Errorf("flushing caches")
+	}
+	p.forkHandler.removeReversibleOutput(clock.Number)
+	return nil
 }
 
 func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) error {

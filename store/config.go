@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/substreams/store/marshaller"
 
 	"github.com/streamingfast/derr"
@@ -57,7 +58,7 @@ func (c *Config) ModuleInitialBlock() uint64 {
 }
 
 func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
-	return &FullKV{c.newBaseStore(logger)}
+	return &FullKV{c.newBaseStore(logger), "N/A"}
 }
 
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {

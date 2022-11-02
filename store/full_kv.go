@@ -13,6 +13,8 @@ var _ Store = (*FullKV)(nil)
 
 type FullKV struct {
 	*baseStore
+
+	loadedFrom string
 }
 
 func (s *FullKV) Marshaller() marshaller.Marshaller {
@@ -38,6 +40,7 @@ func (s *FullKV) storageFilename(exclusiveEndBlock uint64) string {
 
 func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	fileName := s.storageFilename(exclusiveEndBlock)
+	s.loadedFrom = fileName
 	s.logger.Debug("loading full store state from file", zap.String("module_name", s.name), zap.String("fileName", fileName))
 
 	data, err := loadStore(ctx, s.store, fileName)
@@ -52,7 +55,7 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 
 	s.kv = storeData.Kv
 
-	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName))
+	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)))
 	return nil
 }
 
@@ -95,4 +98,12 @@ func (s *FullKV) Reset() {
 	}
 	s.deltas = nil
 	s.lastOrdinal = 0
+}
+
+func (s *FullKV) String() string {
+	var deltaKeys []string
+	for _, delta := range s.deltas {
+		deltaKeys = append(deltaKeys, delta.Key)
+	}
+	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d  keyCount %d loadFrom %s deltasCount %d deltaskeys %s", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas), deltaKeys)
 }

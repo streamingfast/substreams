@@ -71,6 +71,8 @@ The _value_ should be a pointer to either a YAML manifest for Substreams Modules
 
 The filename can be an absolute, relative (to the location of the `.yaml` file), or remote path as long as it starts with `http://` or `https://`.
 
+The imports will be different for each blockchain. For example, Substreams implementations that target Ethereum will reference an appropriate spkg file created for that blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the chain.
+
 ### Protobuf
 
 The `protobuf` section points to the definitions used by the modules.
@@ -105,7 +107,7 @@ The `binaries` field specifies the binary code to use when executing modules.&#x
 The field `modules[].binary` has a default value of `default`.&#x20;
 
 {% hint style="info" %}
-_Note, it's important to define the `default` binary._
+**Note**_: defining the `default` binary is a crucial step of the process when working with Substreams manifests._
 {% endhint %}
 
 Excerpt pulled from the example Substreams manifest.

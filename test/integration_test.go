@@ -407,8 +407,8 @@ func Test_test_store_root_depend(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	_, err := runTest(t, nil, 200, 201, []string{"store_root", "store_depend"}, 10, 10, newBlockGenerator, nil)
-	//_, err = runTest(t, nil, 12, 201, []string{"store_root", "store_depend"}, 10, 5, newBlockGenerator, nil)
+
+	_, err := runTest(t, nil, 10, 11, []string{"store_depends_on_depend"}, 10, 10, newBlockGenerator, nil)
 	require.NoError(t, err)
 }
 

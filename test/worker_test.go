@@ -50,6 +50,11 @@ func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ 
 			Error: fmt.Errorf("processing sub request: %w", err),
 		}
 	}
+	logger.Info("worker done running job",
+		zap.Strings("output_modules", request.OutputModules),
+		zap.Int64("start_block_num", request.StartBlockNum),
+		zap.Uint64("stop_block_num", request.StopBlockNum),
+	)
 
 	var blockRanges []*block.Range
 	if request.StopBlockNum-uint64(request.StartBlockNum) > subrequestsSplitSize {

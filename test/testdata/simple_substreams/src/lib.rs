@@ -191,6 +191,12 @@ fn store_depend(block: test::Block, store_root: StoreGetI64, _store: StoreSetI64
 }
 
 #[substreams::handlers::store]
+fn store_depends_on_depend(block: test::Block, store_root: StoreGetI64, _store_depend: StoreGetI64, _store: StoreSetI64) {
+    let value = store_root.get_last("key.3");
+    assert(block.number, true, value.is_some())
+}
+
+#[substreams::handlers::store]
 fn assert_all_test(
         _assert_test_store_delete_prefix: bool,
         _assert_test_store_add_bigint: bool,

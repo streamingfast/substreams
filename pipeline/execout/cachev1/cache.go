@@ -70,7 +70,7 @@ func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
 }
 
 func (c *OutputCache) isOutOfRange(blockNum uint64) bool {
-	return !c.currentBlockRange.Contains(blockNum)
+	return c.currentBlockRange == nil || !c.currentBlockRange.Contains(blockNum)
 }
 
 //func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {

@@ -40,11 +40,12 @@ func (n noopstats) RecordOutputCacheMiss()                                     {
 func (n noopstats) RecordStoreSquasherProgress(module string, blockNum uint64) {}
 
 func NewReqStats(logger *zap.Logger) Stats {
+	blockCounter := dmetrics.NewAtomicCounter()
 	return &stats{
 		Shutter:           shutter.New(),
-		blockRate:         dmetrics.NewAvgLocalRateCounter(1*time.Second, "blocks"),
-		flushDurationRate: dmetrics.NewAvgLocalRateCounter(1*time.Second, "flush duration"),
-		flushCountRate:    dmetrics.NewAvgLocalRateCounter(1*time.Second, "flush count"),
+		blockCounter:      blockCounter,
+		blockRate:         dmetrics.MustNewAvgRateCounter(blockCounter, 1*time.Second, 30*time.Second, "blocks"),
+		flushDurationRate: dmetrics.NewAvgDurationCounter(1*time.Second, time.Second, "flush duration"),
 		outputCacheHit:    uint64(0),
 		outputCacheMiss:   uint64(0),
 		backprocessing:    newBackprocessStats(),
@@ -54,9 +55,9 @@ func NewReqStats(logger *zap.Logger) Stats {
 
 type stats struct {
 	*shutter.Shutter
-	blockRate         *dmetrics.LocalCounter
-	flushDurationRate *dmetrics.LocalCounter
-	flushCountRate    *dmetrics.LocalCounter
+	blockCounter      *dmetrics.AtomicCounter
+	blockRate         *dmetrics.AvgRateCounter
+	flushDurationRate *dmetrics.AvgDurationCounter
 	lastBlock         bstream.BlockRef
 	outputCacheMiss   uint64
 	outputCacheHit    uint64
@@ -66,13 +67,12 @@ type stats struct {
 }
 
 func (s *stats) RecordBlock(ref bstream.BlockRef) {
-	s.blockRate.Inc()
+	s.blockCounter.Add(1)
 	s.lastBlock = ref
 }
 
 func (s *stats) RecordFlush(elapsed time.Duration) {
-	s.flushDurationRate.IncBy(elapsed.Nanoseconds())
-	s.flushCountRate.Inc()
+	s.flushDurationRate.AddDuration(elapsed)
 }
 
 func (s *stats) RecordOutputCacheHit() {
@@ -130,7 +130,6 @@ func (s *stats) getZapFields() []zap.Field {
 	}
 
 	fields = append(fields,
-		zap.Stringer("flush_count", s.flushCountRate),
 		zap.Stringer("flush_duration", s.flushDurationRate),
 		zap.Uint64("output_cache_hit", s.outputCacheHit),
 		zap.Uint64("output_cache_miss", s.outputCacheMiss),

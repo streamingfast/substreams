@@ -39,6 +39,8 @@ func TestGenerator_Generate(t *testing.T) {
 }
 
 func TestGenerate_GenerateMod(t *testing.T) {
+	t.Skip()
+
 	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
@@ -75,6 +77,8 @@ func TestGenerate_GenerateMod(t *testing.T) {
 }
 
 func TestGenerate_GeneratePbMod(t *testing.T) {
+	t.Skip()
+
 	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
@@ -102,6 +106,8 @@ func TestGenerate_GeneratePbMod(t *testing.T) {
 }
 
 func TestGenerate_GenerateExterns(t *testing.T) {
+	t.Skip()
+
 	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
@@ -131,6 +137,8 @@ func TestGenerate_GenerateExterns(t *testing.T) {
 }
 
 func TestGenerate_GenerateLib(t *testing.T) {
+	t.Skip()
+
 	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()
@@ -160,6 +168,8 @@ func TestGenerate_GenerateLib(t *testing.T) {
 }
 
 func TestGenerate_GenerateSubstreams(t *testing.T) {
+	t.Skip()
+
 	g := InitTestGenerator(t)
 
 	r, w := io.Pipe()

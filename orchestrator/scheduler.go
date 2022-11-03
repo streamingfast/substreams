@@ -136,12 +136,7 @@ func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (e
 
 func (s *Scheduler) processJobResult(result jobResult) error {
 	if result.err != nil {
-		wp := s.workPlan.String()
-		submittedJobs := "submitted jobs: \n"
-		for _, sj := range s.submittedJobs {
-			submittedJobs += sj.String() + "\n"
-		}
-		return fmt.Errorf("worker ended in error: %w\n%s\n%s", result.err, wp, submittedJobs)
+		return fmt.Errorf("worker ended in error: %w", result.err)
 	}
 
 	if result.partialsWritten != nil {

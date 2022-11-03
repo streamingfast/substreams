@@ -191,5 +191,7 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 	})
 
 	jr := fromWorkResult(job, workResult)
+
+	logger.Info("job completed", zap.Object("job", job))
 	return jr
 }

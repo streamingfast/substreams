@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap/zapcore"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -136,7 +137,8 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
 
 	if !found {
-		blockRange = block.NewRange(atBlock, atBlock+c.saveBlockInterval)
+		endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
+		blockRange = block.NewRange(atBlock, endBlockRange)
 		c.currentBlockRange = blockRange
 		return found, nil
 	}

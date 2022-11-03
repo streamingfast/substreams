@@ -14,7 +14,7 @@ type CacheEngine interface {
 	NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (ExecutionOutput, error)
 	Init(modules *manifest.ModuleHashes) error
 
-	EndOfStream(blockNum uint64) error
+	EndOfStream(isSubrequest bool, outputModules map[string]bool) error
 	HandleFinal(clock *pbsubstreams.Clock) error
 	HandleUndo(clock *pbsubstreams.Clock, moduleName string)
 }

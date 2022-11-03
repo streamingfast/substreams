@@ -22,7 +22,8 @@ type Trailable interface {
 }
 
 func (p *Pipeline) Launch(ctx context.Context, stream Streamable, streamSrv Trailable) error {
-	return p.onStreamTerminated(ctx, streamSrv, stream.Run(ctx))
+	streamErr := stream.Run(ctx)
+	return p.onStreamTerminated(ctx, streamSrv, streamErr)
 }
 
 // onStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
@@ -38,7 +39,7 @@ func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, 
 			zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
 		)
 
-		if err := p.execOutputCache.EndOfStream(reqDetails.Request.StopBlockNum); err != nil {
+		if err := p.execOutputCache.EndOfStream(reqDetails.IsSubRequest, p.moduleTree.outputModuleMap); err != nil {
 			return fmt.Errorf("step new irr: exec out end of stream: %w", err)
 		}
 

@@ -49,8 +49,11 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 	})
 }
 
-func (e *Engine) EndOfStream(blockNum uint64) error {
+func (e *Engine) EndOfStream(isSubrequest bool, outputModules map[string]bool) error {
 	for _, cache := range e.caches {
+		if isSubrequest && outputModules[cache.moduleName] {
+			continue
+		}
 		if err := e.flushCache(cache); err != nil {
 			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
 		}

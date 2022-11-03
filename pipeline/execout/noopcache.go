@@ -2,6 +2,7 @@ package execout
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -11,27 +12,23 @@ type NoOpCache struct {
 	blockType string
 }
 
-func NewNoOpCache(blockType string) CacheEngine {
-	return &NoOpCache{blockType: blockType}
-}
-
-func (n *NoOpCache) Init(modules *manifest.ModuleHashes) error {
+func (n *NoOpCache) Init(_ *manifest.ModuleHashes) error {
 	return nil
 }
 
-func (n *NoOpCache) NewBlock(blockRef bstream.BlockRef, step bstream.StepType) error {
+func (n *NoOpCache) NewBlock(_ bstream.BlockRef, _ bstream.StepType) error {
 	return nil
 }
 
-func (n *NoOpCache) EndOfStream(blockNum uint64) error {
+func (n *NoOpCache) EndOfStream(_ bool, _ map[string]bool) error {
 	return nil
 }
 
-func (n *NoOpCache) HandleFinal(clock *pbsubstreams.Clock) error {
+func (n *NoOpCache) HandleFinal(_ *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (n *NoOpCache) HandleUndo(clock *pbsubstreams.Clock, moduleName string) {
+func (n *NoOpCache) HandleUndo(_ *pbsubstreams.Clock, _ string) {
 	return
 }
 

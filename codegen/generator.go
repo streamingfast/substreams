@@ -10,11 +10,29 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/streamingfast/substreams/manifest"
-
 	"github.com/jhump/protoreflect/desc"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/runtime/protoimpl"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
+
+var E_RUST_MODULE = &protoimpl.ExtensionInfo{
+	ExtendedType:  (*descriptorpb.FileOptions)(nil),
+	ExtensionType: (*string)(nil),
+	Field:         56781,
+	Name:          "rust_module",
+	Tag:           "bytes",
+}
+
+func init() {
+	err := protoregistry.GlobalTypes.RegisterExtension(E_RUST_MODULE)
+	if err != nil {
+		panic(fmt.Errorf("registering proto extension rust_module: %w", err))
+	}
+}
 
 //go:embed templates/lib.gotmpl
 var tplLibRs string
@@ -30,13 +48,6 @@ var tplMod string
 
 //go:embed templates/pb_mod.gotmpl
 var tplPbMod string
-
-//var protoMapping = map[string]string{
-//	"sf.ethereum.type.v2.Block":          "substreams_ethereum::pb::eth::v2::Block",
-//	"sf.substreams.v1.Clock":             "substreams::pb::substreams::Clock",
-//	"substreams.entity.v1.EntityChanges": "substreams_entity_change::pb::entity::EntityChanges",
-//	"substreams.entity.v1.EntityChange":  "substreams_entity_change::pb::entity::EntityChange",
-//}
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",
@@ -71,6 +82,13 @@ type Generator struct {
 func NewGenerator(pkg *pbsubstreams.Package, manifest *manifest.Manifest, protoDefinitions []*desc.FileDescriptor, srcPath string) *Generator {
 	engine := &Engine{Manifest: manifest}
 	utils["getEngine"] = engine.GetEngine
+
+	reader, err := os.Open("/Users/cbillett/devel/sf/substreams/codegen/test_substreams/proto/my/v1/my.proto")
+	if err != nil {
+		panic(err)
+	}
+	defer reader.Close()
+
 	return &Generator{
 		pkg:              pkg,
 		manifest:         manifest,
@@ -122,15 +140,9 @@ func (g *Generator) Generate() (err error) {
 	}
 	fmt.Println("Substreams Trait and base struct generated")
 
-	protoPackages := map[string]string{}
-	for _, definition := range g.protoDefinitions {
-		p := definition.GetPackage()
-		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
-	}
-
 	pbModFilePath := filepath.Join(filepath.Join(pbFolder, "mod.rs"))
 	if _, err := os.Stat(pbModFilePath); errors.Is(err, os.ErrNotExist) {
-		err = generate("pb/mod", tplPbMod, protoPackages, pbModFilePath)
+		err = generate("pb/mod", tplPbMod, protoPackages(g.protoDefinitions), pbModFilePath)
 		if err != nil {
 			return fmt.Errorf("generating pb/mod.rs: %w", err)
 		}
@@ -149,6 +161,20 @@ func (g *Generator) Generate() (err error) {
 	}
 
 	return nil
+}
+
+func protoPackages(protoDefinitions []*desc.FileDescriptor) map[string]string {
+	protoPackages := map[string]string{}
+	for _, definition := range protoDefinitions {
+		p := definition.GetPackage()
+		options := definition.GetOptions().(*descriptorpb.FileOptions)
+		rustModule := proto.GetExtension(options, E_RUST_MODULE).(string)
+		if rustModule == "" {
+			rustModule = strings.ReplaceAll(p, ".", "_")
+		}
+		protoPackages[p] = rustModule
+	}
+	return protoPackages
 }
 
 type GenerationOptions func(options *generateOptions)

@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	"os"
 	"time"
+
+	"github.com/streamingfast/substreams/orchestrator/work"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"

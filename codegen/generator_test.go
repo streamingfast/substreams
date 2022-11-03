@@ -89,13 +89,7 @@ func TestGenerate_GeneratePbMod(t *testing.T) {
 		require.NoError(t, err)
 		close(done)
 	}()
-	protoPackages := map[string]string{}
-	for _, definition := range g.protoDefinitions {
-		p := definition.GetPackage()
-		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
-	}
-
-	err = generate("", tplPbMod, protoPackages, "use std.out", WithTestWriter(w))
+	err = generate("", tplPbMod, protoPackages(g.protoDefinitions), "use std.out", WithTestWriter(w))
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)

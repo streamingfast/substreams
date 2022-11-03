@@ -13,6 +13,11 @@ binaries:
   default:
     type: wasm/rust-v1
     file: ./target/wasm32-unknown-unknown/release/substreams_test.wasm
+    protoPackageMapping:
+      sf.ethereum.type.v2: "substreams_ethereum::pb::eth::v2"
+      sf.substreams.v1: "substreams::pb::substreams"
+      sf.substreams.v1.test: "pb::test"
+      my.types.v1: "pb::my_types_v1"
 
 modules:
   - name: test_map
@@ -31,32 +36,6 @@ modules:
     inputs:
       - map: test_map
 
-  - name: test_store_add_int64
-    kind: store
-    initialBlock: 1
-    updatePolicy: add
-    valueType: int64
-    inputs:
-      - source: sf.substreams.v1.test.Block
-
-  - name: test_store_add_bigint
-    kind: store
-    initialBlock: 1
-    updatePolicy: add
-    valueType: bigint
-    inputs:
-      - source: sf.substreams.v1.test.Block
-
-  - name: assert_test_store_add_bigint
-    kind: map
-    initialBlock: 1
-    inputs:
-      - source: sf.substreams.v1.test.Block
-      - store: test_store_add_bigint
-        mode: deltas
-      - store: test_store_add_bigint
-    output:
-      type: boolean
 
   - name: test_store_delete_prefix
     kind: store
@@ -75,7 +54,8 @@ modules:
     output:
       type: boolean
 
-  # -------------------- StoreAddI64 -------------------- #
+
+  # -------------------- INT64 TESTS -------------------- #
   - name: setup_test_store_add_i64
     kind: store
     initialBlock: 1
@@ -104,7 +84,6 @@ modules:
     output:
       type: boolean
 
-  # -------------------- StoreSetI64/StoreGetI64 -------------------- #
   - name: setup_test_store_set_i64
     kind: store
     initialBlock: 1
@@ -133,6 +112,602 @@ modules:
     output:
       type: boolean
 
+  - name: setup_test_store_set_if_not_exists_i64
+    kind: store
+    initialBlock: 1
+    updatePolicy: set_if_not_exists
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_if_not_exists_i64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_i64
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_if_not_exists_i64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_i64
+      - store: setup_test_store_set_if_not_exists_i64
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_min_i64
+    kind: store
+    initialBlock: 1
+    updatePolicy: min
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_min_i64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_i64
+    output:
+      type: boolean
+
+  - name: assert_test_store_min_i64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_i64
+      - store: setup_test_store_min_i64
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_max_i64
+    kind: store
+    initialBlock: 1
+    updatePolicy: max
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_max_i64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_i64
+    output:
+      type: boolean
+
+  - name: assert_test_store_max_i64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_i64
+      - store: setup_test_store_max_i64
+        mode: deltas
+    output:
+      type: boolean
+
+  # -------------------- ------------------------ -------------------- #
+
+  # -------------------- FLOAT64 TESTS -------------------- #
+  - name: setup_test_store_add_float64
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: float64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_float64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_float64
+    output:
+      type: boolean
+
+  - name: assert_test_store_add_float64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_float64
+      - store: setup_test_store_add_float64
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_float64
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: float64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_float64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_float64
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_float64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_float64
+      - store: setup_test_store_set_float64
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_if_not_exists_float64
+    kind: store
+    initialBlock: 1
+    updatePolicy: set_if_not_exists
+    valueType: float64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_if_not_exists_float64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_float64
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_if_not_exists_float64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_float64
+      - store: setup_test_store_set_if_not_exists_float64
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_min_float64
+    kind: store
+    initialBlock: 1
+    updatePolicy: min
+    valueType: float64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_min_float64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_float64
+    output:
+      type: boolean
+
+  - name: assert_test_store_min_float64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_float64
+      - store: setup_test_store_min_float64
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_max_float64
+    kind: store
+    initialBlock: 1
+    updatePolicy: max
+    valueType: float64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_max_float64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_float64
+    output:
+      type: boolean
+
+  - name: assert_test_store_max_float64_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_float64
+      - store: setup_test_store_max_float64
+        mode: deltas
+    output:
+      type: boolean
+
+  # -------------------- BIGINT TESTS -------------------- #
+  - name: setup_test_store_add_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_bigint
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_bigint
+    output:
+      type: boolean
+
+  - name: assert_test_store_add_bigint_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_bigint
+      - store: setup_test_store_add_bigint
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_bigint
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_bigint
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_bigint_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_bigint
+      - store: setup_test_store_set_bigint
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_if_not_exists_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: set_if_not_exists
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_if_not_exists_bigint
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_bigint
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_if_not_exists_bigint_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_bigint
+      - store: setup_test_store_set_if_not_exists_bigint
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_min_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: min
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_min_bigint
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_bigint
+    output:
+      type: boolean
+
+  - name: assert_test_store_min_bigint_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_bigint
+      - store: setup_test_store_min_bigint
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_max_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: max
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_max_bigint
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_bigint
+    output:
+      type: boolean
+
+  - name: assert_test_store_max_bigint_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_bigint
+      - store: setup_test_store_max_bigint
+        mode: deltas
+    output:
+      type: boolean
+
+  # -------------------- BIG DECIMAL TESTS -------------------- #
+  - name: setup_test_store_add_bigdecimal
+    kind: store
+    initialBlock: 1
+    updatePolicy: add
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_bigdecimal
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_bigdecimal
+    output:
+      type: boolean
+
+  - name: assert_test_store_add_bigdecimal_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_bigdecimal
+      - store: setup_test_store_add_bigdecimal
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_bigdecimal
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_bigdecimal
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_bigdecimal
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_bigdecimal_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_bigdecimal
+      - store: setup_test_store_set_bigdecimal
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_if_not_exists_bigdecimal
+    kind: store
+    initialBlock: 1
+    updatePolicy: set_if_not_exists
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_if_not_exists_bigdecimal
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_bigdecimal
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_if_not_exists_bigdecimal_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_bigdecimal
+      - store: setup_test_store_set_if_not_exists_bigdecimal
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_min_bigdecimal
+    kind: store
+    initialBlock: 1
+    updatePolicy: min
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_min_bigdecimal
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_bigdecimal
+    output:
+      type: boolean
+
+  - name: assert_test_store_min_bigdecimal_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_min_bigdecimal
+      - store: setup_test_store_min_bigdecimal
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_max_bigdecimal
+    kind: store
+    initialBlock: 1
+    updatePolicy: max
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_max_bigdecimal
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_bigdecimal
+    output:
+      type: boolean
+
+  - name: assert_test_store_max_bigdecimal_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_max_bigdecimal
+      - store: setup_test_store_max_bigdecimal
+        mode: deltas
+    output:
+      type: boolean
+
+    # -------------------- STRING TESTS -------------------- #
+  - name: setup_test_store_set_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: string
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_string
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_string
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_string_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_string
+      - store: setup_test_store_set_string
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_set_if_not_exists_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: set_if_not_exists
+    valueType: string
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_set_if_not_exists_string
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_string
+    output:
+      type: boolean
+
+  - name: assert_test_store_set_if_not_exists_string_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_set_if_not_exists_string
+      - store: setup_test_store_set_if_not_exists_string
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_append_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: append
+    valueType: string
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_append_string
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_append_string
+    output:
+      type: boolean
+
+  - name: assert_test_store_append_string_deltas
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_append_string
+      - store: setup_test_store_append_string
+        mode: deltas
+    output:
+      type: boolean
+
+  # -------------------- ------------------------ -------------------- #
+
   - name: store_root
     kind: store
     initialBlock: 3
@@ -160,62 +735,94 @@ modules:
       - store: store_root
       - store: store_depend
 
-  - name: setup_test_store_get_set_string
+  - name: assert_all_test_i64
     kind: store
     initialBlock: 1
     updatePolicy: set
-    valueType: string
+    valueType: int64
     inputs:
-      - source: sf.substreams.v1.test.Block
+      - map: assert_test_store_add_i64
+      - map: assert_test_store_add_i64_deltas
+      - map: assert_test_store_set_i64
+      - map: assert_test_store_set_i64_deltas
+      - map: assert_test_store_set_if_not_exists_i64
+      - map: assert_test_store_set_if_not_exists_i64_deltas
+      - map: assert_test_store_min_i64
+      - map: assert_test_store_min_i64_deltas
+      - map: assert_test_store_max_i64
+      - map: assert_test_store_max_i64_deltas
 
-  - name: assert_test_store_get_set_string
-    kind: map
-    initialBlock: 1
-    inputs:
-      - source: sf.substreams.v1.test.Block
-      - store: setup_test_store_get_set_string
-      - store: setup_test_store_get_set_string
-        mode: deltas
-    output:
-      type: boolean
-
-  - name: setup_test_store_get_array_string
+  - name: assert_all_test_float64
     kind: store
     initialBlock: 1
     updatePolicy: set
-    valueType: string
+    valueType: int64
     inputs:
-      - source: sf.substreams.v1.test.Block
+      - map: assert_test_store_add_float64
+      - map: assert_test_store_add_float64_deltas
+      - map: assert_test_store_set_float64
+      - map: assert_test_store_set_float64_deltas
+      - map: assert_test_store_set_if_not_exists_float64
+      - map: assert_test_store_set_if_not_exists_float64_deltas
+      - map: assert_test_store_min_float64
+      - map: assert_test_store_min_float64_deltas
+      - map: assert_test_store_max_float64
+      - map: assert_test_store_max_float64_deltas
 
-  - name: assert_test_store_get_array_string
-    kind: map
-    initialBlock: 1
-    inputs:
-      - source: sf.substreams.v1.test.Block
-      - store: setup_test_store_get_array_string
-      - store: setup_test_store_get_array_string
-        mode: deltas
-    output:
-      type: boolean
-
-  - name: setup_test_store_get_array_proto
+  - name: assert_all_test_bigint
     kind: store
     initialBlock: 1
     updatePolicy: set
-    valueType: string
+    valueType: int64
     inputs:
-      - source: sf.substreams.v1.test.Block
+      - map: assert_test_store_add_bigint
+      - map: assert_test_store_add_bigint_deltas
+      - map: assert_test_store_set_bigint
+      - map: assert_test_store_set_bigint_deltas
+      - map: assert_test_store_set_if_not_exists_bigint
+      - map: assert_test_store_set_if_not_exists_bigint_deltas
+      - map: assert_test_store_min_bigint
+      - map: assert_test_store_min_bigint_deltas
+      - map: assert_test_store_max_bigint
+      - map: assert_test_store_max_bigint_deltas
 
-  - name: assert_test_store_get_array_proto
-    kind: map
+  - name: assert_all_test_bigdecimal
+    kind: store
     initialBlock: 1
+    updatePolicy: set
+    valueType: int64
     inputs:
-      - source: sf.substreams.v1.test.Block
-      - store: setup_test_store_get_array_proto
-      - store: setup_test_store_get_array_proto
-        mode: deltas
-    output:
-      type: boolean
+      - map: assert_test_store_add_bigdecimal
+      - map: assert_test_store_add_bigdecimal_deltas
+      - map: assert_test_store_set_bigdecimal
+      - map: assert_test_store_set_bigdecimal_deltas
+      - map: assert_test_store_set_if_not_exists_bigdecimal
+      - map: assert_test_store_set_if_not_exists_bigdecimal_deltas
+      - map: assert_test_store_min_bigdecimal
+      - map: assert_test_store_min_bigdecimal_deltas
+      - map: assert_test_store_max_bigdecimal
+      - map: assert_test_store_max_bigdecimal_deltas
+
+  - name: assert_all_test_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - map: assert_test_store_append_string
+      - map: assert_test_store_append_string_deltas
+      - map: assert_test_store_set_string
+      - map: assert_test_store_set_string_deltas
+      - map: assert_test_store_set_if_not_exists_string
+      - map: assert_test_store_set_if_not_exists_string_deltas
+
+  - name: assert_all_test_delete_prefix
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - map: assert_test_store_delete_prefix
 
   - name: assert_all_test
     kind: store
@@ -223,9 +830,9 @@ modules:
     updatePolicy: set
     valueType: int64
     inputs:
-      - map: assert_test_store_delete_prefix
-      - map: assert_test_store_add_bigint
-      - map: assert_test_store_add_i64
-      - map: assert_test_store_add_i64_deltas
-      - map: assert_test_store_set_i64
-      - map: assert_test_store_set_i64_deltas
+      - store: assert_all_test_delete_prefix
+      - store: assert_all_test_string
+      - store: assert_all_test_i64
+      - store: assert_all_test_float64
+      - store: assert_all_test_bigint
+      - store: assert_all_test_bigdecimal

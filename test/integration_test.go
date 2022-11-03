@@ -458,3 +458,14 @@ func Test_assert_all_test(t *testing.T) {
 	_, err := runTest(t, nil, 20, 31, []string{"assert_all_test"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
 }
+
+func Test_assert_all_string(t *testing.T) {
+	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock,
+		}
+	}
+	_, err := runTest(t, nil, 20, 31, []string{"assert_all_test_string"}, 10, 1, newBlockGenerator, nil)
+	require.NoError(t, err)
+}

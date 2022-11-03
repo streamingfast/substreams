@@ -55,15 +55,24 @@ var StoreType = map[string]string{
 	"bigint":     "BigInt",
 	"bigdecimal": "BigDecimal",
 	"bigfloat":   "BigDecimal",
-	"int64":      "BigInt",
-	"i64":        "BigInt",
+	"int64":      "Int64",
+	"i64":        "Int64",
 	"float64":    "Float64",
+	"boolean":    "bool",
+}
+
+func maybeTranslateType(t string) string {
+	u, ok := StoreType[t]
+	if !ok {
+		return t
+	}
+	return u
 }
 
 var UpdatePoliciesMap = map[string]string{
 	"":                                  "Unset",
 	manifest.UpdatePolicySet:            "Set",
-	manifest.UpdatePolicySetIfNotExists: "SetIfNotExist",
+	manifest.UpdatePolicySetIfNotExists: "SetIfNotExists",
 	manifest.UpdatePolicyAdd:            "Add",
 	manifest.UpdatePolicyMin:            "Min",
 	manifest.UpdatePolicyMax:            "Max",
@@ -275,7 +284,7 @@ func (e *Engine) mapFunctionSignature(module *manifest.Module) (*FunctionSignatu
 		outType = mustTransformProtoType(outType, e.Manifest)
 	}
 
-	fn := NewFunctionSignature(module.Name, "map", outType, "", inputs)
+	fn := NewFunctionSignature(module.Name, "map", maybeTranslateType(outType), "", inputs)
 
 	return fn, nil
 }
@@ -330,16 +339,17 @@ func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input
 	t := store.ValueType
 	p := store.UpdatePolicy
 
+	//TODO(colin): split out deltas code into a separate function
 	if input.Mode == "deltas" {
 		if strings.HasPrefix(t, "proto") {
 			t = mustTransformProtoType(t, e.Manifest)
 			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaProto<%s>>", t)
 		}
 		if p == manifest.UpdatePolicyAppend {
-			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaArray<%s>>", StoreType[t])
+			return fmt.Sprintf("substreams::store::Deltas<substreams::store::DeltaArray<%s>>", maybeTranslateType(t))
 		}
 
-		t = StoreType[t]
+		t = maybeTranslateType(t)
 		return fmt.Sprintf("substreams::store::Deltas<substreams::store::Delta%s>", t)
 	}
 
@@ -352,7 +362,7 @@ func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input
 		return fmt.Sprintf("substreams::store::StoreGetRaw")
 	}
 
-	t = StoreType[t]
+	t = maybeTranslateType(t)
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
 func (e *Engine) WritableStoreType(store *manifest.Module) string {
@@ -360,7 +370,7 @@ func (e *Engine) WritableStoreType(store *manifest.Module) string {
 	p := store.UpdatePolicy
 
 	if p == manifest.UpdatePolicyAppend {
-		return fmt.Sprintf("substreams::store::StoreAppend<%s>", StoreType[t])
+		return fmt.Sprintf("substreams::store::StoreAppend<%s>", maybeTranslateType(t))
 	}
 
 	p = UpdatePoliciesMap[p]
@@ -369,7 +379,7 @@ func (e *Engine) WritableStoreType(store *manifest.Module) string {
 		return fmt.Sprintf("substreams::store::Store%sProto<%s>", p, t)
 	}
 
-	return fmt.Sprintf("substreams::store::Store%s%s", p, StoreType[t])
+	return fmt.Sprintf("substreams::store::Store%s%s", p, maybeTranslateType(t))
 }
 
 func (e *Engine) WritableStoreDeclaration(store *manifest.Module) string {
@@ -377,7 +387,7 @@ func (e *Engine) WritableStoreDeclaration(store *manifest.Module) string {
 	p := store.UpdatePolicy
 
 	if p == manifest.UpdatePolicyAppend {
-		return fmt.Sprintf("let store: substreams::store::StoreAppend<%s> = substreams::store::StoreAppend::new();", StoreType[t])
+		return fmt.Sprintf("let store: substreams::store::StoreAppend<%s> = substreams::store::StoreAppend::new();", maybeTranslateType(t))
 	}
 
 	p = UpdatePoliciesMap[p]
@@ -386,7 +396,7 @@ func (e *Engine) WritableStoreDeclaration(store *manifest.Module) string {
 		t = mustTransformProtoType(t, e.Manifest)
 		return fmt.Sprintf("let store: substreams::store::Store%sProto<%s> = substreams::store::StoreSetProto::new();", p, t)
 	}
-	t = StoreType[t]
+	t = maybeTranslateType(t)
 	return fmt.Sprintf("let store: substreams::store::Store%s%s = substreams::store::Store%s%s::new();", p, t, p, t)
 }
 
@@ -401,10 +411,10 @@ func (e *Engine) ReadableStoreDeclaration(name string, store *manifest.Module, i
 	if input.Mode == "deltas" {
 
 		raw := fmt.Sprintf("let raw_%s_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(%s_deltas_ptr, %s_deltas_len).unwrap().deltas;", name, name, name)
-		delta := fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+		delta := fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::Delta%s> = substreams::store::Deltas::new(raw_%s_deltas);", name, maybeTranslateType(t), name)
 
 		if p == manifest.UpdatePolicyAppend {
-			delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaArray<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, StoreType[t], name)
+			delta = fmt.Sprintf("let %s_deltas: substreams::store::Deltas<substreams::store::DeltaArray<%s>> = substreams::store::Deltas::new(raw_%s_deltas);", name, maybeTranslateType(t), name)
 		}
 
 		if isProto {
@@ -417,7 +427,7 @@ func (e *Engine) ReadableStoreDeclaration(name string, store *manifest.Module, i
 		return fmt.Sprintf("let %s: substreams::store::StoreGetProto<%s>  = substreams::store::StoreGetProto::new(%s_ptr);", name, t, name)
 	}
 
-	t = StoreType[t]
+	t = maybeTranslateType(t)
 	if p == manifest.UpdatePolicyAppend {
 		return fmt.Sprintf("let %s: substreams::store::StoreGetRaw = substreams::store::StoreGetRaw::new(%s_ptr);", name, name)
 	}
@@ -456,7 +466,7 @@ func NewFunctionSignature(name string, t string, outType string, storePolicy str
 	return &FunctionSignature{
 		Name:        name,
 		Type:        t,
-		OutputType:  outType,
+		OutputType:  maybeTranslateType(outType),
 		StorePolicy: storePolicy,
 		Arguments:   arguments,
 	}
@@ -473,7 +483,7 @@ type Argument struct {
 func NewArgument(name string, argType string, moduleInput *manifest.Input) *Argument {
 	return &Argument{
 		Name:        name,
-		Type:        argType,
+		Type:        maybeTranslateType(argType),
 		ModuleInput: moduleInput,
 	}
 }

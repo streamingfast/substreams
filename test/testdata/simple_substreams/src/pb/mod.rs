@@ -7,7 +7,7 @@ pub mod test;
 
 impl Into<String> for Block {
     fn into(self) -> String {
-        format!("{}:{}:{}", self.id, self.number, self.step)
+        format!("{}:{}", self.id, self.number)
     }
 }
 
@@ -19,13 +19,11 @@ impl From<String> for Block {
             return Self {
                 id: "default".to_string(),
                 number: 1,
-                step: 1,
             };
         }
         Self {
             id: values[0].to_string(),
             number: u64::from_str(values[1]).unwrap(),
-            step: i32::from_str(values[2]).unwrap(),
         }
     }
 }

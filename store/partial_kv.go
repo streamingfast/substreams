@@ -42,7 +42,11 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	if err != nil {
 		return fmt.Errorf("unmarshal store: %w", err)
 	}
+
 	p.kv = storeData.Kv
+	if p.kv == nil {
+		p.kv = map[string][]byte{}
+	}
 	p.DeletedPrefixes = storeData.DeletePrefixes
 
 	p.logger.Debug("partial store loaded", zap.String("filename", filename))

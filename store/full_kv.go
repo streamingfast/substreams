@@ -54,6 +54,9 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	}
 
 	s.kv = storeData.Kv
+	if s.kv == nil {
+		s.kv = make(map[string][]byte)
+	}
 
 	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)))
 	return nil

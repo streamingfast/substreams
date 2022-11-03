@@ -1,0 +1,61 @@
+package store
+
+import (
+	"bytes"
+	"context"
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/store/marshaller"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"io"
+	"testing"
+)
+
+func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
+	var writtenBytes []byte
+	store := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
+		writtenBytes, err = io.ReadAll(f)
+		return err
+	})
+	store.OpenObjectFunc = func(ctx context.Context, name string) (out io.ReadCloser, err error) {
+		return io.NopCloser(bytes.NewBuffer(writtenBytes)), nil
+	}
+
+	kvs := &FullKV{
+		baseStore: &baseStore{
+			kv: map[string][]byte{},
+
+			logger:     zap.NewNop(),
+			marshaller: marshaller.Default(),
+
+			Config: &Config{
+				moduleInitialBlock: 0,
+				store:              store,
+			},
+		},
+	}
+
+	br, writer, err := kvs.Save(123)
+	require.NoError(t, err)
+
+	err = writer.Write(context.Background())
+	require.NoError(t, err)
+
+	kvl := &FullKV{
+		baseStore: &baseStore{
+			kv: map[string][]byte{},
+
+			logger:     zap.NewNop(),
+			marshaller: marshaller.Default(),
+
+			Config: &Config{
+				moduleInitialBlock: 0,
+				store:              store,
+			},
+		},
+	}
+
+	err = kvl.Load(context.Background(), br.ExclusiveEndBlock)
+	require.NoError(t, err)
+	require.NotNilf(t, kvl.kv, "kvl.kv is nil")
+}

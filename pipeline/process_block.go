@@ -31,7 +31,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		}
 	}()
 
-	metrics.BlockProcess.Inc()
+	metrics.BlockBeginProcess.Inc()
+	defer metrics.BlockEndProcess.Inc()
+
 	clock := &pbsubstreams.Clock{
 		Number:    block.Num(),
 		Id:        block.Id,

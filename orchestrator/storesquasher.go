@@ -197,8 +197,7 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 			return nil, fmt.Errorf("process range %s: %w", squashableRange.String(), err)
 		}
 
-		// FIXME(abourget): this was `squashCount++` prior.. we're ++ on a EndBlock?!
-		out.lastExclusiveEndBlock++
+		out.squashCount++
 
 		s.ranges = s.ranges[1:]
 

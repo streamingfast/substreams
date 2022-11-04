@@ -3,12 +3,16 @@ mod pb;
 use crate::pb::test;
 use std::fmt::{Debug, Display};
 
+use crate::test::Block;
+use substreams::prelude::{DeltaInt64, StoreDelete};
+use substreams::store::{Appender, DeltaArray, DeltaString, StoreAppend, StoreSetString};
 use substreams::{
     errors,
     scalar::BigInt,
     store::{
-        DeltaBigInt, DeltaI64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreDelete,
-        StoreGet, StoreGetBigInt, StoreGetI64, StoreNew, StoreSet, StoreSetI64, StoreSetProto,
+        DeltaBigInt, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreGet, StoreGetArray,
+        StoreGetBigInt, StoreGetInt64, StoreGetString, StoreNew, StoreSet, StoreSetInt64,
+        StoreSetProto,
     },
 };
 
@@ -17,7 +21,7 @@ const TO_ADD: i64 = 1;
 const TO_SUBTRACT: i64 = -1;
 
 #[substreams::handlers::map]
-fn test_map(blk: test::Block) -> Result<test::MapResult, errors::Error> {
+fn test_map(blk: Block) -> Result<test::MapResult, errors::Error> {
     let out = test::MapResult {
         block_number: blk.number,
         block_hash: blk.id,
@@ -26,7 +30,7 @@ fn test_map(blk: test::Block) -> Result<test::MapResult, errors::Error> {
 }
 
 #[substreams::handlers::store]
-fn test_store_add_int64(_blk: test::Block, s: StoreAddInt64) {
+fn test_store_add_int64(_blk: Block, s: StoreAddInt64) {
     s.add(1, "a.key", 1)
 }
 
@@ -37,14 +41,14 @@ fn test_store_proto(map_result: test::MapResult, s: StoreSetProto<test::MapResul
 }
 
 #[substreams::handlers::store]
-fn test_store_add_bigint(_blk: test::Block, s: StoreAddBigInt) {
+fn test_store_add_bigint(_blk: Block, s: StoreAddBigInt) {
     s.add(1, "a.key.pos", BigInt::from(TO_ADD));
     s.add(1, "a.key.neg", BigInt::from(TO_SUBTRACT));
 }
 
 #[substreams::handlers::map]
 fn assert_test_store_add_bigint(
-    block: test::Block,
+    block: Block,
     deltas: Deltas<DeltaBigInt>,
     s: StoreGetBigInt,
 ) -> Result<bool, errors::Error> {
@@ -75,7 +79,7 @@ fn assert_test_store_add_bigint(
 }
 
 #[substreams::handlers::store]
-fn test_store_delete_prefix(block: test::Block, s: StoreSetI64) {
+fn test_store_delete_prefix(block: Block, s: StoreSetInt64) {
     let to_set_key = format!("key:{}", block.number);
     s.set(block.number, to_set_key, &TO_SET);
 
@@ -87,10 +91,7 @@ fn test_store_delete_prefix(block: test::Block, s: StoreSetI64) {
 }
 
 #[substreams::handlers::map]
-fn assert_test_store_delete_prefix(
-    block: test::Block,
-    s: StoreGetI64,
-) -> Result<bool, errors::Error> {
+fn assert_test_store_delete_prefix(block: Block, s: StoreGetInt64) -> Result<bool, errors::Error> {
     let to_read_key = format!("key:{}", block.number);
     assert_eq!(TO_SET, s.get_last(to_read_key).unwrap());
 
@@ -105,23 +106,23 @@ fn assert_test_store_delete_prefix(
 
 // -------------------- StoreAddI64 -------------------- //
 #[substreams::handlers::store]
-fn setup_test_store_add_i64(block: test::Block, s: StoreAddInt64) {
+fn setup_test_store_add_i64(block: Block, s: StoreAddInt64) {
     s.add(block.number, "a.key", i64::MAX);
     s.add(block.number, "a.key", i64::MIN);
     s.add(block.number, "a.key", 1);
 }
 
 #[substreams::handlers::map]
-fn assert_test_store_add_i64(block: test::Block, s: StoreGetI64) -> Result<bool, errors::Error> {
+fn assert_test_store_add_i64(block: Block, s: StoreGetInt64) -> Result<bool, errors::Error> {
     assert(block.number, 0, s.get_last("a.key").unwrap());
     Ok(true)
 }
 
 #[substreams::handlers::map]
 fn assert_test_store_add_i64_deltas(
-    block: test::Block,
-    _store: StoreGetI64,
-    deltas: Deltas<DeltaI64>,
+    block: Block,
+    _store: StoreGetInt64,
+    deltas: Deltas<DeltaInt64>,
 ) -> Result<bool, errors::Error> {
     if deltas.deltas.len() != 3 {
         panic!("expected 3 deltas, got {}", deltas.deltas.len());
@@ -142,16 +143,16 @@ fn assert_test_store_add_i64_deltas(
     Ok(true)
 }
 
-// -------------------- StoreSetI64/StoreGetI64 -------------------- //
+// -------------------- StoreSetInt64/StoreGetInt64 -------------------- //
 #[substreams::handlers::store]
-fn setup_test_store_set_i64(block: test::Block, store: StoreSetI64) {
+fn setup_test_store_set_i64(block: Block, store: StoreSetInt64) {
     store.set(block.number, "0", &0);
     store.set(block.number, "min", &i64::MIN);
     store.set(block.number, "max", &i64::MAX);
 }
 
 #[substreams::handlers::map]
-fn assert_test_store_set_i64(block: test::Block, s: StoreGetI64) -> Result<bool, errors::Error> {
+fn assert_test_store_set_i64(block: Block, s: StoreGetInt64) -> Result<bool, errors::Error> {
     assert(block.number, 0, s.get_last("0").unwrap());
     assert(block.number, i64::MIN, s.get_last("min").unwrap());
     assert(block.number, i64::MAX, s.get_last("max").unwrap());
@@ -160,9 +161,9 @@ fn assert_test_store_set_i64(block: test::Block, s: StoreGetI64) -> Result<bool,
 
 #[substreams::handlers::map]
 fn assert_test_store_set_i64_deltas(
-    block: test::Block,
-    _s: StoreGetI64,
-    deltas: Deltas<DeltaI64>,
+    block: Block,
+    _s: StoreGetInt64,
+    deltas: Deltas<DeltaInt64>,
 ) -> Result<bool, errors::Error> {
     if deltas.deltas.len() != 3 {
         panic!("expected 3 deltas, got {}", deltas.deltas.len());
@@ -176,35 +177,149 @@ fn assert_test_store_set_i64_deltas(
     assert(block.number, i64::MAX, delta_2.new_value);
 
     Ok(true)
-
 }
 
 #[substreams::handlers::store]
-fn store_root(block: test::Block, store: StoreSetI64) {
-    store.set(block.number, format!("key.{}", block.number), &(block.number as i64));
+fn store_root(block: Block, store: StoreSetInt64) {
+    store.set(
+        block.number,
+        format!("key.{}", block.number),
+        &(block.number as i64),
+    );
 }
 
 #[substreams::handlers::store]
-fn store_depend(block: test::Block, store_root: StoreGetI64, _store: StoreSetI64) {
+fn store_depend(block: Block, store_root: StoreGetInt64, _store: StoreSetInt64) {
     let value = store_root.get_last("key.3");
     assert(block.number, true, value.is_some())
 }
 
 #[substreams::handlers::store]
-fn store_depends_on_depend(block: test::Block, store_root: StoreGetI64, _store_depend: StoreGetI64, _store: StoreSetI64) {
+fn store_depends_on_depend(
+    block: Block,
+    store_root: StoreGetInt64,
+    _store_depend: StoreGetInt64,
+    _store: StoreSetInt64,
+) {
     let value = store_root.get_last("key.3");
     assert(block.number, true, value.is_some())
+}
+
+#[substreams::handlers::store]
+fn setup_test_store_get_set_string(block: Block, store: StoreSetString) {
+    store.set(
+        1,
+        format!("key:{}", block.number),
+        &block.number.to_string(),
+    )
+}
+
+#[substreams::handlers::map]
+fn assert_test_store_get_set_string(
+    block: Block,
+    s: StoreGetString,
+    deltas: Deltas<DeltaString>,
+) -> Result<bool, errors::Error> {
+    if deltas.deltas.len() != 1 {
+        panic!("expected 1 deltas, got {}", deltas.deltas.len());
+    }
+
+    let value = s.get_last(format!("key:{}", block.number)).unwrap();
+    assert(block.number, block.number.to_string(), value);
+
+    let delta_0 = deltas.deltas.get(0).unwrap();
+    assert(
+        block.number,
+        block.number.to_string(),
+        delta_0.new_value.clone(),
+    );
+
+    Ok(true)
+}
+
+#[substreams::handlers::store]
+fn setup_test_store_get_array_string(block: Block, s: StoreAppend<String>) {
+    for i in 0..5 {
+        s.append(1, format!("key:{}:{}", block.number, i), i.to_string())
+    }
+}
+
+#[substreams::handlers::map]
+fn assert_test_store_get_array_string(
+    block: Block,
+    s: StoreGetArray<String>,
+    deltas: Deltas<DeltaArray<String>>,
+) -> Result<bool, errors::Error> {
+    if deltas.deltas.len() != 5 {
+        panic!("expected 5 deltas, got {}", deltas.deltas.len());
+    }
+
+    for i in 0..5 {
+        let value = s.get_last(format!("key:{}:{}", block.number, i)).unwrap();
+
+        for elem in value {
+            assert(block.number, i.to_string(), elem);
+        }
+
+        let delta_array = deltas.deltas.get(0).unwrap();
+        for delta in delta_array.old_value.clone() {
+            assert(block.number, i.to_string(), delta);
+        }
+    }
+
+    Ok(true)
+}
+
+#[substreams::handlers::store]
+fn setup_test_store_get_array_proto(block: Block, s: StoreAppend<Block>) {
+    for _i in 0..5 {
+        // append the block 5 times on the same key
+        s.append(1, format!("key:{}", block.number), block.clone());
+    }
+}
+
+#[substreams::handlers::map]
+fn assert_test_store_get_array_proto(
+    block: Block,
+    s: StoreGetArray<Block>,
+    deltas: Deltas<DeltaArray<Block>>,
+) -> Result<bool, errors::Error> {
+    if deltas.deltas.len() != 5 {
+        panic!("expected 5 deltas, got {}", deltas.deltas.len());
+    }
+
+    for i in 0..5 {
+        let blocks = s.get_last(format!("key:{}", block.number)).unwrap();
+        assert(block.number, 5, blocks.len());
+
+        for blk in blocks {
+            assert(block.number, &block.id, &blk.id);
+            assert(block.number, &block.number, &blk.number);
+            assert(block.number, &block.step, &blk.step);
+        }
+
+        let delta = &deltas.deltas[i];
+        if i == 0 {
+            assert(block.number, 0, delta.old_value.len());
+            assert(block.number, 1, delta.new_value.len());
+        } else {
+            assert(block.number, i, delta.old_value.len());
+            assert(block.number, i + 1, delta.new_value.len());
+        }
+    }
+
+    Ok(true)
 }
 
 #[substreams::handlers::store]
 fn assert_all_test(
-        _assert_test_store_delete_prefix: bool,
-        _assert_test_store_add_bigint: bool,
-        _assert_test_store_add_i64: bool,
-        _assert_test_store_add_i64_deltas: bool,
-        _assert_test_store_set_i64: bool,
-        _assert_test_store_set_i64_deltas: bool)
-{
+    _assert_test_store_delete_prefix: bool,
+    _assert_test_store_add_bigint: bool,
+    _assert_test_store_add_i64: bool,
+    _assert_test_store_add_i64_deltas: bool,
+    _assert_test_store_set_i64: bool,
+    _assert_test_store_set_i64_deltas: bool,
+) {
     //nop!
 }
 

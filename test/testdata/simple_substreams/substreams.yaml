@@ -160,6 +160,63 @@ modules:
       - store: store_root
       - store: store_depend
 
+  - name: setup_test_store_get_set_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: string
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_get_set_string
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_get_set_string
+      - store: setup_test_store_get_set_string
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_get_array_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: string
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_get_array_string
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_get_array_string
+      - store: setup_test_store_get_array_string
+        mode: deltas
+    output:
+      type: boolean
+
+  - name: setup_test_store_get_array_proto
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: string
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_get_array_proto
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_get_array_proto
+      - store: setup_test_store_get_array_proto
+        mode: deltas
+    output:
+      type: boolean
+
   - name: assert_all_test
     kind: store
     initialBlock: 1

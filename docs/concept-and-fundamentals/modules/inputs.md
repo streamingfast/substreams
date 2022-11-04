@@ -61,6 +61,11 @@ The `store` inputs type __ is defined in the Substreams manifest as seen below.
     - store: my_store # defaults to mode: get
 ```
 
+There are **two possible modes** that can be defined for modules:
+
+* `get`
+* `delta`
+
 {% hint style="warning" %}
 _Important: Stores have constraints defined as_:
 
@@ -68,14 +73,7 @@ _Important: Stores have constraints defined as_:
 * Stores cannot depend on themselves.
 {% endhint %}
 
-### Modes
-
-There are two possible modes that can be defined for modules:
-
-* `get`
-* and `delta`.
-
-#### `get`
+### `get` mode
 
 Get mode provides a key/value store that is readily queryable and guaranteed to be in sync with the block being processed.&#x20;
 
@@ -83,7 +81,7 @@ Get mode provides a key/value store that is readily queryable and guaranteed to 
 _**Note:** `get` mode is the default mode._
 {% endhint %}
 
-#### `delta`
+### `delta` mode
 
 When mode `delta` is specified, the input of the module will be a [protobuf object](../../../proto/sf/substreams/v1/substreams.proto#L124) containing all the changes that occurred in the `store` module in the same block. You can then loop through keys, decode the old and new values that were mutated in your module.
 

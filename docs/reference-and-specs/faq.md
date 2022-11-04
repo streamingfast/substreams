@@ -44,7 +44,7 @@ The Substreams documentation also provides general instructions surrounding auth
 
 [https://substreams.streamingfast.io/reference-and-specs/authentication](https://substreams.streamingfast.io/reference-and-specs/authentication)
 
-### **How do I make a Substream?**
+### **How do I create a Substreams implementation?**
 
 Developers can create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground that has examples to use as a reference and starting point.
 

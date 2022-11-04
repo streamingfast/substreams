@@ -12,7 +12,7 @@ This documentation aims to outline information to further help developers workin
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
-### Building a Substream Key Steps
+### Key Steps
 
 * Identify smart contract addresses of interest including wallets, decentralized exchanges (DEXs), etc.
 * Identify data, and define and create protobufs.

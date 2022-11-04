@@ -4,7 +4,7 @@ description: StreamingFast Substreams examples
 
 # Examples
 
-### Substream Examples
+### Substreams Examples
 
 #### Substreams Template for Dev Guide
 

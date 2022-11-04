@@ -17,7 +17,7 @@ _Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to
 Once the StreamingFast authentication token has been attained and the Substreams CLI has been installed it's time to run Substreams.
 
 ```bash
-substreams run -e api-dev.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
+substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
 
 {% hint style="info" %}
@@ -33,7 +33,7 @@ First, start the Substreams CLI tool using the `run` command.
 #### Endpoint
 
 The endpoint is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
-`-e api-dev.streamingfast.io:443`
+`-e mainnet.eth.streamingfast.io:443`
 
 #### Substreams Package
 

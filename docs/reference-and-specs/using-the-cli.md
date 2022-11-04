@@ -19,7 +19,7 @@ _Note: any time a package is specified any of the following can be used, local `
 The `run` command connects to a Substreams endpoint and begins processing data.
 
 ```
-substreams run -e api-dev.streamingfast.io:443 \
+substreams run -e mainnet.eth.streamingfast.io:443 \
    -t +1 \
    ./substreams.yaml \
    module_name
@@ -27,7 +27,7 @@ substreams run -e api-dev.streamingfast.io:443 \
 
 #### Run Command Breakdown
 
-* `-e api-dev.streamingfast.io:443` is the endpoint of the provider running our Substreams
+* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running our Substreams
 * `-t +1` (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
@@ -37,7 +37,7 @@ Passing a different `-s` (or `--start-block`) will run any prior modules at high
 Example output of `gravatar_updates` starting at block 6200807.
 
 ```
-$ substreams run -e api-dev.streamingfast.io:443 \
+$ substreams run -e mainnet.eth.streamingfast.io:443 \
     https://github.com/Jannis/gravity-substream/releases/download/v0.0.1/gravity-v0.1.0.spkg \
     gravatar_updates -o json
 {
@@ -150,7 +150,7 @@ Usage:
 
 Available Commands:
   completion  Generate the autocompletion script for the specified shell
-  decode      
+  decode
   graph       Generate mermaid-js graph document
   help        Help about any command
   info        Display package modules and docs

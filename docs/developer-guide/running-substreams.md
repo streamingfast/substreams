@@ -7,7 +7,7 @@ description: Running StreamingFast Substreams for the first time
 After a successful build Substreams can be started with the following command, explained in greater detail below.
 
 ```
-substreams run -e api-dev.streamingfast.io:443 \
+substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
    block_to_transfers \
    --start-block 12292922 \
@@ -29,7 +29,7 @@ First, start the Substreams CLI tool passing it a `run` command.
 #### Firehose URI
 
 The server address is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
-`-e api-dev.streamingfast.io:443`
+`-e mainnet.eth.streamingfast.io:443`
 
 #### Substreams YAML Configuration File
 
@@ -51,7 +51,7 @@ Cease block processing with `--stop-block +1.` The +1 option will request a sing
 The following messages will be printed to the terminal for a successfully installed and configured Substreams setup.
 
 ```bash
- substreams run -e api-dev.streamingfast.io:443 \
+ substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
    block_to_transfers \
    --start-block 12292922 \

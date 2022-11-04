@@ -21,7 +21,7 @@ The following code will instruct Firehose to generate merged blocks files to use
 ```bash
 # Downloads 2.6GB of data
 fireeth tools download-from-firehose \
-  api-dev.streamingfast.io:443 \
+  mainnet.eth.streamingfast.io:443 \
   6810000 6820000 \
   ./localblocks
 # You can skip this one:

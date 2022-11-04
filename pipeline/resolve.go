@@ -9,23 +9,22 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool) (*reqctx.RequestDetails, error) {
-	// TODO: fill in this method
-	// TODO: move to `reqctx` ?
-	// request is: start_block: 0, stop_block: 15M
-	// * find the HIGHEST finalized blocks close to stop_block
-	//   (and the highest of all if stop_block is 0)
-	// * we create a new `pbsubstreams.Request{start_block: 15M, stop_block: 15M}
-	//   we create an internal representation of a Request, because we need a new field:
-	//      * output historical data
-	//   we kick off our engine this way, and make sure we pipe
-	//   all the BlockScopedData through, from caches produced.
+type getRecentFinalBlockFunc func() (uint64, error)
+
+func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRecentFinalBlock getRecentFinalBlockFunc) (*reqctx.RequestDetails, error) {
+	// huge nasty FIXME:
 	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
 	//         process directly, even if that's realllly in the past.
 	///        Eventually, we have a first process that corrects the live segment
 	///        joining on a final segment, and then kick off parallel processing
 	///        until a new, more recent, live block.
+	// See also `resolveStartBlockNum`'s TODO
 	effectiveStartBlock, err := resolveStartBlockNum(request)
+	if err != nil {
+		return nil, err
+	}
+
+	liveHandoffBlockNum, err := computeLiveHandoffBlockNum(getRecentFinalBlock, request.StopBlockNum)
 	if err != nil {
 		return nil, err
 	}
@@ -36,15 +35,37 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool) (*req
 	}
 
 	return &reqctx.RequestDetails{
-		Request:                request,
-		EffectiveStartBlockNum: effectiveStartBlock,
-		IsSubRequest:           isSubRequest,
-		IsOutputModule:         outMap,
+		Request:              request,
+		RequestStartBlockNum: effectiveStartBlock,
+		LiveHandoffBlockNum:  liveHandoffBlockNum,
+		StopBlockNum:         request.StopBlockNum,
+		IsSubRequest:         isSubRequest,
+		IsOutputModule:       outMap,
 	}, nil
 }
 
+func computeLiveHandoffBlockNum(getRecentFinalBlock getRecentFinalBlockFunc, stopBlockNum uint64) (uint64, error) {
+	liveHandoffBlockNum, err := getRecentFinalBlock()
+	if stopBlockNum == 0 {
+		if err != nil {
+			return 0, fmt.Errorf("cannot determine a recent finalized block: %w", err)
+		}
+		return liveHandoffBlockNum, nil
+	}
+	if err != nil {
+		return stopBlockNum, nil
+	}
+	return minOf(stopBlockNum, liveHandoffBlockNum), nil
+}
+
 func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
-	// Should already be validated but we play safe here
+	// TODO(abourget): a caller will need to verify that, if there's a cursor.Step that is New or Undo,
+	// then we need to validate that we are returning not only a number, but an ID,
+	// We then need to sync from a known finalized Snapshot's block, down to the potentially
+	// forked block in the Cursor, to then send the Substreams Undo payloads to the user,
+	// before continuing on to live (or parallel download, if the fork happened way in the past
+	// and everything is irreversible.
+
 	if req.StartBlockNum < 0 {
 		return 0, status.Error(grpccodes.InvalidArgument, "start block num must be positive")
 	}
@@ -57,12 +78,21 @@ func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
 	if err != nil {
 		return 0, status.Errorf(grpccodes.InvalidArgument, "invalid start cursor %q: %s", cursor, err.Error())
 	}
-
-	if cursor.Step.Matches(bstream.StepNew) || cursor.Step.Matches(bstream.StepIrreversible) {
+	if cursor.Step.Matches(bstream.StepIrreversible) {
+		return cursor.Block.Num() + 1, nil // this block was the last sent to the customer
+	}
+	if cursor.Step.Matches(bstream.StepNew) {
 		return cursor.Block.Num() + 1, nil // this block was the last sent to the customer
 	}
 	if cursor.Step.Matches(bstream.StepUndo) {
 		return cursor.Block.Num(), nil
 	}
 	return 0, fmt.Errorf("invalid start cursor step")
+}
+
+func minOf(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
 }

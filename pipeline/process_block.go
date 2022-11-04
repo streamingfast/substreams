@@ -146,7 +146,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		}
 	}
 
-	if shouldReturnDataOutputs(clock.Number, reqDetails.EffectiveStartBlockNum, reqDetails.IsSubRequest) {
+	if shouldReturnDataOutputs(clock.Number, reqDetails.RequestStartBlockNum, reqDetails.IsSubRequest) {
 		logger.Debug("will return module outputs")
 
 		if err = returnModuleDataOutputs(clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {

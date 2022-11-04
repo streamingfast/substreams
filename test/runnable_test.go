@@ -73,7 +73,10 @@ func processRequest(
 
 	var opts []pipeline.Option
 
-	reqDetails, err := pipeline.BuildRequestDetails(request, isSubRequest)
+	reqDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, func() (uint64, error) {
+		return request.StopBlockNum, nil
+		//return 0, fmt.Errorf("no live feed")
+	})
 	require.NoError(t, err)
 	ctx = reqctx.WithRequest(ctx, reqDetails)
 
@@ -98,7 +101,7 @@ func processRequest(
 	storeConfigs, err := pipeline.InitializeStoreConfigs(moduleTree, runtimeConfig.BaseObjectStore)
 	require.NoError(t, err)
 
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, reqDetails.EffectiveStartBlockNum, request.StopBlockNum, isSubRequest)
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, reqDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
 	pipe := pipeline.New(
 		ctx,

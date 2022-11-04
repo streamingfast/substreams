@@ -153,7 +153,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 
 	for name, storeConfig := range p.stores.configs {
 		if name == outputModuleName {
-			partialStore := storeConfig.NewPartialKV(reqDetails.EffectiveStartBlockNum, logger)
+			partialStore := storeConfig.NewPartialKV(reqDetails.RequestStartBlockNum, logger)
 			storeMap.Set(partialStore)
 
 			p.backprocessingStores = append(p.backprocessingStores, &backprocessingStore{
@@ -163,8 +163,8 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 		} else {
 			fullStore := storeConfig.NewFullKV(logger)
 
-			if fullStore.InitialBlock() != reqDetails.EffectiveStartBlockNum {
-				if err := fullStore.Load(ctx, reqDetails.EffectiveStartBlockNum); err != nil {
+			if fullStore.InitialBlock() != reqDetails.RequestStartBlockNum {
+				if err := fullStore.Load(ctx, reqDetails.RequestStartBlockNum); err != nil {
 					return nil, fmt.Errorf("load full store: %w", err)
 				}
 			}
@@ -187,7 +187,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	backproc, err := orchestrator.BuildBackprocessor(
 		p.ctx,
 		p.runtimeConfig,
-		reqDetails.EffectiveStartBlockNum,
+		reqDetails.RequestStartBlockNum,
 		p.moduleTree.graph,
 		p.respFunc,
 		p.stores.configs,
@@ -266,12 +266,12 @@ func shouldReturnProgress(isSubRequest bool) bool {
 	return isSubRequest
 }
 
-func shouldReturnDataOutputs(blockNum, effectiveStartBlockNum uint64, isSubRequest bool) bool {
-	return shouldReturn(blockNum, effectiveStartBlockNum) && !isSubRequest
+func shouldReturnDataOutputs(blockNum, requestStartBlockNum uint64, isSubRequest bool) bool {
+	return shouldReturn(blockNum, requestStartBlockNum) && !isSubRequest
 }
 
-func shouldReturn(blockNum, effectiveStartBlockNum uint64) bool {
-	return blockNum >= effectiveStartBlockNum
+func shouldReturn(blockNum, requestStartBlockNum uint64) bool {
+	return blockNum >= requestStartBlockNum
 }
 
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {

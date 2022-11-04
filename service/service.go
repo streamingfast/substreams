@@ -157,13 +157,13 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, isSubRequest)
 
-	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest)
+	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, s.streamFactory.GetRecentFinalBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 
-	if err := moduleTree.ValidateEffectiveStartBlock(requestDetails.EffectiveStartBlockNum); err != nil {
+	if err := moduleTree.ValidateRequestStartBlock(requestDetails.RequestStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
@@ -178,7 +178,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.EffectiveStartBlockNum, request.StopBlockNum, isSubRequest)
+	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
 	respFunc := responseHandler(logger, streamSrv)
 	opts := s.buildPipelineOptions(ctx, request)
@@ -198,18 +198,17 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		defer requestStats.Shutdown()
 	}
 	logger.Info("initializing pipeline",
-		zap.Int64("requested_start_block", request.StartBlockNum),
-		zap.Uint64("effective_start_block", requestDetails.EffectiveStartBlockNum),
-		zap.Uint64("requested_stop_block", request.StopBlockNum),
-		zap.String("requested_start_cursor", request.StartCursor),
-		zap.Bool("is_back_processing", requestDetails.IsSubRequest),
+		zap.Uint64("request_start_block", requestDetails.RequestStartBlockNum),
+		zap.Uint64("request_stop_block", request.StopBlockNum),
+		//zap.String("request_start_cursor", request.StartCursor),
+		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
 		zap.Strings("outputs", request.OutputModules),
 	)
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
-	// It's ok to use `StartBlockNum` directly here (instead of `requestCtx.EffectiveStartBlockNum`)
+	// It's ok to use `StartBlockNum` directly here (instead of `requestCtx.RequestStartBlockNum`)
 	// and in the constructor we also pass `StartCursor` which will be handled by `streamFactory.New`
 	// and will be used to bootstrap the stream correctly from it if set.
 	logger.Info("creating firehose stream",

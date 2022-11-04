@@ -6,6 +6,8 @@ package pipeline
 // highest (hard-coded for now?) final block.
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/streamingfast/bstream"
@@ -100,6 +102,39 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			}
 			if got != tt.expectedBlockNum {
 				t.Errorf("resolveStartBlockNum() got = %v, want %v", got, tt.expectedBlockNum)
+			}
+		})
+	}
+}
+
+func Test_computeLiveHandoffBlockNum(t *testing.T) {
+	tests := []struct {
+		liveHubAvailable bool
+		recentBlockNum   uint64
+		stopBlockNum     uint64
+		expectHandoffNum uint64
+		expectError      bool
+	}{
+		{true, 100, 0, 100, false},
+		{true, 100, 150, 100, false},
+		{true, 100, 50, 50, false},
+		{false, 0, 50, 50, false},
+		{false, 0, 0, 0, true},
+	}
+
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			got, err := computeLiveHandoffBlockNum(func() (uint64, error) {
+				if !test.liveHubAvailable {
+					return 0, fmt.Errorf("live not available")
+				}
+				return test.recentBlockNum, nil
+			}, test.stopBlockNum)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectHandoffNum, got)
 			}
 		})
 	}

@@ -44,3 +44,8 @@ func (sf *StreamFactory) New(
 		h,
 		options...), nil
 }
+
+func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
+	_, _, _, finalBlockNum, err := s.hub.HeadInfo()
+	return finalBlockNum, err
+}

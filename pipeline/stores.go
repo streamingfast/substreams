@@ -25,8 +25,8 @@ type Stores struct {
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 }
 
-func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, effectiveStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
-	bounder := NewStoreBoundary(storeSnapshotSaveInterval, effectiveStartBlockNum, stopBlockNum)
+func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
+	bounder := NewStoreBoundary(storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum)
 	return &Stores{
 		configs:      storeConfigs,
 		isSubRequest: isSubRequest,

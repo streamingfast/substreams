@@ -108,11 +108,11 @@ func (t *ModuleTree) hashModules() {
 	}
 }
 
-func (t *ModuleTree) ValidateEffectiveStartBlock(effectiveStartBlockNum uint64) error {
+func (t *ModuleTree) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
 	for _, module := range t.processModules {
 		isOutput := t.outputModuleMap[module.Name]
-		if isOutput && effectiveStartBlockNum < module.InitialBlock {
-			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", effectiveStartBlockNum, module.Name, module.InitialBlock)
+		if isOutput && requestStartBlockNum < module.InitialBlock {
+			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", requestStartBlockNum, module.Name, module.InitialBlock)
 		}
 	}
 	return nil

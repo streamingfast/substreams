@@ -12,14 +12,14 @@ type storeBoundary struct {
 
 func NewStoreBoundary(
 	interval uint64,
-	effectiveStartBlockNum uint64,
+	requestStartBlockNum uint64,
 	requestStopBlock uint64,
 ) *storeBoundary {
 	b := &storeBoundary{
 		interval:         interval,
 		requestStopBlock: requestStopBlock,
 	}
-	b.InitNextBoundary(effectiveStartBlockNum)
+	b.InitNextBoundary(requestStartBlockNum)
 	return b
 }
 

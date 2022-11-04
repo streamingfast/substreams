@@ -5,14 +5,10 @@ import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 type RequestDetails struct {
 	Request *pbsubstreams.Request
 
-	EffectiveStartBlockNum uint64 // TODO(abourget): to be replaced by LiveHandoffBlockNum
-
-	// Stream
-	StartHistoricalBlock uint64 // block at which we start sending
-	// or LiveHandoffBlockNum
-	StartLiveBlockNum uint64 // block at which we hand off to live
-
-	StopBlockNum uint64
+	// What the user requested, derived from either the Request.StartBlockNum or Request.Cursor
+	RequestStartBlockNum uint64
+	LiveHandoffBlockNum  uint64
+	StopBlockNum         uint64
 
 	IsSubRequest   bool
 	IsOutputModule map[string]bool

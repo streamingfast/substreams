@@ -199,7 +199,7 @@ func withTestRequest(t *testing.T, outputModule string, startBlock uint64) conte
 	req, err := BuildRequestDetails(&pbsubstreams.Request{
 		OutputModules: strings.Split(outputModule, ","),
 		StartBlockNum: int64(startBlock),
-	}, false)
+	}, false, func() (uint64, error) { return 0, nil })
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)
 }

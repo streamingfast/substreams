@@ -39,6 +39,9 @@ func (b *baseStore) GetDeltas() []*pbsubstreams.StoreDelta {
 	return b.deltas
 }
 
-func (b *baseStore) AddDeltas(deltas []*pbsubstreams.StoreDelta) {
-	b.deltas = append(b.deltas, deltas...)
+func (b *baseStore) SetDeltas(deltas []*pbsubstreams.StoreDelta) {
+	b.deltas = deltas
+	for _, delta := range deltas {
+		b.ApplyDelta(delta)
+	}
 }

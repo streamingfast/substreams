@@ -164,3 +164,34 @@ func Test_ApplyDeltasReverse(t *testing.T) {
 		})
 	}
 }
+
+func Test_baseStore_SetDeltas(t *testing.T) {
+	s := baseStore{kv: map[string][]byte{"A": []byte("a")}}
+	s.SetDeltas([]*pbsubstreams.StoreDelta{
+		{
+			Key:       "A",
+			Operation: pbsubstreams.StoreDelta_DELETE,
+			OldValue:  []byte("a"),
+		},
+		{
+			Key:       "B",
+			Operation: pbsubstreams.StoreDelta_CREATE,
+			NewValue:  []byte("b"),
+		},
+		{
+			Key:       "C",
+			Operation: pbsubstreams.StoreDelta_CREATE,
+			NewValue:  []byte("c"),
+		},
+		{
+			Key:       "C",
+			Operation: pbsubstreams.StoreDelta_UPDATE,
+			OldValue:  []byte("c"),
+			NewValue:  []byte("d"),
+		},
+	})
+	assert.Len(t, s.kv, 2)
+	assert.Equal(t, "b", string(s.kv["B"]))
+	assert.Equal(t, "d", string(s.kv["C"]))
+	assert.Len(t, s.deltas, 4)
+}

@@ -436,17 +436,17 @@ func Test_test_store_get_array_string(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_test_store_get_array_proto(t *testing.T) {
-	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
-		return &LinearBlockGenerator{
-			startBlock:         startBlock,
-			inclusiveStopBlock: inclusiveStopBlock,
-		}
-	}
-
-	_, err := runTest(t, nil, 1, 5, []string{"setup_test_store_get_array_proto", "assert_test_store_get_array_proto"}, 10, 1, newBlockGenerator, nil)
-	require.NoError(t, err)
-}
+//func Test_test_store_get_array_proto(t *testing.T) {
+//	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+//		return &LinearBlockGenerator{
+//			startBlock:         startBlock,
+//			inclusiveStopBlock: inclusiveStopBlock,
+//		}
+//	}
+//
+//	_, err := runTest(t, nil, 1, 5, []string{"setup_test_store_get_array_proto", "assert_test_store_get_array_proto"}, 10, 1, newBlockGenerator, nil)
+//	require.NoError(t, err)
+//}
 
 func Test_assert_all_test(t *testing.T) {
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {

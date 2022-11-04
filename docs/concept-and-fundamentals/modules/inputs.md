@@ -4,11 +4,9 @@ description: StreamingFast Substreams module inputs
 
 # Inputs
 
-### Data Inputs
+Modules can receive inputs of three types: `source`, `map`, and `store`.
 
-Modules come in two varieties: `map` and `store` and can define one or multiple inputs. The possible inputs are `map`, `store`, and `source.`
-
-#### `Source`
+## Input type `source`
 
 An Input of type `source` represents a chain-specific, firehose-provisioned protobuf object.
 
@@ -33,7 +31,7 @@ The `sf.substreams.v1.Clock` represents:
 * a block ID,&#x20;
 * and a block timestamp.
 
-#### `Map`
+## Input type `map`
 
 An Input of type `map` represents the output of another `map` module. The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
 
@@ -50,7 +48,7 @@ The `map` inputs type __ is defined in the Substreams manifest as seen below.
 
 Find additional information about `maps` in the Substreams [modules documentation](../../concepts/modules.md#the-map-module-type).
 
-#### `Store`
+## Input type `store`
 
 An Input of type `store` is the state of another store used with Substreams.
 
@@ -62,6 +60,13 @@ The `store` inputs type __ is defined in the Substreams manifest as seen below.
       mode: deltas
     - store: my_store # defaults to mode: get
 ```
+
+{% hint style="warning" %}
+_Important: Stores have constraints defined as_:
+
+* Stores received as `inputs` are read-only.
+* Stores cannot depend on themselves.
+{% endhint %}
 
 ### Modes
 
@@ -80,13 +85,26 @@ _**Note:** `get` mode is the default mode._
 
 #### `delta`
 
-Delta mode provides a protobuf object containing all the changes that occurred in the `store` module in the same block.
+When mode `delta` is specified, the input of the module will be a [protobuf object](../../../proto/sf/substreams/v1/substreams.proto#L124) containing all the changes that occurred in the `store` module in the same block. You can then loop through keys, decode the old and new values that were mutated in your module.
 
-{% hint style="warning" %}
-_Important: Stores have constraints defined as_:
+Here is the protobuf model for StoreDeltas:
 
-* Stores received as `inputs` are read-only.
-* Stores cannot depend on themselves.
-{% endhint %}
+```protobuf
+message StoreDeltas {
+  repeated StoreDelta deltas = 1;
+}
 
-Find additional information for `stores` in the Substreams [modules documentation](../../concepts/modules.md#the-store-module-type).
+message StoreDelta {
+  enum Operation {
+    UNSET = 0;
+    CREATE = 1;
+    UPDATE = 2;
+    DELETE = 3;
+  }
+  Operation operation = 1;
+  uint64 ordinal = 2;
+  string key = 3;
+  bytes old_value = 4;
+  bytes new_value = 5;
+}
+```

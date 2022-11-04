@@ -100,7 +100,7 @@ StreamingFast was originally called dfuse. The company changed the name and is i
 
 StreamingFast is a protocol infrastructure company that provides a massively scalable architecture for streaming blockchain data. StreamingFast is one of the core developers working alongside The Graph Foundation.
 
-### why wasm32-unknown-unknown?
+### Why the `wasm32-unknown-unknown` target?
 
 The first unknown is the system that you are compiling on, and the second is the system you are targeting.
 

@@ -41,14 +41,16 @@ The `updatePolicy` property determines what methods are available in the runtime
 
 The `updatePolicy` also defines the merging strategy for identical keys found in two contiguous stores produced through parallel processing.
 
-| Method              | Supported Value Types                    | Merge strategy\*                    |
-| ------------------- | ---------------------------------------- | ----------------------------------- |
-| `set`               | `bytes`, `string`, `proto:...`           | The last key wins                   |
-| `set_if_not_exists` | `bytes`, `string`, `proto:...`           | The first key wins                  |
-| `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up                |
-| `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept            |
-| `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept           |
-| `append`            | `string`, `bytes`                        | Both keys are concatenated in order |
+| Method              | Supported Value Types                    | Merge strategy\*                                                                                                                                                                                             |
+| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `set`               | `bytes`, `string`, `proto:...`           | The last key wins                                                                                                                                                                                            |
+| `set_if_not_exists` | `bytes`, `string`, `proto:...`           | The first key wins                                                                                                                                                                                           |
+| `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up                                                                                                                                                                                         |
+| `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept                                                                                                                                                                                     |
+| `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept                                                                                                                                                                                    |
+| `append`            | `string`, `bytes`                        | Both keys are concatenated in order. Appended values are limited to 8Kb. For aggregation patterns, [see this example](https://github.com/streamingfast/substreams-uniswap-v3/blob/develop/src/lib.rs#L760).  |
+
+
 
 {% hint style="info" %}
 _**Note**: all update policies provide the `delete_prefix` method._

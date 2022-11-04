@@ -187,7 +187,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	backproc, err := orchestrator.BuildBackprocessor(
 		p.ctx,
 		p.runtimeConfig,
-		reqDetails.RequestStartBlockNum,
+		reqDetails.LiveHandoffBlockNum,
 		p.moduleTree.graph,
 		p.respFunc,
 		p.stores.configs,

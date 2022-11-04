@@ -12,6 +12,7 @@ type ModuleTree struct {
 
 	storeModules    []*pbsubstreams.Module
 	processModules  []*pbsubstreams.Module // only those needed to output `OutputModules`, a subset of the `request.Modules`
+	outputModules   []*pbsubstreams.Module // only those needed to output `OutputModules`
 	outputModuleMap map[string]bool
 
 	graph        *manifest.ModuleGraph
@@ -36,7 +37,6 @@ func NewModuleTree(request *pbsubstreams.Request, blockType string) (out *Module
 	if err := out.computeGraph(); err != nil {
 		return nil, fmt.Errorf("compute graph: %w", err)
 	}
-	out.hashModules()
 
 	return out, nil
 }
@@ -98,7 +98,22 @@ func (t *ModuleTree) computeGraph() error {
 	}
 	t.storeModules = storeModules
 
+	t.outputModules = computeOutputModules(t.processModules, t.outputModuleMap)
+
 	return nil
+}
+
+func computeOutputModules(mods []*pbsubstreams.Module, outMap map[string]bool) (out []*pbsubstreams.Module) {
+	for _, module := range mods {
+		isOutput := outMap[module.Name]
+		if isOutput {
+			out = append(out, module)
+		}
+	}
+	if len(outMap) != len(out) {
+		panic(fmt.Errorf("inconsistent output modules and output modules map: %d and %d", len(out), len(outMap)))
+	}
+	return
 }
 
 func (t *ModuleTree) hashModules() {
@@ -109,9 +124,8 @@ func (t *ModuleTree) hashModules() {
 }
 
 func (t *ModuleTree) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
-	for _, module := range t.processModules {
-		isOutput := t.outputModuleMap[module.Name]
-		if isOutput && requestStartBlockNum < module.InitialBlock {
+	for _, module := range t.outputModules {
+		if requestStartBlockNum < module.InitialBlock {
 			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", requestStartBlockNum, module.Name, module.InitialBlock)
 		}
 	}

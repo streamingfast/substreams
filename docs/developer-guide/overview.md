@@ -18,7 +18,7 @@ The majority of the developer flow is agnostic to the chain anyway.
 
 The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
 
-#### Substreams for Cosmos
+#### Substreams for Solana
 
 [https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
 

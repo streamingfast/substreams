@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package sf.substreams.store.v1;
+
+option go_package = "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb;pboutput";
+import "google/protobuf/timestamp.proto";
+
+message OutputData {
+  map<string, CacheItem> kv = 1;
+}
+
+message CacheItem {
+    uint64 block_num = 1;
+    string block_id = 2;
+    bytes payload = 3;
+    google.protobuf.Timestamp timestamp = 4;
+    string cursor = 5;
+}

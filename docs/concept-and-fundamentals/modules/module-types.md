@@ -9,7 +9,7 @@ description: StreamingFast Substreams module types
 Substreams uses two types of modules, `map` and `store`.&#x20;
 
 * Map modules send and receive bytes.&#x20;
-* Store modules are stateful, saving and tracking data through the use of simple key-value stores.
+* Store modules are stateful, saving and tracking data using simple key-value stores.
 
 ### Store Modules
 
@@ -17,9 +17,7 @@ Store modules write to key-value stores.&#x20;
 
 To ensure successful and proper parallelization store modules are not permitted to read any of their own data or values.
 
-Stores that declare their own data types will expose methods capable of mutating keys within a store.
-
-### Important Store Properties
+Stores that declare their own data types will have methods exposed that are able to mutate the store's keys.
 
 The two important store properties are `valueType,`and `updatePolicy`.
 
@@ -59,24 +57,24 @@ _**Note**: all update policies provide the `delete_prefix` method._
 {% endhint %}
 
 {% hint style="info" %}
-**Note**_**:** The **merge strategy** is applied **during** parallel processing. A module that has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store._
+_**Note:** The **merge strategy** is applied during parallel processing. A module has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store._
 
 _The complete store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly._
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_**:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is currently being written._
+_**Important:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is currently being written._
 
 _To read from a store a downstream module is created with one of its inputs pointing to the store module's output._
 {% endhint %}
 
-### Ordinals
+#### Ordinals
 
 Ordinals allow a key/value store to have multiple versions of a key within a single block. The store APIs contain different methods of `ordinal` or `ord`.
 
 For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
-Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
+Ordinals _must be set_ each time a key is set and keys can _only be set in increasing ordinal order_, or with an ordinal equal to the previous.
 
 For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 

@@ -25,10 +25,10 @@ Blockchains allow synchronization between multiple execution streams opening up 
 ### Single Output
 
 {% hint style="info" %}
-**Note**: Modules have a _**single output.**_ The output is generally typed informing consumers what to expect, and how to interpret the bytes being sent from the module.
+**Note**: Modules have a _**single typed output.**_ Modules are typed to inform consumers of the types of data to expect and also how to interpret the bytes being sent.
 {% endhint %}
 
-Modules are typically formed into a graph; a directed acyclic graph (DAG) to be specific.&#x20;
+Modules are typically formed into a directed acyclic graph (DAG). Information flows from one module to another in a forward progression for DAG data structures.
 
 {% hint style="success" %}
 **Tip**: Data that is output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.

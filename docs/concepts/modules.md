@@ -6,9 +6,13 @@ description: StreamingFast Substreams modules overview
 
 ### What are Modules?
 
-Modules are small pieces of code, running in a WebAssembly virtual machine. Modules exist within the stream of blocks arriving from a blockchain node.&#x20;
+Modules are a crucial aspect of working with Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies into modules.
 
-Modules can also process network history from flat files backed by StreamingFast Firehose. See [Firehose documentation](http://firehose.streamingfast.io/) for additional information.
+In further detail, modules are small pieces of Rust code running in a WebAssembly (WASM) virtual machine. Modules coexist within the stream of blocks sent by the Substreams compute engine arriving from a blockchain node.&#x20;
+
+{% hint style="success" %}
+**Tip**: Modules can also process network history from flat files backed by StreamingFast Firehose. See [Firehose documentation](http://firehose.streamingfast.io/) for additional information.
+{% endhint %}
 
 Modules have one or more inputs. The inputs can be in the form of a `map` or `store,` or a `Block` or `Clock` received from the blockchain's data source.
 
@@ -18,11 +22,19 @@ Modules have one or more inputs. The inputs can be in the form of a `map` or `st
 Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable traditional streaming engines.
 {% endhint %}
 
-#### Single Output
+### Single Output
 
-Modules have a single output, that can be typed, to inform consumers what to expect and how to interpret the bytes being sent from the module.
+{% hint style="info" %}
+**Note**: Modules have a _**single output.**_ The output is generally typed informing consumers what to expect, and how to interpret the bytes being sent from the module.
+{% endhint %}
 
-Modules can be formed into a graph. Data that is output from one module is used as the input for subsequent modules.
+Modules are typically formed into a graph; a directed acyclic graph (DAG) to be specific.&#x20;
+
+{% hint style="success" %}
+**Tip**: Data that is output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.
+{% endhint %}
+
+#### Modules Example
 
 In the diagram shown below the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_counter` store module tracks the number of transfers that have occurred.
 
@@ -39,5 +51,5 @@ Modules with multiple inputs diagram
 All of the modules are executed as a directed acyclic graph (DAG) each time a new `Block` is processed.
 
 {% hint style="info" %}
-_**Note:** The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution._
+**Note:** The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution.
 {% endhint %}

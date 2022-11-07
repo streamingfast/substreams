@@ -78,7 +78,9 @@ Ordinals allow a key/value store to have multiple versions of a key within a sin
 
 For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
-Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
+{% hint style="warning" %}
+**Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
+{% endhint %}
 
 For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 

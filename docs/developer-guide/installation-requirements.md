@@ -50,12 +50,6 @@ _Visit the_ [_Buf website_](https://buf.build/) _for additional information and_
 _**Note**:_ [_Substreams packages_](../reference-and-specs/packages.md) _are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
 {% endhint %}
 
-Install Buf using Homebrew on macOS using the following command.
-
-```bash
-$ brew install bufbuild/buf/buf
-```
-
 ### `protoc-gen-prost` Installation
 
 The `protoc-gen-prost` Rust crate is used to generate protobuf files.&#x20;

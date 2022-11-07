@@ -25,8 +25,8 @@ func ParseRange(in string) *Range {
 }
 
 type Range struct {
-	StartBlock        uint64
-	ExclusiveEndBlock uint64
+	StartBlock        uint64 `json:"start_block"`
+	ExclusiveEndBlock uint64 `json:"exclusive_end_block"`
 }
 
 func NewRange(startBlock, exclusiveEndBlock uint64) *Range {

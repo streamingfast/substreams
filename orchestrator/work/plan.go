@@ -37,6 +37,19 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 		upToBlock:       upToBlock,
 	}
 
+	// TODO(abourget):
+	// Get the output files present for requested output modules
+	// Schedule work a bit differently if we're asking for
+	//  MAPPERS outputs (we don't need to reproc anything if we have
+	// the mapper's output cached already).
+	//
+	// Leaf module? Can be store or mapper?
+	// On schedule tous les stores comme dépendances, les dépendances sont
+	// toujours only stores
+	// mais les leaf modules
+
+	// Fetch outputs for `mapperOutputModules`
+
 	storageState, err := fetchStorageState(ctx, storeConfigMap)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores states: %w", err)

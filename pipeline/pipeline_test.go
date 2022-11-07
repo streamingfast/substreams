@@ -50,7 +50,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			ctx := context.Background()
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
-				moduleTree: &ModuleTree{
+				outputGraph: &OutputModulesGraph{
 					outputModuleMap: map[string]bool{},
 				},
 			}

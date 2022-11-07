@@ -29,20 +29,3 @@ func (d *RequestDetails) ShouldReturnWrittenPartialsInTrailer(modName string) bo
 func (d *RequestDetails) ShouldReturnProgressMessages() bool {
 	return d.IsSubRequest
 }
-
-//type Request struct {
-//	StartCursor          string
-//	StartHistoricalBlock uint64 // block at which we start sending
-//	StartLiveBlockNum    uint64 // block at which we hand off to live
-//	StopBlockNum         uint64 // block at which we stop (excluded)
-//
-//	LiveForkSteps []pbsubstreams.ForkStep
-//	Modules       *pbsubstreams.Modules
-//
-//	OutputModules                             []string
-//	SendStoreSnapshotAtLiveBoundaryForModules []string
-//
-//	// Keep reference to ModuleTree?!
-//
-//	IsSubRequest bool
-//}

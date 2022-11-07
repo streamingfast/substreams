@@ -38,13 +38,13 @@ func (s *Stores) SetStoreMap(storeMap store.Map) {
 	s.StoreMap = storeMap
 }
 
-func InitializeStoreConfigs(moduleTree *ModuleTree, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
+func InitializeStoreConfigs(outputGraph *OutputModulesGraph, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
 	out = make(store.ConfigMap)
-	for _, storeModule := range moduleTree.storeModules {
+	for _, storeModule := range outputGraph.storeModules {
 		c, err := store.NewConfig(
 			storeModule.Name,
 			storeModule.InitialBlock,
-			moduleTree.moduleHashes.Get(storeModule.Name),
+			outputGraph.moduleHashes.Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			baseObjectStore,

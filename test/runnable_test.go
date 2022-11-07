@@ -95,17 +95,17 @@ func processRequest(
 	cachingEngine, err := cachev1.NewEngine(runtimeConfig, "sf.substreams.v1.test.Block", zap.NewNop())
 	require.NoError(t, err)
 
-	moduleTree, err := pipeline.NewModuleTree(request, "sf.substreams.v1.test.Block")
+	outputGraph, err := pipeline.NewOutputModuleGraph(request, "sf.substreams.v1.test.Block")
 	require.NoError(t, err)
 
-	storeConfigs, err := pipeline.InitializeStoreConfigs(moduleTree, runtimeConfig.BaseObjectStore)
+	storeConfigs, err := pipeline.InitializeStoreConfigs(outputGraph, runtimeConfig.BaseObjectStore)
 	require.NoError(t, err)
 
 	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, reqDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
 	pipe := pipeline.New(
 		ctx,
-		moduleTree,
+		outputGraph,
 		stores,
 		wasm.NewRuntime(nil),
 		cachingEngine,

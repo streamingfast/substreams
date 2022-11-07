@@ -39,7 +39,7 @@ func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, 
 			zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
 		)
 
-		if err := p.execOutputCache.EndOfStream(reqDetails.IsSubRequest, p.moduleTree.outputModuleMap); err != nil {
+		if err := p.execOutputCache.EndOfStream(reqDetails.IsSubRequest, p.outputGraph.outputModuleMap); err != nil {
 			return fmt.Errorf("step new irr: exec out end of stream: %w", err)
 		}
 

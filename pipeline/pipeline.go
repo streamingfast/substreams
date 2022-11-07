@@ -35,7 +35,7 @@ type Pipeline struct {
 	postJobHooks   []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Runtime
-	moduleTree      *ModuleTree
+	outputGraph     *OutputModulesGraph
 	moduleExecutors []exec.ModuleExecutor
 	moduleOutputs   []*pbsubstreams.ModuleOutput
 
@@ -52,7 +52,7 @@ type Pipeline struct {
 
 func New(
 	ctx context.Context,
-	moduleTree *ModuleTree,
+	outputGraph *OutputModulesGraph,
 	stores *Stores,
 	wasmRuntime *wasm.Runtime,
 	execOutputCache execout.CacheEngine,
@@ -64,7 +64,7 @@ func New(
 		ctx:             ctx,
 		execOutputCache: execOutputCache,
 		runtimeConfig:   runtimeConfig,
-		moduleTree:      moduleTree,
+		outputGraph:     outputGraph,
 		wasmRuntime:     wasmRuntime,
 		respFunc:        respFunc,
 		stores:          stores,
@@ -93,7 +93,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
 	logger.Info("initializing exec output cache")
-	if err := p.execOutputCache.Init(p.moduleTree.moduleHashes); err != nil {
+	if err := p.execOutputCache.Init(p.outputGraph.moduleHashes); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
@@ -117,11 +117,11 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	p.stores.SetStoreMap(storeMap)
 
 	// Build the Module Executor list
-	// TODO(abourget): this could be done lazily, but the ModuleTree,
+	// TODO(abourget): this could be done lazily, but the OutputModulesGraph,
 	// and cache the latest if all block boundaries
 	// are still clear.
 
-	if err = p.buildWASM(ctx, p.moduleTree.processModules); err != nil {
+	if err = p.buildWASM(ctx, p.outputGraph.processModules); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
@@ -188,7 +188,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 		p.ctx,
 		p.runtimeConfig,
 		reqDetails.LiveHandoffBlockNum,
-		p.moduleTree.graph,
+		p.outputGraph.graph,
 		p.respFunc,
 		p.stores.configs,
 		reqDetails.Request.Modules,
@@ -210,7 +210,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 }
 
 func (p *Pipeline) isOutputModule(name string) bool {
-	return p.moduleTree.IsOutputModule(name)
+	return p.outputGraph.IsOutputModule(name)
 }
 
 func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {

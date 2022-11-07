@@ -7,10 +7,33 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 )
 
-type ModuleTree struct {
+// OutputModuleGraph
+//   stores // required stores to be processed, either because requested directly
+//          // or ancestor to a requested module
+//   requestedMappers // mappers requested in the outputs
+//   all // all dependent modules necessary to produce outputs
+//   requestedOutputs // modules requested in `OutputModules`
+//   outputMap // shorthand for `requestedOutputs` as a map
+
+//
+
+type OutputModulesGraph struct {
 	request *pbsubstreams.Request
 
-	storeModules    []*pbsubstreams.Module
+	// dependentStoreModules
+	storeModules []*pbsubstreams.Module
+	// TODO(abourget): populate with those mapper output, that adds a layer of
+	// scheduling in addition to `storeModules`.
+	// outputMapperModules
+	mapperOutputModules []*pbsubstreams.Module // only those root modules listed in `OutputModules`
+	// modulesInvolvedInRequest
+	// modulesSubsetForRequest
+	// subsetModules
+	// concernedModules
+	// allDependentModules (to satisfy output modules)
+	// outputParentModules
+	// outputAncestorModules
+	//
 	processModules  []*pbsubstreams.Module // only those needed to output `OutputModules`, a subset of the `request.Modules`
 	outputModules   []*pbsubstreams.Module // only those needed to output `OutputModules`
 	outputModuleMap map[string]bool
@@ -22,12 +45,12 @@ type ModuleTree struct {
 	moduleExecutors            []exec.ModuleExecutor
 }
 
-func NewModuleTree(request *pbsubstreams.Request, blockType string) (out *ModuleTree, err error) {
+func NewOutputModuleGraph(request *pbsubstreams.Request, blockType string) (out *OutputModulesGraph, err error) {
 	outMap := make(map[string]bool)
 	for _, name := range request.OutputModules {
 		outMap[name] = true
 	}
-	out = &ModuleTree{
+	out = &OutputModulesGraph{
 		request:         request,
 		outputModuleMap: outMap,
 	}
@@ -78,7 +101,7 @@ func validateRequest(request *pbsubstreams.Request, blockType string) error {
 	return nil
 }
 
-func (t *ModuleTree) computeGraph() error {
+func (t *OutputModulesGraph) computeGraph() error {
 	graph, err := manifest.NewModuleGraph(t.request.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -116,14 +139,14 @@ func computeOutputModules(mods []*pbsubstreams.Module, outMap map[string]bool) (
 	return
 }
 
-func (t *ModuleTree) hashModules() {
+func (t *OutputModulesGraph) hashModules() {
 	t.moduleHashes = manifest.NewModuleHashes()
 	for _, module := range t.processModules {
 		t.moduleHashes.HashModule(t.request.Modules, module, t.graph)
 	}
 }
 
-func (t *ModuleTree) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
+func (t *OutputModulesGraph) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
 	for _, module := range t.outputModules {
 		if requestStartBlockNum < module.InitialBlock {
 			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", requestStartBlockNum, module.Name, module.InitialBlock)
@@ -132,6 +155,6 @@ func (t *ModuleTree) ValidateRequestStartBlock(requestStartBlockNum uint64) erro
 	return nil
 }
 
-func (t *ModuleTree) IsOutputModule(name string) bool {
+func (t *OutputModulesGraph) IsOutputModule(name string) bool {
 	return t.outputModuleMap[name]
 }

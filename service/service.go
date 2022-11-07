@@ -144,7 +144,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 
-	moduleTree, err := pipeline.NewModuleTree(request, s.blockType)
+	outputGraph, err := pipeline.NewOutputModuleGraph(request, s.blockType)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
@@ -163,7 +163,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	}
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 
-	if err := moduleTree.ValidateRequestStartBlock(requestDetails.RequestStartBlockNum); err != nil {
+	if err := outputGraph.ValidateRequestStartBlock(requestDetails.RequestStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
@@ -174,7 +174,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	storeConfigs, err := pipeline.InitializeStoreConfigs(moduleTree, s.runtimeConfig.BaseObjectStore)
+	storeConfigs, err := pipeline.InitializeStoreConfigs(outputGraph, s.runtimeConfig.BaseObjectStore)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -184,7 +184,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	opts := s.buildPipelineOptions(ctx, request)
 	pipe := pipeline.New(
 		ctx,
-		moduleTree,
+		outputGraph,
 		stores,
 		wasmRuntime,
 		execOutputCacheEngine,

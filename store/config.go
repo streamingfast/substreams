@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"fmt"
-
 	"github.com/streamingfast/substreams/store/marshaller"
 
 	"github.com/streamingfast/derr"
@@ -22,6 +21,8 @@ type Config struct {
 	moduleInitialBlock uint64
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType          string
+
+	appendLimit uint64
 }
 
 func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (*Config, error) {
@@ -37,6 +38,7 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 		store:              subStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
+		appendLimit:        8_388_608, // 8kb = 8 * 1024 * 1024,  // TODO(colin): make this configurable instead of hardcoded at 8kb
 	}, nil
 }
 

@@ -19,7 +19,13 @@ func newTestBaseStore(
 		store = dstore.NewMockStore(nil)
 	}
 
+	var appendLimit uint64 = 8_388_608 // 8kb = 8 * 1024 * 1024,
+	if updatePolicy == pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND {
+		appendLimit = 10
+	}
+
 	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store)
+	config.appendLimit = appendLimit
 	require.NoError(t, err)
 	return &baseStore{
 		Config:     config,

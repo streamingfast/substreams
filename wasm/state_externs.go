@@ -49,7 +49,10 @@ func (m *Module) append(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	value := m.Heap.ReadBytes(valPtr, valLength)
 
 	store := m.CurrentInstance.outputStore
-	store.Append(uint64(ord), key, value)
+	err := store.Append(uint64(ord), key, value)
+	if err != nil {
+		returnStateError(fmt.Errorf("appending to store: %w", err))
+	}
 	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.append  %q storeDetail:%s", store.Name(), key, store.String()))
 }
 

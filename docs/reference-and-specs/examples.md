@@ -16,12 +16,6 @@ Substreams-based Uniswap-v3 Subgraph and Substreams. Still in beta.
 
 [https://github.com/streamingfast/substreams-uniswap-v3](https://github.com/streamingfast/substreams-uniswap-v3)
 
-#### Substreams Ethereum
-
-Substreams development kit for Ethereum chains, contains Rust Firehose Block model and helpers as well as utilities for Ethereum ABI encoding/decoding.
-
-[https://github.com/streamingfast/substreams-ethereum](https://github.com/streamingfast/substreams-ethereum)
-
 #### PancakeSwap Substreams
 
 Tracking PancakeSwap on BSC Mainnet using Substreams.

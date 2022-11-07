@@ -31,14 +31,10 @@ _Important: Check the_ [_official Github repository_](https://github.com/streami
 #### Substreams Source Installation
 
 ```bash
-git clone https://github.com/streamingfast/substreams
+git clone git@github.com:streamingfast/substreams
 cd substreams
 go install -v ./cmd/substreams
 ```
-
-{% hint style="warning" %}
-**Important**: Add $HOME/go/bin to the system path if it's not already present.
-{% endhint %}
 
 ### CLI Install Validation
 

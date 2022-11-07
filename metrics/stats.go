@@ -40,11 +40,9 @@ func (n noopstats) RecordOutputCacheMiss()                                     {
 func (n noopstats) RecordStoreSquasherProgress(module string, blockNum uint64) {}
 
 func NewReqStats(logger *zap.Logger) Stats {
-	blockCounter := dmetrics.NewAtomicCounter()
 	return &stats{
 		Shutter:           shutter.New(),
-		blockCounter:      blockCounter,
-		blockRate:         dmetrics.MustNewAvgRateCounter(blockCounter, 1*time.Second, 30*time.Second, "blocks"),
+		blockRate:         dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
 		flushDurationRate: dmetrics.NewAvgDurationCounter(1*time.Second, time.Second, "flush duration"),
 		outputCacheHit:    uint64(0),
 		outputCacheMiss:   uint64(0),
@@ -55,7 +53,6 @@ func NewReqStats(logger *zap.Logger) Stats {
 
 type stats struct {
 	*shutter.Shutter
-	blockCounter      *dmetrics.AtomicCounter
 	blockRate         *dmetrics.AvgRateCounter
 	flushDurationRate *dmetrics.AvgDurationCounter
 	lastBlock         bstream.BlockRef
@@ -67,7 +64,7 @@ type stats struct {
 }
 
 func (s *stats) RecordBlock(ref bstream.BlockRef) {
-	s.blockCounter.Add(1)
+	s.blockRate.Add(1)
 	s.lastBlock = ref
 }
 

@@ -28,9 +28,8 @@ require (
 	github.com/bytecodealliance/wasmtime-go v0.39.0
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
-	github.com/emicklei/proto v1.11.0
 	github.com/mattn/go-isatty v0.0.14
-	github.com/streamingfast/dmetrics v0.0.0-20221103211044-2fc6478a3c23
+	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/sf-tracing v0.0.0-20221028154401-fd8a9e72bfc5
 	github.com/streamingfast/shutter v1.5.0
 	github.com/test-go/testify v1.1.4

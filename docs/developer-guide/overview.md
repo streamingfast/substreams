@@ -9,10 +9,14 @@ description: StreamingFast Substreams developer guide overview
 The Substreams Developer Guide explains the process of building a Substream that tracks the ERC721 holder count for a given contract.
 
 {% hint style="success" %}
-**Tip**_:_ The Substreams developer guide is Ethereum centric, but example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available.&#x20;
-
-The majority of the developer flow is agnostic to the chain anyway.
+**Tip**_:_ The Substreams developer guide is currently focused on an Ethereum Substreams implementation. The majority of the development tasks and workflow is agnostic to each blockchain being targeted by the developer.
 {% endhint %}
+
+{% hint style="info" %}
+**Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study.&#x20;
+{% endhint %}
+
+If you haven't done so already, reviewing the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) and [modules overview](../concepts/modules.md) is helpful for getting up and running with Suubstreams.
 
 #### Substreams Template for Dev Guide
 
@@ -20,10 +24,12 @@ The accompanying template associated with the developer guide is[ ](https://gith
 
 #### Substreams for Solana
 
+A basic Substreams implementation for the Solana blockchain demonstrating how to reference the chain specific SPKG, endpoints, and data models.
+
 [https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
 
 ### StreamingFast Discord for Substreams
 
-Connect with the StreamingFast core developers on Discord to answers questions and provide assistance.
+Connect with the StreamingFast core developers on Discord to find answers to questions and get assistance with authentication and other related issues.
 
 [https://discord.gg/mYPcRAzeVN](https://discord.gg/mYPcRAzeVN)

@@ -6,13 +6,21 @@ description: StreamingFast Substreams manifest creation
 
 ### Manifest Overview
 
+The Substreams manifest provides all of the key elements for the implementation. One manifest is required for each Substreams implementation.&#x20;
+
+The Substreams manifest outlines the implementation and provides vital insights into the blockchain being targeted, the design of the data flow, and the names and types of modules and module handlers.
+
+Additional information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
+
+#### Substreams Modules
+
 A Substreams manifest primarily defines a list of [modules](../concepts/modules.md). Module definitions will generally contain a kind of either `map` or `store`.&#x20;
 
-The manifest will link to the Rust code that implements the business logic of the module, also known as the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
+The manifest will link to the Rust code that implements the business logic of the module, also known as the `module handler`. The `module handler` is a list of `inputs` and a list of `outputs` for the modules.
 
 ### Manifest YAML Creation
 
-The example Substreams manifest provided below shows the fields and values that need to be present in the YAML configuration file.
+The example Substreams manifest below shows the fields and values required in the YAML manifest configuration file.
 
 {% code title="substreams.yaml" %}
 ```yaml

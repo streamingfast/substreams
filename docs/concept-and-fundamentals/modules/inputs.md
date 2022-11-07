@@ -64,11 +64,19 @@ An Input of type `store` represents the state of another store used with the Sub
 
 The `store` inputs type __ is defined in the Substreams manifest as seen below. Similar to maps, stores should be named appropriately indicating the logic contained within them.
 
+Store modules are set to `get` mode by default as illustrated in the following manifest code excerpt.
+
 ```yaml
   inputs:
-    - store: my_store
-      mode: deltas
     - store: my_store # defaults to mode: get
+```
+
+Alternatively, stores can be set to deltas mode as illustrated in the following manifest code excerpt.
+
+```yaml
+  inputs:
+    - store: my_delta_store
+      mode: deltas
 ```
 
 ### Module Modes

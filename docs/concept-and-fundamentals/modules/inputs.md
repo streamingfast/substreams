@@ -46,7 +46,7 @@ An Input of type `map` represents the output of another `map` module.&#x20;
 The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
 
 {% hint style="warning" %}
-**Important**_**:** _ Map modules _**cannot depend on themselves**_.
+**Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's known as a circular dependency, and is not desired.
 {% endhint %}
 
 The `map` inputs type __ is defined in the Substreams manifest as seen below. The name of the map is chosen by the developer and should be representative of the logic contained within.

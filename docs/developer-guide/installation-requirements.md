@@ -11,7 +11,7 @@ Working with Substreams requires a few applications and tools. The full list is 
 Instructions and links are provided below to assist with the installation of the required dependencies for Substreams.
 
 {% hint style="success" %}
-Instructions are provided [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setup and installation instructions.
+Instructions are provided [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setups.
 {% endhint %}
 
 ### Local installation
@@ -59,22 +59,15 @@ $ cargo install protoc-gen-prost
 
 ### Linux Specific Tools
 
-Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate.
+Linux-based machines require CMake and `build-essential` to install the `protoc-gen-prost` cargo crate.
 
 #### CMake
 
-Visit the official [Installing CMake page](https://cmake.org/install/) for further information on `cmake`.
+Find additional information and installation instructions for CMake on the official  [Installing CMake page](https://cmake.org/install/).
 
 #### Build Essential
 
-Find additional information for `build-essential` on the official [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
-
-Run the following commands to install build-essential.
-
-```
-apt update
-apt install cmake build-essential
-```
+Find additional information and installation instructions for `build-essential` on the official [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
 
 ## Cloud-based environment with Gitpod
 

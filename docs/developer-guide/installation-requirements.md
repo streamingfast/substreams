@@ -21,7 +21,7 @@ Instructions are provided [below](installation-requirements.md#cloud-based-gitpo
 The CLI is required and is the user interface for working with Substreams.
 
 {% hint style="success" %}
-**Tip**: _See the_ [_`substreams` installation page_](../getting-started/installing-the-cli.md) _for full setup instructions._
+**Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page_._
 {% endhint %}
 
 ### Rust Installation

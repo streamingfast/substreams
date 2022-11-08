@@ -6,7 +6,7 @@ description: StreamingFast Substreams dependency installation
 
 ## Dependencies Overview
 
-Working with Substreams requires a few applications and tools. The full list is available in the Sustreams [prerequisites](../getting-started/prerequisites.md).&#x20;
+Working with Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](../getting-started/prerequisites.md) page.&#x20;
 
 Instructions and links are provided below to assist with the installation of the required dependencies for Substreams.
 

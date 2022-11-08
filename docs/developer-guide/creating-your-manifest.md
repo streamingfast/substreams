@@ -25,11 +25,11 @@ The manifest will link to the Rust code that implements the business logic of th
 The example manifest below shows the fields and values required in the YAML manifest configuration file for a Substreams implementation.
 
 {% hint style="info" %}
-**Note**: The example below contains Ethereum-specific entries, such as `sf.ethereum.type.v2.Block`.&#x20;
+**Note**: The example below contains Ethereum-specific entries, such as [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto).&#x20;
 
 
 
-Developers working with other blockchains will use values and objects specific to the chain they're targeting, such as `sf.solana.type.v1.Block` for Solana.
+Developers working with other blockchains will use values and objects specific to the chain they're targeting, such as [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v2/type.proto) for Solana.
 {% endhint %}
 
 {% code title="substreams.yaml" %}
@@ -93,7 +93,7 @@ The `protobuf.files` contains a list of Substreams custom protobuf files for the
 
 #### `protobuf.importPaths`
 
-The `protobuf.importPaths` conatins the locations of the custom protobuf files for the current implementation.
+The `protobuf.importPaths` contains the locations of the custom protobuf files for the current implementation.
 
 The example Substreams Template manifest lists two modules: `block_to_transfers` and `nft_state.`&#x20;
 

@@ -10,17 +10,23 @@ The Substreams manifest provides all of the key elements for the implementation.
 
 The Substreams manifest outlines the implementation and provides vital insights into the blockchain being targeted, the design of the data flow, and the names and types of modules and module handlers.
 
-Additional information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
+{% hint style="info" %}
+**Tip**: Additional information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
+{% endhint %}
 
 #### Substreams Modules
 
-A Substreams manifest primarily defines a list of [modules](../concepts/modules.md). Module definitions will generally contain a kind of either `map` or `store`.&#x20;
+A Substreams manifest defines a list of [modules](../concepts/modules.md). Module definitions contain a `kind` of either `map` or `store`.&#x20;
 
-The manifest will link to the Rust code that implements the business logic of the module, also known as the `module handler`. The `module handler` is a list of `inputs` and a list of `outputs` for the modules.
+The manifest will link to the Rust code that implements the business logic of the module, also known as the `module handler`. The `module handler` is a list of `inputs` and a list of `outputs` for each module.
 
 ### Manifest YAML Creation
 
 The example Substreams manifest below shows the fields and values required in the YAML manifest configuration file.
+
+{% hint style="info" %}
+**Note**: the example below contains Ethereum-specific entries, such as `sf.ethereum.type.v2.Block`. Developers working with other blockchains will use values and objects specific to the chain they're targeting, such as `sf.solana.type.v1.Block`.
+{% endhint %}
 
 {% code title="substreams.yaml" %}
 ```yaml

@@ -19,9 +19,13 @@ message Request {
   repeated ForkStep fork_steps = 4;
   string irreversibility_condition = 5;
 
-  // By default, the engine runs in developer mode, with richer and deeper output.
-  // In this mode, parallel execution is enabled, and it:
-  // * restricts the possible requested `output_modules` only to `mappers`,
+  // By default, the engine runs in developer mode, with richer and deeper output,
+  // * support for multiple `output_modules`, of `store` and `map` kinds
+  // * support for `initial_store_snapshot_for_modules`
+  // * log outputs for output modules
+  //
+  // With `production_mode`, however, you trade off functionality for high speed, where it:
+  // * restricts the possible requested `output_modules` to a single mapper module,
   // * turns off support for `initial_store_snapshot_for_modules`,
   // * still streams output linearly, with a cursor, but at higher speeds
   // * and purges log outputs from responses.

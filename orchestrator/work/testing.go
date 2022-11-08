@@ -20,8 +20,12 @@ func TestJobDeps(modName string, rng string, prio int, deps string) *Job {
 	return NewJob(modName, block.ParseRange(rng), strings.Split(deps, ","), prio)
 }
 
-func TestModState(modName string, rng string) storagestate.ModuleStorageState {
+func TestStoreState(modName string, rng string) storagestate.ModuleStorageState {
 	return &storagestate.StoreStorageState{ModuleName: modName, PartialsMissing: block.ParseRanges(rng)}
+}
+
+func TestMapState(modName string, rng string) storagestate.ModuleStorageState {
+	return &storagestate.MapperStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
 }
 
 func TestModStateMap(modStates ...storagestate.ModuleStorageState) (out storagestate.ModuleStorageStateMap) {

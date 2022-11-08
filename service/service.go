@@ -145,7 +145,11 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 
-	outputGraph, err := outputgraph.NewOutputModuleGraph(request, s.blockType)
+	if err := outputgraph.ValidateRequest(request, s.blockType); err != nil {
+		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
+	}
+
+	outputGraph, err := outputgraph.NewOutputModuleGraph(request)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}

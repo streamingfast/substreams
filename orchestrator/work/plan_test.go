@@ -16,71 +16,100 @@ import (
 
 func TestWorkPlanning(t *testing.T) {
 	tests := []struct {
-		name              string
-		plan              *Plan
-		subreqSplit       int
+		name        string
+		upToBlock   uint64
+		subreqSplit int
+		state       storagestate.ModuleStorageStateMap
+		outMods     string
+
 		expectWaitingJobs []*Job
+		expectReadyJobs   []*Job
 	}{
 		{
-			name: "simple",
-			plan: &Plan{
-				upToBlock: 85,
-				ModulesStateMap: TestModStateMap(
-					TestModState("A", "0-10,10-20,30-40,40-50,50-60"),
-					TestModState("B", "0-10"),
-				),
-			},
+			name:        "single",
+			upToBlock:   85,
 			subreqSplit: 20,
-			expectWaitingJobs: []*Job{
-				TestJob("A", "0-20", 4),
-				TestJob("A", "30-50", 3),
-				TestJob("A", "50-60", 2),
+			state: TestModStateMap(
+				TestStoreState("B", "0-10"),
+			),
+			outMods: "B",
+			expectReadyJobs: []*Job{
 				TestJob("B", "0-10", 4),
 			},
 		},
 		{
-			name: "test relative priority",
-			plan: &Plan{
-				upToBlock: 60,
-				ModulesStateMap: TestModStateMap(
-					TestModState("G", "0-10,50-60"),
-					TestModState("A", "0-10,30-40,50-60"),
-					TestModState("D", "10-20,50-60"),
-				),
+			name:        "double",
+			upToBlock:   85,
+			subreqSplit: 20,
+			state: TestModStateMap(
+				TestStoreState("As", "0-10,10-20,30-40,40-50,50-60"),
+				TestStoreState("B", "0-10"),
+			),
+			outMods: "As,B",
+			expectReadyJobs: []*Job{
+				TestJob("As", "0-20", 4),
+				TestJob("B", "0-10", 4),
+				TestJob("As", "30-50", 3),
+				TestJob("As", "50-60", 2),
 			},
+		},
+		{
+			name:        "test relative priority",
+			upToBlock:   60,
 			subreqSplit: 10,
+			state: TestModStateMap(
+				TestStoreState("G", "0-10,50-60"),
+				TestMapState("B", "0-60"),
+				TestStoreState("As", "0-10,30-40,50-60"),
+				TestStoreState("D", "10-20,50-60"),
+			),
+			outMods: "As,D,G",
 			expectWaitingJobs: []*Job{
-				TestJob("A", "0-10", 6),
-				TestJob("A", "30-40", 3),
-				TestJob("A", "50-60", 1),
+				TestJobDeps("G", "0-10", 3, "As,B,E"),
+				TestJobDeps("G", "50-60", -2, "As,B,E"),
 				TestJobDeps("D", "10-20", 4, "B"),
 				TestJobDeps("D", "50-60", 0, "B"),
-				TestJobDeps("G", "0-10", 4, "B,E"),
-				TestJobDeps("G", "50-60", -1, "B,E"),
+			},
+			expectReadyJobs: []*Job{
+				TestJob("As", "0-10", 6),
+				TestJob("B", "0-60", 6),
+				TestJob("As", "30-40", 3),
+				TestJob("As", "50-60", 1),
 			},
 		},
 	}
-	mods := manifest.NewTestModules()
+
 	// TODO(abourget): il faut donner à splitWorkIntoJobs() de quoi de plus slim
 	// et moins loin.. une `Request` est trop gros, faudrait lui préparer plutôt
 	// un OutputModuleGraph avec le data nécessaire à tester `splitWorkIntoJobs`.
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			mods := manifest.NewTestModules()
 			outputGraph, err := outputgraph.NewOutputModuleGraph(&pbsubstreams.Request{
-				Modules:       &pbsubstreams.Modules{Modules: mods},
-				OutputModules: test.plan.ModulesStateMap.Names(),
-			}, "test")
+				Modules: &pbsubstreams.Modules{
+					Modules:  mods,
+					Binaries: []*pbsubstreams.Binary{{}},
+				},
+				OutputModules: strings.Split(test.outMods, ","),
+			})
 			require.NoError(t, err)
-			test.plan.outputGraph = outputGraph
-			//require.NoError(t, test.plan.sortModules(graph))
-			require.NoError(t, test.plan.splitWorkIntoJobs(uint64(test.subreqSplit)))
-			assert.Equal(t, len(test.expectWaitingJobs), len(test.plan.waitingJobs))
-			for i, job := range test.expectWaitingJobs {
-				assert.Equal(t, test.plan.waitingJobs[i].String(), job.String())
-			}
+
+			plan, err := BuildNewPlan(test.state, uint64(test.subreqSplit), test.upToBlock, outputGraph)
+			require.NoError(t, err)
+
+			assert.Equal(t, jobList(test.expectWaitingJobs), jobList(plan.waitingJobs), "waiting jobs")
+			assert.Equal(t, jobList(test.expectReadyJobs), jobList(plan.readyJobs), "ready jobs")
 		})
 	}
+}
+
+func jobList(jobs []*Job) string {
+	var out []string
+	for _, job := range jobs {
+		out = append(out, job.String())
+	}
+	return strings.Join(out, "\n")
 }
 
 //
@@ -164,14 +193,14 @@ func TestPlan_NextJob(t *testing.T) {
 	}{
 		{
 			name:        "one ready,one waiting",
-			waitingJobs: mkJobs("A"),
+			waitingJobs: mkJobs("As"),
 			readyJobs:   mkJobs("B"),
 			expectJob:   &Job{ModuleName: "B"},
 			expectMore:  true,
 		},
 		{
 			name:        "none ready,one waiting",
-			waitingJobs: mkJobs("A"),
+			waitingJobs: mkJobs("As"),
 			readyJobs:   mkJobs(""),
 			expectJob:   nil,
 			expectMore:  true,
@@ -179,8 +208,8 @@ func TestPlan_NextJob(t *testing.T) {
 		{
 			name:        "one ready,none waiting",
 			waitingJobs: mkJobs(""),
-			readyJobs:   mkJobs("A"),
-			expectJob:   &Job{ModuleName: "A"},
+			readyJobs:   mkJobs("As"),
+			expectJob:   &Job{ModuleName: "As"},
 			expectMore:  false,
 		},
 		{
@@ -193,8 +222,8 @@ func TestPlan_NextJob(t *testing.T) {
 		{
 			name:        "two ready,none waiting",
 			waitingJobs: mkJobs(""),
-			readyJobs:   mkJobs("A,B,C"),
-			expectJob:   &Job{ModuleName: "A"},
+			readyJobs:   mkJobs("As,B,C"),
+			expectJob:   &Job{ModuleName: "As"},
 			expectMore:  true,
 		},
 	}

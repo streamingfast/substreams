@@ -44,7 +44,7 @@ func TestModuleGraph_AncestorsOf(t *testing.T) {
 
 	sort.Strings(res)
 
-	assert.Equal(t, []string{"A", "B", "C", "D", "E"}, res)
+	assert.Equal(t, []string{"Am", "As", "B", "C", "D", "E"}, res)
 }
 
 func TestModuleGraph_AncestorStoresOf(t *testing.T) {
@@ -61,7 +61,7 @@ func TestModuleGraph_AncestorStoresOf(t *testing.T) {
 
 	sort.Strings(res)
 
-	assert.Equal(t, []string{"B", "E"}, res)
+	assert.Equal(t, []string{"As", "B", "E"}, res)
 }
 
 func TestModuleGraph_GroupedAncestorStoresOf(t *testing.T) {
@@ -71,7 +71,7 @@ func TestModuleGraph_GroupedAncestorStoresOf(t *testing.T) {
 	groupedAncestors, err := g.GroupedAncestorStores("G")
 	require.Nil(t, err)
 
-	require.Len(t, groupedAncestors, 2)
+	require.Len(t, groupedAncestors, 3)
 }
 
 func TestModuleGraph_ModulesDownTo(t *testing.T) {
@@ -88,7 +88,7 @@ func TestModuleGraph_ModulesDownTo(t *testing.T) {
 
 	sort.Strings(res)
 
-	assert.Equal(t, []string{"A", "B", "C", "D", "E", "G"}, res)
+	assert.Equal(t, []string{"Am", "As", "B", "C", "D", "E", "G"}, res)
 }
 
 func TestModuleGraph_StoresDownTo(t *testing.T) {
@@ -105,7 +105,7 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 
 	sort.Strings(res)
 
-	assert.Equal(t, []string{"B", "E", "G"}, res)
+	assert.Equal(t, []string{"As", "B", "E", "G"}, res)
 }
 
 func TestModuleGraph_computeInitialBlocks(t *testing.T) {

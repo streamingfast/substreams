@@ -68,6 +68,9 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
 	for _, storeName := range p.outputGraph.SchedulableModuleNames() {
 		modState := p.ModulesStateMap[storeName]
+		if modState == nil {
+			continue
+		}
 		requests := modState.BatchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
 			requiredModules := p.outputGraph.AncestorsFrom(storeName)

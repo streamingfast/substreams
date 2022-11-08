@@ -327,10 +327,14 @@ func processRequest(
 		workerFactory,
 	)
 
-	cachingEngine, err := cachev1.NewEngine(runtimeConfig, "sf.substreams.v1.test.Block", zap.NewNop())
+	const blockType = "sf.substreams.v1.test.Block"
+
+	cachingEngine, err := cachev1.NewEngine(runtimeConfig, blockType, zap.NewNop())
 	require.NoError(t, err)
 
-	outputGraph, err := outputgraph.NewOutputModuleGraph(request, "sf.substreams.v1.test.Block")
+	require.NoError(t, outputgraph.ValidateRequest(request, blockType))
+
+	outputGraph, err := outputgraph.NewOutputModuleGraph(request)
 	require.NoError(t, err)
 
 	storeConfigs, err := pipeline.InitializeStoreConfigs(outputGraph, runtimeConfig.BaseObjectStore)

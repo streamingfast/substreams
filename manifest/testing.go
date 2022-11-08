@@ -16,8 +16,14 @@ var thirty = uint64(30)
 func NewTestModules() []*pbsubstreams.Module {
 	return []*pbsubstreams.Module{
 		{
-			Name:         "A",
+			Name:         "As",
 			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+		},
+		{
+			Name:         "Am",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 		},
 		{
 			Name:         "B",
@@ -26,7 +32,7 @@ func NewTestModules() []*pbsubstreams.Module {
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
-						ModuleName: "A",
+						ModuleName: "Am",
 					}},
 				},
 			},
@@ -38,7 +44,7 @@ func NewTestModules() []*pbsubstreams.Module {
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
-						ModuleName: "A",
+						ModuleName: "As",
 					}},
 				},
 			},

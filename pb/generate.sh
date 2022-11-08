@@ -80,7 +80,6 @@ function generate_system() {
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
     "$PROTO/sf/substreams/v1/substreams.proto" \
-    "$PROTO/sf/substreams/v1/test/test.proto" \
     "$PROTO/google/protobuf/any.proto" \
     "$PROTO/google/protobuf/descriptor.proto" \
     "$PROTO/google/protobuf/timestamp.proto" \

@@ -158,6 +158,7 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 		if err != nil {
 			return fmt.Errorf("loading block reader %s: %w", filename, err)
 		}
+		defer objectReader.Close()
 
 		bytes, err := io.ReadAll(objectReader)
 		if err != nil {

@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -272,7 +271,6 @@ func newTestModuleModel(name string, initialBlock uint64, inputType string, outp
 func readProtoDescriptor(t *testing.T, importPath string, file string) (out *descriptorpb.FileDescriptorProto) {
 	t.Helper()
 
-	fmt.Println("PROCESSING FILE", file)
 	parser := protoparse.Parser{
 		ImportPaths:           []string{importPath},
 		IncludeSourceCodeInfo: true,

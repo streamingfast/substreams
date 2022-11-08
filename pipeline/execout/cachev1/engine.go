@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sync"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
@@ -26,7 +25,6 @@ type Engine struct {
 	caches        map[string]*OutputCache
 	runtimeConfig config.RuntimeConfig
 	logger        *zap.Logger
-	wg            *sync.WaitGroup
 }
 
 func NewEngine(runtimeConfig config.RuntimeConfig, blockType string, logger *zap.Logger) (execout.CacheEngine, error) {
@@ -35,7 +33,6 @@ func NewEngine(runtimeConfig config.RuntimeConfig, blockType string, logger *zap
 		runtimeConfig: runtimeConfig,
 		caches:        make(map[string]*OutputCache),
 		logger:        logger,
-		wg:            &sync.WaitGroup{},
 		blockType:     blockType,
 	}
 	return e, nil
@@ -125,7 +122,7 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 		return fmt.Errorf("failed createing substore: %w", err)
 	}
 
-	e.caches[moduleName] = NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger, e.wg)
+	e.caches[moduleName] = NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger)
 
 	return nil
 }
@@ -156,6 +153,8 @@ func (e *Engine) set(moduleName string, data []byte, clock *pbsubstreams.Clock, 
 }
 
 func (e *Engine) Close() error {
-	e.wg.Wait()
+	for _, cache := range e.caches {
+		cache.Close()
+	}
 	return nil
 }

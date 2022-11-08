@@ -45,9 +45,9 @@ type OutputCache struct {
 	initialized bool
 }
 
-func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger, wg *sync.WaitGroup) *OutputCache {
+func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *OutputCache {
 	return &OutputCache{
-		wg:                wg,
+		wg:                &sync.WaitGroup{},
 		moduleName:        moduleName,
 		store:             store,
 		saveBlockInterval: saveBlockInterval,
@@ -258,6 +258,11 @@ func (c *OutputCache) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddUint64("start_block", c.currentBlockRange.StartBlock)
 	enc.AddUint64("end_block", c.currentBlockRange.ExclusiveEndBlock)
 	return nil
+}
+
+func (c *OutputCache) Close() {
+	c.wg.Wait()
+	return
 }
 
 func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {

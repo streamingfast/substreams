@@ -3,8 +3,11 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	"strings"
+
+	"github.com/abourget/llerrgroup"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
@@ -184,29 +187,61 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
-	logger.Info("starting back processing")
-	backproc, err := orchestrator.BuildBackprocessor(
-		p.ctx,
-		p.runtimeConfig,
-		reqDetails.LiveHandoffBlockNum,
-		p.outputGraph,
-		p.respFunc,
-		p.stores.configs,
-		reqDetails.Request.Modules,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("building backproc: %w", err)
+	eg := llerrgroup.New(2)
+	if reqDetails.LiveHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
+		eg.Go(func() error {
+
+			requestedModule := p.outputGraph.RequestedMapModules()[0] //todo: validate only one requested module
+
+			//todo: find a better way to get the cache object
+			moduleHash := p.outputGraph.ModuleHashes().Get(requestedModule.Name)
+			logger.Info("creating sub store", zap.String("module", requestedModule.Name), zap.String("hash", moduleHash))
+			moduleStore, err := p.runtimeConfig.BaseObjectStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
+			if err != nil {
+				return fmt.Errorf("failed createing substore: %w", err)
+			}
+
+			cache := cachev1.NewOutputCache(requestedModule.Name, moduleStore, p.runtimeConfig.StoreSnapshotsSaveInterval, logger)
+
+			d := NewDownloader(reqDetails.RequestStartBlockNum, reqDetails.LiveHandoffBlockNum, p.respFunc, &p.runtimeConfig, logger)
+			err = d.Run(ctx, requestedModule, cache) //blocking call
+			if err != nil {
+				return fmt.Errorf("failed to download block scoped data: %w", err)
+			}
+			logger.Info("data download done")
+			return nil
+		})
 	}
 
-	reqStats.StartBackProcessing()
-	storeMap, err = backproc.Run(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("backrprocess run: %w", err)
+	eg.Go(func() error {
+		logger.Info("starting back processing")
+		backproc, err := orchestrator.BuildBackprocessor(
+			p.ctx,
+			p.runtimeConfig,
+			reqDetails.LiveHandoffBlockNum,
+			p.outputGraph,
+			p.respFunc,
+			p.stores.configs,
+			reqDetails.Request.Modules,
+		)
+		if err != nil {
+			return fmt.Errorf("building backproc: %w", err)
+		}
+
+		reqStats.StartBackProcessing()
+		storeMap, err = backproc.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("backrprocess run: %w", err)
+		}
+		reqStats.EndBackProcessing()
+
+		p.backprocessingStores = nil
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
-	reqStats.EndBackProcessing()
-
-	p.backprocessingStores = nil
-
 	return storeMap, nil
 }
 

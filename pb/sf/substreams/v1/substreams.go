@@ -28,27 +28,17 @@ type ModuleOutputData interface {
 }
 
 func ValidateRequest(req *Request) error {
-	if req.ProductionMode {
-		if len(req.OutputModules) != 1 {
-			return fmt.Errorf("production_mode requires a output modules to be a single module, and be a map")
-		}
-	}
-
 	outMods := map[string]bool{}
-	for _, outMod := range req.OutputModules {
-		if !outMods[outMod] {
-			return fmt.Errorf("output module %q requested but not defined modules graph", outMod)
-		}
-	}
-
 	seenStores := map[string]bool{}
 	for _, mod := range req.Modules.Modules {
 		outMods[mod.Name] = true
 		if _, ok := mod.Kind.(*Module_KindStore_); ok {
 			seenStores[mod.Name] = true
-			if req.ProductionMode && outMods[mod.Name] {
-				return fmt.Errorf("production_mode requires the output module to be of kind 'map'")
-			}
+		}
+	}
+	for _, outMod := range req.OutputModules {
+		if !outMods[outMod] {
+			return fmt.Errorf("output module %q requested but not defined modules graph", outMod)
 		}
 	}
 
@@ -61,5 +51,27 @@ func ValidateRequest(req *Request) error {
 		}
 	}
 
+	if req.ProductionMode {
+		if err := validateProductionMode(req, outMods); err != nil {
+			return fmt.Errorf("production_mode: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func validateProductionMode(req *Request, outMods map[string]bool) error {
+	if len(req.OutputModules) != 1 {
+		return fmt.Errorf("output_modules need to be a single map module")
+	}
+
+	outModName := req.OutputModules[0]
+	for _, mod := range req.Modules.Modules {
+		if outModName == mod.Name {
+			if _, ok := mod.Kind.(*Module_KindMap_); !ok {
+				return fmt.Errorf("the single output_modules specified needs to be of kind 'map'")
+			}
+		}
+	}
 	return nil
 }

@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +16,6 @@ import (
 )
 
 func TestReader_Read(t *testing.T) {
-	systemProtoDefs := readSystemProtoDescriptors(t)
 	absolutePathToDep2, err := filepath.Abs("testdata/dep2.yaml")
 	require.NoError(t, err)
 
@@ -42,11 +42,11 @@ func TestReader_Read(t *testing.T) {
 		assertion require.ErrorAssertionFunc
 	}{
 		{
-			"testdata/bare_minimum.yaml",
+			"bare_minimum.yaml",
 			args{},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: systemProtoDefs,
+				ProtoFiles: readSystemProtoDescriptors(),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -58,11 +58,11 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/imports_relative_path.yaml",
+			"imports_relative_path.yaml",
 			args{},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: systemProtoDefs,
+				ProtoFiles: readSystemProtoDescriptors(),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -78,11 +78,11 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/binaries_relative_path.yaml",
+			"binaries_relative_path.yaml",
 			args{validateBinary: true},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: systemProtoDefs,
+				ProtoFiles: readSystemProtoDescriptors(),
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
 						Name:    "test",
@@ -102,7 +102,7 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/imports_http_url.yaml",
+			"imports_http_url.yaml",
 			args{
 				env: map[string]string{
 					"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
@@ -110,7 +110,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: systemProtoDefs,
+				ProtoFiles: readSystemProtoDescriptors(),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -126,7 +126,7 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/imports_expand_env_variables.yaml",
+			"imports_expand_env_variables.yaml",
 			args{
 				env: map[string]string{
 					"RELATIVE_PATH_TO_DEP1": "./dep1.yaml",
@@ -135,7 +135,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: systemProtoDefs,
+				ProtoFiles: readSystemProtoDescriptors(),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -155,12 +155,11 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/protobuf_files_relative_path.yaml",
+			"protobuf_files_relative_path.yaml",
 			args{},
 			&pbsubstreams.Package{
 				Version: 1,
-				ProtoFiles: append(
-					systemProtoDefs,
+				ProtoFiles: withSystemProtoDefs(
 					readProtoDescriptor(t, "./testdata", "./proto1/sf/substreams/test1.proto"),
 				),
 				Modules: &pbsubstreams.Modules{},
@@ -174,12 +173,11 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/protobuf_importPaths_relative_path.yaml",
+			"protobuf_importPaths_relative_path.yaml",
 			args{},
 			&pbsubstreams.Package{
 				Version: 1,
-				ProtoFiles: append(
-					systemProtoDefs,
+				ProtoFiles: withSystemProtoDefs(
 					readProtoDescriptor(t, "testdata/proto1", "sf/substreams/test1.proto"),
 				),
 				Modules: &pbsubstreams.Modules{},
@@ -193,7 +191,7 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
-			"testdata/protobuf_importPaths_expand_variables.yaml",
+			"protobuf_importPaths_expand_variables.yaml",
 			args{
 				env: map[string]string{
 					"RELATIVE_PATH_TO_PROTO1": "./proto1",
@@ -202,8 +200,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			&pbsubstreams.Package{
 				Version: 1,
-				ProtoFiles: append(
-					systemProtoDefs,
+				ProtoFiles: withSystemProtoDefs(
 					readProtoDescriptor(t, "testdata/proto1", "sf/substreams/test1.proto"),
 					readProtoDescriptor(t, "testdata/proto2", "sf/substreams/test2.proto"),
 				),
@@ -219,8 +216,8 @@ func TestReader_Read(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(strings.Replace(tt.name, "testdata/", "", 1), func(t *testing.T) {
-			manifestPath, err := filepath.Abs(tt.name)
+		t.Run(tt.name, func(t *testing.T) {
+			manifestPath, err := filepath.Abs(filepath.Join("testdata", tt.name))
 			require.NoError(t, err)
 
 			for envKey, envValue := range tt.args.env {
@@ -275,6 +272,7 @@ func newTestModuleModel(name string, initialBlock uint64, inputType string, outp
 func readProtoDescriptor(t *testing.T, importPath string, file string) (out *descriptorpb.FileDescriptorProto) {
 	t.Helper()
 
+	fmt.Println("PROCESSING FILE", file)
 	parser := protoparse.Parser{
 		ImportPaths:           []string{importPath},
 		IncludeSourceCodeInfo: true,
@@ -287,11 +285,16 @@ func readProtoDescriptor(t *testing.T, importPath string, file string) (out *des
 	return customFiles[0].AsFileDescriptorProto()
 }
 
-func readSystemProtoDescriptors(t *testing.T) (out []*descriptorpb.FileDescriptorProto) {
-	t.Helper()
+func withSystemProtoDefs(additionalProto ...*descriptorpb.FileDescriptorProto) (out []*descriptorpb.FileDescriptorProto) {
+	out = readSystemProtoDescriptors()
+	out = append(out, additionalProto...)
+	return
+}
 
+func readSystemProtoDescriptors() (out []*descriptorpb.FileDescriptorProto) {
 	systemProtoFiles, err := readSystemProtobufs()
-	require.NoError(t, err)
-
+	if err != nil {
+		panic("bob dylan is great")
+	}
 	return systemProtoFiles.File
 }

@@ -18,7 +18,7 @@ The Substreams manifest outlines the implementation and provides vital insights 
 
 A Substreams manifest defines a list of [modules](../concepts/modules.md). Module definitions themselves contain a `kind` that is set to either `map` or `store`.&#x20;
 
-The manifest will link to the Rust code that implements the business logic of the module, also known as a `module handler`. The `module handler` is a list of `inputs` and a list of `outputs` for each module.
+The manifest will link to the Rust code that implements the business logic of the module, also known as a `module handler`. The `module handler` manifest entry a list of `inputs` and a list of `outputs` for each module.
 
 ### Manifest YAML Creation
 

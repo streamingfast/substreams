@@ -187,6 +187,9 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
+	// TODO(abourget): move this to `BuildBackprocessor()`, launch a goroutine in `Run()` like the comments
+	// say, and block on the `backproc.Run()` like we did before.
+	// No need to have the two be split.
 	eg := llerrgroup.New(2)
 	if reqDetails.LiveHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
 		eg.Go(func() error {

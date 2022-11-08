@@ -67,8 +67,11 @@ func BuildBackprocessor(
 
 func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
 
+	// TODO(abourget): Charles, check ici:
+	// On peut le préparer dans le `BuildBackprocessor` ci-haut, et l'exécuter ici avec `Launch()`
 	// parallelDownloader := NewLinearExecOutputReader()
 	// go parallelDownloader.Launch()
+
 	b.squasher.Launch(ctx)
 
 	if err := b.scheduler.Schedule(ctx, b.workerPool); err != nil {

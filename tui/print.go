@@ -19,7 +19,7 @@ import (
 func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) error {
 	var s []string
 	for _, out := range output.Outputs {
-		for _, log := range out.Logs {
+		for _, log := range out.DebugLogs {
 			s = append(s, fmt.Sprintf("%s: log: %s\n", out.Name, log))
 		}
 
@@ -32,9 +32,9 @@ func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) er
 				cnt = ui.prettyFormat(cnt, true)
 				s = append(s, string(cnt))
 			}
-		case *pbsubstreams.ModuleOutput_StoreDeltas:
-			if len(data.StoreDeltas.Deltas) != 0 {
-				s = append(s, ui.renderDecoratedDeltas(out.Name, output.Clock.Number, data.StoreDeltas.Deltas, false)...)
+		case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
+			if len(data.DebugStoreDeltas.Deltas) != 0 {
+				s = append(s, ui.renderDecoratedDeltas(out.Name, output.Clock.Number, data.DebugStoreDeltas.Deltas, false)...)
 			}
 		}
 	}
@@ -121,9 +121,9 @@ func (ui *TUI) jsonBlockScopedData(output *pbsubstreams.BlockScopedData) error {
 				cnt = ui.prettyFormat(cnt, true)
 				fmt.Println(string(cnt))
 			}
-		case *pbsubstreams.ModuleOutput_StoreDeltas:
-			if len(data.StoreDeltas.Deltas) != 0 {
-				if err := ui.printJSONBlockDeltas(out.Name, output.Clock.Number, data.StoreDeltas.Deltas); err != nil {
+		case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
+			if len(data.DebugStoreDeltas.Deltas) != 0 {
+				if err := ui.printJSONBlockDeltas(out.Name, output.Clock.Number, data.DebugStoreDeltas.Deltas); err != nil {
 					return fmt.Errorf("print json deltas: %w", err)
 				}
 			}

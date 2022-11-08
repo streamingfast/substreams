@@ -4,7 +4,7 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/work"
+	"github.com/streamingfast/substreams/orchestrator/storagestate"
 	"github.com/streamingfast/substreams/reqctx"
 	"strings"
 
@@ -31,7 +31,7 @@ type MultiSquasher struct {
 func NewMultiSquasher(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
-	modulesStorageStateMap work.ModuleStorageStateMap,
+	modulesStorageStateMap storagestate.ModuleStorageStateMap,
 	storeConfigs store.ConfigMap,
 	upToBlock uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
@@ -39,6 +39,11 @@ func NewMultiSquasher(
 	logger := reqctx.Logger(ctx)
 	storeSquashers := map[string]*StoreSquasher{}
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
+		storeStorageState, ok := moduleStorageState.(*storagestate.StoreStorageState)
+		if !ok {
+			continue
+		}
+		// TODO(abourget): type check the ModuleState here, and continue with the StoreModuleState only
 		storeConfig, found := storeConfigs[storeModuleName]
 		if !found {
 			return nil, fmt.Errorf("store %q not found", storeModuleName)
@@ -50,31 +55,31 @@ func NewMultiSquasher(
 		// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
 		// one is derived?
 		var storeSquasher *StoreSquasher
-		if moduleStorageState.InitialCompleteRange == nil {
+		if storeStorageState.InitialCompleteRange == nil {
 			logger.Debug("setting up initial store",
 				zap.String("store", storeModuleName),
-				zap.Object("initial_store_file", moduleStorageState.InitialCompleteRange),
+				zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
 			)
 			storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 		} else {
 			logger.Debug("loading initial store",
 				zap.String("store", storeModuleName),
-				zap.Object("initial_store_file", moduleStorageState.InitialCompleteRange),
+				zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
 			)
-			if err := startingStore.Load(ctx, moduleStorageState.InitialCompleteRange.ExclusiveEndBlock); err != nil {
-				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, moduleStorageState.InitialCompleteRange, err)
+			if err := startingStore.Load(ctx, storeStorageState.InitialCompleteRange.ExclusiveEndBlock); err != nil {
+				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, storeStorageState.InitialCompleteRange, err)
 			}
-			storeSquasher = NewStoreSquasher(startingStore, upToBlock, moduleStorageState.InitialCompleteRange.ExclusiveEndBlock, uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
+			storeSquasher = NewStoreSquasher(startingStore, upToBlock, storeStorageState.InitialCompleteRange.ExclusiveEndBlock, uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 
-			onStoreCompletedUntilBlock(storeModuleName, moduleStorageState.InitialCompleteRange.ExclusiveEndBlock)
+			onStoreCompletedUntilBlock(storeModuleName, storeStorageState.InitialCompleteRange.ExclusiveEndBlock)
 		}
 
-		if len(moduleStorageState.PartialsMissing) == 0 {
+		if len(storeStorageState.PartialsMissing) == 0 {
 			storeSquasher.targetExclusiveEndBlockReach = true
 		}
 
-		if len(moduleStorageState.PartialsPresent) != 0 {
-			storeSquasher.squash(moduleStorageState.PartialsPresent)
+		if len(storeStorageState.PartialsPresent) != 0 {
+			storeSquasher.squash(storeStorageState.PartialsPresent)
 		}
 
 		storeSquashers[storeModuleName] = storeSquasher

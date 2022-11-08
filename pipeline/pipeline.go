@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	"strings"
 
 	"github.com/streamingfast/bstream"
@@ -35,7 +36,7 @@ type Pipeline struct {
 	postJobHooks   []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Runtime
-	outputGraph     *OutputModulesGraph
+	outputGraph     *outputgraph.OutputModulesGraph
 	moduleExecutors []exec.ModuleExecutor
 	moduleOutputs   []*pbsubstreams.ModuleOutput
 
@@ -52,7 +53,7 @@ type Pipeline struct {
 
 func New(
 	ctx context.Context,
-	outputGraph *OutputModulesGraph,
+	outputGraph *outputgraph.OutputModulesGraph,
 	stores *Stores,
 	wasmRuntime *wasm.Runtime,
 	execOutputCache execout.CacheEngine,
@@ -93,7 +94,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
 	logger.Info("initializing exec output cache")
-	if err := p.execOutputCache.Init(p.outputGraph.moduleHashes); err != nil {
+	if err := p.execOutputCache.Init(p.outputGraph.ModuleHashes()); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
@@ -121,7 +122,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	// and cache the latest if all block boundaries
 	// are still clear.
 
-	if err = p.buildWASM(ctx, p.outputGraph.processModules); err != nil {
+	if err = p.buildWASM(ctx, p.outputGraph.AllModules()); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
 	}
 
@@ -188,7 +189,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 		p.ctx,
 		p.runtimeConfig,
 		reqDetails.LiveHandoffBlockNum,
-		p.outputGraph.graph,
+		p.outputGraph,
 		p.respFunc,
 		p.stores.configs,
 		reqDetails.Request.Modules,
@@ -297,6 +298,11 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 	return nil
 }
 
+// TODO(abourget): have this being generated and the `buildWASM` by taking
+// this OutputModulesGraph as input, and creating the ModuleExecutors, and caching
+// them over there.
+//moduleExecutorsInitialized bool
+//moduleExecutors            []exec.ModuleExecutor
 func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module) error {
 	request := reqctx.Details(ctx).Request
 	tracer := otel.GetTracerProvider().Tracer("executor")

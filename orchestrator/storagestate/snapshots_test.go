@@ -1,4 +1,4 @@
-package work
+package storagestate
 
 import (
 	"github.com/streamingfast/substreams/block"

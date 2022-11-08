@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	"go.uber.org/zap"
 	"strings"
 	"testing"
@@ -50,9 +51,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			ctx := context.Background()
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
-				outputGraph: &OutputModulesGraph{
-					outputModuleMap: map[string]bool{},
-				},
+				outputGraph: outputgraph.TestNew(),
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)

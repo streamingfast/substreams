@@ -1,4 +1,4 @@
-package work
+package storagestate
 
 import (
 	"github.com/streamingfast/substreams/block"
@@ -98,7 +98,7 @@ func TestWorkUnits_init(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			wu, err := newModuleStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			wu, err := newStoreStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectInitLoad, wu.InitialCompleteRange)
 			assert.Equal(t,

@@ -11,7 +11,17 @@ import (
 
 type getRecentFinalBlockFunc func() (uint64, error)
 
-func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRecentFinalBlock getRecentFinalBlockFunc) (*reqctx.RequestDetails, error) {
+func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRecentFinalBlock getRecentFinalBlockFunc) (req *reqctx.RequestDetails, err error) {
+	req = &reqctx.RequestDetails{
+		Request:        request,
+		IsSubRequest:   isSubRequest,
+		StopBlockNum:   request.StopBlockNum,
+		IsOutputModule: map[string]bool{},
+	}
+	for _, modName := range request.OutputModules {
+		req.IsOutputModule[modName] = true
+	}
+
 	// huge nasty FIXME:
 	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
 	//         process directly, even if that's realllly in the past.
@@ -19,29 +29,21 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRe
 	///        joining on a final segment, and then kick off parallel processing
 	///        until a new, more recent, live block.
 	// See also `resolveStartBlockNum`'s TODO
-	effectiveStartBlock, err := resolveStartBlockNum(request)
+	req.RequestStartBlockNum, err = resolveStartBlockNum(request)
 	if err != nil {
 		return nil, err
 	}
 
-	liveHandoffBlockNum, err := computeLiveHandoffBlockNum(getRecentFinalBlock, request.StopBlockNum)
-	if err != nil {
-		return nil, err
+	if request.ProductionMode {
+		req.LiveHandoffBlockNum, err = computeLiveHandoffBlockNum(getRecentFinalBlock, request.StopBlockNum)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		req.LiveHandoffBlockNum = req.RequestStartBlockNum
 	}
 
-	outMap := map[string]bool{}
-	for _, modName := range request.OutputModules {
-		outMap[modName] = true
-	}
-
-	return &reqctx.RequestDetails{
-		Request:              request,
-		RequestStartBlockNum: effectiveStartBlock,
-		LiveHandoffBlockNum:  liveHandoffBlockNum,
-		StopBlockNum:         request.StopBlockNum,
-		IsSubRequest:         isSubRequest,
-		IsOutputModule:       outMap,
-	}, nil
+	return req, nil
 }
 
 func computeLiveHandoffBlockNum(getRecentFinalBlock getRecentFinalBlockFunc, stopBlockNum uint64) (uint64, error) {

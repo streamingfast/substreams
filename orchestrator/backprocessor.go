@@ -3,8 +3,9 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/storagestate"
 
-	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
@@ -22,12 +23,17 @@ func BuildBackprocessor(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
 	upToBlock uint64,
-	graph *manifest.ModuleGraph,
+	outputGraph *outputgraph.OutputModulesGraph,
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
 	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Backprocessor, error) {
-	plan, err := work.BuildNewPlan(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, runtimeConfig.SubrequestsSplitSize, upToBlock, graph)
+	modulesStateMap, err := storagestate.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, outputGraph.RequestedMapModules(), runtimeConfig.ExecOutputSaveInterval, upToBlock)
+	if err != nil {
+		return nil, fmt.Errorf("build storage map: %w", err)
+	}
+
+	plan, err := work.BuildNewPlan(modulesStateMap, runtimeConfig.SubrequestsSplitSize, upToBlock, outputGraph)
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	"os"
 	"time"
 
@@ -144,7 +145,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 
-	outputGraph, err := pipeline.NewOutputModuleGraph(request, s.blockType)
+	outputGraph, err := outputgraph.NewOutputModuleGraph(request, s.blockType)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}

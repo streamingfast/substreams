@@ -20,7 +20,7 @@ import (
 type TestWorker struct {
 	t                      *testing.T
 	responseCollector      *responseCollector
-	newBlockGenerator      NewTestBlockGenerator
+	newBlockGenerator      BlockGeneratorFactory
 	blockProcessedCallBack blockProcessedCallBack
 	testTempDir            string
 }

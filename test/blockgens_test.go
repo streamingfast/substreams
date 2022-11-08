@@ -12,7 +12,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/store"
@@ -212,19 +211,4 @@ func (g LinearBlockGenerator) Generate() []*GeneratedBlock {
 	return generatedBlocks
 }
 
-type responseCollector struct {
-	responses []*pbsubstreams.Response
-}
-
-func newResponseCollector() *responseCollector {
-	return &responseCollector{
-		responses: []*pbsubstreams.Response{},
-	}
-}
-
-func (c *responseCollector) Collect(resp *pbsubstreams.Response) error {
-	c.responses = append(c.responses, resp)
-	return nil
-}
-
-type NewTestBlockGenerator func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator
+type BlockGeneratorFactory func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator

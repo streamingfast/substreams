@@ -83,10 +83,10 @@ func toModuleOutput(executor ModuleExecutor, data pbsubstreams.ModuleOutputData)
 	}
 
 	output := &pbsubstreams.ModuleOutput{
-		Name:          executor.Name(),
-		Logs:          logs,
-		LogsTruncated: truncated,
-		Data:          data,
+		Name:               executor.Name(),
+		DebugLogs:          logs,
+		DebugLogsTruncated: truncated,
+		Data:               data,
 	}
 	return output
 }

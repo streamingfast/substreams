@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -38,13 +39,13 @@ func (s *Stores) SetStoreMap(storeMap store.Map) {
 	s.StoreMap = storeMap
 }
 
-func InitializeStoreConfigs(outputGraph *OutputModulesGraph, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
+func InitializeStoreConfigs(outputGraph *outputgraph.OutputModulesGraph, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
 	out = make(store.ConfigMap)
-	for _, storeModule := range outputGraph.storeModules {
+	for _, storeModule := range outputGraph.Stores() {
 		c, err := store.NewConfig(
 			storeModule.Name,
 			storeModule.InitialBlock,
-			outputGraph.moduleHashes.Get(storeModule.Name),
+			outputGraph.ModuleHashes().Get(storeModule.Name),
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			baseObjectStore,
@@ -85,7 +86,7 @@ func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 func (s *Stores) storesHandleUndo(moduleOutput *pbsubstreams.ModuleOutput) {
 	if s, found := s.StoreMap.Get(moduleOutput.Name); found {
 		if deltaStore, ok := s.(store.DeltaAccessor); ok {
-			deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().GetDeltas())
+			deltaStore.ApplyDeltasReverse(moduleOutput.GetDebugStoreDeltas().GetDeltas())
 		}
 	}
 }

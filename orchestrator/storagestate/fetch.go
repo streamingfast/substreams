@@ -1,4 +1,4 @@
-package work
+package storagestate
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func (s *StorageState) String() string {
 	return strings.Join(out, ", ")
 }
 
-func fetchStorageState(ctx context.Context, storeConfigMap store.ConfigMap) (*StorageState, error) {
+func fetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap) (*StorageState, error) {
 	state := &StorageState{
 		Snapshots: map[string]*Snapshots{},
 	}

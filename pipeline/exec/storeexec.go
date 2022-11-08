@@ -68,8 +68,8 @@ func (e *StoreModuleExecutor) wrapDeltas() (out []byte, moduleOutput pbsubstream
 		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
 	}
 
-	moduleOutput = &pbsubstreams.ModuleOutput_StoreDeltas{
-		StoreDeltas: deltas,
+	moduleOutput = &pbsubstreams.ModuleOutput_DebugStoreDeltas{
+		DebugStoreDeltas: deltas,
 	}
 	return data, moduleOutput, nil
 }
@@ -80,7 +80,7 @@ func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleO
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling output deltas: %w", err)
 	}
-	return toModuleOutput(e, &pbsubstreams.ModuleOutput_StoreDeltas{
-		StoreDeltas: deltas,
+	return toModuleOutput(e, &pbsubstreams.ModuleOutput_DebugStoreDeltas{
+		DebugStoreDeltas: deltas,
 	}), nil
 }

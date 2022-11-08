@@ -1,4 +1,4 @@
-package work
+package storagestate
 
 import (
 	"fmt"
@@ -6,15 +6,9 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type PartialStoreFile = block.Range
-type FullStoreFile = block.Range
-type PartialStoreFiles = block.Ranges
-
-type ModuleStorageStateMap map[string]*ModuleStorageState
-
-// ModuleStorageState contains all the file-related ranges of things we'll want to plan
-// work for, and things that are already available.
-type ModuleStorageState struct {
+// ModuleStorageState contains all the file-related ranges of store snapshots
+// we'll want to plan work for, and things that are already available.
+type StoreStorageState struct {
 	ModuleName         string
 	ModuleInitialBlock uint64
 
@@ -23,8 +17,19 @@ type ModuleStorageState struct {
 	PartialsPresent      PartialStoreFiles
 }
 
-func newModuleStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *Snapshots) (out *ModuleStorageState, err error) {
-	out = &ModuleStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
+type PartialStoreFile = block.Range
+type FullStoreFile = block.Range
+type PartialStoreFiles = block.Ranges
+
+func newMapStorageState(modName string, modInitBlock, workUpToBlockNum uint64, snapshots string) (out *MapperStorageState, err error) {
+	// TODO: base the content of Mapper on the `snapshots` in here..
+	return &MapperStorageState{
+		ModuleName: modName,
+	}, nil
+}
+
+func newStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *Snapshots) (out *StoreStorageState, err error) {
+	out = &StoreStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
 	if workUpToBlockNum <= modInitBlock {
 		return
 	}
@@ -57,11 +62,27 @@ func newModuleStorageState(modName string, storeSaveInterval, modInitBlock, work
 	return
 }
 
-func (w *ModuleStorageState) batchRequests(subreqSplitSize uint64) block.Ranges {
-	return w.PartialsMissing.MergedBuckets(subreqSplitSize)
+func (s *StoreStorageState) Name() string { return s.ModuleName }
+
+func (s *StoreStorageState) BatchRequests(subreqSplitSize uint64) block.Ranges {
+	return s.PartialsMissing.MergedBuckets(subreqSplitSize)
 }
 
-func (w *ModuleStorageState) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (s *StoreStorageState) InitialProgressRanges() (out block.Ranges) {
+	if s.InitialCompleteRange != nil {
+		out = append(out, s.InitialCompleteRange)
+	}
+	out = append(out, s.PartialsPresent.Merged()...)
+	return
+}
+func (s *StoreStorageState) ReadyUpToBlock() uint64 {
+	if s.InitialCompleteRange == nil {
+		return s.ModuleInitialBlock
+	}
+	return s.InitialCompleteRange.ExclusiveEndBlock
+}
+
+func (w *StoreStorageState) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("store_name", w.ModuleName)
 	enc.AddString("intial_range", w.InitialCompleteRange.String())
 	enc.AddInt("partial_missing", len(w.PartialsMissing))

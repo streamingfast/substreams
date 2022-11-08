@@ -1,25 +1,21 @@
 package work
 
 import (
-	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/storagestate"
 	"sort"
 	"sync"
 
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/store"
-	"go.uber.org/zap"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Plan struct {
-	ModulesStateMap ModuleStorageStateMap
+	// ModulesStateMap
+	ModulesStateMap storagestate.ModuleStorageStateMap
 
-	sortedModules   []string
-	moduleAncestors map[string][]string
+	outputGraph *outputgraph.OutputModulesGraph
 
 	upToBlock uint64
 
@@ -31,10 +27,11 @@ type Plan struct {
 	mu sync.Mutex
 }
 
-func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, subrequestSplitSize, upToBlock uint64, graph *manifest.ModuleGraph) (*Plan, error) {
+func BuildNewPlan(modulesStateMap storagestate.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputgraph.OutputModulesGraph) (*Plan, error) {
 	plan := &Plan{
-		ModulesStateMap: make(ModuleStorageStateMap),
+		ModulesStateMap: modulesStateMap,
 		upToBlock:       upToBlock,
+		outputGraph:     outputGraph,
 	}
 
 	// TODO(abourget):
@@ -49,17 +46,13 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 	// mais les leaf modules
 
 	// Fetch outputs for `mapperOutputModules`
+	// TODO(abourget): we'll need to bring in the `dstore.Store` related to the `output` for the mappers in here.
+	// They're only in the
+	//mappersOutputState, err := fetchMappersOutputsState(ctx, mappersConfigMap)
+	//if err := plan.buildMappersStorageState(ctx, mappersOutputState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
+	//	return nil, fmt.Errorf("build plan: %w", err)
+	//}
 
-	storageState, err := fetchStorageState(ctx, storeConfigMap)
-	if err != nil {
-		return nil, fmt.Errorf("fetching stores states: %w", err)
-	}
-	if err := plan.buildPlanFromStorageState(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
-		return nil, fmt.Errorf("build plan: %w", err)
-	}
-	if err := plan.sortModules(graph); err != nil {
-		return nil, fmt.Errorf("sorting modules: %w", err)
-	}
 	if err := plan.splitWorkIntoJobs(subrequestSplitSize); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
@@ -71,58 +64,13 @@ func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnap
 	return plan, nil
 }
 
-func (p *Plan) buildPlanFromStorageState(ctx context.Context, storageState *StorageState, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, upToBlock uint64) error {
-	logger := reqctx.Logger(ctx)
-
-	for _, config := range storeConfigMap {
-		name := config.Name()
-		snapshot, ok := storageState.Snapshots[name]
-		if !ok {
-			return fmt.Errorf("fatal: storage state not reported for module name %q", name)
-		}
-
-		moduleStorageState, err := newModuleStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
-		if err != nil {
-			return fmt.Errorf("new file units %q: %w", name, err)
-		}
-
-		p.ModulesStateMap[name] = moduleStorageState
-
-		logger.Info("work plan for store module", zap.Object("work", moduleStorageState))
-	}
-
-	return nil
-}
-
-func (p *Plan) sortModules(graph *manifest.ModuleGraph) error {
-	moduleAncestors := map[string][]string{}
-	for storeName, _ := range p.ModulesStateMap {
-		ancestors, err := graph.AncestorStoresOf(storeName)
-		if err != nil {
-			return fmt.Errorf("getting ancestor stores for %s: %w", storeName, err)
-		}
-		moduleAncestors[storeName] = moduleNames(ancestors)
-	}
-
-	mods := make([]string, 0, len(p.ModulesStateMap))
-	for modName, _ := range p.ModulesStateMap {
-		mods = append(mods, modName)
-	}
-	mods = manifest.SortModuleNamesByGraphTopology(mods, graph)
-
-	p.sortedModules = mods
-	p.moduleAncestors = moduleAncestors
-
-	return nil
-}
-
 func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
-	for _, storeName := range p.sortedModules {
-		workUnit := p.ModulesStateMap[storeName]
-		requests := workUnit.batchRequests(subrequestSplitSize)
+	for _, storeName := range p.outputGraph.SchedulableModuleNames() {
+		modState := p.ModulesStateMap[storeName]
+		requests := modState.BatchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
-			requiredModules := p.moduleAncestors[storeName]
+			requiredModules := p.outputGraph.AncestorsFrom(storeName)
 
 			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
 			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)
@@ -131,17 +79,19 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
 			p.waitingJobs = append(p.waitingJobs, job)
 		}
 	}
+
+	// Loop through `mappers` and schedule them, separately from the stores
+	// ModulesStateMap would be concerned ONLY with Stores
+	// and we add a MapperStateMap, concerned only with Mappers
+	// with the appropriate ranges in there, and not the
+	// store-specific `PartialsMissing`, `PartialsPresent`, etc..
 	return nil
 }
 
 func (p *Plan) initModulesReadyUpToBlock() {
 	p.modulesReadyUpToBlock = make(map[string]uint64)
 	for modName, modState := range p.ModulesStateMap {
-		if modState.InitialCompleteRange == nil {
-			p.modulesReadyUpToBlock[modName] = modState.ModuleInitialBlock
-		} else {
-			p.modulesReadyUpToBlock[modName] = modState.InitialCompleteRange.ExclusiveEndBlock
-		}
+		p.modulesReadyUpToBlock[modName] = modState.ReadyUpToBlock()
 	}
 }
 
@@ -229,20 +179,12 @@ func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) err
 func (p *Plan) initialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
 	for storeName, modState := range p.ModulesStateMap {
 		var more []*pbsubstreams.BlockRange
-		if modState.InitialCompleteRange != nil {
-			more = append(more, &pbsubstreams.BlockRange{
-				StartBlock: modState.InitialCompleteRange.StartBlock,
-				EndBlock:   modState.InitialCompleteRange.ExclusiveEndBlock,
-			})
-		}
-
-		for _, rng := range modState.PartialsPresent.Merged() {
+		for _, rng := range modState.InitialProgressRanges() {
 			more = append(more, &pbsubstreams.BlockRange{
 				StartBlock: rng.StartBlock,
 				EndBlock:   rng.ExclusiveEndBlock,
 			})
 		}
-
 		if len(more) != 0 {
 			out = append(out, &pbsubstreams.ModuleProgress{
 				Name: storeName,

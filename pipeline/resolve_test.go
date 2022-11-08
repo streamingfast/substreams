@@ -8,6 +8,7 @@ package pipeline
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/streamingfast/bstream"
@@ -138,4 +139,27 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildRequestDetails(t *testing.T) {
+	req, err := BuildRequestDetails(&pbsubstreams.Request{
+		StartBlockNum:  10,
+		ProductionMode: false,
+	}, true, func() (uint64, error) {
+		assert.False(t, true, "shouldn't pass here")
+		return 999, nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 10, int(req.RequestStartBlockNum))
+	assert.Equal(t, 10, int(req.LiveHandoffBlockNum))
+
+	req, err = BuildRequestDetails(&pbsubstreams.Request{
+		StartBlockNum:  10,
+		ProductionMode: true,
+	}, true, func() (uint64, error) {
+		return 999, nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 10, int(req.RequestStartBlockNum))
+	assert.Equal(t, 999, int(req.LiveHandoffBlockNum))
 }

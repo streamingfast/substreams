@@ -57,7 +57,7 @@ func checkE(cmd *cobra.Command, args []string) error {
 }
 
 func newStore(storeURL string) (*store.FullKV, dstore.Store, error) {
-	remoteStore, err := dstore.NewStore(storeURL, "", "", false)
+	remoteStore, err := dstore.NewStore(storeURL, "zst", "zstd", false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
 	}

@@ -8,5 +8,6 @@ import (
 var zlog, _ = logging.PackageLogger("pipe.test", "github.com/streamingfast/substreams/test")
 
 func init() {
-	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.WarnLevel)) // JULIEN PLEASE DON'T TOUCH (╯°□°)╯︵ ┻━┻
+	// To tweak in tests, add DEBUG=true in your ENV VARS dude.
+	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.WarnLevel))
 }

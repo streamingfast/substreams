@@ -6,13 +6,31 @@ description: StreamingFast Substreams manifest creation
 
 ### Manifest Overview
 
-A Substreams manifest primarily defines a list of [modules](../concepts/modules.md). Module definitions will generally contain a kind of either `map` or `store`.&#x20;
+The Substreams manifest provides all of the key elements for the implementation. One manifest is required for each Substreams implementation.&#x20;
 
-The manifest will link to the Rust code that implements the business logic of the module, also known as the `module handler`. The `module handler` is a list of `inputs` for the modules, and a list of `outputs`.
+The Substreams manifest outlines the implementation and provides vital insights into the blockchain being targeted, the design of the data flow, and the names and types of modules and module handlers.
+
+{% hint style="info" %}
+**Tip**: Additional information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
+{% endhint %}
+
+#### Substreams Modules
+
+A Substreams manifest defines a list of [modules](../concepts/modules.md). Module definitions themselves contain a `kind` that is set to either `map` or `store`.&#x20;
+
+The manifest will link to the Rust code that implements the business logic of the module, also known as a `module handler`. The `module handler` manifest entry a list of `inputs` and a list of `outputs` for each module.
 
 ### Manifest YAML Creation
 
-The example Substreams manifest provided below shows the fields and values that need to be present in the YAML configuration file.
+The example manifest below shows the fields and values required in the YAML manifest configuration file for a Substreams implementation.
+
+{% hint style="info" %}
+**Note**: The example below contains Ethereum-specific entries, such as [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto).&#x20;
+
+
+
+Developers working with other blockchains will use values and objects specific to the chain they're targeting, such as [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v2/type.proto) for Solana.
+{% endhint %}
 
 {% code title="substreams.yaml" %}
 ```yaml
@@ -63,42 +81,48 @@ View this file in the repo by visiting the following link.
 
 #### `imports.eth`&#x20;
 
-Substreams consumes Ethereum blocks and depends on the Ethereum Substreams package.&#x20;
+Substreams consumes blocks and depends on a Substreams package matching the target blockchain. The Substreams Template example contains references specific to the Ethereum blocks.  &#x20;
 
 {% hint style="info" %}
-**Note**_:_ _learn more about_ [_packages_](../reference-and-specs/packages.md) _in the reference and specs section of the documentation._
+**Note**_:_ Learn more about [packages](../reference-and-specs/packages.md) in the reference and specs section of the documentation.
 {% endhint %}
 
 #### `protobuf.files`
 
-The list of Substreams custom Protobuf files.&#x20;
+The `protobuf.files` contains a list of Substreams custom protobuf files for the current implementation. The Substreams Template contains references to Ethereum-specific protobuf definitions and files.&#x20;
 
 #### `protobuf.importPaths`
 
-The locations of custom Protobuf files.
+The `protobuf.importPaths` contains the locations of the custom protobuf files for the current implementation.
 
-The manifest lists two modules: `block_to_transfers` and `nft_state`, where the former is a module of kind `map` and the latter is a module of kind `store`.
+The example Substreams Template manifest lists two modules: `block_to_transfers` and `nft_state.`&#x20;
+
+The former is a module of kind `map` and the latter is a module of kind `store`.
 
 **`block_to_transfers`**
 
-The `block_to_transfers` map module will take an Ethereum block as an input and will extract all ERC721 Transfers related to our contract into an object. The inputs of the module are Ethereum blocks with the Protobuf definition of [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto).&#x20;
+The `block_to_transfers` map module will take an Ethereum block as an input and will extract all ERC721 Transfers related to the contract into an object.&#x20;
 
-This Ethereum block definition is one provided by  StreamingFast. The block definition is chain specific and must be versioned. Substreams on NEAR will use the StreamingFast NEAR block definition.
+The inputs of the module are Ethereum blocks with the protobuf definition of [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto).
 
-The outputs of the module are custom `Protobuf` models  defined as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represents a list of ERC721 transfers in any given block.
+{% hint style="warning" %}
+**Important**: Block definitions are _chain specific_ and _must be versioned_.
+{% endhint %}
 
-The module is linked to the wasm code containing the business logic. The modules are Rust code compiled as web assembly.&#x20;
+The outputs of the module are custom protobuf models defined as `proto:eth.erc721.v1.Transfers` representing a list of ERC721 transfers contained within any given block.
 
-The Rust function which implements the modules business logic for the module is defined by the module name and is called `block_to_transfers` (in this example).
+The module is linked to the Web Assembly (WASM) code containing the business logic. The modules are written in the Rust programming language and compiled to WASM.&#x20;
 
-The first transfers of tokens originated from the contracts occurred at block `12287507,` so `initialBlock` is used in the `map` module.
+The Rust function implementing the business logic for the module is defined by the `block_to_transfers` module.
+
+The first transfers of tokens originated from the contracts at block `12287507`. For this reason, `initialBlock` is used in the `map` module.
 
 **`nft_state`**
 
-The `nft_state` `store` module will take the transfers per block that we have extracted in the mapper as input and keep track of the token count for a given holder.&#x20;
+The `nft_state` `store` module takes the transfers per block, extracted in the mapper, as input and keeps track of the token count for a given holder.&#x20;
 
-Inputs of the module are:
+Inputs of the module are a custom protobuf model defined as `proto:eth.erc721.v1.Transfers`.&#x20;
 
-* A custom `Protobuf` model that we will define as `proto:eth.erc721.v1.Transfers`. This `Protobuf` module represent the list of ERC721 transfers in a given block. It is the output for the `map` module defined above.
+The `eth.erc721.v1.Transfers` protobuf module represents a list of ERC721 transfers in a given block, and is used as the output for the `map` module defined above.
 
-The given store will simply store a `count` of ERC721 tokens per holder, thus our store `valueType` is `int64`. Lastly our merge strategy is `add.`
+The given store will stores a `count` of ERC721 tokens for each holder. The store `valueType` is `int64` and the merge strategy is set to `add.`

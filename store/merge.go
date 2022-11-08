@@ -44,6 +44,11 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND:
 		for key, nextVal := range kvPartialStore.kv {
 			if prevVal, found := b.kv[key]; found {
+				newLen := len(prevVal) + len(nextVal)
+				if b.appendLimit > 0 && uint64(newLen) >= b.appendLimit {
+					return fmt.Errorf("append would exceed limit of %d bytes", b.appendLimit)
+				}
+
 				newVal := make([]byte, len(prevVal)+len(nextVal))
 				copy(newVal[0:], prevVal)
 				copy(newVal[len(prevVal):], nextVal)

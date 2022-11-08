@@ -98,7 +98,7 @@ type ConditionalKeySetter interface {
 }
 
 type Appender interface {
-	Append(ord uint64, key string, value []byte)
+	Append(ord uint64, key string, value []byte) error
 }
 
 type Deleter interface {

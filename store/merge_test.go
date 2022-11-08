@@ -92,6 +92,23 @@ func TestStore_Merge(t *testing.T) {
 			},
 		},
 		{
+			name: "append exceeds limit",
+			latest: newPartialStore(map[string][]byte{
+				"one": []byte("foo;"),
+				"two": []byte("bar;"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, manifest.OutputValueTypeString, nil),
+			prev: newStore(map[string][]byte{
+				"one":   []byte("baz;supercalifrastilisticexpialidocious;"),
+				"three": []byte("lol;"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, manifest.OutputValueTypeString),
+			expectedError: true,
+			expectedKV: map[string][]byte{
+				"one":   []byte("baz;foo;"),
+				"two":   []byte("bar;"),
+				"three": []byte("lol;"),
+			},
+		},
+		{
 			name: "sum_int",
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("1"),
@@ -318,10 +335,15 @@ func TestStore_Merge(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.prev.Merge(test.latest)
+			if test.latest.updatePolicy == pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND {
+				test.latest.appendLimit = 20
+				test.prev.appendLimit = 20
+			}
 
+			err := test.prev.Merge(test.latest)
 			if test.expectedError {
 				require.Error(t, err)
+				return
 			} else {
 				require.NoError(t, err)
 			}

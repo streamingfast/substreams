@@ -6,17 +6,12 @@ description: StreamingFast Substreams dependency installation
 
 ## Dependencies Overview
 
-Working with Substreams requires a few applications and tools including:&#x20;
-
-* the `substreams` CLI,&#x20;
-* Rust,&#x20;
-* `buf`&#x20;
-* and `protoc-gen-prost`.
+Working with Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](../getting-started/prerequisites.md) page.&#x20;
 
 Instructions and links are provided below to assist with the installation of the required dependencies for Substreams.
 
 {% hint style="success" %}
-See [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setup and installation instructions.
+Instructions are provided [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setups.
 {% endhint %}
 
 ### Local installation
@@ -25,7 +20,9 @@ See [below](installation-requirements.md#cloud-based-gitpod-installation) for cl
 
 The CLI is required and is the user interface for working with Substreams.
 
-_See the_ [_`substreams` installation page_](../getting-started/installing-the-cli.md) _for additional information._
+{% hint style="success" %}
+**Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page_._
+{% endhint %}
 
 ### Rust Installation
 
@@ -38,7 +35,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env # to configure your current shell
 ```
 
-### `buf` Installation
+### Buf Installation
 
 Buf simplifies the generation of typed structures in any language.
 
@@ -46,15 +43,9 @@ Buf invokes `protoc` and simplifies the process of working with Substreams.&#x20
 
 _Visit the_ [_Buf website_](https://buf.build/) _for additional information and_ [_installation instructions_](https://docs.buf.build/installation)_._
 
-{% hint style="info" %}
-_**Note**:_ [_Substreams packages_](../reference-and-specs/packages.md) _are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
+{% hint style="success" %}
+**Tip**_:_ [_Substreams packages_](../reference-and-specs/packages.md) _are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
 {% endhint %}
-
-Install Buf using Homebrew on macOS using the following command.
-
-```bash
-$ brew install bufbuild/buf/buf
-```
 
 ### `protoc-gen-prost` Installation
 
@@ -66,30 +57,17 @@ Once Rust is installed install `protoc-gen-prost` through `cargo` using the foll
 $ cargo install protoc-gen-prost
 ```
 
-{% hint style="warning" %}
-**Important**: _Linux-based machines require `cmake` and `build-essential` to install the `protoc-gen-prost` cargo crate._
+### Linux Specific Tools
 
-
+Linux-based machines require CMake and `build-essential` to install the `protoc-gen-prost` cargo crate.
 
 #### CMake
 
-Visit the [Installing CMake page](https://cmake.org/install/) for further information on `cmake`.
-
-
+Find additional information and installation instructions for CMake on the official  [Installing CMake page](https://cmake.org/install/).
 
 #### Build Essential
 
-Find additional information for `build-essential` on the [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
-
-
-
-Run the following commands to install build-essential.
-
-```
-apt update
-apt install cmake build-essential
-```
-{% endhint %}
+Find additional information and installation instructions for `build-essential` on the official [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
 
 ## Cloud-based environment with Gitpod
 

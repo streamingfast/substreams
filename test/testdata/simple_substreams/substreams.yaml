@@ -36,7 +36,6 @@ modules:
     inputs:
       - map: test_map
 
-
   - name: test_store_delete_prefix
     kind: store
     initialBlock: 1
@@ -53,7 +52,6 @@ modules:
       - store: test_store_delete_prefix
     output:
       type: boolean
-
 
   # -------------------- INT64 TESTS -------------------- #
   - name: setup_test_store_add_i64

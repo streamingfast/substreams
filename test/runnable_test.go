@@ -209,7 +209,6 @@ func (f *testRun) ModuleOutputs(t *testing.T) (moduleOutputs []string) {
 						require.NoError(t, err)
 						moduleOutputs = append(moduleOutputs, string(jsonData))
 					}
-
 				}
 				if out := output.GetDebugStoreDeltas(); out != nil {
 					testOutput := &TestStoreOutput{

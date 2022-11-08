@@ -441,6 +441,9 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         s.add(block.number, "a.key", BigInt::from(1));
         s.add(block.number, "a.key", BigInt::from(0));
         s.add(block.number, "a.key", BigInt::from(-1));
+
+        s.add(block.number, "a.key.pos", BigInt::from(1));
+        s.add(block.number, "a.key.neg", BigInt::from(-1));
     }
 
     fn assert_test_store_add_bigint(block: Block, s: StoreGetBigInt) -> Result<bool, Error> {
@@ -450,8 +453,8 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
     }
 
     fn assert_test_store_add_bigint_deltas(block: Block, s: StoreGetBigInt, deltas: Deltas<DeltaBigInt>) -> Result<bool, Error> {
-        if deltas.deltas.len() != 3 {
-            panic!("expected 3 deltas, got {}", deltas.deltas.len());
+        if deltas.deltas.len() != 5 {
+            panic!("expected 5 deltas, got {}", deltas.deltas.len());
         }
 
         let delta_0 = deltas.deltas.get(0).unwrap();

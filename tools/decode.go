@@ -4,13 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/streamingfast/substreams/store"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/descriptorpb"
-	"strconv"
-	"strings"
-	"sync"
-
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
@@ -18,6 +11,11 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
+	"github.com/streamingfast/substreams/store"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"strconv"
+	"strings"
 )
 
 var decodeCmd = &cobra.Command{
@@ -131,7 +129,7 @@ func searchMapModule(
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog, &sync.WaitGroup{})
+	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)
 	if err != nil {

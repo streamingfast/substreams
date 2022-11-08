@@ -16,7 +16,7 @@ The Substreams Developer Guide explains the process of building a Substream that
 **Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study.&#x20;
 {% endhint %}
 
-If you haven't done so already, reviewing the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) and [modules overview](../concepts/modules.md) is helpful for getting up and running with Substreams.
+If you haven't done so already, reviewing the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) and [modules overview](../concepts/modules.md) is helpful for getting up and running quickly.
 
 #### Substreams Template for Dev Guide
 
@@ -24,7 +24,7 @@ The accompanying template associated with the developer guide is[ ](https://gith
 
 #### Substreams for Solana
 
-A basic Substreams implementation for the Solana blockchain demonstrating how to reference the chain-specific SPKG, endpoints, and data models.
+A basic Substreams implementation for the Solana blockchain that demonstrates how to reference the chain-specific SPKG, endpoints, and data models.
 
 [https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
 

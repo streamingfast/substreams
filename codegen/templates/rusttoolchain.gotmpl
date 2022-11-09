@@ -1,0 +1,5 @@
+{{$engine := . -}}
+[toolchain]
+channel = "{{ $engine.RustVersion }}"
+components = [ "rustfmt" ]
+targets = [ "wasm32-unknown-unknown" ]

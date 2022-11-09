@@ -11,7 +11,7 @@ Working with Substreams requires a number of different applications and tools. A
 Instructions and links are provided below to assist with the installation of the required dependencies for Substreams.
 
 {% hint style="success" %}
-Instructions are provided [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setups.
+**Tip**: Instructions are provided [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setups.
 {% endhint %}
 
 ### Local installation

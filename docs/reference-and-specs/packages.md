@@ -6,7 +6,7 @@ description: StreamingFast Substreams packages reference
 
 ## Working with Substreams Packages
 
-A Substreams _package_ is a **single file** containing all dependencies, p`rotobuf` definitions (as FileDescriptors), compiled WASM code, and the module's tree definition.&#x20;
+A Substreams _package_ is a **single file** containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code, and the module's DAG definition.&#x20;
 
 Substreams packages are protobuf-serialized files. The standard extension for Substreams packages is **`.spkg`**.
 

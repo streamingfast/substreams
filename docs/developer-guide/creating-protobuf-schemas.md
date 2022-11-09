@@ -28,11 +28,13 @@ Additional information can be found for Protocol Buffers by visiting the links p
 
 ### Protobuf Definition
 
-Define a protobuf model as `proto:eth.erc721.v1.Transfers` representing a list of ERC721 transfers.
+Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) representing a list of ERC721 transfers.
 
-Create a proto directory in the substreams directory and then create the protobuf definition file.
+{% hint style="info" %}
+**Note**: The Transfers protobuf in the Substeams Template example is located in the proto directory.
+{% endhint %}
 
-{% code title="eth/erc721/v1/erc721.proto" %}
+{% code title="eth/erc721/v1/erc721.proto" lineNumbers="true" %}
 ```protobuf
 syntax = "proto3";
 
@@ -58,19 +60,19 @@ View this file in the repo by visiting the following link.
 
 #### Identifying Data types
 
-The ERC721 smart contract associated with the Substreams Template example contains a Transfer event. The event is targeted by creating a matching protobuf.&#x20;
+The ERC721 smart contract associated with the Substreams Template example contains a Transfer event. The event is targeted by creating an associated protobuf.&#x20;
 
-A matching Transfer message including the data type’s fields is defined within the protobuf file. The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.&#x20;
-
-{% hint style="info" %}
-**Note**: ERC721 smart contracts are generic contracts used across many different Ethereum applications.&#x20;
-{% endhint %}
+The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.&#x20;
 
 {% hint style="success" %}
-**Tip**: Transfer events in this example can be targeted for specific smart contracts, such as Bored Ape Yacht Club.&#x20;
+**Tip**: Protobufs are chain agnostic and can be defined and used for various blockchains. The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications. The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
 {% endhint %}
 
-Multitudes of more specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers can create more refined and complex protobufs based on the many custom data types that exist.
+{% hint style="info" %}
+**Note**: The Substreams Template example targets Transfer events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.&#x20;
+{% endhint %}
+
+Multitudes of more specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers can create more refined and complex protobufs based on the many custom data types that exist in the blockchain they are targeting.
 
 {% hint style="success" %}
 **Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
@@ -84,13 +86,15 @@ The Substreams CLI is used to generate the associated Rust code for the protobuf
 **Tip**: Notice the `protogen` command and Substreams manifest passed into the CLI.
 {% endhint %}
 
+{% code overflow="wrap" %}
 ```bash
 substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"
 ```
+{% endcode %}
 
-The Rust code is generated and saved into `src/pb/eth.erc721.v1.rs`
+The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)``
 
-Adding a `mod.rs` file in the `src/pb` directory will export the newly generated Rust code.
+The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
 {% code title="src/pb/mod.rs" %}
 ```rust

@@ -4,16 +4,16 @@ description: StreamingFast Substreams chains and endpoints
 
 # Chains & Endpoints
 
+## Supported Blockchains & Protobuf Models
+
 Protobuf definitions and public endpoints are provided for each of the supported protocols and chains below.&#x20;
 
-{% hint style="warning" %}
-_**Important**: All of the endpoints listed on this page require_ [_authentication_](authentication.md) _before use._
+{% hint style="success" %}
+**Tip**: All of the endpoints listed on this page require [authentication](authentication.md) before use.
 {% endhint %}
 
-{% hint style="info" %}
-_**Note**: Each endpoint will serve only the protobuf model of the underlying protocol and needs to match the Substreams module's_ [_`source:` field_](manifests.md#modules-.inputs)_._
-
-_For example, it is **not** possible to stream an `sf.near.type.v1.Block` from an Ethereum endpoint._
+{% hint style="warning" %}
+_**Important**:_ Endpoints serve protobuf models specific to the underlying protocol and must match the `source:` field for the module. _Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint **is not possible**._
 {% endhint %}
 
 ## Ethereum
@@ -50,7 +50,7 @@ Protobuf model: [`sf.cosmos.type.v1.Block`](https://github.com/figment-networks/
 
 #### Endpoints
 
-_None available at this time._
+_Coming soon._
 
 ## Arweave
 
@@ -70,5 +70,4 @@ Protobuf model: [`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos
 
 ## Other
 
-See the [Firehose _s_chemas documentation](https://firehose.streamingfast.io/references/protobuf-schemas) for what could be made available through Substreams.
-
+Other blockchains can be supported for use with Substreams through Firehose instrumentation. Additional information is available in the [official Firehose documentation](https://firehose.streamingfast.io/).

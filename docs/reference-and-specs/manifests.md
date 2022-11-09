@@ -4,9 +4,11 @@ description: StreamingFast Substreams manifest reference
 
 # Manifests
 
-The Substreams Manifest, `substreams.yaml`, defines the modules composing the Substreams. The manifest is primarily used to define the dependencies between the inputs and outputs of modules.
+## What is a Substreams Manifest?
 
-Below is a reference guide of _all_ fields used in Substreams manifests.
+The manifest is the high-level outline for a Substreams implementation. The manifest file is used for defining properties specific to the current implementation and identifying the dependencies between the inputs and outputs of modules.
+
+This page provides a reference guide of _all_ fields and values used in a Substreams manifest.
 
 ### Specification Version
 
@@ -105,21 +107,21 @@ protobuf:
 The Substreams packager will load files in any of the listed `importPaths`.
 
 {% hint style="info" %}
-**Note**: The `imports` section of the manfiest will also affect which `.proto` files end up in the package.
+**Note**: The `imports` section of the manifest will also affect which `.proto` files end up in the package.
 {% endhint %}
 
-They are packaged with the modules to help clients decode the incoming streams, but are not sent to Substreams server in network requests.
+They are packaged with the modules to help clients decode the incoming streams, but are not sent to the Substreams server in network requests.
 
 Refer to [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
 ### Binaries
 
-The `binaries` field specifies the binary code to use when executing modules.&#x20;
+The `binaries` field specifies the WASM binary code to use when executing modules.&#x20;
 
-The field `modules[].binary` has a default value of `default`.&#x20;
+The `modules[].binary` field uses a default value of `default`.&#x20;
 
 {% hint style="info" %}
-**Note**_: defining the `default` binary is a crucial step of the process when working with Substreams manifests._
+**Note**_:_ Defining the `default` binary is required when creating a Substreams manifest.
 {% endhint %}
 
 Excerpt pulled from the example Substreams manifest.
@@ -134,21 +136,23 @@ binaries:
     file: ./snapshot_of_my_package.wasm
 ```
 
-You can override which binary to use in the [`modules` section](manifests.md#undefined) (see below), and define other binaries by their name (like `other` in the example above).
+The binary used in the modules section of the manifest can be overridden by defining user-specified binaries through a name. Illustrated in the manifest excerpt above by the `other binary.`
 
 #### `binaries[name].type`
 
 The type of code and implied VM for execution.
 
 {% hint style="info" %}
-_Note, at the time of writing, there is only one VM available and it's value is: `wasm/rust-v1`._
+**Note:** At there is only one VM available with a value of: `wasm/rust-v1`.
 {% endhint %}
 
 #### `binaries[name].file`
 
-The path pointing to a local compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). The path will be absolute or relative to the current `.yaml` file's directory.
+The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the directory the manifest is located in; typically the root of the Substreams implementation.
 
-This file will be picked up and packaged into an `.spkg` when invoking the Substreams `pack` and `run` commands.
+{% hint style="success" %}
+**Tip**: The WASM file referenced by the `binary` field will be picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the Substreams CLI.
+{% endhint %}
 
 ### Modules
 
@@ -176,7 +180,7 @@ Excerpt pulled from the example Substreams manifest.
 
 #### `modules[].name`
 
-The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply for the `package.name` field.
+The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply to the `package.name` field.
 
 It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Each package should have a unique name.
 

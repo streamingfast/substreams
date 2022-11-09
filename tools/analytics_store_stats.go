@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -177,6 +178,7 @@ type KeyStats struct {
 	TotalSize   uint64  `json:"total_size_bytes"`
 	LargestSize uint64  `json:"largest_size_bytes"`
 	AverageSize float64 `json:"average_size_bytes"`
+	StdDevSize  float64 `json:"std_dev_size_bytes"`
 
 	Largest string `json:"largest"`
 }
@@ -185,6 +187,7 @@ type ValueStats struct {
 	TotalSize   uint64  `json:"total_size_bytes"`
 	LargestSize uint64  `json:"largest_size_bytes"`
 	AverageSize float64 `json:"average_size_bytes"`
+	StdDevSize  float64 `json:"std_dev_size_bytes"`
 
 	Largest string `json:"largest_value_key"`
 }
@@ -239,10 +242,16 @@ func calculateStoreStats(stateStore store.Store, stats *StoreStats) error {
 	stats.KeyStats = keyStats
 	stats.ValueStats = valueStats
 
+	keyLens := make([]float64, 0, 1000)
+	valueLens := make([]float64, 0, 1000)
+
 	err := stateStore.Iter(func(key string, value []byte) error {
 		stats.KeysCount++
 		stats.ValueStats.TotalSize += uint64(len(value))
 		stats.KeyStats.TotalSize += uint64(len(key))
+
+		keyLens = append(keyLens, float64(len(key)))
+		valueLens = append(valueLens, float64(len(value)))
 
 		if uint64(len(key)) > stats.KeyStats.LargestSize {
 			stats.KeyStats.LargestSize = uint64(len(key))
@@ -261,12 +270,28 @@ func calculateStoreStats(stateStore store.Store, stats *StoreStats) error {
 	}
 
 	if stats.KeysCount > 0 {
-		stats.KeyStats.AverageSize = float64(stats.KeyStats.TotalSize) / float64(stats.KeysCount)
-		stats.ValueStats.AverageSize = float64(stats.ValueStats.TotalSize) / float64(stats.KeysCount)
+		meanKeyLen := float64(stats.KeyStats.TotalSize) / float64(stats.KeysCount)
+		keyLenStdDev := stdDev(keyLens, meanKeyLen)
+		stats.KeyStats.StdDevSize = keyLenStdDev
+
+		meanValueLen := float64(stats.ValueStats.TotalSize) / float64(stats.KeysCount)
+		valueLenStdDev := stdDev(valueLens, meanValueLen)
+		stats.ValueStats.StdDevSize = valueLenStdDev
+
+		stats.KeyStats.AverageSize = meanKeyLen
+		stats.ValueStats.AverageSize = meanValueLen
 	} else {
 		stats.KeyStats = nil
 		stats.ValueStats = nil
 	}
 
 	return nil
+}
+
+func stdDev(xs []float64, mean float64) float64 {
+	var sum float64
+	for _, x := range xs {
+		sum += math.Pow(x-mean, 2)
+	}
+	return math.Sqrt(sum / float64(len(xs)))
 }

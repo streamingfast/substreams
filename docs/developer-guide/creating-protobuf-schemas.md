@@ -18,11 +18,11 @@ Protobufs are Google's language-neutral extensible mechanism for serializing str
 
 Additional information can be found for Protocol Buffers by visiting the links provided below.&#x20;
 
-**Google Protobuf Documentation**
+**Google Protocol Buffer Documentation**
 
 [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
 
-Google Protobuf Tutorial
+**Google Protocol Buffer Tutorial**
 
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 

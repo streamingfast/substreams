@@ -6,11 +6,11 @@ description: StreamingFast Substreams manifest
 
 ## Overview
 
-The Substreams manifest is the center of control for a Substreams implementation.&#x20;
+The manifest contains the details for the various aspects and components of a Substreams implementation.
 
 Every Substreams implementation contains one manifest. The manifest is a YAML-based file and provides all of the key elements and definitions required for the implementation.
 
-The manifest provides vital insights into the blockchain being targeted, the design of the data flow, and the names and types of modules, and protobuf definitions.
+The manifest provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
 
 {% hint style="success" %}
 **Tip**: Additional detailed information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
@@ -18,7 +18,7 @@ The manifest provides vital insights into the blockchain being targeted, the des
 
 ## Example Manifest
 
-The manifest below is from the Substreams Template example accompanying the developer guide.
+The manifest below is from the [Substreams Template example](https://github.com/streamingfast/substreams-template) accompanying the developer guide.
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}
 ```yaml

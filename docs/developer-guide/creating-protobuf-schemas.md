@@ -88,7 +88,7 @@ The Substreams CLI is used to generate the associated Rust code for the protobuf
 substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"
 ```
 
-The generated Rust code is generated and saved into `src/pb/eth.erc721.v1.rs`
+The Rust code is generated and saved into `src/pb/eth.erc721.v1.rs`
 
 Adding a `mod.rs` file in the `src/pb` directory will export the newly generated Rust code.
 

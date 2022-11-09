@@ -8,9 +8,7 @@ description: StreamingFast Substreams manifest
 
 The manifest contains the details for the various aspects and components of a Substreams implementation.
 
-Every Substreams implementation contains one manifest. The manifest is a YAML-based file and provides all of the key elements and definitions required for the implementation.
-
-The manifest provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
+Every Substreams implementation contains one manifest. The manifest is a YAML-based file and provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
 
 {% hint style="success" %}
 **Tip**: Additional detailed information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
@@ -19,6 +17,10 @@ The manifest provides vital insights into the blockchain being targeted, the des
 ## Example Manifest
 
 The manifest below is from the [Substreams Template example](https://github.com/streamingfast/substreams-template) accompanying the developer guide.
+
+{% hint style="info" %}
+**Note**: The example manifest below is specific to the Ethereum blockchain. The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml) specific to the Solana blockchain.
+{% endhint %}
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}
 ```yaml
@@ -69,10 +71,10 @@ View this file in the repo by visiting the following link.
 
 ### `imports.eth`&#x20;
 
-Substreams consumes blocks and depends on a Substreams [package](../reference-and-specs/packages.md) matching the target blockchain.&#x20;
+Substreams consumes blocks and depends on a Substreams [package](../reference-and-specs/packages.md) matching the target blockchain. The package is referenced by `imports.`
 
 {% hint style="info" %}
-**Note**: The Substreams Template references a package specific to the Ethereum blockchain referenced in the manifest as `ethereum-v0.10.4.spkg`.
+**Note**: The Substreams Template references a package specific to the Ethereum blockchain, referenced in the manifest as `ethereum-v0.10.4.spkg`. The Solana SPL Token Transfers manifest references `solana-v0.1.0.spkg`.
 {% endhint %}
 
 ### `protobuf.files`
@@ -80,7 +82,7 @@ Substreams consumes blocks and depends on a Substreams [package](../reference-an
 The `protobuf.files` contains a list of protobuf files for the current Substreams implementation.&#x20;
 
 {% hint style="info" %}
-**Note**: The Substreams Template references the Ethereum-specific `erc721.proto` protobuf.&#x20;
+**Note**: The Substreams Template references the Ethereum-specific `erc721.proto` protobuf while the Solana SPL Token Transfers example references the Solana-specific `solana_spl.proto`.&#x20;
 {% endhint %}
 
 ### `protobuf.importPaths`

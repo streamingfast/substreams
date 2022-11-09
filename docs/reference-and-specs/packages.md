@@ -4,16 +4,18 @@ description: StreamingFast Substreams packages reference
 
 # Packages
 
-A Substreams _package_ is a **single file** containing all dependencies, `Protobuf` definitions (as FileDescriptors), compiled WASM code, and the modules tree specifications.&#x20;
+## Working with Substreams Packages
+
+A Substreams _package_ is a **single file** containing all dependencies, p`rotobuf` definitions (as FileDescriptors), compiled WASM code, and the module's tree definition.&#x20;
+
+Substreams packages are protobuf-serialized files. The standard extension for Substreams packages is **`.spkg`**.
 
 {% hint style="success" %}
-_Tip: Packages allow developers to begin streaming immediately!_
+**Tip**: Packages simplify the process of working with Substreams and allow developers to _begin streaming immediately_!
 {% endhint %}
 
-Substreams packages are protobuf-serialized files. Their standard extension is **`.spkg`**.
-
 {% hint style="info" %}
-The [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) as well as the standard `protobuf` _FileDescriptorSet_. This means Substreams packages can be used with multiple code generation tools as a source for schema definitions.
+**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This enables Substreams packages to be used with multiple code generation tools as a source for schema definitions.
 {% endhint %}
 
 ### Creating Packages
@@ -24,14 +26,16 @@ Packages are created using the `substreams pack` command, passing the Substreams
 substreams pack ./substreams.yaml
 ```
 
-### Dependencies
+### Package Dependencies
 
-When `imports` is defined in a new `substreams.yaml`, it can load modules and protobuf definitions from _other_ Substreams packages.
+Developers can use modules and protobuf definitions from other Substreams packages when `imports` is defined in the manifest.&#x20;
 
 {% hint style="warning" %}
-_**Important: local protobuf filenames take precedence over the imported package's proto files in this situation**._&#x20;
+**Important**: To avoid potential naming collisions select unique `.proto` filenames and namespaces using fully qualified paths.
 {% endhint %}
 
-To avoid conflicts it's important to use unique `.proto` filenames. It's also important to use namespaces with fully qualified paths. These efforts help avoid potential naming collisions.
+{% hint style="info" %}
+**Note**: Local protobuf filenames take precedence over the imported package's proto files.&#x20;
+{% endhint %}
 
-See the [Substreams Playground](https://github.com/streamingfast/substreams-playground) for package examples.
+Additional package examples are available in the [Substreams Playground](https://github.com/streamingfast/substreams-playground).

@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/manifest"
-
-	"github.com/streamingfast/substreams/orchestrator/work"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
@@ -182,6 +181,9 @@ func Test_SimpleMapModule(t *testing.T) {
 		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
 		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
 	}, moduleOutputs)
+
+	runtime.GC()
+
 }
 
 //todo:

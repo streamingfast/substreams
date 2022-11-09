@@ -22,6 +22,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+replace github.com/bytecodealliance/wasmtime-go => github.com/streamingfast/wasmtime-go v0.0.0-20221109210612-72b94c4a6a33
+
 replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 
 require (
@@ -29,6 +31,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
 	github.com/mattn/go-isatty v0.0.14
+	github.com/mitchellh/go-testing-interface v1.14.1
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/sf-tracing v0.0.0-20221028154401-fd8a9e72bfc5
 	github.com/streamingfast/shutter v1.5.0
@@ -94,7 +97,6 @@ require (
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b // indirect
 	github.com/muesli/cancelreader v0.2.0 // indirect

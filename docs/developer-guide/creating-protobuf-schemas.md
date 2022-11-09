@@ -12,7 +12,7 @@ Substreams uses Protocol Buffers (protobufs) as the API for data models specific
 **Tip**: Protobufs define the input and output for modules.
 {% endhint %}
 
-### Protobufs in Detail
+### Protobuf Basics
 
 Protobufs are Google's language-neutral extensible mechanism for serializing structured data. Protobufs are similar to XML but smaller, faster, and simpler.&#x20;
 

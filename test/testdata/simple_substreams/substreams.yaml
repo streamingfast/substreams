@@ -823,10 +823,8 @@ modules:
       - map: assert_test_store_delete_prefix
 
   - name: assert_all_test
-    kind: store
+    kind: map
     initialBlock: 1
-    updatePolicy: set
-    valueType: int64
     inputs:
       - store: assert_all_test_delete_prefix
       - store: assert_all_test_string
@@ -834,3 +832,5 @@ modules:
       - store: assert_all_test_float64
       - store: assert_all_test_bigint
       - store: assert_all_test_bigdecimal
+    output:
+      type: boolean

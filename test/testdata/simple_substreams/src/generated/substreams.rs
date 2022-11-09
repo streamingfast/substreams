@@ -489,8 +489,7 @@ pub trait SubstreamsTrait {
         assert_all_test_float64: substreams::store::StoreGetInt64,
         assert_all_test_bigint: substreams::store::StoreGetInt64,
         assert_all_test_bigdecimal: substreams::store::StoreGetInt64,
-        store: substreams::store::StoreSetInt64,
-    );
+    ) -> Result<bool, Error>;
 }
 
 

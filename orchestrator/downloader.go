@@ -1,4 +1,4 @@
-package pipeline
+package orchestrator
 
 import (
 	"context"
@@ -13,32 +13,36 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type Downloader struct {
+type LinearExecOutputReader struct {
 	startBlock        uint64
 	exclusiveEndBlock uint64
 	responseFunc      substreams.ResponseFunc
 	logger            *zap.Logger
 	cfg               config.RuntimeConfig
 	runtimeConfig     *config.RuntimeConfig
+	module            *pbsubstreams.Module
+	cache             *cachev1.OutputCache
 }
 
-func NewDownloader(startBlock uint64, exclusiveEndBlock uint64, responseFunc substreams.ResponseFunc, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *Downloader {
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *cachev1.OutputCache, responseFunc substreams.ResponseFunc, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *LinearExecOutputReader {
 	logger = logger.With(zap.String("component", "downloader"))
 	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
-	return &Downloader{
-		responseFunc:      responseFunc,
+	return &LinearExecOutputReader{
 		startBlock:        startBlock,
 		exclusiveEndBlock: exclusiveEndBlock,
+		module:            module,
+		cache:             cache,
+		responseFunc:      responseFunc,
 		runtimeConfig:     runtimeConfig,
 		logger:            logger,
 	}
 }
 
-func (d *Downloader) Run(ctx context.Context, module *pbsubstreams.Module, cache *cachev1.OutputCache) error {
-	stream := NewCachedItemStream(d.startBlock, module, cache, d.runtimeConfig, d.logger)
+func (d *LinearExecOutputReader) Run(ctx context.Context) error {
+	stream := NewCachedItemStream(d.startBlock, d.module, d.cache, d.runtimeConfig, d.logger)
 	for {
 		cacheItem, err := stream.next(ctx)
-		blockScopedData, err := toBlockScopedData(module, cacheItem)
+		blockScopedData, err := toBlockScopedData(d.module, cacheItem)
 		err = d.responseFunc(substreams.NewBlockScopedDataResponse(blockScopedData))
 		if err != nil {
 			return fmt.Errorf("calling response func: %w", err)

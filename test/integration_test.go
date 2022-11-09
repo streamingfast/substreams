@@ -2,14 +2,15 @@ package integration
 
 import (
 	"context"
+	"math/big"
+	"strings"
+	"testing"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"strings"
-	"testing"
 )
 
 //todo:

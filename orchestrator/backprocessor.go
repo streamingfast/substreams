@@ -14,13 +14,14 @@ import (
 )
 
 type Backprocessor struct {
-	plan       *work.Plan
-	scheduler  *Scheduler
-	squasher   *MultiSquasher
-	workerPool work.WorkerPool
+	plan             *work.Plan
+	scheduler        *Scheduler
+	squasher         *MultiSquasher
+	workerPool       work.WorkerPool
+	execOutputReader *LinearExecOutputReader
 }
 
-func BuildBackprocessor(
+func BuildBackProcessor(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
 	upToBlock uint64,
@@ -65,27 +66,35 @@ func BuildBackprocessor(
 	}, nil
 }
 
-func (b *Backprocessor) Run(ctx context.Context) (store.Map, error) {
+func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error) {
 
-	// TODO(abourget): Charles, check ici:
-	// On peut le préparer dans le `BuildBackprocessor` ci-haut, et l'exécuter ici avec `Launch()`
-	// parallelDownloader := NewLinearExecOutputReader()
-	// go parallelDownloader.Launch()
-
+	readerDone := make(chan struct{})
+	if b.execOutputReader != nil {
+		go func() {
+			err = b.execOutputReader.Run(ctx)
+			close(readerDone)
+		}()
+	}
 	b.squasher.Launch(ctx)
 
 	if err := b.scheduler.Schedule(ctx, b.workerPool); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	finalStoreMap, err := b.squasher.Wait(ctx)
+	storeMap, err = b.squasher.Wait(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// if err := parallelDownloader.Wait(); err != nil {
-	// 	return nil, err
-	// }
+	if b.execOutputReader != nil {
+		select {
+		case <-readerDone:
+		case <-ctx.Done():
+		}
+	}
+	return storeMap, nil
+}
 
-	return finalStoreMap, nil
+func (b *Backprocessor) SetOutputReader(execOutputReader *LinearExecOutputReader) {
+	b.execOutputReader = execOutputReader
 }

@@ -41,12 +41,13 @@ type testRun struct {
 	ParallelSubrequests    uint64
 	NewBlockGenerator      BlockGeneratorFactory
 	BlockProcessedCallback blockProcessedCallBack
+	ProductionMode         bool
 
 	Responses []*pbsubstreams.Response
 }
 
 func newTestRun(startBlock int64, exclusiveEndBlock uint64, moduleNames ...string) *testRun {
-	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleNames: moduleNames}
+	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleNames: moduleNames, ProductionMode: true}
 }
 
 func (f *testRun) Run(t *testing.T) error {
@@ -66,11 +67,12 @@ func (f *testRun) Run(t *testing.T) error {
 		opaqueCursor = f.Cursor.ToOpaque()
 	}
 	request := &pbsubstreams.Request{
-		StartBlockNum: f.StartBlock,
-		StopBlockNum:  f.ExclusiveEndBlock,
-		StartCursor:   opaqueCursor,
-		Modules:       pkg.Modules,
-		OutputModules: f.ModuleNames,
+		StartBlockNum:  f.StartBlock,
+		StopBlockNum:   f.ExclusiveEndBlock,
+		StartCursor:    opaqueCursor,
+		Modules:        pkg.Modules,
+		OutputModules:  f.ModuleNames,
+		ProductionMode: f.ProductionMode,
 	}
 
 	if f.SubrequestsSplitSize == 0 {

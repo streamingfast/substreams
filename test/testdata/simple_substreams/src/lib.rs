@@ -99,6 +99,65 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         Ok(true)
     }
 
+    fn setup_test_store_set_i64(block: test::Block, store: StoreSetInt64) {
+        store.set(block.number, "0", &0);
+        store.set(block.number, "min", &i64::MIN);
+        store.set(block.number, "max", &i64::MAX);
+    }
+
+    fn assert_test_store_set_i64(block: test::Block, s: StoreGetInt64) -> Result<bool, errors::Error> {
+        assert(block.number, 0, s.get_last("0").unwrap());
+        assert(block.number, i64::MIN, s.get_last("min").unwrap());
+        assert(block.number, i64::MAX, s.get_last("max").unwrap());
+        Ok(true)
+    }
+
+    fn assert_test_store_set_i64_deltas(block: test::Block, s: StoreGetInt64, deltas: Deltas<DeltaInt64>) -> Result<bool, errors::Error> {
+        if deltas.deltas.len() != 3 {
+            panic!("expected 3 deltas, got {}", deltas.deltas.len());
+        }
+
+        let delta_0 = deltas.deltas.get(0).unwrap();
+        assert(block.number, 0, delta_0.new_value);
+        let delta_1 = deltas.deltas.get(1).unwrap();
+        assert(block.number, i64::MIN, delta_1.new_value);
+        let delta_2 = deltas.deltas.get(2).unwrap();
+        assert(block.number, i64::MAX, delta_2.new_value);
+
+        Ok(true)
+    }
+
+    fn setup_test_store_set_if_not_exists_i64(block: Block, s: StoreSetIfNotExistsInt64) {
+        s.set_if_not_exists(block.number, "key.0", &10);
+        s.set_if_not_exists(block.number, "key.0", &1000);
+    }
+
+    fn assert_test_store_set_if_not_exists_i64(block: Block, s: StoreGetInt64) -> Result<bool, Error> {
+        assert(block.number, 10, s.get_last("key.0").unwrap());
+        Ok(true)
+    }
+
+    fn assert_test_store_set_if_not_exists_i64_deltas(block: Block, s: StoreGetInt64, deltas: Deltas<DeltaInt64>) -> Result<bool, Error> {
+        match block.number {
+            1 => {
+                if deltas.deltas.len() != 1 {
+                    panic!("expected 1 delta, got {}", deltas.deltas.len());
+                }
+
+                let delta_0 = deltas.deltas.get(0).unwrap();
+                assert(block.number, 0, delta_0.old_value);
+                assert(block.number, 10, delta_0.new_value);
+            },
+            _ => {
+                if deltas.deltas.len() != 0 {
+                    panic!("expected 0 deltas, got {}", deltas.deltas.len());
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
     fn setup_test_store_min_i64(block: test::Block, s: StoreMinInt64) {
         match block.number {
             1 => {
@@ -191,65 +250,6 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         Ok(true)
     }
 
-    fn setup_test_store_set_i64(block: test::Block, store: StoreSetInt64) {
-        store.set(block.number, "0", &0);
-        store.set(block.number, "min", &i64::MIN);
-        store.set(block.number, "max", &i64::MAX);
-    }
-
-    fn assert_test_store_set_i64(block: test::Block, s: StoreGetInt64) -> Result<bool, errors::Error> {
-        assert(block.number, 0, s.get_last("0").unwrap());
-        assert(block.number, i64::MIN, s.get_last("min").unwrap());
-        assert(block.number, i64::MAX, s.get_last("max").unwrap());
-        Ok(true)
-    }
-
-    fn assert_test_store_set_i64_deltas(block: test::Block, s: StoreGetInt64, deltas: Deltas<DeltaInt64>) -> Result<bool, errors::Error> {
-        if deltas.deltas.len() != 3 {
-            panic!("expected 3 deltas, got {}", deltas.deltas.len());
-        }
-
-        let delta_0 = deltas.deltas.get(0).unwrap();
-        assert(block.number, 0, delta_0.new_value);
-        let delta_1 = deltas.deltas.get(1).unwrap();
-        assert(block.number, i64::MIN, delta_1.new_value);
-        let delta_2 = deltas.deltas.get(2).unwrap();
-        assert(block.number, i64::MAX, delta_2.new_value);
-
-        Ok(true)
-    }
-
-    fn setup_test_store_set_if_not_exists_i64(block: Block, s: StoreSetIfNotExistsInt64) {
-        s.set_if_not_exists(block.number, "key.0", &10);
-        s.set_if_not_exists(block.number, "key.0", &1000);
-    }
-
-    fn assert_test_store_set_if_not_exists_i64(block: Block, s: StoreGetInt64) -> Result<bool, Error> {
-        assert(block.number, 10, s.get_last("key.0").unwrap());
-        Ok(true)
-    }
-
-    fn assert_test_store_set_if_not_exists_i64_deltas(block: Block, s: StoreGetInt64, deltas: Deltas<DeltaInt64>) -> Result<bool, Error> {
-        match block.number {
-            1 => {
-                if deltas.deltas.len() != 1 {
-                    panic!("expected 1 delta, got {}", deltas.deltas.len());
-                }
-
-                let delta_0 = deltas.deltas.get(0).unwrap();
-                assert(block.number, 0, delta_0.old_value);
-                assert(block.number, 10, delta_0.new_value);
-            },
-            _ => {
-                if deltas.deltas.len() != 0 {
-                    panic!("expected 0 deltas, got {}", deltas.deltas.len());
-                }
-            }
-        }
-
-        Ok(true)
-    }
-
     ////////////////////// FLOAT 64 //////////////////////
 
     fn setup_test_store_add_float64(block: Block, s: StoreAddFloat64) {
@@ -290,6 +290,28 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         store.set(block.number, "max", &f64::MAX);
     }
 
+    fn assert_test_store_set_float64(block: Block, s: StoreGetFloat64) -> Result<bool, Error> {
+        assert(block.number, 0.0, s.get_last("0").unwrap());
+        assert(block.number, f64::MIN, s.get_last("min").unwrap());
+        assert(block.number, f64::MAX, s.get_last("max").unwrap());
+        Ok(true)
+    }
+
+    fn assert_test_store_set_float64_deltas(block: Block, setup_test_store_set_float64: StoreGetFloat64, deltas: Deltas<DeltaFloat64>) -> Result<bool, Error> {
+        if deltas.deltas.len() != 3 {
+            panic!("expected 3 deltas, got {}", deltas.deltas.len());
+        }
+
+        let delta_0 = deltas.deltas.get(0).unwrap();
+        assert(block.number, 0.0, delta_0.new_value);
+        let delta_1 = deltas.deltas.get(1).unwrap();
+        assert(block.number, f64::MIN, delta_1.new_value);
+        let delta_2 = deltas.deltas.get(2).unwrap();
+        assert(block.number, f64::MAX, delta_2.new_value);
+
+        Ok(true)
+    }
+
     fn setup_test_store_set_if_not_exists_float64(block: Block, s: StoreSetIfNotExistsFloat64) {
         s.set_if_not_exists(block.number, "key.0", &10.0);
         s.set_if_not_exists(block.number, "key.0", &1000.0);
@@ -317,28 +339,6 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
                 }
             }
         }
-
-        Ok(true)
-    }
-
-    fn assert_test_store_set_float64(block: Block, s: StoreGetFloat64) -> Result<bool, Error> {
-        assert(block.number, 0.0, s.get_last("0").unwrap());
-        assert(block.number, f64::MIN, s.get_last("min").unwrap());
-        assert(block.number, f64::MAX, s.get_last("max").unwrap());
-        Ok(true)
-    }
-
-    fn assert_test_store_set_float64_deltas(block: Block, setup_test_store_set_float64: StoreGetFloat64, deltas: Deltas<DeltaFloat64>) -> Result<bool, Error> {
-        if deltas.deltas.len() != 3 {
-            panic!("expected 3 deltas, got {}", deltas.deltas.len());
-        }
-
-        let delta_0 = deltas.deltas.get(0).unwrap();
-        assert(block.number, 0.0, delta_0.new_value);
-        let delta_1 = deltas.deltas.get(1).unwrap();
-        assert(block.number, f64::MIN, delta_1.new_value);
-        let delta_2 = deltas.deltas.get(2).unwrap();
-        assert(block.number, f64::MAX, delta_2.new_value);
 
         Ok(true)
     }
@@ -810,67 +810,6 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
 
     ////////////////////// STRING //////////////////////
 
-    fn setup_test_store_append_string(block: Block, store: StoreAppend<String>) {
-        store.append(block.number, "test.key", "a".to_string());
-    }
-
-    fn assert_test_store_append_string(block: Block, store: StoreGetRaw) -> Result<bool, Error> {
-        match block.number {
-            1 => {
-                let raw_value = store.get_last("test.key").unwrap();
-                let value = String::from_utf8(raw_value).unwrap();
-                assert(block.number, "a;", value.as_str());
-            },
-            3 => {
-                let raw_value = store.get_last("test.key").unwrap();
-                let value = String::from_utf8(raw_value).unwrap();
-                assert(block.number, "a;a;a;", value.as_str());
-            }
-            _ => {}
-        }
-
-        Ok(true)
-    }
-
-    fn assert_test_store_append_string_deltas(block: Block, s: StoreGetRaw, deltas: Deltas<DeltaArray<String>>) -> Result<bool, Error> {
-        match block.number {
-            1 => {
-                if deltas.deltas.len() != 1 {
-                    panic!("expected 1 delta, got {}", deltas.deltas.len());
-                }
-
-                let delta_0 = deltas.deltas.get(0).unwrap();
-
-                let old_value = delta_0.old_value.clone().to_vec().join(";");
-                let empty_vec : Vec<String> = vec!();
-                let old_expected_value = empty_vec.join(";");
-                assert(block.number, old_expected_value, old_value);
-
-                let new_value = delta_0.new_value.clone().to_vec().join(";");
-                let new_expected_value = vec!("a").join(";");
-                assert(block.number, new_expected_value, new_value);
-            },
-            3 => {
-                if deltas.deltas.len() != 1 {
-                    panic!("expected 1 delta, got {}", deltas.deltas.len());
-                }
-
-                let delta_0 = deltas.deltas.get(0).unwrap();
-
-                let old_value = delta_0.old_value.clone().to_vec().join(";");
-                let old_expected_value = vec!("a", "a").join(";");
-                assert(block.number, old_expected_value, old_value);
-
-                let new_value = delta_0.new_value.clone().to_vec().join(";");
-                let new_expected_value = vec!("a", "a", "a").join(";");
-                assert(block.number, new_expected_value, new_value);
-            }
-            _ => {}
-        }
-
-        Ok(true)
-    }
-
     fn setup_test_store_set_string(block: Block, store: StoreSetString) {
         store.set(block.number, "a.key", &"foo".to_string());
     }
@@ -938,8 +877,79 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         Ok(true)
     }
 
-    fn assert_all_test_delete_prefix(assert_test_store_delete_prefix: bool, store: substreams::store::StoreSetInt64) {
-        //
+    fn setup_test_store_append_string(block: Block, store: StoreAppend<String>) {
+        store.append(block.number, "test.key", "a".to_string());
+    }
+
+    fn assert_test_store_append_string(block: Block, store: StoreGetRaw) -> Result<bool, Error> {
+        match block.number {
+            1 => {
+                let raw_value = store.get_last("test.key").unwrap();
+                let value = String::from_utf8(raw_value).unwrap();
+                assert(block.number, "a;", value.as_str());
+            },
+            3 => {
+                let raw_value = store.get_last("test.key").unwrap();
+                let value = String::from_utf8(raw_value).unwrap();
+                assert(block.number, "a;a;a;", value.as_str());
+            }
+            _ => {}
+        }
+
+        Ok(true)
+    }
+
+    fn assert_test_store_append_string_deltas(block: Block, s: StoreGetRaw, deltas: Deltas<DeltaArray<String>>) -> Result<bool, Error> {
+        match block.number {
+            1 => {
+                if deltas.deltas.len() != 1 {
+                    panic!("expected 1 delta, got {}", deltas.deltas.len());
+                }
+
+                let delta_0 = deltas.deltas.get(0).unwrap();
+
+                let old_value = delta_0.old_value.clone().to_vec().join(";");
+                let empty_vec : Vec<String> = vec!();
+                let old_expected_value = empty_vec.join(";");
+                assert(block.number, old_expected_value, old_value);
+
+                let new_value = delta_0.new_value.clone().to_vec().join(";");
+                let new_expected_value = vec!("a").join(";");
+                assert(block.number, new_expected_value, new_value);
+            },
+            3 => {
+                if deltas.deltas.len() != 1 {
+                    panic!("expected 1 delta, got {}", deltas.deltas.len());
+                }
+
+                let delta_0 = deltas.deltas.get(0).unwrap();
+
+                let old_value = delta_0.old_value.clone().to_vec().join(";");
+                let old_expected_value = vec!("a", "a").join(";");
+                assert(block.number, old_expected_value, old_value);
+
+                let new_value = delta_0.new_value.clone().to_vec().join(";");
+                let new_expected_value = vec!("a", "a", "a").join(";");
+                assert(block.number, new_expected_value, new_value);
+            }
+            _ => {}
+        }
+
+        Ok(true)
+    }
+
+    fn store_root(block: test::Block, store: StoreSetInt64) {
+        store.set(block.number, format!("key.{}", block.number), &(block.number as i64));
+    }
+
+    fn store_depend(block: test::Block, store_root: StoreGetInt64, _store: StoreSetInt64) {
+        let value = store_root.get_last("key.3");
+        assert(block.number, true, value.is_some())
+    }
+
+    fn store_depends_on_depend(block: test::Block, store_root: StoreGetInt64, _store_depend: StoreGetInt64, _store: StoreSetInt64) {
+        let value = store_root.get_last("key.3");
+        assert(block.number, true, value.is_some())
     }
 
     fn assert_all_test_i64(assert_test_store_add_i64: bool, assert_test_store_add_i64_deltas: bool, assert_test_store_set_i64: bool, assert_test_store_set_i64_deltas: bool, assert_test_store_set_if_not_exists_i64: bool, assert_test_store_set_if_not_exists_i64_deltas: bool, assert_test_store_min_i64: bool, assert_test_store_min_i64_deltas: bool, assert_test_store_max_i64: bool, assert_test_store_max_i64_deltas: bool, store: substreams::store::StoreSetInt64) {
@@ -962,22 +972,12 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         //
     }
 
-    fn assert_all_test(assert_all_test_delete_prefix: StoreGetInt64, assert_all_test_string: StoreGetInt64, assert_all_test_i64: StoreGetInt64, assert_all_test_float64: StoreGetInt64, assert_all_test_bigint: StoreGetInt64, assert_all_test_bigdecimal: StoreGetInt64, store: StoreSetInt64) {
+    fn assert_all_test_delete_prefix(assert_test_store_delete_prefix: bool, store: substreams::store::StoreSetInt64) {
         //
     }
 
-    fn store_root(block: test::Block, store: StoreSetInt64) {
-        store.set(block.number, format!("key.{}", block.number), &(block.number as i64));
-    }
-
-    fn store_depend(block: test::Block, store_root: StoreGetInt64, _store: StoreSetInt64) {
-        let value = store_root.get_last("key.3");
-        assert(block.number, true, value.is_some())
-    }
-
-    fn store_depends_on_depend(block: test::Block, store_root: StoreGetInt64, _store_depend: StoreGetInt64, _store: StoreSetInt64) {
-        let value = store_root.get_last("key.3");
-        assert(block.number, true, value.is_some())
+    fn assert_all_test(assert_all_test_delete_prefix: StoreGetInt64, assert_all_test_string: StoreGetInt64, assert_all_test_i64: StoreGetInt64, assert_all_test_float64: StoreGetInt64, assert_all_test_bigint: StoreGetInt64, assert_all_test_bigdecimal: StoreGetInt64) -> Result<bool, Error> {
+        return Ok(true)
     }
 }
 

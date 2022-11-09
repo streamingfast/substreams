@@ -2097,9 +2097,7 @@ pub extern "C" fn assert_all_test(
     assert_all_test_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||{
-        
-        let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
+    let func = ||-> Result<bool, Error>{
         
         let assert_all_test_delete_prefix: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_delete_prefix_ptr);
         let assert_all_test_string: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_string_ptr);
@@ -2114,8 +2112,12 @@ pub extern "C" fn assert_all_test(
             assert_all_test_float64,
             assert_all_test_bigint,
             assert_all_test_bigdecimal,
-            store,
+            
         )
     };
-    func()
+    let result = func();
+    if result.is_err() {
+        panic!("{:?}", &result.err().unwrap());
+    }
+    substreams::output(result.unwrap());
 }

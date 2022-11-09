@@ -6,22 +6,25 @@ description: StreamingFast Substreams protobuf schemas
 
 ### Protobuf Overview
 
-After creating the Substreams manifest a custom protobuf needs to be defined in the manifest file. The protobuf is used for defining input and output.
+Substreams uses Protocol Buffers (protobufs) as the API for data models specific to each blockchain. Each manifest defines references to the protobufs for the Substreams implementation.&#x20;
 
-{% hint style="info" %}
-**Note**_: Protocol Buffers (protobufs) are Google's language-neutral extensible mechanism for serializing structured data. Protobufs are similar to XML, but smaller, faster, and simpler. Find additional information regarding Protocol Buffers on the_ [_Google website_](https://developers.google.com/protocol-buffers)_._
+{% hint style="success" %}
+**Tip**: Protobufs define the input and output for modules.
+{% endhint %}
 
-__\
-__**Google Protobuf Documentation**
+### Protobufs in Detail
+
+Protobufs are Google's language-neutral extensible mechanism for serializing structured data. Protobufs are similar to XML but smaller, faster, and simpler.&#x20;
+
+Additional information can be found for Protocol Buffers by visiting the links provided below.&#x20;
+
+**Google Protobuf Documentation**
 
 [https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
 
-####
-
-#### Google Protobuf Tutorial
+Google Protobuf Tutorial
 
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
-{% endhint %}
 
 ### Protobuf Definition
 

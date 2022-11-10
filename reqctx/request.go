@@ -6,9 +6,9 @@ type RequestDetails struct {
 	Request *pbsubstreams.Request
 
 	// What the user requested, derived from either the Request.StartBlockNum or Request.Cursor
-	RequestStartBlockNum uint64
-	LiveHandoffBlockNum  uint64
-	StopBlockNum         uint64
+	RequestStartBlockNum  uint64
+	LinearHandoffBlockNum uint64
+	StopBlockNum          uint64
 
 	IsSubRequest   bool
 	IsOutputModule map[string]bool

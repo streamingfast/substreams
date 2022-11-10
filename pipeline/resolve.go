@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
@@ -35,12 +36,12 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRe
 	}
 
 	if request.ProductionMode {
-		req.LiveHandoffBlockNum, err = computeLiveHandoffBlockNum(getRecentFinalBlock, request.StopBlockNum)
+		req.LinearHandoffBlockNum, err = computeLiveHandoffBlockNum(getRecentFinalBlock, request.StopBlockNum)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		req.LiveHandoffBlockNum = req.RequestStartBlockNum
+		req.LinearHandoffBlockNum = req.RequestStartBlockNum
 	}
 
 	return req, nil

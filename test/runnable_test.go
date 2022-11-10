@@ -42,13 +42,14 @@ type testRun struct {
 	ParallelSubrequests    uint64
 	NewBlockGenerator      BlockGeneratorFactory
 	BlockProcessedCallback blockProcessedCallBack
+	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	ProductionMode         bool
 
 	Responses []*pbsubstreams.Response
 }
 
-func newTestRun(startBlock int64, exclusiveEndBlock uint64, moduleNames ...string) *testRun {
-	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleNames: moduleNames, ProductionMode: true}
+func newTestRun(startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleNames ...string) *testRun {
+	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleNames: moduleNames, LinearHandoffBlockNum: linearHandoffBlock}
 }
 
 func (f *testRun) Run(t *testing.T) error {
@@ -107,7 +108,7 @@ func (f *testRun) Run(t *testing.T) error {
 		return w
 	}
 
-	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, testTempDir, f.SubrequestsSplitSize, f.ParallelSubrequests); err != nil {
+	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, testTempDir, f.SubrequestsSplitSize, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 
@@ -253,30 +254,6 @@ func (f *testRun) ModuleOutputs(t *testing.T) (moduleOutputs []string) {
 	return moduleOutputs
 }
 
-func runTest(
-	t *testing.T,
-	cursor *bstream.Cursor,
-	startBlock int64,
-	exclusiveEndBlock uint64,
-	moduleNames []string,
-	subrequestsSplitSize uint64,
-	parallelSubrequests uint64,
-	newBlockGenerator BlockGeneratorFactory,
-	blockProcessedCallBack blockProcessedCallBack,
-) (moduleOutputs []string, err error) {
-	run := newTestRun(startBlock, exclusiveEndBlock, moduleNames...)
-	run.Cursor = cursor
-	run.SubrequestsSplitSize = subrequestsSplitSize
-	run.ParallelSubrequests = parallelSubrequests
-	run.NewBlockGenerator = newBlockGenerator
-	run.BlockProcessedCallback = blockProcessedCallBack
-	if err := run.Run(t); err != nil {
-		return nil, err
-	}
-
-	return run.ModuleOutputs(t), nil
-}
-
 func withTestTracing(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
@@ -307,12 +284,15 @@ func processRequest(
 	testTempDir string,
 	subrequestsSplitSize uint64,
 	parallelSubrequests uint64,
+	linearHandoffBlockNum uint64,
 ) error {
 	t.Helper()
 
 	reqDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, func() (uint64, error) {
-		return request.StopBlockNum, nil
-		//return 0, fmt.Errorf("no live feed")
+		if linearHandoffBlockNum != 0 {
+			return linearHandoffBlockNum, nil
+		}
+		return 0, fmt.Errorf("no live feed")
 	})
 	require.NoError(t, err)
 	ctx = reqctx.WithRequest(ctx, reqDetails)

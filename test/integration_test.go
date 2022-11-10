@@ -21,7 +21,7 @@ import (
 // 2. also expected field validation for the cursor and the step type
 
 func TestForkSituation(t *testing.T) { // todo: change test name
-	run := newTestRun(1, 7, "assert_test_store_add_bigint")
+	run := newTestRun(1, 1, 7, "assert_test_store_add_bigint")
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &ForkBlockGenerator{
 			initialLIB: bstream.NewBlockRef("0a", 0),
@@ -63,7 +63,7 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 }
 
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
-	run := newTestRun(110, 112, "test_map", "test_store_proto")
+	run := newTestRun(110, 112, 112, "test_map", "test_store_proto")
 	outputFilesLen := 0
 	run.BlockProcessedCallback = func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		err := baseStore.Walk(context.Background(), "", func(filename string) (err error) {
@@ -77,12 +77,12 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 
 	require.NoError(t, run.Run(t))
 
-	require.NotZero(t, run.ModuleOutputs(t))
+	require.NotZero(t, run.MapOutput("test_map"))
 	require.NotZero(t, outputFilesLen)
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
-	run := newTestRun(30, 41, "assert_test_store_delete_prefix")
+	run := newTestRun(30, 41, 41, "assert_test_store_delete_prefix")
 	run.BlockProcessedCallback = func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
 		if b.Number == 40 {
 			s, storeFound := stores.Get("test_store_delete_prefix")
@@ -95,12 +95,13 @@ func TestStoreDeletePrefix(t *testing.T) {
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(20, 31, "assert_all_test")
+	run := newTestRun(20, 31, 31, "assert_all_test")
 	require.NoError(t, run.Run(t))
 }
 
 func TestAllAssertionsParallel(t *testing.T) {
-	run := newTestRun(20, 31, "assert_all_test")
+	run := newTestRun(20, 28, 31, "assert_all_test")
+	run.ProductionMode = true
 	run.ParallelSubrequests = 5
 	require.NoError(t, run.Run(t))
 }

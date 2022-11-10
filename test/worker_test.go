@@ -45,7 +45,7 @@ func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ 
 		zap.Uint64("stop_block_num", request.StopBlockNum),
 	)
 	subrequestsSplitSize := uint64(10)
-	if err := processRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize, 1); err != nil {
+	if err := processRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize, 1, 0); err != nil {
 		return &work.Result{
 			Error: fmt.Errorf("processing sub request: %w", err),
 		}

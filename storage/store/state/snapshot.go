@@ -1,12 +1,13 @@
-package store
+package state
 
 import (
 	"context"
 	"fmt"
 	"sort"
 
+	"github.com/streamingfast/substreams/storage/store"
+
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/store"
 )
 
 type StoreSnapshots struct {

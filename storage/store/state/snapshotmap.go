@@ -1,4 +1,4 @@
-package store
+package state
 
 import (
 	"context"
@@ -6,10 +6,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/streamingfast/substreams/storage/store"
+
 	"github.com/abourget/llerrgroup"
-	"github.com/streamingfast/substreams/store"
 )
 
+// TODO(abourget): rename to `ModulesMap`
+// under `state`
 type storeSnapshotsMap struct {
 	sync.Mutex
 	Snapshots map[string]*StoreSnapshots

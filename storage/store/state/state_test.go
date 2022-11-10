@@ -1,4 +1,4 @@
-package store
+package state
 
 import (
 	"strings"
@@ -99,7 +99,7 @@ func TestWorkUnits_init(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			wu, err := storage.newStoreStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			wu, err := NewStoreStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectInitLoad, wu.InitialCompleteRange)
 			assert.Equal(t,

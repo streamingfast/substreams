@@ -6,13 +6,14 @@ import (
 	"io"
 	"runtime/debug"
 
+	"github.com/streamingfast/substreams/storage/execout"
+
 	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/streamingfast/substreams/store/marshaller"
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/dstore"

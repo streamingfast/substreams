@@ -9,6 +9,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// ExecOutputMap holds the values produced by modules and exchanged between them
+// as a sort of buffer.
 type ExecOutputMap struct {
 	values map[string][]byte
 	clock  *pbsubstreams.Clock

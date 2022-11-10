@@ -3,8 +3,9 @@ package exec
 import (
 	"context"
 
+	"github.com/streamingfast/substreams/storage/execout"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
 )
 
 type ModuleExecutor interface {

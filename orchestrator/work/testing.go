@@ -3,7 +3,9 @@ package work
 import (
 	"strings"
 
-	"github.com/streamingfast/substreams/storage/execoutput"
+	state2 "github.com/streamingfast/substreams/storage/store/state"
+
+	"github.com/streamingfast/substreams/storage/execout/state"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/storage"
@@ -24,11 +26,11 @@ func TestJobDeps(modName string, rng string, prio int, deps string) *Job {
 }
 
 func TestStoreState(modName string, rng string) storage.ModuleStorageState {
-	return &storage.StoreStorageState{ModuleName: modName, PartialsMissing: block.ParseRanges(rng)}
+	return &state2.StoreStorageState{ModuleName: modName, PartialsMissing: block.ParseRanges(rng)}
 }
 
 func TestMapState(modName string, rng string) storage.ModuleStorageState {
-	return &execoutput.ExecOutputStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
+	return &state.ExecOutputStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
 }
 
 func TestModStateMap(modStates ...storage.ModuleStorageState) (out storage.ModuleStorageStateMap) {

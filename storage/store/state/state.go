@@ -1,9 +1,7 @@
-package storage
+package state
 
 import (
 	"fmt"
-
-	store2 "github.com/streamingfast/substreams/storage/store"
 
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap/zapcore"
@@ -23,7 +21,7 @@ type StoreStorageState struct {
 type FullStoreFile = block.Range
 type PartialStoreFiles = block.Ranges
 
-func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *store2.StoreSnapshots) (out *StoreStorageState, err error) {
+func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *StoreSnapshots) (out *StoreStorageState, err error) {
 	out = &StoreStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
 	if workUpToBlockNum <= modInitBlock {
 		return

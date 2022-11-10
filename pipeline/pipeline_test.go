@@ -2,11 +2,13 @@ package pipeline
 
 import (
 	"context"
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
-	"go.uber.org/zap"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
+	store2 "github.com/streamingfast/substreams/storage/store"
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -15,7 +17,6 @@ import (
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/store"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,11 +149,11 @@ func TestSetupSubrequestStores(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, storeMap, 3)
 
-		fullKV := storeMap["mod1"].(*store.FullKV)
+		fullKV := storeMap["mod1"].(*store2.FullKV)
 		assert.Equal(t, 10, int(fullKV.ModuleInitialBlock()))
-		val, _ := storeMap["mod2"].(*store.FullKV).GetLast("k")
+		val, _ := storeMap["mod2"].(*store2.FullKV).GetLast("k")
 		assert.Equal(t, []byte("v"), val)
-		partialKV := storeMap["mod3"].(*store.PartialKV)
+		partialKV := storeMap["mod3"].(*store2.PartialKV)
 		assert.Equal(t, 10, int(partialKV.InitialBlock()))
 	})
 
@@ -166,13 +167,13 @@ func TestSetupSubrequestStores(t *testing.T) {
 	})
 }
 
-func testConfigMap(t *testing.T, configs []testStoreConfig) store.ConfigMap {
+func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 	t.Helper()
-	confMap := make(store.ConfigMap)
+	confMap := make(store2.ConfigMap)
 	objStore := dstore.NewMockStore(nil)
 
 	for _, conf := range configs {
-		newStore, err := store.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
+		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
 

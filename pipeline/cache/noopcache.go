@@ -1,7 +1,9 @@
-package execout
+package cache
 
 import (
 	"fmt"
+
+	execout2 "github.com/streamingfast/substreams/storage/execout"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
@@ -32,8 +34,8 @@ func (n *NoOpCache) HandleUndo(_ *pbsubstreams.Clock, _ string) {
 	return
 }
 
-func (n *NoOpCache) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (ExecutionOutput, error) {
-	execOutMap, err := NewExecOutputMap(n.blockType, block, clock)
+func (n *NoOpCache) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout2.ExecutionOutput, error) {
+	execOutMap, err := execout2.NewExecOutputMap(n.blockType, block, clock)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}

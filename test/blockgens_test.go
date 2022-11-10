@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/substreams/storage/store"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/streamingfast/bstream/forkable"
@@ -14,7 +16,6 @@ import (
 	"github.com/streamingfast/dstore"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/store"
 )
 
 type blockProcessedCallBack func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store)

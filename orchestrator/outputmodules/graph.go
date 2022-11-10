@@ -2,13 +2,11 @@ package outputmodules
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// TODO(abourget): rename to `outputmodules.Graph` perhaps?
-//  * `outputgraph` isn't exact, they are output modules, and it's a graph of those output modules.
-//  * once in `outputmods`, having `Graph` becomes redundant.
 type Graph struct {
 	request *pbsubstreams.Request
 

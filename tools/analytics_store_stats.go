@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
+	store2 "github.com/streamingfast/substreams/storage/store"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
 
@@ -82,7 +83,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 				return
 			}
 
-			conf, err := store.NewConfig(
+			conf, err := store2.NewConfig(
 				module.Name,
 				module.InitialBlock,
 				hex.EncodeToString(hashes.HashModule(pkg.Modules, module, graph)),
@@ -192,7 +193,7 @@ type ValueStats struct {
 	Largest string `json:"largest_value_key"`
 }
 
-func initializeStoreStats(conf *store.Config) *StoreStats {
+func initializeStoreStats(conf *store2.Config) *StoreStats {
 	storeStats := &StoreStats{
 		Name:         conf.Name(),
 		ModuleHash:   conf.ModuleHash(),
@@ -204,7 +205,7 @@ func initializeStoreStats(conf *store.Config) *StoreStats {
 	return storeStats
 }
 
-func getStore(ctx context.Context, conf *store.Config) (store.Store, *store.FileInfo, error) {
+func getStore(ctx context.Context, conf *store2.Config) (store2.Store, *store2.FileInfo, error) {
 	files, err := conf.ListSnapshotFiles(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing snapshot files: %w", err)
@@ -214,7 +215,7 @@ func getStore(ctx context.Context, conf *store.Config) (store.Store, *store.File
 		return nil, nil, EmptyStoreError
 	}
 
-	kvFiles := make([]*store.FileInfo, 0, len(files))
+	kvFiles := make([]*store2.FileInfo, 0, len(files))
 	for _, file := range files {
 		if file.Partial {
 			continue
@@ -236,7 +237,7 @@ func getStore(ctx context.Context, conf *store.Config) (store.Store, *store.File
 	return s, latestFile, nil
 }
 
-func calculateStoreStats(stateStore store.Store, stats *StoreStats) error {
+func calculateStoreStats(stateStore store2.Store, stats *StoreStats) error {
 	keyStats := &KeyStats{}
 	valueStats := &ValueStats{}
 	stats.KeyStats = keyStats

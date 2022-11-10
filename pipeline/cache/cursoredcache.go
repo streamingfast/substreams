@@ -1,12 +1,14 @@
-package cachev1
+package cache
 
 import (
 	"fmt"
+
+	"github.com/streamingfast/substreams/storage/execout"
+
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams/pipeline/execout"
 )
 
-type CursoredCache struct {
+type cursoredCache struct {
 	*execout.ExecOutputMap
 
 	engine *Engine
@@ -14,7 +16,7 @@ type CursoredCache struct {
 }
 
 // assert_test_store_delete_prefix
-func (e *CursoredCache) Get(moduleName string) (value []byte, cached bool, err error) {
+func (e *cursoredCache) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, _, err := e.ExecOutputMap.Get(moduleName)
 	if err != nil && err != execout.NotFound {
 		return nil, false, fmt.Errorf("get from memory: %w", err)
@@ -34,7 +36,7 @@ func (e *CursoredCache) Get(moduleName string) (value []byte, cached bool, err e
 	return nil, false, execout.NotFound
 }
 
-func (e *CursoredCache) Set(moduleName string, value []byte) (err error) {
+func (e *cursoredCache) Set(moduleName string, value []byte) (err error) {
 	if err := e.ExecOutputMap.Set(moduleName, value); err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-package cachev1
+package execout
 
 import (
 	"bytes"
@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 
 	"go.uber.org/zap/zapcore"
 
@@ -17,17 +20,20 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	pboutput "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb"
-
 	"go.uber.org/zap"
 )
 
-// TODO(abourget): rename to `Item` ?
-type OutputCache struct {
+var stateFilenameRegexp *regexp.Regexp
+
+func init() {
+	stateFilenameRegexp = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
+}
+
+type File struct {
 	sync.RWMutex
 
 	wg                *sync.WaitGroup
-	moduleName        string
+	ModuleName        string
 	currentBlockRange *block.Range
 	outputData        *pboutput.Map
 	store             dstore.Store
@@ -37,22 +43,24 @@ type OutputCache struct {
 	initialized bool
 }
 
-// TODO(abourget): rename to Open
-func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *OutputCache {
-	return &OutputCache{
+// TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
+// more than that.
+
+func NewFile(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *File {
+	return &File{
 		wg:                &sync.WaitGroup{},
-		moduleName:        moduleName,
+		ModuleName:        moduleName,
 		store:             store,
 		saveBlockInterval: saveBlockInterval,
 		logger:            logger.Named("cache").With(zap.String("module_name", moduleName)),
 	}
 }
 
-func (c *OutputCache) currentFilename() string {
+func (c *File) currentFilename() string {
 	return ComputeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
 }
 
-func (c *OutputCache) SortedCacheItems() (out []*pboutput.Item) {
+func (c *File) SortedCacheItems() (out []*pboutput.Item) {
 	for _, item := range c.outputData.Kv {
 		out = append(out, item)
 	}
@@ -62,19 +70,21 @@ func (c *OutputCache) SortedCacheItems() (out []*pboutput.Item) {
 	return
 }
 
-func (c *OutputCache) isOutOfRange(blockNum uint64) bool {
+func (c *File) IsInitialized() bool { return c.initialized }
+
+func (c *File) IsOutOfRange(blockNum uint64) bool {
 	if !c.initialized { // should become in-range once we Set it
 		return false
 	}
 	return !c.currentBlockRange.Contains(blockNum)
 }
 
-//func (c *OutputCache) IsAtUpperBoundary(ref bstream.BlockRef) bool {
+//func (c *File) IsAtUpperBoundary(ref bstream.BlockRef) bool {
 //	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
-//	return c.isOutOfRange(incRef)
+//	return c.IsOutOfRange(incRef)
 //}
 
-func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
+func (c *File) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -94,7 +104,7 @@ func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte)
 	return nil
 }
 
-func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
+func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -107,7 +117,7 @@ func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	return cacheItem.Payload, found
 }
 
-func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
+func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -120,7 +130,11 @@ func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	return nil, false
 }
 
-func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
+func (c *File) LoadAtEndBlockBoundary(ctx context.Context) (found bool, err error) {
+	return c.LoadAtBlock(ctx, c.currentBlockRange.ExclusiveEndBlock)
+}
+
+func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
 	c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
 
 	c.outputData = &pboutput.Map{
@@ -129,7 +143,7 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 
 	blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
 	if err != nil {
-		return found, fmt.Errorf("computing block range for module %q: %w", c.moduleName, err)
+		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
 	}
 
 	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
@@ -143,12 +157,15 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 
 	err = c.Load(ctx, blockRange)
 	if err != nil {
-		return false, fmt.Errorf("loading cache: %w", err)
+		return false, fmt.Errorf("loading cache at %d: %w", atBlock, err)
 	}
+
+	c.initialized = true
+
 	return found, nil
 
 }
-func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
+func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
 	c.logger.Debug("loading cache", zap.Object("range", blockRange))
 	c.outputData.Kv = make(map[string]*pboutput.Item)
 
@@ -182,7 +199,9 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 	return nil
 }
 
-func (c *OutputCache) save(ctx context.Context, filename string) error {
+func (c *File) Save(ctx context.Context) error {
+	filename := c.currentFilename()
+
 	c.logger.Info("saving cache", zap.Stringer("block_range", c.currentBlockRange), zap.String("filename", filename))
 
 	cnt, err := c.outputData.MarshalFast()
@@ -207,20 +226,20 @@ func (c *OutputCache) save(ctx context.Context, filename string) error {
 	return nil
 }
 
-func (c *OutputCache) String() string {
+func (c *File) String() string {
 	return c.store.ObjectURL("")
 }
 
-func (c *OutputCache) ListContinuousCacheRanges(ctx context.Context, from uint64) (block.Ranges, error) {
+func (c *File) ListContinuousCacheRanges(ctx context.Context, from uint64) (block.Ranges, error) {
 	cachedRanges, err := c.ListCacheRanges(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("listing cached ranges %q: %w", c.moduleName, err)
+		return nil, fmt.Errorf("listing cached ranges %q: %w", c.ModuleName, err)
 	}
 	out := listContinuousCacheRanges(cachedRanges, from)
 	return out, nil
 }
 
-func (c *OutputCache) ListCacheRanges(ctx context.Context) (block.Ranges, error) {
+func (c *File) ListCacheRanges(ctx context.Context) (block.Ranges, error) {
 	var out block.Ranges
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		if err := c.store.Walk(ctx, "", func(filename string) (err error) {
@@ -245,21 +264,21 @@ func (c *OutputCache) ListCacheRanges(ctx context.Context) (block.Ranges, error)
 	return out, nil
 }
 
-func (c *OutputCache) Delete(blockID string) {
+func (c *File) Delete(blockID string) {
 	c.Lock()
 	defer c.Unlock()
 
 	delete(c.outputData.Kv, blockID)
 }
 
-func (c *OutputCache) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("store", c.moduleName)
+func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("store", c.ModuleName)
 	enc.AddUint64("start_block", c.currentBlockRange.StartBlock)
 	enc.AddUint64("end_block", c.currentBlockRange.ExclusiveEndBlock)
 	return nil
 }
 
-func (c *OutputCache) Close() {
+func (c *File) Close() {
 	c.wg.Wait()
 	return
 }
@@ -284,7 +303,7 @@ func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ran
 }
 
 func fileNameToRange(filename string) (*block.Range, error) {
-	res := cacheFilenameRegex.FindAllStringSubmatch(filename, 1)
+	res := stateFilenameRegexp.FindAllStringSubmatch(filename, 1)
 	if len(res) != 1 {
 		return nil, fmt.Errorf("invalid output cache filename, %q", filename)
 	}

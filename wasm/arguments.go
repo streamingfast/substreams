@@ -2,7 +2,7 @@ package wasm
 
 import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 const ClockType = "sf.substreams.v1.Clock"

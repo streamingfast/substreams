@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/storage/execout"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/types/known/anypb"

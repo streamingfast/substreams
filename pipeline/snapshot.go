@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/storage/store"
+
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/store"
 )
 
 func (p *Pipeline) sendSnapshots(ctx context.Context, storeMap store.Map) error {

@@ -2,9 +2,8 @@ package store
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/store/marshaller"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

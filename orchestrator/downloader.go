@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/substreams/storage/execout"
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
+
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/service/config"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -23,10 +25,10 @@ type LinearExecOutputReader struct {
 	cfg               config.RuntimeConfig
 	runtimeConfig     *config.RuntimeConfig
 	module            *pbsubstreams.Module
-	cache             *cachev1.OutputCache
+	cache             *execout.File
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *cachev1.OutputCache, responseFunc substreams.ResponseFunc, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *LinearExecOutputReader {
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *execout.File, responseFunc substreams.ResponseFunc, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *LinearExecOutputReader {
 	logger = logger.With(zap.String("component", "downloader"))
 	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
 	return &LinearExecOutputReader{
@@ -78,21 +80,21 @@ func (r *LinearExecOutputReader) run(ctx context.Context, stream *CachedItemStre
 type CachedItemStream struct {
 	*shutter.Shutter
 	module            *pbsubstreams.Module
-	cache             *cachev1.OutputCache
+	cache             *execout.File
 	requestStartBlock uint64
 	logger            *zap.Logger
 	runtimeConfig     *config.RuntimeConfig
-	cacheItems        chan *cachev1.CacheItem
+	cacheItems        chan *pboutput.Item
 }
 
-func NewCachedItemStream(requestStartBlock uint64, module *pbsubstreams.Module, cache *cachev1.OutputCache, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *CachedItemStream {
+func NewCachedItemStream(requestStartBlock uint64, module *pbsubstreams.Module, cache *execout.File, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *CachedItemStream {
 	return &CachedItemStream{
 		requestStartBlock: requestStartBlock,
 		module:            module,
 		cache:             cache,
 		logger:            logger,
 		runtimeConfig:     runtimeConfig,
-		cacheItems:        make(chan *cachev1.CacheItem, runtimeConfig.ExecOutputSaveInterval*2),
+		cacheItems:        make(chan *pboutput.Item, runtimeConfig.ExecOutputSaveInterval*2),
 	}
 }
 
@@ -102,7 +104,7 @@ func (s *CachedItemStream) Launch(ctx context.Context) {
 	}()
 }
 
-func (s *CachedItemStream) next(ctx context.Context) (*cachev1.CacheItem, error) {
+func (s *CachedItemStream) next(ctx context.Context) (*pboutput.Item, error) {
 	select {
 	case <-ctx.Done():
 		return nil, nil
@@ -140,7 +142,7 @@ func (s *CachedItemStream) run(ctx context.Context) error {
 	}
 }
 
-func (s *CachedItemStream) sortedCacheItems(ctx context.Context, atBlockNum uint64) (out []*cachev1.CacheItem, err error) {
+func (s *CachedItemStream) sortedCacheItems(ctx context.Context, atBlockNum uint64) (out []*pboutput.Item, err error) {
 	for {
 		s.logger.Debug("loading next cache", zap.String("module", s.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
 		found, err := s.cache.LoadAtBlock(ctx, atBlockNum)
@@ -163,7 +165,7 @@ func (s *CachedItemStream) sortedCacheItems(ctx context.Context, atBlockNum uint
 	}
 }
 
-func toModuleOutput(module *pbsubstreams.Module, cacheItem *cachev1.CacheItem) (*pbsubstreams.ModuleOutput, error) {
+func toModuleOutput(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreams.ModuleOutput, error) {
 	var output pbsubstreams.ModuleOutputData
 	switch module.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
@@ -183,15 +185,15 @@ func toModuleOutput(module *pbsubstreams.Module, cacheItem *cachev1.CacheItem) (
 	}, nil
 }
 
-func toClock(item *cachev1.CacheItem) *pbsubstreams.Clock {
+func toClock(item *pboutput.Item) *pbsubstreams.Clock {
 	return &pbsubstreams.Clock{
-		Id:        item.BlockID,
+		Id:        item.BlockId,
 		Number:    item.BlockNum,
 		Timestamp: item.Timestamp,
 	}
 }
 
-func toBlockScopedData(module *pbsubstreams.Module, cacheItem *cachev1.CacheItem) (*pbsubstreams.BlockScopedData, error) {
+func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreams.BlockScopedData, error) {
 	out := &pbsubstreams.BlockScopedData{
 		Step: pbsubstreams.ForkStep_STEP_IRREVERSIBLE,
 	}

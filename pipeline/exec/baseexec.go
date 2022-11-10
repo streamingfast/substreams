@@ -3,7 +3,8 @@ package exec
 import (
 	"fmt"
 
-	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/storage/execout"
+
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
 )

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/substreams/pipeline/cache"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
@@ -21,7 +23,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
@@ -330,7 +331,7 @@ func processRequest(
 
 	const blockType = "sf.substreams.v1.test.Block"
 
-	cachingEngine, err := cachev1.NewEngine(runtimeConfig, blockType, zap.NewNop())
+	cachingEngine, err := cache.NewEngine(runtimeConfig, blockType, zap.NewNop())
 	require.NoError(t, err)
 
 	require.NoError(t, outputmodules.ValidateRequest(request, blockType))

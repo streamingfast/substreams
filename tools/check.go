@@ -2,13 +2,14 @@ package tools
 
 import (
 	"fmt"
+
+	store2 "github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store"
 )
 
 var checkCmd = &cobra.Command{
@@ -56,13 +57,13 @@ func checkE(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func newStore(storeURL string) (*store.FullKV, dstore.Store, error) {
+func newStore(storeURL string) (*store2.FullKV, dstore.Store, error) {
 	remoteStore, err := dstore.NewStore(storeURL, "zst", "zstd", false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
 	}
 
-	config, err := store.NewConfig("", 0, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore)
+	config, err := store2.NewConfig("", 0, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore)
 	if err != nil {
 		return nil, nil, err
 	}

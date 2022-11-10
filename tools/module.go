@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/manifest"
-	store2 "github.com/streamingfast/substreams/store"
+	store2 "github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"

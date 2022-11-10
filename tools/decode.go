@@ -4,18 +4,20 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"strconv"
-	"strings"
 )
 
 var decodeCmd = &cobra.Command{
@@ -100,7 +102,7 @@ func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
 	moduleHash := hex.EncodeToString(hashes.HashModule(pkg.Modules, matchingModule, moduleGraph))
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
-	startBlock := cachev1.ComputeStartBlock(blockNumber, saveInterval)
+	startBlock := execout.ComputeStartBlock(blockNumber, saveInterval)
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
@@ -129,7 +131,7 @@ func searchMapModule(
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog)
+	outputCache := execout.NewFile(module.Name, moduleStore, saveInterval, zlog)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)
 	if err != nil {

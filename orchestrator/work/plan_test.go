@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/streamingfast/substreams/storage/store/state"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/outputmodules"
@@ -390,7 +392,7 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 			name: "one module,initial block",
 			fields: fields{
 				ModulesStateMap: storage.ModuleStorageStateMap{
-					"A": &storage.StoreStorageState{
+					"A": &state.StoreStorageState{
 						ModuleInitialBlock: 1,
 					},
 				},
@@ -403,8 +405,8 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 			name: "one module,complete range",
 			fields: fields{
 				ModulesStateMap: storage.ModuleStorageStateMap{
-					"A": &storage.StoreStorageState{
-						InitialCompleteRange: &storage.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
+					"A": &state.StoreStorageState{
+						InitialCompleteRange: &state.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
 					},
 				},
 			},
@@ -416,10 +418,10 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 			name: "mixed modules",
 			fields: fields{
 				ModulesStateMap: storage.ModuleStorageStateMap{
-					"A": &storage.StoreStorageState{
-						InitialCompleteRange: &storage.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
+					"A": &state.StoreStorageState{
+						InitialCompleteRange: &state.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
 					},
-					"B": &storage.StoreStorageState{
+					"B": &state.StoreStorageState{
 						ModuleInitialBlock: 1,
 					},
 				},
@@ -631,7 +633,7 @@ func TestPlan_initialProgressMessages(t *testing.T) {
 		expectedProgress string
 	}{
 		{
-			modState: &storage.StoreStorageState{
+			modState: &state.StoreStorageState{
 				ModuleName:           "A",
 				InitialCompleteRange: block.ParseRange("1-10"),
 				PartialsPresent:      block.ParseRanges("20-30,40-50,50-60"),
@@ -639,21 +641,21 @@ func TestPlan_initialProgressMessages(t *testing.T) {
 			expectedProgress: "A:r1-10,20-30,40-60",
 		},
 		{
-			modState: &storage.StoreStorageState{
+			modState: &state.StoreStorageState{
 				ModuleName:           "A",
 				InitialCompleteRange: block.ParseRange("1-10"),
 			},
 			expectedProgress: "A:r1-10",
 		},
 		{
-			modState: &storage.StoreStorageState{
+			modState: &state.StoreStorageState{
 				ModuleName:      "A",
 				PartialsPresent: block.ParseRanges("10-20"),
 			},
 			expectedProgress: "A:r10-20",
 		},
 		{
-			modState: &storage.StoreStorageState{
+			modState: &state.StoreStorageState{
 				ModuleName: "A",
 			},
 			expectedProgress: "",

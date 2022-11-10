@@ -1,37 +1,30 @@
-package cachev1
+package cache
 
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/storage/execout"
 	"go.uber.org/zap"
 )
-
-var cacheFilenameRegex *regexp.Regexp
-
-func init() {
-	cacheFilenameRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
-}
 
 type Engine struct {
 	ctx           context.Context
 	blockType     string
-	caches        map[string]*OutputCache
+	caches        map[string]*execout.File
 	runtimeConfig config.RuntimeConfig
 	logger        *zap.Logger
 }
 
-func NewEngine(runtimeConfig config.RuntimeConfig, blockType string, logger *zap.Logger) (execout.CacheEngine, error) {
+func NewEngine(runtimeConfig config.RuntimeConfig, blockType string, logger *zap.Logger) (CacheEngine, error) {
 	e := &Engine{
 		ctx:           context.Background(),
 		runtimeConfig: runtimeConfig,
-		caches:        make(map[string]*OutputCache),
+		caches:        make(map[string]*execout.File),
 		logger:        logger,
 		blockType:     blockType,
 	}
@@ -48,11 +41,11 @@ func (e *Engine) Init(modules *manifest.ModuleHashes) error {
 
 func (e *Engine) EndOfStream(isSubrequest bool, outputModules map[string]bool) error {
 	for _, cache := range e.caches {
-		if isSubrequest && outputModules[cache.moduleName] {
+		if isSubrequest && outputModules[cache.ModuleName] {
 			continue
 		}
 		if err := e.flushCache(cache); err != nil {
-			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
+			return fmt.Errorf("flushing output cache %s: %w", cache.ModuleName, err)
 		}
 	}
 	return nil
@@ -60,7 +53,7 @@ func (e *Engine) EndOfStream(isSubrequest bool, outputModules map[string]bool) e
 
 func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 	for _, cache := range e.caches {
-		if !cache.isOutOfRange(clock.Number) {
+		if !cache.IsOutOfRange(clock.Number) {
 			continue
 		}
 		// FIXME(abourget): here we have no guarantee that we only have written
@@ -72,9 +65,9 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		// Will we easily find those back??
 		// Perhaps we should only write caches for finalized blocks, and purge
 		// those block IDs that have not been marked as FINAL from storage.
-		// In cache.go:188 we save the `.kv` indistinctly.
+		// In file.go:188 we save the `.kv` indistinctly.
 		if err := e.flushCache(cache); err != nil {
-			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
+			return fmt.Errorf("flushing output cache %s: %w", cache.ModuleName, err)
 		}
 
 	}
@@ -93,22 +86,22 @@ func (e *Engine) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, 
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}
 
-	return &CursoredCache{
+	return &cursoredCache{
 		ExecOutputMap: execOutMap,
 		engine:        e,
 		cursor:        cursor,
 	}, nil
 }
 
-func (e *Engine) flushCache(cache *OutputCache) error {
+func (e *Engine) flushCache(cache *execout.File) error {
 	e.logger.Debug("saving cache", zap.Object("cache", cache))
-	err := cache.save(e.ctx, cache.currentFilename())
+	err := cache.Save(e.ctx)
 	if err != nil {
 		return fmt.Errorf("saving cache ouputs: %w", err)
 	}
 
-	if _, err := cache.LoadAtBlock(e.ctx, cache.currentBlockRange.ExclusiveEndBlock); err != nil {
-		return fmt.Errorf("loading cache outputs  at blocks %d: %w", cache.currentBlockRange.ExclusiveEndBlock, err)
+	if _, err := cache.LoadAtEndBlockBoundary(e.ctx); err != nil {
+		return fmt.Errorf("loading cache: %w", err)
 	}
 	return nil
 }
@@ -134,7 +127,7 @@ func (e *Engine) registerCache(moduleName, moduleHash string) error {
 		return fmt.Errorf("failed createing substore: %w", err)
 	}
 
-	e.caches[moduleName] = NewOutputCache(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger)
+	e.caches[moduleName] = execout.NewFile(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger)
 
 	return nil
 }
@@ -144,11 +137,14 @@ func (e *Engine) get(moduleName string, clock *pbsubstreams.Clock) ([]byte, bool
 	if !found {
 		return nil, false, fmt.Errorf("cache %q not found in: %v", moduleName, e.caches)
 	}
-	if !cache.initialized {
+
+	// TODO(abourget): it's none of the business of the Engine to know
+	// whether the `cache` should initialized itself, or load whatever
+	// the first call to `Get()` should manage that.
+	if !cache.IsInitialized() {
 		if _, err := cache.LoadAtBlock(e.ctx, clock.Number); err != nil {
 			return nil, false, fmt.Errorf("unable to load cache %q at block %d: %w", moduleName, clock.Number, err)
 		}
-		cache.initialized = true
 	}
 
 	data, found := cache.Get(clock)

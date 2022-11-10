@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/store/marshaller"
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"

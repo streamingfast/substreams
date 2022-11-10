@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	store2 "github.com/streamingfast/substreams/storage/store"
+
 	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/store"
 )
 
 type Backprocessor struct {
@@ -27,7 +28,7 @@ func BuildBackProcessor(
 	upToBlock uint64,
 	outputGraph *outputmodules.Graph,
 	respFunc func(resp *pbsubstreams.Response) error,
-	storeConfigs store.ConfigMap,
+	storeConfigs store2.ConfigMap,
 	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Backprocessor, error) {
 	modulesStateMap, err := storage.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, outputGraph.RequestedMapModules(), runtimeConfig.ExecOutputSaveInterval, upToBlock)
@@ -66,7 +67,7 @@ func BuildBackProcessor(
 	}, nil
 }
 
-func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error) {
+func (b *Backprocessor) Run(ctx context.Context) (storeMap store2.Map, err error) {
 	if b.execOutputReader != nil {
 		b.execOutputReader.Launch(ctx)
 	}

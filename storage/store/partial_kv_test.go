@@ -3,15 +3,16 @@ package store
 import (
 	"bytes"
 	"context"
-	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/store/marshaller"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"io"
 	"testing"
+
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/storage/store/marshaller"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
-func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
+func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 	var writtenBytes []byte
 	store := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
 		writtenBytes, err = io.ReadAll(f)
@@ -21,7 +22,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		return io.NopCloser(bytes.NewBuffer(writtenBytes)), nil
 	}
 
-	kvs := &FullKV{
+	kvs := &PartialKV{
 		baseStore: &baseStore{
 			kv: map[string][]byte{},
 
@@ -41,7 +42,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 	err = writer.Write(context.Background())
 	require.NoError(t, err)
 
-	kvl := &FullKV{
+	kvl := &PartialKV{
 		baseStore: &baseStore{
 			kv: map[string][]byte{},
 

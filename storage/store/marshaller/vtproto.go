@@ -2,14 +2,15 @@ package marshaller
 
 import (
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/store/marshaller/pb"
 	"io"
+
+	pbstore "github.com/streamingfast/substreams/storage/store/marshaller/pb"
 )
 
 type VTproto struct{}
 
 func (p *VTproto) Unmarshal(in []byte) (*StoreData, error) {
-	stateData := &pbsubstreams.StoreData{}
+	stateData := &pbstore.StoreData{}
 	if err := unmarshalVT(stateData, in); err != nil {
 		return nil, fmt.Errorf("unmarshal store: %w", err)
 	}
@@ -20,7 +21,7 @@ func (p *VTproto) Unmarshal(in []byte) (*StoreData, error) {
 }
 
 func (p *VTproto) Marshal(data *StoreData) ([]byte, error) {
-	stateData := &pbsubstreams.StoreData{
+	stateData := &pbstore.StoreData{
 		Kv:             data.Kv,
 		DeletePrefixes: data.DeletePrefixes,
 	}
@@ -32,7 +33,7 @@ func (p *VTproto) Marshal(data *StoreData) ([]byte, error) {
 // by the vtprotobuf protobuf plugin is ok, but we can greatly improve the allocation and
 // speed with a few optimizations. This function is a 98% copy of the function in
 // ./pb/store_vtproto.pb.go
-func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
+func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -40,7 +41,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return pbsubstreams.ErrIntOverflow
+				return pbstore.ErrIntOverflow
 			}
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
@@ -68,7 +69,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return pbsubstreams.ErrIntOverflow
+					return pbstore.ErrIntOverflow
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -81,11 +82,11 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return pbsubstreams.ErrInvalidLength
+				return pbstore.ErrInvalidLength
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return pbsubstreams.ErrInvalidLength
+				return pbstore.ErrInvalidLength
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -100,7 +101,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 				var wire uint64
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
-						return pbsubstreams.ErrIntOverflow
+						return pbstore.ErrIntOverflow
 					}
 					if iNdEx >= l {
 						return io.ErrUnexpectedEOF
@@ -117,7 +118,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 					var stringLenmapkey uint64
 					for shift := uint(0); ; shift += 7 {
 						if shift >= 64 {
-							return pbsubstreams.ErrIntOverflow
+							return pbstore.ErrIntOverflow
 						}
 						if iNdEx >= l {
 							return io.ErrUnexpectedEOF
@@ -131,11 +132,11 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 					}
 					intStringLenmapkey := int(stringLenmapkey)
 					if intStringLenmapkey < 0 {
-						return pbsubstreams.ErrInvalidLength
+						return pbstore.ErrInvalidLength
 					}
 					postStringIndexmapkey := iNdEx + intStringLenmapkey
 					if postStringIndexmapkey < 0 {
-						return pbsubstreams.ErrInvalidLength
+						return pbstore.ErrInvalidLength
 					}
 					if postStringIndexmapkey > l {
 						return io.ErrUnexpectedEOF
@@ -150,7 +151,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 					var mapbyteLen uint64
 					for shift := uint(0); ; shift += 7 {
 						if shift >= 64 {
-							return pbsubstreams.ErrIntOverflow
+							return pbstore.ErrIntOverflow
 						}
 						if iNdEx >= l {
 							return io.ErrUnexpectedEOF
@@ -164,11 +165,11 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 					}
 					intMapbyteLen := int(mapbyteLen)
 					if intMapbyteLen < 0 {
-						return pbsubstreams.ErrInvalidLength
+						return pbstore.ErrInvalidLength
 					}
 					postbytesIndex := iNdEx + intMapbyteLen
 					if postbytesIndex < 0 {
-						return pbsubstreams.ErrInvalidLength
+						return pbstore.ErrInvalidLength
 					}
 					if postbytesIndex > l {
 						return io.ErrUnexpectedEOF
@@ -187,7 +188,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 						return err
 					}
 					if (skippy < 0) || (iNdEx+skippy) < 0 {
-						return pbsubstreams.ErrInvalidLength
+						return pbstore.ErrInvalidLength
 					}
 					if (iNdEx + skippy) > postIndex {
 						return io.ErrUnexpectedEOF
@@ -204,7 +205,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return pbsubstreams.ErrIntOverflow
+					return pbstore.ErrIntOverflow
 				}
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
@@ -218,11 +219,11 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 			}
 			intStringLen := int(stringLen)
 			if intStringLen < 0 {
-				return pbsubstreams.ErrInvalidLength
+				return pbstore.ErrInvalidLength
 			}
 			postIndex := iNdEx + intStringLen
 			if postIndex < 0 {
-				return pbsubstreams.ErrInvalidLength
+				return pbstore.ErrInvalidLength
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
@@ -239,7 +240,7 @@ func unmarshalVT(m *pbsubstreams.StoreData, dAtA []byte) error {
 				return err
 			}
 			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return pbsubstreams.ErrInvalidLength
+				return pbstore.ErrInvalidLength
 			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
@@ -263,7 +264,7 @@ func skip(dAtA []byte) (n int, err error) {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return 0, pbsubstreams.ErrIntOverflow
+				return 0, pbstore.ErrIntOverflow
 			}
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
@@ -280,7 +281,7 @@ func skip(dAtA []byte) (n int, err error) {
 		case 0:
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return 0, pbsubstreams.ErrIntOverflow
+					return 0, pbstore.ErrIntOverflow
 				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
@@ -296,7 +297,7 @@ func skip(dAtA []byte) (n int, err error) {
 			var length int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return 0, pbsubstreams.ErrIntOverflow
+					return 0, pbstore.ErrIntOverflow
 				}
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
@@ -309,14 +310,14 @@ func skip(dAtA []byte) (n int, err error) {
 				}
 			}
 			if length < 0 {
-				return 0, pbsubstreams.ErrInvalidLength
+				return 0, pbstore.ErrInvalidLength
 			}
 			iNdEx += length
 		case 3:
 			depth++
 		case 4:
 			if depth == 0 {
-				return 0, pbsubstreams.ErrUnexpectedEndOfGroup
+				return 0, pbstore.ErrUnexpectedEndOfGroup
 			}
 			depth--
 		case 5:
@@ -325,7 +326,7 @@ func skip(dAtA []byte) (n int, err error) {
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
 		if iNdEx < 0 {
-			return 0, pbsubstreams.ErrInvalidLength
+			return 0, pbstore.ErrInvalidLength
 		}
 		if depth == 0 {
 			return iNdEx, nil

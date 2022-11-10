@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/streamingfast/substreams/storage/store/marshaller"
+
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store/marshaller"
 	"go.uber.org/zap"
 )
 

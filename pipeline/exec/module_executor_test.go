@@ -3,10 +3,12 @@ package exec
 import (
 	"context"
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/streamingfast/substreams/storage/execout"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/assert"
 )
 
 type MockExecOutput struct {

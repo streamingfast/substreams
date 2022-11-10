@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	store2 "github.com/streamingfast/substreams/storage/store"
+
+	"github.com/streamingfast/substreams/storage/execout"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/store"
 	"google.golang.org/protobuf/proto"
 )
 
 type StoreModuleExecutor struct {
 	BaseExecutor
-	outputStore store.DeltaAccessor
+	outputStore store2.DeltaAccessor
 }
 
 var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
 
-func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store.DeltaAccessor) *StoreModuleExecutor {
+func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store2.DeltaAccessor) *StoreModuleExecutor {
 	return &StoreModuleExecutor{BaseExecutor: *baseExecutor, outputStore: outputStore}
 }
 
@@ -54,7 +56,7 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 }
 
 func (e *StoreModuleExecutor) holdsPartialStore() bool {
-	_, ok := e.outputStore.(*store.PartialKV)
+	_, ok := e.outputStore.(*store2.PartialKV)
 	return ok
 }
 

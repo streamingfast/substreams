@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	store2 "github.com/streamingfast/substreams/storage/store"
+
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -203,7 +204,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				if strings.HasSuffix(name, ".partial") {
 					loadedPartialFilename = name
 				}
-				return newPartialKVContent(t, map[string][]byte{}, &store.FullKV{}), nil
+				return newPartialKVContent(t, map[string][]byte{}, &store2.FullKV{}), nil
 			}
 			testStore.WriteObjectFunc = func(ctx context.Context, base string, f io.Reader) error {
 				if strings.HasSuffix(base, ".kv") {
@@ -231,8 +232,8 @@ func TestStoreSquasher_processRange(t *testing.T) {
 	}
 }
 
-func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *store.FullKV {
-	c, err := store.NewConfig(
+func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *store2.FullKV {
+	c, err := store2.NewConfig(
 		"mod",
 		initialBlock,
 		"mod.hash",
@@ -245,7 +246,7 @@ func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *st
 	return c.NewFullKV(zap.NewNop())
 }
 
-func newPartialKVContent(t *testing.T, data map[string][]byte, kv *store.FullKV) io.ReadCloser {
+func newPartialKVContent(t *testing.T, data map[string][]byte, kv *store2.FullKV) io.ReadCloser {
 	//marshaller := kv.Marshaller()
 	//content, err := marshaller.Marshal(data)
 	//require.NoError(t, err)

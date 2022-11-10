@@ -1,10 +1,11 @@
-package cachev1
+package execout
 
 import (
 	"testing"
 
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
+
 	"github.com/streamingfast/substreams/block"
-	pboutput "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -112,7 +113,7 @@ func TestOutputCache_Delete(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			outputCache := NewOutputCache("module1", nil, 10, zlog)
+			outputCache := NewFile("module1", nil, 10, zlog)
 			outputCache.outputData = &pboutput.Map{
 				Kv: test.kv,
 			}

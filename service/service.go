@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"os"
 	"time"
+
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/cache"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
 
@@ -18,7 +20,6 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/wasm"
@@ -172,7 +173,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	execOutputCacheEngine, err := cachev1.NewEngine(s.runtimeConfig, s.blockType, reqctx.Logger(ctx))
+	execOutputCacheEngine, err := cache.NewEngine(s.runtimeConfig, s.blockType, reqctx.Logger(ctx))
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}

@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/streamingfast/substreams/storage/store/state"
+
+	store2 "github.com/streamingfast/substreams/storage/store"
+
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
 
@@ -33,14 +36,14 @@ func NewMultiSquasher(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
 	modulesStorageStateMap storage.ModuleStorageStateMap,
-	storeConfigs store.ConfigMap,
+	storeConfigs store2.ConfigMap,
 	upToBlock uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) (*MultiSquasher, error) {
 	logger := reqctx.Logger(ctx)
 	storeSquashers := map[string]*StoreSquasher{}
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
-		storeStorageState, ok := moduleStorageState.(*storage.StoreStorageState)
+		storeStorageState, ok := moduleStorageState.(*state.StoreStorageState)
 		if !ok {
 			continue
 		}
@@ -113,7 +116,7 @@ func (s *MultiSquasher) Squash(moduleName string, partialsRanges block.Ranges) e
 	return squashable.squash(partialsRanges)
 }
 
-func (s *MultiSquasher) Wait(ctx context.Context) (out store.Map, err error) {
+func (s *MultiSquasher) Wait(ctx context.Context) (out store2.Map, err error) {
 	if err := s.waitUntilCompleted(ctx); err != nil {
 		return nil, fmt.Errorf("waiting for squashers to complete: %w", err)
 	}
@@ -142,8 +145,8 @@ func (s *MultiSquasher) waitUntilCompleted(ctx context.Context) error {
 	return nil
 }
 
-func (s *MultiSquasher) getFinalStores() (out store.Map, err error) {
-	out = store.NewMap()
+func (s *MultiSquasher) getFinalStores() (out store2.Map, err error) {
+	out = store2.NewMap()
 	var errs []string
 	for _, squashable := range s.storeSquashers {
 		if !squashable.targetExclusiveEndBlockReach {

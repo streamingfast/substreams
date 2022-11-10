@@ -9,6 +9,10 @@ message OutputData {
   map<string, CacheItem> kv = 1;
 }
 
+message OutputDataTest {
+    repeated CacheItem items = 1;
+}
+
 message CacheItem {
     uint64 block_num = 1;
     string block_id = 2;

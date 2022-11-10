@@ -18,7 +18,8 @@ type Store interface {
 	Iterable
 	DeltaAccessor
 	Resettable
-	Nameable
+	Mergeable
+	Named
 	// todoo: add fmt.Stringer ??
 
 	// intrinsics
@@ -61,7 +62,7 @@ type Resettable interface {
 	Reset()
 }
 
-type Nameable interface {
+type Named interface {
 	Name() string
 }
 
@@ -80,11 +81,16 @@ type DeltaAccessor interface {
 type Reader interface {
 	fmt.Stringer
 
-	Nameable
+	Named
 
 	GetFirst(key string) ([]byte, bool)
 	GetLast(key string) ([]byte, bool)
 	GetAt(ord uint64, key string) ([]byte, bool)
+}
+
+type Mergeable interface {
+	ValueType() string
+	UpdatePolicy() pbsubstreams.Module_KindStore_UpdatePolicy
 }
 
 type UpdateKeySetter interface {

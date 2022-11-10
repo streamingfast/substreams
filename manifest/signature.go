@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"sync"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -14,19 +15,27 @@ type ModuleHash []byte
 
 type ModuleHashes struct {
 	cache map[string][]byte
+
+	mu *sync.RWMutex
 }
 
 func NewModuleHashes() *ModuleHashes {
 	return &ModuleHashes{
 		cache: make(map[string][]byte),
+		mu:    &sync.RWMutex{},
 	}
 }
 
 func (m *ModuleHashes) Get(moduleName string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return hex.EncodeToString(m.cache[moduleName])
 }
 
 func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	for name, hash := range m.cache {
 		if err := cb(hex.EncodeToString(hash), name); err != nil {
 			return err
@@ -36,9 +45,12 @@ func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
 }
 
 func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
+	m.mu.RLock()
 	if cachedHash := m.cache[module.Name]; cachedHash != nil {
+		m.mu.RUnlock()
 		return cachedHash
 	}
+	m.mu.RUnlock()
 
 	buf := bytes.NewBuffer(nil)
 
@@ -82,7 +94,9 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	h.Write(buf.Bytes())
 
 	output := h.Sum(nil)
+	m.mu.Lock()
 	m.cache[module.Name] = output
+	m.mu.Unlock()
 	return output
 }
 

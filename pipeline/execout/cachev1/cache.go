@@ -3,8 +3,8 @@ package cachev1
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"sort"
 	"strconv"
@@ -17,28 +17,19 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pboutput "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb"
+
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TODO(abourget): rename to `Item` ?
-type CacheItem struct {
-	BlockNum  uint64                 `json:"block_num"`
-	BlockID   string                 `json:"block_id"`
-	Payload   []byte                 `json:"payload"`
-	Timestamp *timestamppb.Timestamp `json:"timestamp"`
-	Cursor    string                 `json:"cursor"`
-}
-
-type outputKV map[string]*CacheItem
-
 type OutputCache struct {
 	sync.RWMutex
 
 	wg                *sync.WaitGroup
 	moduleName        string
 	currentBlockRange *block.Range
-	kv                outputKV
+	outputData        *pboutput.Map
 	store             dstore.Store
 	saveBlockInterval uint64
 	logger            *zap.Logger
@@ -61,8 +52,8 @@ func (c *OutputCache) currentFilename() string {
 	return ComputeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
 }
 
-func (c *OutputCache) SortedCacheItems() (out []*CacheItem) {
-	for _, item := range c.kv {
+func (c *OutputCache) SortedCacheItems() (out []*pboutput.Item) {
+	for _, item := range c.outputData.Kv {
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -90,15 +81,15 @@ func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte)
 	cp := make([]byte, len(data))
 	copy(cp, data)
 
-	ci := &CacheItem{
+	ci := &pboutput.Item{
 		BlockNum:  clock.Number,
-		BlockID:   clock.Id,
+		BlockId:   clock.Id,
 		Timestamp: clock.Timestamp,
 		Cursor:    cursor,
 		Payload:   cp,
 	}
 
-	c.kv[clock.Id] = ci
+	c.outputData.Kv[clock.Id] = ci
 
 	return nil
 }
@@ -107,7 +98,7 @@ func (c *OutputCache) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	cacheItem, found := c.kv[clock.Id]
+	cacheItem, found := c.outputData.Kv[clock.Id]
 
 	if !found {
 		return nil, false
@@ -120,7 +111,7 @@ func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	for _, value := range c.kv {
+	for _, value := range c.outputData.Kv {
 		if value.BlockNum == blockNumber {
 			return value.Payload, true
 		}
@@ -132,7 +123,9 @@ func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
 	c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
 
-	c.kv = make(outputKV)
+	c.outputData = &pboutput.Map{
+		Kv: make(map[string]*pboutput.Item),
+	}
 
 	blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
 	if err != nil {
@@ -157,7 +150,7 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 }
 func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 	c.logger.Debug("loading cache", zap.Object("range", blockRange))
-	c.kv = make(outputKV)
+	c.outputData.Kv = make(map[string]*pboutput.Item)
 
 	filename := ComputeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
 	c.logger.Debug("loading outputs data", zap.String("file_name", filename), zap.Object("block_range", blockRange))
@@ -167,9 +160,15 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 		if err != nil {
 			return fmt.Errorf("loading block reader %s: %w", filename, err)
 		}
+		defer objectReader.Close()
 
-		if err = json.NewDecoder(objectReader).Decode(&c.kv); err != nil {
-			return fmt.Errorf("json decoding file %s: %w", filename, err)
+		bytes, err := io.ReadAll(objectReader)
+		if err != nil {
+			return fmt.Errorf("reading store file %s: %w", filename, err)
+		}
+
+		if err = c.outputData.UnmarshalFast(bytes); err != nil {
+			return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 		}
 
 		return nil
@@ -179,19 +178,17 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 	}
 
 	c.currentBlockRange = blockRange
-	c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.currentBlockRange))
+	c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.outputData.Kv)), zap.Stringer("block_range", c.currentBlockRange))
 	return nil
 }
 
 func (c *OutputCache) save(ctx context.Context, filename string) error {
 	c.logger.Info("saving cache", zap.Stringer("block_range", c.currentBlockRange), zap.String("filename", filename))
 
-	buffer := bytes.NewBuffer(nil)
-	err := json.NewEncoder(buffer).Encode(c.kv)
+	cnt, err := c.outputData.MarshalFast()
 	if err != nil {
-		return fmt.Errorf("json encoding outputs: %w", err)
+		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 	}
-	cnt := buffer.Bytes()
 
 	c.wg.Add(1)
 	go func() {
@@ -252,7 +249,7 @@ func (c *OutputCache) Delete(blockID string) {
 	c.Lock()
 	defer c.Unlock()
 
-	delete(c.kv, blockID)
+	delete(c.outputData.Kv, blockID)
 }
 
 func (c *OutputCache) MarshalLogObject(enc zapcore.ObjectEncoder) error {

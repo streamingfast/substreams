@@ -3,15 +3,20 @@ package integration
 import (
 	"context"
 	"math/big"
+	"runtime"
 	"strings"
 	"testing"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/require"
 )
+
+
+	runtime.GC()
 
 //todo:
 // 1. add test and new block generator (string and parse easier) that generates

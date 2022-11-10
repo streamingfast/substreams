@@ -51,3 +51,11 @@ func (b *baseStore) bumpOrdinal(ord uint64) {
 	}
 	b.lastOrdinal = ord
 }
+
+func (b *baseStore) ValueType() string {
+	return b.valueType
+}
+
+func (b *baseStore) UpdatePolicy() pbsubstreams.Module_KindStore_UpdatePolicy {
+	return b.updatePolicy
+}

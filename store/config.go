@@ -3,11 +3,12 @@ package store
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/store/marshaller"
+	"io"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/store/marshaller"
 	"go.uber.org/zap"
 )
 
@@ -55,6 +56,18 @@ func (c *Config) Name() string {
 	return c.name
 }
 
+func (c *Config) ModuleHash() string {
+	return c.moduleHash
+}
+
+func (c *Config) ValueType() string {
+	return c.valueType
+}
+
+func (c *Config) UpdatePolicy() pbsubstreams.Module_KindStore_UpdatePolicy {
+	return c.updatePolicy
+}
+
 func (c *Config) ModuleInitialBlock() uint64 {
 	return c.moduleInitialBlock
 }
@@ -68,6 +81,32 @@ func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialK
 		baseStore:    c.newBaseStore(logger),
 		initialBlock: initialBlock,
 	}
+}
+
+func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (uint64, error) {
+	var size uint64
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		rc, err := c.store.OpenObject(ctx, fileInfo.Filename)
+		if err != nil {
+			return fmt.Errorf("opening file: %w", err)
+		}
+		defer rc.Close()
+
+		w := io.Discard
+		n, err := io.Copy(w, rc)
+		if err != nil {
+			return fmt.Errorf("reading file: %w", err)
+		}
+
+		size = uint64(n)
+
+		return nil
+
+	})
+	if err != nil {
+		return 0, err
+	}
+	return size, nil
 }
 
 func (c *Config) ListSnapshotFiles(ctx context.Context) (files []*FileInfo, err error) {

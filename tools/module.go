@@ -38,7 +38,7 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 		zap.String("state_store_url", stateStoreURL),
 	)
 
-	stateStore, err := dstore.NewStore(stateStoreURL, "", "", false)
+	stateStore, err := dstore.NewStore(stateStoreURL, "zst", "zstd", false)
 	cli.NoError(err, "New state store")
 
 	zlog.Info("Reading Substreams manifest")

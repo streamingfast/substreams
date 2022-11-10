@@ -104,9 +104,5 @@ func (s *FullKV) Reset() {
 }
 
 func (s *FullKV) String() string {
-	var deltaKeys []string
-	for _, delta := range s.deltas {
-		deltaKeys = append(deltaKeys, delta.Key)
-	}
-	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d  keyCount %d loadFrom %s deltasCount %d deltaskeys %s", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas), deltaKeys)
+	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d  keyCount %d loadFrom %s deltasCount %d", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas))
 }

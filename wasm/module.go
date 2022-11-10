@@ -27,6 +27,12 @@ type Module struct {
 	Heap            *Heap
 }
 
+func (m *Module) FreeMem() {
+	m.wasmEngine.FreeMem()
+	m.wasmStore.FreeMem()
+	m.wasmLinker.FreeMem()
+}
+
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
 	engine := wasmtime.NewEngine()
 	linker := wasmtime.NewLinker(engine)
@@ -57,7 +63,6 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 			}
 		}
 	}
-
 	instance, err := m.wasmLinker.Instantiate(m.wasmStore, m.wasmModule)
 	if err != nil {
 		return nil, fmt.Errorf("creating new instance: %w", err)

@@ -23,7 +23,7 @@
 
 * [Overview](developer-guide/overview.md)
 * [Dependency Installation](developer-guide/installation-requirements.md)
-* [Manifest Creation](developer-guide/creating-your-manifest.md)
+* [Manifest](developer-guide/creating-your-manifest.md)
 * [Protobuf Schemas](developer-guide/creating-protobuf-schemas.md)
 * [Module Handlers](developer-guide/setting-up-handlers.md)
 * [Module Handler Creation](developer-guide/writing-module-handlers.md)

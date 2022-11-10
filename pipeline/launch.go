@@ -32,6 +32,10 @@ func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, 
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
 
+	for _, executor := range p.moduleExecutors {
+		executor.FreeMem()
+	}
+
 	if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
 		logger.Debug("stream of blocks ended",
 			zap.Uint64("stop_block_num", reqDetails.Request.StopBlockNum),

@@ -17,7 +17,6 @@ type StoreStorageState struct {
 	PartialsPresent      PartialStoreFiles
 }
 
-type PartialStoreFile = block.Range
 type FullStoreFile = block.Range
 type PartialStoreFiles = block.Ranges
 
@@ -28,7 +27,7 @@ func newMapStorageState(modName string, modInitBlock, workUpToBlockNum uint64, s
 	}, nil
 }
 
-func newStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *Snapshots) (out *StoreStorageState, err error) {
+func newStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *storeSnapshots) (out *StoreStorageState, err error) {
 	out = &StoreStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
 	if workUpToBlockNum <= modInitBlock {
 		return

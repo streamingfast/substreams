@@ -63,6 +63,16 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		if !cache.isOutOfRange(clock.Number) {
 			continue
 		}
+		// FIXME(abourget): here we have no guarantee that we only have written
+		// fINALIZED blocks in the cache.  IN fact, we could very well have received
+		// New blocks in the live.
+		// Is that a problem? If we have written blocks in the cache that are not
+		// in the range we're about to write, they'll have been written in the future
+		// (for a cache of 0-100, we might have written 105 and 106).
+		// Will we easily find those back??
+		// Perhaps we should only write caches for finalized blocks, and purge
+		// those block IDs that have not been marked as FINAL from storage.
+		// In cache.go:188 we save the `.kv` indistinctly.
 		if err := e.flushCache(cache); err != nil {
 			return fmt.Errorf("flushing output cache %s: %w", cache.moduleName, err)
 		}

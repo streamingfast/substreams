@@ -6,12 +6,9 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// OutputModuleGraph
-//   stores
-//   outputMap // shorthand for `requestedOutputs` as a map
-
-//
-
+// TODO(abourget): rename to `outputmods.Graph` perhaps?
+//  * `outputgraph` isn't exact, they are output modules, and it's a graph of those output modules.
+//  * once in `outputmods`, having `OutputModulesGraph` becomes redundant.
 type OutputModulesGraph struct {
 	request *pbsubstreams.Request
 

@@ -8,12 +8,12 @@ import (
 )
 
 func TestSnapshots_LastCompleted(t *testing.T) {
-	assert.Equal(t, 300, int((&Snapshots{
+	assert.Equal(t, 300, int((&storeSnapshots{
 		Completes: block.ParseRanges("100-200,100-300"),
 		Partials:  block.ParseRanges("300-400"),
 	}).LastCompletedBlock()))
 
-	assert.Equal(t, 0, int((&Snapshots{
+	assert.Equal(t, 0, int((&storeSnapshots{
 		Completes: block.ParseRanges(""),
 		Partials:  block.ParseRanges("200-300"),
 	}).LastCompletedBlock()))
@@ -22,13 +22,13 @@ func TestSnapshots_LastCompleted(t *testing.T) {
 func TestSnapshots_LastCompleteBefore(t *testing.T) {
 	tests := []struct {
 		name         string
-		snapshot     *Snapshots
+		snapshot     *storeSnapshots
 		blockNum     uint64
 		expectBrange *block.Range
 	}{
 		{
 			name: "no complete range covering block",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     0,
@@ -36,7 +36,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "no complete range covering block",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     19,
@@ -44,7 +44,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "complete range ending on block",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     20,
@@ -52,7 +52,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "complete range ending just before lookup block",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     21,
@@ -60,7 +60,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "complete range ending before lookup block",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     49,
@@ -68,7 +68,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "better complete range ending on block",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     50,
@@ -76,7 +76,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "another test 1",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     51,
@@ -84,7 +84,7 @@ func TestSnapshots_LastCompleteBefore(t *testing.T) {
 		},
 		{
 			name: "another test 2",
-			snapshot: &Snapshots{
+			snapshot: &storeSnapshots{
 				Completes: block.ParseRanges("10-20,10-50,10-1000"),
 			},
 			blockNum:     1003,

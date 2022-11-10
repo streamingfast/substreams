@@ -16,7 +16,6 @@ Substreams uses a myriad of technologies including:
 * [Buf](https://buf.build/)
 * [YAML](https://yaml.org/)
 
-
 {% hint style="info" %}
 **Note**: [PostgreSQL](https://www.postgresql.org/), [MongoDB](https://www.mongodb.com/) and other backend knowledge may also be required when working with different sink types for Substreams.
 {% endhint %}

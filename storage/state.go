@@ -5,8 +5,6 @@ import (
 
 	store2 "github.com/streamingfast/substreams/storage/store"
 
-	"github.com/streamingfast/substreams/storage/execoutput"
-
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap/zapcore"
 )
@@ -24,13 +22,6 @@ type StoreStorageState struct {
 
 type FullStoreFile = block.Range
 type PartialStoreFiles = block.Ranges
-
-func NewMapStorageState(modName string, modInitBlock, workUpToBlockNum uint64, snapshots string) (out *execoutput.MapperStorageState, err error) {
-	// TODO: base the content of Mapper on the `snapshots` in here..
-	return &execoutput.MapperStorageState{
-		ModuleName: modName,
-	}, nil
-}
 
 func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *store2.StoreSnapshots) (out *StoreStorageState, err error) {
 	out = &StoreStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}

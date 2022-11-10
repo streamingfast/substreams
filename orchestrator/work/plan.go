@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams"
@@ -16,7 +16,7 @@ type Plan struct {
 	// ModulesStateMap
 	ModulesStateMap storage.ModuleStorageStateMap
 
-	outputGraph *outputgraph.OutputModulesGraph
+	outputGraph *outputmodules.Graph
 
 	upToBlock uint64
 
@@ -28,7 +28,7 @@ type Plan struct {
 	mu sync.Mutex
 }
 
-func BuildNewPlan(modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputgraph.OutputModulesGraph) (*Plan, error) {
+func BuildNewPlan(modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputmodules.Graph) (*Plan, error) {
 	plan := &Plan{
 		ModulesStateMap: modulesStateMap,
 		upToBlock:       upToBlock,

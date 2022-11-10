@@ -1,4 +1,4 @@
-package outputgraph
+package outputmodules
 
 import (
 	"fmt"

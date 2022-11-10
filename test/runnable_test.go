@@ -16,7 +16,7 @@ import (
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
@@ -333,9 +333,9 @@ func processRequest(
 	cachingEngine, err := cachev1.NewEngine(runtimeConfig, blockType, zap.NewNop())
 	require.NoError(t, err)
 
-	require.NoError(t, outputgraph.ValidateRequest(request, blockType))
+	require.NoError(t, outputmodules.ValidateRequest(request, blockType))
 
-	outputGraph, err := outputgraph.NewOutputModuleGraph(request)
+	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
 	require.NoError(t, err)
 
 	storeConfigs, err := pipeline.InitializeStoreConfigs(outputGraph, runtimeConfig.BaseObjectStore)

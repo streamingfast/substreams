@@ -54,7 +54,7 @@ type Loadable interface {
 }
 
 type Savable interface {
-	Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error)
+	Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error)
 }
 
 type Resettable interface {

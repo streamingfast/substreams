@@ -8,7 +8,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage"
 	"github.com/stretchr/testify/assert"
@@ -87,7 +87,7 @@ func TestWorkPlanning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mods := manifest.NewTestModules()
-			outputGraph, err := outputgraph.NewOutputModuleGraph(&pbsubstreams.Request{
+			outputGraph, err := outputmodules.NewOutputModuleGraph(&pbsubstreams.Request{
 				Modules: &pbsubstreams.Modules{
 					Modules:  mods,
 					Binaries: []*pbsubstreams.Binary{{}},

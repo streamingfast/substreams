@@ -53,7 +53,7 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	return nil
 }
 
-func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
+func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
 	stateData := &marshaller.StoreData{
@@ -74,7 +74,7 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, er
 		zap.Object("block_range", brange),
 	)
 
-	fw := &FileWriter{
+	fw := &fileWriter{
 		store:    p.store,
 		filename: filename,
 		content:  content,

@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -36,7 +36,7 @@ func (s *Stores) SetStoreMap(storeMap store.Map) {
 	s.StoreMap = storeMap
 }
 
-func InitializeStoreConfigs(outputGraph *outputgraph.OutputModulesGraph, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
+func InitializeStoreConfigs(outputGraph *outputmodules.Graph, baseObjectStore dstore.Store) (out store.ConfigMap, err error) {
 	out = make(store.ConfigMap)
 	for _, storeModule := range outputGraph.Stores() {
 		c, err := store.NewConfig(

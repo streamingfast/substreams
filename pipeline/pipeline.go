@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 
 	"github.com/streamingfast/bstream"
@@ -38,7 +38,7 @@ type Pipeline struct {
 	postJobHooks   []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Runtime
-	outputGraph     *outputgraph.OutputModulesGraph
+	outputGraph     *outputmodules.Graph
 	moduleExecutors []exec.ModuleExecutor
 	moduleOutputs   []*pbsubstreams.ModuleOutput
 
@@ -55,7 +55,7 @@ type Pipeline struct {
 
 func New(
 	ctx context.Context,
-	outputGraph *outputgraph.OutputModulesGraph,
+	outputGraph *outputmodules.Graph,
 	stores *Stores,
 	wasmRuntime *wasm.Runtime,
 	execOutputCache execout.CacheEngine,
@@ -120,7 +120,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	p.stores.SetStoreMap(storeMap)
 
 	// Build the Module Executor list
-	// TODO(abourget): this could be done lazily, but the OutputModulesGraph,
+	// TODO(abourget): this could be done lazily, but the Graph,
 	// and cache the latest if all block boundaries
 	// are still clear.
 
@@ -321,7 +321,7 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 }
 
 // TODO(abourget): have this being generated and the `buildWASM` by taking
-// this OutputModulesGraph as input, and creating the ModuleExecutors, and caching
+// this Graph as input, and creating the ModuleExecutors, and caching
 // them over there.
 //moduleExecutorsInitialized bool
 //moduleExecutors            []exec.ModuleExecutor

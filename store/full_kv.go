@@ -65,7 +65,7 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 // Save is to be called ONLY when we just passed the
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
-func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error) {
+func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
 	stateData := &marshaller.StoreData{
@@ -86,7 +86,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *FileWriter, error
 		zap.Object("block_range", brange),
 	)
 
-	fw := &FileWriter{
+	fw := &fileWriter{
 		store:    s.store,
 		filename: filename,
 		content:  content,

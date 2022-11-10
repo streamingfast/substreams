@@ -1,4 +1,4 @@
-package outputgraph
+package outputmodules
 
 import (
 	"fmt"
@@ -6,10 +6,10 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// TODO(abourget): rename to `outputmods.Graph` perhaps?
+// TODO(abourget): rename to `outputmodules.Graph` perhaps?
 //  * `outputgraph` isn't exact, they are output modules, and it's a graph of those output modules.
-//  * once in `outputmods`, having `OutputModulesGraph` becomes redundant.
-type OutputModulesGraph struct {
+//  * once in `outputmods`, having `Graph` becomes redundant.
+type Graph struct {
 	request *pbsubstreams.Request
 
 	// required stores to be processed, either because requested directly
@@ -32,19 +32,19 @@ type OutputModulesGraph struct {
 	moduleHashes *manifest.ModuleHashes
 }
 
-func (t *OutputModulesGraph) RequestedMapModules() []*pbsubstreams.Module { return t.requestedMappers }
-func (t *OutputModulesGraph) Stores() []*pbsubstreams.Module              { return t.stores }
-func (g *OutputModulesGraph) AllModules() []*pbsubstreams.Module          { return g.allModules }
-func (t *OutputModulesGraph) IsOutputModule(name string) bool             { return t.outputModuleMap[name] }
-func (t *OutputModulesGraph) OutputMap() map[string]bool                  { return t.outputModuleMap }
-func (t *OutputModulesGraph) ModuleHashes() *manifest.ModuleHashes        { return t.moduleHashes }
+func (t *Graph) RequestedMapModules() []*pbsubstreams.Module { return t.requestedMappers }
+func (t *Graph) Stores() []*pbsubstreams.Module              { return t.stores }
+func (g *Graph) AllModules() []*pbsubstreams.Module          { return g.allModules }
+func (t *Graph) IsOutputModule(name string) bool             { return t.outputModuleMap[name] }
+func (t *Graph) OutputMap() map[string]bool                  { return t.outputModuleMap }
+func (t *Graph) ModuleHashes() *manifest.ModuleHashes        { return t.moduleHashes }
 
-func NewOutputModuleGraph(request *pbsubstreams.Request) (out *OutputModulesGraph, err error) {
+func NewOutputModuleGraph(request *pbsubstreams.Request) (out *Graph, err error) {
 	outMap := make(map[string]bool)
 	for _, name := range request.OutputModules {
 		outMap[name] = true
 	}
-	out = &OutputModulesGraph{
+	out = &Graph{
 		request:         request,
 		outputModuleMap: outMap,
 	}
@@ -55,7 +55,7 @@ func NewOutputModuleGraph(request *pbsubstreams.Request) (out *OutputModulesGrap
 	return out, nil
 }
 
-func (t *OutputModulesGraph) computeGraph() error {
+func (t *Graph) computeGraph() error {
 	graph, err := manifest.NewModuleGraph(t.request.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -126,11 +126,11 @@ func computeSchedulableAncestors(graph *manifest.ModuleGraph, schedulableModules
 	return out, nil
 }
 
-func (g *OutputModulesGraph) SchedulableModuleNames() []string {
+func (g *Graph) SchedulableModuleNames() []string {
 	return moduleNames(g.schedulableModules)
 }
 
-func (g *OutputModulesGraph) AncestorsFrom(moduleName string) []string {
+func (g *Graph) AncestorsFrom(moduleName string) []string {
 	return g.schedulableAncestorsMap[moduleName]
 }
 
@@ -141,14 +141,14 @@ func moduleNames(modules []*pbsubstreams.Module) (out []string) {
 	return
 }
 
-func (t *OutputModulesGraph) hashModules(graph *manifest.ModuleGraph) {
+func (t *Graph) hashModules(graph *manifest.ModuleGraph) {
 	t.moduleHashes = manifest.NewModuleHashes()
 	for _, module := range t.allModules {
 		t.moduleHashes.HashModule(t.request.Modules, module, graph)
 	}
 }
 
-func (t *OutputModulesGraph) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
+func (t *Graph) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
 	for _, module := range t.requestedOutputs {
 		if requestStartBlockNum < module.InitialBlock {
 			return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", requestStartBlockNum, module.Name, module.InitialBlock)

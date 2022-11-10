@@ -28,7 +28,7 @@ func TestStoreState(modName string, rng string) storage.ModuleStorageState {
 }
 
 func TestMapState(modName string, rng string) storage.ModuleStorageState {
-	return &execoutput.MapperStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
+	return &execoutput.ExecOutputStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
 }
 
 func TestModStateMap(modStates ...storage.ModuleStorageState) (out storage.ModuleStorageStateMap) {

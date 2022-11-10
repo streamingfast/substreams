@@ -6,7 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/storage"
 
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
@@ -25,7 +25,7 @@ func BuildBackProcessor(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
 	upToBlock uint64,
-	outputGraph *outputgraph.OutputModulesGraph,
+	outputGraph *outputmodules.Graph,
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
 	upstreamRequestModules *pbsubstreams.Modules,

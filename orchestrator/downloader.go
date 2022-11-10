@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
@@ -14,6 +15,7 @@ import (
 )
 
 type LinearExecOutputReader struct {
+	*shutter.Shutter
 	startBlock        uint64
 	exclusiveEndBlock uint64
 	responseFunc      substreams.ResponseFunc
@@ -38,83 +40,126 @@ func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, modu
 	}
 }
 
-func (d *LinearExecOutputReader) Run(ctx context.Context) error {
-	stream := NewCachedItemStream(d.startBlock, d.module, d.cache, d.runtimeConfig, d.logger)
+func (r *LinearExecOutputReader) Launch(ctx context.Context) {
+	stream := NewCachedItemStream(r.startBlock, r.module, r.cache, r.runtimeConfig, r.logger)
+	r.OnTerminating(func(err error) {
+		stream.Shutdown(err)
+	})
+	stream.Launch(ctx)
+
+	go func() {
+		r.Shutdown(r.run(ctx, stream))
+	}()
+}
+
+func (r *LinearExecOutputReader) run(ctx context.Context, stream *CachedItemStream) error {
 	for {
 		cacheItem, err := stream.next(ctx)
-		blockScopedData, err := toBlockScopedData(d.module, cacheItem)
-		err = d.responseFunc(substreams.NewBlockScopedDataResponse(blockScopedData))
+		if cacheItem == nil {
+			return nil
+		}
+
+		blockScopedData, err := toBlockScopedData(r.module, cacheItem)
+		err = r.responseFunc(substreams.NewBlockScopedDataResponse(blockScopedData))
 		if err != nil {
 			return fmt.Errorf("calling response func: %w", err)
 		}
-		if blockScopedData.Clock.Number >= d.exclusiveEndBlock {
-			d.logger.Info("stop pulling block scoped data, end block reach",
-				zap.Uint64("exclusive_end_block_num", d.exclusiveEndBlock),
+		if blockScopedData.Clock.Number >= r.exclusiveEndBlock {
+			r.logger.Info("stop pulling block scoped data, end block reach",
+				zap.Uint64("exclusive_end_block_num", r.exclusiveEndBlock),
 				zap.Uint64("cache_item_block_num", blockScopedData.Clock.Number),
 			)
 			break
 		}
 	}
-
 	return nil
 }
 
 type CachedItemStream struct {
-	nextCachedBlockNum uint64
-	module             *pbsubstreams.Module
-	cache              *cachev1.OutputCache
-	requestStartBlock  uint64
-	sortedCacheItems   []*cachev1.CacheItem
-	logger             *zap.Logger
-	runtimeConfig      *config.RuntimeConfig
+	*shutter.Shutter
+	module            *pbsubstreams.Module
+	cache             *cachev1.OutputCache
+	requestStartBlock uint64
+	logger            *zap.Logger
+	runtimeConfig     *config.RuntimeConfig
+	cacheItems        chan *cachev1.CacheItem
 }
 
 func NewCachedItemStream(requestStartBlock uint64, module *pbsubstreams.Module, cache *cachev1.OutputCache, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *CachedItemStream {
 	return &CachedItemStream{
-		requestStartBlock:  requestStartBlock,
-		nextCachedBlockNum: requestStartBlock,
-		module:             module,
-		cache:              cache,
-		logger:             logger,
-		runtimeConfig:      runtimeConfig,
+		requestStartBlock: requestStartBlock,
+		module:            module,
+		cache:             cache,
+		logger:            logger,
+		runtimeConfig:     runtimeConfig,
+		cacheItems:        make(chan *cachev1.CacheItem, runtimeConfig.ExecOutputSaveInterval*2),
 	}
+}
+
+func (s *CachedItemStream) Launch(ctx context.Context) {
+	go func() {
+		s.Shutdown(s.run(ctx))
+	}()
 }
 
 func (s *CachedItemStream) next(ctx context.Context) (*cachev1.CacheItem, error) {
-	for {
-		if len(s.sortedCacheItems) > 0 {
-			break
-		}
-		err := s.loadNextCache(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading next cache: %w", err)
-		}
+	select {
+	case <-ctx.Done():
+		return nil, nil
+	case <-s.Terminating():
+		return nil, nil
+	case item := <-s.cacheItems:
+		return item, nil
 	}
-	cacheItem := s.sortedCacheItems[0]
-	s.sortedCacheItems = s.sortedCacheItems[1:]
-	return cacheItem, nil
 }
 
-func (s *CachedItemStream) loadNextCache(ctx context.Context) (err error) {
+func (s *CachedItemStream) run(ctx context.Context) error {
+	nextCachedBlockNum := s.requestStartBlock - (s.requestStartBlock % s.runtimeConfig.ExecOutputSaveInterval)
 	for {
-		s.logger.Debug("loading next cache", zap.String("module", s.module.Name), zap.Uint64("next_cached_block_num", s.nextCachedBlockNum))
-		found, err := s.cache.LoadAtBlock(ctx, s.nextCachedBlockNum)
+		sortedCachedItems, err := s.sortedCacheItems(ctx, nextCachedBlockNum)
 		if err != nil {
-			return fmt.Errorf("loading %s cache at block %d: %w", s.module.Name, s.nextCachedBlockNum, err)
+			return fmt.Errorf("getting sorted cache items: %w", err)
 		}
 
+		if len(sortedCachedItems) == 0 {
+			return nil
+		}
+
+		nextCachedBlockNum += s.runtimeConfig.ExecOutputSaveInterval
+		for _, cachedItem := range sortedCachedItems {
+			select {
+			case s.cacheItems <- cachedItem:
+				continue
+			case <-s.Terminating():
+				return nil
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+		}
+	}
+}
+
+func (s *CachedItemStream) sortedCacheItems(ctx context.Context, atBlockNum uint64) (out []*cachev1.CacheItem, err error) {
+	for {
+		s.logger.Debug("loading next cache", zap.String("module", s.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
+		found, err := s.cache.LoadAtBlock(ctx, atBlockNum)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s cache at block %d: %w", s.module.Name, atBlockNum, err)
+		}
 		if !found {
-			s.logger.Debug("cache not found, waiting 5s", zap.String("module", s.module.Name), zap.Uint64("next_cached_block_num", s.nextCachedBlockNum))
+			s.logger.Debug("cache not found, waiting 5s", zap.String("module", s.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
 			select {
 			case <-time.After(5 * time.Second):
 				continue
+			case <-s.Terminating():
+				return nil, nil
 			case <-ctx.Done():
-				return nil
+				return nil, nil
 			}
 		}
-		s.nextCachedBlockNum += s.runtimeConfig.ExecOutputSaveInterval
-		s.sortedCacheItems = s.cache.SortedCacheItems()
-		return nil
+		out = s.cache.SortedCacheItems()
+		return out, nil
 	}
 }
 

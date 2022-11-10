@@ -4,9 +4,10 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/storagestate"
-	"github.com/streamingfast/substreams/reqctx"
 	"strings"
+
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/service/config"
@@ -31,7 +32,7 @@ type MultiSquasher struct {
 func NewMultiSquasher(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
-	modulesStorageStateMap storagestate.ModuleStorageStateMap,
+	modulesStorageStateMap storage.ModuleStorageStateMap,
 	storeConfigs store.ConfigMap,
 	upToBlock uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
@@ -39,7 +40,7 @@ func NewMultiSquasher(
 	logger := reqctx.Logger(ctx)
 	storeSquashers := map[string]*StoreSquasher{}
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
-		storeStorageState, ok := moduleStorageState.(*storagestate.StoreStorageState)
+		storeStorageState, ok := moduleStorageState.(*storage.StoreStorageState)
 		if !ok {
 			continue
 		}

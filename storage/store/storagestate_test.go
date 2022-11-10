@@ -1,11 +1,12 @@
-package storagestate
+package store
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 func TestWorkUnits_init(t *testing.T) {
@@ -13,7 +14,7 @@ func TestWorkUnits_init(t *testing.T) {
 		name string
 
 		modInitBlock uint64          // ModuleInitialBlock
-		snapshots    *storeSnapshots // store's Last block saved from the store's Info file
+		snapshots    *StoreSnapshots // store's Last block saved from the store's Info file
 		reqStart     uint64          // the request's absolute start block
 
 		expectInitLoad    *block.Range // Used for LoadFrom()
@@ -98,7 +99,7 @@ func TestWorkUnits_init(t *testing.T) {
 		),
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			wu, err := newStoreStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
+			wu, err := storage.newStoreStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectInitLoad, wu.InitialCompleteRange)
 			assert.Equal(t,
@@ -113,8 +114,8 @@ func TestWorkUnits_init(t *testing.T) {
 	}
 }
 
-func parseSnapshotSpec(in string) *storeSnapshots {
-	out := &storeSnapshots{}
+func parseSnapshotSpec(in string) *StoreSnapshots {
+	out := &StoreSnapshots{}
 	if in == "" {
 		return out
 	}

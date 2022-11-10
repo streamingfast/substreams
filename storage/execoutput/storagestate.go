@@ -1,4 +1,4 @@
-package storagestate
+package execoutput
 
 import "github.com/streamingfast/substreams/block"
 

@@ -1,19 +1,20 @@
-package storagestate
+package store
 
 import (
 	"context"
 	"fmt"
+	"sort"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/store"
-	"sort"
 )
 
-type storeSnapshots struct {
+type StoreSnapshots struct {
 	Completes block.Ranges // Shortest completes first, largest last.
 	Partials  block.Ranges // First partials first, last last
 }
 
-func (s *storeSnapshots) Sort() {
+func (s *StoreSnapshots) Sort() {
 	sort.Slice(s.Completes, func(i, j int) bool {
 		return s.Completes[i].ExclusiveEndBlock < s.Completes[j].ExclusiveEndBlock
 	})
@@ -22,18 +23,18 @@ func (s *storeSnapshots) Sort() {
 	})
 }
 
-func (s *storeSnapshots) String() string {
+func (s *StoreSnapshots) String() string {
 	return fmt.Sprintf("completes=%s, partials=%s", s.Completes, s.Partials)
 }
 
-func (s *storeSnapshots) LastCompletedBlock() uint64 {
+func (s *StoreSnapshots) LastCompletedBlock() uint64 {
 	if len(s.Completes) == 0 {
 		return 0
 	}
 	return s.Completes[len(s.Completes)-1].ExclusiveEndBlock
 }
 
-func (s *storeSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *block.Range {
+func (s *StoreSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *block.Range {
 	for i := len(s.Completes); i > 0; i-- {
 		comp := s.Completes[i-1]
 		if comp.ExclusiveEndBlock > blockNum {
@@ -44,7 +45,7 @@ func (s *storeSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *block.Rang
 	return nil
 }
 
-func (s *storeSnapshots) ContainsPartial(r *block.Range) bool {
+func (s *StoreSnapshots) ContainsPartial(r *block.Range) bool {
 	for _, file := range s.Partials {
 		if file.StartBlock == r.StartBlock && file.ExclusiveEndBlock == r.ExclusiveEndBlock {
 			return true
@@ -58,8 +59,8 @@ type Snapshot struct {
 	Path string
 }
 
-func listSnapshots(ctx context.Context, storeConfig *store.Config) (*storeSnapshots, error) {
-	out := &storeSnapshots{}
+func listSnapshots(ctx context.Context, storeConfig *store.Config) (*StoreSnapshots, error) {
+	out := &StoreSnapshots{}
 
 	files, err := storeConfig.ListSnapshotFiles(ctx)
 	if err != nil {

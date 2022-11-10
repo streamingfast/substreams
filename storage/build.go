@@ -1,10 +1,12 @@
-package storagestate
+package storage
 
 import (
 	"context"
 	"fmt"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
+	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 )
@@ -25,7 +27,7 @@ func buildMappersStorageState(ctx context.Context, mapModules []*pbsubstreams.Mo
 
 	for _, mod := range mapModules {
 		snapshot := "TODO: hmmm.. need a snapshot fetcher here!"
-		state, err := newMapStorageState(mod.Name, mod.InitialBlock, upToBlock, snapshot)
+		state, err := NewMapStorageState(mod.Name, mod.InitialBlock, upToBlock, snapshot)
 		if err != nil {
 			return fmt.Errorf("new map state: %w", err)
 		}
@@ -36,7 +38,7 @@ func buildMappersStorageState(ctx context.Context, mapModules []*pbsubstreams.Mo
 func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, upToBlock uint64, out ModuleStorageStateMap) error {
 	logger := reqctx.Logger(ctx)
 
-	state, err := fetchStoresState(ctx, storeConfigMap)
+	state, err := store2.FetchStoresState(ctx, storeConfigMap)
 	if err != nil {
 		return fmt.Errorf("fetching stores states: %w", err)
 	}
@@ -48,7 +50,7 @@ func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap
 			return fmt.Errorf("fatal: storage state not reported for module name %q", name)
 		}
 
-		moduleStorageState, err := newStoreStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
+		moduleStorageState, err := NewStoreStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
 		if err != nil {
 			return fmt.Errorf("new file units %q: %w", name, err)
 		}

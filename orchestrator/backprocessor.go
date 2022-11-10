@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
-	"github.com/streamingfast/substreams/orchestrator/storagestate"
+	"github.com/streamingfast/substreams/storage"
 
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
@@ -30,7 +30,7 @@ func BuildBackProcessor(
 	storeConfigs store.ConfigMap,
 	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Backprocessor, error) {
-	modulesStateMap, err := storagestate.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, outputGraph.RequestedMapModules(), runtimeConfig.ExecOutputSaveInterval, upToBlock)
+	modulesStateMap, err := storage.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, outputGraph.RequestedMapModules(), runtimeConfig.ExecOutputSaveInterval, upToBlock)
 	if err != nil {
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}

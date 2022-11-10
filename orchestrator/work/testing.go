@@ -1,9 +1,12 @@
 package work
 
 import (
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/orchestrator/storagestate"
 	"strings"
+
+	"github.com/streamingfast/substreams/storage/execoutput"
+
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage"
 )
 
 func TestJob(modName string, rng string, prio int) *Job {
@@ -20,16 +23,16 @@ func TestJobDeps(modName string, rng string, prio int, deps string) *Job {
 	return NewJob(modName, block.ParseRange(rng), strings.Split(deps, ","), prio)
 }
 
-func TestStoreState(modName string, rng string) storagestate.ModuleStorageState {
-	return &storagestate.StoreStorageState{ModuleName: modName, PartialsMissing: block.ParseRanges(rng)}
+func TestStoreState(modName string, rng string) storage.ModuleStorageState {
+	return &storage.StoreStorageState{ModuleName: modName, PartialsMissing: block.ParseRanges(rng)}
 }
 
-func TestMapState(modName string, rng string) storagestate.ModuleStorageState {
-	return &storagestate.MapperStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
+func TestMapState(modName string, rng string) storage.ModuleStorageState {
+	return &execoutput.MapperStorageState{ModuleName: modName, SegmentsMissing: block.ParseRanges(rng)}
 }
 
-func TestModStateMap(modStates ...storagestate.ModuleStorageState) (out storagestate.ModuleStorageStateMap) {
-	out = make(storagestate.ModuleStorageStateMap)
+func TestModStateMap(modStates ...storage.ModuleStorageState) (out storage.ModuleStorageStateMap) {
+	out = make(storage.ModuleStorageStateMap)
 	for _, mod := range modStates {
 		out[mod.Name()] = mod
 	}

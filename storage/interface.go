@@ -1,8 +1,9 @@
-package storagestate
+package storage
 
 import (
-	"github.com/streamingfast/substreams/block"
 	"sort"
+
+	"github.com/streamingfast/substreams/block"
 )
 
 type ModuleStorageState interface {

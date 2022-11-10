@@ -2,16 +2,17 @@ package work
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
-	"github.com/streamingfast/substreams/orchestrator/storagestate"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWorkPlanning(t *testing.T) {
@@ -19,7 +20,7 @@ func TestWorkPlanning(t *testing.T) {
 		name        string
 		upToBlock   uint64
 		subreqSplit int
-		state       storagestate.ModuleStorageStateMap
+		state       storage.ModuleStorageStateMap
 		outMods     string
 
 		expectWaitingJobs []*Job
@@ -143,7 +144,7 @@ func jobList(jobs []*Job) string {
 
 func TestPlan_MarkDependencyComplete(t *testing.T) {
 	type fields struct {
-		ModulesStateMap       storagestate.ModuleStorageStateMap
+		ModulesStateMap       storage.ModuleStorageStateMap
 		upToBlock             uint64
 		waitingJobs           []*Job
 		readyJobs             []*Job
@@ -370,7 +371,7 @@ func TestPlan_prioritize(t *testing.T) {
 
 func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 	type fields struct {
-		ModulesStateMap       storagestate.ModuleStorageStateMap
+		ModulesStateMap       storage.ModuleStorageStateMap
 		modulesReadyUpToBlock map[string]uint64
 	}
 	tests := []struct {
@@ -381,15 +382,15 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 		{
 			name: "no modules",
 			fields: fields{
-				ModulesStateMap: storagestate.ModuleStorageStateMap{},
+				ModulesStateMap: storage.ModuleStorageStateMap{},
 			},
 			expected: map[string]uint64{},
 		},
 		{
 			name: "one module,initial block",
 			fields: fields{
-				ModulesStateMap: storagestate.ModuleStorageStateMap{
-					"A": &storagestate.StoreStorageState{
+				ModulesStateMap: storage.ModuleStorageStateMap{
+					"A": &storage.StoreStorageState{
 						ModuleInitialBlock: 1,
 					},
 				},
@@ -401,9 +402,9 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 		{
 			name: "one module,complete range",
 			fields: fields{
-				ModulesStateMap: storagestate.ModuleStorageStateMap{
-					"A": &storagestate.StoreStorageState{
-						InitialCompleteRange: &storagestate.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
+				ModulesStateMap: storage.ModuleStorageStateMap{
+					"A": &storage.StoreStorageState{
+						InitialCompleteRange: &storage.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
 					},
 				},
 			},
@@ -414,11 +415,11 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 		{
 			name: "mixed modules",
 			fields: fields{
-				ModulesStateMap: storagestate.ModuleStorageStateMap{
-					"A": &storagestate.StoreStorageState{
-						InitialCompleteRange: &storagestate.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
+				ModulesStateMap: storage.ModuleStorageStateMap{
+					"A": &storage.StoreStorageState{
+						InitialCompleteRange: &storage.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
 					},
-					"B": &storagestate.StoreStorageState{
+					"B": &storage.StoreStorageState{
 						ModuleInitialBlock: 1,
 					},
 				},
@@ -589,7 +590,7 @@ func TestPlan_promoteWaitingJobs(t *testing.T) {
 func TestPlan_splitWorkIntoJobs(t *testing.T) {
 	t.Skip("not implemented")
 	type fields struct {
-		ModulesStateMap       storagestate.ModuleStorageStateMap
+		ModulesStateMap       storage.ModuleStorageStateMap
 		upToBlock             uint64
 		waitingJobs           []*Job
 		readyJobs             []*Job
@@ -626,11 +627,11 @@ func TestPlan_splitWorkIntoJobs(t *testing.T) {
 func TestPlan_initialProgressMessages(t *testing.T) {
 	tests := []struct {
 		name             string
-		modState         storagestate.ModuleStorageState
+		modState         storage.ModuleStorageState
 		expectedProgress string
 	}{
 		{
-			modState: &storagestate.StoreStorageState{
+			modState: &storage.StoreStorageState{
 				ModuleName:           "A",
 				InitialCompleteRange: block.ParseRange("1-10"),
 				PartialsPresent:      block.ParseRanges("20-30,40-50,50-60"),
@@ -638,21 +639,21 @@ func TestPlan_initialProgressMessages(t *testing.T) {
 			expectedProgress: "A:r1-10,20-30,40-60",
 		},
 		{
-			modState: &storagestate.StoreStorageState{
+			modState: &storage.StoreStorageState{
 				ModuleName:           "A",
 				InitialCompleteRange: block.ParseRange("1-10"),
 			},
 			expectedProgress: "A:r1-10",
 		},
 		{
-			modState: &storagestate.StoreStorageState{
+			modState: &storage.StoreStorageState{
 				ModuleName:      "A",
 				PartialsPresent: block.ParseRanges("10-20"),
 			},
 			expectedProgress: "A:r10-20",
 		},
 		{
-			modState: &storagestate.StoreStorageState{
+			modState: &storage.StoreStorageState{
 				ModuleName: "A",
 			},
 			expectedProgress: "",

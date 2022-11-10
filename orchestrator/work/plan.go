@@ -2,10 +2,11 @@ package work
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
-	"github.com/streamingfast/substreams/orchestrator/storagestate"
 	"sort"
 	"sync"
+
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
+	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -13,7 +14,7 @@ import (
 
 type Plan struct {
 	// ModulesStateMap
-	ModulesStateMap storagestate.ModuleStorageStateMap
+	ModulesStateMap storage.ModuleStorageStateMap
 
 	outputGraph *outputgraph.OutputModulesGraph
 
@@ -27,7 +28,7 @@ type Plan struct {
 	mu sync.Mutex
 }
 
-func BuildNewPlan(modulesStateMap storagestate.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputgraph.OutputModulesGraph) (*Plan, error) {
+func BuildNewPlan(modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputgraph.OutputModulesGraph) (*Plan, error) {
 	plan := &Plan{
 		ModulesStateMap: modulesStateMap,
 		upToBlock:       upToBlock,

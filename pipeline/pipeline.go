@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streamingfast/substreams/orchestrator/outputgraph"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
+	"github.com/streamingfast/substreams/orchestrator/outputgraph"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
@@ -280,8 +279,9 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		returnOutput()
 	}
 
-	p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
-
+	if output != nil {
+		p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
+	}
 	return nil
 }
 

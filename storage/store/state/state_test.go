@@ -14,7 +14,7 @@ func TestWorkUnits_init(t *testing.T) {
 		name string
 
 		modInitBlock uint64          // ModuleInitialBlock
-		snapshots    *StoreSnapshots // store's Last block saved from the store's Info file
+		snapshots    *storeSnapshots // store's Last block saved from the store's Info file
 		reqStart     uint64          // the request's absolute start block
 
 		expectInitLoad    *block.Range // Used for LoadFrom()
@@ -114,8 +114,8 @@ func TestWorkUnits_init(t *testing.T) {
 	}
 }
 
-func parseSnapshotSpec(in string) *StoreSnapshots {
-	out := &StoreSnapshots{}
+func parseSnapshotSpec(in string) *storeSnapshots {
+	out := &storeSnapshots{}
 	if in == "" {
 		return out
 	}

@@ -12,19 +12,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/storage/execout"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
+	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
@@ -319,7 +321,11 @@ func processRequest(
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
 	require.NoError(t, err)
 
-	storeConfigs, err := pipeline.InitializeStoreConfigs(outputGraph, runtimeConfig.BaseObjectStore)
+	execoutConfigMap, err := execout.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes())
+	require.NoError(t, err)
+	execoutConfigs := execout.NewConfigs(runtimeConfig.ExecOutputSaveInterval, execoutConfigMap)
+
+	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	require.NoError(t, err)
 
 	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, reqDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
@@ -328,6 +334,7 @@ func processRequest(
 		ctx,
 		outputGraph,
 		stores,
+		execoutConfigs,
 		wasm.NewRuntime(nil),
 		cachingEngine,
 		runtimeConfig,

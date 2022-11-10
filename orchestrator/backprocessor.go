@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
+
 	store2 "github.com/streamingfast/substreams/storage/store"
 
 	"github.com/streamingfast/substreams/storage"
 
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"

@@ -21,7 +21,7 @@ type StoreStorageState struct {
 type FullStoreFile = block.Range
 type PartialStoreFiles = block.Ranges
 
-func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *StoreSnapshots) (out *StoreStorageState, err error) {
+func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *storeSnapshots) (out *StoreStorageState, err error) {
 	out = &StoreStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
 	if workUpToBlockNum <= modInitBlock {
 		return

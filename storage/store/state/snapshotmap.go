@@ -15,7 +15,7 @@ import (
 // under `state`
 type storeSnapshotsMap struct {
 	sync.Mutex
-	Snapshots map[string]*StoreSnapshots
+	Snapshots map[string]*storeSnapshots
 }
 
 func (s *storeSnapshotsMap) String() string {
@@ -28,7 +28,7 @@ func (s *storeSnapshotsMap) String() string {
 
 func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap) (*storeSnapshotsMap, error) {
 	state := &storeSnapshotsMap{
-		Snapshots: map[string]*StoreSnapshots{},
+		Snapshots: map[string]*storeSnapshots{},
 	}
 
 	eg := llerrgroup.New(10)

@@ -6,11 +6,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
+
 	"github.com/streamingfast/substreams/storage/store/state"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage"
 	"github.com/stretchr/testify/assert"

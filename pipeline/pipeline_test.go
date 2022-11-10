@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
+
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
 

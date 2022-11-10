@@ -7,7 +7,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
+	"github.com/streamingfast/substreams/storage/store"
+
+	outputmodules2 "github.com/streamingfast/substreams/pipeline/outputmodules"
+
+	"github.com/streamingfast/substreams/storage/execout"
+
 	"github.com/streamingfast/substreams/pipeline/cache"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -146,11 +151,14 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 
-	if err := outputmodules.ValidateRequest(request, s.blockType); err != nil {
+	// TODO(abourget): this is fullllly duplicated with the `runnable_test.go`  initialization methods..
+	// DRY that up.. it's super risky.
+
+	if err := outputmodules2.ValidateRequest(request, s.blockType); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
-	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
+	outputGraph, err := outputmodules2.NewOutputModuleGraph(request)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
@@ -180,7 +188,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	storeConfigs, err := pipeline.InitializeStoreConfigs(outputGraph, s.runtimeConfig.BaseObjectStore)
+	execOutputConfigMap, err := execout.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes())
+	if err != nil {
+		return fmt.Errorf("new config map: %w", err)
+	}
+	execOutputConfigs := execout.NewConfigs(s.runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap)
+	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -192,6 +205,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		ctx,
 		outputGraph,
 		stores,
+		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
 		s.runtimeConfig,

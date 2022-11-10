@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
-	store2 "github.com/streamingfast/substreams/storage/store"
-
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
@@ -19,12 +16,12 @@ import (
 type Stores struct {
 	isSubRequest    bool
 	bounder         *storeBoundary
-	configs         store2.ConfigMap
-	StoreMap        store2.Map
+	configs         store.ConfigMap
+	StoreMap        store.Map
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 }
 
-func NewStores(storeConfigs store2.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
+func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
 	bounder := NewStoreBoundary(storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum)
 	return &Stores{
 		configs:      storeConfigs,
@@ -33,31 +30,13 @@ func NewStores(storeConfigs store2.ConfigMap, storeSnapshotSaveInterval, request
 	}
 }
 
-func (s *Stores) SetStoreMap(storeMap store2.Map) {
+func (s *Stores) SetStoreMap(storeMap store.Map) {
 	s.StoreMap = storeMap
 }
 
-func InitializeStoreConfigs(outputGraph *outputmodules.Graph, baseObjectStore dstore.Store) (out store2.ConfigMap, err error) {
-	out = make(store2.ConfigMap)
-	for _, storeModule := range outputGraph.Stores() {
-		c, err := store2.NewConfig(
-			storeModule.Name,
-			storeModule.InitialBlock,
-			outputGraph.ModuleHashes().Get(storeModule.Name),
-			storeModule.GetKindStore().UpdatePolicy,
-			storeModule.GetKindStore().ValueType,
-			baseObjectStore,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("new config for store %q: %w", storeModule.Name, err)
-		}
-		out[storeModule.Name] = c
-	}
-	return out, nil
-}
 func (s *Stores) resetStores() {
 	for _, s := range s.StoreMap.All() {
-		if resetableStore, ok := s.(store2.Resettable); ok {
+		if resetableStore, ok := s.(store.Resettable); ok {
 			resetableStore.Reset()
 		}
 	}
@@ -83,7 +62,7 @@ func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 }
 func (s *Stores) storesHandleUndo(moduleOutput *pbsubstreams.ModuleOutput) {
 	if s, found := s.StoreMap.Get(moduleOutput.Name); found {
-		if deltaStore, ok := s.(store2.DeltaAccessor); ok {
+		if deltaStore, ok := s.(store.DeltaAccessor); ok {
 			deltaStore.ApplyDeltasReverse(moduleOutput.GetDebugStoreDeltas().GetDeltas())
 		}
 	}
@@ -103,7 +82,7 @@ func (s *Stores) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) 
 	return nil
 }
 
-func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store2.Store, boundaryBlock uint64) (err error) {
+func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, boundaryBlock uint64) (err error) {
 	ctx, span := reqctx.WithSpan(ctx, "save_store_snapshot")
 	span.SetAttributes(attribute.String("store", saveStore.Name()))
 	defer span.EndWithErr(&err)
@@ -121,7 +100,7 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store2.Store, 
 		s.partialsWritten = append(s.partialsWritten, blockRange)
 		reqctx.Logger(ctx).Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", s.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
 
-		if v, ok := saveStore.(store2.PartialStore); ok {
+		if v, ok := saveStore.(store.PartialStore); ok {
 			reqctx.Span(ctx).AddEvent("store_roll_trigger")
 			v.Roll(boundaryBlock)
 		}

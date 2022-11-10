@@ -5,7 +5,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
+
 	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams"

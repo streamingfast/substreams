@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streamingfast/substreams/storage/store"
-
-	execout2 "github.com/streamingfast/substreams/storage/execout"
-
-	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
-	"github.com/streamingfast/substreams/orchestrator/outputmodules"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -52,13 +50,15 @@ type Pipeline struct {
 
 	forkHandler *ForkHandler
 
-	stores *Stores
+	stores         *Stores
+	execoutStorage *execout.Configs
 }
 
 func New(
 	ctx context.Context,
 	outputGraph *outputmodules.Graph,
 	stores *Stores,
+	execoutStorage *execout.Configs,
 	wasmRuntime *wasm.Runtime,
 	execOutputCache cache.CacheEngine,
 	runtimeConfig config.RuntimeConfig,
@@ -73,6 +73,7 @@ func New(
 		wasmRuntime:     wasmRuntime,
 		respFunc:        respFunc,
 		stores:          stores,
+		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
 	}
 	for _, opt := range opts {
@@ -214,7 +215,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 			return nil, fmt.Errorf("failed createing substore: %w", err)
 		}
 
-		requestedModuleCache := execout2.NewFile(requestedModule.Name, moduleStore, p.runtimeConfig.StoreSnapshotsSaveInterval, logger)
+		requestedModuleCache := execout.NewFile(requestedModule.Name, moduleStore, p.runtimeConfig.StoreSnapshotsSaveInterval, logger)
 		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, &p.runtimeConfig, logger)
 
 		backprocessor.SetOutputReader(outputReader)
@@ -259,7 +260,7 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 	return nil
 }
 
-func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout2.ExecutionOutput) (err error) {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
 
 	executor.ResetWASMInstance()

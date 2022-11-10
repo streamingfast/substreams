@@ -126,11 +126,13 @@ func searchMapModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
+	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, moduleHash, stateStore)
 	moduleStore, err := stateStore.SubStore(moduleHash + "/outputs")
 	if err != nil {
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
+	modStore.NewFile()
 	outputCache := execout.NewFile(module.Name, moduleStore, saveInterval, zlog)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)

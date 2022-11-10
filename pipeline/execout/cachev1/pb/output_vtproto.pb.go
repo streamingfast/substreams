@@ -2,7 +2,7 @@
 // protoc-gen-go-vtproto version: v0.3.0
 // source: output.proto
 
-package pboutput
+package pboutputcache
 
 import (
 	fmt "fmt"
@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-func (m *OutputData) MarshalVT() (dAtA []byte, err error) {
+func (m *Map) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -33,12 +33,12 @@ func (m *OutputData) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *OutputData) MarshalToVT(dAtA []byte) (int, error) {
+func (m *Map) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *OutputData) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *Map) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -75,7 +75,7 @@ func (m *OutputData) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *OutputDataTest) MarshalVT() (dAtA []byte, err error) {
+func (m *Array) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -88,12 +88,12 @@ func (m *OutputDataTest) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *OutputDataTest) MarshalToVT(dAtA []byte) (int, error) {
+func (m *Array) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *OutputDataTest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *Array) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -120,7 +120,7 @@ func (m *OutputDataTest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *CacheItem) MarshalVT() (dAtA []byte, err error) {
+func (m *Item) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -133,12 +133,12 @@ func (m *CacheItem) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *CacheItem) MarshalToVT(dAtA []byte) (int, error) {
+func (m *Item) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *CacheItem) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *Item) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -212,7 +212,7 @@ func encodeVarint(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *OutputData) SizeVT() (n int) {
+func (m *Map) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -237,7 +237,7 @@ func (m *OutputData) SizeVT() (n int) {
 	return n
 }
 
-func (m *OutputDataTest) SizeVT() (n int) {
+func (m *Array) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -255,7 +255,7 @@ func (m *OutputDataTest) SizeVT() (n int) {
 	return n
 }
 
-func (m *CacheItem) SizeVT() (n int) {
+func (m *Item) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -298,7 +298,7 @@ func sov(x uint64) (n int) {
 func soz(x uint64) (n int) {
 	return sov(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *OutputData) UnmarshalVT(dAtA []byte) error {
+func (m *Map) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -321,10 +321,10 @@ func (m *OutputData) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: OutputData: wiretype end group for non-group")
+			return fmt.Errorf("proto: Map: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: OutputData: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: Map: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -357,10 +357,10 @@ func (m *OutputData) UnmarshalVT(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Kv == nil {
-				m.Kv = make(map[string]*CacheItem)
+				m.Kv = make(map[string]*Item)
 			}
 			var mapkey string
-			var mapvalue *CacheItem
+			var mapvalue *Item
 			for iNdEx < postIndex {
 				entryPreIndex := iNdEx
 				var wire uint64
@@ -434,7 +434,7 @@ func (m *OutputData) UnmarshalVT(dAtA []byte) error {
 					if postmsgIndex > l {
 						return io.ErrUnexpectedEOF
 					}
-					mapvalue = &CacheItem{}
+					mapvalue = &Item{}
 					if err := mapvalue.UnmarshalVT(dAtA[iNdEx:postmsgIndex]); err != nil {
 						return err
 					}
@@ -478,7 +478,7 @@ func (m *OutputData) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *OutputDataTest) UnmarshalVT(dAtA []byte) error {
+func (m *Array) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -501,10 +501,10 @@ func (m *OutputDataTest) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: OutputDataTest: wiretype end group for non-group")
+			return fmt.Errorf("proto: Array: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: OutputDataTest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: Array: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -536,7 +536,7 @@ func (m *OutputDataTest) UnmarshalVT(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Items = append(m.Items, &CacheItem{})
+			m.Items = append(m.Items, &Item{})
 			if err := m.Items[len(m.Items)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -563,8 +563,7 @@ func (m *OutputDataTest) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-
-func (m *CacheItem) UnmarshalVT(dAtA []byte) error {
+func (m *Item) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -587,10 +586,10 @@ func (m *CacheItem) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: CacheItem: wiretype end group for non-group")
+			return fmt.Errorf("proto: Item: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: CacheItem: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: Item: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -752,7 +751,6 @@ func (m *CacheItem) UnmarshalVT(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-
 			m.Cursor = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
@@ -777,7 +775,6 @@ func (m *CacheItem) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-
 func skip(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0

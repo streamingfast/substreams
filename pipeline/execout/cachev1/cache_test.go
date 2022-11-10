@@ -62,13 +62,13 @@ func TestOutputCache_listContinuousCacheRanges(t *testing.T) {
 func TestOutputCache_Delete(t *testing.T) {
 	testCases := []struct {
 		name         string
-		kv           map[string]*pboutput.CacheItem
+		kv           map[string]*pboutput.Item
 		keysToDelete []string
-		expectedKv   map[string]*pboutput.CacheItem
+		expectedKv   map[string]*pboutput.Item
 	}{
 		{
 			name: "delete one block id from output cache",
-			kv: map[string]*pboutput.CacheItem{
+			kv: map[string]*pboutput.Item{
 				"1": {
 					BlockNum: 1,
 				},
@@ -77,7 +77,7 @@ func TestOutputCache_Delete(t *testing.T) {
 				},
 			},
 			keysToDelete: []string{"2"},
-			expectedKv: map[string]*pboutput.CacheItem{
+			expectedKv: map[string]*pboutput.Item{
 				"1": {
 					BlockNum: 1,
 				},
@@ -85,7 +85,7 @@ func TestOutputCache_Delete(t *testing.T) {
 		},
 		{
 			name: "delete two block ids from output cache",
-			kv: map[string]*pboutput.CacheItem{
+			kv: map[string]*pboutput.Item{
 				"1": {
 					BlockNum: 1,
 				},
@@ -100,7 +100,7 @@ func TestOutputCache_Delete(t *testing.T) {
 				},
 			},
 			keysToDelete: []string{"1", "2"},
-			expectedKv: map[string]*pboutput.CacheItem{
+			expectedKv: map[string]*pboutput.Item{
 				"3": {
 					BlockNum: 3,
 				},
@@ -114,7 +114,7 @@ func TestOutputCache_Delete(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			outputCache := NewOutputCache("module1", nil, 10, zlog, &sync.WaitGroup{})
-			outputCache.outputData = &pboutput.OutputData{
+			outputCache.outputData = &pboutput.Map{
 				Kv: test.kv,
 			}
 			for _, key := range test.keysToDelete {

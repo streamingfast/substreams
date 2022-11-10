@@ -37,37 +37,13 @@ source $HOME/.cargo/env # to configure your current shell
 
 ### Buf Installation
 
-Buf simplifies the generation of typed structures in any language. Buf also invokes `protoc` and simplifies the process of working with Substreams.&#x20;
+Buf simplifies the generation of typed structures in any language. Buf works with remote builder executed on Buf server, so an internet connection is required when generating Rust bindings from Protobuf definitions.&#x20;
 
 Visit the [Buf website](https://buf.build/) for additional information and [installation instructions](https://docs.buf.build/installation).
 
 {% hint style="info" %}
 **Note**_:_ [_Substreams packages_](../reference-and-specs/packages.md) _are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
 {% endhint %}
-
-### `protoc-gen-prost` Installation
-
-``[`protoc-gen-prost`](https://crates.io/crates/protoc-gen-prost) is a `protoc` plugin that generates code using the [Prost!](https://github.com/tokio-rs/prost) code generation engine.
-
-Substreams developers use `protoc-gen-prost` to generate protobuf files.&#x20;
-
-After completing the Rust installation, install `protoc-gen-prost` through `cargo` using the following command.
-
-```bash
-$ cargo install protoc-gen-prost
-```
-
-## Linux Specific Tools
-
-Linux-based machines require CMake and `build-essential` to install the `protoc-gen-prost` cargo crate.
-
-#### CMake
-
-Find additional information and installation instructions for CMake on the official  [Installing CMake page](https://cmake.org/install/).
-
-#### Build Essential
-
-Find additional information and installation instructions for `build-essential` on the official [Build Essential Package page](https://itsfoss.com/build-essential-ubuntu/).
 
 ## Cloud-based environment with Gitpod
 

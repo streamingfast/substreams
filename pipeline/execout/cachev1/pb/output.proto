@@ -1,19 +1,19 @@
 syntax = "proto3";
 
-package sf.substreams.store.v1;
+package sf.substreams.internal.outputcache.v1;
 
-option go_package = "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb;pboutput";
+option go_package = "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb;pboutputcache";
 import "google/protobuf/timestamp.proto";
 
-message OutputData {
-  map<string, CacheItem> kv = 1;
+message Map {
+  map<string, Item> kv = 1;
 }
 
-message OutputDataTest {
-    repeated CacheItem items = 1;
+message Array {
+    repeated Item items = 1;
 }
 
-message CacheItem {
+message Item {
     uint64 block_num = 1;
     string block_id = 2;
     bytes payload = 3;

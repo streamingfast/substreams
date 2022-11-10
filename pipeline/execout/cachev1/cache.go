@@ -28,7 +28,7 @@ type OutputCache struct {
 	wg                *sync.WaitGroup
 	moduleName        string
 	currentBlockRange *block.Range
-	outputData        *pboutput.OutputData
+	outputData        *pboutput.Map
 	store             dstore.Store
 	saveBlockInterval uint64
 	logger            *zap.Logger
@@ -50,7 +50,7 @@ func (c *OutputCache) currentFilename() string {
 	return ComputeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
 }
 
-func (c *OutputCache) SortedCacheItems() (out []*pboutput.CacheItem) {
+func (c *OutputCache) SortedCacheItems() (out []*pboutput.Item) {
 	for _, item := range c.outputData.Kv {
 		out = append(out, item)
 	}
@@ -79,7 +79,7 @@ func (c *OutputCache) Set(clock *pbsubstreams.Clock, cursor string, data []byte)
 	cp := make([]byte, len(data))
 	copy(cp, data)
 
-	ci := &pboutput.CacheItem{
+	ci := &pboutput.Item{
 		BlockNum:  clock.Number,
 		BlockId:   clock.Id,
 		Timestamp: clock.Timestamp,
@@ -121,8 +121,8 @@ func (c *OutputCache) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
 	c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
 
-	c.outputData = &pboutput.OutputData{
-		Kv: make(map[string]*pboutput.CacheItem),
+	c.outputData = &pboutput.Map{
+		Kv: make(map[string]*pboutput.Item),
 	}
 
 	blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
@@ -148,7 +148,7 @@ func (c *OutputCache) LoadAtBlock(ctx context.Context, atBlock uint64) (found bo
 }
 func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 	c.logger.Debug("loading cache", zap.Object("range", blockRange))
-	c.outputData.Kv = make(map[string]*pboutput.CacheItem)
+	c.outputData.Kv = make(map[string]*pboutput.Item)
 
 	filename := ComputeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
 	c.logger.Debug("loading outputs data", zap.String("file_name", filename), zap.Object("block_range", blockRange))
@@ -165,7 +165,7 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 			return fmt.Errorf("reading store file %s: %w", filename, err)
 		}
 
-		if err = c.outputData.UnmarshalVTNoAlloc(bytes); err != nil {
+		if err = c.outputData.UnmarshalFast(bytes); err != nil {
 			return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 		}
 
@@ -183,7 +183,7 @@ func (c *OutputCache) Load(ctx context.Context, blockRange *block.Range) error {
 func (c *OutputCache) save(ctx context.Context, filename string) error {
 	c.logger.Info("saving cache", zap.Stringer("block_range", c.currentBlockRange), zap.String("filename", filename))
 
-	cnt, err := c.outputData.MarshalVT()
+	cnt, err := c.outputData.MarshalFast()
 	if err != nil {
 		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 	}

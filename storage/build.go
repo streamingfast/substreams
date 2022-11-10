@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/storage/execoutput"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
@@ -27,7 +28,7 @@ func buildMappersStorageState(ctx context.Context, mapModules []*pbsubstreams.Mo
 
 	for _, mod := range mapModules {
 		snapshot := "TODO: hmmm.. need a snapshot fetcher here!"
-		state, err := NewMapStorageState(mod.Name, mod.InitialBlock, upToBlock, snapshot)
+		state, err := execoutput.NewExecOutputStorageState(mod.Name, mod.InitialBlock, upToBlock, snapshot)
 		if err != nil {
 			return fmt.Errorf("new map state: %w", err)
 		}

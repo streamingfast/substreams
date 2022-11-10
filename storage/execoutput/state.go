@@ -17,9 +17,9 @@ func (m ExecOutputStorageState) BatchRequests(subreqSplitSize uint64) block.Rang
 	return m.SegmentsMissing.MergedBuckets(subreqSplitSize)
 }
 
-func NewMapStorageState(modName string, modInitBlock, workUpToBlockNum uint64, snapshots string) (out *execoutput.MapperStorageState, err error) {
+func NewExecOutputStorageState(modName string, modInitBlock, workUpToBlockNum uint64, snapshots string) (out *ExecOutputStorageState, err error) {
 	// TODO: base the content of Mapper on the `snapshots` in here..
-	return &execoutput.MapperStorageState{
+	return &ExecOutputStorageState{
 		ModuleName: modName,
 	}, nil
 }

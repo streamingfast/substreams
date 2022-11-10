@@ -6,7 +6,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/execout"
 )
 
-type ExecOutputCache struct {
+type CursoredCache struct {
 	*execout.ExecOutputMap
 
 	engine *Engine
@@ -14,7 +14,7 @@ type ExecOutputCache struct {
 }
 
 // assert_test_store_delete_prefix
-func (e *ExecOutputCache) Get(moduleName string) (value []byte, cached bool, err error) {
+func (e *CursoredCache) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, _, err := e.ExecOutputMap.Get(moduleName)
 	if err != nil && err != execout.NotFound {
 		return nil, false, fmt.Errorf("get from memory: %w", err)
@@ -34,7 +34,7 @@ func (e *ExecOutputCache) Get(moduleName string) (value []byte, cached bool, err
 	return nil, false, execout.NotFound
 }
 
-func (e *ExecOutputCache) Set(moduleName string, value []byte) (err error) {
+func (e *CursoredCache) Set(moduleName string, value []byte) (err error) {
 	if err := e.ExecOutputMap.Set(moduleName, value); err != nil {
 		return err
 	}

@@ -93,7 +93,7 @@ func (e *Engine) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, 
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}
 
-	return &ExecOutputCache{
+	return &CursoredCache{
 		ExecOutputMap: execOutMap,
 		engine:        e,
 		cursor:        cursor,
@@ -120,6 +120,8 @@ func (e *Engine) undoCaches(blockRef bstream.BlockRef) error {
 	return nil
 }
 
+// TODO(abourget): this needs to be extracted, and return something like
+// the `store.ConfigMap`, but for the `execoutput` COnfigMap
 func (e *Engine) registerCache(moduleName, moduleHash string) error {
 	e.logger.Debug("registering modules", zap.String("module_name", moduleName))
 

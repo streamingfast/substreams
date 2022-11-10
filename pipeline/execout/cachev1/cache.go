@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// TODO(abourget): rename to `Item` ?
 type CacheItem struct {
 	BlockNum  uint64                 `json:"block_num"`
 	BlockID   string                 `json:"block_id"`
@@ -45,6 +46,7 @@ type OutputCache struct {
 	initialized bool
 }
 
+// TODO(abourget): rename to Open
 func NewOutputCache(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *OutputCache {
 	return &OutputCache{
 		wg:                &sync.WaitGroup{},

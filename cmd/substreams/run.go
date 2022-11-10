@@ -19,8 +19,8 @@ func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	runCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
+	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
-
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
@@ -87,6 +87,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	req := &pbsubstreams.Request{
 		StartBlockNum: startBlock,
+		StartCursor:   mustGetString(cmd, "cursor"),
 		StopBlockNum:  stopBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:       pkg.Modules,

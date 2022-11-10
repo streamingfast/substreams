@@ -6,14 +6,13 @@ import (
 	"strings"
 
 	"github.com/streamingfast/substreams/orchestrator/outputmodules"
-	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/execout"
+	"github.com/streamingfast/substreams/pipeline/execout/cachev1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/store"
@@ -189,7 +188,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	backprocessor, err := orchestrator.BuildBackProcessor(
 		p.ctx,
 		p.runtimeConfig,
-		reqDetails.LiveHandoffBlockNum,
+		reqDetails.LinearHandoffBlockNum,
 		p.outputGraph,
 		p.respFunc,
 		p.stores.configs,
@@ -202,7 +201,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	// TODO(abourget): move this to `BuildBackProcessor()`, launch a goroutine in `Run()` like the comments
 	// say, and block on the `backprocessor.Run()` like we did before.
 	// No need to have the two be split.
-	if reqDetails.LiveHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
+	if reqDetails.LinearHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
 		requestedModule := p.outputGraph.RequestedMapModules()[0] //todo: validate only one requested module
 		//todo: find a better way to get the requestedModuleCache object
 		moduleHash := p.outputGraph.ModuleHashes().Get(requestedModule.Name)
@@ -213,7 +212,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 		}
 
 		requestedModuleCache := cachev1.NewOutputCache(requestedModule.Name, moduleStore, p.runtimeConfig.StoreSnapshotsSaveInterval, logger)
-		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LiveHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, &p.runtimeConfig, logger)
+		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, &p.runtimeConfig, logger)
 
 		backprocessor.SetOutputReader(outputReader)
 	}
@@ -280,8 +279,9 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		returnOutput()
 	}
 
-	p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
-
+	if output != nil {
+		p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
+	}
 	return nil
 }
 

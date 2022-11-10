@@ -67,13 +67,8 @@ func BuildBackProcessor(
 }
 
 func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error) {
-
-	readerDone := make(chan struct{})
 	if b.execOutputReader != nil {
-		go func() {
-			err = b.execOutputReader.Run(ctx)
-			close(readerDone)
-		}()
+		b.execOutputReader.Launch(ctx)
 	}
 	b.squasher.Launch(ctx)
 
@@ -88,7 +83,7 @@ func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error)
 
 	if b.execOutputReader != nil {
 		select {
-		case <-readerDone:
+		case <-b.execOutputReader.Terminated():
 		case <-ctx.Done():
 		}
 	}

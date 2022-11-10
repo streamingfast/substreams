@@ -7,9 +7,10 @@ package pipeline
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/streamingfast/bstream"
 
@@ -151,7 +152,7 @@ func TestBuildRequestDetails(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
-	assert.Equal(t, 10, int(req.LiveHandoffBlockNum))
+	assert.Equal(t, 10, int(req.LinearHandoffBlockNum))
 
 	req, err = BuildRequestDetails(&pbsubstreams.Request{
 		StartBlockNum:  10,
@@ -161,5 +162,5 @@ func TestBuildRequestDetails(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
-	assert.Equal(t, 999, int(req.LiveHandoffBlockNum))
+	assert.Equal(t, 999, int(req.LinearHandoffBlockNum))
 }

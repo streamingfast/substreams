@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/streamingfast/substreams/manifest"
+
+	"github.com/streamingfast/substreams/orchestrator/work"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
-	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
@@ -171,29 +170,18 @@ func runTest(
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	t.Skip("Skipping until we can figure out why this is failing")
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	//var dum []byte
-	//var data [100_000_000]byte
-	eg := errgroup.Group{}
-	for k := 0; k < 2; k++ {
-
-		eg.Go(func() error {
-			_, err := runTest(t, nil, 100, 120, []string{"test_store_proto"}, 10, 1, newBlockGenerator, nil)
-			require.NoError(t, err)
-			runtime.GC()
-			runtime.GC()
-			return nil
-		})
-	}
-	err := eg.Wait()
-	fmt.Println("done")
+	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_map"}, 10, 1, newBlockGenerator, nil)
 	require.NoError(t, err)
+	require.Equal(t, []string{
+		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
+		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
+	}, moduleOutputs)
 }
 
 //todo:

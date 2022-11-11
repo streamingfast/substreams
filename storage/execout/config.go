@@ -1,8 +1,12 @@
 package execout
 
 import (
+	"context"
 	"fmt"
 	"sync"
+
+	"github.com/streamingfast/derr"
+	"github.com/streamingfast/substreams/block"
 
 	"go.uber.org/zap"
 
@@ -38,4 +42,26 @@ func (conf *Config) NewFile(saveBlockInterval uint64, logger *zap.Logger) *File 
 		saveBlockInterval: saveBlockInterval,
 		logger:            logger.Named("cache").With(zap.String("module_name", conf.name)),
 	}
+}
+
+type ExecOutputFiles = block.Ranges
+
+func (c *Config) ListSnapshotFiles(ctx context.Context) (files ExecOutputFiles, err error) {
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		if err := c.store.Walk(ctx, "", func(filename string) (err error) {
+			fileInfo, ok := parseFileName(filename)
+			if !ok {
+				return nil
+			}
+			files = append(files, fileInfo)
+			return nil
+		}); err != nil {
+			return fmt.Errorf("walking snapshots: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
 }

@@ -29,30 +29,29 @@ type ModuleOutputData interface {
 
 func ValidateRequest(req *Request) error {
 	outMods := map[string]bool{}
+	allMods := map[string]bool{}
 	seenStores := map[string]bool{}
 	for _, mod := range req.Modules.Modules {
-		outMods[mod.Name] = true
+		allMods[mod.Name] = true
 		if _, ok := mod.Kind.(*Module_KindStore_); ok {
 			seenStores[mod.Name] = true
 		}
 	}
 	for _, outMod := range req.OutputModules {
-		if !outMods[outMod] {
+		outMods[outMod] = true
+		if !allMods[outMod] {
 			return fmt.Errorf("output module %q requested but not defined modules graph", outMod)
 		}
 	}
 
 	for _, outMod := range req.InitialStoreSnapshotForModules {
 		if !seenStores[outMod] {
-			if outMods[outMod] {
-				return fmt.Errorf("initial store snapshots for modules: %q: not a 'store' module", outMod)
-			}
-			return fmt.Errorf("initial store snapshots for module: %q: not defined modules graph", outMod)
+			return fmt.Errorf("initial store snapshots for module: %q: no such 'store' module defined modules graph", outMod)
 		}
 	}
 
 	if req.ProductionMode {
-		if err := validateProductionMode(req, outMods); err != nil {
+		if err := validateProductionMode(req); err != nil {
 			return fmt.Errorf("production_mode: %w", err)
 		}
 	}
@@ -60,7 +59,7 @@ func ValidateRequest(req *Request) error {
 	return nil
 }
 
-func validateProductionMode(req *Request, outMods map[string]bool) error {
+func validateProductionMode(req *Request) error {
 	if len(req.OutputModules) != 1 {
 		return fmt.Errorf("output_modules need to be a single map module")
 	}

@@ -46,7 +46,7 @@ type Pipeline struct {
 
 	backprocessingStores []*backprocessingStore
 
-	execOutputCache cache.CacheEngine
+	execOutputCache *cache.Engine
 
 	forkHandler *ForkHandler
 
@@ -60,7 +60,7 @@ func New(
 	stores *Stores,
 	execoutStorage *execout.Configs,
 	wasmRuntime *wasm.Runtime,
-	execOutputCache cache.CacheEngine,
+	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc func(resp *pbsubstreams.Response) error,
 	opts ...Option,
@@ -99,7 +99,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
 	logger.Info("initializing exec output cache")
-	if err := p.execOutputCache.Init(p.outputGraph.ModuleHashes()); err != nil {
+	if err := p.execOutputCache.Init(p.execoutStorage); err != nil {
 		return fmt.Errorf("failed to prime caching engine: %w", err)
 	}
 
@@ -206,18 +206,9 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	// say, and block on the `backprocessor.Run()` like we did before.
 	// No need to have the two be split.
 	if reqDetails.LinearHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
-		requestedModule := p.outputGraph.RequestedMapModules()[0] //todo: validate only one requested module
-		//todo: find a better way to get the requestedModuleCache object
-		moduleHash := p.outputGraph.ModuleHashes().Get(requestedModule.Name)
-		logger.Info("creating sub store", zap.String("module", requestedModule.Name), zap.String("hash", moduleHash))
-		moduleStore, err := p.runtimeConfig.BaseObjectStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
-		if err != nil {
-			return nil, fmt.Errorf("failed createing substore: %w", err)
-		}
-
-		requestedModuleCache := execout.NewFile(requestedModule.Name, moduleStore, p.runtimeConfig.StoreSnapshotsSaveInterval, logger)
-		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, &p.runtimeConfig, logger)
-
+		requestedModule := p.outputGraph.RequestedMapModules()[0]
+		requestedModuleCache := p.execoutStorage.NewFile(requestedModule.Name, logger)
+		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, p.runtimeConfig, logger)
 		backprocessor.SetOutputReader(outputReader)
 	}
 

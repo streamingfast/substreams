@@ -178,11 +178,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	execOutputCacheEngine, err := cache.NewEngine(s.runtimeConfig, s.blockType, reqctx.Logger(ctx))
-	if err != nil {
-		return fmt.Errorf("error building caching engine: %w", err)
-	}
-
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
 	execOutputConfigMap, err := execout.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes())
@@ -195,6 +190,11 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
+
+	execOutputCacheEngine, err := cache.NewEngine(s.runtimeConfig, execOutputConfigs, s.blockType, reqctx.Logger(ctx))
+	if err != nil {
+		return fmt.Errorf("error building caching engine: %w", err)
+	}
 
 	opts := s.buildPipelineOptions(ctx, request)
 	pipe := pipeline.New(

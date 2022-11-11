@@ -23,12 +23,12 @@ type LinearExecOutputReader struct {
 	responseFunc      substreams.ResponseFunc
 	logger            *zap.Logger
 	cfg               config.RuntimeConfig
-	runtimeConfig     *config.RuntimeConfig
+	runtimeConfig     config.RuntimeConfig
 	module            *pbsubstreams.Module
 	cache             *execout.File
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *execout.File, responseFunc substreams.ResponseFunc, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *LinearExecOutputReader {
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *execout.File, responseFunc substreams.ResponseFunc, runtimeConfig config.RuntimeConfig, logger *zap.Logger) *LinearExecOutputReader {
 	logger = logger.With(zap.String("component", "downloader"))
 	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
 	return &LinearExecOutputReader{

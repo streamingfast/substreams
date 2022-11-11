@@ -3,6 +3,8 @@ package execout
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -18,6 +20,18 @@ func NewConfigs(execOutputSaveInterval uint64, confMap map[string]*Config) *Conf
 		execOutputSaveInterval: execOutputSaveInterval,
 		configMap:              confMap,
 	}
+}
+
+func (c *Configs) NewFiles(logger *zap.Logger) map[string]*File {
+	out := make(map[string]*File)
+	for modName, config := range c.configMap {
+		out[modName] = config.NewFile(c.execOutputSaveInterval, logger)
+	}
+	return out
+}
+
+func (c *Configs) NewFile(moduleName string, logger *zap.Logger) *File {
+	return c.configMap[moduleName].NewFile(c.execOutputSaveInterval, logger)
 }
 
 func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes) (out map[string]*Config, err error) {

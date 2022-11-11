@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -20,23 +19,15 @@ type Engine struct {
 	logger        *zap.Logger
 }
 
-func NewEngine(runtimeConfig config.RuntimeConfig, blockType string, logger *zap.Logger) (CacheEngine, error) {
+func NewEngine(runtimeConfig config.RuntimeConfig, execoutConfigs *execout.Configs, blockType string, logger *zap.Logger) (*Engine, error) {
 	e := &Engine{
 		ctx:           context.Background(),
 		runtimeConfig: runtimeConfig,
-		caches:        make(map[string]*execout.File),
+		caches:        execoutConfigs.NewFiles(logger),
 		logger:        logger,
 		blockType:     blockType,
 	}
 	return e, nil
-}
-func (e *Engine) Init(modules *manifest.ModuleHashes) error {
-	return modules.Iter(func(hash, name string) error {
-		if err := e.registerCache(name, hash); err != nil {
-			return fmt.Errorf("failed to register chache for module %q: %w", name, err)
-		}
-		return nil
-	})
 }
 
 func (e *Engine) EndOfStream(isSubrequest bool, outputModules map[string]bool) error {
@@ -110,25 +101,6 @@ func (e *Engine) undoCaches(blockRef bstream.BlockRef) error {
 	for _, cache := range e.caches {
 		cache.Delete(blockRef.ID())
 	}
-	return nil
-}
-
-// TODO(abourget): this needs to be extracted, and return something like
-// the `store.ConfigMap`, but for the `execoutput` COnfigMap
-func (e *Engine) registerCache(moduleName, moduleHash string) error {
-	e.logger.Debug("registering modules", zap.String("module_name", moduleName))
-
-	if _, found := e.caches[moduleName]; found {
-		return fmt.Errorf("cache alreayd registered: %q", moduleName)
-	}
-
-	moduleStore, err := e.runtimeConfig.BaseObjectStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
-	if err != nil {
-		return fmt.Errorf("failed createing substore: %w", err)
-	}
-
-	e.caches[moduleName] = execout.NewFile(moduleName, moduleStore, e.runtimeConfig.StoreSnapshotsSaveInterval, e.logger)
-
 	return nil
 }
 

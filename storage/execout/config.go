@@ -2,6 +2,9 @@ package execout
 
 import (
 	"fmt"
+	"sync"
+
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/dstore"
 )
@@ -25,4 +28,14 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseSt
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 	}, nil
+}
+
+func (conf *Config) NewFile(saveBlockInterval uint64, logger *zap.Logger) *File {
+	return &File{
+		wg:                &sync.WaitGroup{},
+		ModuleName:        conf.name,
+		store:             conf.store,
+		saveBlockInterval: saveBlockInterval,
+		logger:            logger.Named("cache").With(zap.String("module_name", conf.name)),
+	}
 }

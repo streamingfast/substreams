@@ -29,6 +29,9 @@ func init() {
 	stateFilenameRegexp = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
 }
 
+// TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
+// more than that.
+
 type File struct {
 	sync.RWMutex
 
@@ -41,19 +44,6 @@ type File struct {
 	logger            *zap.Logger
 
 	initialized bool
-}
-
-// TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
-// more than that.
-
-func NewFile(moduleName string, store dstore.Store, saveBlockInterval uint64, logger *zap.Logger) *File {
-	return &File{
-		wg:                &sync.WaitGroup{},
-		ModuleName:        moduleName,
-		store:             store,
-		saveBlockInterval: saveBlockInterval,
-		logger:            logger.Named("cache").With(zap.String("module_name", moduleName)),
-	}
 }
 
 func (c *File) currentFilename() string {

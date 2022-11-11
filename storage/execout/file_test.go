@@ -113,7 +113,7 @@ func TestOutputCache_Delete(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			outputCache := NewFile("module1", nil, 10, zlog)
+			outputCache := &File{ModuleName: "module1", saveBlockInterval: 10, logger: zlog}
 			outputCache.outputData = &pboutput.Map{
 				Kv: test.kv,
 			}

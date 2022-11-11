@@ -11,39 +11,37 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/service/config"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type LinearExecOutputReader struct {
 	*shutter.Shutter
-	startBlock        uint64
-	exclusiveEndBlock uint64
-	responseFunc      substreams.ResponseFunc
-	logger            *zap.Logger
-	cfg               config.RuntimeConfig
-	runtimeConfig     config.RuntimeConfig
-	module            *pbsubstreams.Module
-	cache             *execout.File
+	startBlock             uint64
+	exclusiveEndBlock      uint64
+	responseFunc           substreams.ResponseFunc
+	logger                 *zap.Logger
+	execOutputSaveInterval uint64
+	module                 *pbsubstreams.Module
+	cache                  *execout.File
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *execout.File, responseFunc substreams.ResponseFunc, runtimeConfig config.RuntimeConfig, logger *zap.Logger) *LinearExecOutputReader {
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64, logger *zap.Logger) *LinearExecOutputReader {
 	logger = logger.With(zap.String("component", "downloader"))
 	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
 	return &LinearExecOutputReader{
-		startBlock:        startBlock,
-		exclusiveEndBlock: exclusiveEndBlock,
-		module:            module,
-		cache:             cache,
-		responseFunc:      responseFunc,
-		runtimeConfig:     runtimeConfig,
-		logger:            logger,
+		startBlock:             startBlock,
+		exclusiveEndBlock:      exclusiveEndBlock,
+		module:                 module,
+		cache:                  cache,
+		responseFunc:           responseFunc,
+		execOutputSaveInterval: execOutputSaveInterval,
+		logger:                 logger,
 	}
 }
 
 func (r *LinearExecOutputReader) Launch(ctx context.Context) {
-	stream := NewCachedItemStream(r.startBlock, r.module, r.cache, r.runtimeConfig, r.logger)
+	stream := NewCachedItemStream(r.startBlock, r.module, r.cache, r.execOutputSaveInterval, r.logger)
 	r.OnTerminating(func(err error) {
 		stream.Shutdown(err)
 	})
@@ -79,22 +77,21 @@ func (r *LinearExecOutputReader) run(ctx context.Context, stream *CachedItemStre
 
 type CachedItemStream struct {
 	*shutter.Shutter
-	module            *pbsubstreams.Module
-	cache             *execout.File
-	requestStartBlock uint64
-	logger            *zap.Logger
-	runtimeConfig     *config.RuntimeConfig
-	cacheItems        chan *pboutput.Item
+	module                 *pbsubstreams.Module
+	cache                  *execout.File
+	requestStartBlock      uint64
+	logger                 *zap.Logger
+	execOutputSaveInterval uint64
+	cacheItems             chan *pboutput.Item
 }
 
-func NewCachedItemStream(requestStartBlock uint64, module *pbsubstreams.Module, cache *execout.File, runtimeConfig *config.RuntimeConfig, logger *zap.Logger) *CachedItemStream {
+func NewCachedItemStream(requestStartBlock uint64, module *pbsubstreams.Module, cache *execout.File, execOutputSaveInterval uint64, logger *zap.Logger) *CachedItemStream {
 	return &CachedItemStream{
 		requestStartBlock: requestStartBlock,
 		module:            module,
 		cache:             cache,
 		logger:            logger,
-		runtimeConfig:     runtimeConfig,
-		cacheItems:        make(chan *pboutput.Item, runtimeConfig.ExecOutputSaveInterval*2),
+		cacheItems:        make(chan *pboutput.Item, execOutputSaveInterval*2),
 	}
 }
 
@@ -116,7 +113,7 @@ func (s *CachedItemStream) next(ctx context.Context) (*pboutput.Item, error) {
 }
 
 func (s *CachedItemStream) run(ctx context.Context) error {
-	nextCachedBlockNum := s.requestStartBlock - (s.requestStartBlock % s.runtimeConfig.ExecOutputSaveInterval)
+	nextCachedBlockNum := s.requestStartBlock - (s.requestStartBlock % s.execOutputSaveInterval)
 	for {
 		sortedCachedItems, err := s.sortedCacheItems(ctx, nextCachedBlockNum)
 		if err != nil {
@@ -127,7 +124,7 @@ func (s *CachedItemStream) run(ctx context.Context) error {
 			return nil
 		}
 
-		nextCachedBlockNum += s.runtimeConfig.ExecOutputSaveInterval
+		nextCachedBlockNum += s.execOutputSaveInterval
 		for _, cachedItem := range sortedCachedItems {
 			select {
 			case s.cacheItems <- cachedItem:

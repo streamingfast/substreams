@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -247,9 +246,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 		return err
 	}
 
-	if closer, ok := execOutputCacheEngine.(io.Closer); ok {
-		closer.Close()
-	}
+	execOutputCacheEngine.Close()
 
 	return nil
 }

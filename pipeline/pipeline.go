@@ -98,11 +98,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
-	logger.Info("initializing exec output cache")
-	if err := p.execOutputCache.Init(p.execoutStorage); err != nil {
-		return fmt.Errorf("failed to prime caching engine: %w", err)
-	}
-
 	// FIXME(abourget): Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
 	// This clearly doesn't belong in the Init() function.
 	var storeMap store.Map
@@ -208,7 +203,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	if reqDetails.LinearHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
 		requestedModule := p.outputGraph.RequestedMapModules()[0]
 		requestedModuleCache := p.execoutStorage.NewFile(requestedModule.Name, logger)
-		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, p.runtimeConfig, logger)
+		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, p.runtimeConfig.ExecOutputSaveInterval, logger)
 		backprocessor.SetOutputReader(outputReader)
 	}
 

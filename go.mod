@@ -22,7 +22,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/bytecodealliance/wasmtime-go => github.com/streamingfast/wasmtime-go v0.0.0-20221110162800-03b0c10e9b6a
+replace github.com/bytecodealliance/wasmtime-go => github.com/streamingfast/wasmtime-go v0.0.0-20221111141131-ac385fd74dde
 
 replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 
@@ -43,6 +43,7 @@ require (
 	go.uber.org/atomic v1.10.0
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/oauth2 v0.0.0-20221006150949-b44042a4b9c1
+	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
 	google.golang.org/grpc v1.50.1
 )
 
@@ -134,7 +135,6 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458 // indirect
-	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0 // indirect
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect

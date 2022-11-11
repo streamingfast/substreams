@@ -26,7 +26,6 @@ var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
 
 // Name implements ModuleExecutor
 func (e *MapperModuleExecutor) Name() string { return e.moduleName }
-func (e *MapperModuleExecutor) FreeMem()     { e.BaseExecutor.wasmModule.FreeMem() }
 
 func (e *MapperModuleExecutor) String() string { return e.Name() }
 

@@ -25,12 +25,14 @@ type Module struct {
 	wasmModule      *wasmtime.Module
 	wasmLinker      *wasmtime.Linker
 	Heap            *Heap
+	isClosed        bool
 }
 
 func (m *Module) FreeMem() {
 	m.wasmStore.FreeMem()
 	m.wasmLinker.FreeMem()
 	m.wasmEngine.FreeMem()
+	m.isClosed = true
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
@@ -82,6 +84,9 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 }
 
 func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*Instance, error) {
+	if m.isClosed {
+		panic("module is closed")
+	}
 	export := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint)
 	if export == nil {
 		return nil, fmt.Errorf("failed to get entrypoint %q most likely does not exists", m.entrypoint)

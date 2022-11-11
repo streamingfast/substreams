@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/substreams/block"
+	pboutput "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,13 +62,13 @@ func TestOutputCache_listContinuousCacheRanges(t *testing.T) {
 func TestOutputCache_Delete(t *testing.T) {
 	testCases := []struct {
 		name         string
-		kv           outputKV
+		kv           map[string]*pboutput.Item
 		keysToDelete []string
-		expectedKv   outputKV
+		expectedKv   map[string]*pboutput.Item
 	}{
 		{
 			name: "delete one block id from output cache",
-			kv: map[string]*CacheItem{
+			kv: map[string]*pboutput.Item{
 				"1": {
 					BlockNum: 1,
 				},
@@ -76,7 +77,7 @@ func TestOutputCache_Delete(t *testing.T) {
 				},
 			},
 			keysToDelete: []string{"2"},
-			expectedKv: map[string]*CacheItem{
+			expectedKv: map[string]*pboutput.Item{
 				"1": {
 					BlockNum: 1,
 				},
@@ -84,7 +85,7 @@ func TestOutputCache_Delete(t *testing.T) {
 		},
 		{
 			name: "delete two block ids from output cache",
-			kv: map[string]*CacheItem{
+			kv: map[string]*pboutput.Item{
 				"1": {
 					BlockNum: 1,
 				},
@@ -99,7 +100,7 @@ func TestOutputCache_Delete(t *testing.T) {
 				},
 			},
 			keysToDelete: []string{"1", "2"},
-			expectedKv: map[string]*CacheItem{
+			expectedKv: map[string]*pboutput.Item{
 				"3": {
 					BlockNum: 3,
 				},
@@ -113,11 +114,13 @@ func TestOutputCache_Delete(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			outputCache := NewOutputCache("module1", nil, 10, zlog, &sync.WaitGroup{})
-			outputCache.kv = test.kv
+			outputCache.outputData = &pboutput.Map{
+				Kv: test.kv,
+			}
 			for _, key := range test.keysToDelete {
 				outputCache.Delete(key)
 			}
-			require.Equal(t, test.expectedKv, outputCache.kv)
+			require.Equal(t, test.expectedKv, outputCache.outputData.Kv)
 		})
 	}
 }

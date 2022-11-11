@@ -28,9 +28,9 @@ type Module struct {
 }
 
 func (m *Module) FreeMem() {
-	m.wasmEngine.FreeMem()
 	m.wasmStore.FreeMem()
 	m.wasmLinker.FreeMem()
+	m.wasmEngine.FreeMem()
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {

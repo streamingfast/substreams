@@ -175,14 +175,15 @@ func Test_SimpleMapModule(t *testing.T) {
 			inclusiveStopBlock: inclusiveStopBlock,
 		}
 	}
-	moduleOutputs, err := runTest(t, nil, 10, 12, []string{"test_map"}, 10, 1, newBlockGenerator, nil)
-	require.NoError(t, err)
-	require.Equal(t, []string{
-		`{"name":"test_map","result":{"block_number":10,"block_hash":"block-10"}}`,
-		`{"name":"test_map","result":{"block_number":11,"block_hash":"block-11"}}`,
-	}, moduleOutputs)
-
-	runtime.GC()
+	//var dum []byte
+	//var data [100_000_000]byte
+	for k := 0; k < 10; k++ {
+		//dum = append(dum, data[:]...)
+		_, err := runTest(t, nil, 10, 12, []string{"test_store_proto"}, 10, 1, newBlockGenerator, nil)
+		require.NoError(t, err)
+		runtime.GC()
+		runtime.GC()
+	}
 
 }
 

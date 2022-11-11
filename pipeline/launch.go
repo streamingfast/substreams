@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime"
 	"strings"
 
 	"github.com/streamingfast/bstream/stream"
@@ -32,7 +31,10 @@ func (p *Pipeline) Launch(ctx context.Context, stream Streamable, streamSrv Trai
 func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
-	runtime.GC() // tentative - help wasmtime run its finalizers to reclaim memory
+
+	for _, executor := range p.moduleExecutors {
+		executor.FreeMem()
+	}
 
 	if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
 		logger.Debug("stream of blocks ended",

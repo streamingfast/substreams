@@ -2,6 +2,7 @@ package exec
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
@@ -18,6 +19,7 @@ type BaseExecutor struct {
 func NewBaseExecutor(moduleName string, wasmModule *wasm.Module, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
 }
+func (e *BaseExecutor) FreeMem() { e.wasmModule.FreeMem() }
 
 func (e *BaseExecutor) moduleLogs() (logs []string, truncated bool) {
 	if instance := e.wasmModule.CurrentInstance; instance != nil {
@@ -65,7 +67,8 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 			}
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %v", clock.Number, e.moduleName, errExecutor.Error())
 		}
-		err = instance.Module.Heap.Clear()
+		err = instance.Cleanup()
+
 		if err != nil {
 			return nil, fmt.Errorf("block %d: module %q: wasm heap clear failed: %w", clock.Number, e.moduleName, err)
 		}

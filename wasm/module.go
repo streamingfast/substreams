@@ -25,6 +25,14 @@ type Module struct {
 	wasmModule      *wasmtime.Module
 	wasmLinker      *wasmtime.Linker
 	Heap            *Heap
+	isClosed        bool
+}
+
+func (m *Module) FreeMem() {
+	m.wasmStore.FreeMem()
+	m.wasmLinker.FreeMem()
+	m.wasmEngine.FreeMem()
+	m.isClosed = true
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
@@ -57,7 +65,6 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 			}
 		}
 	}
-
 	instance, err := m.wasmLinker.Instantiate(m.wasmStore, m.wasmModule)
 	if err != nil {
 		return nil, fmt.Errorf("creating new instance: %w", err)
@@ -77,6 +84,9 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 }
 
 func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*Instance, error) {
+	if m.isClosed {
+		panic("module is closed")
+	}
 	export := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint)
 	if export == nil {
 		return nil, fmt.Errorf("failed to get entrypoint %q most likely does not exists", m.entrypoint)
@@ -133,7 +143,7 @@ func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams
 		// It's unclear if WASMExtension implementor will correctly handle the context canceled case, as a safety
 		// measure, we check if the context was canceled without being handled correctly and stop here.
 		if ctx.Err() == context.Canceled {
-			panic(fmt.Errorf("running wasm extension has been stop upstream in the call stack: %w", ctx.Err()))
+			panic(fmt.Errorf("running wasm %s@%s extension has been stop upstream in the call stack: %w", namespace, name, ctx.Err()))
 		}
 
 		err = m.CurrentInstance.WriteOutputToHeap(outputPtr, out, name)

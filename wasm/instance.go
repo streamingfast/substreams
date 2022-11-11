@@ -87,3 +87,12 @@ func (i *Instance) ReachedLogsMaxByteCount() bool {
 func (i *Instance) PushExecutionStack(event string) {
 	i.ExecutionStack = append(i.ExecutionStack, event)
 }
+
+func (i *Instance) Cleanup() error {
+	err := i.Module.Heap.Clear()
+	if err != nil {
+		return fmt.Errorf("clearing heap: %w", err)
+	}
+	i.Module.wasmStore.GC()
+	return err
+}

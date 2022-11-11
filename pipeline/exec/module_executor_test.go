@@ -52,6 +52,8 @@ func (t *MockModuleExecutor) String() string {
 	return fmt.Sprintf("TestModuleExecutor(%s)", t.name)
 }
 
+func (t *MockModuleExecutor) FreeMem() {}
+
 func (t *MockModuleExecutor) ResetWASMInstance() {}
 
 func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error) {

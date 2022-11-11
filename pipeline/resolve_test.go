@@ -1,10 +1,5 @@
 package pipeline
 
-// TODO(abourget): do the tests to split incoming requests
-// with the proper LiveHandoff block, and historical stream start block
-// and pipeline start block and all, with a simple resolver of the
-// highest (hard-coded for now?) final block.
-
 import (
 	"fmt"
 	"testing"

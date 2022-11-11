@@ -11,8 +11,6 @@ import (
 	"github.com/abourget/llerrgroup"
 )
 
-// TODO(abourget): rename to `ModulesMap`
-// under `state`
 type storeSnapshotsMap struct {
 	sync.Mutex
 	Snapshots map[string]*storeSnapshots

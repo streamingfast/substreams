@@ -47,7 +47,7 @@ func NewMultiSquasher(
 		if !ok {
 			continue
 		}
-		// TODO(abourget): type check the ModuleState here, and continue with the StoreModuleState only
+
 		storeConfig, found := storeConfigs[storeModuleName]
 		if !found {
 			return nil, fmt.Errorf("store %q not found", storeModuleName)

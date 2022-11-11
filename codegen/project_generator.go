@@ -95,7 +95,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 			return fmt.Errorf("creating abis directory %v: %w", abisDir, err)
 		}
 	} else {
-		fmt.Println("Abis directory already exists, skipping")
+		fmt.Println("abis directory already exists, skipping")
 	}
 
 	cargoTomlPath := filepath.Join(fullPath, "Cargo.toml")

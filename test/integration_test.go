@@ -7,9 +7,6 @@ import (
 	"testing"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,9 +37,9 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 			},
 		}
 	}
-	run.BlockProcessedCallback = func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-		if b.Number == 6 {
-			s, found := stores.Get("setup_test_store_add_bigint")
+	run.BlockProcessedCallback = func(ctx *execContext) {
+		if ctx.block.Number == 6 {
+			s, found := ctx.stores.Get("setup_test_store_add_bigint")
 			require.True(t, found)
 			bytes, found := s.GetLast("a.key.pos")
 			require.True(t, found)
@@ -65,8 +62,8 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	run := newTestRun(110, 112, 112, "test_map", "test_store_proto")
 	outputFilesLen := 0
-	run.BlockProcessedCallback = func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-		err := baseStore.Walk(context.Background(), "", func(filename string) (err error) {
+	run.BlockProcessedCallback = func(ctx *execContext) {
+		err := ctx.baseStore.Walk(context.Background(), "", func(filename string) (err error) {
 			if strings.Contains(filename, "output") {
 				outputFilesLen++
 			}
@@ -83,13 +80,14 @@ func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 
 func TestStoreDeletePrefix(t *testing.T) {
 	run := newTestRun(30, 41, 41, "assert_test_store_delete_prefix")
-	run.BlockProcessedCallback = func(p *pipeline.Pipeline, b *bstream.Block, stores store.Map, baseStore dstore.Store) {
-		if b.Number == 40 {
-			s, storeFound := stores.Get("test_store_delete_prefix")
+	run.BlockProcessedCallback = func(ctx *execContext) {
+		if ctx.block.Number == 40 {
+			s, storeFound := ctx.stores.Get("test_store_delete_prefix")
 			require.True(t, storeFound)
 			require.Equal(t, uint64(1), s.Length())
 		}
 	}
+
 	require.NoError(t, run.Run(t))
 }
 

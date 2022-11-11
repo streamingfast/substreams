@@ -13,22 +13,9 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type Streamable interface {
-	Run(ctx context.Context) error
-}
-
-type Trailable interface {
-	SetTrailer(metadata.MD)
-}
-
-func (p *Pipeline) Launch(ctx context.Context, stream Streamable, streamSrv Trailable) error {
-	streamErr := stream.Run(ctx)
-	return p.onStreamTerminated(ctx, streamSrv, streamErr)
-}
-
-// onStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
+// OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.
-func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, err error) error {
+func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
 
@@ -66,4 +53,8 @@ func (p *Pipeline) onStreamTerminated(ctx context.Context, streamSrv Trailable, 
 
 	// We are not responsible for doing any other error handling here, caller will deal with them
 	return err
+}
+
+type Trailable interface {
+	SetTrailer(metadata.MD)
 }

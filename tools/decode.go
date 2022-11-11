@@ -132,7 +132,8 @@ func searchMapModule(
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	modStore.NewFile()
+	// TODO(abourget): move to use the `modStore` configured above.
+	_ = modStore
 	outputCache := execout.NewFile(module.Name, moduleStore, saveInterval, zlog)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)

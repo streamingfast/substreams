@@ -12,7 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/storage/execout"
+	"google.golang.org/grpc/metadata"
+
+	"github.com/streamingfast/shutter"
+
+	"github.com/streamingfast/substreams/service"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -22,16 +26,11 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
-	"github.com/streamingfast/substreams/pipeline/cache"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/storage/store"
-	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -168,94 +167,6 @@ func (f *testRun) MapOutput(modName string) string {
 	return "\n" + strings.Join(moduleOutputs, "\n")
 }
 
-func (f *testRun) ModuleOutputs(t *testing.T) (moduleOutputs []string) {
-	// TODO(abourget): get rid of this method, rather have more spotted
-	// methods to return what we're interested in, and compare that.
-	// We can then run multiple spotted assertions.
-	for _, response := range f.Responses {
-		switch r := response.Message.(type) {
-		case *pbsubstreams.Response_Progress:
-			_ = r.Progress
-		case *pbsubstreams.Response_SnapshotData:
-			_ = r.SnapshotData
-		case *pbsubstreams.Response_SnapshotComplete:
-			_ = r.SnapshotComplete
-		case *pbsubstreams.Response_Data:
-			for _, output := range r.Data.Outputs {
-				for _, log := range output.DebugLogs {
-					fmt.Println("LOG: ", log)
-				}
-				if out := output.GetMapOutput(); out != nil {
-					if output.Name == "test_map" {
-						// TODO(abourget): get rid of those side effects, have the caller do the job.. and
-						// test where appropriate. (even if we have a `assertCommonThings()` method that does this.
-						r := &pbsubstreamstest.MapResult{}
-						err := proto.Unmarshal(out.Value, r)
-						require.NoError(t, err)
-
-						out := &TestMapOutput{
-							ModuleName: output.Name,
-							Result:     r,
-						}
-						jsonData, err := json.Marshal(out)
-						require.NoError(t, err)
-						moduleOutputs = append(moduleOutputs, string(jsonData))
-						continue
-					}
-
-					if strings.HasPrefix(output.Name, "assert") {
-						// TODO(abourget): get rid of those assertion side effects..
-						// have the caller assert the right things
-						assertOut := &AssertMapOutput{
-							ModuleName: output.Name,
-							Result:     len(out.Value) > 0,
-						}
-
-						jsonData, err := json.Marshal(assertOut)
-						require.NoError(t, err)
-						moduleOutputs = append(moduleOutputs, string(jsonData))
-					}
-				}
-				if out := output.GetDebugStoreDeltas(); out != nil {
-					testOutput := &TestStoreOutput{
-						StoreName: output.Name,
-					}
-					for _, delta := range out.Deltas {
-
-						if output.Name == "test_store_proto" {
-							// TODO(abourget): same here, get rid of that hard-coded test assertion within the
-							// module outputs function call.
-							o := &pbsubstreamstest.MapResult{}
-							err := proto.Unmarshal(delta.OldValue, o)
-							require.NoError(t, err)
-
-							n := &pbsubstreamstest.MapResult{}
-							err = proto.Unmarshal(delta.NewValue, n)
-							require.NoError(t, err)
-
-							testOutput.Deltas = append(testOutput.Deltas, &TestStoreDelta{
-								Operation: delta.Operation.String(),
-								OldValue:  o,
-								NewValue:  n,
-							})
-						} else {
-							testOutput.Deltas = append(testOutput.Deltas, &TestStoreDelta{
-								Operation: delta.Operation.String(),
-								OldValue:  string(delta.OldValue),
-								NewValue:  string(delta.NewValue),
-							})
-						}
-					}
-					jsonData, err := json.Marshal(testOutput)
-					require.NoError(t, err)
-					moduleOutputs = append(moduleOutputs, string(jsonData))
-				}
-			}
-		}
-	}
-	return moduleOutputs
-}
-
 func withTestTracing(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
@@ -290,18 +201,15 @@ func processRequest(
 ) error {
 	t.Helper()
 
-	reqDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, func() (uint64, error) {
-		if linearHandoffBlockNum != 0 {
-			return linearHandoffBlockNum, nil
-		}
-		return 0, fmt.Errorf("no live feed")
-	})
-	require.NoError(t, err)
-	ctx = reqctx.WithRequest(ctx, reqDetails)
-
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
 
+	tr := &TestRunner{
+		t:                      t,
+		baseStoreStore:         baseStoreStore,
+		blockProcessedCallBack: blockProcessedCallBack,
+		blockGeneratorFactory:  newGenerator,
+	}
 	runtimeConfig := config.NewRuntimeConfig(
 		10,
 		10,
@@ -310,75 +218,35 @@ func processRequest(
 		baseStoreStore,
 		workerFactory,
 	)
+	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)
 
-	const blockType = "sf.substreams.v1.test.Block"
-
-	cachingEngine, err := cache.NewEngine(runtimeConfig, blockType, zap.NewNop())
-	require.NoError(t, err)
-
-	require.NoError(t, outputmodules.ValidateRequest(request, blockType))
-
-	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
-	require.NoError(t, err)
-
-	execoutConfigMap, err := execout.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes())
-	require.NoError(t, err)
-	execoutConfigs := execout.NewConfigs(runtimeConfig.ExecOutputSaveInterval, execoutConfigMap)
-
-	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
-	require.NoError(t, err)
-
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, reqDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
-
-	pipe := pipeline.New(
-		ctx,
-		outputGraph,
-		stores,
-		execoutConfigs,
-		wasm.NewRuntime(nil),
-		cachingEngine,
-		runtimeConfig,
-		responseCollector.Collect,
-	)
-
-	require.NoError(t, pipe.Init(ctx))
-
-	tr := &TestRunner{
-		t:                      t,
-		baseStoreStore:         baseStoreStore,
-		blockProcessedCallBack: blockProcessedCallBack,
-		request:                request,
-		blockGeneratorFactory:  newGenerator,
-		pipe:                   pipe,
+	if isSubRequest {
+		ctx = metadata.NewIncomingContext(ctx, metadata.MD{"substreams-partial-mode": []string{"true"}})
 	}
-
-	err = pipe.Launch(ctx, tr, &nooptrailable{})
-
-	if closer, ok := cachingEngine.(io.Closer); ok {
-		closer.Close()
-	}
-
-	return err
+	return svc.TestBlocks(ctx, request, responseCollector.Collect)
 }
-
-type nooptrailable struct{}
-
-func (n nooptrailable) SetTrailer(md metadata.MD) {}
 
 type TestRunner struct {
 	t *testing.T
+	*shutter.Shutter
 
 	baseStoreStore         dstore.Store
 	blockProcessedCallBack blockProcessedCallBack
-	request                *pbsubstreams.Request
 	blockGeneratorFactory  BlockGeneratorFactory
-	pipe                   *pipeline.Pipeline
+
+	pipe      *pipeline.Pipeline
+	generator TestBlockGenerator
+}
+
+func (r *TestRunner) StreamFactory(h bstream.Handler, startBlockNum int64, stopBlockNum uint64, cursor string) (service.Streamable, error) {
+	r.pipe = h.(*pipeline.Pipeline)
+	r.Shutter = shutter.New()
+	r.generator = r.blockGeneratorFactory(uint64(startBlockNum), stopBlockNum)
+	return r, nil
 }
 
 func (r *TestRunner) Run(context.Context) error {
-	generator := r.blockGeneratorFactory(uint64(r.request.StartBlockNum), r.request.StopBlockNum)
-
-	for _, generatedBlock := range generator.Generate() {
+	for _, generatedBlock := range r.generator.Generate() {
 		blk := generatedBlock.block
 		err := r.pipe.ProcessBlock(blk, generatedBlock.obj)
 
@@ -390,7 +258,11 @@ func (r *TestRunner) Run(context.Context) error {
 		}
 
 		if r.blockProcessedCallBack != nil {
-			r.blockProcessedCallBack(r.pipe, blk, r.pipe.GetStoreMap(), r.baseStoreStore)
+			r.blockProcessedCallBack(&execContext{
+				block:     blk,
+				stores:    r.pipe.GetStoreMap(),
+				baseStore: r.baseStoreStore,
+			})
 		}
 	}
 	return nil

@@ -20,7 +20,7 @@ func (sf *StreamFactory) New(
 	startBlockNum int64,
 	stopBlockNum uint64,
 	cursor string,
-) (*stream.Stream, error) {
+) (Streamable, error) {
 
 	options := []stream.Option{
 		stream.WithStopBlock(stopBlockNum),

@@ -4,18 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
-	"github.com/streamingfast/substreams/storage/store"
-
-	outputmodules2 "github.com/streamingfast/substreams/pipeline/outputmodules"
-
-	"github.com/streamingfast/substreams/storage/execout"
-
-	"github.com/streamingfast/substreams/pipeline/cache"
-
-	"github.com/streamingfast/substreams/orchestrator/work"
+	"github.com/streamingfast/substreams"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
@@ -23,10 +16,15 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
+	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -41,11 +39,12 @@ import (
 )
 
 type Service struct {
-	blockType          string
-	partialModeEnabled bool
-	wasmExtensions     []wasm.WASMExtensioner
-	pipelineOptions    []pipeline.PipelineOptioner
-	streamFactory      *StreamFactory
+	blockType           string
+	partialModeEnabled  bool
+	wasmExtensions      []wasm.WASMExtensioner
+	pipelineOptions     []pipeline.PipelineOptioner
+	streamFactoryFunc   StreamFactoryFunc
+	getRecentFinalBlock func() (uint64, error)
 
 	runtimeConfig config.RuntimeConfig
 
@@ -59,7 +58,7 @@ func New(
 	stateStore dstore.Store,
 	blockType string,
 	parallelSubRequests uint64,
-	blockRangeSizeSubRequests uint64,
+	subrequestSplitSize uint64,
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
 ) (s *Service, err error) {
@@ -70,7 +69,7 @@ func New(
 	runtimeConfig := config.NewRuntimeConfig(
 		1000, // overriden by Options
 		1000, // overriden by Options
-		blockRangeSizeSubRequests,
+		subrequestSplitSize,
 		parallelSubRequests,
 		stateStore,
 		func(logger *zap.Logger) work.Worker {
@@ -114,7 +113,8 @@ func (s *Service) Register(
 		hub:               forkableHub,
 	}
 
-	s.streamFactory = sf
+	s.streamFactoryFunc = sf.New
+	s.getRecentFinalBlock = sf.GetRecentFinalBlock
 	s.logger = logger
 	server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreams.RegisterStreamServer(gs, s)
@@ -135,9 +135,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
-	// We execute the blocks stream handler and then transform `err` to a gRPC error, keeping both of them.
-	// They will be both `nil` if `err` is `nil` itself.
-	err = s.blocks(ctx, request, streamSrv)
+	respFunc := responseHandler(logger, streamSrv)
+
+	err = s.blocks(ctx, request, respFunc, streamSrv)
 	grpcError = s.toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -147,18 +147,15 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	return grpcError
 }
 
-func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) error {
+func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 
-	// TODO(abourget): this is fullllly duplicated with the `runnable_test.go`  initialization methods..
-	// DRY that up.. it's super risky.
-
-	if err := outputmodules2.ValidateRequest(request, s.blockType); err != nil {
+	if err := outputmodules.ValidateRequest(request, s.blockType); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
-	outputGraph, err := outputmodules2.NewOutputModuleGraph(request)
+	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
@@ -171,7 +168,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, isSubRequest)
 
-	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, s.streamFactory.GetRecentFinalBlock)
+	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, s.getRecentFinalBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
@@ -199,7 +196,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 	}
 	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
-	respFunc := responseHandler(logger, streamSrv)
 	opts := s.buildPipelineOptions(ctx, request)
 	pipe := pipeline.New(
 		ctx,
@@ -236,7 +232,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		zap.Uint64("end_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
 	)
-	blockStream, err := s.streamFactory.New(
+	blockStream, err := s.streamFactoryFunc(
 		pipe,
 		request.StartBlockNum,
 		request.StopBlockNum,
@@ -246,7 +242,16 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
-	return pipe.Launch(ctx, blockStream, streamSrv)
+	streamErr := blockStream.Run(ctx)
+	if err := pipe.OnStreamTerminated(ctx, trailerWriter, streamErr); err != nil {
+		return err
+	}
+
+	if closer, ok := execOutputCacheEngine.(io.Closer); ok {
+		closer.Close()
+	}
+
+	return nil
 }
 
 func (s *Service) buildPipelineOptions(ctx context.Context, request *pbsubstreams.Request) (opts []pipeline.Option) {
@@ -285,7 +290,7 @@ func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats
 
 func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
 	/*
-		this entire `if` is not good, the ctx is from the StreamServer so there
+		FIXME: this entire `if` is not good, the ctx is from the StreamServer so there
 		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
 	*/
 	if md, ok := metadata.FromIncomingContext(ctx); ok {

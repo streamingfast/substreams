@@ -31,7 +31,7 @@ Additional information can be found for Protocol Buffers by visiting the links p
 Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) representing a list of ERC721 transfers.
 
 {% hint style="info" %}
-**Note**: The Transfers protobuf in the Substeams Template example is located in the proto directory.
+**Note**: The Transfers protobuf in the Substreams Template example is located in the proto directory.
 {% endhint %}
 
 {% code title="eth/erc721/v1/erc721.proto" lineNumbers="true" %}

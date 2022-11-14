@@ -2,23 +2,23 @@ package execout
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/block"
 	"regexp"
 	"strconv"
+
+	"github.com/streamingfast/substreams/block"
 )
 
 // TODO(abourget): turn that into something that works for OUTPUTS, not partials
 var stateFileRegex *regexp.Regexp
 
 func init() {
-	stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.(kv|partial)`)
+	stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
 }
 
 type FileInfo struct {
 	Filename   string
 	StartBlock uint64
 	EndBlock   uint64
-	Partial    bool
 }
 
 func parseFileName(filename string) (*FileInfo, bool) {

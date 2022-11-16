@@ -6,6 +6,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,9 @@ import (
 )
 
 func TestWorkPlanning(t *testing.T) {
+	ctx := context.Background()
+	logger := reqctx.Logger(ctx)
+
 	tests := []struct {
 		name              string
 		plan              *Plan
@@ -29,6 +33,7 @@ func TestWorkPlanning(t *testing.T) {
 					TestModState("A", "0-10,10-20,30-40,40-50,50-60"),
 					TestModState("B", "0-10"),
 				),
+				logger: logger,
 			},
 			subreqSplit: 20,
 			expectWaitingJobs: []*Job{
@@ -47,6 +52,7 @@ func TestWorkPlanning(t *testing.T) {
 					TestModState("A", "0-10,30-40,50-60"),
 					TestModState("D", "10-20,50-60"),
 				),
+				logger: logger,
 			},
 			subreqSplit: 10,
 			expectWaitingJobs: []*Job{

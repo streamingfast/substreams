@@ -28,13 +28,16 @@ type Plan struct {
 
 	modulesReadyUpToBlock map[string]uint64
 
-	mu sync.Mutex
+	mu     sync.Mutex
+	logger *zap.Logger
 }
 
 func BuildNewPlan(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, subrequestSplitSize, upToBlock uint64, graph *manifest.ModuleGraph) (*Plan, error) {
+	logger := reqctx.Logger(ctx)
 	plan := &Plan{
 		ModulesStateMap: make(ModuleStorageStateMap),
 		upToBlock:       upToBlock,
+		logger:          logger,
 	}
 
 	storageState, err := fetchStorageState(ctx, storeConfigMap)
@@ -113,6 +116,13 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
 
 			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
 			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)
+
+			p.logger.Debug("adding job",
+				zap.String("module", storeName),
+				zap.Uint64("start_block", requestRange.StartBlock),
+				zap.Uint64("end_block", requestRange.ExclusiveEndBlock),
+				zap.Int("priority", priority),
+			)
 
 			job := NewJob(storeName, requestRange, requiredModules, priority)
 			p.waitingJobs = append(p.waitingJobs, job)

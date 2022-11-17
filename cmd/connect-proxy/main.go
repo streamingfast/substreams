@@ -24,8 +24,6 @@ type ConnectServer struct {
 	SubstreamsClientConfig *client.SubstreamsClientConfig
 }
 
-var addr = "localhost:9000"
-
 func (cs *ConnectServer) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreams.Request],
@@ -102,6 +100,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
 	rootCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	rootCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
 	rootCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	rootCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 	rootCmd.Flags().String("force-manifest", "", "if non-empty, the requests' modules will be replaced by the modules loaded from this location. Can be a local spkg or yaml file, or a remote (HTTP) spkg file.")
@@ -109,6 +108,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	addr := mustGetString(cmd, "listen-addr")
 	fmt.Println("listening on", addr)
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(

@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
@@ -27,6 +27,8 @@ replace github.com/bytecodealliance/wasmtime-go => github.com/streamingfast/wasm
 replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 
 require (
+	github.com/bufbuild/connect-go v1.1.0
+	github.com/bufbuild/connect-grpcreflect-go v1.0.0
 	github.com/bytecodealliance/wasmtime-go v0.39.0
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
@@ -34,6 +36,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-testing-interface v1.14.1
 	github.com/prometheus/client_golang v1.12.1
+	github.com/rs/cors v1.8.2
 	github.com/streamingfast/dauth v0.0.0-20221027185237-b209f25fa3ff
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/sf-tracing v0.0.0-20221028154401-fd8a9e72bfc5
@@ -45,6 +48,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.11.1
 	go.uber.org/atomic v1.10.0
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
+	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458
 	golang.org/x/oauth2 v0.0.0-20221006150949-b44042a4b9c1
 	google.golang.org/grpc v1.50.1
 )
@@ -134,7 +138,6 @@ require (
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458 // indirect
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0 // indirect
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect

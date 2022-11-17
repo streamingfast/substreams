@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/bufbuild/connect-go"
+	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -124,10 +125,16 @@ func run(cmd *cobra.Command, args []string) error {
 		StartBlock:             mustGetUint64(cmd, "force-start-block"),
 	}
 
+	reflector := grpcreflect.NewStaticReflector(
+		"sf.substreams.v1.Stream",
+	)
+
 	mux := http.NewServeMux()
 	// The generated constructors return a path and a plain net/http
 	// handler.
 	mux.Handle(ssconnect.NewStreamHandler(cs))
+	mux.Handle(grpcreflect.NewHandlerV1(reflector))
+	mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
 	return http.ListenAndServe(
 		addr,
 		// For gRPC clients, it's convenient to support HTTP/2 without TLS. You can

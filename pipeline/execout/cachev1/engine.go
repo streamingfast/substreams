@@ -94,7 +94,7 @@ func (e *Engine) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, 
 }
 
 func (e *Engine) flushCache(cache *OutputCache) error {
-	e.logger.Debug("saving cache", zap.Object("cache", cache))
+	e.logger.Debug("saving cache", zap.Object("cache", cache), zap.Int("kv_count", len(cache.outputData.Kv)))
 	err := cache.save(e.ctx, cache.currentFilename())
 	if err != nil {
 		return fmt.Errorf("saving cache ouputs: %w", err)

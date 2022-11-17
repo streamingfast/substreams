@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
+
+	"google.golang.org/protobuf/proto"
+
+	"github.com/jhump/protoreflect/dynamic"
+
 	"github.com/streamingfast/substreams/store"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"strconv"
-	"strings"
-	"sync"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
@@ -25,25 +28,32 @@ var decodeCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
-var decodeModuleCmd = &cobra.Command{
-	Use:          "output <manifest_file> <module_name> <output_url> <block_number>",
-	Short:        "Decode output base 64 encoded bytes to protobuf data structure",
-	RunE:         runDecodeModuleRunE,
+var decodeOutputsModuleCmd = &cobra.Command{
+	Use:          "outputs <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Short:        "Decode outputs base 64 encoded bytes to protobuf data structure",
+	RunE:         runDecodeOutputsModuleRunE,
 	Args:         cobra.MinimumNArgs(4),
 	SilenceUsage: true,
 }
 
-func init() {
-	decodeModuleCmd.Flags().Uint64("save-interval", 1000, "Output save interval")
-	//decodeStoresCmd.Flags().Uint64("save-interval", 1000, "Output save interval")
+// todo: add decode states to decode the kv which is saved on disc
+//var decodeStatesModuleCmd = &cobra.Command{
+//	Use:          "states <manifest_file> <module_name> <output_url> <block_number> <key>",
+//	Short:        "Decode states base 64 encoded bytes to protobuf data structure",
+//	RunE:         runDecodeStatesModuleRunE,
+//	Args:         cobra.MinimumNArgs(4),
+//	SilenceUsage: true,
+//}
 
-	decodeCmd.AddCommand(decodeModuleCmd)
-	//decodeCmd.AddCommand(decodeStoresCmd)
+func init() {
+	decodeOutputsModuleCmd.Flags().Uint64("save-interval", 1000, "Output save interval")
+
+	decodeCmd.AddCommand(decodeOutputsModuleCmd)
 
 	Cmd.AddCommand(decodeCmd)
 }
 
-func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
+func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	manifestPath := args[0]
 	moduleName := args[1]
@@ -53,9 +63,10 @@ func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
 	}
+
 	key := ""
 	if len(args) > 4 {
-		key = args[5]
+		key = args[4]
 	}
 
 	zlog.Info("decoding module",
@@ -67,7 +78,7 @@ func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
 		zap.String("key", key),
 	)
 
-	store, err := dstore.NewSimpleStore(storeUrl)
+	s, err := dstore.NewStore(storeUrl, "zst", "zstd", false)
 	if err != nil {
 		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
 	}
@@ -106,17 +117,14 @@ func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
-		return searchMapModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, store, protoFiles)
+		return searchOutputsModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
 	case *pbsubstreams.Module_KindStore_:
-		if key == "" {
-			return fmt.Errorf("unable to search a store with a blank key")
-		}
-		return searchStoreModule(ctx, startBlock, saveInterval, moduleHash, key, matchingModule, store, protoFiles)
+		return searchOutputsModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
 	}
 	return fmt.Errorf("module has an unknown")
 }
 
-func searchMapModule(
+func searchOutputsModule(
 	ctx context.Context,
 	blockNumber,
 	startBlock,
@@ -131,32 +139,31 @@ func searchMapModule(
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog, &sync.WaitGroup{})
+	outputCache := cachev1.NewOutputCache(module.Name, moduleStore, saveInterval, zlog, nil)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)
 	if err != nil {
-		return fmt.Errorf("loading cache: %w", err)
+		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
 	}
 	if !found {
 		return fmt.Errorf("can't find cache at block %d storeUrl %q", blockNumber, moduleStore.BaseURL().String())
 	}
 
 	fmt.Println()
-	fmt.Printf("Found map output cache file containing block in bucket: %s\n", outputCache.String())
-	outputBytes, found := outputCache.GetAtBlock(blockNumber)
+	payloadBytes, found := outputCache.GetAtBlock(blockNumber)
 	if !found {
 		return fmt.Errorf("data not found at block %d", blockNumber)
 	}
 
-	if len(outputBytes) == 0 {
+	if len(payloadBytes) == 0 {
 		fmt.Printf("RecordBlock %d found but payload is empty. Module did not produce data at block num.", blockNumber)
 		return nil
 	}
 
-	return printObject(module, protoFiles, outputBytes)
+	return printObject(module, protoFiles, payloadBytes)
 }
 
-func searchStoreModule(
+func searchStateModule(
 	ctx context.Context,
 	startBlock,
 	saveInterval uint64,
@@ -183,7 +190,17 @@ func searchStoreModule(
 }
 
 func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDescriptorProto, data []byte) error {
-	protoDefinition := module.Output.GetType()
+	protoDefinition := ""
+	valuePrinted := false
+
+	switch module.Kind.(type) {
+	case *pbsubstreams.Module_KindMap_:
+		protoDefinition = module.Output.GetType()
+	case *pbsubstreams.Module_KindStore_:
+		protoDefinition = module.Kind.(*pbsubstreams.Module_KindStore_).KindStore.ValueType
+	default:
+		return fmt.Errorf("invalid module kind: %q", module.Kind)
+	}
 	fileDescriptors, err := desc.CreateFileDescriptors(protoFiles)
 	if err != nil {
 		return fmt.Errorf("unable to find file descriptors: %w", err)
@@ -193,21 +210,63 @@ func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDes
 	for _, file := range fileDescriptors {
 		msgDesc = file.FindMessage(strings.TrimPrefix(protoDefinition, "proto:"))
 		if msgDesc != nil {
-			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+			switch module.Kind.(type) {
+			case *pbsubstreams.Module_KindMap_:
+				dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+				val, err := unmarshalData(data, dynMsg)
+				if err != nil {
+					return fmt.Errorf("unmarshalling data: %w", err)
+				}
+				fmt.Println(val)
+				valuePrinted = true
+			case *pbsubstreams.Module_KindStore_:
+				deltas := &pbsubstreams.StoreDeltas{}
+				_ = proto.Unmarshal(data, deltas)
 
-			if err := dynMsg.Unmarshal(data); err != nil {
-				return fmt.Errorf("unmarshalling outputBytes: %w", err)
-			}
-			cnt, err := dynMsg.MarshalJSON()
-			if err != nil {
-				return fmt.Errorf("marshalling json: %w", err)
-			}
-			fmt.Println(string(cnt))
+				dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 
-			return nil
+				value := ""
+				for _, delta := range deltas.Deltas {
+					value += fmt.Sprintf("> Key %s\n", delta.Key)
+					value += fmt.Sprintln("----- New Value -----")
+					val, err := unmarshalData(delta.NewValue, dynMsg)
+					if err != nil {
+						return fmt.Errorf("unmarshalling data: %w", err)
+					}
+					value += fmt.Sprintln(val)
+
+					value += fmt.Sprintln("----- Old Value -----")
+					val, err = unmarshalData(delta.OldValue, dynMsg)
+					if err != nil {
+						return fmt.Errorf("unmarshalling data: %w", err)
+					}
+					value += fmt.Sprintln(val)
+				}
+
+				fmt.Println(value)
+				valuePrinted = true
+			default:
+				return fmt.Errorf("invalid module kind: %q", module.Kind)
+			}
 		}
-
-		return fmt.Errorf("protobuf definition %s doesn't exist in the manifest", protoDefinition)
 	}
+
+	if valuePrinted {
+		return nil
+	}
+
+	fmt.Println(string(data))
 	return nil
+}
+
+func unmarshalData(data []byte, dynMsg *dynamic.Message) (string, error) {
+	if err := dynMsg.Unmarshal(data); err != nil {
+		return "", fmt.Errorf("unmarshalling outputBytes: %w", err)
+	}
+	cnt, err := dynMsg.MarshalJSON()
+	if err != nil {
+		return "", fmt.Errorf("marshalling json: %w", err)
+	}
+
+	return string(cnt), nil
 }

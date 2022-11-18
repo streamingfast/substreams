@@ -5,7 +5,10 @@ on:
     tags:
       - "[a-z0-9]+-v*"
     branches:
-      - develop
+      - "dockerbuild"
+      - "develop"
+      - "release/v*"
+      - "feature/*"
 
 env:
   REGISTRY: ghcr.io

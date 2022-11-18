@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 
 	"github.com/bufbuild/connect-go"
 	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
@@ -17,6 +16,13 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
+
+var proxyCmd = &cobra.Command{
+	Use:          "proxy <package>",
+	Short:        "A tool to proxy substreams requests from a web browser (connect-web protocol)",
+	RunE:         runProxy,
+	SilenceUsage: true,
+}
 
 type ConnectServer struct {
 	ssconnect.UnimplementedStreamHandler
@@ -84,31 +90,19 @@ func (cs *ConnectServer) Blocks(
 	}
 }
 
-func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println("failed:", err)
-	}
-}
-
-var rootCmd = &cobra.Command{
-	Use:          "connect-proxy",
-	Short:        "A tool to proxy substreams requests from a web browser (connect-web protocol)",
-	Long:         "A tool to proxy substreams requests from a web browser (connect-web protocol)",
-	SilenceUsage: true,
-	RunE:         run,
-}
-
 func init() {
-	rootCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
-	rootCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
-	rootCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
-	rootCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
-	rootCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
-	rootCmd.Flags().String("force-manifest", "", "if non-empty, the requests' modules will be replaced by the modules loaded from this location. Can be a local spkg or yaml file, or a remote (HTTP) spkg file.")
-	rootCmd.Flags().Uint64("force-start-block", 0, "if non-zero, the requests' start-block will be replaced by this value")
+	proxyCmd.Flags().StringP("substreams-endpoint", "e", "api.streamingfast.io:443", "Substreams gRPC endpoint")
+	proxyCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	proxyCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
+	proxyCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
+	proxyCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+	proxyCmd.Flags().String("force-manifest", "", "if non-empty, the requests' modules will be replaced by the modules loaded from this location. Can be a local spkg or yaml file, or a remote (HTTP) spkg file.")
+	proxyCmd.Flags().Uint64("force-start-block", 0, "if non-zero, the requests' start-block will be replaced by this value")
+
+	rootCmd.AddCommand(proxyCmd)
 }
 
-func run(cmd *cobra.Command, args []string) error {
+func runProxy(cmd *cobra.Command, args []string) error {
 	addr := mustGetString(cmd, "listen-addr")
 	fmt.Println("listening on", addr)
 
@@ -141,43 +135,4 @@ func run(cmd *cobra.Command, args []string) error {
 		// avoid x/net/http2 by using http.ListenAndServeTLS.
 		h2c.NewHandler(mux, &http2.Server{}),
 	)
-}
-
-func mustGetString(cmd *cobra.Command, flagName string) string {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func readAPIToken(cmd *cobra.Command, envFlagName string) string {
-	envVar := mustGetString(cmd, envFlagName)
-	value := os.Getenv(envVar)
-	if value != "" {
-		return value
-	}
-
-	return os.Getenv("SF_API_TOKEN")
-}
-
-func mustGetInt64(cmd *cobra.Command, flagName string) int64 {
-	val, err := cmd.Flags().GetInt64(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func mustGetUint64(cmd *cobra.Command, flagName string) uint64 {
-	val, err := cmd.Flags().GetUint64(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func mustGetBool(cmd *cobra.Command, flagName string) bool {
-	val, err := cmd.Flags().GetBool(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
 }

@@ -4,36 +4,40 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/execout/state"
+	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	store2 "github.com/streamingfast/substreams/storage/store/state"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
 
-func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval uint64, mapModules []*pbsubstreams.Module, execOutputSaveInterval, upToBlock uint64) (ModuleStorageStateMap, error) {
+func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval uint64, mapConfigs *execout.Configs, execOutputSaveInterval, upToBlock uint64) (ModuleStorageStateMap, error) {
 	out := make(ModuleStorageStateMap)
 	if err := buildStoresStorageState(ctx, storeConfigMap, storeSnapshotsSaveInterval, upToBlock, out); err != nil {
 		return nil, err
 	}
-	if err := buildMappersStorageState(ctx, mapModules, execOutputSaveInterval, upToBlock, out); err != nil {
+	if err := buildMappersStorageState(ctx, mapConfigs, execOutputSaveInterval, upToBlock, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func buildMappersStorageState(ctx context.Context, mapModules []*pbsubstreams.Module, execOutputSaveInterval, upToBlock uint64, out ModuleStorageStateMap) error {
+func buildMappersStorageState(ctx context.Context, mapConfigs *execout.Configs, execOutputSaveInterval, upToBlock uint64, out ModuleStorageStateMap) error {
 	// TODO(abourget): fetch execout states
 
-	for _, mod := range mapModules {
-		snapshot := "TODO: hmmm.. need a snapshot fetcher here!"
-		state, err := state.NewExecOutputStorageState(mod.Name, mod.InitialBlock, upToBlock, snapshot)
+	stateMap, err := execoutState.FetchState(ctx, mapConfigs)
+	if err != nil {
+		return fmt.Errorf("fetching execout states: %w", err)
+	}
+	for _, config := range mapConfigs.ConfigMap {
+		snapshot := stateMap.Snapshots[config.Name()]
+		storageState, err := state.NewExecOutputStorageState(config, execOutputSaveInterval, upToBlock, snapshot)
 		if err != nil {
-			return fmt.Errorf("new map state: %w", err)
+			return fmt.Errorf("new map storageState: %w", err)
 		}
-		out[mod.Name] = state
+		out[config.Name()] = storageState
 	}
 	return nil
 }

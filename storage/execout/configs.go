@@ -11,27 +11,27 @@ import (
 )
 
 type Configs struct {
-	configMap              map[string]*Config
+	ConfigMap              map[string]*Config
 	execOutputSaveInterval uint64
 }
 
 func NewConfigs(execOutputSaveInterval uint64, confMap map[string]*Config) *Configs {
 	return &Configs{
 		execOutputSaveInterval: execOutputSaveInterval,
-		configMap:              confMap,
+		ConfigMap:              confMap,
 	}
 }
 
 func (c *Configs) NewFiles(logger *zap.Logger) map[string]*File {
 	out := make(map[string]*File)
-	for modName, config := range c.configMap {
+	for modName, config := range c.ConfigMap {
 		out[modName] = config.NewFile(c.execOutputSaveInterval, logger)
 	}
 	return out
 }
 
 func (c *Configs) NewFile(moduleName string, logger *zap.Logger) *File {
-	return c.configMap[moduleName].NewFile(c.execOutputSaveInterval, logger)
+	return c.ConfigMap[moduleName].NewFile(c.execOutputSaveInterval, logger)
 }
 
 func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes) (out map[string]*Config, err error) {

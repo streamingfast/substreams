@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/streamingfast/substreams/storage/store"
-
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 type storeSnapshots struct {

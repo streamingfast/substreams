@@ -6,11 +6,8 @@ import (
 	"sync"
 
 	"github.com/streamingfast/derr"
-	"github.com/streamingfast/substreams/block"
-
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -18,7 +15,7 @@ type Config struct {
 	moduleHash string
 	store      dstore.Store
 
-	moduleInitialBlock uint64
+	ModuleInitialBlock uint64
 }
 
 func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseStore dstore.Store) (*Config, error) {
@@ -29,28 +26,32 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseSt
 	return &Config{
 		name:               name,
 		store:              subStore,
-		moduleInitialBlock: moduleInitialBlock,
+		ModuleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 	}, nil
 }
 
-func (conf *Config) NewFile(saveBlockInterval uint64, logger *zap.Logger) *File {
+func (c *Config) NewFile(saveBlockInterval uint64, logger *zap.Logger) *File {
 	return &File{
 		wg:                &sync.WaitGroup{},
-		ModuleName:        conf.name,
-		store:             conf.store,
+		ModuleName:        c.name,
+		store:             c.store,
 		saveBlockInterval: saveBlockInterval,
-		logger:            logger.Named("cache").With(zap.String("module_name", conf.name)),
+		logger:            logger.Named("cache").With(zap.String("module_name", c.name)),
 	}
 }
 
-type ExecOutputFiles = block.Ranges
+func (c *Config) Name() string {
+	return c.name
+}
+
+type ExecOutputFiles = []*FileInfo
 
 func (c *Config) ListSnapshotFiles(ctx context.Context) (files ExecOutputFiles, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		if err := c.store.Walk(ctx, "", func(filename string) (err error) {
-			fileInfo, ok := parseFileName(filename)
-			if !ok {
+			fileInfo, err := parseFileName(filename)
+			if err != nil {
 				return nil
 			}
 			files = append(files, fileInfo)

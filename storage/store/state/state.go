@@ -3,6 +3,8 @@ package state
 import (
 	"fmt"
 
+	"github.com/streamingfast/substreams/utils"
+
 	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap/zapcore"
 )
@@ -43,7 +45,7 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 	}
 
 	for ptr := backProcessStartBlock; ptr < workUpToBlockNum; {
-		end := minOf(ptr-ptr%storeSaveInterval+storeSaveInterval, workUpToBlockNum)
+		end := utils.MinOf(ptr-ptr%storeSaveInterval+storeSaveInterval, workUpToBlockNum)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {
 			out.PartialsMissing = append(out.PartialsMissing, newPartial)
@@ -81,11 +83,4 @@ func (w *StoreStorageState) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddInt("partial_missing", len(w.PartialsMissing))
 	enc.AddInt("partial_present", len(w.PartialsPresent))
 	return nil
-}
-
-func minOf(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
 }

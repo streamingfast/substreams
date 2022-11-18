@@ -3,9 +3,8 @@ package execout
 import (
 	"testing"
 
-	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
-
 	"github.com/streamingfast/substreams/block"
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/stretchr/testify/require"
 )
 

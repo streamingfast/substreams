@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,12 +21,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
-
-var stateFilenameRegexp *regexp.Regexp
-
-func init() {
-	stateFilenameRegexp = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
-}
 
 // TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
 // more than that.
@@ -290,21 +283,6 @@ func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ran
 	}
 
 	return out
-}
-
-func fileNameToRange(filename string) (*block.Range, error) {
-	res := stateFilenameRegexp.FindAllStringSubmatch(filename, 1)
-	if len(res) != 1 {
-		return nil, fmt.Errorf("invalid output cache filename, %q", filename)
-	}
-
-	start := uint64(mustAtoi(res[0][1]))
-	end := uint64(mustAtoi(res[0][2]))
-
-	return &block.Range{
-		StartBlock:        start,
-		ExclusiveEndBlock: end,
-	}, nil
 }
 
 func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {

@@ -7,30 +7,30 @@ import (
 	"sync"
 
 	"github.com/abourget/llerrgroup"
-	"github.com/streamingfast/substreams/storage/store"
+	"github.com/streamingfast/substreams/storage/execout"
 )
 
-type storeSnapshotsMap struct {
+type SnapshotsMap struct {
 	sync.Mutex
-	Snapshots map[string]*storeSnapshots
+	Snapshots map[string]*Snapshots
 }
 
-func (s *storeSnapshotsMap) String() string {
+func (s *SnapshotsMap) String() string {
 	var out []string
 	for k, v := range s.Snapshots {
-		out = append(out, fmt.Sprintf("store=%s (%s)", k, v))
+		out = append(out, fmt.Sprintf("execout=%s (%s)", k, v))
 	}
 	return strings.Join(out, ", ")
 }
 
-func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap) (*storeSnapshotsMap, error) {
-	state := &storeSnapshotsMap{
-		Snapshots: map[string]*storeSnapshots{},
+func FetchState(ctx context.Context, configs *execout.Configs) (*SnapshotsMap, error) {
+	state := &SnapshotsMap{
+		Snapshots: map[string]*Snapshots{},
 	}
 
 	eg := llerrgroup.New(10)
 
-	for _, config := range storeConfigMap {
+	for _, config := range configs.ConfigMap {
 		if eg.Stop() {
 			break
 		}

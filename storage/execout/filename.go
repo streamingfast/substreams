@@ -3,58 +3,42 @@ package execout
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 
 	"github.com/streamingfast/substreams/block"
 )
 
-// TODO(abourget): turn that into something that works for OUTPUTS, not partials
-var stateFileRegex *regexp.Regexp
+var cacheFilenameRegex *regexp.Regexp
 
 func init() {
-	stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
+	cacheFilenameRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
 }
 
 type FileInfo struct {
 	Filename   string
-	StartBlock uint64
-	EndBlock   uint64
+	BlockRange *block.Range
 }
 
-func parseFileName(filename string) (*FileInfo, bool) {
-	res := stateFileRegex.FindAllStringSubmatch(filename, 1)
-	if len(res) != 1 {
-		return nil, false
+func parseFileName(filename string) (*FileInfo, error) {
+	blockRange, err := fileNameToRange(filename)
+	if err != nil {
+		return nil, fmt.Errorf("parsing filename %q: %w", filename, err)
 	}
-
-	end := uint64(mustAtoi(res[0][1]))
-	start := uint64(mustAtoi(res[0][2]))
-	partial := res[0][3] == "partial"
-
 	return &FileInfo{
 		Filename:   filename,
-		StartBlock: start,
-		EndBlock:   end,
-		Partial:    partial,
-	}, true
+		BlockRange: blockRange,
+	}, nil
 }
-
-func fullStateFilePrefix(blockNum uint64) string {
-	return fmt.Sprintf("%010d", blockNum)
-}
-
-func partialFileName(r *block.Range) string {
-	return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
-}
-
-func fullStateFileName(r *block.Range) string {
-	return fmt.Sprintf("%010d-%010d.kv", r.ExclusiveEndBlock, r.StartBlock)
-}
-
-func mustAtoi(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
+func fileNameToRange(filename string) (*block.Range, error) {
+	res := cacheFilenameRegex.FindAllStringSubmatch(filename, 1)
+	if len(res) != 1 {
+		return nil, fmt.Errorf("invalid output cache filename, %q", filename)
 	}
-	return i
+
+	start := uint64(mustAtoi(res[0][1]))
+	end := uint64(mustAtoi(res[0][2]))
+
+	return &block.Range{
+		StartBlock:        start,
+		ExclusiveEndBlock: end,
+	}, nil
 }

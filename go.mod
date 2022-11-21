@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dgrpc v0.0.0-20221031174241-978a7951c117
-	github.com/streamingfast/dstore v0.1.1-0.20221025062403-36259703e97b
+	github.com/streamingfast/dstore v0.1.1-0.20221118114203-13f4092e3bf0
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
 	github.com/stretchr/testify v1.8.0
@@ -30,6 +30,7 @@ require (
 	github.com/bytecodealliance/wasmtime-go v0.39.0
 	github.com/charmbracelet/bubbletea v0.20.1-0.20220530004057-97050569c9ec
 	github.com/dustin/go-humanize v1.0.0
+	github.com/google/uuid v1.3.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-testing-interface v1.14.1
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
@@ -76,7 +77,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.6.0 // indirect
 	github.com/googleapis/go-type-adapters v1.0.0 // indirect

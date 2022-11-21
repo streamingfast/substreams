@@ -15,7 +15,7 @@ type Config struct {
 	moduleHash string
 	store      dstore.Store
 
-	ModuleInitialBlock uint64
+	moduleInitialBlock uint64
 }
 
 func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseStore dstore.Store) (*Config, error) {
@@ -26,7 +26,7 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseSt
 	return &Config{
 		name:               name,
 		store:              subStore,
-		ModuleInitialBlock: moduleInitialBlock,
+		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 	}, nil
 }
@@ -41,13 +41,10 @@ func (c *Config) NewFile(saveBlockInterval uint64, logger *zap.Logger) *File {
 	}
 }
 
-func (c *Config) Name() string {
-	return c.name
-}
+func (c *Config) Name() string               { return c.name }
+func (c *Config) ModuleInitialBlock() uint64 { return c.moduleInitialBlock }
 
-type ExecOutputFiles = []*FileInfo
-
-func (c *Config) ListSnapshotFiles(ctx context.Context) (files ExecOutputFiles, err error) {
+func (c *Config) ListSnapshotFiles(ctx context.Context) (files FileInfos, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		if err := c.store.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, err := parseFileName(filename)

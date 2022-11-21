@@ -13,6 +13,8 @@ func init() {
 	cacheFilenameRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
 }
 
+type FileInfos = []*FileInfo
+
 type FileInfo struct {
 	Filename   string
 	BlockRange *block.Range

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/streamingfast/cli"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/jhump/protoreflect/dynamic"
@@ -29,28 +31,116 @@ var decodeCmd = &cobra.Command{
 }
 
 var decodeOutputsModuleCmd = &cobra.Command{
-	Use:          "outputs <manifest_file> <module_name> <output_url> <block_number> <key>",
-	Short:        "Decode outputs base 64 encoded bytes to protobuf data structure",
+	Use:   "outputs <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
+	Long: cli.Dedent(`
+		When running this outputs command with a mapper or a store the key will be the block hash. The key is optional
+		as it will return all the keys on the given block.
+	`),
+	Example: cli.Dedent(`
+		substreams tools decode outputs uniswap-v3.spkg map_pools_created [bucket-url-path] 12487090 <optional_key>
+		substreams tools decode outputs uniswap-v3.spkg store_pools [bucket-url-path] 12487090 <optional_key>
+	`),
 	RunE:         runDecodeOutputsModuleRunE,
 	Args:         cobra.MinimumNArgs(4),
 	SilenceUsage: true,
 }
 
-// todo: add decode states to decode the kv which is saved on disc
-//var decodeStatesModuleCmd = &cobra.Command{
-//	Use:          "states <manifest_file> <module_name> <output_url> <block_number> <key>",
-//	Short:        "Decode states base 64 encoded bytes to protobuf data structure",
-//	RunE:         runDecodeStatesModuleRunE,
-//	Args:         cobra.MinimumNArgs(4),
-//	SilenceUsage: true,
-//}
+var decodeStatesModuleCmd = &cobra.Command{
+	Use:   "states <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Short: "Decode states base 64 encoded bytes to protobuf data structure",
+	Long: cli.Dedent(`
+		Running the states command only works if the module is a store. If it is a map an error message will be returned
+		to the user. The user needs to specify a key as it is required.
+	`),
+	Example: cli.Dedent(`
+		substreams tools decode states uniswap-v3.spkg store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+		substreams tools decode states uniswap-v3.spkg store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+	`),
+	RunE:         runDecodeStatesModuleRunE,
+	Args:         cobra.MinimumNArgs(4),
+	SilenceUsage: true,
+}
 
 func init() {
 	decodeOutputsModuleCmd.Flags().Uint64("save-interval", 1000, "Output save interval")
+	decodeStatesModuleCmd.Flags().Uint64("save-interval", 1000, "states save interval")
 
 	decodeCmd.AddCommand(decodeOutputsModuleCmd)
+	decodeCmd.AddCommand(decodeStatesModuleCmd)
 
 	Cmd.AddCommand(decodeCmd)
+}
+
+func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	manifestPath := args[0]
+	moduleName := args[1]
+	storeUrl := args[2]
+	saveInterval := mustGetUint64(cmd, "save-interval")
+	blockNumber, err := strconv.ParseUint(args[3], 10, 64)
+	if err != nil {
+		return fmt.Errorf("converting blockNumber to uint: %w", err)
+	}
+
+	key := ""
+	if len(args) > 4 {
+		key = args[4]
+	}
+
+	zlog.Info("decoding module",
+		zap.String("manifest_path", manifestPath),
+		zap.String("module_name", moduleName),
+		zap.String("store_url", storeUrl),
+		zap.Uint64("block_number", blockNumber),
+		zap.Uint64("save_internal", saveInterval),
+		zap.String("key", key),
+	)
+
+	s, err := dstore.NewStore(storeUrl, "zst", "zstd", false)
+	if err != nil {
+		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
+	}
+
+	pkg, err := manifest.NewReader(manifestPath).Read()
+	if err != nil {
+		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	protoFiles := pkg.ProtoFiles
+	if len(protoFiles) == 0 {
+		return fmt.Errorf("no protobuf file definitions in the manifest")
+	}
+
+	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return fmt.Errorf("processing module graph %w", err)
+	}
+
+	hashes := manifest.NewModuleHashes()
+
+	var matchingModule *pbsubstreams.Module
+	for _, module := range pkg.Modules.Modules {
+		if module.Name == moduleName {
+			matchingModule = module
+		}
+	}
+	if matchingModule == nil {
+		return fmt.Errorf("module %q not found", moduleName)
+	}
+
+	moduleHash := hex.EncodeToString(hashes.HashModule(pkg.Modules, matchingModule, moduleGraph))
+	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
+
+	startBlock := cachev1.ComputeStartBlock(blockNumber, saveInterval)
+
+	switch matchingModule.Kind.(type) {
+	case *pbsubstreams.Module_KindMap_:
+		return fmt.Errorf("no states are available for a mapper")
+	case *pbsubstreams.Module_KindStore_:
+		return searchStateModule(ctx, startBlock, saveInterval, moduleHash, key, matchingModule, s, protoFiles)
+	}
+	return fmt.Errorf("module has an unknown")
 }
 
 func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {

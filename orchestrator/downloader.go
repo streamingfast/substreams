@@ -30,6 +30,7 @@ func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, modu
 	logger = logger.With(zap.String("component", "downloader"))
 	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
 	return &LinearExecOutputReader{
+		Shutter:                shutter.New(),
 		startBlock:             startBlock,
 		exclusiveEndBlock:      exclusiveEndBlock,
 		module:                 module,

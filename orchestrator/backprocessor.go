@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
-
-	store2 "github.com/streamingfast/substreams/storage/store"
-
-	"github.com/streamingfast/substreams/storage"
-
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/storage"
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 type Backprocessor struct {
@@ -28,11 +26,12 @@ func BuildBackProcessor(
 	runtimeConfig config.RuntimeConfig,
 	upToBlock uint64,
 	outputGraph *outputmodules.Graph,
+	execoutStorage *execout.Configs,
 	respFunc func(resp *pbsubstreams.Response) error,
-	storeConfigs store2.ConfigMap,
+	storeConfigs store.ConfigMap,
 	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Backprocessor, error) {
-	modulesStateMap, err := storage.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, outputGraph.RequestedMapModules(), runtimeConfig.ExecOutputSaveInterval, upToBlock)
+	modulesStateMap, err := storage.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, execoutStorage, runtimeConfig.ExecOutputSaveInterval, upToBlock)
 	if err != nil {
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
@@ -68,7 +67,7 @@ func BuildBackProcessor(
 	}, nil
 }
 
-func (b *Backprocessor) Run(ctx context.Context) (storeMap store2.Map, err error) {
+func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error) {
 	if b.execOutputReader != nil {
 		b.execOutputReader.Launch(ctx)
 	}

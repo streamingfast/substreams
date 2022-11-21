@@ -189,6 +189,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 		p.runtimeConfig,
 		reqDetails.LinearHandoffBlockNum,
 		p.outputGraph,
+		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
 		reqDetails.Request.Modules,

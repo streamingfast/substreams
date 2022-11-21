@@ -29,7 +29,7 @@ func (m ExecOutputStorageState) BatchRequests(subRequestSplitSize uint64) block.
 
 func NewExecOutputStorageState(config *execout.Config, saveInterval, workUpToBlockNum uint64, snapshots *Snapshots) (out *ExecOutputStorageState, err error) {
 	// TODO: base the content of Mapper on the `snapshots` in here..
-	modInitBlock := config.ModuleInitialBlock
+	modInitBlock := config.ModuleInitialBlock()
 	out = &ExecOutputStorageState{ModuleName: config.Name()}
 
 	if workUpToBlockNum <= modInitBlock {

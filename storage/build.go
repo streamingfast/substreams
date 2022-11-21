@@ -9,7 +9,7 @@ import (
 	"github.com/streamingfast/substreams/storage/execout/state"
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
-	store2 "github.com/streamingfast/substreams/storage/store/state"
+	storeState "github.com/streamingfast/substreams/storage/store/state"
 	"go.uber.org/zap"
 )
 
@@ -24,27 +24,10 @@ func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.Config
 	return out, nil
 }
 
-func buildMappersStorageState(ctx context.Context, mapConfigs *execout.Configs, execOutputSaveInterval, upToBlock uint64, out ModuleStorageStateMap) error {
-	// TODO(abourget): fetch execout states
-
-	stateMap, err := execoutState.FetchState(ctx, mapConfigs)
-	if err != nil {
-		return fmt.Errorf("fetching execout states: %w", err)
-	}
-	for _, config := range mapConfigs.ConfigMap {
-		snapshot := stateMap.Snapshots[config.Name()]
-		storageState, err := state.NewExecOutputStorageState(config, execOutputSaveInterval, upToBlock, snapshot)
-		if err != nil {
-			return fmt.Errorf("new map storageState: %w", err)
-		}
-		out[config.Name()] = storageState
-	}
-	return nil
-}
 func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, upToBlock uint64, out ModuleStorageStateMap) error {
 	logger := reqctx.Logger(ctx)
 
-	state, err := store2.FetchStoresState(ctx, storeConfigMap)
+	state, err := storeState.FetchState(ctx, storeConfigMap)
 	if err != nil {
 		return fmt.Errorf("fetching stores states: %w", err)
 	}
@@ -56,7 +39,7 @@ func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap
 			return fmt.Errorf("fatal: storage state not reported for module name %q", name)
 		}
 
-		moduleStorageState, err := store2.NewStoreStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
+		moduleStorageState, err := storeState.NewStoreStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), upToBlock, snapshot)
 		if err != nil {
 			return fmt.Errorf("new file units %q: %w", name, err)
 		}
@@ -64,6 +47,27 @@ func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap
 		out[name] = moduleStorageState
 
 		logger.Info("work plan for store module", zap.Object("work", moduleStorageState))
+	}
+	return nil
+}
+
+func buildMappersStorageState(ctx context.Context, execoutConfigs *execout.Configs, execOutputSaveInterval, upToBlock uint64, out ModuleStorageStateMap) error {
+	stateMap, err := execoutState.FetchMappersState(ctx, execoutConfigs)
+	if err != nil {
+		return fmt.Errorf("fetching execout states: %w", err)
+	}
+	// TODO(abourget): loop the `stateMap` instead, there shouldn't be
+	// anything but mappers in there, so the error shouldn't trigger below.
+	for modName, ranges := range stateMap.Snapshots {
+		if out[modName] != nil {
+			return fmt.Errorf("attempting to overwrite storage state for module %q", modName)
+		}
+		config := execoutConfigs.ConfigMap[modName]
+		storageState, err := state.NewExecOutputStorageState(config, execOutputSaveInterval, upToBlock, ranges)
+		if err != nil {
+			return fmt.Errorf("new map storageState: %w", err)
+		}
+		out[modName] = storageState
 	}
 	return nil
 }

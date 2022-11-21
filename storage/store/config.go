@@ -15,7 +15,7 @@ import (
 type Config struct {
 	name       string
 	moduleHash string
-	store      dstore.Store
+	objStore   dstore.Store
 
 	moduleInitialBlock uint64
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
@@ -34,10 +34,10 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 		name:               name,
 		updatePolicy:       updatePolicy,
 		valueType:          valueType,
-		store:              subStore,
+		objStore:           subStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
-		appendLimit:        8_388_608, // 8kb = 8 * 1024 * 1024,  // TODO(colin): make this configurable instead of hardcoded at 8kb
+		appendLimit:        8_388_608, // 8kb = 8 * 1024 * 1024,  // TODO(colin): keep this hard-coded at 8kb :)
 	}, nil
 }
 
@@ -84,7 +84,7 @@ func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialK
 func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (uint64, error) {
 	var size uint64
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		rc, err := c.store.OpenObject(ctx, fileInfo.Filename)
+		rc, err := c.objStore.OpenObject(ctx, fileInfo.Filename)
 		if err != nil {
 			return fmt.Errorf("opening file: %w", err)
 		}
@@ -109,7 +109,7 @@ func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (uint64, erro
 
 func (c *Config) ListSnapshotFiles(ctx context.Context) (files []*FileInfo, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		if err := c.store.Walk(ctx, "", func(filename string) (err error) {
+		if err := c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(filename)
 			if !ok {
 				return nil

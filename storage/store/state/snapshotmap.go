@@ -23,7 +23,7 @@ func (s *storeSnapshotsMap) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap) (*storeSnapshotsMap, error) {
+func FetchState(ctx context.Context, storeConfigMap store.ConfigMap) (*storeSnapshotsMap, error) {
 	state := &storeSnapshotsMap{
 		Snapshots: map[string]*storeSnapshots{},
 	}

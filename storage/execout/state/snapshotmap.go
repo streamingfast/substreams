@@ -6,13 +6,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/streamingfast/substreams/block"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/storage/execout"
 )
 
 type SnapshotsMap struct {
 	sync.Mutex
-	Snapshots map[string]*Snapshots
+	Snapshots map[string]block.Ranges
 }
 
 func (s *SnapshotsMap) String() string {
@@ -23,14 +26,18 @@ func (s *SnapshotsMap) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchState(ctx context.Context, configs *execout.Configs) (*SnapshotsMap, error) {
+func FetchMappersState(ctx context.Context, configs *execout.Configs) (*SnapshotsMap, error) {
 	state := &SnapshotsMap{
-		Snapshots: map[string]*Snapshots{},
+		Snapshots: map[string]block.Ranges{},
 	}
 
 	eg := llerrgroup.New(10)
 
 	for _, config := range configs.ConfigMap {
+		if config.ModuleKind() != pbsubstreams.ModuleKindMap {
+			continue
+		}
+
 		if eg.Stop() {
 			break
 		}

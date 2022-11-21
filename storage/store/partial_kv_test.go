@@ -31,7 +31,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 			Config: &Config{
 				moduleInitialBlock: 0,
-				store:              store,
+				objStore:           store,
 			},
 		},
 	}
@@ -51,7 +51,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 
 			Config: &Config{
 				moduleInitialBlock: 0,
-				store:              store,
+				objStore:           store,
 			},
 		},
 	}

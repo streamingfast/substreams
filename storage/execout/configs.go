@@ -40,6 +40,7 @@ func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstre
 		conf, err := NewConfig(
 			mod.Name,
 			mod.InitialBlock,
+			mod.ModuleKind(),
 			moduleHashes.Get(mod.Name),
 			baseObjectStore,
 		)

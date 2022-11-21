@@ -33,7 +33,7 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	p.loadedFrom = filename
 	p.logger.Debug("loading partial store state from file", zap.String("filename", filename))
 
-	data, err := loadStore(ctx, p.store, filename)
+	data, err := loadStore(ctx, p.objStore, filename)
 	if err != nil {
 		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
 	}
@@ -75,7 +75,7 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, er
 	)
 
 	fw := &fileWriter{
-		store:    p.store,
+		store:    p.objStore,
 		filename: filename,
 		content:  content,
 	}
@@ -93,7 +93,7 @@ func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error
 	filename := p.storageFilename(endBlock)
 	zlog.Debug("deleting partial store file", zap.String("file_name", filename))
 
-	if err = p.store.DeleteObject(ctx, filename); err != nil {
+	if err = p.objStore.DeleteObject(ctx, filename); err != nil {
 		zlog.Warn("deleting file", zap.String("file_name", filename), zap.Error(err))
 	}
 	return err

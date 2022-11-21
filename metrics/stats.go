@@ -2,13 +2,14 @@ package metrics
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"sync"
-	"time"
 )
 
 type Stats interface {
@@ -192,13 +193,15 @@ func (b *backprocessStats) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		return nil
 	}
 
-	enc.AddTime("stated_at", *b.startAt)
-	if b.stopAt != nil {
-		enc.AddDuration("elapsed", (*b.stopAt).Sub(*b.startAt))
-		return nil
+	if b.startAt != nil {
+		enc.AddTime("stated_at", *b.startAt)
+		if b.stopAt != nil {
+			enc.AddDuration("elapsed", (*b.stopAt).Sub(*b.startAt))
+			return nil
+		}
+		enc.AddDuration("elapsed", time.Since(*b.startAt))
 	}
 
-	enc.AddDuration("elapsed", time.Since(*b.startAt))
 	b.RLock()
 	defer b.RUnlock()
 	for moduleName, blockNum := range b.storeSquashers {

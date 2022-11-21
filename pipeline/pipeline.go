@@ -118,7 +118,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	p.stores.SetStoreMap(storeMap)
 
 	// Build the Module Executor list
-	// TODO(abourget): this could be done lazily, but the Graph,
+	// TODO(abourget): this could be done lazily, but the outputmodules.Graph,
 	// and cache the latest if all block boundaries
 	// are still clear.
 
@@ -353,7 +353,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 
 			outputStore, found := p.stores.StoreMap.Get(modName)
 			if !found {
-				return fmt.Errorf(" store %q not found", modName)
+				return fmt.Errorf("store %q not found", modName)
 			}
 			inputs = append(inputs, wasm.NewStoreWriterOutput(modName, outputStore, updatePolicy, valueType))
 

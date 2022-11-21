@@ -27,6 +27,8 @@ func init() {
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().BoolP("initial-snapshots", "i", false, "Load an initial snapshot at start block, before continuing processing.")
 
+	runCmd.Flags().Bool("production-mode", false, "Enable production mode, with high-speed forward processing: limits stream to a single mapper module.")
+
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -86,11 +88,12 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	req := &pbsubstreams.Request{
-		StartBlockNum: startBlock,
-		StopBlockNum:  stopBlock,
-		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
-		Modules:       pkg.Modules,
-		OutputModules: outputStreamNames,
+		StartBlockNum:  startBlock,
+		StopBlockNum:   stopBlock,
+		ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
+		Modules:        pkg.Modules,
+		OutputModules:  outputStreamNames,
+		ProductionMode: mustGetBool(cmd, "production-mode"),
 	}
 	if mustGetBool(cmd, "initial-snapshots") {
 		for _, modName := range req.OutputModules {

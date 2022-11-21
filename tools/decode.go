@@ -67,7 +67,7 @@ func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
 		zap.String("key", key),
 	)
 
-	store, err := dstore.NewSimpleStore(storeUrl)
+	objStore, err := dstore.NewSimpleStore(storeUrl)
 	if err != nil {
 		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
 	}
@@ -106,12 +106,12 @@ func runDecodeModuleRunE(cmd *cobra.Command, args []string) error {
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
-		return searchMapModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, store, protoFiles)
+		return searchMapModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, objStore, protoFiles)
 	case *pbsubstreams.Module_KindStore_:
 		if key == "" {
 			return fmt.Errorf("unable to search a store with a blank key")
 		}
-		return searchStoreModule(ctx, startBlock, saveInterval, moduleHash, key, matchingModule, store, protoFiles)
+		return searchStoreModule(ctx, startBlock, saveInterval, moduleHash, key, matchingModule, objStore, protoFiles)
 	}
 	return fmt.Errorf("module has an unknown")
 }
@@ -126,7 +126,7 @@ func searchMapModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, moduleHash, stateStore)
+	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore)
 	moduleStore, err := stateStore.SubStore(moduleHash + "/outputs")
 	if err != nil {
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)

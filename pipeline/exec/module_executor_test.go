@@ -3,10 +3,11 @@ package exec
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/execout"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 type MockExecOutput struct {
@@ -152,4 +153,5 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, applied)
 	assert.NotEmpty(t, moduleOutput)
+	assert.True(t, moduleOutput.Cached)
 }

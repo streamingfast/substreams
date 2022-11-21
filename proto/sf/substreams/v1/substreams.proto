@@ -81,6 +81,8 @@ message ModuleOutput {
   // LogsTruncated is a flag that tells you if you received all the logs or if they
   // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
   bool logs_truncated = 5;
+
+  bool cached = 6;
 }
 
 message ModulesProgress {

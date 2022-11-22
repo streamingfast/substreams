@@ -254,6 +254,7 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("store", c.ModuleName)
 	enc.AddUint64("start_block", c.currentBlockRange.StartBlock)
 	enc.AddUint64("end_block", c.currentBlockRange.ExclusiveEndBlock)
+	enc.AddInt("kv_count", len(c.outputData.Kv))
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package work
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -99,7 +100,7 @@ func TestWorkPlanning(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			plan, err := BuildNewPlan(test.state, uint64(test.subreqSplit), test.upToBlock, outputGraph)
+			plan, err := BuildNewPlan(context.Background(), test.state, uint64(test.subreqSplit), test.upToBlock, outputGraph)
 			require.NoError(t, err)
 
 			assert.Equal(t, jobList(test.expectWaitingJobs), jobList(plan.waitingJobs), "waiting jobs")

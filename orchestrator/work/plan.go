@@ -43,16 +43,6 @@ func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStat
 		outputGraph:     outputGraph,
 	}
 
-	storageState, err := fetchStorageState(ctx, storeConfigMap)
-	if err != nil {
-		return nil, fmt.Errorf("fetching stores states: %w", err)
-	}
-	if err := plan.buildPlanFromStorageState(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
-		return nil, fmt.Errorf("build plan: %w", err)
-	}
-	if err := plan.sortModules(graph); err != nil {
-		return nil, fmt.Errorf("sorting modules: %w", err)
-	}
 	if err := plan.splitWorkIntoJobs(subrequestSplitSize); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
@@ -221,11 +211,4 @@ func (p *Plan) String() string {
 	}
 
 	return workingPlan + waitingJobs + readyJobs
-}
-
-func moduleNames(modules []*pbsubstreams.Module) (out []string) {
-	for _, mod := range modules {
-		out = append(out, mod.Name)
-	}
-	return
 }

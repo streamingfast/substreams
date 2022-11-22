@@ -45,6 +45,7 @@ type testRun struct {
 	BlockProcessedCallback blockProcessedCallBack
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	ProductionMode         bool
+	Context                context.Context // custom top-level context, defaults to context.Background()
 
 	Responses []*pbsubstreams.Response
 }
@@ -55,6 +56,9 @@ func newTestRun(startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, 
 
 func (f *testRun) Run(t *testing.T) error {
 	ctx := context.Background()
+	if f.Context != nil {
+		ctx = f.Context
+	}
 	ctx = reqctx.WithLogger(ctx, zlog)
 
 	testTempDir := t.TempDir()

@@ -49,6 +49,18 @@ var tplMod string
 //go:embed templates/pb_mod.gotmpl
 var tplPbMod string
 
+//go:embed templates/buildsh.gotmpl
+var tplBuildSh string
+
+//go:embed templates/cargotoml.gotmpl
+var tplCargoToml string
+
+//go:embed templates/manifestyaml.gotmpl
+var tplManifestYaml string
+
+//go:embed templates/rusttoolchain.gotmpl
+var tplRustToolchain string
+
 var StoreType = map[string]string{
 	"bytes":      "Raw",
 	"string":     "String",
@@ -196,6 +208,7 @@ func WithTestWriter(w io.Writer) GenerationOptions {
 		options.w = w
 	}
 }
+
 func generate(name, tpl string, data any, outputFile string, options ...GenerationOptions) (err error) {
 	var w io.Writer
 
@@ -365,6 +378,7 @@ func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input
 	t = maybeTranslateType(t)
 	return fmt.Sprintf("substreams::store::StoreGet%s", t)
 }
+
 func (e *Engine) WritableStoreType(store *manifest.Module) string {
 	t := store.ValueType
 	p := store.UpdatePolicy

@@ -1,9 +1,13 @@
 package work
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/streamingfast/substreams/reqctx"
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
@@ -26,35 +30,29 @@ type Plan struct {
 
 	modulesReadyUpToBlock map[string]uint64
 
-	mu sync.Mutex
+	mu     sync.Mutex
+	logger *zap.Logger
 }
 
-func BuildNewPlan(modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputmodules.Graph) (*Plan, error) {
+func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputmodules.Graph) (*Plan, error) {
+	logger := reqctx.Logger(ctx)
 	plan := &Plan{
 		ModulesStateMap: modulesStateMap,
 		upToBlock:       upToBlock,
+		logger:          logger,
 		outputGraph:     outputGraph,
 	}
 
-	// TODO(abourget):
-	// Get the output files present for requested output modules
-	// Schedule work a bit differently if we're asking for
-	//  MAPPERS outputs (we don't need to reproc anything if we have
-	// the mapper's output cached already).
-	//
-	// Leaf module? Can be store or mapper?
-	// On schedule tous les stores comme dépendances, les dépendances sont
-	// toujours only stores
-	// mais les leaf modules
-
-	// Fetch outputs for `mapperOutputModules`
-	// TODO(abourget): we'll need to bring in the `dstore.Store` related to the `output` for the mappers in here.
-	// They're only in the
-	//mappersOutputState, err := fetchMappersOutputsState(ctx, mappersConfigMap)
-	//if err := plan.buildMappersStorageState(ctx, mappersOutputState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
-	//	return nil, fmt.Errorf("build plan: %w", err)
-	//}
-
+	storageState, err := fetchStorageState(ctx, storeConfigMap)
+	if err != nil {
+		return nil, fmt.Errorf("fetching stores states: %w", err)
+	}
+	if err := plan.buildPlanFromStorageState(ctx, storageState, storeConfigMap, storeSnapshotsSaveInterval, upToBlock); err != nil {
+		return nil, fmt.Errorf("build plan: %w", err)
+	}
+	if err := plan.sortModules(graph); err != nil {
+		return nil, fmt.Errorf("sorting modules: %w", err)
+	}
 	if err := plan.splitWorkIntoJobs(subrequestSplitSize); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
@@ -79,6 +77,13 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
 
 			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
 			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)
+
+			p.logger.Debug("adding job",
+				zap.String("module", storeName),
+				zap.Uint64("start_block", requestRange.StartBlock),
+				zap.Uint64("end_block", requestRange.ExclusiveEndBlock),
+				zap.Int("priority", priority),
+			)
 
 			job := NewJob(storeName, requestRange, requiredModules, priority)
 			p.waitingJobs = append(p.waitingJobs, job)

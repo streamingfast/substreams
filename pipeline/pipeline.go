@@ -276,10 +276,6 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	return nil
 }
 
-func shouldReturnProgress(isSubRequest bool) bool {
-	return isSubRequest
-}
-
 func shouldReturnDataOutputs(blockNum, requestStartBlockNum uint64, isSubRequest bool) bool {
 	return shouldReturn(blockNum, requestStartBlockNum) && !isSubRequest
 }

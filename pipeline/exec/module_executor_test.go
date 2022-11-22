@@ -154,4 +154,5 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, applied)
 	assert.NotEmpty(t, moduleOutput)
+	assert.True(t, moduleOutput.Cached)
 }

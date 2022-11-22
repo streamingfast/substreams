@@ -8,7 +8,7 @@ description: StreamingFast Substreams conceptual diagram
 
 <img src="../.gitbook/assets/substreams.excalidraw (1).svg" alt="StreamingFast Substreams high-level conceptual diagram" class="gitbook-drawing">
 
-Substreams has two perspectives as illustrated in the high-level visual diagram seen below. One perspective is the architecture of and Substreams engine itself. The other perspective is from that of an end-user developer. &#x20;
+Substreams has two perspectives as illustrated in the high-level visual diagram seen below. One perspective is from the Substreams engine itself. The other perspective is from that of an end-user developer. &#x20;
 
 Essentially the developer of an end-user application will design and create a data refinement strategy.&#x20;
 

@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/require"
@@ -102,4 +103,29 @@ func TestAllAssertionsParallel(t *testing.T) {
 	run.ProductionMode = true
 	run.ParallelSubrequests = 5
 	require.NoError(t, run.Run(t))
+}
+
+func Test_SimpleMapModule(t *testing.T) {
+	//t.Skip("Skipping until we can figure out why this is failing")
+
+	run := newTestRun(10000, 10001, 10001, "test_store_proto")
+	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock + 10,
+		}
+	}
+	run.ParallelSubrequests = 5
+	run.Context = cancelledContext(100 * time.Millisecond)
+
+	require.NoError(t, run.Run(t))
+}
+
+func cancelledContext(delay time.Duration) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(delay)
+		cancel()
+	}()
+	return ctx
 }

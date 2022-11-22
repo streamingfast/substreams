@@ -11,13 +11,12 @@ import (
 	"sync"
 	"time"
 
-	store2 "github.com/streamingfast/substreams/storage/store"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
 )
 
@@ -72,21 +71,38 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 	hashes := manifest.NewModuleHashes()
 	for _, module := range pkg.Modules.Modules {
 		go func(module *pbsubstreams.Module) {
+			done := make(chan any)
+			defer close(done)
+
+			hash := hex.EncodeToString(hashes.HashModule(pkg.Modules, module, graph))
+
+			go func() {
+				for {
+					select {
+					case <-time.After(10 * time.Second):
+						zlog.Debug("still getting store stats", zap.String("module", module.Name), zap.String("hash", hash))
+					case <-done:
+						return
+					}
+				}
+			}()
+
 			start := time.Now()
 			defer func() {
 				zlog.Debug("finished getting store stats for module", zap.String("module", module.Name), zap.Duration("duration", time.Now().Sub(start)))
 			}()
 
 			defer wg.Done()
+
 			if module.GetKindStore() == nil {
 				zlog.Debug("skipping non-store module", zap.String("module", module.Name))
 				return
 			}
 
-			conf, err := store2.NewConfig(
+			conf, err := store.NewConfig(
 				module.Name,
 				module.InitialBlock,
-				hex.EncodeToString(hashes.HashModule(pkg.Modules, module, graph)),
+				hash,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.UpdatePolicy,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.ValueType,
 				baseDStore,
@@ -97,7 +113,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			}
 			storeStats := initializeStoreStats(conf)
 
-			stateStore, fileInfo, err := getStore(ctx, conf)
+			stateStore, fileInfos, err := getStore(ctx, conf)
 			if err != nil {
 				if errors.Is(err, EmptyStoreError) {
 					zlog.Debug("skipping empty store", zap.String("module", module.Name))
@@ -109,16 +125,26 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 				return
 			}
 
-			var fileSize uint64
-			fileSize, err = conf.FileSize(ctx, fileInfo)
+			growth, err := fileSizeGrowth(ctx, conf, fileInfos)
+			if err != nil {
+				zlog.Error("getting file size growth", zap.Error(err))
+				return
+			}
+
+			latestFile := fileInfos[len(fileInfos)-1]
+
+			var fileSize int64
+			fileSize, err = conf.FileSize(ctx, latestFile)
 			if err != nil {
 				zlog.Error("getting file size", zap.Error(err))
 				return
 			}
+
 			storeStats.FileInfo = &FileInfo{
-				FileBlockRange: block.NewRange(fileInfo.StartBlock, fileInfo.EndBlock),
-				FileName:       fileInfo.Filename,
+				FileBlockRange: block.NewRange(latestFile.StartBlock, latestFile.EndBlock),
+				FileName:       latestFile.Filename,
 				FileSize:       fileSize,
+				FileSizeGrowth: growth,
 			}
 
 			err = calculateStoreStats(stateStore, storeStats)
@@ -171,7 +197,8 @@ type StoreStats struct {
 
 type FileInfo struct {
 	FileName       string       `json:"name"`
-	FileSize       uint64       `json:"size_bytes"`
+	FileSize       int64        `json:"size_bytes"`
+	FileSizeGrowth float64      `json:"size_growth"`
 	FileBlockRange *block.Range `json:"block_range"`
 }
 
@@ -193,7 +220,7 @@ type ValueStats struct {
 	Largest string `json:"largest_value_key"`
 }
 
-func initializeStoreStats(conf *store2.Config) *StoreStats {
+func initializeStoreStats(conf *store.Config) *StoreStats {
 	storeStats := &StoreStats{
 		Name:         conf.Name(),
 		ModuleHash:   conf.ModuleHash(),
@@ -205,17 +232,20 @@ func initializeStoreStats(conf *store2.Config) *StoreStats {
 	return storeStats
 }
 
-func getStore(ctx context.Context, conf *store2.Config) (store2.Store, *store2.FileInfo, error) {
+func getStore(ctx context.Context, conf *store.Config) (store.Store, []*store.FileInfo, error) {
+	start := time.Now()
 	files, err := conf.ListSnapshotFiles(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing snapshot files: %w", err)
 	}
+	zlog.Debug("listing snapshot files", zap.Duration("duration", time.Now().Sub(start)))
+
 	if len(files) == 0 {
 		zlog.Debug("store is empty", zap.String("module", conf.Name()), zap.String("hash", conf.ModuleHash()))
 		return nil, nil, EmptyStoreError
 	}
 
-	kvFiles := make([]*store2.FileInfo, 0, len(files))
+	kvFiles := make([]*store.FileInfo, 0, len(files))
 	for _, file := range files {
 		if file.Partial {
 			continue
@@ -223,21 +253,31 @@ func getStore(ctx context.Context, conf *store2.Config) (store2.Store, *store2.F
 		kvFiles = append(kvFiles, file)
 	}
 
+	start = time.Now()
 	sort.Slice(kvFiles, func(i, j int) bool { //reverse sort
 		return kvFiles[i].EndBlock >= kvFiles[j].EndBlock
 	})
+	zlog.Debug("sorting snapshot files", zap.Duration("duration", time.Now().Sub(start)))
+	latestFiles := kvFiles[:5]
 	latestFile := kvFiles[0]
 
+	start = time.Now()
 	s := conf.NewFullKV(zlog)
 	err = s.Load(ctx, latestFile.EndBlock)
 	if err != nil {
 		return nil, nil, fmt.Errorf("loading store: %w", err)
 	}
+	zlog.Debug("loading store", zap.Duration("duration", time.Now().Sub(start)))
 
-	return s, latestFile, nil
+	return s, latestFiles, nil
 }
 
-func calculateStoreStats(stateStore store2.Store, stats *StoreStats) error {
+func calculateStoreStats(stateStore store.Store, stats *StoreStats) error {
+	start := time.Now()
+	defer func() {
+		zlog.Debug("calculating store stats", zap.Duration("duration", time.Now().Sub(start)))
+	}()
+
 	keyStats := &KeyStats{}
 	valueStats := &ValueStats{}
 	stats.KeyStats = keyStats
@@ -295,4 +335,70 @@ func stdDev(xs []float64, mean float64) float64 {
 		sum += math.Pow(x-mean, 2)
 	}
 	return math.Sqrt(sum / float64(len(xs)))
+}
+
+func fileSizeGrowth(ctx context.Context, conf *store.Config, files []*store.FileInfo) (float64, error) {
+	if len(files) < 2 {
+		return 0, nil
+	}
+
+	firstSize, err := conf.FileSize(ctx, files[0])
+	if err != nil {
+		return 0, fmt.Errorf("getting file size: %w", err)
+	}
+	lastSize, err := conf.FileSize(ctx, files[len(files)-1])
+	if err != nil {
+		return 0, fmt.Errorf("getting file size: %w", err)
+	}
+
+	if firstSize == lastSize {
+		return 0, nil
+	}
+
+	if len(files) == 2 {
+		return float64(lastSize - firstSize), nil
+	}
+
+	ixs := make([]float64, 0, len(files))
+	sizes := make([]float64, 0, len(files))
+	for i := 0; i < len(files); i++ {
+		switch i {
+		case 0:
+			ixs = append(ixs, float64(i))
+			sizes = append(sizes, float64(firstSize))
+			continue
+		case len(files) - 1:
+			ixs = append(ixs, float64(i))
+			sizes = append(sizes, float64(lastSize))
+			continue
+		}
+
+		file := files[i]
+		s, err := conf.FileSize(ctx, file)
+		if err != nil {
+			return 0, fmt.Errorf("getting file size: %w", err)
+		}
+		sizes = append(sizes, float64(s))
+		ixs = append(ixs, float64(i))
+	}
+
+	m, _ := leastSquareRegression(ixs, sizes)
+
+	return -1 * m, nil
+}
+
+func leastSquareRegression(xs, ys []float64) (float64, float64) {
+	var sumX, sumY, sumXY, sumXX float64
+	for i := range xs {
+		sumX += xs[i]
+		sumY += ys[i]
+		sumXY += xs[i] * ys[i]
+		sumXX += xs[i] * xs[i]
+	}
+
+	n := float64(len(xs))
+	m := (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX)
+	b := (sumY - m*sumX) / n
+
+	return m, b
 }

@@ -30,10 +30,16 @@ func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) er
 				msgType := ui.msgTypes[out.Name]
 				cnt := ui.decodeDynamicMessage(msgType, msgDesc, output.Clock.Number, out.Name, data.MapOutput)
 				cnt = ui.prettyFormat(cnt, true)
+				if out.Cached {
+					s = append(s, cachedValues(out.Name))
+				}
 				s = append(s, string(cnt))
 			}
 		case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
 			if len(data.DebugStoreDeltas.Deltas) != 0 {
+				if out.Cached {
+					s = append(s, cachedValues(out.Name))
+				}
 				s = append(s, ui.renderDecoratedDeltas(out.Name, output.Clock.Number, data.DebugStoreDeltas.Deltas, false)...)
 			}
 		}
@@ -42,6 +48,10 @@ func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) er
 		fmt.Println(strings.Join(s, ""))
 	}
 	return nil
+}
+
+func cachedValues(name string) string {
+	return fmt.Sprintf("Cached value(s) for %s\n", name)
 }
 
 func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*pbsubstreams.StoreDelta, initialSnapshot bool) (s []string) {
@@ -119,10 +129,16 @@ func (ui *TUI) jsonBlockScopedData(output *pbsubstreams.BlockScopedData) error {
 				msgType := ui.msgTypes[out.Name]
 				cnt := ui.decodeDynamicMessage(msgType, msgDesc, output.Clock.Number, out.Name, data.MapOutput)
 				cnt = ui.prettyFormat(cnt, true)
+				if out.Cached {
+					fmt.Println(cachedValues(out.Name))
+				}
 				fmt.Println(string(cnt))
 			}
 		case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
 			if len(data.DebugStoreDeltas.Deltas) != 0 {
+				if out.Cached {
+					fmt.Println(cachedValues(out.Name))
+				}
 				if err := ui.printJSONBlockDeltas(out.Name, output.Clock.Number, data.DebugStoreDeltas.Deltas); err != nil {
 					return fmt.Errorf("print json deltas: %w", err)
 				}
@@ -244,7 +260,7 @@ func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescrip
 			String: string(decodeAsString(in)),
 			Bytes:  in,
 		})
-		return []byte(decodeAsString(cnt))
+		return decodeAsString(cnt)
 	}
 
 	return cnt
@@ -307,7 +323,7 @@ func msgDescToJSON(msgType string, blockNum uint64, mod string, dynMsg *dynamic.
 			Module:   mod,
 			BlockNum: blockNum,
 			Type:     msgType,
-			Data:     json.RawMessage(cnt),
+			Data:     cnt,
 		})
 		if err != nil {
 			return

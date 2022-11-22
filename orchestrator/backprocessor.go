@@ -36,7 +36,7 @@ func BuildBackProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
-	plan, err := work.BuildNewPlan(modulesStateMap, runtimeConfig.SubrequestsSplitSize, upToBlock, outputGraph)
+	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, upToBlock, outputGraph)
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}

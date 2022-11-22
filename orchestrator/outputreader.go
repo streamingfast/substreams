@@ -87,16 +87,11 @@ func (r *LinearExecOutputReader) download(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("getting sorted cache items: %w", err)
 		}
-
-		if len(sortedCachedItems) == 0 {
-			return nil
-		}
-
 		nextCachedBlockNum += r.execOutputSaveInterval
+
 		for _, cachedItem := range sortedCachedItems {
 			select {
 			case r.cacheItems <- cachedItem:
-				continue
 			case <-r.Terminating():
 				return nil
 			case <-ctx.Done():

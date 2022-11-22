@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -81,25 +80,16 @@ func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialK
 	}
 }
 
-func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (uint64, error) {
-	var size uint64
+func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (int64, error) {
+	var size int64
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		rc, err := c.objStore.OpenObject(ctx, fileInfo.Filename)
+		attr, err := c.objStore.ObjectAttributes(ctx, fileInfo.Filename)
 		if err != nil {
-			return fmt.Errorf("opening file: %w", err)
-		}
-		defer rc.Close()
-
-		w := io.Discard
-		n, err := io.Copy(w, rc)
-		if err != nil {
-			return fmt.Errorf("reading file: %w", err)
+			return fmt.Errorf("getting object attributes: %w", err)
 		}
 
-		size = uint64(n)
-
+		size = attr.Size
 		return nil
-
 	})
 	if err != nil {
 		return 0, err

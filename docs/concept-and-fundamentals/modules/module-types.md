@@ -4,9 +4,9 @@ description: StreamingFast Substreams module types
 
 # Module Types
 
-### Two Module Types
+## Modules Overview
 
-Substreams uses two types of modules, `map` and `store`.&#x20;
+Substreams developers use two types of modules, `map` and `store`.&#x20;
 
 * Map modules send and receive bytes.&#x20;
 * Store modules are stateful, saving and tracking data through the use of simple key-value stores.
@@ -20,6 +20,11 @@ Store modules write to key-value stores.&#x20;
 {% endhint %}
 
 Stores that declare their own data types will expose methods capable of mutating keys within the store.
+
+### Core Principle Usage of Stores
+
+* Do not store keys in stores _unless they are to be read by a downstream module_. Substreams stores are a means to do aggregations, but it is not a storage layer.
+* Do not store all transfers of a chain in a `store` module, rather, output them in a mapper and have a downstream system store them for a quick query.
 
 ### Important Store Properties
 

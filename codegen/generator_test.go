@@ -77,7 +77,7 @@ func TestGenerate_GenerateMod(t *testing.T) {
 }
 
 func TestGenerate_GeneratePbMod(t *testing.T) {
-	//t.Skip()
+	t.Skip()
 
 	g := InitTestGenerator(t)
 

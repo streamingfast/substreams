@@ -88,6 +88,7 @@ func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error)
 		case <-ctx.Done():
 		}
 	}
+
 	return storeMap, nil
 }
 

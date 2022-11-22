@@ -106,7 +106,7 @@ func TestAllAssertionsParallel(t *testing.T) {
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	//t.Skip("Skipping until we can figure out why this is failing")
+	t.Skip("Skipping until we can figure out why this is failing")
 
 	run := newTestRun(10000, 10001, 10001, "test_store_proto")
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {

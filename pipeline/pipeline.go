@@ -144,11 +144,6 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 
 	outputModuleName := reqDetails.Request.OutputModules[0]
 
-	// there is an assumption that in backprocess mode the outputModule is a store
-	if _, found := p.stores.configs[outputModuleName]; !found {
-		return nil, fmt.Errorf("requested output module %q is not found in store configurations", outputModuleName)
-	}
-
 	ttrace.SpanContextFromContext(context.Background())
 	storeMap := store.NewMap()
 

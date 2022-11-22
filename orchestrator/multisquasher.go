@@ -6,22 +6,27 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streamingfast/substreams/storage/store/state"
-
-	store2 "github.com/streamingfast/substreams/storage/store"
-
-	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/storage"
-
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/storage"
+	execoutState "github.com/streamingfast/substreams/storage/execout/state"
+	"github.com/streamingfast/substreams/storage/store"
+	storeState "github.com/streamingfast/substreams/storage/store/state"
 	"go.uber.org/zap"
 )
 
 // MultiSquasher produces _complete_ stores, by merging backing partial stores.
 type MultiSquasher struct {
-	storeSquashers       map[string]*StoreSquasher
+	storeSquashers       map[string]squashable
 	targetExclusiveBlock uint64
+}
+
+type squashable interface {
+	launch(ctx context.Context)
+	waitForCompletion(ctx context.Context) error
+	squash(partialsChunks block.Ranges) error
+	moduleName() string
 }
 
 // NewMultiSquasher receives stores, initializes them and fetches them from
@@ -36,69 +41,77 @@ func NewMultiSquasher(
 	ctx context.Context,
 	runtimeConfig config.RuntimeConfig,
 	modulesStorageStateMap storage.ModuleStorageStateMap,
-	storeConfigs store2.ConfigMap,
+	storeConfigs store.ConfigMap,
 	upToBlock uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) (*MultiSquasher, error) {
 	logger := reqctx.Logger(ctx)
-	storeSquashers := map[string]*StoreSquasher{}
+	storeSquashers := map[string]squashable{}
+
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
-		storeStorageState, ok := moduleStorageState.(*state.StoreStorageState)
-		if !ok {
-			continue
-		}
-
-		storeConfig, found := storeConfigs[storeModuleName]
-		if !found {
-			return nil, fmt.Errorf("store %q not found", storeModuleName)
-		}
-
-		startingStore := storeConfig.NewFullKV(logger)
-
-		// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
-		// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
-		// one is derived?
-		var storeSquasher *StoreSquasher
-		if storeStorageState.InitialCompleteRange == nil {
-			logger.Debug("setting up initial store",
-				zap.String("store", storeModuleName),
-				zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
-			)
-			storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
-		} else {
-			logger.Debug("loading initial store",
-				zap.String("store", storeModuleName),
-				zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
-			)
-			if err := startingStore.Load(ctx, storeStorageState.InitialCompleteRange.ExclusiveEndBlock); err != nil {
-				return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, storeStorageState.InitialCompleteRange, err)
+		switch storageState := moduleStorageState.(type) {
+		case *storeState.StoreStorageState:
+			storeConfig, found := storeConfigs[storeModuleName]
+			if !found {
+				return nil, fmt.Errorf("store %q not found", storeModuleName)
 			}
-			storeSquasher = NewStoreSquasher(startingStore, upToBlock, storeStorageState.InitialCompleteRange.ExclusiveEndBlock, uint64(runtimeConfig.StoreSnapshotsSaveInterval), onStoreCompletedUntilBlock)
 
-			onStoreCompletedUntilBlock(storeModuleName, storeStorageState.InitialCompleteRange.ExclusiveEndBlock)
+			storeSquasher, err := buildStoreSquasher(ctx, runtimeConfig.StoreSnapshotsSaveInterval, storeConfig, logger, storageState, upToBlock, onStoreCompletedUntilBlock)
+			if err != nil {
+				return nil, err
+			}
+
+			storeSquashers[storeModuleName] = storeSquasher
+			logger.Debug("store squasher initialized", zap.String("module_name", storeModuleName))
+
+		case *execoutState.ExecOutputStorageState:
+			storeSquashers[storeModuleName] = &NoopMapSquasher{name: storeModuleName}
+			logger.Debug("noop squasher initialized", zap.String("module_name", storeModuleName))
 		}
-
-		if len(storeStorageState.PartialsMissing) == 0 {
-			storeSquasher.targetExclusiveEndBlockReach = true
-		}
-
-		if len(storeStorageState.PartialsPresent) != 0 {
-			storeSquasher.squash(storeStorageState.PartialsPresent)
-		}
-
-		storeSquashers[storeModuleName] = storeSquasher
-
-		logger.Info("store squasher initialized",
-			zap.String("module_name", storeModuleName),
-		)
 	}
 
-	squasher := &MultiSquasher{
+	return &MultiSquasher{
 		storeSquashers:       storeSquashers,
 		targetExclusiveBlock: upToBlock,
+	}, nil
+}
+
+func buildStoreSquasher(ctx context.Context, storeSnapshotsSaveInterval uint64, storeConfig *store.Config, logger *zap.Logger, storeStorageState *storeState.StoreStorageState, upToBlock uint64, onStoreCompletedUntilBlock func(storeName string, blockNum uint64)) (*StoreSquasher, error) {
+	storeModuleName := storeConfig.Name()
+	startingStore := storeConfig.NewFullKV(logger)
+
+	// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
+	// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
+	// one is derived?
+	var storeSquasher *StoreSquasher
+	if storeStorageState.InitialCompleteRange == nil {
+		logger.Debug("setting up initial store",
+			zap.String("store", storeModuleName),
+			zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
+		)
+		storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+	} else {
+		logger.Debug("loading initial store",
+			zap.String("store", storeModuleName),
+			zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
+		)
+		if err := startingStore.Load(ctx, storeStorageState.InitialCompleteRange.ExclusiveEndBlock); err != nil {
+			return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, storeStorageState.InitialCompleteRange, err)
+		}
+		storeSquasher = NewStoreSquasher(startingStore, upToBlock, storeStorageState.InitialCompleteRange.ExclusiveEndBlock, storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+
+		onStoreCompletedUntilBlock(storeModuleName, storeStorageState.InitialCompleteRange.ExclusiveEndBlock)
 	}
 
-	return squasher, nil
+	if len(storeStorageState.PartialsMissing) == 0 {
+		storeSquasher.targetExclusiveEndBlockReach = true
+	}
+	if len(storeStorageState.PartialsPresent) != 0 {
+		if err := storeSquasher.squash(storeStorageState.PartialsPresent); err != nil {
+			return nil, fmt.Errorf("first squash: %w", err)
+		}
+	}
+	return storeSquasher, nil
 }
 
 func (s *MultiSquasher) Launch(ctx context.Context) {
@@ -116,7 +129,7 @@ func (s *MultiSquasher) Squash(moduleName string, partialsRanges block.Ranges) e
 	return squashable.squash(partialsRanges)
 }
 
-func (s *MultiSquasher) Wait(ctx context.Context) (out store2.Map, err error) {
+func (s *MultiSquasher) Wait(ctx context.Context) (out store.Map, err error) {
 	if err := s.waitUntilCompleted(ctx); err != nil {
 		return nil, fmt.Errorf("waiting for squashers to complete: %w", err)
 	}
@@ -131,32 +144,34 @@ func (s *MultiSquasher) Wait(ctx context.Context) (out store2.Map, err error) {
 
 func (s *MultiSquasher) waitUntilCompleted(ctx context.Context) error {
 	logger := reqctx.Logger(ctx)
-	logger.Info("squasher waiting till squasher stores are completed",
+	logger.Info("squasher waiting until all are completed",
 		zap.Int("store_count", len(s.storeSquashers)),
 	)
 	for _, squashable := range s.storeSquashers {
-		logger.Info("shutting down store squasher",
-			zap.String("store", squashable.name),
+		logger.Info("shutting down squasher",
+			zap.String("module", squashable.moduleName()),
 		)
-		if err := squashable.WaitForCompletion(ctx); err != nil {
-			return fmt.Errorf("%q completed with err: %w", squashable.name, err)
+		if err := squashable.waitForCompletion(ctx); err != nil {
+			return fmt.Errorf("%q completed with err: %w", squashable.moduleName(), err)
 		}
 	}
 	return nil
 }
 
-func (s *MultiSquasher) getFinalStores() (out store2.Map, err error) {
-	out = store2.NewMap()
+func (s *MultiSquasher) getFinalStores() (out store.Map, err error) {
+	out = store.NewMap()
 	var errs []string
 	for _, squashable := range s.storeSquashers {
-		if !squashable.targetExclusiveEndBlockReach {
-			errs = append(errs, fmt.Sprintf("module %s: target %d not reached (next expected: %d)", squashable.store.String(), s.targetExclusiveBlock, squashable.nextExpectedStartBlock))
-		}
-		if !squashable.IsEmpty() {
-			errs = append(errs, fmt.Sprintf("module %s: missing ranges %s", squashable.store.String(), squashable.ranges))
-		}
+		if storeSquasher, ok := squashable.(*StoreSquasher); ok {
+			if !storeSquasher.targetExclusiveEndBlockReach {
+				errs = append(errs, fmt.Sprintf("module %s: target %d not reached (next expected: %d)", storeSquasher.moduleName(), s.targetExclusiveBlock, storeSquasher.nextExpectedStartBlock))
+			}
+			if !storeSquasher.IsEmpty() {
+				errs = append(errs, fmt.Sprintf("module %s: missing ranges %s", storeSquasher.moduleName(), storeSquasher.ranges))
+			}
 
-		out.Set(squashable.store)
+			out.Set(storeSquasher.store)
+		}
 	}
 	if len(errs) != 0 {
 		return nil, fmt.Errorf("%d errors: %s", len(errs), strings.Join(errs, "; "))

@@ -67,7 +67,8 @@ func (f *testRun) Run(t *testing.T) error {
 	ctx = withTestTracing(t, ctx)
 
 	//todo: compile substreams
-	pkg := manifest.TestReadManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
+	//pkg := manifest.TestReadManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
+	pkg := manifest.TestReadManifest(t, "./testdata/simple_substreams/substreams.yaml")
 
 	opaqueCursor := ""
 	if f.Cursor != nil {

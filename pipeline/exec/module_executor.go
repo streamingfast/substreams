@@ -56,8 +56,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		return moduleOutput, fmt.Errorf("execute: %w", err)
 	}
 
-	hasValidOutput := moduleOutput != nil
-	if hasValidOutput {
+	if executor.outputCacheable() {
 		if err = setOutputCache(modName, execOutput, outputBytes); err != nil {
 			return moduleOutput, fmt.Errorf("set output cache: %w", err)
 		}

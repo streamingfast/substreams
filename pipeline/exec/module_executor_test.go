@@ -42,6 +42,7 @@ type MockModuleExecutor struct {
 	ToOutputFunc func(data []byte) (*pbsubstreams.ModuleOutput, error)
 	LogsFunc     func() (logs []string, truncated bool)
 	StackFunc    func() []string
+	cacheable    bool
 }
 
 var _ ModuleExecutor = (*MockModuleExecutor)(nil)
@@ -63,6 +64,10 @@ func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOu
 		return t.RunFunc(ctx, reader)
 	}
 	return nil, nil, fmt.Errorf("not implemented")
+}
+
+func (t *MockModuleExecutor) outputCacheable() bool {
+	return t.cacheable
 }
 
 func (t *MockModuleExecutor) applyCachedOutput(value []byte) error {

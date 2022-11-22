@@ -48,19 +48,15 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 		return nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}
 
-	if e.holdsPartialStore() {
-		return nil, nil, nil
-	}
-
 	return e.wrapDeltas()
 }
 
-func (e *StoreModuleExecutor) holdsPartialStore() bool {
+func (e *StoreModuleExecutor) outputCacheable() bool {
 	_, ok := e.outputStore.(*store2.PartialKV)
-	return ok
+	return !ok
 }
 
-func (e *StoreModuleExecutor) wrapDeltas() (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
+func (e *StoreModuleExecutor) wrapDeltas() ([]byte, pbsubstreams.ModuleOutputData, error) {
 	deltas := &pbsubstreams.StoreDeltas{
 		Deltas: e.outputStore.GetDeltas(),
 	}
@@ -70,7 +66,7 @@ func (e *StoreModuleExecutor) wrapDeltas() (out []byte, moduleOutput pbsubstream
 		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
 	}
 
-	moduleOutput = &pbsubstreams.ModuleOutput_DebugStoreDeltas{
+	moduleOutput := &pbsubstreams.ModuleOutput_DebugStoreDeltas{
 		DebugStoreDeltas: deltas,
 	}
 	return data, moduleOutput, nil

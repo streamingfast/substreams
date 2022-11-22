@@ -178,6 +178,11 @@ func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
 }
 
 func (c *File) Save(ctx context.Context) error {
+	if len(c.outputData.Kv) == 0 {
+		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.currentBlockRange))
+		return nil
+	}
+	// TODO(abourget): track if there are Payloads in there?
 	filename := c.currentFilename()
 
 	c.logger.Info("saving cache", zap.Stringer("block_range", c.currentBlockRange), zap.String("filename", filename))

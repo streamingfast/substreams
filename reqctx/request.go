@@ -29,3 +29,7 @@ func (d *RequestDetails) ShouldReturnWrittenPartialsInTrailer(modName string) bo
 func (d *RequestDetails) ShouldReturnProgressMessages() bool {
 	return d.IsSubRequest
 }
+
+func (d *RequestDetails) ShouldBackprocessAndStreamLinearly() bool {
+	return d.RequestStartBlockNum != d.LinearHandoffBlockNum
+}

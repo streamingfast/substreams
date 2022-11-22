@@ -45,7 +45,8 @@ func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, modu
 
 func (r *LinearExecOutputReader) Launch(ctx context.Context) {
 	go func() {
-		r.Shutdown(r.run(ctx))
+		err := r.run(ctx)
+		r.Shutdown(err)
 	}()
 }
 
@@ -53,6 +54,7 @@ func (r *LinearExecOutputReader) run(ctx context.Context) error {
 	go func() {
 		r.Shutdown(r.download(ctx))
 	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,6 +71,7 @@ func (r *LinearExecOutputReader) run(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("calling response func: %w", err)
 			}
+
 			if blockScopedData.Clock.Number >= r.exclusiveEndBlock {
 				r.logger.Info("stop pulling block scoped data, end block reach",
 					zap.Uint64("exclusive_end_block_num", r.exclusiveEndBlock),
@@ -76,6 +79,7 @@ func (r *LinearExecOutputReader) run(ctx context.Context) error {
 				)
 				return nil
 			}
+
 		}
 	}
 }

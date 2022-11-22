@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
@@ -23,15 +25,35 @@ type Backprocessor struct {
 
 func BuildBackProcessor(
 	ctx context.Context,
+	reqDetails *reqctx.RequestDetails,
 	runtimeConfig config.RuntimeConfig,
-	upToBlock uint64,
 	outputGraph *outputmodules.Graph,
 	execoutStorage *execout.Configs,
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
-	upstreamRequestModules *pbsubstreams.Modules,
 ) (*Backprocessor, error) {
-	modulesStateMap, err := storage.BuildModuleStorageStateMap(ctx, storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, execoutStorage, runtimeConfig.ExecOutputSaveInterval, upToBlock)
+	upstreamRequestModules := reqDetails.Request.Modules
+	upToBlock := reqDetails.LinearHandoffBlockNum
+	logger := reqctx.Logger(ctx)
+	// TODO(abourget): move this to `BuildBackProcessor()`, launch a goroutine in `Run()` like the comments
+	// say, and block on the `backprocessor.Run()` like we did before.
+	// No need to have the two be split.
+	var execOutputReader *LinearExecOutputReader
+	if reqDetails.ShouldBackprocessAndStreamLinearly() {
+		requestedModule := outputGraph.RequestedMapModules()[0]
+		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, logger)
+		execOutputReader = NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, respFunc, runtimeConfig.ExecOutputSaveInterval, logger)
+	}
+
+	modulesStateMap, err := storage.BuildModuleStorageStateMap(
+		ctx,
+		storeConfigs,
+		runtimeConfig.StoreSnapshotsSaveInterval,
+		execoutStorage,
+		runtimeConfig.ExecOutputSaveInterval,
+		reqDetails.RequestStartBlockNum,
+		reqDetails.LinearHandoffBlockNum,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
@@ -60,10 +82,11 @@ func BuildBackProcessor(
 	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
 
 	return &Backprocessor{
-		plan:       plan,
-		scheduler:  scheduler,
-		squasher:   squasher,
-		workerPool: runnerPool,
+		plan:             plan,
+		scheduler:        scheduler,
+		squasher:         squasher,
+		workerPool:       runnerPool,
+		execOutputReader: execOutputReader,
 	}, nil
 }
 
@@ -90,8 +113,4 @@ func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error)
 	}
 
 	return storeMap, nil
-}
-
-func (b *Backprocessor) SetOutputReader(execOutputReader *LinearExecOutputReader) {
-	b.execOutputReader = execOutputReader
 }

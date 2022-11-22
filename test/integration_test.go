@@ -60,6 +60,15 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 	require.NoError(t, run.Run(t))
 }
 
+func TestProductionMode(t *testing.T) {
+	run := newTestRun(20, 28, 31, "assert_test_store_add_i64")
+	run.ProductionMode = true
+	run.ParallelSubrequests = 5
+	require.NoError(t, run.Run(t))
+
+	require.Equal(t, "bob", run.MapOutput("assert_test_store_add_i64"))
+}
+
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
 	run := newTestRun(110, 112, 112, "test_map", "test_store_proto")
 	outputFilesLen := 0
@@ -95,13 +104,6 @@ func TestStoreDeletePrefix(t *testing.T) {
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
 	run := newTestRun(20, 31, 31, "assert_all_test")
-	require.NoError(t, run.Run(t))
-}
-
-func TestAllAssertionsParallel(t *testing.T) {
-	run := newTestRun(20, 28, 31, "assert_all_test")
-	run.ProductionMode = true
-	run.ParallelSubrequests = 5
 	require.NoError(t, run.Run(t))
 }
 

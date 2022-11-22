@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package sf.substreams.internal.outputcache.v1;
 
-option go_package = "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb;pboutputcache";
+option go_package = "github.com/streamingfast/substreams/storage/execout/pb;pboutputcache";
 import "google/protobuf/timestamp.proto";
 
 message Map {

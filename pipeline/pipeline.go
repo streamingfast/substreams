@@ -181,26 +181,15 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 
 	backprocessor, err := orchestrator.BuildBackProcessor(
 		p.ctx,
+		reqDetails,
 		p.runtimeConfig,
-		reqDetails.LinearHandoffBlockNum,
 		p.outputGraph,
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		reqDetails.Request.Modules,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building backprocessor: %w", err)
-	}
-
-	// TODO(abourget): move this to `BuildBackProcessor()`, launch a goroutine in `Run()` like the comments
-	// say, and block on the `backprocessor.Run()` like we did before.
-	// No need to have the two be split.
-	if reqDetails.LinearHandoffBlockNum >= reqDetails.RequestStartBlockNum+p.runtimeConfig.ExecOutputSaveInterval {
-		requestedModule := p.outputGraph.RequestedMapModules()[0]
-		requestedModuleCache := p.execoutStorage.NewFile(requestedModule.Name, logger)
-		outputReader := orchestrator.NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, p.respFunc, p.runtimeConfig.ExecOutputSaveInterval, logger)
-		backprocessor.SetOutputReader(outputReader)
 	}
 
 	logger.Info("starting back processing")

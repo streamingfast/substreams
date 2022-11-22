@@ -31,7 +31,7 @@ func (e *MapperModuleExecutor) String() string { return e.Name() }
 
 func (e *MapperModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
 
-//todo: this is strange because it has to be done on both the store and the mapper
+// todo: this is strange because it has to be done on both the store and the mapper
 // and in this case, we don't do anything
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
@@ -61,4 +61,8 @@ func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.Module
 	return toModuleOutput(e, &pbsubstreams.ModuleOutput_MapOutput{
 		MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: data},
 	}), nil
+}
+
+func (e *MapperModuleExecutor) outputCacheable() bool {
+	return true
 }

@@ -157,6 +157,11 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, str
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, isSubRequest)
 
+	reqctx.Logger(ctx).Debug("executing subrequest",
+		zap.Strings("output_modules", request.OutputModules),
+		zap.Int64("start_block", request.StartBlockNum),
+		zap.Uint64("stop_block", request.StopBlockNum),
+	)
 	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)

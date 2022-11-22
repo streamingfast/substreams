@@ -40,7 +40,7 @@ type File struct {
 }
 
 func (c *File) currentFilename() string {
-	return ComputeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
+	return computeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
 }
 
 func (c *File) SortedCacheItems() (out []*pboutput.Item) {
@@ -61,11 +61,6 @@ func (c *File) IsOutOfRange(blockNum uint64) bool {
 	}
 	return !c.currentBlockRange.Contains(blockNum)
 }
-
-//func (c *File) IsAtUpperBoundary(ref bstream.BlockRef) bool {
-//	incRef := bstream.NewBlockRef(ref.ID(), ref.Num()+1)
-//	return c.IsOutOfRange(incRef)
-//}
 
 func (c *File) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
 	c.Lock()
@@ -152,7 +147,7 @@ func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
 	c.logger.Debug("loading cache", zap.Object("range", blockRange))
 	c.outputData.Kv = make(map[string]*pboutput.Item)
 
-	filename := ComputeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
+	filename := computeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
 	c.logger.Debug("loading outputs data", zap.String("file_name", filename), zap.Object("block_range", blockRange))
 
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -222,6 +217,7 @@ func (c *File) ListContinuousCacheRanges(ctx context.Context, from uint64) (bloc
 	return out, nil
 }
 
+// TODO(abourget): this doesn't belong to the "File", rather a "FileRange" or something else
 func (c *File) ListCacheRanges(ctx context.Context) (block.Ranges, error) {
 	var out block.Ranges
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -320,7 +316,7 @@ func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock ui
 	return block.NewRange(prefixStartBlock, exclusiveEndBlock), true, nil
 }
 
-func ComputeDBinFilename(startBlock, stopBlock uint64) string {
+func computeDBinFilename(startBlock, stopBlock uint64) string {
 	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
 }
 

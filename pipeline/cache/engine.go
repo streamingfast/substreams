@@ -19,6 +19,14 @@ type Engine struct {
 	logger        *zap.Logger
 }
 
+// CurrentBlock Items
+// taking current block items and writing to a File at some point.
+
+type CachedFiles struct {
+	writableFile *execout.File
+	readableFile *execout.File
+}
+
 func NewEngine(runtimeConfig config.RuntimeConfig, execoutConfigs *execout.Configs, blockType string, logger *zap.Logger) (*Engine, error) {
 	e := &Engine{
 		ctx:           context.Background(),

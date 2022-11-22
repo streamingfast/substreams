@@ -25,10 +25,28 @@ import (
 // TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
 // more than that.
 
+// WindowedFile
+// FileHopper
+// FileSeeker
+// FilesPointer
+// FileSystem
+// IntervalFile
+// FileInterval
+// FileRange
+// RangedFile
+// FilesRange
+// FilesManager
+//
+type FileSeeker struct {
+	saveBlockInterval uint64
+	prevFile          *File
+	nextFile          *File
+}
+
 type File struct {
 	sync.RWMutex
+	wg *sync.WaitGroup
 
-	wg                *sync.WaitGroup
 	ModuleName        string
 	currentBlockRange *block.Range
 	outputData        *pboutput.Map
@@ -43,7 +61,7 @@ func (c *File) currentFilename() string {
 	return computeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
 }
 
-func (c *File) SortedCacheItems() (out []*pboutput.Item) {
+func (c *File) SortedItems() (out []*pboutput.Item) {
 	for _, item := range c.outputData.Kv {
 		out = append(out, item)
 	}

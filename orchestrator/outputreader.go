@@ -23,11 +23,11 @@ type LinearExecOutputReader struct {
 	logger                 *zap.Logger
 	execOutputSaveInterval uint64
 	module                 *pbsubstreams.Module
-	cache                  *execout.File
+	file                   *execout.File
 	cacheItems             chan *pboutput.Item
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, cache *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64, logger *zap.Logger) *LinearExecOutputReader {
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, file *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64, logger *zap.Logger) *LinearExecOutputReader {
 	logger = logger.With(zap.String("component", "downloader"))
 	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
 	return &LinearExecOutputReader{
@@ -35,7 +35,7 @@ func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, modu
 		requestStartBlock:      startBlock,
 		exclusiveEndBlock:      exclusiveEndBlock,
 		module:                 module,
-		cache:                  cache,
+		file:                   file,
 		responseFunc:           responseFunc,
 		execOutputSaveInterval: execOutputSaveInterval,
 		logger:                 logger,
@@ -108,7 +108,7 @@ func (r *LinearExecOutputReader) download(ctx context.Context) error {
 func (r *LinearExecOutputReader) downloadNextFile(ctx context.Context, atBlockNum uint64) (out []*pboutput.Item, err error) {
 	for {
 		r.logger.Debug("loading next cache", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
-		found, err := r.cache.LoadAtBlock(ctx, atBlockNum)
+		found, err := r.file.LoadAtBlock(ctx, atBlockNum)
 		if err != nil {
 			return nil, fmt.Errorf("loading %s cache at block %d: %w", r.module.Name, atBlockNum, err)
 		}
@@ -123,7 +123,7 @@ func (r *LinearExecOutputReader) downloadNextFile(ctx context.Context, atBlockNu
 				return nil, nil
 			}
 		}
-		out = r.cache.SortedCacheItems()
+		out = r.file.SortedItems()
 		return out, nil
 	}
 }

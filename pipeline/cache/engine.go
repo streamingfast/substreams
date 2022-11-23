@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -13,6 +14,7 @@ import (
 
 type Engine struct {
 	ctx               context.Context
+	wg                *sync.WaitGroup
 	blockType         string
 	reversibleSegment map[uint64]*execout.ExecOutputBuffer // block num to modules' outputs for that given block
 	writableFiles     *execout.ExecOutputWriter            // moduleName => irreversible File
@@ -23,6 +25,7 @@ type Engine struct {
 func NewEngine(runtimeConfig config.RuntimeConfig, execoutConfigs *execout.Configs, blockType string, logger *zap.Logger) (*Engine, error) {
 	e := &Engine{
 		ctx:               context.Background(),
+		wg:                &sync.WaitGroup{},
 		runtimeConfig:     runtimeConfig,
 		reversibleSegment: map[uint64]*execout.ExecOutputBuffer{},
 		writableFiles:     &ExecOutputWriter{files: map[string]*execout.File{}},
@@ -101,11 +104,16 @@ func (e *Engine) EndOfStream(isSubrequest bool, outputModules map[string]bool) e
 }
 
 func (e *Engine) flushWritableFiles(cache *execout.File) error {
-
-	err := cache.Save(e.ctx)
+	doSave, err := cache.Save(e.ctx)
 	if err != nil {
 		return fmt.Errorf("saving cache ouputs: %w", err)
 	}
+
+	e.wg.Add(1)
+	go func() {
+		doSave()
+		e.wg.Done()
+	}()
 
 	if _, err := cache.LoadAtEndBlockBoundary(e.ctx); err != nil {
 		return fmt.Errorf("loading cache: %w", err)
@@ -143,8 +151,6 @@ func (e *Engine) get(moduleName string, clock *pbsubstreams.Clock) ([]byte, bool
 //}
 
 func (e *Engine) Close() error {
-	for _, cache := range e.caches {
-		cache.Close()
-	}
+	e.wg.Wait()
 	return nil
 }

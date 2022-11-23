@@ -3,7 +3,6 @@ package execout
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -41,7 +40,6 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 
 func (c *Config) NewFile(targetRange *block.BoundedRange) *File {
 	return &File{
-		wg:          &sync.WaitGroup{},
 		ModuleName:  c.name,
 		store:       c.objStore,
 		targetRange: targetRange,

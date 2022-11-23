@@ -24,10 +24,10 @@ func NewBoundedRange(moduleInitBlock, boundInterval, requestStartBlock, requestE
 	return r
 }
 
-func (r BoundedRange) NextBoundary() BoundedRange {
-	newBoundedRange := r
+func (r *BoundedRange) NextBoundary() *BoundedRange {
+	newBoundedRange := *r
 	newBoundedRange.Range = r.computeNextBounds()
-	return newBoundedRange
+	return &newBoundedRange
 }
 
 func (r *BoundedRange) IsEmpty() bool {

@@ -25,48 +25,32 @@ import (
 // TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
 // more than that.
 
-// WindowedFile
-// FileHopper
-// FileSeeker
-// FilesPointer
-// FileSystem
-// IntervalFile
-// FileInterval
-// FileRange
-// RangedFile
-// FilesRange
-// FilesManager
-//
-type FileSeeker struct {
-	saveBlockInterval uint64
-	prevFile          *File
-	nextFile          *File
-}
-
 // A File in `execout` stores, for a given module (with a given hash), the outputs of module execution
 // for _multiple blocks_, based on their block ID.
 type File struct {
 	sync.RWMutex
-	wg *sync.WaitGroup
+	*block.BoundedRange
 
-	ModuleName  string
-	targetRange *block.BoundedRange
-	outputData  *pboutput.Map
-	store       dstore.Store
-	logger      *zap.Logger
+	ModuleName string
+	outputData *pboutput.Map
+	store      dstore.Store
+	logger     *zap.Logger
 
-	initialized bool
+	loadedFromStore bool
 }
 
 // NextFile initializes a new *File pointing to the next boundary, according to `targetRange`.
 func (c *File) NextFile() *File {
 	return &File{
-		ModuleName: c.ModuleName,
+		ModuleName:   c.ModuleName,
+		store:        c.store,
+		logger:       c.logger,
+		BoundedRange: c.BoundedRange.NextBoundary(),
 	}
 }
 
 func (c *File) currentFilename() string {
-	return computeDBinFilename(c.targetRange.StartBlock, c.targetRange.ExclusiveEndBlock)
+	return computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
 }
 
 func (c *File) SortedItems() (out []*pboutput.Item) {
@@ -77,15 +61,6 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 		return out[i].BlockNum < out[j].BlockNum
 	})
 	return
-}
-
-func (c *File) IsInitialized() bool { return c.initialized }
-
-func (c *File) IsOutOfBounds(blockNum uint64) bool {
-	if !c.initialized { // should become in-range once we SetItem it
-		return false
-	}
-	return c.targetRange.IsOutOfBounds(blockNum)
 }
 
 func (c *File) SetItem(clock *pbsubstreams.Clock, cursor string, data []byte) error {
@@ -135,7 +110,7 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 }
 
 func (c *File) LoadAtEndBlockBoundary(ctx context.Context) (found bool, err error) {
-	return c.LoadAtBlock(ctx, c.targetRange.ExclusiveEndBlock)
+	return c.LoadAtBlock(ctx, c.BoundedRange.ExclusiveEndBlock)
 }
 
 func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
@@ -153,6 +128,11 @@ func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err
 	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
 
 	if !found {
+		// TODO(abourget): it's not this object's business to go over boundaries,
+		//  use the BoundedRange object on it to switch, and change files.
+		//  In any case, this will belong to the Writer or to a consuming object
+		//  not within the "File" to switch bounds. The caller might call "NextBoundary()"
+		//  and get a new File, and manage it itself.
 		endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
 		blockRange = block.NewRange(atBlock, endBlockRange)
 		c.targetRange = blockRange
@@ -164,7 +144,7 @@ func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err
 		return false, fmt.Errorf("loading cache at %d: %w", atBlock, err)
 	}
 
-	c.initialized = true
+	c.loadedFromStore = true
 
 	return found, nil
 
@@ -203,10 +183,10 @@ func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
 	return nil
 }
 
-func (c *File) Save(ctx context.Context) (func() error, error) {
+func (c *File) Save(ctx context.Context) (func(), error) {
 	if len(c.outputData.Kv) == 0 {
 		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.targetRange))
-		return func() error { return nil }, nil
+		return func() {}, nil
 	}
 	// TODO(abourget): track if there are Payloads in there?
 	filename := c.currentFilename()
@@ -223,7 +203,6 @@ func (c *File) Save(ctx context.Context) (func() error, error) {
 	//  flow.
 	//  It,s going to be the ExecOutputWriter, that will want to ensure to its caller upon Close()
 	//  that all the Saves it initiated are properly terminated before returning from its Close().
-	c.wg.Add(1)
 	return func() {
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
@@ -246,11 +225,6 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddUint64("end_block", c.targetRange.ExclusiveEndBlock)
 	enc.AddInt("kv_count", len(c.outputData.Kv))
 	return nil
-}
-
-func (c *File) Close() {
-	c.wg.Wait()
-	return
 }
 
 //

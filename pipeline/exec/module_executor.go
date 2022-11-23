@@ -13,7 +13,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) (*pbsubstreams.ModuleOutput, error) {
+func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbsubstreams.ModuleOutput, []byte, error) {
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
 
@@ -29,43 +29,37 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	logger.Debug("running module")
 
-	cached, output, err := getCachedOutput(execOutput, executor)
+	cached, outputBytes, err := getCachedOutput(execOutput, executor)
 	if err != nil {
-		return nil, fmt.Errorf("check cache output exists: %w", err)
+		return nil, nil, fmt.Errorf("check cache output exists: %w", err)
 	}
 	span.SetAttributes(attribute.Bool("module.cached", cached))
 
 	if cached {
 		reqStats.RecordOutputCacheHit()
-		if err = executor.applyCachedOutput(output); err != nil {
-			return nil, fmt.Errorf("apply cached output: %w", err)
+		if err = executor.applyCachedOutput(outputBytes); err != nil {
+			return nil, nil, fmt.Errorf("apply cached output: %w", err)
 		}
 
-		moduleOutput, err := executor.toModuleOutput(output)
+		moduleOutput, err := executor.toModuleOutput(outputBytes)
 		if err != nil {
-			return nil, fmt.Errorf("converting output to module output: %w", err)
+			return moduleOutput, outputBytes, fmt.Errorf("converting output to module output: %w", err)
 		}
 
 		moduleOutput.Cached = true
-		return moduleOutput, nil
+		return moduleOutput, outputBytes, nil
 	}
 	reqStats.RecordOutputCacheMiss()
 
 	outputBytes, moduleOutput, err := executeModule(ctx, executor, execOutput)
 	if err != nil {
-		return moduleOutput, fmt.Errorf("execute: %w", err)
+		return nil, nil, fmt.Errorf("execute: %w", err)
 	}
 
-	if executor.outputCacheable() {
-		if err = setOutputCache(modName, execOutput, outputBytes); err != nil {
-			return moduleOutput, fmt.Errorf("set output cache: %w", err)
-		}
-	}
-
-	return moduleOutput, nil
+	return moduleOutput, outputBytes, nil
 }
 
-func getCachedOutput(execOutput execout.ExecutionOutput, executor ModuleExecutor) (bool, []byte, error) {
+func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {
 	output, cached, err := execOutput.Get(executor.Name())
 	if err != nil && err != execout.NotFound {
 		return false, nil, fmt.Errorf("get cached output: %w", err)
@@ -73,7 +67,7 @@ func getCachedOutput(execOutput execout.ExecutionOutput, executor ModuleExecutor
 	return cached, output, nil
 }
 
-func executeModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutput) ([]byte, *pbsubstreams.ModuleOutput, error) {
+func executeModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) ([]byte, *pbsubstreams.ModuleOutput, error) {
 	out, moduleOutputData, err := executor.run(ctx, execOutput)
 	moduleOutput := toModuleOutput(executor, moduleOutputData)
 
@@ -96,12 +90,4 @@ func toModuleOutput(executor ModuleExecutor, data pbsubstreams.ModuleOutputData)
 		Data:               data,
 	}
 	return output
-}
-
-func setOutputCache(executorName string, execOutput execout.ExecutionOutput, value []byte) error {
-	err := execOutput.Set(executorName, value)
-	if err != nil {
-		return fmt.Errorf("set cached output: %w", err)
-	}
-	return nil
 }

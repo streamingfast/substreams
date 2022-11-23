@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -32,17 +34,19 @@ func BuildBackProcessor(
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
 ) (*Backprocessor, error) {
-	upstreamRequestModules := reqDetails.Request.Modules
-	upToBlock := reqDetails.LinearHandoffBlockNum
-	logger := reqctx.Logger(ctx)
-	// TODO(abourget): move this to `BuildBackProcessor()`, launch a goroutine in `Run()` like the comments
-	// say, and block on the `backprocessor.Run()` like we did before.
-	// No need to have the two be split.
 	var execOutputReader *LinearExecOutputReader
 	if reqDetails.ShouldBackprocessAndStreamLinearly() {
 		requestedModule := outputGraph.RequestedMapModules()[0]
-		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, logger)
-		execOutputReader = NewLinearExecOutputReader(reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum, requestedModule, requestedModuleCache, respFunc, runtimeConfig.ExecOutputSaveInterval, logger)
+		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.StopBlockNum)
+		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
+		execOutputReader = NewLinearExecOutputReader(
+			reqDetails.RequestStartBlockNum,
+			reqDetails.LinearHandoffBlockNum,
+			requestedModule,
+			requestedModuleCache,
+			respFunc,
+			runtimeConfig.ExecOutputSaveInterval,
+		)
 	}
 
 	modulesStateMap, err := storage.BuildModuleStorageStateMap(
@@ -58,7 +62,7 @@ func BuildBackProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
-	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, upToBlock, outputGraph)
+	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, outputGraph)
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}
@@ -67,12 +71,12 @@ func BuildBackProcessor(
 		return nil, fmt.Errorf("send initial progress: %w", err)
 	}
 
-	scheduler := NewScheduler(plan, respFunc, upstreamRequestModules)
+	scheduler := NewScheduler(plan, respFunc, reqDetails.Request.Modules)
 	if err != nil {
 		return nil, err
 	}
 
-	squasher, err := NewMultiSquasher(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, upToBlock, scheduler.OnStoreCompletedUntilBlock)
+	squasher, err := NewMultiSquasher(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, reqDetails.LinearHandoffBlockNum, scheduler.OnStoreCompletedUntilBlock)
 	if err != nil {
 		return nil, err
 	}

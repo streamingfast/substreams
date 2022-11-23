@@ -4,30 +4,26 @@ import (
 	"context"
 	"fmt"
 
-	store2 "github.com/streamingfast/substreams/storage/store"
-
-	"github.com/streamingfast/substreams/storage/execout"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 	"google.golang.org/protobuf/proto"
 )
 
 type StoreModuleExecutor struct {
 	BaseExecutor
-	outputStore store2.DeltaAccessor
+	outputStore store.DeltaAccessor
 }
 
 var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
 
-func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store2.DeltaAccessor) *StoreModuleExecutor {
+func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store.DeltaAccessor) *StoreModuleExecutor {
 	return &StoreModuleExecutor{BaseExecutor: *baseExecutor, outputStore: outputStore}
 }
 
-func (e *StoreModuleExecutor) Name() string { return e.moduleName }
-
-func (e *StoreModuleExecutor) String() string { return e.Name() }
-
+func (e *StoreModuleExecutor) Name() string       { return e.moduleName }
+func (e *StoreModuleExecutor) String() string     { return e.Name() }
 func (e *StoreModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
@@ -51,9 +47,9 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	return e.wrapDeltas()
 }
 
-func (e *StoreModuleExecutor) outputCacheable() bool {
-	_, ok := e.outputStore.(*store2.PartialKV)
-	return !ok
+func (e *StoreModuleExecutor) OutputCacheable() bool {
+	_, ok := e.outputStore.(*store.FullKV)
+	return ok
 }
 
 func (e *StoreModuleExecutor) wrapDeltas() ([]byte, pbsubstreams.ModuleOutputData, error) {

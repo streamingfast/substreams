@@ -43,22 +43,30 @@ type FileSeeker struct {
 	nextFile          *File
 }
 
+// A File in `execout` stores, for a given module (with a given hash), the outputs of module execution
+// for _multiple blocks_, based on their block ID.
 type File struct {
 	sync.RWMutex
 	wg *sync.WaitGroup
 
-	ModuleName        string
-	currentBlockRange *block.Range
-	outputData        *pboutput.Map
-	store             dstore.Store
-	saveBlockInterval uint64
-	logger            *zap.Logger
+	ModuleName  string
+	targetRange *block.BoundedRange
+	outputData  *pboutput.Map
+	store       dstore.Store
+	logger      *zap.Logger
 
 	initialized bool
 }
 
+// NextFile initializes a new *File pointing to the next boundary, according to `targetRange`.
+func (c *File) NextFile() *File {
+	return &File{
+		ModuleName: c.ModuleName,
+	}
+}
+
 func (c *File) currentFilename() string {
-	return computeDBinFilename(c.currentBlockRange.StartBlock, c.currentBlockRange.ExclusiveEndBlock)
+	return computeDBinFilename(c.targetRange.StartBlock, c.targetRange.ExclusiveEndBlock)
 }
 
 func (c *File) SortedItems() (out []*pboutput.Item) {
@@ -73,14 +81,14 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 
 func (c *File) IsInitialized() bool { return c.initialized }
 
-func (c *File) IsOutOfRange(blockNum uint64) bool {
-	if !c.initialized { // should become in-range once we Set it
+func (c *File) IsOutOfBounds(blockNum uint64) bool {
+	if !c.initialized { // should become in-range once we SetItem it
 		return false
 	}
-	return !c.currentBlockRange.Contains(blockNum)
+	return c.targetRange.IsOutOfBounds(blockNum)
 }
 
-func (c *File) Set(clock *pbsubstreams.Clock, cursor string, data []byte) error {
+func (c *File) SetItem(clock *pbsubstreams.Clock, cursor string, data []byte) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -127,7 +135,7 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 }
 
 func (c *File) LoadAtEndBlockBoundary(ctx context.Context) (found bool, err error) {
-	return c.LoadAtBlock(ctx, c.currentBlockRange.ExclusiveEndBlock)
+	return c.LoadAtBlock(ctx, c.targetRange.ExclusiveEndBlock)
 }
 
 func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
@@ -147,7 +155,7 @@ func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err
 	if !found {
 		endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
 		blockRange = block.NewRange(atBlock, endBlockRange)
-		c.currentBlockRange = blockRange
+		c.targetRange = blockRange
 		return found, nil
 	}
 
@@ -190,30 +198,33 @@ func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
 		return fmt.Errorf("retried: %w", err)
 	}
 
-	c.currentBlockRange = blockRange
-	c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.outputData.Kv)), zap.Stringer("block_range", c.currentBlockRange))
+	c.targetRange = blockRange
+	c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.outputData.Kv)), zap.Stringer("block_range", c.targetRange))
 	return nil
 }
 
-func (c *File) Save(ctx context.Context) error {
+func (c *File) Save(ctx context.Context) (func() error, error) {
 	if len(c.outputData.Kv) == 0 {
-		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.currentBlockRange))
-		return nil
+		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.targetRange))
+		return func() error { return nil }, nil
 	}
 	// TODO(abourget): track if there are Payloads in there?
 	filename := c.currentFilename()
 
-	c.logger.Info("saving cache", zap.Stringer("block_range", c.currentBlockRange), zap.String("filename", filename))
+	c.logger.Info("saving cache", zap.Stringer("block_range", c.targetRange), zap.String("filename", filename))
 
 	cnt, err := c.outputData.MarshalFast()
 	if err != nil {
-		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
+		return nil, fmt.Errorf("unmarshalling file %s: %w", filename, err)
 	}
 
+	// TODO(abourget): split this, and return a closure, so the CALLER can control the wait group
+	//  and decide when its completely done. It's not the business of the File to handle its control
+	//  flow.
+	//  It,s going to be the ExecOutputWriter, that will want to ensure to its caller upon Close()
+	//  that all the Saves it initiated are properly terminated before returning from its Close().
 	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-
+	return func() {
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
 			err := c.store.WriteObject(ctx, filename, reader)
@@ -222,61 +233,17 @@ func (c *File) Save(ctx context.Context) error {
 		if err != nil {
 			c.logger.Warn("failed writing output cache", zap.Error(err))
 		}
-	}()
-
-	return nil
+	}, nil
 }
 
 func (c *File) String() string {
 	return c.store.ObjectURL("")
 }
 
-func (c *File) ListContinuousCacheRanges(ctx context.Context, from uint64) (block.Ranges, error) {
-	cachedRanges, err := c.ListCacheRanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("listing cached ranges %q: %w", c.ModuleName, err)
-	}
-	out := listContinuousCacheRanges(cachedRanges, from)
-	return out, nil
-}
-
-// TODO(abourget): this doesn't belong to the "File", rather a "FileRange" or something else
-func (c *File) ListCacheRanges(ctx context.Context) (block.Ranges, error) {
-	var out block.Ranges
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		if err := c.store.Walk(ctx, "", func(filename string) (err error) {
-			r, err := fileNameToRange(filename)
-			if err != nil {
-				return fmt.Errorf("getting range from filename: %w", err)
-			}
-			out = append(out, r)
-			return nil
-		}); err != nil {
-			return fmt.Errorf("walking cache ouputs: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].StartBlock < out[j].StartBlock
-	})
-
-	return out, nil
-}
-
-func (c *File) Delete(blockID string) {
-	c.Lock()
-	defer c.Unlock()
-
-	delete(c.outputData.Kv, blockID)
-}
-
 func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("store", c.ModuleName)
-	enc.AddUint64("start_block", c.currentBlockRange.StartBlock)
-	enc.AddUint64("end_block", c.currentBlockRange.ExclusiveEndBlock)
+	enc.AddUint64("start_block", c.targetRange.StartBlock)
+	enc.AddUint64("end_block", c.targetRange.ExclusiveEndBlock)
 	enc.AddInt("kv_count", len(c.outputData.Kv))
 	return nil
 }
@@ -286,24 +253,25 @@ func (c *File) Close() {
 	return
 }
 
-func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {
-	cachedRangeCount := len(cachedRanges)
-	var out block.Ranges
-	for i, r := range cachedRanges {
-		if r.StartBlock < from {
-			continue
-		}
-		out = append(out, r)
-		if cachedRangeCount > i+1 {
-			next := cachedRanges[i+1]
-			if next.StartBlock != r.ExclusiveEndBlock { //continuous seq broken
-				break
-			}
-		}
-	}
-
-	return out
-}
+//
+//func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {
+//	cachedRangeCount := len(cachedRanges)
+//	var out block.Ranges
+//	for i, r := range cachedRanges {
+//		if r.StartBlock < from {
+//			continue
+//		}
+//		out = append(out, r)
+//		if cachedRangeCount > i+1 {
+//			next := cachedRanges[i+1]
+//			if next.StartBlock != r.ExclusiveEndBlock { //continuous seq broken
+//				break
+//			}
+//		}
+//	}
+//
+//	return out
+//}
 
 func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {
 	var exclusiveEndBlock uint64

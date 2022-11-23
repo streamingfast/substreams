@@ -4,20 +4,19 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/storage/execout"
-
-	"github.com/streamingfast/bstream"
 )
 
+// DELETE ME, no need any more.. replaced by other constructs.
+
 type cursoredCache struct {
-	*execout.ExecOutputMap
+	*execout.ExecOutputBuffer
 
 	engine *Engine
-	cursor *bstream.Cursor
+	cursor string
 }
 
-// assert_test_store_delete_prefix
 func (e *cursoredCache) Get(moduleName string) (value []byte, cached bool, err error) {
-	val, _, err := e.ExecOutputMap.Get(moduleName)
+	val, _, err := e.ExecOutputBuffer.Get(moduleName)
 	if err != nil && err != execout.NotFound {
 		return nil, false, fmt.Errorf("get from memory: %w", err)
 	}
@@ -37,8 +36,8 @@ func (e *cursoredCache) Get(moduleName string) (value []byte, cached bool, err e
 }
 
 func (e *cursoredCache) Set(moduleName string, value []byte) (err error) {
-	if err := e.ExecOutputMap.Set(moduleName, value); err != nil {
+	if err := e.ExecOutputBuffer.Set(moduleName, value); err != nil {
 		return err
 	}
-	return e.engine.set(moduleName, value, e.Clock(), e.cursor.ToOpaque())
+	return e.engine.set(moduleName, value, e.Clock(), e.cursor)
 }

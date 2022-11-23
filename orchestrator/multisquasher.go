@@ -81,8 +81,8 @@ func buildStoreSquasher(ctx context.Context, storeSnapshotsSaveInterval uint64, 
 	startingStore := storeConfig.NewFullKV(logger)
 
 	// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
-	// can we derive it from a prior store? Did we REALLY need to initialize the store from which this
-	// one is derived?
+	//  can we derive it from a prior store? Did we REALLY need to initialize the store from which this
+	//  one is derived?
 	var storeSquasher *StoreSquasher
 	if storeStorageState.InitialCompleteRange == nil {
 		logger.Debug("setting up initial store",

@@ -185,11 +185,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	execOutputConfigMap, err := execout.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes())
+	execOutputConfigMap, err := execout.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
-	execOutputConfigs := execout.NewConfigs(s.runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap)
+	execOutputConfigs := execout.NewConfigs(s.runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap, logger)
+
 	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
@@ -294,7 +295,7 @@ func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats
 func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
 	/*
 		FIXME: this entire `if` is not good, the ctx is from the StreamServer so there
-		is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
+		 is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
 	*/
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")

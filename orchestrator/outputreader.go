@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/substreams/reqctx"
+
+	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 
@@ -17,33 +21,30 @@ import (
 
 type LinearExecOutputReader struct {
 	*shutter.Shutter
-	requestStartBlock      uint64
-	exclusiveEndBlock      uint64
-	responseFunc           substreams.ResponseFunc
-	logger                 *zap.Logger
-	execOutputSaveInterval uint64
-	module                 *pbsubstreams.Module
-	file                   *execout.File
-	cacheItems             chan *pboutput.Item
+	requestStartBlock uint64
+	exclusiveEndBlock uint64
+	responseFunc      substreams.ResponseFunc
+	module            *pbsubstreams.Module
+	file              *execout.File
+	cacheItems        chan *pboutput.Item
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, file *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64, logger *zap.Logger) *LinearExecOutputReader {
-	logger = logger.With(zap.String("component", "downloader"))
-	logger.Info("creating downloader", zap.Uint64("start_block", startBlock), zap.Uint64("exclusive_end_block", exclusiveEndBlock))
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, file *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64) *LinearExecOutputReader {
 	return &LinearExecOutputReader{
-		Shutter:                shutter.New(),
-		requestStartBlock:      startBlock,
-		exclusiveEndBlock:      exclusiveEndBlock,
-		module:                 module,
-		file:                   file,
-		responseFunc:           responseFunc,
-		execOutputSaveInterval: execOutputSaveInterval,
-		logger:                 logger,
-		cacheItems:             make(chan *pboutput.Item, execOutputSaveInterval*2),
+		Shutter:           shutter.New(),
+		requestStartBlock: startBlock,
+		exclusiveEndBlock: exclusiveEndBlock,
+		module:            module,
+		file:              file,
+		responseFunc:      responseFunc,
+		cacheItems:        make(chan *pboutput.Item, execOutputSaveInterval*2),
 	}
 }
 
 func (r *LinearExecOutputReader) Launch(ctx context.Context) {
+	logger := reqctx.Logger(ctx)
+	logger.Info("launching downloader", zap.Uint64("start_block", r.requestStartBlock), zap.Uint64("exclusive_end_block", r.exclusiveEndBlock))
+
 	go func() {
 		err := r.run(ctx)
 		r.Shutdown(err)
@@ -106,14 +107,15 @@ func (r *LinearExecOutputReader) download(ctx context.Context) error {
 }
 
 func (r *LinearExecOutputReader) downloadNextFile(ctx context.Context, atBlockNum uint64) (out []*pboutput.Item, err error) {
+	logger := reqctx.Logger(ctx)
 	for {
-		r.logger.Debug("loading next cache", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
+		logger.Debug("loading next cache", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
 		found, err := r.file.LoadAtBlock(ctx, atBlockNum)
 		if err != nil {
 			return nil, fmt.Errorf("loading %s cache at block %d: %w", r.module.Name, atBlockNum, err)
 		}
 		if !found {
-			r.logger.Debug("cache not found, waiting 5s", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
+			logger.Debug("cache not found, waiting 5s", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
 			select {
 			case <-time.After(5 * time.Second):
 				continue
@@ -129,12 +131,20 @@ func (r *LinearExecOutputReader) downloadNextFile(ctx context.Context, atBlockNu
 }
 
 func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreams.BlockScopedData, error) {
+	clock := toClock(cacheItem)
+	blockRef := bstream.NewBlockRef(clock.Id, clock.Number)
+	cursor := bstream.Cursor{
+		Step:      bstream.StepNewIrreversible,
+		Block:     blockRef,
+		LIB:       blockRef,
+		HeadBlock: blockRef,
+	}
 	out := &pbsubstreams.BlockScopedData{
-		Step: pbsubstreams.ForkStep_STEP_IRREVERSIBLE,
+		Step:   pbsubstreams.ForkStep_STEP_IRREVERSIBLE,
+		Cursor: cursor.ToOpaque(),
+		Clock:  clock,
 	}
 
-	out.Clock = toClock(cacheItem)
-	out.Cursor = cacheItem.Cursor
 	m, err := toModuleOutput(module, cacheItem)
 	if err != nil {
 		return nil, fmt.Errorf("module output: %w", err)

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/cli"
 
 	"google.golang.org/protobuf/proto"
@@ -224,13 +226,14 @@ func searchOutputsModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore)
+	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore, zlog)
 	moduleStore, err := stateStore.SubStore(moduleHash + "/outputs")
 	if err != nil {
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	outputCache := modStore.NewFile(saveInterval, zlog)
+	targetRange := block.NewBoundedRange(module.InitialBlock, saveInterval, startBlock, startBlock-startBlock%saveInterval+saveInterval)
+	outputCache := modStore.NewFile(targetRange)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	found, err := outputCache.LoadAtBlock(ctx, startBlock)
 	if err != nil {

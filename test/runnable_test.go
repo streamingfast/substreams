@@ -90,7 +90,6 @@ func (f *testRun) Run(t *testing.T) error {
 		f.ParallelSubrequests = 1
 	}
 
-	// TODO(abourget): why are there two response collectors?
 	responseCollector := newResponseCollector()
 
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {

@@ -57,22 +57,16 @@ func (r *Range) Contains(blockNum uint64) bool {
 	return blockNum >= r.StartBlock && blockNum < r.ExclusiveEndBlock
 }
 
-func (r *Range) Next(size uint64) *Range {
-	return &Range{
-		StartBlock:        r.ExclusiveEndBlock,
-		ExclusiveEndBlock: r.ExclusiveEndBlock + size,
-	}
+func (r *Range) IsAbove(blockNum uint64) bool {
+	return blockNum > r.ExclusiveEndBlock
 }
 
-func (r *Range) Previous(size uint64) *Range {
-	return &Range{
-		StartBlock:        r.StartBlock - size,
-		ExclusiveEndBlock: r.StartBlock,
-	}
+func (r *Range) IsBelow(blockNum uint64) bool {
+	return blockNum < r.StartBlock
 }
 
-func (r *Range) IsNext(next *Range, size uint64) bool {
-	return r.Next(size).Equals(next)
+func (r *Range) IsOutOfBounds(blockNum uint64) bool {
+	return !r.Contains(blockNum)
 }
 
 func (r *Range) Equals(other *Range) bool {

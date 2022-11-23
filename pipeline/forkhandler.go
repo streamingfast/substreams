@@ -7,7 +7,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type UndoHandler func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput)
+type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.ModuleOutput)
 
 type ForkHandler struct {
 	reversibleOutputs map[uint64][]*pbsubstreams.ModuleOutput
@@ -21,7 +21,7 @@ func NewForkHandler() *ForkHandler {
 	}
 }
 
-func (f *ForkHandler) registerHandler(handler UndoHandler) {
+func (f *ForkHandler) registerUndoHandler(handler UndoHandler) {
 	f.undoHandlers = append(f.undoHandlers, handler)
 }
 
@@ -35,10 +35,8 @@ func (f *ForkHandler) handleUndo(
 			return fmt.Errorf("calling return func when reverting outputs: %w", err)
 		}
 
-		for _, moduleOutput := range moduleOutputs {
-			for _, h := range f.undoHandlers {
-				h(clock, moduleOutput)
-			}
+		for _, h := range f.undoHandlers {
+			h(clock, moduleOutputs)
 		}
 	}
 	return nil

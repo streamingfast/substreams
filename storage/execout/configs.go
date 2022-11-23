@@ -3,6 +3,8 @@ package execout
 import (
 	"fmt"
 
+	"github.com/streamingfast/substreams/block"
+
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/dstore"
@@ -13,28 +15,22 @@ import (
 type Configs struct {
 	ConfigMap              map[string]*Config
 	execOutputSaveInterval uint64
+	logger                 *zap.Logger
 }
 
-func NewConfigs(execOutputSaveInterval uint64, confMap map[string]*Config) *Configs {
+func NewConfigs(execOutputSaveInterval uint64, confMap map[string]*Config, logger *zap.Logger) *Configs {
 	return &Configs{
 		execOutputSaveInterval: execOutputSaveInterval,
 		ConfigMap:              confMap,
+		logger:                 logger,
 	}
 }
 
-func (c *Configs) NewFiles(logger *zap.Logger) map[string]*File {
-	out := make(map[string]*File)
-	for modName, config := range c.ConfigMap {
-		out[modName] = config.NewFile(c.execOutputSaveInterval, logger)
-	}
-	return out
+func (c *Configs) NewFile(moduleName string, targetRange *block.BoundedRange) *File {
+	return c.ConfigMap[moduleName].NewFile(targetRange)
 }
 
-func (c *Configs) NewFile(moduleName string, logger *zap.Logger) *File {
-	return c.ConfigMap[moduleName].NewFile(c.execOutputSaveInterval, logger)
-}
-
-func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes) (out map[string]*Config, err error) {
+func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, logger *zap.Logger) (out map[string]*Config, err error) {
 	out = make(map[string]*Config)
 	for _, mod := range allRequestedModules {
 		conf, err := NewConfig(
@@ -43,6 +39,7 @@ func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstre
 			mod.ModuleKind(),
 			moduleHashes.Get(mod.Name),
 			baseObjectStore,
+			logger,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new exec output config for %q: %w", mod.Name, err)

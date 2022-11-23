@@ -22,6 +22,9 @@ type Stores struct {
 }
 
 func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
+	// FIXME(abourget): a StoreBoundary should exist for EACH Store
+	//  because the module's Initial Block could change the range of each
+	//  store.
 	bounder := NewStoreBoundary(storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum)
 	return &Stores{
 		configs:      storeConfigs,
@@ -60,6 +63,7 @@ func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	}
 	return nil
 }
+
 func (s *Stores) storesHandleUndo(moduleOutput *pbsubstreams.ModuleOutput) {
 	if s, found := s.StoreMap.Get(moduleOutput.Name); found {
 		if deltaStore, ok := s.(store.DeltaAccessor); ok {

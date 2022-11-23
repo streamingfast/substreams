@@ -15,7 +15,7 @@ type ExecutionOutputSetter interface {
 	Set(name string, value []byte) (err error)
 }
 
-// ExecutionOutput Execution output for a given graph at a given block
+// ExecutionOutput gets/sets execution output for a given graph at a given block
 type ExecutionOutput interface {
 	ExecutionOutputGetter
 	ExecutionOutputSetter

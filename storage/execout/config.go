@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/streamingfast/derr"
@@ -17,12 +18,13 @@ type Config struct {
 	moduleHash string
 	objStore   dstore.Store
 
-	modKind pbsubstreams.ModuleKind
-
+	modKind            pbsubstreams.ModuleKind
 	moduleInitialBlock uint64
+
+	logger *zap.Logger
 }
 
-func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.ModuleKind, moduleHash string, baseStore dstore.Store) (*Config, error) {
+func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.ModuleKind, moduleHash string, baseStore dstore.Store, logger *zap.Logger) (*Config, error) {
 	subStore, err := baseStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -33,16 +35,17 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 		modKind:            modKind,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
+		logger:             logger.Named("cache").With(zap.String("module_name", name)),
 	}, nil
 }
 
-func (c *Config) NewFile(saveBlockInterval uint64, logger *zap.Logger) *File {
+func (c *Config) NewFile(targetRange *block.BoundedRange) *File {
 	return &File{
-		wg:                &sync.WaitGroup{},
-		ModuleName:        c.name,
-		store:             c.objStore,
-		saveBlockInterval: saveBlockInterval,
-		logger:            logger.Named("cache").With(zap.String("module_name", c.name)),
+		wg:          &sync.WaitGroup{},
+		ModuleName:  c.name,
+		store:       c.objStore,
+		targetRange: targetRange,
+		logger:      c.logger,
 	}
 }
 

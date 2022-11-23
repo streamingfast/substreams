@@ -23,8 +23,8 @@ func NewStoreBoundary(
 	return b
 }
 
-func (r *storeBoundary) OverBoundary(blockNUm uint64) bool {
-	return blockNUm >= r.nextBoundary
+func (r *storeBoundary) OverBoundary(blockNum uint64) bool {
+	return blockNum >= r.nextBoundary
 }
 
 func (r *storeBoundary) BumpBoundary() {

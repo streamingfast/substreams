@@ -57,7 +57,7 @@ func buildMappersStorageState(ctx context.Context, execoutConfigs *execout.Confi
 		return fmt.Errorf("fetching execout states: %w", err)
 	}
 	// TODO(abourget): loop the `stateMap` instead, there shouldn't be
-	// anything but mappers in there, so the error shouldn't trigger below.
+	//  anything but mappers in there, so the error shouldn't trigger below.
 	for modName, ranges := range stateMap.Snapshots {
 		if out[modName] != nil {
 			return fmt.Errorf("attempting to overwrite storage state for module %q", modName)

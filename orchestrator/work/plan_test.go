@@ -85,8 +85,8 @@ func TestWorkPlanning(t *testing.T) {
 	}
 
 	// TODO(abourget): il faut donner à splitWorkIntoJobs() de quoi de plus slim
-	// et moins loin.. une `Request` est trop gros, faudrait lui préparer plutôt
-	// un OutputModuleGraph avec le data nécessaire à tester `splitWorkIntoJobs`.
+	//  et moins loin.. une `Request` est trop gros, faudrait lui préparer plutôt
+	//  un OutputModuleGraph avec le data nécessaire à tester `splitWorkIntoJobs`.
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

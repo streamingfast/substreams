@@ -9,14 +9,14 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ExecOutputMap holds the values produced by modules and exchanged between them
+// ExecOutputBuffer holds the values produced by modules and exchanged between them
 // as a sort of buffer.
-type ExecOutputMap struct {
+type ExecOutputBuffer struct {
 	values map[string][]byte
 	clock  *pbsubstreams.Clock
 }
 
-func NewExecOutputMap(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*ExecOutputMap, error) {
+func NewExecOutputBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*ExecOutputBuffer, error) {
 	blkBytes, err := block.Payload.Get()
 	if err != nil {
 		return nil, fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
@@ -26,7 +26,7 @@ func NewExecOutputMap(blockType string, block *bstream.Block, clock *pbsubstream
 		return nil, fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
 	}
 
-	return &ExecOutputMap{
+	return &ExecOutputBuffer{
 		clock: clock,
 		values: map[string][]byte{
 			blockType:      blkBytes,
@@ -35,11 +35,11 @@ func NewExecOutputMap(blockType string, block *bstream.Block, clock *pbsubstream
 	}, nil
 }
 
-func (i *ExecOutputMap) Clock() *pbsubstreams.Clock {
+func (i *ExecOutputBuffer) Clock() *pbsubstreams.Clock {
 	return i.clock
 }
 
-func (i *ExecOutputMap) Get(moduleName string) (value []byte, cached bool, err error) {
+func (i *ExecOutputBuffer) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, found := i.values[moduleName]
 	if !found {
 		return nil, false, NotFound
@@ -47,7 +47,7 @@ func (i *ExecOutputMap) Get(moduleName string) (value []byte, cached bool, err e
 	return val, false, nil
 }
 
-func (i *ExecOutputMap) Set(moduleName string, value []byte) (err error) {
+func (i *ExecOutputBuffer) Set(moduleName string, value []byte) (err error) {
 	i.values[moduleName] = value
 	return nil
 }

@@ -88,18 +88,16 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
 	defer span.EndWithErr(&err)
 
-	// Registers some ForkHandlers (to adjust exec output, and stores states)
-	p.forkHandler.registerHandler(func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput) {
-		p.execOutputCache.HandleUndo(clock, moduleOutput.Name)
-	})
-	p.forkHandler.registerHandler(func(clock *pbsubstreams.Clock, moduleOutput *pbsubstreams.ModuleOutput) {
-		p.stores.storesHandleUndo(moduleOutput)
+	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.ModuleOutput) {
+		for _, modOut := range moduleOutputs {
+			p.stores.storesHandleUndo(modOut)
+		}
 	})
 
 	// Initialization of the Store Provider, ExecOut Cache Engine?
 
 	// FIXME(abourget): Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
-	// This clearly doesn't belong in the Init() function.
+	//  This clearly doesn't belong in the Init() function.
 	var storeMap store.Map
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
@@ -117,10 +115,9 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	}
 	p.stores.SetStoreMap(storeMap)
 
-	// Build the Module Executor list
-	// TODO(abourget): this could be done lazily, but the outputmodules.Graph,
-	// and cache the latest if all block boundaries
-	// are still clear.
+	// TODO(abourget): Build the Module Executor list: this could be done lazily, but the outputmodules.Graph,
+	//  and cache the latest if all block boundaries
+	//  are still clear.
 
 	if err = p.buildWASM(ctx, p.outputGraph.AllModules()); err != nil {
 		return fmt.Errorf("initiating module output caches: %w", err)
@@ -239,10 +236,10 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	output, runError := exec.RunModule(ctx, executor, execOutput)
+	moduleOutput, outputBytes, runError := exec.RunModule(ctx, executor, execOutput)
 	returnOutput := func() {
-		if output != nil {
-			p.moduleOutputs = append(p.moduleOutputs, output)
+		if moduleOutput != nil {
+			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
 		}
 	}
 	if runError != nil {
@@ -254,8 +251,12 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		returnOutput()
 	}
 
-	if output != nil {
-		p.forkHandler.addReversibleOutput(output, execOutput.Clock().Number)
+	if err := execOutput.Set(executorName, outputBytes); err != nil {
+		return fmt.Errorf("set output cache: %w", err)
+	}
+
+	if moduleOutput != nil {
+		p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Number)
 	}
 	return nil
 }

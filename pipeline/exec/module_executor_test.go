@@ -66,7 +66,7 @@ func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOu
 	return nil, nil, fmt.Errorf("not implemented")
 }
 
-func (t *MockModuleExecutor) outputCacheable() bool {
+func (t *MockModuleExecutor) OutputCacheable() bool {
 	return t.cacheable
 }
 

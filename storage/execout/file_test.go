@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/streamingfast/substreams/block"
-	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,72 +53,6 @@ func TestOutputCache_listContinuousCacheRanges(t *testing.T) {
 			ranges := listContinuousCacheRanges(c.cachedRanges, c.fromBlock)
 			result := ranges.String()
 			require.Equal(t, c.expectedOutput, result)
-		})
-	}
-}
-
-func TestOutputCache_Delete(t *testing.T) {
-	testCases := []struct {
-		name         string
-		kv           map[string]*pboutput.Item
-		keysToDelete []string
-		expectedKv   map[string]*pboutput.Item
-	}{
-		{
-			name: "delete one block id from output cache",
-			kv: map[string]*pboutput.Item{
-				"1": {
-					BlockNum: 1,
-				},
-				"2": {
-					BlockNum: 2,
-				},
-			},
-			keysToDelete: []string{"2"},
-			expectedKv: map[string]*pboutput.Item{
-				"1": {
-					BlockNum: 1,
-				},
-			},
-		},
-		{
-			name: "delete two block ids from output cache",
-			kv: map[string]*pboutput.Item{
-				"1": {
-					BlockNum: 1,
-				},
-				"2": {
-					BlockNum: 2,
-				},
-				"3": {
-					BlockNum: 3,
-				},
-				"4": {
-					BlockNum: 4,
-				},
-			},
-			keysToDelete: []string{"1", "2"},
-			expectedKv: map[string]*pboutput.Item{
-				"3": {
-					BlockNum: 3,
-				},
-				"4": {
-					BlockNum: 4,
-				},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			outputCache := &File{ModuleName: "module1", saveBlockInterval: 10, logger: zlog}
-			outputCache.outputData = &pboutput.Map{
-				Kv: test.kv,
-			}
-			for _, key := range test.keysToDelete {
-				outputCache.Delete(key)
-			}
-			require.Equal(t, test.expectedKv, outputCache.outputData.Kv)
 		})
 	}
 }

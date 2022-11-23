@@ -52,13 +52,13 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	reqStats.RecordBlock(block.AsRef())
 	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
 		p.runPostJobHooks(ctx, clock)
-		return err
+		return err // watch out, io.EOF needs to go through undecorated
 	}
-
 	return
 }
 
 func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) (err error) {
+	var eof bool
 	switch step {
 	case bstream.StepUndo:
 		if err = p.handleStepUndo(ctx, clock, cursor); err != nil {
@@ -75,11 +75,16 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
-
+		if err == io.EOF {
+			eof = true
+		}
 	case bstream.StepNewIrreversible:
 		err := p.handlerStepNew(ctx, block, clock, cursor, step)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
+		}
+		if err == io.EOF {
+			eof = true
 		}
 		err = p.handleStepIrreversible(clock)
 		if err != nil {
@@ -93,16 +98,23 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		}
 	}
 
+	if eof {
+		return io.EOF
+	}
 	return nil
 }
 
 func (p *Pipeline) handleStepStalled(_ context.Context, clock *pbsubstreams.Clock) error {
 	p.forkHandler.removeReversibleOutput(clock.Number)
+	p.execOutputCache.HandleStalled(clock)
 	return nil
 }
 
 func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
 	reqctx.Span(ctx).AddEvent("handling_step_undo")
+
+	p.execOutputCache.HandleUndo(clock)
+
 	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
@@ -111,7 +123,7 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock
 
 func (p *Pipeline) handleStepIrreversible(clock *pbsubstreams.Clock) error {
 	if err := p.execOutputCache.HandleFinal(clock); err != nil {
-		return fmt.Errorf("flushing caches")
+		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
 	p.forkHandler.removeReversibleOutput(clock.Number)
 	return nil

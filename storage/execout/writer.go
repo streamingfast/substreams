@@ -49,7 +49,7 @@ func NewExecOutputWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputM
 	return w
 }
 
-func (w *ExecOutputWriter) Write(clock *pbsubstreams.Clock, buffer *ExecOutputBuffer) {
+func (w *ExecOutputWriter) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 	for modName := range w.outputModules {
 		if val, found := buffer.values[modName]; found {
 			// TODO(abourget): triple check that we don't want to write

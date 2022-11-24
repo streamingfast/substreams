@@ -1,37 +1,32 @@
-package orchestrator
+package execout
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/substreams/reqctx"
-
 	"github.com/streamingfast/bstream"
-
-	"github.com/streamingfast/substreams/storage/execout"
-	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
-
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// TODO(abourget): move to `execout`, rename to LinearReader, aside the `Writer` over there.
-type LinearExecOutputReader struct {
+type LinearReader struct {
 	*shutter.Shutter
 	requestStartBlock uint64
 	exclusiveEndBlock uint64
 	responseFunc      substreams.ResponseFunc
 	module            *pbsubstreams.Module
-	firstFile         *execout.File
+	firstFile         *File
 	cacheItems        chan *pboutput.Item
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, firstFile *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64) *LinearExecOutputReader {
-	return &LinearExecOutputReader{
+func NewLinearReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, firstFile *File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64) *LinearReader {
+	return &LinearReader{
 		Shutter:           shutter.New(),
 		requestStartBlock: startBlock,
 		exclusiveEndBlock: exclusiveEndBlock,
@@ -42,7 +37,7 @@ func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, modu
 	}
 }
 
-func (r *LinearExecOutputReader) Launch(ctx context.Context) {
+func (r *LinearReader) Launch(ctx context.Context) {
 	logger := reqctx.Logger(ctx)
 	logger.Info("launching downloader", zap.Uint64("start_block", r.requestStartBlock), zap.Uint64("exclusive_end_block", r.exclusiveEndBlock))
 
@@ -52,7 +47,7 @@ func (r *LinearExecOutputReader) Launch(ctx context.Context) {
 	}()
 }
 
-func (r *LinearExecOutputReader) run(ctx context.Context) error {
+func (r *LinearReader) run(ctx context.Context) error {
 	logger := reqctx.Logger(ctx)
 
 	go func() {
@@ -90,7 +85,7 @@ func (r *LinearExecOutputReader) run(ctx context.Context) error {
 	}
 }
 
-func (r *LinearExecOutputReader) download(ctx context.Context, file *execout.File) error {
+func (r *LinearReader) download(ctx context.Context, file *File) error {
 	for {
 		sortedCachedItems, err := r.downloadFile(ctx, file)
 		if err != nil {
@@ -114,7 +109,7 @@ func (r *LinearExecOutputReader) download(ctx context.Context, file *execout.Fil
 	}
 }
 
-func (r *LinearExecOutputReader) downloadFile(ctx context.Context, file *execout.File) (out []*pboutput.Item, err error) {
+func (r *LinearReader) downloadFile(ctx context.Context, file *File) (out []*pboutput.Item, err error) {
 	logger := reqctx.Logger(ctx)
 	for {
 		logger.Debug("loading next cache", zap.Object("file", file))

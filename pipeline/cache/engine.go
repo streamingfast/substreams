@@ -18,8 +18,8 @@ type Engine struct {
 	ctx               context.Context
 	wg                *sync.WaitGroup
 	blockType         string
-	reversibleSegment map[uint64]*execout.ExecOutputBuffer // block num to modules' outputs for that given block
-	writableFiles     *execout.ExecOutputWriter            // moduleName => irreversible File
+	reversibleSegment map[uint64]*execout.Buffer // block num to modules' outputs for that given block
+	writableFiles     *execout.ExecOutputWriter  // moduleName => irreversible File
 	runtimeConfig     config.RuntimeConfig
 	logger            *zap.Logger
 }
@@ -29,7 +29,7 @@ func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutW
 		ctx:               ctx,
 		wg:                &sync.WaitGroup{},
 		runtimeConfig:     runtimeConfig,
-		reversibleSegment: map[uint64]*execout.ExecOutputBuffer{},
+		reversibleSegment: map[uint64]*execout.Buffer{},
 		writableFiles:     execOutWriter,
 		logger:            reqctx.Logger(ctx),
 		blockType:         blockType,

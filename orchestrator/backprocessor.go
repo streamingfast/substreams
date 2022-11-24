@@ -22,7 +22,7 @@ type Backprocessor struct {
 	scheduler        *Scheduler
 	squasher         *MultiSquasher
 	workerPool       work.WorkerPool
-	execOutputReader *LinearExecOutputReader
+	execOutputReader *execout.LinearReader
 }
 
 func BuildBackProcessor(
@@ -34,12 +34,12 @@ func BuildBackProcessor(
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
 ) (*Backprocessor, error) {
-	var execOutputReader *LinearExecOutputReader
+	var execOutputReader *execout.LinearReader
 	if reqDetails.ShouldBackprocessAndStreamLinearly() {
 		requestedModule := outputGraph.RequestedMapModules()[0]
 		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
-		execOutputReader = NewLinearExecOutputReader(
+		execOutputReader = execout.NewLinearReader(
 			reqDetails.RequestStartBlockNum,
 			reqDetails.LinearHandoffBlockNum,
 			requestedModule,

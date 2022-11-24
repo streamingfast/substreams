@@ -94,7 +94,7 @@ func (e *Engine) NewExecOutput(block *bstream.Block, clock *pbsubstreams.Clock, 
 }
 
 func (e *Engine) flushCache(cache *OutputCache) error {
-	if len(cache.outputData.Kv) != 0 {
+	if cache.outputData != nil && len(cache.outputData.Kv) != 0 {
 		payloads := 0
 		for _, v := range cache.outputData.Kv {
 			if len(v.Payload) > 0 {

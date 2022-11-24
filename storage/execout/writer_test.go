@@ -24,13 +24,13 @@ var testConfigs = &Configs{
 }
 
 func TestNewExecOutputWriterNotSubrequest(t *testing.T) {
-	res := NewExecOutputWriter(11, 15, mkmap("A"), testConfigs, false)
+	res := NewWriter(11, 15, mkmap("A"), testConfigs, false)
 	require.NotNil(t, res)
 	assert.Equal(t, 20, int(res.files["A"].ExclusiveEndBlock))
 }
 
 func TestNewExecOutputWriterIsSubRequest(t *testing.T) {
-	res := NewExecOutputWriter(11, 15, mkmap("A"), testConfigs, true)
+	res := NewWriter(11, 15, mkmap("A"), testConfigs, true)
 	require.NotNil(t, res)
 	assert.Equal(t, 15, int(res.files["A"].ExclusiveEndBlock))
 }

@@ -66,7 +66,7 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		}
 
 	case bstream.StepStalled:
-		if err := p.handleStepStalled(ctx, clock); err != nil {
+		if err := p.handleStepStalled(clock); err != nil {
 			return fmt.Errorf("step stalled: %w", err)
 		}
 
@@ -104,17 +104,14 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 	return nil
 }
 
-func (p *Pipeline) handleStepStalled(_ context.Context, clock *pbsubstreams.Clock) error {
-	p.forkHandler.removeReversibleOutput(clock.Number)
+func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	p.execOutputCache.HandleStalled(clock)
+	p.forkHandler.removeReversibleOutput(clock.Number)
 	return nil
 }
 
 func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
-	reqctx.Span(ctx).AddEvent("handling_step_undo")
-
 	p.execOutputCache.HandleUndo(clock)
-
 	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
@@ -141,7 +138,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 	}
 
 	logger := reqctx.Logger(ctx)
-	execOutput, err := p.execOutputCache.NewExecOutput(block, clock, cursor)
+	execOutput, err := p.execOutputCache.NewBuffer(block, clock, cursor)
 	if err != nil {
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
@@ -177,7 +174,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, span := reqctx.WithSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
-	// TODO(abourget): get the module executors from the OutputModulesGraph
+	// TODO(abourget): get the module executors lazily from the OutputModulesGraph
+	//  this way we skip the buildWASM() in `Init()`.
+	//  Would pave the way towards PATCH'd modules too.
 
 	p.moduleOutputs = nil
 	for _, executor := range p.moduleExecutors {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,15 +63,30 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 }
 
 func TestProductionMode(t *testing.T) {
-	run := newTestRun(20, 28, 31, "assert_test_store_add_i64")
+	var objStore dstore.Store
+	run := newTestRun(20, 28, 33, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 5
+	run.BlockProcessedCallback = func(ctx *execContext) {
+		objStore = ctx.baseStore
+	}
 
 	require.NoError(t, run.Run(t))
 
 	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 11, strings.Count(mapOutput, "\n"))
+	assert.Equal(t, 13, strings.Count(mapOutput, "\n"))
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
+	assert.Regexp(t, "20:", mapOutput)
+	assert.Regexp(t, "32:", mapOutput)
+
+	storedFiles, err := objStore.ListFiles(context.Background(), "", 999)
+	require.NoError(t, err)
+	assert.Len(t, storedFiles, 4)
+	filenames := strings.Join(storedFiles, "\n")
+	assert.Regexp(t, "outputs/0000000020-0000000028.output", filenames)
+	assert.Regexp(t, "states/0000000010-0000000001.kv", filenames)
+	assert.Regexp(t, "states/0000000020-0000000001.kv", filenames)
+	assert.Regexp(t, "states/0000000030-0000000001.kv", filenames)
 }
 
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {

@@ -10,32 +10,29 @@ import (
 type Graph struct {
 	request *pbsubstreams.Request
 
-	// required stores to be processed, either because requested directly
-	// or ancestor to a requested module
-	stores []*pbsubstreams.Module
-
-	// TODO(abourget): populate with those mapper output, that adds a layer of
-	// scheduling in addition to `storeModules`.
-	// outputMapperModules
-	requestedMappers []*pbsubstreams.Module
-
-	schedulableModules []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
-
-	allModules       []*pbsubstreams.Module // subset of request.Modules, needed for any `OutputModules`.
-	requestedOutputs []*pbsubstreams.Module // modules requested in `OutputModules`
-	outputModuleMap  map[string]bool
-
+	stores                  []*pbsubstreams.Module // stores that need to be processed, either requested directly of as ancestor to a required module.
+	requestedMappers        []*pbsubstreams.Module
+	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
+	allModules              []*pbsubstreams.Module // subset of request.Modules, needed for any `OutputModules`.
+	requestedOutputs        []*pbsubstreams.Module // modules requested in `OutputModules`
+	outputModuleMap         map[string]bool
 	schedulableAncestorsMap map[string][]string // modules that are ancestors (therefore dependencies) of a given module
-
-	moduleHashes *manifest.ModuleHashes
+	moduleHashes            *manifest.ModuleHashes
 }
 
-func (t *Graph) RequestedMapModules() []*pbsubstreams.Module { return t.requestedMappers }
-func (t *Graph) Stores() []*pbsubstreams.Module              { return t.stores }
-func (g *Graph) AllModules() []*pbsubstreams.Module          { return g.allModules }
-func (t *Graph) IsOutputModule(name string) bool             { return t.outputModuleMap[name] }
-func (t *Graph) OutputMap() map[string]bool                  { return t.outputModuleMap }
-func (t *Graph) ModuleHashes() *manifest.ModuleHashes        { return t.moduleHashes }
+func (t *Graph) RequestedMapperModules() []*pbsubstreams.Module { return t.requestedMappers }
+func (t *Graph) RequestedMapperModulesMap() map[string]bool {
+	out := make(map[string]bool)
+	for _, mod := range t.RequestedMapperModules() {
+		out[mod.Name] = true
+	}
+	return out
+}
+func (t *Graph) Stores() []*pbsubstreams.Module       { return t.stores }
+func (g *Graph) AllModules() []*pbsubstreams.Module   { return g.allModules }
+func (t *Graph) IsOutputModule(name string) bool      { return t.outputModuleMap[name] }
+func (t *Graph) OutputMap() map[string]bool           { return t.outputModuleMap }
+func (t *Graph) ModuleHashes() *manifest.ModuleHashes { return t.moduleHashes }
 
 func NewOutputModuleGraph(request *pbsubstreams.Request) (out *Graph, err error) {
 	outMap := make(map[string]bool)

@@ -200,8 +200,6 @@ func (c *File) Save(ctx context.Context) (func(), error) {
 	}
 	filename := c.Filename()
 
-	c.logger.Info("saving cache", zap.Stringer("block_range", c.BoundedRange), zap.String("filename", filename))
-
 	// TODO(abourget): once the `outputData` has been detached, could we put the full MarshalFast() call
 	// inside the Go routine? Since in this new version of a File, the File itself
 	// is not reused, but a Next() one is created.
@@ -212,6 +210,8 @@ func (c *File) Save(ctx context.Context) (func(), error) {
 	}
 
 	return func() {
+		c.logger.Info("writing execution output file", zap.String("filename", filename))
+
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
 			err := c.store.WriteObject(ctx, filename, reader)

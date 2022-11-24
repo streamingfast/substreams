@@ -197,10 +197,22 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 	}
 	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
-	// TODO(abourget): indicate to the OutputWriter which ones we should flush if we're in a subrequest..
-	// or we align the end boundary on a boundary unless we're in a subrequest, so we never write
-	// misaligned files otherwise.
-	execOutWriter := execout.NewExecOutputWriter(requestDetails.RequestStartBlockNum, requestDetails.StopBlockNum, outputGraph.OutputMap(), execOutputConfigs, isSubRequest)
+	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
+	//  * in direct mode, this would mean we start writing files after the handoff,
+	//    but it's not so useful to write those files, as they're partials
+	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
+	//  *
+	var execOutWriter *execout.Writer
+	mapperMods := outputGraph.RequestedMapperModulesMap()
+	if len(mapperMods) != 0 && isSubRequest {
+		execOutWriter = execout.NewWriter(
+			requestDetails.LinearHandoffBlockNum,
+			requestDetails.StopBlockNum,
+			mapperMods,
+			execOutputConfigs,
+			isSubRequest,
+		)
+	}
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
 	if err != nil {

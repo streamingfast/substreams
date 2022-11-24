@@ -64,6 +64,6 @@ func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.Module
 	}), nil
 }
 
-func (e *MapperModuleExecutor) OutputCacheable() bool {
+func (e *MapperModuleExecutor) HasValidOutput() bool {
 	return true
 }

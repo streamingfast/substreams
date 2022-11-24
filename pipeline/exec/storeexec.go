@@ -47,7 +47,7 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	return e.wrapDeltas()
 }
 
-func (e *StoreModuleExecutor) OutputCacheable() bool {
+func (e *StoreModuleExecutor) HasValidOutput() bool {
 	_, ok := e.outputStore.(*store.FullKV)
 	return ok
 }

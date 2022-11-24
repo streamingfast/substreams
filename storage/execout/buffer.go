@@ -16,7 +16,7 @@ type Buffer struct {
 	clock  *pbsubstreams.Clock
 } // TODO(abourget): rename to `Buffer`
 
-func NewExecOutputBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
+func NewBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
 	blkBytes, err := block.Payload.Get()
 	if err != nil {
 		return nil, fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)

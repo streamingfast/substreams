@@ -9,14 +9,14 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// MultiWriter ?
+// MultiplexedWriter?
 
-// The ExecOutputWriter is responsible for writing an rotating files
+// The Writer is responsible for writing an rotating files
 // containing execution outputs.
 // Those files will then be read by the LinearExecOutReader.
 // `initialBlockBoundary` is expected to be on a boundary, or to be
 // modules' initial blocks.
-type ExecOutputWriter struct {
+type Writer struct {
 	wg *sync.WaitGroup
 
 	files         map[string]*File // moduleName => file
@@ -24,8 +24,8 @@ type ExecOutputWriter struct {
 	configs       *Configs
 }
 
-func NewExecOutputWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModules map[string]bool, configs *Configs, isSubRequest bool) *ExecOutputWriter {
-	w := &ExecOutputWriter{
+func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModules map[string]bool, configs *Configs, isSubRequest bool) *Writer {
+	w := &Writer{
 		wg:            &sync.WaitGroup{},
 		files:         make(map[string]*File),
 		configs:       configs,
@@ -49,7 +49,7 @@ func NewExecOutputWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputM
 	return w
 }
 
-func (w *ExecOutputWriter) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
+func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 	for modName := range w.outputModules {
 		if val, found := buffer.values[modName]; found {
 			// TODO(abourget): triple check that we don't want to write
@@ -62,7 +62,7 @@ func (w *ExecOutputWriter) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 	}
 }
 
-func (w *ExecOutputWriter) MaybeRotate(ctx context.Context, clockNumber uint64) error {
+func (w *Writer) MaybeRotate(ctx context.Context, clockNumber uint64) error {
 	for modName := range w.outputModules {
 		curFile := w.files[modName]
 		if curFile == nil {
@@ -106,7 +106,7 @@ func (w *ExecOutputWriter) MaybeRotate(ctx context.Context, clockNumber uint64) 
 	return nil
 }
 
-func (w *ExecOutputWriter) Close() error {
+func (w *Writer) Close() error {
 	// TODO(abourget): make sure we flush and wait for all the Save()'s to happen
 	w.wg.Wait()
 	return nil

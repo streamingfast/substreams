@@ -235,27 +235,26 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executor.ResetWASMInstance()
 
 	executorName := executor.Name()
+	hasValidOutput := executor.HasValidOutput()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	moduleOutput, outputBytes, runError := exec.RunModule(ctx, executor, execOutput)
-	returnOutput := func() {
-		if moduleOutput != nil {
-			p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
-		}
-	}
 	if runError != nil {
-		returnOutput()
+		if hasValidOutput {
+			p.appendModuleOutputs(moduleOutput)
+		}
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	if p.isOutputModule(executor.Name()) {
-		returnOutput()
+	if !hasValidOutput {
+		return nil
 	}
-
+	if p.isOutputModule(executor.Name()) {
+		p.appendModuleOutputs(moduleOutput)
+	}
 	if err := execOutput.Set(executorName, outputBytes); err != nil {
 		return fmt.Errorf("set output cache: %w", err)
 	}
-
 	if moduleOutput != nil {
 		p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Number)
 	}
@@ -270,6 +269,11 @@ func shouldReturn(blockNum, requestStartBlockNum uint64) bool {
 	return blockNum >= requestStartBlockNum
 }
 
+func (p *Pipeline) appendModuleOutputs(moduleOutput *pbsubstreams.ModuleOutput) {
+	if moduleOutput != nil {
+		p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
+	}
+}
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {
 	var progress []*pbsubstreams.ModuleProgress
 	for _, backprocessStore := range p.partialStores {

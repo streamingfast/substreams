@@ -41,17 +41,18 @@ type Pipeline struct {
 	outputGraph     *outputmodules.Graph
 	moduleExecutors []exec.ModuleExecutor
 	moduleOutputs   []*pbsubstreams.ModuleOutput
-
-	respFunc func(resp *pbsubstreams.Response) error
-
-	backprocessingStores []*backprocessingStore
-
-	execOutputCache *cache.Engine
-
-	forkHandler *ForkHandler
+	respFunc        func(resp *pbsubstreams.Response) error
 
 	stores         *Stores
 	execoutStorage *execout.Configs
+	partialStores  []*backprocessingStore
+
+	forkHandler     *ForkHandler
+	execOutputCache *cache.Engine
+
+	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
+	// (for chains with potential block skips)
+	lastFinalClock *pbsubstreams.Clock
 }
 
 func New(
@@ -149,7 +150,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 			partialStore := storeConfig.NewPartialKV(reqDetails.RequestStartBlockNum, logger)
 			storeMap.Set(partialStore)
 
-			p.backprocessingStores = append(p.backprocessingStores, &backprocessingStore{
+			p.partialStores = append(p.partialStores, &backprocessingStore{
 				name:            partialStore.Name(),
 				initialBlockNum: partialStore.InitialBlock(),
 			})
@@ -198,7 +199,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	}
 	reqStats.EndBackProcessing()
 
-	p.backprocessingStores = nil
+	p.partialStores = nil
 
 	return storeMap, nil
 }
@@ -271,7 +272,7 @@ func shouldReturn(blockNum, requestStartBlockNum uint64) bool {
 
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {
 	var progress []*pbsubstreams.ModuleProgress
-	for _, backprocessStore := range p.backprocessingStores {
+	for _, backprocessStore := range p.partialStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
 			Name: backprocessStore.name,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{

@@ -19,23 +19,24 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// TODO(abourget): move to `execout`, rename to LinearReader, aside the `Writer` over there.
 type LinearExecOutputReader struct {
 	*shutter.Shutter
 	requestStartBlock uint64
 	exclusiveEndBlock uint64
 	responseFunc      substreams.ResponseFunc
 	module            *pbsubstreams.Module
-	file              *execout.File
+	firstFile         *execout.File
 	cacheItems        chan *pboutput.Item
 }
 
-func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, file *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64) *LinearExecOutputReader {
+func NewLinearExecOutputReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, firstFile *execout.File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64) *LinearExecOutputReader {
 	return &LinearExecOutputReader{
 		Shutter:           shutter.New(),
 		requestStartBlock: startBlock,
 		exclusiveEndBlock: exclusiveEndBlock,
 		module:            module,
-		file:              file,
+		firstFile:         firstFile,
 		responseFunc:      responseFunc,
 		cacheItems:        make(chan *pboutput.Item, execOutputSaveInterval*2),
 	}
@@ -52,8 +53,13 @@ func (r *LinearExecOutputReader) Launch(ctx context.Context) {
 }
 
 func (r *LinearExecOutputReader) run(ctx context.Context) error {
+	logger := reqctx.Logger(ctx)
+
 	go func() {
-		r.Shutdown(r.download(ctx))
+		if err := r.download(ctx, r.firstFile); err != nil {
+			r.Shutdown(err)
+		}
+		close(r.cacheItems)
 	}()
 
 	for {
@@ -74,25 +80,22 @@ func (r *LinearExecOutputReader) run(ctx context.Context) error {
 			}
 
 			if blockScopedData.Clock.Number >= r.exclusiveEndBlock {
-				r.logger.Info("stop pulling block scoped data, end block reach",
+				logger.Info("stop pulling block scoped data, end block reach",
 					zap.Uint64("exclusive_end_block_num", r.exclusiveEndBlock),
 					zap.Uint64("cache_item_block_num", blockScopedData.Clock.Number),
 				)
 				return nil
 			}
-
 		}
 	}
 }
 
-func (r *LinearExecOutputReader) download(ctx context.Context) error {
-	nextCachedBlockNum := r.requestStartBlock - (r.requestStartBlock % r.execOutputSaveInterval)
+func (r *LinearExecOutputReader) download(ctx context.Context, file *execout.File) error {
 	for {
-		sortedCachedItems, err := r.downloadNextFile(ctx, nextCachedBlockNum)
+		sortedCachedItems, err := r.downloadFile(ctx, file)
 		if err != nil {
 			return fmt.Errorf("getting sorted cache items: %w", err)
 		}
-		nextCachedBlockNum += r.execOutputSaveInterval
 
 		for _, cachedItem := range sortedCachedItems {
 			select {
@@ -103,30 +106,39 @@ func (r *LinearExecOutputReader) download(ctx context.Context) error {
 				return nil
 			}
 		}
+
+		file = file.NextFile()
+		if file == nil {
+			return nil
+		}
 	}
 }
 
-func (r *LinearExecOutputReader) downloadNextFile(ctx context.Context, atBlockNum uint64) (out []*pboutput.Item, err error) {
+func (r *LinearExecOutputReader) downloadFile(ctx context.Context, file *execout.File) (out []*pboutput.Item, err error) {
 	logger := reqctx.Logger(ctx)
 	for {
-		logger.Debug("loading next cache", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
-		found, err := r.file.LoadAtBlock(ctx, atBlockNum)
+		logger.Debug("loading next cache", zap.Object("file", file))
+		loaded, err := file.Load(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("loading %s cache at block %d: %w", r.module.Name, atBlockNum, err)
+			return nil, fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err)
 		}
-		if !found {
-			logger.Debug("cache not found, waiting 5s", zap.String("module", r.module.Name), zap.Uint64("next_cached_block_num", atBlockNum))
-			select {
-			case <-time.After(5 * time.Second):
-				continue
-			case <-r.Terminating():
-				return nil, nil
-			case <-ctx.Done():
-				return nil, nil
-			}
+		if loaded {
+			out = file.SortedItems()
+			return out, nil
 		}
-		out = r.file.SortedItems()
-		return out, nil
+
+		// TODO(abourget): if file.IsPartial(), we should delete it, it would mean it'd be left
+		// over, and never reused, unless an EXACT request would come and use it.
+
+		logger.Debug("cache not found, waiting 2s", zap.Object("file", file))
+		select {
+		case <-time.After(2 * time.Second):
+			continue
+		case <-r.Terminating():
+			return nil, nil
+		case <-ctx.Done():
+			return nil, nil
+		}
 	}
 }
 

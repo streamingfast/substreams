@@ -30,8 +30,8 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 			zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
 		)
 
-		if err := p.execOutputCache.EndOfStream(reqDetails.IsSubRequest, p.outputGraph.OutputMap()); err != nil {
-			return fmt.Errorf("step new irr: exec out end of stream: %w", err)
+		if err := p.execOutputCache.EndOfStream(p.lastFinalClock); err != nil {
+			return fmt.Errorf("end of stream: %w", err)
 		}
 
 		if err := p.stores.flushStores(ctx, reqDetails.Request.StopBlockNum); err != nil {

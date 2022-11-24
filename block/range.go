@@ -30,9 +30,6 @@ type Range struct {
 }
 
 func NewRange(startBlock, exclusiveEndBlock uint64) *Range {
-	if exclusiveEndBlock <= startBlock {
-		panic(fmt.Sprintf("invalid block range start %d, end %d", startBlock, exclusiveEndBlock))
-	}
 	return &Range{startBlock, exclusiveEndBlock}
 }
 
@@ -51,6 +48,10 @@ func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		enc.AddUint64("exclusive_end_block", r.ExclusiveEndBlock)
 	}
 	return nil
+}
+
+func (r *Range) IsEmpty() bool {
+	return r.StartBlock == r.ExclusiveEndBlock
 }
 
 func (r *Range) Contains(blockNum uint64) bool {

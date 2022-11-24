@@ -22,9 +22,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO(abourget): this is called File because we want it to BECOME a File, but right now it knows
-// more than that.
-
 // A File in `execout` stores, for a given module (with a given hash), the outputs of module execution
 // for _multiple blocks_, based on their block ID.
 type File struct {
@@ -32,29 +29,38 @@ type File struct {
 	*block.BoundedRange
 
 	ModuleName string
-	outputData *pboutput.Map
+	kv         map[string]*pboutput.Item
 	store      dstore.Store
 	logger     *zap.Logger
-
-	loadedFromStore bool
 }
+
+// NOTE(abourget): this File could be split in a BoundedFile which would know about NextFile() as well the BoundedRange,
+// and the File could know only about its own `targetRange`.  Only if useful in the future.  A File is rarely going to
+// be consumed in isolation, we're interested in the window.
 
 // NextFile initializes a new *File pointing to the next boundary, according to `targetRange`.
 func (c *File) NextFile() *File {
+	nextBoundary := c.BoundedRange.NextBoundary()
+	if nextBoundary.IsEmpty() {
+		return nil
+	}
 	return &File{
+		kv:           make(map[string]*pboutput.Item),
 		ModuleName:   c.ModuleName,
 		store:        c.store,
 		logger:       c.logger,
-		BoundedRange: c.BoundedRange.NextBoundary(),
+		BoundedRange: nextBoundary,
 	}
 }
 
-func (c *File) currentFilename() string {
+func (c *File) Filename() string {
 	return computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
 }
 
 func (c *File) SortedItems() (out []*pboutput.Item) {
-	for _, item := range c.outputData.Kv {
+	// TODO(abourget): eventually, what is saved should be sorted before saving,
+	// or we import a list and Load() automatically sorts what needs to be sorted.
+	for _, item := range c.kv {
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -63,7 +69,7 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 	return
 }
 
-func (c *File) SetItem(clock *pbsubstreams.Clock, cursor string, data []byte) error {
+func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -74,20 +80,19 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, cursor string, data []byte) er
 		BlockNum:  clock.Number,
 		BlockId:   clock.Id,
 		Timestamp: clock.Timestamp,
-		Cursor:    cursor,
-		Payload:   cp,
+		// TODO(abourget): remove the `Cursor` from this `pboutput.Item` struct,
+		//  as we're only going to store irreversible stuff now.
+		Payload: cp,
 	}
 
-	c.outputData.Kv[clock.Id] = ci
-
-	return nil
+	c.kv[clock.Id] = ci
 }
 
 func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	cacheItem, found := c.outputData.Kv[clock.Id]
+	cacheItem, found := c.kv[clock.Id]
 
 	if !found {
 		return nil, false
@@ -100,7 +105,7 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	for _, value := range c.outputData.Kv {
+	for _, value := range c.kv {
 		if value.BlockNum == blockNumber {
 			return value.Payload, true
 		}
@@ -109,55 +114,61 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	return nil, false
 }
 
-func (c *File) LoadAtEndBlockBoundary(ctx context.Context) (found bool, err error) {
-	return c.LoadAtBlock(ctx, c.BoundedRange.ExclusiveEndBlock)
-}
+//func (c *File) LoadAtEndBlockBoundary(ctx context.Context) (found bool, err error) {
+//	return c.LoadAtBlock(ctx, c.BoundedRange.ExclusiveEndBlock)
+//}
 
-func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
-	c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
+//
+//func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
+//	c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
+//
+//	c.outputData = &pboutput.Map{
+//		Kv: make(map[string]*pboutput.Item),
+//	}
+//
+//	blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
+//	if err != nil {
+//		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
+//	}
+//
+//	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
+//
+//	if !found {
+//		// TODO(abourget): it's not this object's business to go over boundaries,
+//		//  use the BoundedRange object on it to switch, and change files.
+//		//  In any case, this will belong to the Writer or to a consuming object
+//		//  not within the "File" to switch bounds. The caller might call "NextBoundary()"
+//		//  and get a new File, and manage it itself.
+//		endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
+//		blockRange = block.NewRange(atBlock, endBlockRange)
+//		c.BoundedRange = blockRange
+//		return found, nil
+//	}
+//
+//	err = c.Load(ctx, blockRange)
+//	if err != nil {
+//		return false, fmt.Errorf("loading cache at %d: %w", atBlock, err)
+//	}
+//
+//	c.loadedFromStore = true
+//
+//	return found, nil
+//
+//}
+func (c *File) Load(ctx context.Context) (loaded bool, err error) {
 
-	c.outputData = &pboutput.Map{
-		Kv: make(map[string]*pboutput.Item),
-	}
+	filename := computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
+	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.BoundedRange))
 
-	blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
-	if err != nil {
-		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
-	}
-
-	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
-
-	if !found {
-		// TODO(abourget): it's not this object's business to go over boundaries,
-		//  use the BoundedRange object on it to switch, and change files.
-		//  In any case, this will belong to the Writer or to a consuming object
-		//  not within the "File" to switch bounds. The caller might call "NextBoundary()"
-		//  and get a new File, and manage it itself.
-		endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
-		blockRange = block.NewRange(atBlock, endBlockRange)
-		c.targetRange = blockRange
-		return found, nil
-	}
-
-	err = c.Load(ctx, blockRange)
-	if err != nil {
-		return false, fmt.Errorf("loading cache at %d: %w", atBlock, err)
-	}
-
-	c.loadedFromStore = true
-
-	return found, nil
-
-}
-func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
-	c.logger.Debug("loading cache", zap.Object("range", blockRange))
-	c.outputData.Kv = make(map[string]*pboutput.Item)
-
-	filename := computeDBinFilename(blockRange.StartBlock, blockRange.ExclusiveEndBlock)
-	c.logger.Debug("loading outputs data", zap.String("file_name", filename), zap.Object("block_range", blockRange))
-
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		objectReader, err := c.store.OpenObject(ctx, filename)
+		if err == dstore.ErrNotFound {
+			// TODO(abourget,stepd): proper design would be that RetryContext could handle a `NotRetryableError`
+			//  that would terminate the Retry loop, and unwrap the NotRetryableError and return it
+			//  to the caller.
+			//  We're hacking our way here.
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("loading block reader %s: %w", filename, err)
 		}
@@ -168,41 +179,38 @@ func (c *File) Load(ctx context.Context, blockRange *block.Range) error {
 			return fmt.Errorf("reading store file %s: %w", filename, err)
 		}
 
-		if err = c.outputData.UnmarshalFast(bytes); err != nil {
+		outputData := &pboutput.Map{}
+		if err = outputData.UnmarshalFast(bytes); err != nil {
 			return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 		}
 
+		c.kv = outputData.Kv
+
+		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.BoundedRange))
+		loaded = true
 		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("retried: %w", err)
-	}
-
-	c.targetRange = blockRange
-	c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.outputData.Kv)), zap.Stringer("block_range", c.targetRange))
-	return nil
+	return
 }
 
 func (c *File) Save(ctx context.Context) (func(), error) {
-	if len(c.outputData.Kv) == 0 {
-		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.targetRange))
+	if len(c.kv) == 0 {
+		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.BoundedRange))
 		return func() {}, nil
 	}
-	// TODO(abourget): track if there are Payloads in there?
-	filename := c.currentFilename()
+	filename := c.Filename()
 
-	c.logger.Info("saving cache", zap.Stringer("block_range", c.targetRange), zap.String("filename", filename))
+	c.logger.Info("saving cache", zap.Stringer("block_range", c.BoundedRange), zap.String("filename", filename))
 
-	cnt, err := c.outputData.MarshalFast()
+	// TODO(abourget): once the `outputData` has been detached, could we put the full MarshalFast() call
+	// inside the Go routine? Since in this new version of a File, the File itself
+	// is not reused, but a Next() one is created.
+	outputData := &pboutput.Map{Kv: c.kv}
+	cnt, err := outputData.MarshalFast()
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling file %s: %w", filename, err)
 	}
 
-	// TODO(abourget): split this, and return a closure, so the CALLER can control the wait group
-	//  and decide when its completely done. It's not the business of the File to handle its control
-	//  flow.
-	//  It,s going to be the ExecOutputWriter, that will want to ensure to its caller upon Close()
-	//  that all the Saves it initiated are properly terminated before returning from its Close().
 	return func() {
 		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
@@ -220,10 +228,13 @@ func (c *File) String() string {
 }
 
 func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("store", c.ModuleName)
-	enc.AddUint64("start_block", c.targetRange.StartBlock)
-	enc.AddUint64("end_block", c.targetRange.ExclusiveEndBlock)
-	enc.AddInt("kv_count", len(c.outputData.Kv))
+	if c == nil {
+		return nil
+	}
+	enc.AddString("module", c.ModuleName)
+	enc.AddUint64("start_block", c.BoundedRange.StartBlock)
+	enc.AddUint64("end_block", c.BoundedRange.ExclusiveEndBlock)
+	enc.AddInt("kv_count", len(c.kv))
 	return nil
 }
 

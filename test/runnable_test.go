@@ -2,7 +2,7 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -31,7 +31,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 type testRun struct {
@@ -150,21 +149,21 @@ func (f *testRun) MapOutput(modName string) string {
 					continue
 				}
 
-				res := &pbsubstreamstest.MapResult{}
-				err := proto.Unmarshal(mapout.Value, res)
-				if err != nil {
-					panic("marshaling proto: " + err.Error())
-				}
-
-				out := &TestMapOutput{
-					ModuleName: output.Name,
-					Result:     res,
-				}
-				jsonData, err := json.Marshal(out)
-				if err != nil {
-					panic("marshaling json: " + err.Error())
-				}
-				moduleOutputs = append(moduleOutputs, fmt.Sprintf("%d: %s: %s", r.Data.Clock.Number, output.Name, string(jsonData)))
+				// TODO(abourget): use our library to decode those protobufs on the fly, and
+				// allow us to test with that as JSON.
+				// That MapResult right now is pretty useless.. it doesn't really
+				// honor what is
+				//res := &pbsubstreamstest.MapResult{}
+				//err := proto.Unmarshal(mapout.Value, res)
+				//if err != nil {
+				//	panic("marshaling proto: " + err.Error())
+				//}
+				res := hex.EncodeToString(mapout.Value)
+				//jsonData, err := json.Marshal(res)
+				//if err != nil {
+				//	panic("marshaling json: " + err.Error())
+				//}
+				moduleOutputs = append(moduleOutputs, fmt.Sprintf("%d: %s: %s", r.Data.Clock.Number, output.Name, res))
 			}
 		}
 	}

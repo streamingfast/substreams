@@ -14,7 +14,7 @@ import (
 type ExecOutputBuffer struct {
 	values map[string][]byte
 	clock  *pbsubstreams.Clock
-}
+} // TODO(abourget): rename to `Buffer`
 
 func NewExecOutputBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*ExecOutputBuffer, error) {
 	blkBytes, err := block.Payload.Get()
@@ -23,7 +23,7 @@ func NewExecOutputBuffer(blockType string, block *bstream.Block, clock *pbsubstr
 	}
 	clockBytes, err := proto.Marshal(clock)
 	if err != nil {
-		return nil, fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
+		return nil, fmt.Errorf("marshalling clock %d %q: %w", clock.Number, clock.Id, err)
 	}
 
 	return &ExecOutputBuffer{

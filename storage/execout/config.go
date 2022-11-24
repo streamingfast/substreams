@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -40,10 +41,11 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 
 func (c *Config) NewFile(targetRange *block.BoundedRange) *File {
 	return &File{
-		ModuleName:  c.name,
-		store:       c.objStore,
-		targetRange: targetRange,
-		logger:      c.logger,
+		kv:           make(map[string]*pboutput.Item),
+		ModuleName:   c.name,
+		store:        c.objStore,
+		BoundedRange: targetRange,
+		logger:       c.logger,
 	}
 }
 

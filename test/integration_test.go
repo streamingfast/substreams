@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,9 +65,12 @@ func TestProductionMode(t *testing.T) {
 	run := newTestRun(20, 28, 31, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 5
+
 	require.NoError(t, run.Run(t))
 
-	require.Equal(t, "bob", run.MapOutput("assert_test_store_add_i64"))
+	mapOutput := run.MapOutput("assert_test_store_add_i64")
+	assert.Equal(t, 11, strings.Count(mapOutput, "\n"))
+	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 
 func Test_MultipleModule_Batch_Output_Written(t *testing.T) {

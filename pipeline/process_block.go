@@ -86,13 +86,13 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		if err == io.EOF {
 			eof = true
 		}
-		err = p.handleStepIrreversible(clock)
+		err = p.handleStepFinal(clock)
 		if err != nil {
 			return fmt.Errorf("handling step irreversible: %w", err)
 		}
 
 	case bstream.StepIrreversible:
-		err = p.handleStepIrreversible(clock)
+		err = p.handleStepFinal(clock)
 		if err != nil {
 			return fmt.Errorf("handling step irreversible: %w", err)
 		}
@@ -121,7 +121,8 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock
 	return nil
 }
 
-func (p *Pipeline) handleStepIrreversible(clock *pbsubstreams.Clock) error {
+func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
+	p.lastFinalClock = clock
 	if err := p.execOutputCache.HandleFinal(clock); err != nil {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}

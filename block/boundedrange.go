@@ -30,13 +30,13 @@ func (r *BoundedRange) NextBoundary() *BoundedRange {
 	return &newBoundedRange
 }
 
-func (r *BoundedRange) IsEmpty() bool {
-	return r.Range == nil
-}
-
 // Whether both sides of the range are aligned with interval boundaries.
 func (r *BoundedRange) AlignsWithBoundaries() bool {
 	return r.AlignsWithLowerBound() && r.AlignsWithUpperBound()
+}
+
+func (r *BoundedRange) IsPartial() bool {
+	return !r.AlignsWithUpperBound()
 }
 
 func (r *BoundedRange) AlignsWithLowerBound() bool {

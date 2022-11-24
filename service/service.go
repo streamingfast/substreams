@@ -197,7 +197,12 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 	}
 	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
-	execOutputCacheEngine, err := cache.NewEngine(s.runtimeConfig, execOutputConfigs, s.blockType, reqctx.Logger(ctx))
+	// TODO(abourget): indicate to the OutputWriter which ones we should flush if we're in a subrequest..
+	// or we align the end boundary on a boundary unless we're in a subrequest, so we never write
+	// misaligned files otherwise.
+	execOutWriter := execout.NewExecOutputWriter(requestDetails.RequestStartBlockNum, requestDetails.StopBlockNum, outputGraph.OutputMap(), execOutputConfigs, isSubRequest)
+
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -238,12 +243,24 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 		zap.Uint64("end_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
 	)
-	blockStream, err := s.streamFactoryFunc(
-		pipe,
-		request.StartBlockNum,
-		request.StopBlockNum,
-		request.StartCursor,
-	)
+
+	var blockStream Streamable
+	if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
+		blockStream, err = s.streamFactoryFunc(
+			pipe,
+			int64(requestDetails.LinearHandoffBlockNum),
+			request.StopBlockNum,
+			"",
+		)
+
+	} else {
+		blockStream, err = s.streamFactoryFunc(
+			pipe,
+			request.StartBlockNum,
+			request.StopBlockNum,
+			request.StartCursor,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}

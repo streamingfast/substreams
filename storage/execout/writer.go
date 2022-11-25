@@ -106,8 +106,6 @@ func (w *Writer) MaybeRotate(ctx context.Context, clockNumber uint64) error {
 	return nil
 }
 
-func (w *Writer) Close() error {
-	// TODO(abourget): make sure we flush and wait for all the Save()'s to happen
+func (w *Writer) Close() {
 	w.wg.Wait()
-	return nil
 }

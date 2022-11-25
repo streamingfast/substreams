@@ -43,6 +43,8 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
+	p.execOutputCache.Close()
+
 	if p.stores.partialsWritten != nil {
 		partialRanges := make([]string, len(p.stores.partialsWritten))
 		for i, rng := range p.stores.partialsWritten {

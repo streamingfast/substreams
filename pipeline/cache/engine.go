@@ -3,7 +3,6 @@ package cache
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/streamingfast/substreams/reqctx"
 
@@ -15,11 +14,11 @@ import (
 )
 
 // TODO(abourget): this is now something like an execout.LifecycleWriter ?
-//  pipeline.Lifecycle ? to hold also the *pbsubstreams.ModuleOutput
-//  so that `ForkHandler` disappears in the end?
+//
+//	pipeline.Lifecycle ? to hold also the *pbsubstreams.ModuleOutput
+//	so that `ForkHandler` disappears in the end?
 type Engine struct {
 	ctx               context.Context
-	wg                *sync.WaitGroup
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
 	writableFiles     *execout.Writer            // moduleName => irreversible File
@@ -30,7 +29,6 @@ type Engine struct {
 func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriter *execout.Writer, blockType string) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
-		wg:                &sync.WaitGroup{},
 		runtimeConfig:     runtimeConfig,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
 		writableFiles:     execOutWriter,
@@ -98,7 +96,8 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (e *Engine) Close() error {
-	e.wg.Wait()
-	return nil
+func (e *Engine) Close() {
+	if e.writableFiles != nil {
+		e.writableFiles.Close()
+	}
 }

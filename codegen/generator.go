@@ -104,12 +104,6 @@ func NewGenerator(pkg *pbsubstreams.Package, manifest *manifest.Manifest, protoD
 	engine := &Engine{Manifest: manifest}
 	utils["getEngine"] = engine.GetEngine
 
-	reader, err := os.Open("/Users/cbillett/devel/sf/substreams/codegen/test_substreams/proto/my/v1/my.proto")
-	if err != nil {
-		panic(err)
-	}
-	defer reader.Close()
-
 	return &Generator{
 		pkg:              pkg,
 		manifest:         manifest,

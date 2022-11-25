@@ -301,8 +301,6 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		return err
 	}
 
-	execOutputCacheEngine.Close()
-
 	return nil
 }
 

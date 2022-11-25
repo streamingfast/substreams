@@ -12,3 +12,7 @@ message MapResult {
   uint64 block_number = 1;
   string block_hash = 2;
 }
+
+message Boolean {
+  bool result = 1;
+}

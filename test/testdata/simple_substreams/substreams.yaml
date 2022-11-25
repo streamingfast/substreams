@@ -51,7 +51,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: test_store_delete_prefix
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   # -------------------- INT64 TESTS -------------------- #
   - name: setup_test_store_add_i64
@@ -69,7 +69,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_add_i64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_add_i64_deltas
     kind: map
@@ -80,7 +80,7 @@ modules:
       - store: setup_test_store_add_i64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_i64
     kind: store
@@ -97,7 +97,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_i64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_i64_deltas
     kind: map
@@ -108,7 +108,7 @@ modules:
       - store: setup_test_store_set_i64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_if_not_exists_i64
     kind: store
@@ -125,7 +125,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_if_not_exists_i64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_if_not_exists_i64_deltas
     kind: map
@@ -136,7 +136,7 @@ modules:
       - store: setup_test_store_set_if_not_exists_i64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_min_i64
     kind: store
@@ -153,7 +153,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_min_i64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_min_i64_deltas
     kind: map
@@ -164,7 +164,7 @@ modules:
       - store: setup_test_store_min_i64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_max_i64
     kind: store
@@ -181,7 +181,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_max_i64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_max_i64_deltas
     kind: map
@@ -192,7 +192,7 @@ modules:
       - store: setup_test_store_max_i64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   # -------------------- ------------------------ -------------------- #
 
@@ -212,7 +212,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_add_float64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_add_float64_deltas
     kind: map
@@ -223,7 +223,7 @@ modules:
       - store: setup_test_store_add_float64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_float64
     kind: store
@@ -240,7 +240,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_float64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_float64_deltas
     kind: map
@@ -251,7 +251,7 @@ modules:
       - store: setup_test_store_set_float64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_if_not_exists_float64
     kind: store
@@ -268,7 +268,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_if_not_exists_float64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_if_not_exists_float64_deltas
     kind: map
@@ -279,7 +279,7 @@ modules:
       - store: setup_test_store_set_if_not_exists_float64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_min_float64
     kind: store
@@ -296,7 +296,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_min_float64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_min_float64_deltas
     kind: map
@@ -307,7 +307,7 @@ modules:
       - store: setup_test_store_min_float64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_max_float64
     kind: store
@@ -324,7 +324,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_max_float64
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_max_float64_deltas
     kind: map
@@ -335,7 +335,7 @@ modules:
       - store: setup_test_store_max_float64
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   # -------------------- BIGINT TESTS -------------------- #
   - name: setup_test_store_add_bigint
@@ -353,7 +353,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_add_bigint
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_add_bigint_deltas
     kind: map
@@ -364,7 +364,7 @@ modules:
       - store: setup_test_store_add_bigint
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_bigint
     kind: store
@@ -381,7 +381,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_bigint
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_bigint_deltas
     kind: map
@@ -392,7 +392,7 @@ modules:
       - store: setup_test_store_set_bigint
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_if_not_exists_bigint
     kind: store
@@ -409,7 +409,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_if_not_exists_bigint
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_if_not_exists_bigint_deltas
     kind: map
@@ -420,7 +420,7 @@ modules:
       - store: setup_test_store_set_if_not_exists_bigint
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_min_bigint
     kind: store
@@ -437,7 +437,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_min_bigint
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_min_bigint_deltas
     kind: map
@@ -448,7 +448,7 @@ modules:
       - store: setup_test_store_min_bigint
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_max_bigint
     kind: store
@@ -465,7 +465,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_max_bigint
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_max_bigint_deltas
     kind: map
@@ -476,7 +476,7 @@ modules:
       - store: setup_test_store_max_bigint
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   # -------------------- BIG DECIMAL TESTS -------------------- #
   - name: setup_test_store_add_bigdecimal
@@ -494,7 +494,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_add_bigdecimal
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_add_bigdecimal_deltas
     kind: map
@@ -505,7 +505,7 @@ modules:
       - store: setup_test_store_add_bigdecimal
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_bigdecimal
     kind: store
@@ -522,7 +522,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_bigdecimal
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_bigdecimal_deltas
     kind: map
@@ -533,7 +533,7 @@ modules:
       - store: setup_test_store_set_bigdecimal
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_if_not_exists_bigdecimal
     kind: store
@@ -550,7 +550,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_if_not_exists_bigdecimal
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_if_not_exists_bigdecimal_deltas
     kind: map
@@ -561,7 +561,7 @@ modules:
       - store: setup_test_store_set_if_not_exists_bigdecimal
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_min_bigdecimal
     kind: store
@@ -578,7 +578,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_min_bigdecimal
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_min_bigdecimal_deltas
     kind: map
@@ -589,7 +589,7 @@ modules:
       - store: setup_test_store_min_bigdecimal
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_max_bigdecimal
     kind: store
@@ -606,7 +606,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_max_bigdecimal
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_max_bigdecimal_deltas
     kind: map
@@ -617,7 +617,7 @@ modules:
       - store: setup_test_store_max_bigdecimal
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
     # -------------------- STRING TESTS -------------------- #
   - name: setup_test_store_set_string
@@ -635,7 +635,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_string
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_string_deltas
     kind: map
@@ -646,7 +646,7 @@ modules:
       - store: setup_test_store_set_string
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_set_if_not_exists_string
     kind: store
@@ -663,7 +663,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_set_if_not_exists_string
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_set_if_not_exists_string_deltas
     kind: map
@@ -674,7 +674,7 @@ modules:
       - store: setup_test_store_set_if_not_exists_string
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: setup_test_store_append_string
     kind: store
@@ -691,7 +691,7 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: setup_test_store_append_string
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   - name: assert_test_store_append_string_deltas
     kind: map
@@ -702,7 +702,7 @@ modules:
       - store: setup_test_store_append_string
         mode: deltas
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean
 
   # -------------------- ------------------------ -------------------- #
 
@@ -833,4 +833,4 @@ modules:
       - store: assert_all_test_bigint
       - store: assert_all_test_bigdecimal
     output:
-      type: boolean
+      type: proto:sf.substreams.v1.test.Boolean

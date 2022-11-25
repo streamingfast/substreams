@@ -70,7 +70,7 @@ pub extern "C" fn assert_test_store_delete_prefix(
     test_store_delete_prefix_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let test_store_delete_prefix: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(test_store_delete_prefix_ptr);
@@ -113,7 +113,7 @@ pub extern "C" fn assert_test_store_add_i64(
     setup_test_store_add_i64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_add_i64_ptr);
@@ -139,7 +139,7 @@ pub extern "C" fn assert_test_store_add_i64_deltas(
     setup_test_store_add_i64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_add_i64_ptr);
@@ -185,7 +185,7 @@ pub extern "C" fn assert_test_store_set_i64(
     setup_test_store_set_i64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_set_i64_ptr);
@@ -211,7 +211,7 @@ pub extern "C" fn assert_test_store_set_i64_deltas(
     setup_test_store_set_i64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_set_i64_ptr);
@@ -257,7 +257,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_i64(
     setup_test_store_set_if_not_exists_i64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_set_if_not_exists_i64_ptr);
@@ -283,7 +283,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_i64_deltas(
     setup_test_store_set_if_not_exists_i64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_set_if_not_exists_i64_ptr);
@@ -329,7 +329,7 @@ pub extern "C" fn assert_test_store_min_i64(
     setup_test_store_min_i64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_min_i64_ptr);
@@ -355,7 +355,7 @@ pub extern "C" fn assert_test_store_min_i64_deltas(
     setup_test_store_min_i64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_min_i64_ptr);
@@ -401,7 +401,7 @@ pub extern "C" fn assert_test_store_max_i64(
     setup_test_store_max_i64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_max_i64_ptr);
@@ -427,7 +427,7 @@ pub extern "C" fn assert_test_store_max_i64_deltas(
     setup_test_store_max_i64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_i64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(setup_test_store_max_i64_ptr);
@@ -473,7 +473,7 @@ pub extern "C" fn assert_test_store_add_float64(
     setup_test_store_add_float64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_add_float64_ptr);
@@ -499,7 +499,7 @@ pub extern "C" fn assert_test_store_add_float64_deltas(
     setup_test_store_add_float64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_add_float64_ptr);
@@ -545,7 +545,7 @@ pub extern "C" fn assert_test_store_set_float64(
     setup_test_store_set_float64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_set_float64_ptr);
@@ -571,7 +571,7 @@ pub extern "C" fn assert_test_store_set_float64_deltas(
     setup_test_store_set_float64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_set_float64_ptr);
@@ -617,7 +617,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_float64(
     setup_test_store_set_if_not_exists_float64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_set_if_not_exists_float64_ptr);
@@ -643,7 +643,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_float64_deltas(
     setup_test_store_set_if_not_exists_float64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_set_if_not_exists_float64_ptr);
@@ -689,7 +689,7 @@ pub extern "C" fn assert_test_store_min_float64(
     setup_test_store_min_float64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_min_float64_ptr);
@@ -715,7 +715,7 @@ pub extern "C" fn assert_test_store_min_float64_deltas(
     setup_test_store_min_float64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_min_float64_ptr);
@@ -761,7 +761,7 @@ pub extern "C" fn assert_test_store_max_float64(
     setup_test_store_max_float64_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_max_float64_ptr);
@@ -787,7 +787,7 @@ pub extern "C" fn assert_test_store_max_float64_deltas(
     setup_test_store_max_float64_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_float64: substreams::store::StoreGetFloat64 = substreams::store::StoreGetFloat64::new(setup_test_store_max_float64_ptr);
@@ -833,7 +833,7 @@ pub extern "C" fn assert_test_store_add_bigint(
     setup_test_store_add_bigint_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_add_bigint_ptr);
@@ -859,7 +859,7 @@ pub extern "C" fn assert_test_store_add_bigint_deltas(
     setup_test_store_add_bigint_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_add_bigint_ptr);
@@ -905,7 +905,7 @@ pub extern "C" fn assert_test_store_set_bigint(
     setup_test_store_set_bigint_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_set_bigint_ptr);
@@ -931,7 +931,7 @@ pub extern "C" fn assert_test_store_set_bigint_deltas(
     setup_test_store_set_bigint_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_set_bigint_ptr);
@@ -977,7 +977,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigint(
     setup_test_store_set_if_not_exists_bigint_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_set_if_not_exists_bigint_ptr);
@@ -1003,7 +1003,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigint_deltas(
     setup_test_store_set_if_not_exists_bigint_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_set_if_not_exists_bigint_ptr);
@@ -1049,7 +1049,7 @@ pub extern "C" fn assert_test_store_min_bigint(
     setup_test_store_min_bigint_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_min_bigint_ptr);
@@ -1075,7 +1075,7 @@ pub extern "C" fn assert_test_store_min_bigint_deltas(
     setup_test_store_min_bigint_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_min_bigint_ptr);
@@ -1121,7 +1121,7 @@ pub extern "C" fn assert_test_store_max_bigint(
     setup_test_store_max_bigint_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_max_bigint_ptr);
@@ -1147,7 +1147,7 @@ pub extern "C" fn assert_test_store_max_bigint_deltas(
     setup_test_store_max_bigint_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(setup_test_store_max_bigint_ptr);
@@ -1193,7 +1193,7 @@ pub extern "C" fn assert_test_store_add_bigdecimal(
     setup_test_store_add_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_add_bigdecimal_ptr);
@@ -1219,7 +1219,7 @@ pub extern "C" fn assert_test_store_add_bigdecimal_deltas(
     setup_test_store_add_bigdecimal_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_add_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_add_bigdecimal_ptr);
@@ -1265,7 +1265,7 @@ pub extern "C" fn assert_test_store_set_bigdecimal(
     setup_test_store_set_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_set_bigdecimal_ptr);
@@ -1291,7 +1291,7 @@ pub extern "C" fn assert_test_store_set_bigdecimal_deltas(
     setup_test_store_set_bigdecimal_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_set_bigdecimal_ptr);
@@ -1337,7 +1337,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigdecimal(
     setup_test_store_set_if_not_exists_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_set_if_not_exists_bigdecimal_ptr);
@@ -1363,7 +1363,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigdecimal_deltas(
     setup_test_store_set_if_not_exists_bigdecimal_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_set_if_not_exists_bigdecimal_ptr);
@@ -1409,7 +1409,7 @@ pub extern "C" fn assert_test_store_min_bigdecimal(
     setup_test_store_min_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_min_bigdecimal_ptr);
@@ -1435,7 +1435,7 @@ pub extern "C" fn assert_test_store_min_bigdecimal_deltas(
     setup_test_store_min_bigdecimal_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_min_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_min_bigdecimal_ptr);
@@ -1481,7 +1481,7 @@ pub extern "C" fn assert_test_store_max_bigdecimal(
     setup_test_store_max_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_max_bigdecimal_ptr);
@@ -1507,7 +1507,7 @@ pub extern "C" fn assert_test_store_max_bigdecimal_deltas(
     setup_test_store_max_bigdecimal_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_max_bigdecimal: substreams::store::StoreGetBigDecimal = substreams::store::StoreGetBigDecimal::new(setup_test_store_max_bigdecimal_ptr);
@@ -1553,7 +1553,7 @@ pub extern "C" fn assert_test_store_set_string(
     setup_test_store_set_string_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_string: substreams::store::StoreGetString = substreams::store::StoreGetString::new(setup_test_store_set_string_ptr);
@@ -1579,7 +1579,7 @@ pub extern "C" fn assert_test_store_set_string_deltas(
     setup_test_store_set_string_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_string: substreams::store::StoreGetString = substreams::store::StoreGetString::new(setup_test_store_set_string_ptr);
@@ -1625,7 +1625,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_string(
     setup_test_store_set_if_not_exists_string_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_string: substreams::store::StoreGetString = substreams::store::StoreGetString::new(setup_test_store_set_if_not_exists_string_ptr);
@@ -1651,7 +1651,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_string_deltas(
     setup_test_store_set_if_not_exists_string_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_set_if_not_exists_string: substreams::store::StoreGetString = substreams::store::StoreGetString::new(setup_test_store_set_if_not_exists_string_ptr);
@@ -1697,7 +1697,7 @@ pub extern "C" fn assert_test_store_append_string(
     setup_test_store_append_string_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_append_string: substreams::store::StoreGetRaw = substreams::store::StoreGetRaw::new(setup_test_store_append_string_ptr);
@@ -1723,7 +1723,7 @@ pub extern "C" fn assert_test_store_append_string_deltas(
     setup_test_store_append_string_deltas_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
         let setup_test_store_append_string: substreams::store::StoreGetRaw = substreams::store::StoreGetRaw::new(setup_test_store_append_string_ptr);
@@ -1837,16 +1837,16 @@ pub extern "C" fn assert_all_test_i64(
         
         let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
         
-        let assert_test_store_add_i64: bool = substreams::proto::decode_ptr(assert_test_store_add_i64_ptr, assert_test_store_add_i64_len).unwrap();
-        let assert_test_store_add_i64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_add_i64_deltas_ptr, assert_test_store_add_i64_deltas_len).unwrap();
-        let assert_test_store_set_i64: bool = substreams::proto::decode_ptr(assert_test_store_set_i64_ptr, assert_test_store_set_i64_len).unwrap();
-        let assert_test_store_set_i64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_i64_deltas_ptr, assert_test_store_set_i64_deltas_len).unwrap();
-        let assert_test_store_set_if_not_exists_i64: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_i64_ptr, assert_test_store_set_if_not_exists_i64_len).unwrap();
-        let assert_test_store_set_if_not_exists_i64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_i64_deltas_ptr, assert_test_store_set_if_not_exists_i64_deltas_len).unwrap();
-        let assert_test_store_min_i64: bool = substreams::proto::decode_ptr(assert_test_store_min_i64_ptr, assert_test_store_min_i64_len).unwrap();
-        let assert_test_store_min_i64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_min_i64_deltas_ptr, assert_test_store_min_i64_deltas_len).unwrap();
-        let assert_test_store_max_i64: bool = substreams::proto::decode_ptr(assert_test_store_max_i64_ptr, assert_test_store_max_i64_len).unwrap();
-        let assert_test_store_max_i64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_max_i64_deltas_ptr, assert_test_store_max_i64_deltas_len).unwrap();
+        let assert_test_store_add_i64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_i64_ptr, assert_test_store_add_i64_len).unwrap();
+        let assert_test_store_add_i64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_i64_deltas_ptr, assert_test_store_add_i64_deltas_len).unwrap();
+        let assert_test_store_set_i64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_i64_ptr, assert_test_store_set_i64_len).unwrap();
+        let assert_test_store_set_i64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_i64_deltas_ptr, assert_test_store_set_i64_deltas_len).unwrap();
+        let assert_test_store_set_if_not_exists_i64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_i64_ptr, assert_test_store_set_if_not_exists_i64_len).unwrap();
+        let assert_test_store_set_if_not_exists_i64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_i64_deltas_ptr, assert_test_store_set_if_not_exists_i64_deltas_len).unwrap();
+        let assert_test_store_min_i64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_i64_ptr, assert_test_store_min_i64_len).unwrap();
+        let assert_test_store_min_i64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_i64_deltas_ptr, assert_test_store_min_i64_deltas_len).unwrap();
+        let assert_test_store_max_i64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_i64_ptr, assert_test_store_max_i64_len).unwrap();
+        let assert_test_store_max_i64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_i64_deltas_ptr, assert_test_store_max_i64_deltas_len).unwrap();
 
         Substreams::assert_all_test_i64(assert_test_store_add_i64,
             assert_test_store_add_i64_deltas,
@@ -1892,16 +1892,16 @@ pub extern "C" fn assert_all_test_float64(
         
         let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
         
-        let assert_test_store_add_float64: bool = substreams::proto::decode_ptr(assert_test_store_add_float64_ptr, assert_test_store_add_float64_len).unwrap();
-        let assert_test_store_add_float64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_add_float64_deltas_ptr, assert_test_store_add_float64_deltas_len).unwrap();
-        let assert_test_store_set_float64: bool = substreams::proto::decode_ptr(assert_test_store_set_float64_ptr, assert_test_store_set_float64_len).unwrap();
-        let assert_test_store_set_float64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_float64_deltas_ptr, assert_test_store_set_float64_deltas_len).unwrap();
-        let assert_test_store_set_if_not_exists_float64: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_float64_ptr, assert_test_store_set_if_not_exists_float64_len).unwrap();
-        let assert_test_store_set_if_not_exists_float64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_float64_deltas_ptr, assert_test_store_set_if_not_exists_float64_deltas_len).unwrap();
-        let assert_test_store_min_float64: bool = substreams::proto::decode_ptr(assert_test_store_min_float64_ptr, assert_test_store_min_float64_len).unwrap();
-        let assert_test_store_min_float64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_min_float64_deltas_ptr, assert_test_store_min_float64_deltas_len).unwrap();
-        let assert_test_store_max_float64: bool = substreams::proto::decode_ptr(assert_test_store_max_float64_ptr, assert_test_store_max_float64_len).unwrap();
-        let assert_test_store_max_float64_deltas: bool = substreams::proto::decode_ptr(assert_test_store_max_float64_deltas_ptr, assert_test_store_max_float64_deltas_len).unwrap();
+        let assert_test_store_add_float64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_float64_ptr, assert_test_store_add_float64_len).unwrap();
+        let assert_test_store_add_float64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_float64_deltas_ptr, assert_test_store_add_float64_deltas_len).unwrap();
+        let assert_test_store_set_float64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_float64_ptr, assert_test_store_set_float64_len).unwrap();
+        let assert_test_store_set_float64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_float64_deltas_ptr, assert_test_store_set_float64_deltas_len).unwrap();
+        let assert_test_store_set_if_not_exists_float64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_float64_ptr, assert_test_store_set_if_not_exists_float64_len).unwrap();
+        let assert_test_store_set_if_not_exists_float64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_float64_deltas_ptr, assert_test_store_set_if_not_exists_float64_deltas_len).unwrap();
+        let assert_test_store_min_float64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_float64_ptr, assert_test_store_min_float64_len).unwrap();
+        let assert_test_store_min_float64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_float64_deltas_ptr, assert_test_store_min_float64_deltas_len).unwrap();
+        let assert_test_store_max_float64: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_float64_ptr, assert_test_store_max_float64_len).unwrap();
+        let assert_test_store_max_float64_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_float64_deltas_ptr, assert_test_store_max_float64_deltas_len).unwrap();
 
         Substreams::assert_all_test_float64(assert_test_store_add_float64,
             assert_test_store_add_float64_deltas,
@@ -1947,16 +1947,16 @@ pub extern "C" fn assert_all_test_bigint(
         
         let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
         
-        let assert_test_store_add_bigint: bool = substreams::proto::decode_ptr(assert_test_store_add_bigint_ptr, assert_test_store_add_bigint_len).unwrap();
-        let assert_test_store_add_bigint_deltas: bool = substreams::proto::decode_ptr(assert_test_store_add_bigint_deltas_ptr, assert_test_store_add_bigint_deltas_len).unwrap();
-        let assert_test_store_set_bigint: bool = substreams::proto::decode_ptr(assert_test_store_set_bigint_ptr, assert_test_store_set_bigint_len).unwrap();
-        let assert_test_store_set_bigint_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_bigint_deltas_ptr, assert_test_store_set_bigint_deltas_len).unwrap();
-        let assert_test_store_set_if_not_exists_bigint: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigint_ptr, assert_test_store_set_if_not_exists_bigint_len).unwrap();
-        let assert_test_store_set_if_not_exists_bigint_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigint_deltas_ptr, assert_test_store_set_if_not_exists_bigint_deltas_len).unwrap();
-        let assert_test_store_min_bigint: bool = substreams::proto::decode_ptr(assert_test_store_min_bigint_ptr, assert_test_store_min_bigint_len).unwrap();
-        let assert_test_store_min_bigint_deltas: bool = substreams::proto::decode_ptr(assert_test_store_min_bigint_deltas_ptr, assert_test_store_min_bigint_deltas_len).unwrap();
-        let assert_test_store_max_bigint: bool = substreams::proto::decode_ptr(assert_test_store_max_bigint_ptr, assert_test_store_max_bigint_len).unwrap();
-        let assert_test_store_max_bigint_deltas: bool = substreams::proto::decode_ptr(assert_test_store_max_bigint_deltas_ptr, assert_test_store_max_bigint_deltas_len).unwrap();
+        let assert_test_store_add_bigint: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_bigint_ptr, assert_test_store_add_bigint_len).unwrap();
+        let assert_test_store_add_bigint_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_bigint_deltas_ptr, assert_test_store_add_bigint_deltas_len).unwrap();
+        let assert_test_store_set_bigint: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_bigint_ptr, assert_test_store_set_bigint_len).unwrap();
+        let assert_test_store_set_bigint_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_bigint_deltas_ptr, assert_test_store_set_bigint_deltas_len).unwrap();
+        let assert_test_store_set_if_not_exists_bigint: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigint_ptr, assert_test_store_set_if_not_exists_bigint_len).unwrap();
+        let assert_test_store_set_if_not_exists_bigint_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigint_deltas_ptr, assert_test_store_set_if_not_exists_bigint_deltas_len).unwrap();
+        let assert_test_store_min_bigint: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_bigint_ptr, assert_test_store_min_bigint_len).unwrap();
+        let assert_test_store_min_bigint_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_bigint_deltas_ptr, assert_test_store_min_bigint_deltas_len).unwrap();
+        let assert_test_store_max_bigint: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_bigint_ptr, assert_test_store_max_bigint_len).unwrap();
+        let assert_test_store_max_bigint_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_bigint_deltas_ptr, assert_test_store_max_bigint_deltas_len).unwrap();
 
         Substreams::assert_all_test_bigint(assert_test_store_add_bigint,
             assert_test_store_add_bigint_deltas,
@@ -2002,16 +2002,16 @@ pub extern "C" fn assert_all_test_bigdecimal(
         
         let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
         
-        let assert_test_store_add_bigdecimal: bool = substreams::proto::decode_ptr(assert_test_store_add_bigdecimal_ptr, assert_test_store_add_bigdecimal_len).unwrap();
-        let assert_test_store_add_bigdecimal_deltas: bool = substreams::proto::decode_ptr(assert_test_store_add_bigdecimal_deltas_ptr, assert_test_store_add_bigdecimal_deltas_len).unwrap();
-        let assert_test_store_set_bigdecimal: bool = substreams::proto::decode_ptr(assert_test_store_set_bigdecimal_ptr, assert_test_store_set_bigdecimal_len).unwrap();
-        let assert_test_store_set_bigdecimal_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_bigdecimal_deltas_ptr, assert_test_store_set_bigdecimal_deltas_len).unwrap();
-        let assert_test_store_set_if_not_exists_bigdecimal: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigdecimal_ptr, assert_test_store_set_if_not_exists_bigdecimal_len).unwrap();
-        let assert_test_store_set_if_not_exists_bigdecimal_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigdecimal_deltas_ptr, assert_test_store_set_if_not_exists_bigdecimal_deltas_len).unwrap();
-        let assert_test_store_min_bigdecimal: bool = substreams::proto::decode_ptr(assert_test_store_min_bigdecimal_ptr, assert_test_store_min_bigdecimal_len).unwrap();
-        let assert_test_store_min_bigdecimal_deltas: bool = substreams::proto::decode_ptr(assert_test_store_min_bigdecimal_deltas_ptr, assert_test_store_min_bigdecimal_deltas_len).unwrap();
-        let assert_test_store_max_bigdecimal: bool = substreams::proto::decode_ptr(assert_test_store_max_bigdecimal_ptr, assert_test_store_max_bigdecimal_len).unwrap();
-        let assert_test_store_max_bigdecimal_deltas: bool = substreams::proto::decode_ptr(assert_test_store_max_bigdecimal_deltas_ptr, assert_test_store_max_bigdecimal_deltas_len).unwrap();
+        let assert_test_store_add_bigdecimal: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_bigdecimal_ptr, assert_test_store_add_bigdecimal_len).unwrap();
+        let assert_test_store_add_bigdecimal_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_add_bigdecimal_deltas_ptr, assert_test_store_add_bigdecimal_deltas_len).unwrap();
+        let assert_test_store_set_bigdecimal: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_bigdecimal_ptr, assert_test_store_set_bigdecimal_len).unwrap();
+        let assert_test_store_set_bigdecimal_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_bigdecimal_deltas_ptr, assert_test_store_set_bigdecimal_deltas_len).unwrap();
+        let assert_test_store_set_if_not_exists_bigdecimal: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigdecimal_ptr, assert_test_store_set_if_not_exists_bigdecimal_len).unwrap();
+        let assert_test_store_set_if_not_exists_bigdecimal_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_bigdecimal_deltas_ptr, assert_test_store_set_if_not_exists_bigdecimal_deltas_len).unwrap();
+        let assert_test_store_min_bigdecimal: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_bigdecimal_ptr, assert_test_store_min_bigdecimal_len).unwrap();
+        let assert_test_store_min_bigdecimal_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_min_bigdecimal_deltas_ptr, assert_test_store_min_bigdecimal_deltas_len).unwrap();
+        let assert_test_store_max_bigdecimal: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_bigdecimal_ptr, assert_test_store_max_bigdecimal_len).unwrap();
+        let assert_test_store_max_bigdecimal_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_max_bigdecimal_deltas_ptr, assert_test_store_max_bigdecimal_deltas_len).unwrap();
 
         Substreams::assert_all_test_bigdecimal(assert_test_store_add_bigdecimal,
             assert_test_store_add_bigdecimal_deltas,
@@ -2049,12 +2049,12 @@ pub extern "C" fn assert_all_test_string(
         
         let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
         
-        let assert_test_store_append_string: bool = substreams::proto::decode_ptr(assert_test_store_append_string_ptr, assert_test_store_append_string_len).unwrap();
-        let assert_test_store_append_string_deltas: bool = substreams::proto::decode_ptr(assert_test_store_append_string_deltas_ptr, assert_test_store_append_string_deltas_len).unwrap();
-        let assert_test_store_set_string: bool = substreams::proto::decode_ptr(assert_test_store_set_string_ptr, assert_test_store_set_string_len).unwrap();
-        let assert_test_store_set_string_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_string_deltas_ptr, assert_test_store_set_string_deltas_len).unwrap();
-        let assert_test_store_set_if_not_exists_string: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_string_ptr, assert_test_store_set_if_not_exists_string_len).unwrap();
-        let assert_test_store_set_if_not_exists_string_deltas: bool = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_string_deltas_ptr, assert_test_store_set_if_not_exists_string_deltas_len).unwrap();
+        let assert_test_store_append_string: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_append_string_ptr, assert_test_store_append_string_len).unwrap();
+        let assert_test_store_append_string_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_append_string_deltas_ptr, assert_test_store_append_string_deltas_len).unwrap();
+        let assert_test_store_set_string: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_string_ptr, assert_test_store_set_string_len).unwrap();
+        let assert_test_store_set_string_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_string_deltas_ptr, assert_test_store_set_string_deltas_len).unwrap();
+        let assert_test_store_set_if_not_exists_string: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_string_ptr, assert_test_store_set_if_not_exists_string_len).unwrap();
+        let assert_test_store_set_if_not_exists_string_deltas: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_set_if_not_exists_string_deltas_ptr, assert_test_store_set_if_not_exists_string_deltas_len).unwrap();
 
         Substreams::assert_all_test_string(assert_test_store_append_string,
             assert_test_store_append_string_deltas,
@@ -2078,7 +2078,7 @@ pub extern "C" fn assert_all_test_delete_prefix(
         
         let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
         
-        let assert_test_store_delete_prefix: bool = substreams::proto::decode_ptr(assert_test_store_delete_prefix_ptr, assert_test_store_delete_prefix_len).unwrap();
+        let assert_test_store_delete_prefix: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_store_delete_prefix_ptr, assert_test_store_delete_prefix_len).unwrap();
 
         Substreams::assert_all_test_delete_prefix(assert_test_store_delete_prefix,
             store,
@@ -2097,7 +2097,7 @@ pub extern "C" fn assert_all_test(
     assert_all_test_bigdecimal_ptr: u32,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<bool, Error>{
+    let func = ||-> Result<pb::test::Boolean, Error>{
         
         let assert_all_test_delete_prefix: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_delete_prefix_ptr);
         let assert_all_test_string: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_string_ptr);

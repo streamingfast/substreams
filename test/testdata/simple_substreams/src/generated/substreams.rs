@@ -23,7 +23,7 @@ pub trait SubstreamsTrait {
     fn assert_test_store_delete_prefix(
         block: pb::test::Block,
         test_store_delete_prefix: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_add_i64(
         block: pb::test::Block,
@@ -33,13 +33,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_add_i64(
         block: pb::test::Block,
         setup_test_store_add_i64: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_add_i64_deltas(
         block: pb::test::Block,
         setup_test_store_add_i64: substreams::store::StoreGetInt64,
         setup_test_store_add_i64_deltas: substreams::store::Deltas<substreams::store::DeltaInt64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_i64(
         block: pb::test::Block,
@@ -49,13 +49,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_i64(
         block: pb::test::Block,
         setup_test_store_set_i64: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_i64_deltas(
         block: pb::test::Block,
         setup_test_store_set_i64: substreams::store::StoreGetInt64,
         setup_test_store_set_i64_deltas: substreams::store::Deltas<substreams::store::DeltaInt64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_if_not_exists_i64(
         block: pb::test::Block,
@@ -65,13 +65,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_if_not_exists_i64(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_i64: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_if_not_exists_i64_deltas(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_i64: substreams::store::StoreGetInt64,
         setup_test_store_set_if_not_exists_i64_deltas: substreams::store::Deltas<substreams::store::DeltaInt64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_min_i64(
         block: pb::test::Block,
@@ -81,13 +81,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_min_i64(
         block: pb::test::Block,
         setup_test_store_min_i64: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_min_i64_deltas(
         block: pb::test::Block,
         setup_test_store_min_i64: substreams::store::StoreGetInt64,
         setup_test_store_min_i64_deltas: substreams::store::Deltas<substreams::store::DeltaInt64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_max_i64(
         block: pb::test::Block,
@@ -97,13 +97,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_max_i64(
         block: pb::test::Block,
         setup_test_store_max_i64: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_max_i64_deltas(
         block: pb::test::Block,
         setup_test_store_max_i64: substreams::store::StoreGetInt64,
         setup_test_store_max_i64_deltas: substreams::store::Deltas<substreams::store::DeltaInt64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_add_float64(
         block: pb::test::Block,
@@ -113,13 +113,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_add_float64(
         block: pb::test::Block,
         setup_test_store_add_float64: substreams::store::StoreGetFloat64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_add_float64_deltas(
         block: pb::test::Block,
         setup_test_store_add_float64: substreams::store::StoreGetFloat64,
         setup_test_store_add_float64_deltas: substreams::store::Deltas<substreams::store::DeltaFloat64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_float64(
         block: pb::test::Block,
@@ -129,13 +129,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_float64(
         block: pb::test::Block,
         setup_test_store_set_float64: substreams::store::StoreGetFloat64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_float64_deltas(
         block: pb::test::Block,
         setup_test_store_set_float64: substreams::store::StoreGetFloat64,
         setup_test_store_set_float64_deltas: substreams::store::Deltas<substreams::store::DeltaFloat64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_if_not_exists_float64(
         block: pb::test::Block,
@@ -145,13 +145,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_if_not_exists_float64(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_float64: substreams::store::StoreGetFloat64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_if_not_exists_float64_deltas(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_float64: substreams::store::StoreGetFloat64,
         setup_test_store_set_if_not_exists_float64_deltas: substreams::store::Deltas<substreams::store::DeltaFloat64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_min_float64(
         block: pb::test::Block,
@@ -161,13 +161,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_min_float64(
         block: pb::test::Block,
         setup_test_store_min_float64: substreams::store::StoreGetFloat64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_min_float64_deltas(
         block: pb::test::Block,
         setup_test_store_min_float64: substreams::store::StoreGetFloat64,
         setup_test_store_min_float64_deltas: substreams::store::Deltas<substreams::store::DeltaFloat64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_max_float64(
         block: pb::test::Block,
@@ -177,13 +177,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_max_float64(
         block: pb::test::Block,
         setup_test_store_max_float64: substreams::store::StoreGetFloat64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_max_float64_deltas(
         block: pb::test::Block,
         setup_test_store_max_float64: substreams::store::StoreGetFloat64,
         setup_test_store_max_float64_deltas: substreams::store::Deltas<substreams::store::DeltaFloat64>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_add_bigint(
         block: pb::test::Block,
@@ -193,13 +193,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_add_bigint(
         block: pb::test::Block,
         setup_test_store_add_bigint: substreams::store::StoreGetBigInt,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_add_bigint_deltas(
         block: pb::test::Block,
         setup_test_store_add_bigint: substreams::store::StoreGetBigInt,
         setup_test_store_add_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_bigint(
         block: pb::test::Block,
@@ -209,13 +209,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_bigint(
         block: pb::test::Block,
         setup_test_store_set_bigint: substreams::store::StoreGetBigInt,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_bigint_deltas(
         block: pb::test::Block,
         setup_test_store_set_bigint: substreams::store::StoreGetBigInt,
         setup_test_store_set_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_if_not_exists_bigint(
         block: pb::test::Block,
@@ -225,13 +225,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_if_not_exists_bigint(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_bigint: substreams::store::StoreGetBigInt,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_if_not_exists_bigint_deltas(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_bigint: substreams::store::StoreGetBigInt,
         setup_test_store_set_if_not_exists_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_min_bigint(
         block: pb::test::Block,
@@ -241,13 +241,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_min_bigint(
         block: pb::test::Block,
         setup_test_store_min_bigint: substreams::store::StoreGetBigInt,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_min_bigint_deltas(
         block: pb::test::Block,
         setup_test_store_min_bigint: substreams::store::StoreGetBigInt,
         setup_test_store_min_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_max_bigint(
         block: pb::test::Block,
@@ -257,13 +257,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_max_bigint(
         block: pb::test::Block,
         setup_test_store_max_bigint: substreams::store::StoreGetBigInt,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_max_bigint_deltas(
         block: pb::test::Block,
         setup_test_store_max_bigint: substreams::store::StoreGetBigInt,
         setup_test_store_max_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_add_bigdecimal(
         block: pb::test::Block,
@@ -273,13 +273,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_add_bigdecimal(
         block: pb::test::Block,
         setup_test_store_add_bigdecimal: substreams::store::StoreGetBigDecimal,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_add_bigdecimal_deltas(
         block: pb::test::Block,
         setup_test_store_add_bigdecimal: substreams::store::StoreGetBigDecimal,
         setup_test_store_add_bigdecimal_deltas: substreams::store::Deltas<substreams::store::DeltaBigDecimal>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_bigdecimal(
         block: pb::test::Block,
@@ -289,13 +289,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_bigdecimal(
         block: pb::test::Block,
         setup_test_store_set_bigdecimal: substreams::store::StoreGetBigDecimal,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_bigdecimal_deltas(
         block: pb::test::Block,
         setup_test_store_set_bigdecimal: substreams::store::StoreGetBigDecimal,
         setup_test_store_set_bigdecimal_deltas: substreams::store::Deltas<substreams::store::DeltaBigDecimal>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_if_not_exists_bigdecimal(
         block: pb::test::Block,
@@ -305,13 +305,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_if_not_exists_bigdecimal(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_bigdecimal: substreams::store::StoreGetBigDecimal,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_if_not_exists_bigdecimal_deltas(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_bigdecimal: substreams::store::StoreGetBigDecimal,
         setup_test_store_set_if_not_exists_bigdecimal_deltas: substreams::store::Deltas<substreams::store::DeltaBigDecimal>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_min_bigdecimal(
         block: pb::test::Block,
@@ -321,13 +321,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_min_bigdecimal(
         block: pb::test::Block,
         setup_test_store_min_bigdecimal: substreams::store::StoreGetBigDecimal,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_min_bigdecimal_deltas(
         block: pb::test::Block,
         setup_test_store_min_bigdecimal: substreams::store::StoreGetBigDecimal,
         setup_test_store_min_bigdecimal_deltas: substreams::store::Deltas<substreams::store::DeltaBigDecimal>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_max_bigdecimal(
         block: pb::test::Block,
@@ -337,13 +337,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_max_bigdecimal(
         block: pb::test::Block,
         setup_test_store_max_bigdecimal: substreams::store::StoreGetBigDecimal,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_max_bigdecimal_deltas(
         block: pb::test::Block,
         setup_test_store_max_bigdecimal: substreams::store::StoreGetBigDecimal,
         setup_test_store_max_bigdecimal_deltas: substreams::store::Deltas<substreams::store::DeltaBigDecimal>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_string(
         block: pb::test::Block,
@@ -353,13 +353,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_string(
         block: pb::test::Block,
         setup_test_store_set_string: substreams::store::StoreGetString,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_string_deltas(
         block: pb::test::Block,
         setup_test_store_set_string: substreams::store::StoreGetString,
         setup_test_store_set_string_deltas: substreams::store::Deltas<substreams::store::DeltaString>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_set_if_not_exists_string(
         block: pb::test::Block,
@@ -369,13 +369,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_set_if_not_exists_string(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_string: substreams::store::StoreGetString,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_set_if_not_exists_string_deltas(
         block: pb::test::Block,
         setup_test_store_set_if_not_exists_string: substreams::store::StoreGetString,
         setup_test_store_set_if_not_exists_string_deltas: substreams::store::Deltas<substreams::store::DeltaString>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn setup_test_store_append_string(
         block: pb::test::Block,
@@ -385,13 +385,13 @@ pub trait SubstreamsTrait {
     fn assert_test_store_append_string(
         block: pb::test::Block,
         setup_test_store_append_string: substreams::store::StoreGetRaw,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn assert_test_store_append_string_deltas(
         block: pb::test::Block,
         setup_test_store_append_string: substreams::store::StoreGetRaw,
         setup_test_store_append_string_deltas: substreams::store::Deltas<substreams::store::DeltaArray<String>>,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn store_root(
         block: pb::test::Block,
@@ -412,73 +412,73 @@ pub trait SubstreamsTrait {
     );
 
     fn assert_all_test_i64(
-        assert_test_store_add_i64: bool,
-        assert_test_store_add_i64_deltas: bool,
-        assert_test_store_set_i64: bool,
-        assert_test_store_set_i64_deltas: bool,
-        assert_test_store_set_if_not_exists_i64: bool,
-        assert_test_store_set_if_not_exists_i64_deltas: bool,
-        assert_test_store_min_i64: bool,
-        assert_test_store_min_i64_deltas: bool,
-        assert_test_store_max_i64: bool,
-        assert_test_store_max_i64_deltas: bool,
+        assert_test_store_add_i64: pb::test::Boolean,
+        assert_test_store_add_i64_deltas: pb::test::Boolean,
+        assert_test_store_set_i64: pb::test::Boolean,
+        assert_test_store_set_i64_deltas: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_i64: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_i64_deltas: pb::test::Boolean,
+        assert_test_store_min_i64: pb::test::Boolean,
+        assert_test_store_min_i64_deltas: pb::test::Boolean,
+        assert_test_store_max_i64: pb::test::Boolean,
+        assert_test_store_max_i64_deltas: pb::test::Boolean,
         store: substreams::store::StoreSetInt64,
     );
 
     fn assert_all_test_float64(
-        assert_test_store_add_float64: bool,
-        assert_test_store_add_float64_deltas: bool,
-        assert_test_store_set_float64: bool,
-        assert_test_store_set_float64_deltas: bool,
-        assert_test_store_set_if_not_exists_float64: bool,
-        assert_test_store_set_if_not_exists_float64_deltas: bool,
-        assert_test_store_min_float64: bool,
-        assert_test_store_min_float64_deltas: bool,
-        assert_test_store_max_float64: bool,
-        assert_test_store_max_float64_deltas: bool,
+        assert_test_store_add_float64: pb::test::Boolean,
+        assert_test_store_add_float64_deltas: pb::test::Boolean,
+        assert_test_store_set_float64: pb::test::Boolean,
+        assert_test_store_set_float64_deltas: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_float64: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_float64_deltas: pb::test::Boolean,
+        assert_test_store_min_float64: pb::test::Boolean,
+        assert_test_store_min_float64_deltas: pb::test::Boolean,
+        assert_test_store_max_float64: pb::test::Boolean,
+        assert_test_store_max_float64_deltas: pb::test::Boolean,
         store: substreams::store::StoreSetInt64,
     );
 
     fn assert_all_test_bigint(
-        assert_test_store_add_bigint: bool,
-        assert_test_store_add_bigint_deltas: bool,
-        assert_test_store_set_bigint: bool,
-        assert_test_store_set_bigint_deltas: bool,
-        assert_test_store_set_if_not_exists_bigint: bool,
-        assert_test_store_set_if_not_exists_bigint_deltas: bool,
-        assert_test_store_min_bigint: bool,
-        assert_test_store_min_bigint_deltas: bool,
-        assert_test_store_max_bigint: bool,
-        assert_test_store_max_bigint_deltas: bool,
+        assert_test_store_add_bigint: pb::test::Boolean,
+        assert_test_store_add_bigint_deltas: pb::test::Boolean,
+        assert_test_store_set_bigint: pb::test::Boolean,
+        assert_test_store_set_bigint_deltas: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_bigint: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_bigint_deltas: pb::test::Boolean,
+        assert_test_store_min_bigint: pb::test::Boolean,
+        assert_test_store_min_bigint_deltas: pb::test::Boolean,
+        assert_test_store_max_bigint: pb::test::Boolean,
+        assert_test_store_max_bigint_deltas: pb::test::Boolean,
         store: substreams::store::StoreSetInt64,
     );
 
     fn assert_all_test_bigdecimal(
-        assert_test_store_add_bigdecimal: bool,
-        assert_test_store_add_bigdecimal_deltas: bool,
-        assert_test_store_set_bigdecimal: bool,
-        assert_test_store_set_bigdecimal_deltas: bool,
-        assert_test_store_set_if_not_exists_bigdecimal: bool,
-        assert_test_store_set_if_not_exists_bigdecimal_deltas: bool,
-        assert_test_store_min_bigdecimal: bool,
-        assert_test_store_min_bigdecimal_deltas: bool,
-        assert_test_store_max_bigdecimal: bool,
-        assert_test_store_max_bigdecimal_deltas: bool,
+        assert_test_store_add_bigdecimal: pb::test::Boolean,
+        assert_test_store_add_bigdecimal_deltas: pb::test::Boolean,
+        assert_test_store_set_bigdecimal: pb::test::Boolean,
+        assert_test_store_set_bigdecimal_deltas: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_bigdecimal: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_bigdecimal_deltas: pb::test::Boolean,
+        assert_test_store_min_bigdecimal: pb::test::Boolean,
+        assert_test_store_min_bigdecimal_deltas: pb::test::Boolean,
+        assert_test_store_max_bigdecimal: pb::test::Boolean,
+        assert_test_store_max_bigdecimal_deltas: pb::test::Boolean,
         store: substreams::store::StoreSetInt64,
     );
 
     fn assert_all_test_string(
-        assert_test_store_append_string: bool,
-        assert_test_store_append_string_deltas: bool,
-        assert_test_store_set_string: bool,
-        assert_test_store_set_string_deltas: bool,
-        assert_test_store_set_if_not_exists_string: bool,
-        assert_test_store_set_if_not_exists_string_deltas: bool,
+        assert_test_store_append_string: pb::test::Boolean,
+        assert_test_store_append_string_deltas: pb::test::Boolean,
+        assert_test_store_set_string: pb::test::Boolean,
+        assert_test_store_set_string_deltas: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_string: pb::test::Boolean,
+        assert_test_store_set_if_not_exists_string_deltas: pb::test::Boolean,
         store: substreams::store::StoreSetInt64,
     );
 
     fn assert_all_test_delete_prefix(
-        assert_test_store_delete_prefix: bool,
+        assert_test_store_delete_prefix: pb::test::Boolean,
         store: substreams::store::StoreSetInt64,
     );
 
@@ -489,7 +489,7 @@ pub trait SubstreamsTrait {
         assert_all_test_float64: substreams::store::StoreGetInt64,
         assert_all_test_bigint: substreams::store::StoreGetInt64,
         assert_all_test_bigdecimal: substreams::store::StoreGetInt64,
-    ) -> Result<bool, Error>;
+    ) -> Result<pb::test::Boolean, Error>;
 }
 
 

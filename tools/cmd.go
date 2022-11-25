@@ -16,6 +16,7 @@ package tools
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
@@ -54,6 +55,13 @@ func mustGetUint64(cmd *cobra.Command, flagName string) uint64 {
 }
 func mustGetBool(cmd *cobra.Command, flagName string) bool {
 	val, err := cmd.Flags().GetBool(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	return val
+}
+func mustGetDuration(cmd *cobra.Command, flagName string) time.Duration {
+	val, err := cmd.Flags().GetDuration(flagName)
 	if err != nil {
 		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
 	}

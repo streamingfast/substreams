@@ -1,0 +1,22 @@
+specVersion: v0.1.0
+package:
+  name: test
+  version: v0.0.0
+
+protobuf:
+  files:
+    - sf/substreams/test1.proto
+  importPaths:
+    - ./proto1
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: target/wasm32-unknown-unknown/release/test.wasm
+
+modules:
+  - name: invalid_map
+    kind: map
+    initialBlock: 0
+    output:
+      type: string

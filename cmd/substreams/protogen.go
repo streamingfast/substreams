@@ -33,7 +33,7 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
 	manifestPath := args[0]
-	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
+	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
 
 	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {
 		newOutputPath := filepath.Join(filepath.Dir(manifestPath), outputPath)

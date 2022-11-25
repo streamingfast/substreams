@@ -34,6 +34,13 @@ func SkipSourceCodeReader() Options {
 	}
 }
 
+func SkipModuleOutputTypeValidationReader() Options {
+	return func(r *Reader) *Reader {
+		r.skipModuleOutputTypeValidation = true
+		return r
+	}
+}
+
 func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Options {
 	return func(r *Reader) *Reader {
 		r.collectProtoDefinitionsFunc = f
@@ -44,8 +51,10 @@ func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)
 type Reader struct {
 	input                       string
 	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
+
 	//options
 	skipSourceCodeImportValidation bool
+	skipModuleOutputTypeValidation bool
 }
 
 func NewReader(input string, opts ...Options) *Reader {
@@ -213,12 +222,21 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 
 	for _, mod := range pkg.Modules.Modules {
 		switch i := mod.Kind.(type) {
+		case *pbsubstreams.Module_KindMap_:
+			outputType := i.KindMap.OutputType
+			if !r.skipModuleOutputTypeValidation {
+				if !strings.HasPrefix(outputType, "proto:") {
+					return fmt.Errorf("module %q incorrect outputTyupe %q valueType must be a proto Message", mod.Name, outputType)
+				}
+			}
 		case *pbsubstreams.Module_KindStore_:
 			valueType := i.KindStore.ValueType
-			if strings.HasPrefix(valueType, "proto:") {
-
-			} else if !validValueTypes[valueType] {
-				return fmt.Errorf("module %q: invalid valueType %q", mod.Name, valueType)
+			if !r.skipModuleOutputTypeValidation {
+				if strings.HasPrefix(valueType, "proto:") {
+					// any store with a prototype is considered valid
+				} else if !storeValidTypes[valueType] {
+					return fmt.Errorf("module %q: invalid valueType %q", mod.Name, valueType)
+				}
 			}
 		}
 
@@ -528,7 +546,7 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 	return
 }
 
-var validValueTypes = map[string]bool{
+var storeValidTypes = map[string]bool{
 	"bigint":     true,
 	"int64":      true,
 	"float64":    true,

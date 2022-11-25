@@ -213,6 +213,12 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 		},
+		{
+			"invalid_map_module.yaml",
+			args{},
+			nil,
+			require.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

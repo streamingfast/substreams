@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams"
 
 	"github.com/streamingfast/bstream/hub"
@@ -125,10 +126,23 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 	ctx := streamSrv.Context()
-	logger := reqctx.Logger(ctx)
+
+	isSubRequest, err := s.isSubRequest(ctx)
+	if err != nil {
+		return err
+	}
+
+	loggerName := "tier1"
+	if isSubRequest {
+		loggerName = "tier2"
+	}
+
+	logger := reqctx.Logger(ctx).Named(loggerName)
+	ctx = logging.WithLogger(ctx, logger)
+
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
-	ctx, span := reqctx.WithSpan(ctx, "substream_request")
+	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
 
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
@@ -163,7 +177,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 	if err != nil {
 		return err
 	}
-	logger.Debug("set is_subrequest", zap.Bool("is_subrequest", isSubRequest))
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, isSubRequest)
 

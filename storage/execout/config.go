@@ -35,7 +35,7 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 		modKind:            modKind,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
-		logger:             logger.Named("execout").With(zap.String("module", name)),
+		logger:             logger.With(zap.String("module", name)),
 	}, nil
 }
 

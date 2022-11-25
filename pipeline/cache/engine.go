@@ -15,11 +15,13 @@ import (
 )
 
 // TODO(abourget): this is now something like an execout.LifecycleWriter ?
+//  pipeline.Lifecycle ? to hold also the *pbsubstreams.ModuleOutput
+//  so that `ForkHandler` disappears in the end?
 type Engine struct {
 	ctx               context.Context
 	wg                *sync.WaitGroup
 	blockType         string
-	reversibleSegment map[uint64]*execout.Buffer // block num to modules' outputs for that given block
+	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
 	writableFiles     *execout.Writer            // moduleName => irreversible File
 	runtimeConfig     config.RuntimeConfig
 	logger            *zap.Logger
@@ -30,7 +32,7 @@ func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutW
 		ctx:               ctx,
 		wg:                &sync.WaitGroup{},
 		runtimeConfig:     runtimeConfig,
-		reversibleSegment: map[uint64]*execout.Buffer{},
+		reversibleBuffers: map[uint64]*execout.Buffer{},
 		writableFiles:     execOutWriter,
 		logger:            reqctx.Logger(ctx),
 		blockType:         blockType,
@@ -44,17 +46,17 @@ func (e *Engine) NewBuffer(block *bstream.Block, clock *pbsubstreams.Clock, curs
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}
 
-	e.reversibleSegment[clock.Number] = execOutBuf
+	e.reversibleBuffers[clock.Number] = execOutBuf
 
 	return execOutBuf, nil
 }
 
 func (e *Engine) HandleUndo(clock *pbsubstreams.Clock) {
-	delete(e.reversibleSegment, clock.Number)
+	delete(e.reversibleBuffers, clock.Number)
 }
 
 func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
-	execOutBuf := e.reversibleSegment[clock.Number]
+	execOutBuf := e.reversibleBuffers[clock.Number]
 	if execOutBuf == nil {
 		// TODO(abourget): cross check here, do we want to defer the MaybeRotate
 		//  at after?
@@ -72,13 +74,13 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		e.writableFiles.Write(clock, execOutBuf)
 	}
 
-	delete(e.reversibleSegment, clock.Number)
+	delete(e.reversibleBuffers, clock.Number)
 
 	return nil
 }
 
 func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
-	delete(e.reversibleSegment, clock.Number)
+	delete(e.reversibleBuffers, clock.Number)
 	return nil
 }
 
@@ -94,15 +96,6 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 	}
 
 	return nil
-}
-
-func (e *Engine) get(moduleName string, clock *pbsubstreams.Clock) ([]byte, bool, error) {
-	cache, found := e.reversibleSegment[clock.Number]
-	if !found {
-		return nil, false, fmt.Errorf("cache %q not found at block %d", moduleName, clock.Number)
-	}
-
-	return cache.Get(moduleName)
 }
 
 func (e *Engine) Close() error {

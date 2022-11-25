@@ -9,6 +9,13 @@ import (
 
 type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.ModuleOutput)
 
+// TODO(abourget): The scope of this object and the Engine
+//  are not pretty similar, to keep track of certain pieces
+//  of info that are reversible, and handle the back and forth
+//  between undos and redos.
+//  Perhaps what we could have here, is have those undo handlers
+//  live on the Pipeline (where it makes sense)
+//  and have some nested structs handle
 type ForkHandler struct {
 	reversibleOutputs map[uint64][]*pbsubstreams.ModuleOutput
 	undoHandlers      []UndoHandler
@@ -48,8 +55,4 @@ func (f *ForkHandler) removeReversibleOutput(blockNumber uint64) {
 
 func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockNum uint64) {
 	f.reversibleOutputs[blockNum] = append(f.reversibleOutputs[blockNum], moduleOutput)
-}
-
-type DeltaGetter interface {
-	GetDeltas() []*pbsubstreams.StoreDelta
 }

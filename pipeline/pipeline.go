@@ -95,10 +95,11 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		}
 	})
 
-	// Initialization of the Store Provider, ExecOut Cache Engine?
-
-	// FIXME(abourget): Populate the StoreProvider by one of two means: on-disk snapshots, or parallel backprocessing.
-	//  This clearly doesn't belong in the Init() function.
+	// DESTROY Init
+	// TODO(abourget):
+	//  when in a SubRequest, the caller should call `setupSubrequestStores` and take the result, assign it
+	//  to the `stores.SetStoreMap()` and also keep track of the `partialStores` (extracted from looping through
+	//  that map)
 	var storeMap store.Map
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))

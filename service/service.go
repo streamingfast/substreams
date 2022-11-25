@@ -239,7 +239,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 	logger.Info("initializing pipeline",
 		zap.Uint64("request_start_block", requestDetails.RequestStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
-		//zap.String("request_start_cursor", request.StartCursor),
+		zap.String("request_start_cursor", request.StartCursor),
 		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
 		zap.Strings("outputs", request.OutputModules),
 	)
@@ -247,42 +247,36 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
-	// It's ok to use `StartBlockNum` directly here (instead of `requestCtx.RequestStartBlockNum`)
-	// and in the constructor we also pass `StartCursor` which will be handled by `streamFactory.New`
-	// and will be used to bootstrap the stream correctly from it if set.
-	logger.Info("creating firehose stream",
-		zap.Int64("start_block", request.StartBlockNum),
-		zap.Uint64("end_block", request.StopBlockNum),
-		zap.String("cursor", request.StartCursor),
-	)
-
-	var blockStream Streamable
-	if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
-		blockStream, err = s.streamFactoryFunc(
+	var streamErr error
+	if requestDetails.LinearHandoffBlockNum != request.StopBlockNum {
+		cursor := request.StartCursor
+		if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
+			cursor = ""
+		}
+		logger.Info("creating firehose stream",
+			zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
+			zap.Uint64("stop_block", request.StopBlockNum),
+			zap.String("cursor", cursor),
+		)
+		blockStream, err := s.streamFactoryFunc(
 			pipe,
 			int64(requestDetails.LinearHandoffBlockNum),
 			request.StopBlockNum,
-			"",
+			cursor,
 		)
-
-	} else {
-		blockStream, err = s.streamFactoryFunc(
-			pipe,
-			request.StartBlockNum,
-			request.StopBlockNum,
-			request.StartCursor,
-		)
-	}
-	if err != nil {
-		return fmt.Errorf("error getting stream: %w", err)
+		if err != nil {
+			return fmt.Errorf("error getting stream: %w", err)
+		}
+		streamErr = blockStream.Run(ctx)
 	}
 
-	streamErr := blockStream.Run(ctx)
 	if err := pipe.OnStreamTerminated(ctx, trailerWriter, streamErr); err != nil {
 		return err
 	}
 
 	execOutputCacheEngine.Close()
+
+	fmt.Println("ExITING THE FLOW MAN")
 
 	return nil
 }

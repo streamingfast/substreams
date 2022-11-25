@@ -3,12 +3,13 @@ package integration
 import (
 	"context"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,13 +64,9 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 }
 
 func TestProductionMode(t *testing.T) {
-	var objStore dstore.Store
 	run := newTestRun(20, 28, 33, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 5
-	run.BlockProcessedCallback = func(ctx *execContext) {
-		objStore = ctx.baseStore
-	}
 
 	require.NoError(t, run.Run(t))
 
@@ -78,34 +75,12 @@ func TestProductionMode(t *testing.T) {
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 	assert.Regexp(t, "20:", mapOutput)
 	assert.Regexp(t, "32:", mapOutput)
-
-	storedFiles, err := objStore.ListFiles(context.Background(), "", 999)
-	require.NoError(t, err)
-	assert.Len(t, storedFiles, 4)
-	filenames := strings.Join(storedFiles, "\n")
-	assert.Regexp(t, "outputs/0000000020-0000000028.output", filenames)
-	assert.Regexp(t, "states/0000000010-0000000001.kv", filenames)
-	assert.Regexp(t, "states/0000000020-0000000001.kv", filenames)
-	assert.Regexp(t, "states/0000000030-0000000001.kv", filenames)
-}
-
-func Test_MultipleModule_Batch_Output_Written(t *testing.T) {
-	run := newTestRun(110, 112, 112, "test_map", "test_store_proto")
-	outputFilesLen := 0
-	run.BlockProcessedCallback = func(ctx *execContext) {
-		err := ctx.baseStore.Walk(context.Background(), "", func(filename string) (err error) {
-			if strings.Contains(filename, "output") {
-				outputFilesLen++
-			}
-			return nil
-		})
-		require.NoError(t, err)
-	}
-
-	require.NoError(t, run.Run(t))
-
-	require.NotZero(t, run.MapOutput("test_map"))
-	require.NotZero(t, outputFilesLen)
+	assertFiles(t, run.TempDir,
+		"outputs/0000000020-0000000028.output",
+		"states/0000000010-0000000001.kv",
+		"states/0000000020-0000000001.kv",
+		"states/0000000030-0000000001.kv",
+	)
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
@@ -124,7 +99,10 @@ func TestStoreDeletePrefix(t *testing.T) {
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
 	run := newTestRun(20, 31, 31, "assert_all_test")
+
 	require.NoError(t, run.Run(t))
+
+	assert.Len(t, listFiles(t, run.TempDir), 90) // All these .kv files on disk
 }
 
 func Test_SimpleMapModule(t *testing.T) {
@@ -150,4 +128,29 @@ func cancelledContext(delay time.Duration) context.Context {
 		cancel()
 	}()
 	return ctx
+}
+
+func listFiles(t *testing.T, tempDir string) []string {
+	var storedFiles []string
+	require.NoError(t, filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		storedFiles = append(storedFiles, strings.TrimPrefix(path, tempDir))
+		return nil
+	}))
+	//fmt.Println("STORED FILES", storedFiles)
+	return storedFiles
+}
+
+func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
+	storedFiles := listFiles(t, tempDir)
+	assert.Len(t, storedFiles, len(wantedFiles))
+	filenames := strings.Join(storedFiles, "\n")
+	for _, re := range wantedFiles {
+		assert.Regexp(t, re, filenames)
+	}
 }

@@ -47,6 +47,7 @@ type testRun struct {
 	Context                context.Context // custom top-level context, defaults to context.Background()
 
 	Responses []*pbsubstreams.Response
+	TempDir   string
 }
 
 func newTestRun(startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleNames ...string) *testRun {
@@ -62,6 +63,7 @@ func (f *testRun) Run(t *testing.T) error {
 
 	testTempDir := t.TempDir()
 	fmt.Println("Running test in temp dir: ", testTempDir)
+	f.TempDir = testTempDir
 
 	ctx = withTestTracing(t, ctx)
 

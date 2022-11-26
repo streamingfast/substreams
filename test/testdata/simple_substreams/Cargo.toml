@@ -16,3 +16,8 @@ substreams = { version = "0.4.0" }
 [build-dependencies]
 anyhow = "1"
 prost-build = "^0.11.0"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

@@ -139,8 +139,8 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	logger := reqctx.Logger(ctx).Named(loggerName)
 	ctx = logging.WithLogger(ctx, logger)
-
 	ctx = reqctx.WithTracer(ctx, s.tracer)
+	ctx = reqctx.WithBytesMeter(ctx, reqctx.NewBytesMeter())
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
@@ -204,7 +204,7 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 	}
 	execOutputConfigs := execout.NewConfigs(s.runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap, logger)
 
-	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(NewMeteredStore(ctx, s.runtimeConfig.BaseObjectStore), outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

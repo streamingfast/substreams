@@ -18,6 +18,7 @@ import (
 func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
+	bytesMeter := reqctx.BytesMeter(ctx)
 
 	for _, executor := range p.moduleExecutors {
 		executor.FreeMem()
@@ -27,10 +28,12 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 		return err
 	}
 
-	logger.Debug("stream of blocks ended",
+	logger.Info("stream of blocks ended",
 		zap.Uint64("stop_block_num", reqDetails.Request.StopBlockNum),
 		zap.Bool("eof", errors.Is(err, io.EOF)),
 		zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
+		zap.Uint64("bytes_written", bytesMeter.BytesWritten()),
+		zap.Uint64("bytes_read", bytesMeter.BytesRead()),
 	)
 
 	// TODO(abourget): check, in the tier1, there might not be a `lastFinalClock`

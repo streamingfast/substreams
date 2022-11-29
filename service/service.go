@@ -154,8 +154,15 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
-	runtimeConfig := s.runtimeConfig
-	runtimeConfig.BaseObjectStore = tracking.NewMeteredStore(ctx, runtimeConfig.BaseObjectStore)
+	runtimeConfig := config.NewRuntimeConfig(
+		s.runtimeConfig.StoreSnapshotsSaveInterval,
+		s.runtimeConfig.ExecOutputSaveInterval,
+		s.runtimeConfig.SubrequestsSplitSize,
+		s.runtimeConfig.ParallelSubrequests,
+		tracking.NewMeteredStore(ctx, s.runtimeConfig.BaseObjectStore),
+		s.runtimeConfig.WorkerFactory,
+	)
+	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
 
 	err = s.blocks(ctx, runtimeConfig, request, respFunc, streamSrv)
 	grpcError = s.toGRPCError(err)

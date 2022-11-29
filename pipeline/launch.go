@@ -9,7 +9,6 @@ import (
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/tracking"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
@@ -19,7 +18,6 @@ import (
 func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
-	bytesMeter := tracking.GetBytesMeter(ctx)
 
 	for _, executor := range p.moduleExecutors {
 		executor.FreeMem()
@@ -29,12 +27,10 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 		return err
 	}
 
-	logger.Info("stream of blocks ended",
+	logger.Debug("stream of blocks ended",
 		zap.Uint64("stop_block_num", reqDetails.Request.StopBlockNum),
 		zap.Bool("eof", errors.Is(err, io.EOF)),
 		zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
-		zap.Uint64("total_bytes_written", bytesMeter.BytesWritten()),
-		zap.Uint64("total_bytes_read", bytesMeter.BytesRead()),
 	)
 
 	// TODO(abourget): check, in the tier1, there might not be a `lastFinalClock`
@@ -48,10 +44,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 	}
 
 	p.execOutputCache.Close()
-
-	if err := bytesMeter.Send(p.respFunc); err != nil {
-		return fmt.Errorf("sending bytes meter %w", err)
-	}
 
 	if p.stores.partialsWritten != nil {
 		partialRanges := make([]string, len(p.stores.partialsWritten))

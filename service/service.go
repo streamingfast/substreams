@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/tracking"
 	"os"
 	"time"
 
@@ -139,14 +138,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	}
 
 	logger := reqctx.Logger(ctx).Named(loggerName)
-	respFunc := responseHandler(logger, streamSrv)
-
-	bytesMeter := tracking.NewBytesMeter()
-	bytesMeter.Launch(ctx, respFunc)
-
 	ctx = logging.WithLogger(ctx, logger)
+
 	ctx = reqctx.WithTracer(ctx, s.tracer)
-	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
@@ -154,17 +148,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
-	runtimeConfig := config.NewRuntimeConfig(
-		s.runtimeConfig.StoreSnapshotsSaveInterval,
-		s.runtimeConfig.ExecOutputSaveInterval,
-		s.runtimeConfig.SubrequestsSplitSize,
-		s.runtimeConfig.ParallelSubrequests,
-		tracking.NewMeteredStore(ctx, s.runtimeConfig.BaseObjectStore),
-		s.runtimeConfig.WorkerFactory,
-	)
-	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
+	respFunc := responseHandler(logger, streamSrv)
 
-	err = s.blocks(ctx, runtimeConfig, request, respFunc, streamSrv)
+	err = s.blocks(ctx, request, respFunc, streamSrv)
 	grpcError = s.toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -174,7 +160,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	return grpcError
 }
 
-func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
+func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
 	logger := reqctx.Logger(ctx)
 	logger.Info("validating request")
 
@@ -192,7 +178,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		return err
 	}
 
-	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, isSubRequest)
+	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, isSubRequest)
 
 	logger.Debug("executing subrequest",
 		zap.Strings("output_modules", request.OutputModules),
@@ -212,17 +198,17 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	execOutputConfigMap, err := execout.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), logger)
+	execOutputConfigMap, err := execout.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
-	execOutputConfigs := execout.NewConfigs(runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap, logger)
+	execOutputConfigs := execout.NewConfigs(s.runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap, logger)
 
-	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
+	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
 	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
 	//  * in direct mode, this would mean we start writing files after the handoff,
@@ -241,7 +227,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		)
 	}
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, execOutWriter, s.blockType)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -254,7 +240,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		runtimeConfig,
+		s.runtimeConfig,
 		respFunc,
 		opts...,
 	)
@@ -302,6 +288,8 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	}
 
 	execOutputCacheEngine.Close()
+
+	fmt.Println("ExITING THE FLOW MAN")
 
 	return nil
 }

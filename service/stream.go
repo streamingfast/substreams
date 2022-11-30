@@ -47,5 +47,12 @@ func (sf *StreamFactory) New(
 
 func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 	_, _, _, finalBlockNum, err := s.hub.HeadInfo()
+	if finalBlockNum > bstream.GetProtocolFirstStreamableBlock+200 {
+		finalBlockNum -= finalBlockNum % 100
+		finalBlockNum -= 100
+	} else if finalBlockNum > bstream.GetProtocolFirstStreamableBlock+200 {
+		finalBlockNum -= finalBlockNum % 100
+	}
+
 	return finalBlockNum, err
 }

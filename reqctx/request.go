@@ -30,6 +30,7 @@ func (d *RequestDetails) ShouldReturnProgressMessages() bool {
 	return d.IsSubRequest
 }
 
-func (d *RequestDetails) ShouldBackprocessAndStreamLinearly() bool {
-	return d.RequestStartBlockNum != d.LinearHandoffBlockNum
+func (d *RequestDetails) ShouldStreamCachedOutputs() bool {
+	return d.Request.ProductionMode &&
+		d.RequestStartBlockNum < d.LinearHandoffBlockNum
 }

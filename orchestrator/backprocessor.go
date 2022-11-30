@@ -35,7 +35,7 @@ func BuildBackProcessor(
 	storeConfigs store.ConfigMap,
 ) (*Backprocessor, error) {
 	var execOutputReader *execout.LinearReader
-	if reqDetails.ShouldBackprocessAndStreamLinearly() {
+	if reqDetails.ShouldStreamCachedOutputs() {
 		requestedModule := outputGraph.RequestedMapperModules()[0]
 		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)

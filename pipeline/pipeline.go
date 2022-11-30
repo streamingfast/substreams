@@ -47,6 +47,8 @@ type Pipeline struct {
 	execoutStorage *execout.Configs
 	partialStores  []*backprocessingStore
 
+	snapshotSent bool
+
 	forkHandler     *ForkHandler
 	execOutputCache *cache.Engine
 
@@ -109,10 +111,6 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	} else {
 		if storeMap, err = p.runBackProcessAndSetupStores(ctx); err != nil {
 			return fmt.Errorf("failed setup request: %w", err)
-		}
-
-		if err := p.sendSnapshots(ctx, storeMap); err != nil {
-			return fmt.Errorf("send initial snapshots: %w", err)
 		}
 	}
 	p.stores.SetStoreMap(storeMap)
@@ -302,8 +300,8 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 // TODO(abourget): have this being generated and the `buildWASM` by taking
 // this Graph as input, and creating the ModuleExecutors, and caching
 // them over there.
-//moduleExecutorsInitialized bool
-//moduleExecutors            []exec.ModuleExecutor
+// moduleExecutorsInitialized bool
+// moduleExecutors            []exec.ModuleExecutor
 func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module) error {
 	request := reqctx.Details(ctx).Request
 	tracer := otel.GetTracerProvider().Tracer("executor")

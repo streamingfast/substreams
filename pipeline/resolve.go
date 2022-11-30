@@ -23,7 +23,7 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRe
 		req.IsOutputModule[modName] = true
 	}
 
-	// huge nasty FIXME:
+	// FIXME:
 	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
 	//         process directly, even if that's realllly in the past.
 	///        Eventually, we have a first process that corrects the live segment
@@ -36,29 +36,23 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRe
 	}
 
 	if request.ProductionMode {
-		req.LinearHandoffBlockNum, err = computeLiveHandoffBlockNum(getRecentFinalBlock, request.StopBlockNum)
-		if err != nil {
-			return nil, err
+		if maxHandoff, err := getRecentFinalBlock(); err != nil {
+			if request.StopBlockNum == 0 {
+				return nil, fmt.Errorf("cannot determine a recent finalized block: %w", err)
+			}
+			req.LinearHandoffBlockNum = request.StopBlockNum
+		} else {
+			req.LinearHandoffBlockNum = minOf(request.StopBlockNum, maxHandoff)
 		}
 	} else {
-		req.LinearHandoffBlockNum = req.RequestStartBlockNum
+		if maxHandoff, err := getRecentFinalBlock(); err != nil {
+			req.LinearHandoffBlockNum = req.RequestStartBlockNum
+		} else {
+			req.LinearHandoffBlockNum = minOf(req.RequestStartBlockNum, maxHandoff)
+		}
 	}
 
 	return req, nil
-}
-
-func computeLiveHandoffBlockNum(getRecentFinalBlock getRecentFinalBlockFunc, stopBlockNum uint64) (uint64, error) {
-	liveHandoffBlockNum, err := getRecentFinalBlock()
-	if stopBlockNum == 0 {
-		if err != nil {
-			return 0, fmt.Errorf("cannot determine a recent finalized block: %w", err)
-		}
-		return liveHandoffBlockNum, nil
-	}
-	if err != nil {
-		return stopBlockNum, nil
-	}
-	return minOf(stopBlockNum, liveHandoffBlockNum), nil
 }
 
 func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {

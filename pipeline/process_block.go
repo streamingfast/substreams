@@ -137,6 +137,15 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
+	sendOutput := shouldReturnDataOutputs(clock.Number, reqDetails.RequestStartBlockNum, reqDetails.IsSubRequest)
+
+	if sendOutput && !p.snapshotSent {
+		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
+			return fmt.Errorf("send initial snapshots: %w", err)
+		}
+		p.snapshotSent = true
+	}
+
 	logger := reqctx.Logger(ctx)
 	execOutput, err := p.execOutputCache.NewBuffer(block, clock, cursor)
 	if err != nil {
@@ -157,7 +166,7 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		}
 	}
 
-	if shouldReturnDataOutputs(clock.Number, reqDetails.RequestStartBlockNum, reqDetails.IsSubRequest) {
+	if sendOutput {
 		logger.Debug("will return module outputs")
 
 		if err = returnModuleDataOutputs(clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {

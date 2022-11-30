@@ -26,6 +26,23 @@ type SubstreamsClientConfig struct {
 	insecure  bool
 	plaintext bool
 }
+
+func (c *SubstreamsClientConfig) Endpoint() string {
+	return c.endpoint
+}
+
+func (c *SubstreamsClientConfig) Insecure() bool {
+	return c.insecure
+}
+
+func (c *SubstreamsClientConfig) PlainText() bool {
+	return c.plaintext
+}
+
+func (c *SubstreamsClientConfig) JWT() string {
+	return c.jwt
+}
+
 type Factory = func() (cli pbsubstreams.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error)
 
 func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plaintext bool) *SubstreamsClientConfig {

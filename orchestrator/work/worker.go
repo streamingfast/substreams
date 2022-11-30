@@ -138,14 +138,6 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 						bm := tracking.GetBytesMeter(ctx)
 
 						module := progress.GetName()
-
-						written := f.TotalBytesWritten
-						read := f.TotalBytesRead
-
-						if written > 0 || read > 0 {
-							logger.Info("progress")
-						}
-
 						bm.AddBytesWritten(module, int(f.TotalBytesWritten))
 						bm.AddBytesRead(module, int(f.TotalBytesRead))
 					}

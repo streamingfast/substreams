@@ -42,7 +42,11 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRe
 			}
 			req.LinearHandoffBlockNum = request.StopBlockNum
 		} else {
-			req.LinearHandoffBlockNum = minOf(request.StopBlockNum, maxHandoff)
+			if request.StopBlockNum == 0 {
+				req.LinearHandoffBlockNum = maxHandoff
+			} else {
+				req.LinearHandoffBlockNum = minOf(request.StopBlockNum, maxHandoff)
+			}
 		}
 	} else {
 		if maxHandoff, err := getRecentFinalBlock(); err != nil {

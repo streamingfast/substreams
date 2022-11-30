@@ -156,7 +156,6 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 //
 //}
 func (c *File) Load(ctx context.Context) (loaded bool, err error) {
-
 	filename := computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
 	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.BoundedRange))
 

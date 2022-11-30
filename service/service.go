@@ -289,8 +289,6 @@ func (s *Service) blocks(ctx context.Context, request *pbsubstreams.Request, res
 
 	execOutputCacheEngine.Close()
 
-	fmt.Println("ExITING THE FLOW MAN")
-
 	return nil
 }
 

@@ -83,6 +83,26 @@ func TestProductionMode(t *testing.T) {
 	)
 }
 
+func TestProductionMode_Broken(t *testing.T) {
+	run := newTestRun(7, 8, 10, "assert_test_store_add_i64")
+	run.ProductionMode = true
+	run.ParallelSubrequests = 5
+
+	require.NoError(t, run.Run(t))
+
+	mapOutput := run.MapOutput("assert_test_store_add_i64")
+	assert.Equal(t, 3, strings.Count(mapOutput, "\n"))
+	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
+	assert.Regexp(t, "20:", mapOutput)
+	assert.Regexp(t, "32:", mapOutput)
+	assertFiles(t, run.TempDir,
+		"outputs/0000000020-0000000028.output",
+		"states/0000000010-0000000001.kv",
+		"states/0000000020-0000000001.kv",
+		"states/0000000030-0000000001.kv",
+	)
+}
+
 func TestStoreDeletePrefix(t *testing.T) {
 	run := newTestRun(30, 41, 41, "assert_test_store_delete_prefix")
 	run.BlockProcessedCallback = func(ctx *execContext) {

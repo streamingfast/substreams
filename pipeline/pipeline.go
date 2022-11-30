@@ -104,7 +104,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
 		if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
-			return fmt.Errorf("faile to setup backprocessings: %w", err)
+			return fmt.Errorf("failed to setup backprocessings: %w", err)
 		}
 	} else {
 		if storeMap, err = p.runBackProcessAndSetupStores(ctx); err != nil {
@@ -158,6 +158,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 		} else {
 			fullStore := storeConfig.NewFullKV(logger)
 
+			//fixme: should we check if we don't have a boundary finished to not load ?
 			if fullStore.InitialBlock() != reqDetails.RequestStartBlockNum {
 				if err := fullStore.Load(ctx, reqDetails.RequestStartBlockNum); err != nil {
 					return nil, fmt.Errorf("load full store: %w", err)
@@ -196,7 +197,7 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 	reqStats.StartBackProcessing()
 	storeMap, err = backprocessor.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("backrprocess run: %w", err)
+		return nil, fmt.Errorf("backprocess run: %w", err)
 	}
 	reqStats.EndBackProcessing()
 

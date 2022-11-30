@@ -34,5 +34,5 @@ type nooptrailable struct{}
 func (n nooptrailable) SetTrailer(md metadata.MD) {}
 
 func (s *Service) TestBlocks(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) error {
-	return s.blocks(ctx, request, respFunc, &nooptrailable{})
+	return s.blocks(ctx, s.runtimeConfig, request, respFunc, &nooptrailable{})
 }

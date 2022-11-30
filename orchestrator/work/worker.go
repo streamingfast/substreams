@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/tracking"
 	"io"
 
 	"github.com/streamingfast/substreams"
@@ -124,7 +125,6 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 		if resp != nil {
 			switch r := resp.Message.(type) {
 			case *pbsubstreams.Response_Progress:
-
 				err := respFunc(resp)
 				if err != nil {
 					span.SetStatus(codes.Error, err.Error())
@@ -134,6 +134,22 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 				}
 
 				for _, progress := range resp.GetProgress().Modules {
+					if f := progress.GetProcessedBytes(); f != nil {
+						bm := tracking.GetBytesMeter(ctx)
+
+						module := progress.GetName()
+
+						written := f.TotalBytesWritten
+						read := f.TotalBytesRead
+
+						if written > 0 || read > 0 {
+							logger.Info("progress")
+						}
+
+						bm.AddBytesWritten(module, int(f.TotalBytesWritten))
+						bm.AddBytesRead(module, int(f.TotalBytesRead))
+					}
+
 					if f := progress.GetFailed(); f != nil {
 						err := fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
 						span.SetStatus(codes.Error, err.Error())

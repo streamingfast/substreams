@@ -83,7 +83,7 @@ func TestBytesMeter_AddBytesRead(t *testing.T) {
 	}
 }
 
-func TestNoopBytesMeter_AddBytesWritten(t *testing.T) {
+func TestBytesMeter_AddBytesWritten(t *testing.T) {
 	type fields struct {
 		modules         map[string]struct{}
 		bytesWrittenMap map[string]uint64
@@ -157,7 +157,7 @@ func TestNoopBytesMeter_AddBytesWritten(t *testing.T) {
 	}
 }
 
-func TestNoopBytesMeter_Send(t *testing.T) {
+func TestBytesMeter_Send(t *testing.T) {
 	var respFuncError = errors.New("respFuncError")
 
 	type fields struct {

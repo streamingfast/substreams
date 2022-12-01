@@ -2,8 +2,9 @@ package tracking
 
 import (
 	"context"
-	"github.com/streamingfast/dstore"
 	"io"
+
+	"github.com/streamingfast/dstore"
 )
 
 type meteredReadCloser struct {
@@ -39,10 +40,6 @@ type MeteredStore struct {
 	Meter  BytesMeter
 }
 
-func (m *MeteredStore) SetModule(module string) {
-	m.module = module
-}
-
 func (m *MeteredStore) OpenObject(ctx context.Context, name string) (out io.ReadCloser, err error) {
 	out, err = m.Store.OpenObject(ctx, name)
 	if err != nil {
@@ -50,7 +47,7 @@ func (m *MeteredStore) OpenObject(ctx context.Context, name string) (out io.Read
 	}
 
 	fn := func(n int) {
-		m.Meter.AddBytesRead(m.module, n)
+		m.Meter.AddBytesRead(n)
 	}
 
 	return &meteredReadCloser{r: out, f: fn}, nil
@@ -58,7 +55,7 @@ func (m *MeteredStore) OpenObject(ctx context.Context, name string) (out io.Read
 
 func (m *MeteredStore) WriteObject(ctx context.Context, base string, f io.Reader) (err error) {
 	fn := func(n int) {
-		m.Meter.AddBytesWritten(m.module, n)
+		m.Meter.AddBytesWritten(n)
 	}
 
 	mf := &meteredReadCloser{r: io.NopCloser(f), f: fn}

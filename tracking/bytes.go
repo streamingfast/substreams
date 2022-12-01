@@ -2,40 +2,35 @@ package tracking
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
-	"sync"
-	"time"
 )
 
 type BytesMeter interface {
-	AddBytesWritten(module string, n int)
-	AddBytesRead(module string, n int)
+	AddBytesWritten(n int)
+	AddBytesRead(n int)
 
-	BytesWritten(module string) uint64
-	BytesRead(module string) uint64
+	BytesWritten() uint64
+	BytesRead() uint64
 
 	Launch(ctx context.Context, respFunc substreams.ResponseFunc)
 	Send(respFunc substreams.ResponseFunc) error
 }
 
 type bytesMeter struct {
-	modules map[string]struct{}
-
-	bytesWrittenMap map[string]uint64
-	bytesReadMap    map[string]uint64
+	bytesWritten uint64
+	bytesRead    uint64
 
 	mu sync.RWMutex
 }
 
 func NewBytesMeter() BytesMeter {
-	return &bytesMeter{
-		bytesWrittenMap: map[string]uint64{},
-		bytesReadMap:    map[string]uint64{},
-		modules:         map[string]struct{}{},
-	}
+	return &bytesMeter{}
 }
 
 func (b *bytesMeter) Start(ctx context.Context, respFunc substreams.ResponseFunc) {
@@ -63,24 +58,15 @@ func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
 
 	var in []*pbsubstreams.ModuleProgress
 
-	for module := range b.modules {
-		written := b.bytesWrittenMap[module]
-		read := b.bytesReadMap[module]
-
-		in = append(in, &pbsubstreams.ModuleProgress{
-			Name: module,
-			Type: &pbsubstreams.ModuleProgress_ProcessedBytes_{
-				ProcessedBytes: &pbsubstreams.ModuleProgress_ProcessedBytes{
-					TotalBytesWritten: written,
-					TotalBytesRead:    read,
-				},
+	in = append(in, &pbsubstreams.ModuleProgress{
+		Name: "",
+		Type: &pbsubstreams.ModuleProgress_ProcessedBytes_{
+			ProcessedBytes: &pbsubstreams.ModuleProgress_ProcessedBytes{
+				TotalBytesWritten: b.bytesWritten,
+				TotalBytesRead:    b.bytesRead,
 			},
-		})
-	}
-
-	if len(in) == 0 {
-		return nil
-	}
+		},
+	})
 
 	resp := substreams.NewModulesProgressResponse(in)
 	err := respFunc(resp)
@@ -91,58 +77,44 @@ func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
 	return nil
 }
 
-func (b *bytesMeter) AddBytesWritten(module string, n int) {
+func (b *bytesMeter) AddBytesWritten(n int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	if module == "" {
-		panic("module is empty")
-	}
-	b.modules[module] = struct{}{}
 
 	if n < 0 {
 		panic("negative value")
 	}
 
-	b.bytesWrittenMap[module] += uint64(n)
+	b.bytesWritten += uint64(n)
 }
 
-func (b *bytesMeter) AddBytesRead(module string, n int) {
+func (b *bytesMeter) AddBytesRead(n int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if module == "" {
-		panic("module is empty")
-	}
-	b.modules[module] = struct{}{}
-
-	if n < 0 {
-		panic("negative value")
-	}
-
-	b.bytesReadMap[module] += uint64(n)
+	b.bytesRead += uint64(n)
 }
 
-func (b *bytesMeter) BytesWritten(module string) uint64 {
+func (b *bytesMeter) BytesWritten() uint64 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	return b.bytesWrittenMap[module]
+	return b.bytesWritten
 }
 
-func (b *bytesMeter) BytesRead(module string) uint64 {
+func (b *bytesMeter) BytesRead() uint64 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	return b.bytesReadMap[module]
+	return b.bytesRead
 }
 
 type noopBytesMeter struct{}
 
-func (_ *noopBytesMeter) AddBytesWritten(module string, n int)                         { return }
-func (_ *noopBytesMeter) AddBytesRead(module string, n int)                            { return }
-func (_ *noopBytesMeter) BytesWritten(module string) uint64                            { return 0 }
-func (_ *noopBytesMeter) BytesRead(module string) uint64                               { return 0 }
+func (_ *noopBytesMeter) AddBytesWritten(n int)                                        { return }
+func (_ *noopBytesMeter) AddBytesRead(n int)                                           { return }
+func (_ *noopBytesMeter) BytesWritten() uint64                                         { return 0 }
+func (_ *noopBytesMeter) BytesRead() uint64                                            { return 0 }
 func (_ *noopBytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFunc) {}
 func (_ *noopBytesMeter) Send(respFunc substreams.ResponseFunc) error                  { return nil }
 

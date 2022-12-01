@@ -136,10 +136,8 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 				for _, progress := range resp.GetProgress().Modules {
 					if f := progress.GetProcessedBytes(); f != nil {
 						bm := tracking.GetBytesMeter(ctx)
-
-						module := progress.GetName()
-						bm.AddBytesWritten(module, int(f.TotalBytesWritten))
-						bm.AddBytesRead(module, int(f.TotalBytesRead))
+						bm.AddBytesWritten(int(f.TotalBytesWritten))
+						bm.AddBytesRead(int(f.TotalBytesRead))
 					}
 
 					if f := progress.GetFailed(); f != nil {

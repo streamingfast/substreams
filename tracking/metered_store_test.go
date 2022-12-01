@@ -19,10 +19,8 @@ func TestMeteredReadCloser_Read(t *testing.T) {
 	m := NewBytesMeter()
 	rc := io.NopCloser(testReader())
 
-	module := "abc123"
-
 	fn := func(n int) {
-		m.AddBytesRead(module, n)
+		m.AddBytesRead(n)
 	}
 
 	mrc := &meteredReadCloser{r: rc, f: fn}
@@ -30,7 +28,7 @@ func TestMeteredReadCloser_Read(t *testing.T) {
 	res, err := io.ReadAll(mrc)
 	require.Nil(t, err)
 
-	actual := m.BytesRead(module)
+	actual := m.BytesRead()
 	expected := uint64(len(res))
 	require.Equal(t, expected, actual)
 }
@@ -38,8 +36,6 @@ func TestMeteredReadCloser_Read(t *testing.T) {
 func TestMeteredStore_OpenObject(t *testing.T) {
 	ctx := context.Background()
 	ctx = WithBytesMeter(ctx, NewBytesMeter())
-
-	module := "abc123"
 
 	baseStore := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
 		return nil
@@ -52,7 +48,6 @@ func TestMeteredStore_OpenObject(t *testing.T) {
 	}
 
 	store := NewMeteredStore(ctx, baseStore)
-	store.(*MeteredStore).SetModule(module)
 
 	rc, err := store.OpenObject(ctx, "test")
 	require.Nil(t, err)
@@ -62,7 +57,7 @@ func TestMeteredStore_OpenObject(t *testing.T) {
 
 	m := GetBytesMeter(ctx)
 
-	actual := m.BytesRead(module)
+	actual := m.BytesRead()
 	expected := uint64(len(res))
 	require.Equal(t, expected, actual)
 }
@@ -70,8 +65,6 @@ func TestMeteredStore_OpenObject(t *testing.T) {
 func TestMeteredStore_WriteObject(t *testing.T) {
 	ctx := context.Background()
 	ctx = WithBytesMeter(ctx, NewBytesMeter())
-
-	module := "abc123"
 
 	baseStore := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
 		return nil
@@ -85,14 +78,13 @@ func TestMeteredStore_WriteObject(t *testing.T) {
 	}
 
 	store := NewMeteredStore(ctx, baseStore)
-	store.(*MeteredStore).SetModule(module)
 
 	err := store.WriteObject(ctx, "test", testReader())
 	require.Nil(t, err)
 
 	m := GetBytesMeter(ctx)
 
-	actual := m.BytesWritten(module)
+	actual := m.BytesWritten()
 	expected := uint64(written)
 	require.Equal(t, expected, actual)
 }
@@ -100,8 +92,6 @@ func TestMeteredStore_WriteObject(t *testing.T) {
 func TestMeteredStore_SubStore(t *testing.T) {
 	ctx := context.Background()
 	ctx = WithBytesMeter(ctx, NewBytesMeter())
-
-	module := "abc123"
 
 	baseStore := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
 		return nil
@@ -120,7 +110,6 @@ func TestMeteredStore_SubStore(t *testing.T) {
 	}
 
 	store := NewMeteredStore(ctx, baseStore)
-	store.(*MeteredStore).SetModule(module)
 
 	subStore1, err := store.SubStore("foo")
 	require.Nil(t, err)
@@ -139,11 +128,11 @@ func TestMeteredStore_SubStore(t *testing.T) {
 
 	m := GetBytesMeter(ctx)
 
-	actualWritten := m.BytesWritten(module)
+	actualWritten := m.BytesWritten()
 	expectedWritten := uint64(written)
 	require.Equal(t, expectedWritten, actualWritten)
 
-	actualRead := m.BytesRead(module)
+	actualRead := m.BytesRead()
 	expectedRead := uint64(len(res))
 	require.Equal(t, actualRead, expectedRead)
 }

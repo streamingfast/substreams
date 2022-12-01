@@ -11,9 +11,8 @@ import (
 
 func TestBytesMeter_AddBytesRead(t *testing.T) {
 	type fields struct {
-		modules         map[string]struct{}
-		bytesWrittenMap map[string]uint64
-		bytesReadMap    map[string]uint64
+		bytesWritten uint64
+		bytesRead    uint64
 	}
 	type args struct {
 		module string
@@ -23,136 +22,86 @@ func TestBytesMeter_AddBytesRead(t *testing.T) {
 		name     string
 		fields   fields
 		args     args
-		validate func(t *testing.T, fields fields, args args)
+		expected uint64
 	}{
 		{
-			name: "simple",
-			fields: fields{
-				modules:         map[string]struct{}{},
-				bytesWrittenMap: map[string]uint64{},
-				bytesReadMap:    map[string]uint64{},
-			},
+			name:   "simple",
+			fields: fields{},
 			args: args{
-				module: "A",
-				n:      1,
+				n: 1,
 			},
-			validate: func(t *testing.T, fields fields, args args) {
-				expected := uint64(1)
-				actual := fields.bytesReadMap[args.module]
-				require.Equal(t, expected, actual)
-			},
+			expected: uint64(1),
 		},
 		{
 			name: "multiple",
 			fields: fields{
-				modules: map[string]struct{}{
-					"test": {},
-				},
-				bytesWrittenMap: map[string]uint64{},
-				bytesReadMap: map[string]uint64{
-					"A": 1,
-					"B": 2,
-				},
+				bytesRead: 1,
 			},
 			args: args{
-				module: "A",
-				n:      1,
+				n: 1,
 			},
-			validate: func(t *testing.T, fields fields, args args) {
-				expected := uint64(2)
-				actual := fields.bytesReadMap[args.module]
-				require.Equal(t, expected, actual)
-
-				expected = uint64(2)
-				actual = fields.bytesReadMap["B"]
-				require.Equal(t, expected, actual)
-			},
+			expected: 2,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &bytesMeter{
-				modules:         tt.fields.modules,
-				bytesWrittenMap: tt.fields.bytesWrittenMap,
-				bytesReadMap:    tt.fields.bytesReadMap,
+				bytesWritten: tt.fields.bytesWritten,
+				bytesRead:    tt.fields.bytesRead,
 			}
-			b.AddBytesRead(tt.args.module, tt.args.n)
-			tt.validate(t, tt.fields, tt.args)
+			b.AddBytesRead(tt.args.n)
+			actual := b.bytesRead
+			expected := tt.expected
+			require.Equal(t, expected, actual)
 		})
 	}
 }
 
 func TestBytesMeter_AddBytesWritten(t *testing.T) {
 	type fields struct {
-		modules         map[string]struct{}
-		bytesWrittenMap map[string]uint64
-		bytesReadMap    map[string]uint64
+		bytesWritten uint64
+		bytesRead    uint64
 	}
 	type args struct {
-		module string
-		n      int
+		n int
 	}
 	tests := []struct {
 		name     string
 		fields   fields
 		args     args
-		validate func(t *testing.T, fields fields, args args)
+		expected uint64
 	}{
 		{
-			name: "simple",
-			fields: fields{
-				modules:         map[string]struct{}{},
-				bytesWrittenMap: map[string]uint64{},
-				bytesReadMap:    map[string]uint64{},
-			},
+			name:   "simple",
+			fields: fields{},
 			args: args{
-				module: "A",
-				n:      1,
+				n: 1,
 			},
-			validate: func(t *testing.T, fields fields, args args) {
-				expected := uint64(1)
-				actual := fields.bytesWrittenMap[args.module]
-				require.Equal(t, expected, actual)
-			},
+			expected: 1,
 		},
 		{
 			name: "multiple",
 			fields: fields{
-				modules: map[string]struct{}{
-					"test": {},
-				},
-				bytesWrittenMap: map[string]uint64{
-					"A": 1,
-					"B": 2,
-				},
-				bytesReadMap: map[string]uint64{},
+				bytesWritten: 1,
 			},
 			args: args{
-				module: "A",
-				n:      1,
+				n: 1,
 			},
-			validate: func(t *testing.T, fields fields, args args) {
-				expected := uint64(2)
-				actual := fields.bytesWrittenMap[args.module]
-				require.Equal(t, expected, actual)
-
-				expected = uint64(2)
-				actual = fields.bytesWrittenMap["B"]
-				require.Equal(t, expected, actual)
-			},
+			expected: 2,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &bytesMeter{
-				modules:         tt.fields.modules,
-				bytesWrittenMap: tt.fields.bytesWrittenMap,
-				bytesReadMap:    tt.fields.bytesReadMap,
+				bytesWritten: tt.fields.bytesWritten,
+				bytesRead:    tt.fields.bytesRead,
 			}
-			b.AddBytesWritten(tt.args.module, tt.args.n)
-			tt.validate(t, tt.fields, tt.args)
+			b.AddBytesWritten(tt.args.n)
+			actual := b.bytesWritten
+			expected := tt.expected
+			require.Equal(t, expected, actual)
 		})
 	}
 }
@@ -161,83 +110,51 @@ func TestBytesMeter_Send(t *testing.T) {
 	var respFuncError = errors.New("respFuncError")
 
 	type fields struct {
-		modules         map[string]struct{}
-		bytesWrittenMap map[string]uint64
-		bytesReadMap    map[string]uint64
+		bytesWritten uint64
+		bytesRead    uint64
 	}
 	tests := []struct {
-		name     string
-		fields   fields
-		err      error
-		validate func(t *testing.T, fields fields, resps []*pbsubstreams.Response, err error)
+		name         string
+		fields       fields
+		err          error
+		requiredMsgs int
+		requiredErr  error
+		validate     func(t *testing.T, fields fields, resps []*pbsubstreams.Response, err error)
 	}{
 		{
-			name: "baseline",
-			fields: fields{
-				modules:         map[string]struct{}{},
-				bytesWrittenMap: map[string]uint64{},
-				bytesReadMap:    map[string]uint64{},
-			},
-			validate: func(t *testing.T, fields fields, resps []*pbsubstreams.Response, err error) {
-				require.Len(t, resps, 0)
-				require.Nil(t, err)
-			},
+			name:         "simple",
+			fields:       fields{},
+			requiredMsgs: 1,
+			requiredErr:  nil,
 		},
 		{
-			name: "simple",
-			fields: fields{
-				modules: map[string]struct{}{
-					"A": {},
-					"B": {},
-				},
-				bytesWrittenMap: map[string]uint64{
-					"A": 1,
-				},
-				bytesReadMap: map[string]uint64{
-					"A": 1,
-				},
-			},
-			validate: func(t *testing.T, fields fields, resps []*pbsubstreams.Response, err error) {
-				require.Len(t, resps, 1)
-				require.Nil(t, err)
-			},
-		},
-		{
-			name: "error",
-			fields: fields{
-				modules: map[string]struct{}{
-					"A": {},
-				},
-				bytesWrittenMap: map[string]uint64{
-					"A": 1,
-				},
-				bytesReadMap: map[string]uint64{
-					"A": 1,
-				},
-			},
-			err: respFuncError,
-			validate: func(t *testing.T, fields fields, resps []*pbsubstreams.Response, err error) {
-				require.Equal(t, respFuncError, err)
-			},
+			name:         "error",
+			fields:       fields{},
+			err:          respFuncError,
+			requiredMsgs: 0,
+			requiredErr:  respFuncError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &bytesMeter{
-				modules:         tt.fields.modules,
-				bytesWrittenMap: tt.fields.bytesWrittenMap,
-				bytesReadMap:    tt.fields.bytesReadMap,
+				bytesWritten: tt.fields.bytesWritten,
+				bytesRead:    tt.fields.bytesRead,
 			}
 
 			var resps []*pbsubstreams.Response
 			testRespFunc := substreams.ResponseFunc(func(resp *pbsubstreams.Response) error {
+				if tt.err != nil {
+					return tt.err
+				}
 				resps = append(resps, resp)
-				return tt.err
+				return nil
 			})
 
 			err := b.Send(testRespFunc)
-			tt.validate(t, tt.fields, resps, err)
+			require.Equal(t, len(resps), tt.requiredMsgs)
+			require.Equal(t, err, tt.requiredErr)
 		})
 	}
 }

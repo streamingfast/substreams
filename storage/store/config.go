@@ -8,7 +8,6 @@ import (
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
-	"github.com/streamingfast/substreams/tracking"
 	"go.uber.org/zap"
 )
 
@@ -28,10 +27,6 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
-	}
-
-	if ms, ok := subStore.(*tracking.MeteredStore); ok {
-		ms.SetModule(name)
 	}
 
 	return &Config{

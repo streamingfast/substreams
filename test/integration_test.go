@@ -63,6 +63,18 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 	require.NoError(t, run.Run(t))
 }
 
+func TestProductionMode_simple(t *testing.T) {
+	run := newTestRun(1, 10, 15, "assert_test_store_add_i64")
+	run.ProductionMode = true
+	run.ParallelSubrequests = 1
+
+	require.NoError(t, run.Run(t))
+
+	mapOutput := run.MapOutput("assert_test_store_add_i64")
+	assert.Equal(t, 14, strings.Count(mapOutput, "\n"))
+	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
+}
+
 func TestProductionMode(t *testing.T) {
 	run := newTestRun(20, 28, 33, "assert_test_store_add_i64")
 	run.ProductionMode = true
@@ -83,25 +95,43 @@ func TestProductionMode(t *testing.T) {
 	)
 }
 
-func TestProductionMode_Broken(t *testing.T) {
+func TestProductionMode_a_bit_more_complex(t *testing.T) {
+	run := newTestRun(10, 10, 15, "assert_test_store_add_i64")
+	run.ProductionMode = true
+	run.ParallelSubrequests = 1
+
+	require.NoError(t, run.Run(t))
+
+	mapOutput := run.MapOutput("assert_test_store_add_i64")
+	assert.Equal(t, 5, strings.Count(mapOutput, "\n"))
+	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
+}
+
+func TestProductionMode_broken(t *testing.T) {
 	t.Skip()
 	run := newTestRun(7, 8, 10, "assert_test_store_add_i64")
 	run.ProductionMode = true
-	run.ParallelSubrequests = 5
+	run.ParallelSubrequests = 1
 
 	require.NoError(t, run.Run(t))
 
 	mapOutput := run.MapOutput("assert_test_store_add_i64")
 	assert.Equal(t, 3, strings.Count(mapOutput, "\n"))
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
-	assert.Regexp(t, "20:", mapOutput)
-	assert.Regexp(t, "32:", mapOutput)
-	assertFiles(t, run.TempDir,
-		"outputs/0000000020-0000000028.output",
-		"states/0000000010-0000000001.kv",
-		"states/0000000020-0000000001.kv",
-		"states/0000000030-0000000001.kv",
-	)
+}
+
+// fixnow
+func TestProductionMode_broken_endless_loop(t *testing.T) {
+	t.Skip()
+	run := newTestRun(10, 11, 12, "assert_test_store_add_i64")
+	run.ProductionMode = true
+	run.ParallelSubrequests = 1
+
+	require.NoError(t, run.Run(t))
+
+	mapOutput := run.MapOutput("assert_test_store_add_i64")
+	assert.Equal(t, 2, strings.Count(mapOutput, "\n"))
+	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 
 func TestStoreDeletePrefix(t *testing.T) {

@@ -84,6 +84,7 @@ func TestProductionMode(t *testing.T) {
 }
 
 func TestProductionMode_Broken(t *testing.T) {
+	t.Skip()
 	run := newTestRun(7, 8, 10, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 5

@@ -142,7 +142,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	respFunc := responseHandler(logger, streamSrv)
 
 	bytesMeter := tracking.NewBytesMeter()
-	go bytesMeter.Launch(ctx, respFunc)
+	bytesMeter.Launch(ctx, respFunc)
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)

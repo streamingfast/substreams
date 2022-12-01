@@ -2,13 +2,12 @@ package tracking
 
 import (
 	"context"
-	"sync"
-	"time"
-
 	"github.com/streamingfast/substreams"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
+	"sync"
+	"time"
 )
 
 type BytesMeter interface {
@@ -28,8 +27,7 @@ type bytesMeter struct {
 	bytesWrittenMap map[string]uint64
 	bytesReadMap    map[string]uint64
 
-	mu     sync.RWMutex
-	logger *zap.Logger
+	mu sync.RWMutex
 }
 
 func NewBytesMeter() BytesMeter {
@@ -40,7 +38,7 @@ func NewBytesMeter() BytesMeter {
 	}
 }
 
-func (b *bytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFunc) {
+func (b *bytesMeter) Start(ctx context.Context, respFunc substreams.ResponseFunc) {
 	logger := reqctx.Logger(ctx)
 	for {
 		select {
@@ -53,6 +51,10 @@ func (b *bytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFun
 			}
 		}
 	}
+}
+
+func (b *bytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFunc) {
+	go b.Start(ctx, respFunc)
 }
 
 func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
@@ -74,6 +76,10 @@ func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
 				},
 			},
 		})
+	}
+
+	if len(in) == 0 {
+		return nil
 	}
 
 	resp := substreams.NewModulesProgressResponse(in)

@@ -35,28 +35,35 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRe
 		return nil, err
 	}
 
-	if request.ProductionMode {
-		if maxHandoff, err := getRecentFinalBlock(); err != nil {
-			if request.StopBlockNum == 0 {
-				return nil, fmt.Errorf("cannot determine a recent finalized block: %w", err)
-			}
-			req.LinearHandoffBlockNum = request.StopBlockNum
-		} else {
-			if request.StopBlockNum == 0 {
-				req.LinearHandoffBlockNum = maxHandoff
-			} else {
-				req.LinearHandoffBlockNum = minOf(request.StopBlockNum, maxHandoff)
-			}
-		}
-	} else {
-		if maxHandoff, err := getRecentFinalBlock(); err != nil {
-			req.LinearHandoffBlockNum = req.RequestStartBlockNum
-		} else {
-			req.LinearHandoffBlockNum = minOf(req.RequestStartBlockNum, maxHandoff)
-		}
+	linearHandoff, err := computeLiveHandoffBlockNum(request.ProductionMode, req.RequestStartBlockNum, request.StopBlockNum, getRecentFinalBlock)
+	if err != nil {
+		return nil, err
 	}
 
+	req.LinearHandoffBlockNum = linearHandoff
+
 	return req, nil
+}
+
+func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {
+	if productionMode {
+		maxHandoff, err := getRecentFinalBlockFunc()
+		if err != nil {
+			if stopBlock == 0 {
+				return 0, fmt.Errorf("cannot determine a recent finalized block: %w", err)
+			}
+			return stopBlock, nil
+		}
+		if stopBlock == 0 {
+			return maxHandoff, nil
+		}
+		return minOf(stopBlock, maxHandoff), nil
+	}
+	maxHandoff, err := getRecentFinalBlockFunc()
+	if err != nil {
+		return startBlock, nil
+	}
+	return minOf(startBlock, maxHandoff), nil
 }
 
 func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {

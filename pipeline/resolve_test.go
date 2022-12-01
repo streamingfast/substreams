@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -103,39 +104,53 @@ func Test_resolveStartBlockNum(t *testing.T) {
 	}
 }
 
-// TODO rewrite this test for new set of possibilities
-//func Test_computeLiveHandoffBlockNum(t *testing.T) {
-//	tests := []struct {
-//		liveHubAvailable bool
-//		recentBlockNum   uint64
-//		stopBlockNum     uint64
-//		expectHandoffNum uint64
-//		expectError      bool
-//	}{
-//		{true, 100, 0, 100, false},
-//		{true, 100, 150, 100, false},
-//		{true, 100, 50, 50, false},
-//		{false, 0, 50, 50, false},
-//		{false, 0, 0, 0, true},
-//	}
-//
-//	for _, test := range tests {
-//		t.Run("", func(t *testing.T) {
-//			got, err := computeLiveHandoffBlockNum(func() (uint64, error) {
-//				if !test.liveHubAvailable {
-//					return 0, fmt.Errorf("live not available")
-//				}
-//				return test.recentBlockNum, nil
-//			}, test.stopBlockNum)
-//			if test.expectError {
-//				assert.Error(t, err)
-//			} else {
-//				assert.NoError(t, err)
-//				assert.Equal(t, test.expectHandoffNum, got)
-//			}
-//		})
-//	}
-//}
+func Test_computeLiveHandoffBlockNum(t *testing.T) {
+	tests := []struct {
+		liveHubAvailable bool
+		recentBlockNum   uint64
+		prodMode         bool
+		startBlockNum    uint64
+		stopBlockNum     uint64
+		expectHandoffNum uint64
+		expectError      bool
+	}{
+		// prod (start-block ignored)
+		{true, 100, true, 10, 0, 100, false},
+		{true, 100, true, 10, 150, 100, false},
+		{true, 100, true, 10, 50, 50, false},
+		{false, 0, true, 10, 50, 50, false},
+		{false, 0, true, 10, 0, 0, true},
+
+		// non-prod (stop-block ignored)
+		{true, 100, false, 10, 0, 10, false},
+		{true, 100, false, 10, 9999, 10, false},
+		{true, 100, false, 150, 0, 100, false},
+		{true, 100, false, 150, 9999, 100, false},
+		{false, 0, false, 150, 0, 150, false},
+		{false, 0, false, 150, 9999, 150, false},
+	}
+
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			got, err := computeLiveHandoffBlockNum(
+				test.prodMode,
+				test.startBlockNum,
+				test.stopBlockNum,
+				func() (uint64, error) {
+					if !test.liveHubAvailable {
+						return 0, fmt.Errorf("live not available")
+					}
+					return test.recentBlockNum, nil
+				})
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectHandoffNum, got)
+			}
+		})
+	}
+}
 
 func TestBuildRequestDetails(t *testing.T) {
 	req, err := BuildRequestDetails(&pbsubstreams.Request{

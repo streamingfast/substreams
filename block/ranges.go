@@ -82,7 +82,7 @@ func (r Ranges) MergedBuckets(maxBucketSize uint64) (out Ranges) {
 			break
 		}
 
-		if currentRange.Size() > maxBucketSize {
+		if currentRange.Size() >= maxBucketSize-1 {
 			out = append(out, currentRange)
 			continue
 		}

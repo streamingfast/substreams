@@ -64,6 +64,9 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 }
 
 func TestProductionMode_simple(t *testing.T) {
+	// this will generate 2 readyJobs:
+	// 	- setup_test_store_add_i64 [1,10)
+	// 	- assert_test_store_add_i64 [1,10)
 	run := newTestRun(1, 10, 15, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 1
@@ -75,7 +78,7 @@ func TestProductionMode_simple(t *testing.T) {
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 
-func TestProductionMode(t *testing.T) {
+func TestProductionMode_StartBlock_Before_LinearHandoffBlock(t *testing.T) {
 	run := newTestRun(20, 28, 33, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 5
@@ -95,7 +98,7 @@ func TestProductionMode(t *testing.T) {
 	)
 }
 
-func TestProductionMode_a_bit_more_complex(t *testing.T) {
+func TestProductionMode_StartBlock_Same_LinearHandoffBlock(t *testing.T) {
 	run := newTestRun(10, 10, 15, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 1
@@ -107,7 +110,12 @@ func TestProductionMode_a_bit_more_complex(t *testing.T) {
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 
-func TestProductionMode_broken(t *testing.T) {
+func TestProductionMode_StartBlock_Before_LinearBlock_And_FirstBoundary(t *testing.T) {
+	//t.Skip()
+	// this will generate 1 readyJob:
+	// 	- setup_test_store_add_i64 [1, 8)
+	// and 1 waitingJob:
+	// 	- assert_test_store_add_i64 [7, 8)
 	t.Skip()
 	run := newTestRun(7, 8, 10, "assert_test_store_add_i64")
 	run.ProductionMode = true
@@ -120,17 +128,15 @@ func TestProductionMode_broken(t *testing.T) {
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 
-// fixnow
-func TestProductionMode_broken_endless_loop(t *testing.T) {
-	t.Skip()
-	run := newTestRun(10, 11, 12, "assert_test_store_add_i64")
+func TestProductionMode_close_after_boundary(t *testing.T) {
+	run := newTestRun(10, 11, 20, "assert_test_store_add_i64")
 	run.ProductionMode = true
-	run.ParallelSubrequests = 1
+	run.ParallelSubrequests = 5
 
 	require.NoError(t, run.Run(t))
 
 	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 2, strings.Count(mapOutput, "\n"))
+	assert.Equal(t, 10, strings.Count(mapOutput, "\n"))
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 

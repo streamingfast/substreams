@@ -15,6 +15,14 @@ func TestRangeMerged(t *testing.T) {
 
 func TestRangeMergedBuckets(t *testing.T) {
 	assert.Equal(t,
+		ParseRanges("1-10,10-11").String(),
+		ParseRanges("1-10,10-11").MergedBuckets(10).String(),
+	)
+	assert.Equal(t,
+		ParseRanges("1-10,10-12").String(),
+		ParseRanges("1-10,10-12").MergedBuckets(10).String(),
+	)
+	assert.Equal(t,
 		ParseRanges("10-30,30-40,50-70").String(),
 		ParseRanges("10-20,20-30,30-40,50-60,60-70").MergedBuckets(20).String(),
 	)

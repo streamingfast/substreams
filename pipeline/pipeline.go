@@ -106,7 +106,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
 		if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
-			return fmt.Errorf("failed to setup backprocessings: %w", err)
+			return fmt.Errorf("failed to load stores: %w", err)
 		}
 	} else {
 		if storeMap, err = p.runBackProcessAndSetupStores(ctx); err != nil {

@@ -128,7 +128,7 @@ func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (e
 				return nil
 			}
 			if err := s.processJobResult(jobResult); err != nil {
-				return fmt.Errorf("process job result: %w", err)
+				return fmt.Errorf("process job result for target %q: %w", jobResult.job.ModuleName, err)
 			}
 		}
 	}

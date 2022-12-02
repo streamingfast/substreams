@@ -246,7 +246,7 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	logger.Debug("store merge", zap.Object("store", s.store))
 	s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 
-	logger.Info("deleting store", zap.Object("store", nextStore))
+	logger.Info("deleting store", zap.Stringer("store", nextStore))
 	eg.Go(func() error {
 		return nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
 	})

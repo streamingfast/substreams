@@ -45,6 +45,10 @@ func TestWorkUnits_init(t *testing.T) {
 			/* expected: initial progress, covered ranges, partials missing, present */
 			"", "50-60, 60-70, 70-80, 80-90, 90-100", "",
 		),
+		splitTest("simple in-bound of interval", 10,
+			1, "", 11,
+			"", "1-10,10-11", "",
+		),
 		splitTest("nothing to work for, nothing to initialize", 10,
 			55, "", 55,
 			"", "", "",

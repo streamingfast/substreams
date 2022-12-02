@@ -12,25 +12,22 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/metadata"
-
-	"github.com/streamingfast/shutter"
-
-	"github.com/streamingfast/substreams/service"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
 type testRun struct {
@@ -241,7 +238,7 @@ type TestRunner struct {
 	generator TestBlockGenerator
 }
 
-func (r *TestRunner) StreamFactory(h bstream.Handler, startBlockNum int64, stopBlockNum uint64, cursor string) (service.Streamable, error) {
+func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, cursor string) (service.Streamable, error) {
 	r.pipe = h.(*pipeline.Pipeline)
 	r.Shutter = shutter.New()
 	r.generator = r.blockGeneratorFactory(uint64(startBlockNum), stopBlockNum)

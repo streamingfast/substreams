@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.18
+go 1.19
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20221125175206-82e01d420d45
 	github.com/streamingfast/dgrpc v0.0.0-20221031174241-978a7951c117
-	github.com/streamingfast/dstore v0.1.1-0.20221118114203-13f4092e3bf0
+	github.com/streamingfast/dstore v0.1.1-0.20221202183406-47bb9dd9c5e8
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
 	github.com/stretchr/testify v1.8.0
@@ -33,6 +33,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-testing-interface v1.14.1
+	github.com/prometheus/client_golang v1.12.1
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/sf-tracing v0.0.0-20221028154401-fd8a9e72bfc5
 	github.com/streamingfast/shutter v1.5.0
@@ -106,7 +107,6 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect

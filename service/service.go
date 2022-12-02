@@ -4,17 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/tracking"
 	"os"
 	"time"
-
-	"github.com/streamingfast/logging"
-	"github.com/streamingfast/substreams"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/logging"
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -26,6 +24,7 @@ import (
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
+	"github.com/streamingfast/substreams/tracking"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -141,11 +140,12 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	logger := reqctx.Logger(ctx).Named(loggerName)
 	respFunc := responseHandler(logger, streamSrv)
 
-	bytesMeter := tracking.NewBytesMeter()
-	bytesMeter.Launch(ctx, respFunc)
-
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
+
+	bytesMeter := tracking.NewBytesMeter(ctx)
+	bytesMeter.Launch(ctx, respFunc)
+
 	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
@@ -154,12 +154,14 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
+	s.runtimeConfig.BaseObjectStore.SetMeter(tracking.GetBytesMeter(ctx))
+
 	runtimeConfig := config.NewRuntimeConfig(
 		s.runtimeConfig.StoreSnapshotsSaveInterval,
 		s.runtimeConfig.ExecOutputSaveInterval,
 		s.runtimeConfig.SubrequestsSplitSize,
 		s.runtimeConfig.ParallelSubrequests,
-		tracking.NewMeteredStore(ctx, s.runtimeConfig.BaseObjectStore),
+		s.runtimeConfig.BaseObjectStore,
 		s.runtimeConfig.WorkerFactory,
 	)
 	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
@@ -285,7 +287,9 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 			zap.Uint64("stop_block", request.StopBlockNum),
 			zap.String("cursor", cursor),
 		)
+
 		blockStream, err := s.streamFactoryFunc(
+			ctx,
 			pipe,
 			int64(requestDetails.LinearHandoffBlockNum),
 			request.StopBlockNum,

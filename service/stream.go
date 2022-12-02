@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/tracking"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -16,12 +18,12 @@ type StreamFactory struct {
 }
 
 func (sf *StreamFactory) New(
+	ctx context.Context,
 	h bstream.Handler,
 	startBlockNum int64,
 	stopBlockNum uint64,
 	cursor string,
 ) (Streamable, error) {
-
 	options := []stream.Option{
 		stream.WithStopBlock(stopBlockNum),
 		stream.WithCustomStepTypeFilter(bstream.StepsAll), // substreams always wants new, undo, new+irreversible, irreversible, stalled
@@ -34,6 +36,12 @@ func (sf *StreamFactory) New(
 		}
 
 		options = append(options, stream.WithCursor(cur))
+	}
+
+	bytesMeter := tracking.GetBytesMeter(ctx)
+	if bytesMeter != nil {
+		sf.mergedBlocksStore.SetMeter(bytesMeter)
+		sf.forkedBlocksStore.SetMeter(bytesMeter)
 	}
 
 	return stream.New(

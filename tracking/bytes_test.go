@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"errors"
+	"go.uber.org/zap"
 	"testing"
 
 	"github.com/streamingfast/substreams"
@@ -49,6 +50,8 @@ func TestBytesMeter_AddBytesRead(t *testing.T) {
 			b := &bytesMeter{
 				bytesWritten: tt.fields.bytesWritten,
 				bytesRead:    tt.fields.bytesRead,
+
+				logger: zap.NewNop(),
 			}
 			b.AddBytesRead(tt.args.n)
 			actual := b.bytesRead
@@ -97,6 +100,8 @@ func TestBytesMeter_AddBytesWritten(t *testing.T) {
 			b := &bytesMeter{
 				bytesWritten: tt.fields.bytesWritten,
 				bytesRead:    tt.fields.bytesRead,
+
+				logger: zap.NewNop(),
 			}
 			b.AddBytesWritten(tt.args.n)
 			actual := b.bytesWritten
@@ -141,6 +146,8 @@ func TestBytesMeter_Send(t *testing.T) {
 			b := &bytesMeter{
 				bytesWritten: tt.fields.bytesWritten,
 				bytesRead:    tt.fields.bytesRead,
+
+				logger: zap.NewNop(),
 			}
 
 			var resps []*pbsubstreams.Response

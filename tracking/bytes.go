@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type BytesMeter interface {
@@ -26,11 +28,31 @@ type bytesMeter struct {
 	bytesWritten uint64
 	bytesRead    uint64
 
-	mu sync.RWMutex
+	mu     sync.RWMutex
+	logger *zap.Logger
 }
 
-func NewBytesMeter() BytesMeter {
-	return &bytesMeter{}
+func NewBytesMeter(ctx context.Context) BytesMeter {
+	return &bytesMeter{
+		logger: reqctx.Logger(ctx),
+	}
+}
+
+func (b *bytesMeter) String() string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return fmt.Sprintf("bytes written: %d, bytes read: %d", b.bytesWritten, b.bytesRead)
+}
+
+func (b *bytesMeter) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	enc.AddUint64("bytes_written", b.bytesWritten)
+	enc.AddUint64("bytes_read", b.bytesRead)
+
+	return nil
 }
 
 func (b *bytesMeter) Start(ctx context.Context, respFunc substreams.ResponseFunc) {
@@ -53,6 +75,10 @@ func (b *bytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFun
 }
 
 func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
+	defer func() {
+		b.logger.Info("bytes meter", zap.Object("bytes_meter", b))
+	}()
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 

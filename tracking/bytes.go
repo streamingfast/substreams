@@ -61,7 +61,7 @@ func (b *bytesMeter) Start(ctx context.Context, respFunc substreams.ResponseFunc
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(1 * time.Second):
+		case <-time.After(5 * time.Second):
 			err := b.Send(respFunc)
 			if err != nil {
 				logger.Error("unable to send bytes meter", zap.Error(err))

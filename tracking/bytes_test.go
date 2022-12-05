@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"context"
 	"errors"
 	"go.uber.org/zap"
 	"testing"
@@ -159,7 +160,7 @@ func TestBytesMeter_Send(t *testing.T) {
 				return nil
 			})
 
-			err := b.Send(testRespFunc)
+			err := b.Send(context.TODO(), testRespFunc)
 			require.Equal(t, len(resps), tt.requiredMsgs)
 			require.Equal(t, err, tt.requiredErr)
 		})

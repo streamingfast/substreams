@@ -83,7 +83,7 @@ func New(
 	}
 
 	zlog.Info("registering substreams metrics")
-	metrics.Metricset.Register()
+	metrics.MetricSet.Register()
 
 	for _, opt := range opts {
 		opt(s)
@@ -143,11 +143,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
-	bytesMeter := tracking.NewBytesMeter(ctx)
-	bytesMeter.Launch(ctx, respFunc)
-
-	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
-
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
 
@@ -195,6 +190,10 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	}
 
 	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, isSubRequest)
+
+	bytesMeter := tracking.NewBytesMeter(ctx)
+	bytesMeter.Launch(ctx, respFunc)
+	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	logger.Debug("executing subrequest",
 		zap.Strings("output_modules", request.OutputModules),

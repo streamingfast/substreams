@@ -20,8 +20,11 @@ type BytesMeter interface {
 	BytesWritten() uint64
 	BytesRead() uint64
 
+	BytesWrittenDelta() uint64
+	BytesReadDelta() uint64
+
 	Launch(ctx context.Context, respFunc substreams.ResponseFunc)
-	Send(respFunc substreams.ResponseFunc) error
+	Send(ctx context.Context, respFunc substreams.ResponseFunc) error
 }
 
 type bytesMeter struct {
@@ -69,8 +72,8 @@ func (b *bytesMeter) Start(ctx context.Context, respFunc substreams.ResponseFunc
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(5 * time.Second):
-			err := b.Send(respFunc)
+		case <-time.After(1 * time.Second):
+			err := b.Send(ctx, respFunc)
 			if err != nil {
 				logger.Error("unable to send bytes meter", zap.Error(err))
 			}
@@ -91,10 +94,11 @@ func (b *bytesMeter) resetDeltas() {
 	b.lastTime = time.Now()
 }
 
-func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
+func (b *bytesMeter) Send(ctx context.Context, respFunc substreams.ResponseFunc) error {
 	defer func() {
-		b.logger.Info("bytes meter", zap.Object("bytes_meter", b))
-		b.resetDeltas()
+		stats := reqctx.ReqStats(ctx)
+		stats.RecordBytesWritten(b.BytesWrittenDelta())
+		stats.RecordBytesRead(b.BytesReadDelta())
 	}()
 
 	b.mu.RLock()
@@ -178,7 +182,11 @@ func (_ *noopBytesMeter) AddBytesWritten(n int)                                 
 func (_ *noopBytesMeter) AddBytesRead(n int)                                           { return }
 func (_ *noopBytesMeter) BytesWritten() uint64                                         { return 0 }
 func (_ *noopBytesMeter) BytesRead() uint64                                            { return 0 }
+func (_ *noopBytesMeter) BytesWrittenDelta() uint64                                    { return 0 }
+func (_ *noopBytesMeter) BytesReadDelta() uint64                                       { return 0 }
 func (_ *noopBytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFunc) {}
-func (_ *noopBytesMeter) Send(respFunc substreams.ResponseFunc) error                  { return nil }
+func (_ *noopBytesMeter) Send(ctx context.Context, respFunc substreams.ResponseFunc) error {
+	return nil
+}
 
 var NoopBytesMeter BytesMeter = &noopBytesMeter{}

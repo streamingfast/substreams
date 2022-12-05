@@ -49,7 +49,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 
 	p.execOutputCache.Close()
 
-	if err := bytesMeter.Send(p.respFunc); err != nil {
+	if err := bytesMeter.Send(ctx, p.respFunc); err != nil {
 		return fmt.Errorf("sending bytes meter %w", err)
 	}
 

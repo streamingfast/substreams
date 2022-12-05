@@ -39,7 +39,8 @@ type bytesMeter struct {
 
 func NewBytesMeter(ctx context.Context) BytesMeter {
 	return &bytesMeter{
-		logger: reqctx.Logger(ctx),
+		logger:   reqctx.Logger(ctx),
+		lastTime: time.Now(),
 	}
 }
 
@@ -96,8 +97,8 @@ func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
 		b.resetDeltas()
 	}()
 
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 
 	var in []*pbsubstreams.ModuleProgress
 
@@ -107,6 +108,9 @@ func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
 			ProcessedBytes: &pbsubstreams.ModuleProgress_ProcessedBytes{
 				TotalBytesWritten: b.bytesWritten,
 				TotalBytesRead:    b.bytesRead,
+				BytesWrittenDelta: b.bytesWrittenDelta,
+				BytesReadDelta:    b.bytesReadDelta,
+				NanoSecondsDelta:  uint64(time.Since(b.lastTime).Nanoseconds()),
 			},
 		},
 	})
@@ -152,6 +156,20 @@ func (b *bytesMeter) BytesRead() uint64 {
 	defer b.mu.RUnlock()
 
 	return b.bytesRead
+}
+
+func (b *bytesMeter) BytesWrittenDelta() uint64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.bytesWrittenDelta
+}
+
+func (b *bytesMeter) BytesReadDelta() uint64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.bytesReadDelta
 }
 
 type noopBytesMeter struct{}

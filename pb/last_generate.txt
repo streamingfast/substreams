@@ -1,2 +1,2 @@
-generate.sh - Fri Nov 25 13:58:53 EST 2022 - eduardvoiculescu
-streamingfast/proto revision: 39f36fab0d2404f1397d2a65479d15c9e0680277
+generate.sh - Mon Dec  5 10:39:55 EST 2022 - colindickson
+streamingfast/proto revision: e9ba676dc7d93fc10586b8ff6b5dc99840b25eac

@@ -137,6 +137,9 @@ message ModuleProgress {
   message ProcessedBytes {
     uint64 total_bytes_read = 1;
     uint64 total_bytes_written = 2;
+    uint64 bytes_read_delta = 3;
+    uint64 bytes_written_delta = 4;
+    uint64 nano_seconds_delta = 5;
   }
   message Failed {
     string reason = 1;

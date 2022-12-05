@@ -28,6 +28,11 @@ type bytesMeter struct {
 	bytesWritten uint64
 	bytesRead    uint64
 
+	bytesWrittenDelta uint64
+	bytesReadDelta    uint64
+
+	lastTime time.Time
+
 	mu     sync.RWMutex
 	logger *zap.Logger
 }
@@ -49,9 +54,11 @@ func (b *bytesMeter) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	enc.AddUint64("bytes_written", b.bytesWritten)
-	enc.AddUint64("bytes_read", b.bytesRead)
-
+	enc.AddUint64("total_bytes_written", b.bytesWritten)
+	enc.AddUint64("bytes_written_delta", b.bytesWrittenDelta)
+	enc.AddUint64("total_bytes_read", b.bytesRead)
+	enc.AddUint64("bytes_read_delta", b.bytesReadDelta)
+	enc.AddDuration("time_delta", time.Since(b.lastTime))
 	return nil
 }
 
@@ -74,13 +81,23 @@ func (b *bytesMeter) Launch(ctx context.Context, respFunc substreams.ResponseFun
 	go b.Start(ctx, respFunc)
 }
 
+func (b *bytesMeter) resetDeltas() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.bytesWrittenDelta = 0
+	b.bytesReadDelta = 0
+	b.lastTime = time.Now()
+}
+
 func (b *bytesMeter) Send(respFunc substreams.ResponseFunc) error {
 	defer func() {
 		b.logger.Info("bytes meter", zap.Object("bytes_meter", b))
+		b.resetDeltas()
 	}()
 
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	var in []*pbsubstreams.ModuleProgress
 
@@ -111,6 +128,7 @@ func (b *bytesMeter) AddBytesWritten(n int) {
 		panic("negative value")
 	}
 
+	b.bytesWrittenDelta += uint64(n)
 	b.bytesWritten += uint64(n)
 }
 
@@ -118,6 +136,7 @@ func (b *bytesMeter) AddBytesRead(n int) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	b.bytesReadDelta += uint64(n)
 	b.bytesRead += uint64(n)
 }
 

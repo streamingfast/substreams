@@ -25,12 +25,12 @@ func TestBoundedRange_computeInitialBounds(t *testing.T) {
 		{
 			"after init block, start off bound",
 			fields{8, 12, 20},
-			"12-20",
+			"10-20", // fixme: simple solution for the production-mode issue
 		},
 		{
 			"range below interval",
 			fields{8, 12, 18},
-			"12-18",
+			"10-18", // fixme: simple solution for the production-mode issue
 		},
 		{
 			"below module init block",

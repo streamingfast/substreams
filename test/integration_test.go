@@ -64,9 +64,6 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 }
 
 func TestProductionMode_simple(t *testing.T) {
-	// this will generate 2 readyJobs:
-	// 	- setup_test_store_add_i64 [1,10)
-	// 	- assert_test_store_add_i64 [1,10)
 	run := newTestRun(1, 10, 15, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 1
@@ -111,12 +108,6 @@ func TestProductionMode_StartBlock_Same_LinearHandoffBlock(t *testing.T) {
 }
 
 func TestProductionMode_StartBlock_Before_LinearBlock_And_FirstBoundary(t *testing.T) {
-	//t.Skip()
-	// this will generate 1 readyJob:
-	// 	- setup_test_store_add_i64 [1, 8)
-	// and 1 waitingJob:
-	// 	- assert_test_store_add_i64 [7, 8)
-	t.Skip()
 	run := newTestRun(7, 8, 10, "assert_test_store_add_i64")
 	run.ProductionMode = true
 	run.ParallelSubrequests = 1
@@ -124,7 +115,7 @@ func TestProductionMode_StartBlock_Before_LinearBlock_And_FirstBoundary(t *testi
 	require.NoError(t, run.Run(t))
 
 	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 3, strings.Count(mapOutput, "\n"))
+	assert.Equal(t, 9, strings.Count(mapOutput, "\n"))
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 

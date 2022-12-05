@@ -201,7 +201,6 @@ func (ui *TUI) formatPostDataProgress(msg *pbsubstreams.Response_Progress) {
 	for _, mod := range msg.Progress.Modules {
 		switch progMsg := mod.Type.(type) {
 		case *pbsubstreams.ModuleProgress_ProcessedRanges:
-			fmt.Println("debug: still processing ranges after data?")
 		case *pbsubstreams.ModuleProgress_InitialState_:
 		case *pbsubstreams.ModuleProgress_ProcessedBytes_:
 		case *pbsubstreams.ModuleProgress_Failed_:

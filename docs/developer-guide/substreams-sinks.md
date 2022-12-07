@@ -2,13 +2,15 @@
 
 ## **Introduction**
 
-Blockchain data captured with Substreams can be persisted in databases and other types of storage. Working under the StreamingFasst methodology of development the databases are referred to as “sinks.”
+Substreams is compatable with a handful of database technologies. StreamingFast provides tools and practices for developers wishing to persist blockchain data to a relational, flat or object oriented database. The StreamingFasst methodology of development referes to databases as “sinks.”
 
-Creating a solution to persist Substreams data consists of setting up a standard Substreams project with the addition of setting up the database environment, writing a schema to match the data output by Substreams, and running a specialized sink tool provided by StreamingFast. Sink tools are currently available for PostgreSQL, MongoDB, and file-based persistence.
+Substreams data persistence solutions consists of a standard Substreams project with the addition of a database environment, and a schema to match the data output by Substreams. Specialized sink tools provided by StreamingFast assit Substreams developers wishing to persit blockchain data. Sink tools are currently available for PostgreSQL, MongoDB, and file-based persistence.
 
 ## **Substreams Sink Basics**
 
-Substreams developers author Rust-based modules that extract targeted blockchain data for persistence into a database. Additional information and example code for creating and working with standard Substreams modules are available in the documentation. An understanding of basic Substreams fundamentals is suggested before continuing.
+Substreams developers author Rust-based modules that extract targeted blockchain data for persistence into a database. Additional information and example code for creating and working with standard Substreams modules is available in the documentation. An understanding of basic Substreams fundamentals is suggested before continuing. Learn more about modules basics in the Substreams documentation at the following link.
+
+https://substreams.streamingfast.io/concept-and-fundamentals/modules
 
 An important consideration is the structure of the extracted information in the Substreams modules. There is a direct mapping between the structure of the database tables, their fields, and the structure of the data formed in the Substreams modules.
 
@@ -55,22 +57,37 @@ The following code snippets illustrate an extremely simple database table schema
 
 **Basic Rust data structure from Substreams map module example**
 
-    BlockMeta {
-    number: blk.number,
-    hash: blk.hash,
-    parent_hash: header.parent_hash,
-    },
+```rust
+BlockMeta {
+number: blk.number,
+hash: blk.hash,
+parent_hash: header.parent_hash,
+},
+```
 
 **Basic table schema definition for PostgreSQL matching map module data**
 
-    create table block_meta
-    (
-    id  text not null constraint block_meta_pk primary key,
-    at  text,
-    number  integer,
-    hash  text,
-    parent_hash text,
-    );
+```
+create table block_meta
+(
+id text not null constraint block_meta_pk primary key,
+at text,
+number integer,
+hash text,
+parent_hash text,
+);
+```
+
+The prefered naming convention for the module that's used to transfer data to a database states that the map is named "db_out." As previously mentioned, the type needs to be proto:substreams.database.v1.DatabaseChanges. The following snippet taken from a Substreams manifest illustrates the proper naming conventions and format.
+
+**Example Substreams Sink Enabled Manifest**
+
+```
+ - name: db_out
+    kind: map
+    output:
+      type: proto:substreams.database.v1.DatabaseChanges
+```
 
 Database types currently supported by Substreams sink solutions include INTEGER, DOUBLE, BOOLEAN, TIMESTAMP, NULL. DATE, and STRING.
 

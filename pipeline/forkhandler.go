@@ -10,12 +10,13 @@ import (
 type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.ModuleOutput)
 
 // TODO(abourget): The scope of this object and the Engine
-//  are not pretty similar, to keep track of certain pieces
-//  of info that are reversible, and handle the back and forth
-//  between undos and redos.
-//  Perhaps what we could have here, is have those undo handlers
-//  live on the Pipeline (where it makes sense)
-//  and have some nested structs handle
+//
+//	are not pretty similar, to keep track of certain pieces
+//	of info that are reversible, and handle the back and forth
+//	between undos and redos.
+//	Perhaps what we could have here, is have those undo handlers
+//	live on the Pipeline (where it makes sense)
+//	and have some nested structs handle
 type ForkHandler struct {
 	reversibleOutputs map[uint64][]*pbsubstreams.ModuleOutput
 	undoHandlers      []UndoHandler
@@ -36,10 +37,13 @@ func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 	respFunc func(resp *pbsubstreams.Response) error,
+	sendOutputs bool,
 ) error {
 	if moduleOutputs, found := f.reversibleOutputs[clock.Number]; found {
-		if err := returnModuleDataOutputs(clock, bstream.StepUndo, cursor, moduleOutputs, respFunc); err != nil {
-			return fmt.Errorf("calling return func when reverting outputs: %w", err)
+		if sendOutputs {
+			if err := returnModuleDataOutputs(clock, bstream.StepUndo, cursor, moduleOutputs, respFunc); err != nil {
+				return fmt.Errorf("calling return func when reverting outputs: %w", err)
+			}
 		}
 
 		for _, h := range f.undoHandlers {

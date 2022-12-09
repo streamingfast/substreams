@@ -50,6 +50,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	)
 
 	reqStats.RecordBlock(block.AsRef())
+	p.gate.processBlock(block.Number, step)
 	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
 		p.runPostJobHooks(ctx, clock)
 		return err // watch out, io.EOF needs to go through undecorated
@@ -71,7 +72,7 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		}
 
 	case bstream.StepNew:
-		err := p.handlerStepNew(ctx, block, clock, cursor, step)
+		err := p.handlerStepNew(ctx, block, clock, cursor)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
@@ -79,7 +80,7 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 			eof = true
 		}
 	case bstream.StepNewIrreversible:
-		err := p.handlerStepNew(ctx, block, clock, cursor, step)
+		err := p.handlerStepNew(ctx, block, clock, cursor)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
 		}
@@ -111,8 +112,13 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
+	if p.gate.shouldSendSnapshot() {
+		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
+			return fmt.Errorf("send initial snapshots: %w", err)
+		}
+	}
 	p.execOutputCache.HandleUndo(clock)
-	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc); err != nil {
+	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc, p.gate.shouldSendOutputs()); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 	return nil
@@ -127,7 +133,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) error {
+func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.Request.StopBlockNum) {
 		return io.EOF
@@ -137,13 +143,10 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
-	sendOutput := shouldReturnDataOutputs(clock.Number, reqDetails.RequestStartBlockNum, reqDetails.IsSubRequest)
-
-	if sendOutput && !p.snapshotSent {
+	if p.gate.shouldSendSnapshot() {
 		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
 			return fmt.Errorf("send initial snapshots: %w", err)
 		}
-		p.snapshotSent = true
 	}
 
 	logger := reqctx.Logger(ctx)
@@ -166,10 +169,9 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 		}
 	}
 
-	if sendOutput {
+	if p.gate.shouldSendOutputs() {
 		logger.Debug("will return module outputs")
-
-		if err = returnModuleDataOutputs(clock, step, cursor, p.moduleOutputs, p.respFunc); err != nil {
+		if err = returnModuleDataOutputs(clock, bstream.StepNew, cursor, p.moduleOutputs, p.respFunc); err != nil {
 			return fmt.Errorf("failed to return module data output: %w", err)
 		}
 	}

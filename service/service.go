@@ -278,8 +278,9 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	var streamErr error
 	if requestDetails.LinearHandoffBlockNum != request.StopBlockNum {
 		cursor := request.StartCursor
+		var cursorIsTarget bool
 		if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
-			cursor = ""
+			cursorIsTarget = true
 		}
 		logger.Info("creating firehose stream",
 			zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
@@ -293,6 +294,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 			int64(requestDetails.LinearHandoffBlockNum),
 			request.StopBlockNum,
 			cursor,
+			cursorIsTarget,
 		)
 		if err != nil {
 			return fmt.Errorf("error getting stream: %w", err)

@@ -47,7 +47,7 @@ type Pipeline struct {
 	execoutStorage *execout.Configs
 	partialStores  []*backprocessingStore
 
-	snapshotSent bool
+	gate *gate
 
 	forkHandler     *ForkHandler
 	execOutputCache *cache.Engine
@@ -70,6 +70,7 @@ func New(
 ) *Pipeline {
 	pipe := &Pipeline{
 		ctx:             ctx,
+		gate:            newGate(ctx),
 		execOutputCache: execOutputCache,
 		runtimeConfig:   runtimeConfig,
 		outputGraph:     outputGraph,
@@ -261,14 +262,6 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	return nil
 }
 
-func shouldReturnDataOutputs(blockNum, requestStartBlockNum uint64, isSubRequest bool) bool {
-	return shouldReturn(blockNum, requestStartBlockNum) && !isSubRequest
-}
-
-func shouldReturn(blockNum, requestStartBlockNum uint64) bool {
-	return blockNum >= requestStartBlockNum
-}
-
 func (p *Pipeline) appendModuleOutputs(moduleOutput *pbsubstreams.ModuleOutput) {
 	if moduleOutput != nil {
 		p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
@@ -402,4 +395,56 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 		}
 	}
 	return out, nil
+}
+
+func newGate(ctx context.Context) *gate {
+	reqDetails := reqctx.Details(ctx)
+	return &gate{
+		disabled:             reqDetails.IsSubRequest,
+		requestStartBlockNum: reqDetails.RequestStartBlockNum,
+	}
+}
+
+type gate struct {
+	requestStartBlockNum uint64
+	disabled             bool
+	passed               bool
+	snapshotSent         bool
+}
+
+func (g *gate) processBlock(blockNum uint64, step bstream.StepType) {
+	if g.disabled || g.passed {
+		return
+	}
+
+	if blockTriggersGate(blockNum, g.requestStartBlockNum, step) {
+		g.passed = true
+	}
+
+}
+
+func (g *gate) shouldSendSnapshot() bool {
+	if g.snapshotSent {
+		return false
+	}
+
+	if g.passed {
+		g.snapshotSent = true
+		return true
+	}
+	return false
+}
+
+func (g *gate) shouldSendOutputs() bool {
+	return g.passed
+}
+
+func blockTriggersGate(blockNum, requestStartBlockNum uint64, step bstream.StepType) bool {
+	if step.Matches(bstream.StepNew) {
+		return blockNum >= requestStartBlockNum
+	}
+	if step.Matches(bstream.StepUndo) {
+		return blockNum+1 == requestStartBlockNum //  FIXME undo case will require additional previousBlock in cursor
+	}
+	return false
 }

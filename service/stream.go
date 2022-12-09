@@ -23,6 +23,7 @@ func (sf *StreamFactory) New(
 	startBlockNum int64,
 	stopBlockNum uint64,
 	cursor string,
+	cursorIsTarget bool,
 ) (Streamable, error) {
 	options := []stream.Option{
 		stream.WithStopBlock(stopBlockNum),
@@ -34,8 +35,11 @@ func (sf *StreamFactory) New(
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid start cursor %q: %s", cursor, err)
 		}
-
-		options = append(options, stream.WithCursor(cur))
+		if cursorIsTarget {
+			options = append(options, stream.WithTargetCursor(cur))
+		} else {
+			options = append(options, stream.WithCursor(cur))
+		}
 	}
 
 	bytesMeter := tracking.GetBytesMeter(ctx)

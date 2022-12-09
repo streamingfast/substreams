@@ -238,7 +238,7 @@ type TestRunner struct {
 	generator TestBlockGenerator
 }
 
-func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, cursor string) (service.Streamable, error) {
+func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, cursor string, _ bool) (service.Streamable, error) {
 	r.pipe = h.(*pipeline.Pipeline)
 	r.Shutter = shutter.New()
 	r.generator = r.blockGeneratorFactory(uint64(startBlockNum), stopBlockNum)

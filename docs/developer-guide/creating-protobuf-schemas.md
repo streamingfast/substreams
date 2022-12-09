@@ -35,6 +35,7 @@ Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/
 {% endhint %}
 
 {% code title="eth/erc721/v1/erc721.proto" lineNumbers="true" %}
+
 ```protobuf
 syntax = "proto3";
 
@@ -52,6 +53,7 @@ message Transfer {
   uint64 ordinal = 5;
 }
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -87,9 +89,11 @@ The Substreams CLI is used to generate the associated Rust code for the protobuf
 {% endhint %}
 
 {% code overflow="wrap" %}
+
 ```bash
 substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"
 ```
+
 {% endcode %}
 
 The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)``
@@ -97,13 +101,31 @@ The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://gi
 The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
 {% code title="src/pb/mod.rs" %}
+
 ```rust
 #[path = "eth.erc721.v1.rs"]
 #[allow(dead_code)]
 pub mod erc721;
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
+
+### Protobuf & Rust Optional Fields
+
+Fields in Protocol Buffer messages are optional by default. Each field in a Protocol Buffer message has a default value of `None`, indicating that the field has not been populated with any data.
+
+Prost generates Rust code that uses the `Option` type for each field in the Protocol Buffer message. The `Option` type is used to represent the absence of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
+
+Additional information is available for `prost` in its official GitHub repository.
+
+[https://github.com/tokio-rs/prost](https://github.com/tokio-rs/prost)
+
+Learn more about Rust Option in the offical documentation.
+
+[https://doc.rust-lang.org/rust-by-example/std/option.html](https://doc.rust-lang.org/rust-by-example/std/option.html)
+
+[https://doc.rust-lang.org/std/option/](https://doc.rust-lang.org/std/option/)

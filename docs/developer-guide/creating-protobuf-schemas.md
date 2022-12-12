@@ -118,7 +118,7 @@ View this file in the repo by visiting the following link.
 
 Each field in a Protocol Buffer message are optional by default. Each field in a Protocol Buffer message needs a default value, this indicates that the field has not been populated with any data.
 
-For each field that are reference to other Protocol Buffer message types, Prost generates Rust code that uses the `Option` enum . The `Option` enum is used to represent the absence of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
+For each field that are reference to other Protocol Buffer message types, Prost generates Rust code that uses the `Option` enum. The `Option` enum is used to represent the absence of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
 
 Additional information is available for `prost` in its [official GitHub repository](https://github.com/tokio-rs/prost).
 

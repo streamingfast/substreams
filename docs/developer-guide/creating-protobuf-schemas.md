@@ -122,8 +122,4 @@ For each field that are reference to other Protocol Buffer message types, Prost 
 
 Additional information is available for `prost` in its [official GitHub repository](https://github.com/tokio-rs/prost).
 
-Learn more about Rust Option in the offical documentation.
-
-[https://doc.rust-lang.org/rust-by-example/std/option.html](https://doc.rust-lang.org/rust-by-example/std/option.html)
-
-[https://doc.rust-lang.org/std/option/](https://doc.rust-lang.org/std/option/)
+Learn more about Rust Option[Rust Option](https://doc.rust-lang.org/rust-by-example/std/option.html) in the offical documentation.

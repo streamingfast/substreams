@@ -12,6 +12,7 @@ import (
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
@@ -33,7 +34,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	grpccode "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -139,6 +139,14 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 	logger := reqctx.Logger(ctx).Named(loggerName)
 	respFunc := responseHandler(logger, streamSrv)
+
+	respFunc(&pbsubstreams.Response{
+		Message: &pbsubstreams.Response_Session{
+			Session: &pbsubstreams.SessionInit{
+				TraceId: tracing.GetTraceID(ctx).String(),
+			},
+		},
+	})
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
@@ -311,9 +319,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 
 func (s *Service) buildPipelineOptions(ctx context.Context, request *pbsubstreams.Request) (opts []pipeline.Option) {
 	for _, pipeOpts := range s.pipelineOptions {
-		for _, opt := range pipeOpts.PipelineOptions(ctx, request) {
-			opts = append(opts, opt)
-		}
+		opts = append(opts, pipeOpts.PipelineOptions(ctx, request)...)
 	}
 	return
 }
@@ -352,7 +358,7 @@ func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
 		partialMode := md.Get("substreams-partial-mode")
 		if len(partialMode) == 1 && partialMode[0] == "true" {
 			if !s.partialModeEnabled {
-				return false, status.Error(grpccode.InvalidArgument, "substreams-partial-mode not enabled on this instance")
+				return false, status.Error(codes.InvalidArgument, "substreams-partial-mode not enabled on this instance")
 			}
 			return true, nil
 		}

@@ -13,7 +13,7 @@ builds:
     #- linux_amd64
     - darwin_amd64
     - darwin_arm64
-    ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    ldflags: -s -w -X main.version={{.Version}} -X
     main: ./cmd/substreams
     binary: substreams
     env:

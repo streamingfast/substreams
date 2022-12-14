@@ -2,20 +2,20 @@ package main
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 )
-
-// Commit sha1 value, injected via go build `ldflags` at build time
-var commit = ""
 
 // Version value, injected via go build `ldflags` at build time
 var version = "dev"
 
-// Date value, injected via go build `ldflags` at build time
-var date = ""
-
 func main() {
-	rootCmd.Version = computeVersionString(version, commit, date)
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		panic("we should have been able to retrieve info from 'runtime/debug#ReadBuildInfo'")
+	}
+
+	rootCmd.Version = computeVersionString(version, info.Settings)
 	setup()
 
 	if err := rootCmd.Execute(); err != nil {
@@ -23,7 +23,10 @@ func main() {
 	}
 }
 
-func computeVersionString(version, commit, date string) string {
+func computeVersionString(version string, settings []debug.BuildSetting) string {
+	commit := findSetting("vcs.revision", settings)
+	date := findSetting("vcs.time", settings)
+
 	var labels []string
 	if len(commit) >= 7 {
 		labels = append(labels, fmt.Sprintf("Commit %s", commit[0:7]))
@@ -38,4 +41,14 @@ func computeVersionString(version, commit, date string) string {
 	}
 
 	return fmt.Sprintf("%s (%s)", version, strings.Join(labels, ", "))
+}
+
+func findSetting(key string, settings []debug.BuildSetting) (value string) {
+	for _, setting := range settings {
+		if setting.Key == key {
+			return setting.Value
+		}
+	}
+
+	return ""
 }

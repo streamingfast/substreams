@@ -2,25 +2,43 @@
 
 ## **Introduction**
 
-Substreams is compatable with a handful of database technologies. StreamingFast provides tools and practices for developers wishing to persist blockchain data to a relational, flat or object oriented database. The StreamingFasst methodology of development referes to databases as “sinks.”
+The data captured from a blockchain with Substreams can be routed to multiple types of sinks. A sink is an end container to house the data acquired. Examples are a database, Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data can be routed anywhere a developer can imagine.
 
-Substreams data persistence solutions consists of a standard Substreams project with the addition of a database environment, and a schema to match the data output by Substreams. Specialized sink tools provided by StreamingFast assit Substreams developers wishing to persit blockchain data. Sink tools are currently available for PostgreSQL, MongoDB, and file-based persistence.
+StreamingFast provides a few examples, libraries, and tools to assist Substreams developers with routing blockchain data to sinks.
 
-## **Substreams Sink Basics**
+## **Basics**
 
-Substreams developers author Rust-based modules that extract targeted blockchain data for persistence into a database. Additional information and example code for creating and working with standard Substreams modules is available in the documentation. An understanding of basic Substreams fundamentals is suggested before continuing. Learn more about modules basics in the Substreams documentation at the following link.
+Data captured and processed by Substreams can be stored in many different ways through sinks. A Substreams developer’s imagination is really the only limitation. Immediate and typical storage types could be a database or flat files however Substreams data can be piped into other desired locations required by a new or existing application or architecture.
+
+An important design aspect of Substreams is the deciiosn to rely on Google Protocol Buffers, or protobufs, for data packaging and transmission. Protobufs provide a data-centric, technology stack and languages agnostic approach to working with data that is passed from one application to another. The application-agnostic capabilities of protobufs give developers the opportunity to package and route data captured by Substreams to other sources, including sinks.
+
+## **General Requirements**
+
+One of the critical steps involved is the creation of a protobuf that forms data to meet the requirements of a sink. The protobuf is populated with blockchain data captured in a Substreams module and then used as output. Existing sink solutions, such as PostgreSQL, provided by StreamingFast, demonstrate this functionality. It’s important to note that databases are merely one type of sink.
+
+The consuming application, or code, can read protobuf-based data being sent out of Substreams. Protobufs are flexible and the expectations of the consuming application can be matched closely with mindful data design. Substreams will send the data through a map module using a protobuf defined by the developer. The data is then consumed by another application that will route the data to the desired location, or sink.
+
+An understanding of basic Substreams fundamentals is suggested before continuing. Learn more about modules basics in the Substreams documentation at the following link.
 
 https://substreams.streamingfast.io/concept-and-fundamentals/modules
 
-An important consideration is the structure of the extracted information in the Substreams modules. There is a direct mapping between the structure of the database tables, their fields, and the structure of the data formed in the Substreams modules.
+## **Existing & Commnuity Sinks**
 
-Using the example code, tooling, and following the prescription provided in the documentation is the best path to getting up and running with Substreams and database persistence.
+StreamingFast values external contributions for Substreams sinks. If your team has created a sink, please reach so we can add it to the documentation!
 
-## Sink Project Structure & Requirements
+## **Build a Sink**
 
-Persisting data extracted from the blockchain using Substreams to a database is a straightforward process, with a few caveats. Substreams developers must follow specific patterns and practices outlined in this documentation and the associated example.
+StreamingFast provides tools allowing developers to route blockchain data to a few different types of data storage sinks, or means of ingestion. The types of sinks with tools provided by StreamingFast aren’t the only options for Substreams developers. Existing applications, databases, and other tools can be fed by blockchain data captured and output by Substreams.
 
-## Substreams Sink Tools
+Developers can examine the StreamingFast sink tools to see examples of how protobuf-based data from Substreams can be used with other approaches. One example could be a database, such as Oracle, that doesn’t currently have tools in place. As mentioned, databases are only one example of where Substreams data can be routed. Developers should be able to review the PostgreSQL tool and its codebase to begin to understand how to construct their own data-sinking solution.
+
+Reiterating from above, protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store the Substreams data in a myriad of different capacities.
+
+Through careful design of the Substreams manifest, modules, and protobufs developers can craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules. Developers need to examine and account for the format and any requirements of the end target they want their data routed. The specifics of how data is ingested by the targeted sink will determine the design of the output from Substreams.
+
+The substreams-eth-block-meta example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
+
+https://github.com/streamingfast/substreams-eth-block-meta
 
 StreamingFast provides several tools to assist Substreams developers interested in persisting data to databases; each can be found in its official GitHub repository.
 
@@ -32,96 +50,3 @@ https://github.com/streamingfast/substreams-sink-mongodb
 
 **File Based Storage**
 https://github.com/streamingfast/substreams-sink-files
-
-## DatabaseChanges Rust Crate
-
-The StreamingFast DatabaseChanges Rust crate provides definitions for database changes that are emitted by Substreams. The DatabaseChanges Crate provides an assortment of functionality to ease the process of working with database-enabled Substreams development efforts. Find more information about the crate at the following link.
-
-https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html
-
-DatabaseChanges uses its protobuf definition. The protobuf definition can be viewed at the following link for a peek into the crates implementation.
-
-https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto
-
-Full source code is provided by StreamingFast for the DatabaseChanges crate found in its official GitHub repository.
-
-https://github.com/streamingfast/substreams-database-change
-
-An output type of proto:substreams.database.v1.DatabaseChanges is required by the map module in the Substreams manifest when working with a sink.
-
-## Database Schemas & Data Structures
-
-The database schema requires a table named “cursors”. The cursors table needs to define columns for id, cursor, and block_num. The schema will also define one or more tables that match the output from the blockchain data extracted in the prescribed db_out Substreams map module.
-
-The following code snippets illustrate an extremely simple database table schema definition and associated Rust map module data structure.
-
-**Basic Rust data structure from Substreams map module example**
-
-```rust
-BlockMeta {
-number: blk.number,
-hash: blk.hash,
-parent_hash: header.parent_hash,
-},
-```
-
-**Basic table schema definition for PostgreSQL matching map module data**
-
-```
-create table block_meta
-(
-id text not null constraint block_meta_pk primary key,
-at text,
-number integer,
-hash text,
-parent_hash text,
-);
-```
-
-The prefered naming convention for the module that's used to transfer data to a database states that the map is named "db_out." As previously mentioned, the type needs to be proto:substreams.database.v1.DatabaseChanges. The following snippet taken from a Substreams manifest illustrates the proper naming conventions and format.
-
-**Example Substreams Sink Enabled Manifest**
-
-```
- - name: db_out
-    kind: map
-    output:
-      type: proto:substreams.database.v1.DatabaseChanges
-```
-
-Database types currently supported by Substreams sink solutions include INTEGER, DOUBLE, BOOLEAN, TIMESTAMP, NULL. DATE, and STRING.
-
-## Advanced Considerations & DeltaProto
-
-Larger, more robust Substreams codebases use multiple modules of both types, map, and store. Data is extracted and processed in the map modules and passed to a store module to build up an aggregate collection of blockchain data. Store modules defined in the Substreams manifest output DatabaseChanges that map modules ingest.
-
-Typed data defined through a custom protobuf is passed into the map module through a DeltaProto Vec in larger, production-type Substreams scenarios. DeltaProto is made available through the StreamingFast Substreams crate. DeltaProto isn’t specific to database-related Substreams development.
-
-Find the details for DeltaProto in the Substreams Rust documentation at the following link.
-
-https://docs.rs/substreams/latest/substreams/store/struct.DeltaProto.html
-
-The substreams-eth-block-meta example demonstrates DeltaProto in action. Check out the source code in the project’s official GitHub repository.
-
-https://github.com/streamingfast/substreams-eth-block-meta
-
-## Substreams Sink Tutorial
-
-_[_**_TODO_**_: Create new simple example that adds database persistence to the eth chain-agnostic example.]_
-
-1. Clone and test chain-agnostic example.
-   https://github.com/seanmooretechwriter/substreams-ethereum-tutorial
-
-2. Run the chain-agnostic example and briefly explain what data is extracted. (Link to new chain agnostic example and doc page when published.)
-
-3. Modify the map module name (to db_out) and output type (to DatabaseChanges) in the manifest
-
-4. Create a database schema matching the data extracted in the eth chain-agnostic example.
-
-5. Run the schema with PostgreSQL tools to make the database.
-
-6. Install the substreams-sink-postgres tool.
-
-7. Run the StreamingFast PostgreSQL sink took on the chain-agnostic example.
-
-8. Provide a simple command line query with PostgreSQL to display persisted data in the database.

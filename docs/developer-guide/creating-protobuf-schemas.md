@@ -116,9 +116,28 @@ View this file in the repo by visiting the following link.
 
 ### Protobuf & Rust Optional Fields
 
-Each field in a Protocol Buffer message are optional by default. Each field in a Protocol Buffer message needs a default value, this indicates that the field has not been populated with any data.
+Protobufs define fields within them that can be typed as scalar, or simple, values such as a string or integer. Messages can also contain other messages nested within them.
 
-For each field that are reference to other Protocol Buffer message types, Prost generates Rust code that uses the `Option` enum. The `Option` enum is used to represent the absence of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
+All messages are processed into `Option` enums by `prost`. Any scalar values in a message will return the value assigned, or an empty string, or zero, 0, for integer types. Messages nested within messages will be processed into an `Option`.
+
+The `Option` enum is used to represent the absence of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
+
+The Rust match keyword is used to compare the value of an `Option` with a `Some` or `None` variant. The Rust `Option` enum is used as the return type for functions, or in this case protobuf-based data fields, that may not always return a value. The following code can be used to check for the existence of a value with match, `Option`, `Some`, and `None`.
+
+```rust
+match person.Location {
+    Some(location) => { // Present, do something },
+    None => { // Not present, do something }
+}
+```
+
+Scenarios that are known to always contain a value can use the `if let` statement and bypass the `None` arm of the `match` code shown above. The following code example demonstrates using `if let` for `Option` fields that are known to always contain a value.
+
+```rust
+if let Some(location) = person.location {
+    // A value is present. The processing logic would be written here.
+}
+```
 
 Additional information is available for `prost` in its [official GitHub repository](https://github.com/tokio-rs/prost).
 

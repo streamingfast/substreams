@@ -9,6 +9,7 @@ import (
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
+	"github.com/streamingfast/dauth/authenticator"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -169,6 +170,25 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	)
 	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
 
+	moduleNames := make([]string, len(request.Modules.Modules))
+	for i := 0; i < len(moduleNames); i++ {
+		moduleNames[i] = request.Modules.Modules[i].Name
+	}
+	fields := []zap.Field{
+		zap.Int64("start_block", request.StartBlockNum),
+		zap.Uint64("stop_block", request.StopBlockNum),
+		zap.Strings("modules", moduleNames),
+		zap.Strings("output_modules", request.OutputModules),
+	}
+	if !isSubRequest {
+		fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
+		auth := authenticator.GetCredentials(ctx)
+		if id := auth.GetUserID(); id != "" {
+			fields = append(fields, zap.String("user_id", id))
+		}
+	}
+	logger.Info("incoming substreams Block request", fields...)
+
 	err = s.blocks(ctx, runtimeConfig, request, respFunc, streamSrv)
 	grpcError = s.toGRPCError(err)
 
@@ -181,7 +201,6 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 
 func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
 	logger := reqctx.Logger(ctx)
-	logger.Info("validating request")
 
 	if err := outputmodules.ValidateRequest(request, s.blockType); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())

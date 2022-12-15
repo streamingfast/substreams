@@ -42,7 +42,7 @@ func (s *FullKV) storageFilename(exclusiveEndBlock uint64) string {
 func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	fileName := s.storageFilename(exclusiveEndBlock)
 	s.loadedFrom = fileName
-	s.logger.Debug("loading full store state from file", zap.String("module_name", s.name), zap.String("fileName", fileName))
+	s.logger.Debug("loading full store state from file", zap.String("fileName", fileName))
 
 	data, err := loadStore(ctx, s.objStore, fileName)
 	if err != nil {
@@ -59,7 +59,7 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		s.kv = make(map[string][]byte)
 	}
 
-	s.logger.Debug("full store loaded", zap.String("store_name", s.name), zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)))
+	s.logger.Debug("full store loaded", zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)))
 	return nil
 }
 
@@ -81,8 +81,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error
 	filename := s.storageFilename(endBoundaryBlock)
 	brange := block.NewRange(s.moduleInitialBlock, endBoundaryBlock)
 
-	s.logger.Info("full store state saved",
-		zap.String("store", s.name),
+	s.logger.Info("saving store",
 		zap.String("file_name", filename),
 		zap.Object("block_range", brange),
 	)
@@ -98,7 +97,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error
 
 func (s *FullKV) Reset() {
 	if tracer.Enabled() {
-		s.logger.Debug("flushing store", zap.String("name", s.name), zap.Int("delta_count", len(s.deltas)), zap.Int("entry_count", len(s.kv)))
+		s.logger.Debug("flushing store", zap.Int("delta_count", len(s.deltas)), zap.Int("entry_count", len(s.kv)))
 	}
 	s.deltas = nil
 	s.lastOrdinal = 0

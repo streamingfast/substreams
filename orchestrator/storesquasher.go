@@ -58,7 +58,7 @@ func NewStoreSquasher(
 func (s *StoreSquasher) moduleName() string { return s.name }
 
 func (s *StoreSquasher) waitForCompletion(ctx context.Context) error {
-	logger := reqctx.Logger(ctx)
+	logger := s.logger(ctx)
 
 	// TODO(abourget): unsure what this line means, a `close()` doesn't wait?
 	logger.Info("waiting form terminate after partials chucks chan empty")
@@ -87,10 +87,12 @@ func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
 	return nil
 }
 
+func (s *StoreSquasher) logger(ctx context.Context) *zap.Logger {
+	return reqctx.Logger(ctx).With(zap.String("store_name", s.store.Name()), zap.String("module_hash", s.store.ModuleHash()))
+}
+
 func (s *StoreSquasher) launch(ctx context.Context) {
-	logger := reqctx.Logger(ctx)
-	logger = logger.With(zap.String("store_name", s.name))
-	ctx = reqctx.WithLogger(ctx, logger)
+	logger := s.logger(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 
 	logger.Info("launching store squasher")
@@ -148,7 +150,7 @@ func (s *StoreSquasher) sortRange() {
 }
 
 func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
-	logger := reqctx.Logger(ctx)
+	logger := s.logger(ctx)
 
 	select {
 	case <-ctx.Done():
@@ -177,8 +179,7 @@ func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
 //j6 8 -> 10
 
 func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rangeProgress, error) {
-	logger := reqctx.Logger(ctx)
-
+	logger := s.logger(ctx)
 	logger.Info("processing range", zap.Int("range_count", len(s.ranges)))
 	out := &rangeProgress{}
 	for {
@@ -214,7 +215,7 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 }
 
 func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, squashableRange *block.Range) error {
-	logger := reqctx.Logger(ctx)
+	logger := s.logger(ctx)
 
 	logger.Info("testing squashable range",
 		zap.Object("range", squashableRange),

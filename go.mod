@@ -34,6 +34,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-testing-interface v1.14.1
 	github.com/prometheus/client_golang v1.12.1
+	github.com/streamingfast/dauth v0.0.0-20221027185237-b209f25fa3ff
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/sf-tracing v0.0.0-20221028154401-fd8a9e72bfc5
 	github.com/streamingfast/shutter v1.5.0

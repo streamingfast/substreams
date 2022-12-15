@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
@@ -38,7 +39,7 @@ func (b *baseStore) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 
 func (b *baseStore) Reset() {
 	if tracer.Enabled() {
-		b.logger.Debug("flushing store", zap.String("name", b.name), zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", len(b.kv)))
+		b.logger.Debug("flushing store", zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", len(b.kv)))
 	}
 	b.deltas = nil
 	b.lastOrdinal = 0

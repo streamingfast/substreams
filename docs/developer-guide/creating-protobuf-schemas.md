@@ -116,29 +116,33 @@ View this file in the repo by visiting the following link.
 
 ### Protobuf & Rust Optional Fields
 
-Protobufs define fields within them that can be typed as scalar, or simple, values such as a string or integer. Messages can also contain other messages nested within them.
+Protocol buffers define fields' type using either usual primitive data types, such as integers, booleans, and floats ([full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) or one of complex data types `message`, `enum`, `oneof` or `map`.
 
-All messages are processed into `Option` enums by `prost`. Any scalar values in a message will return the value assigned, or an empty string, or zero, 0, for integer types. Messages nested within messages will be processed into an `Option`.
+Any primitive data types in a message will generate the corresponding Rust type (`String` for `string`, `u64` for `uint64`, etc.) and will assign the default value of the this corresponding Rust type if the field is not present in a message (empty string for `String`, 0 for integer types, `false` for `bool`, etc.). For field that references other `message` complex type, Rust will generate the corresponding `message` type wrapped with an `Option` enum type and will use `None` variant if the field is not present in the message.
 
-The `Option` enum is used to represent the absence of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
+The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
 
-The Rust match keyword is used to compare the value of an `Option` with a `Some` or `None` variant. The Rust `Option` enum is used as the return type for functions, or in this case protobuf-based data fields, that may not always return a value. The following code can be used to check for the existence of a value with match, `Option`, `Some`, and `None`.
+The Rust `match` keyword can be used to compare the value of an `Option` with a `Some` or `None` variant. Here a code snippet that can be used to deal with a type wrapped in an `Option`:
 
 ```rust
 match person.Location {
-    Some(location) => { // Present, do something },
-    None => { // Not present, do something }
+    Some(location) => { /* Value is present, do something */ }
+    None => { /* Value is absent, do something */ }
 }
 ```
 
-Scenarios that are known to always contain a value can use the `if let` statement and bypass the `None` arm of the `match` code shown above. The following code example demonstrates using `if let` for `Option` fields that are known to always contain a value.
+If you are only interested in dealing with presence of a value, use the `if let` statement to only have do deal with the `Some(x)` arm of the `match` code shown above:
 
 ```rust
 if let Some(location) = person.location {
-    // A value is present. The processing logic would be written here.
+    // Value is present, do something
 }
 ```
+Scenarios that are known to always contain a value can use the `.unwrap()` call on the `Option` to obtain the wrapped data. This is true if you control the creation of the messages yourself or if the field is documented as always being present
 
-Additional information is available for `prost` in its [official GitHub repository](https://github.com/tokio-rs/prost).
+{% hint style=“info” %}
+**Note**: Be 100% sure that the field is always present, otherwise your Substreams will panic and will never complete, being stuck on this block forever.
+{% endhint %}
+Additional information is available for `prost`, the tool generating the Rust code from Protobuf definitions, in its [official GitHub repository](https://github.com/tokio-rs/prost).
 
 Learn more about [Rust Option](https://doc.rust-lang.org/rust-by-example/std/option.html) in the official documentation.

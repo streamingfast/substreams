@@ -35,6 +35,7 @@ Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/
 {% endhint %}
 
 {% code title="eth/erc721/v1/erc721.proto" lineNumbers="true" %}
+
 ```protobuf
 syntax = "proto3";
 
@@ -52,6 +53,7 @@ message Transfer {
   uint64 ordinal = 5;
 }
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -87,9 +89,11 @@ The Substreams CLI is used to generate the associated Rust code for the protobuf
 {% endhint %}
 
 {% code overflow="wrap" %}
+
 ```bash
 substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"
 ```
+
 {% endcode %}
 
 The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)``
@@ -97,13 +101,48 @@ The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://gi
 The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
 {% code title="src/pb/mod.rs" %}
+
 ```rust
 #[path = "eth.erc721.v1.rs"]
 #[allow(dead_code)]
 pub mod erc721;
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
+
+### Protobuf & Rust Optional Fields
+
+Protocol buffers define fields' type using either usual primitive data types, such as integers, booleans, and floats ([full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) or one of complex data types `message`, `enum`, `oneof` or `map`.
+
+Any primitive data types in a message will generate the corresponding Rust type (`String` for `string`, `u64` for `uint64`, etc.) and will assign the default value of the this corresponding Rust type if the field is not present in a message (empty string for `String`, 0 for integer types, `false` for `bool`, etc.). For field that references other `message` complex type, Rust will generate the corresponding `message` type wrapped with an `Option` enum type and will use `None` variant if the field is not present in the message.
+
+The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is through wrapping optional values in `Option<T>`.
+
+The Rust `match` keyword can be used to compare the value of an `Option` with a `Some` or `None` variant. Here a code snippet that can be used to deal with a type wrapped in an `Option`:
+
+```rust
+match person.Location {
+    Some(location) => { /* Value is present, do something */ }
+    None => { /* Value is absent, do something */ }
+}
+```
+
+If you are only interested in dealing with presence of a value, use the `if let` statement to only have do deal with the `Some(x)` arm of the `match` code shown above:
+
+```rust
+if let Some(location) = person.location {
+    // Value is present, do something
+}
+```
+Scenarios that are known to always contain a value can use the `.unwrap()` call on the `Option` to obtain the wrapped data. This is true if you control the creation of the messages yourself or if the field is documented as always being present
+
+{% hint style=“info” %}
+**Note**: Be 100% sure that the field is always present, otherwise your Substreams will panic and will never complete, being stuck on this block forever.
+{% endhint %}
+Additional information is available for `prost`, the tool generating the Rust code from Protobuf definitions, in its [official GitHub repository](https://github.com/tokio-rs/prost).
+
+Learn more about [Rust Option](https://doc.rust-lang.org/rust-by-example/std/option.html) in the official documentation.

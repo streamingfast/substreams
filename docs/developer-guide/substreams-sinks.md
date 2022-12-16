@@ -38,7 +38,7 @@ Reiterating from above, protobufs are designed by the developer. The protobufs a
 
 Through careful design of the Substreams manifest, modules, and protobufs developers can craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules. Developers need to examine and account for the format and any requirements of the end target they want their data routed. The specifics of how data is ingested by the targeted sink will determine the design of the output from Substreams.
 
-The substreams-eth-block-meta example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
+The `substreams-eth-block-meta` example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
 
 https://github.com/streamingfast/substreams-eth-block-meta
 

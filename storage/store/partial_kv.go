@@ -38,7 +38,7 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
 	}
 
-	storeData, err := p.marshaller.Unmarshal(data)
+	storeData, size, err := p.marshaller.Unmarshal(data)
 	if err != nil {
 		return fmt.Errorf("unmarshal store: %w", err)
 	}
@@ -47,9 +47,10 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	if p.kv == nil {
 		p.kv = map[string][]byte{}
 	}
+	p.totalSizeBytes = size
 	p.DeletedPrefixes = storeData.DeletePrefixes
 
-	p.logger.Debug("partial store loaded", zap.String("filename", filename))
+	p.logger.Debug("partial store loaded", zap.String("filename", filename), zap.Int("key_count", len(p.kv)), zap.Uint64("data_size", size))
 	return nil
 }
 

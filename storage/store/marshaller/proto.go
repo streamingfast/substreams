@@ -9,15 +9,15 @@ import (
 
 type Proto struct{}
 
-func (p *Proto) Unmarshal(in []byte) (*StoreData, error) {
+func (p *Proto) Unmarshal(in []byte) (*StoreData, uint64, error) {
 	stateData := &pbsubstreams.StoreData{}
 	if err := proto.Unmarshal(in, stateData); err != nil {
-		return nil, fmt.Errorf("unmarshal store: %w", err)
+		return nil, 0, fmt.Errorf("unmarshal store: %w", err)
 	}
 	return &StoreData{
 		Kv:             stateData.GetKv(),
 		DeletePrefixes: stateData.GetDeletePrefixes(),
-	}, nil
+	}, 0, nil
 }
 
 func (p *Proto) Marshal(data *StoreData) ([]byte, error) {

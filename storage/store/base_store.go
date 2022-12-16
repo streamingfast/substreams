@@ -12,10 +12,11 @@ import (
 type baseStore struct {
 	*Config
 
-	kv          map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
-	deltas      []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
-	lastOrdinal uint64
-	marshaller  marshaller.Marshaller
+	kv             map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
+	deltas         []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
+	lastOrdinal    uint64
+	marshaller     marshaller.Marshaller
+	totalSizeBytes uint64
 
 	logger *zap.Logger
 }
@@ -33,13 +34,14 @@ func (b *baseStore) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("hash", b.moduleHash)
 	enc.AddUint64("module_initial_block", b.moduleInitialBlock)
 	enc.AddInt("key_count", len(b.kv))
+	enc.AddUint64("total_size_bytes", b.totalSizeBytes)
 
 	return nil
 }
 
 func (b *baseStore) Reset() {
 	if tracer.Enabled() {
-		b.logger.Debug("flushing store", zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", len(b.kv)))
+		b.logger.Debug("flushing store", zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", len(b.kv)), zap.Uint64("total_size_bytes", b.totalSizeBytes))
 	}
 	b.deltas = nil
 	b.lastOrdinal = 0

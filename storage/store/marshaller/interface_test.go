@@ -94,7 +94,7 @@ func Benchmark_Unmarshall(b *testing.B) {
 				bb.ReportAllocs()
 
 				for n := 0; n < bb.N; n++ {
-					_, err := m.m.Unmarshal(data)
+					_, _, err := m.m.Unmarshal(data)
 					require.NoError(bb, err)
 				}
 			})

@@ -30,7 +30,7 @@ StreamingFast values external contributions for Substreams sinks. If your team h
 
 StreamingFast provides tools allowing developers to route blockchain data to a few different types of data storage sinks, or means of ingestion. The types of sinks with tools provided by StreamingFast aren’t the only options for Substreams developers. Existing applications, databases, and other tools can be fed by blockchain data captured and output by Substreams.
 
-Developers can examine the StreamingFast sink tools to see examples of how protobuf-based data from Substreams can be used with other approaches. One example could be a database, such as Oracle, that doesn’t currently have tools in place. As mentioned, databases are only one example of where Substreams data can be routed. Developers should be able to review the PostgreSQL tool and its codebase to begin to understand how to construct their own data-sinking solution.
+Developers can get inspiration on how to write their own sink by looking at sinks provided by StreamingFast today. One example could be a database, such as Oracle, that doesn’t currently have tools in place. Developers should be able to review the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct your own data-sinking solution.
 
 Reiterating from above, protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store the Substreams data in a myriad of different capacities.
 

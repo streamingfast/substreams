@@ -97,7 +97,7 @@ The manifest defines a list of [modules](../concepts/modules.md) used in the Sub
 The modules are Rust functions containing the business logic for the implementation.
 
 {% hint style="info" %}
-**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The naming convention prescribed by StreamingFast for Substreams modules is to prefix the name with either `map_` or `store_` depending on the module type.
+**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The naming convention for Substreams modules is to prefix the name with either `map_` or `store_` depending on the module type.
 {% endhint %}
 
 ### **`map_transfers`**

@@ -22,13 +22,13 @@ func NewModulesProgressResponse(in []*pbsubstreams.ModuleProgress) *pbsubstreams
 
 func NewSnapshotData(in *pbsubstreams.InitialSnapshotData) *pbsubstreams.Response {
 	return &pbsubstreams.Response{
-		Message: &pbsubstreams.Response_SnapshotData{SnapshotData: in},
+		Message: &pbsubstreams.Response_DebugSnapshotData{DebugSnapshotData: in},
 	}
 }
 
 func NewSnapshotComplete() *pbsubstreams.Response {
 	return &pbsubstreams.Response{
-		Message: &pbsubstreams.Response_SnapshotComplete{SnapshotComplete: &pbsubstreams.InitialSnapshotComplete{}},
+		Message: &pbsubstreams.Response_DebugSnapshotComplete{DebugSnapshotComplete: &pbsubstreams.InitialSnapshotComplete{}},
 	}
 }
 

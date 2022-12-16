@@ -53,7 +53,7 @@ func ValidateRequest(req *Request) error {
 	}
 
 	//TODO: should we remove this
-	for _, outMod := range req.InitialStoreSnapshotForModules {
+	for _, outMod := range req.DebugInitialStoreSnapshotForModules {
 		if !seenStores[outMod] {
 			return fmt.Errorf("initial store snapshots for module: %q: no such 'store' module defined modules graph", outMod)
 		}

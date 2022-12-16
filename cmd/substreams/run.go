@@ -25,7 +25,7 @@ func init() {
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
-	runCmd.Flags().BoolP("initial-snapshots", "i", false, "Load an initial snapshot at start block, before continuing processing.")
+	runCmd.Flags().BoolP("debug-initial-snapshots", "i", false, "Load an initial snapshot at start block, before continuing processing. Available only in development mode (production mode = false)")
 
 	runCmd.Flags().Bool("production-mode", false, "Enable production mode, with high-speed forward processing: limits stream to a single mapper module.")
 
@@ -98,7 +98,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// TODO: need to handle this case in the refactor
-	//if mustGetBool(cmd, "initial-snapshots") {
+	//if !req.ProductionMode && mustGetBool(cmd, "debug-initial-snapshots") {
 	//	for _, modName := range req.OutputModules {
 	//		for _, v := range pkg.Modules.Modules {
 	//			if modName != v.Name {
@@ -106,7 +106,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	//			}
 	//
 	//			if _, isStore := v.Kind.(*pbsubstreams.Module_KindStore_); isStore {
-	//				req.InitialStoreSnapshotForModules = append(req.InitialStoreSnapshotForModules, modName)
+	//				req.DebugInitialStoreSnapshotForModules = append(req.DebugInitialStoreSnapshotForModules, modName)
 	//			}
 	//		}
 	//	}

@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Service now needs to pass a `client.Factory` instead of some client configuration.
 
+* `--initial-snapshots` flag has been renamed to `--debug-initial-snapshots` and can only be activated in development mode (ie: when `production-mode` flag is false).
+
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 
 * Moved Rust modules to `github.com/streamingfast/substreams-rs`

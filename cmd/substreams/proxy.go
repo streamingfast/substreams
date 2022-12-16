@@ -41,14 +41,14 @@ func (cs *ConnectServer) Blocks(
 ) error {
 
 	newReq := &pbsubstreams.Request{
-		StartBlockNum:                  req.Msg.StartBlockNum,
-		StopBlockNum:                   req.Msg.StopBlockNum,
-		StartCursor:                    req.Msg.StartCursor,
-		ForkSteps:                      req.Msg.ForkSteps,
-		IrreversibilityCondition:       req.Msg.IrreversibilityCondition,
-		OutputModules:                  req.Msg.OutputModules,
-		Modules:                        req.Msg.Modules,
-		InitialStoreSnapshotForModules: req.Msg.InitialStoreSnapshotForModules,
+		StartBlockNum:                       req.Msg.StartBlockNum,
+		StopBlockNum:                        req.Msg.StopBlockNum,
+		StartCursor:                         req.Msg.StartCursor,
+		ForkSteps:                           req.Msg.ForkSteps,
+		IrreversibilityCondition:            req.Msg.IrreversibilityCondition,
+		OutputModules:                       req.Msg.OutputModules,
+		Modules:                             req.Msg.Modules,
+		DebugInitialStoreSnapshotForModules: req.Msg.DebugInitialStoreSnapshotForModules,
 	}
 
 	if cs.Manifest != "" {

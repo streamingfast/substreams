@@ -148,10 +148,10 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 						}
 					}
 				}
-			case *pbsubstreams.Response_SnapshotData:
-				_ = r.SnapshotData
-			case *pbsubstreams.Response_SnapshotComplete:
-				_ = r.SnapshotComplete
+			case *pbsubstreams.Response_DebugSnapshotData:
+				_ = r.DebugSnapshotData
+			case *pbsubstreams.Response_DebugSnapshotComplete:
+				_ = r.DebugSnapshotComplete
 			case *pbsubstreams.Response_Data:
 				// These are not returned by virtue of `returnOutputs`
 			}

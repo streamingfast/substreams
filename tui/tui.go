@@ -150,15 +150,15 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 				}
 			}
 		}
-	case *pbsubstreams.Response_SnapshotData:
+	case *pbsubstreams.Response_DebugSnapshotData:
 		if ui.decorateOutput {
 			ui.ensureTerminalUnlocked()
-			return ui.decoratedSnapshotData(m.SnapshotData)
+			return ui.decoratedSnapshotData(m.DebugSnapshotData)
 		} else {
-			return ui.jsonSnapshotData(m.SnapshotData)
+			return ui.jsonSnapshotData(m.DebugSnapshotData)
 		}
 
-	case *pbsubstreams.Response_SnapshotComplete:
+	case *pbsubstreams.Response_DebugSnapshotComplete:
 		if ui.decorateOutput {
 			fmt.Println("Snapshot data dump complete")
 		}

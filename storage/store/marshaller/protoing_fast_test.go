@@ -1,9 +1,10 @@
 package marshaller
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestProtoFast_CompareMarshal(t *testing.T) {
@@ -71,7 +72,7 @@ func TestProtoFast_CompareMarshal(t *testing.T) {
 			assert.Equal(t, protoData, protoingFastData)
 			assert.Equal(t, protoData, vtProtoData)
 
-			v, err := pf.Unmarshal(protoingFastData)
+			v, _, err := pf.Unmarshal(protoingFastData)
 			require.NoError(t, err)
 
 			assert.Equal(t, test.data, v)

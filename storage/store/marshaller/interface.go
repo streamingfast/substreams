@@ -6,7 +6,7 @@ type StoreData struct {
 }
 
 type Marshaller interface {
-	Unmarshal(in []byte) (*StoreData, error)
+	Unmarshal(in []byte) (*StoreData, uint64, error)
 	Marshal(data *StoreData) ([]byte, error)
 }
 

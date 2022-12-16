@@ -49,17 +49,18 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		return fmt.Errorf("load full store %s at %s: %w", s.name, fileName, err)
 	}
 
-	storeData, err := s.marshaller.Unmarshal(data)
+	storeData, size, err := s.marshaller.Unmarshal(data)
 	if err != nil {
 		return fmt.Errorf("unmarshal store: %w", err)
 	}
 
 	s.kv = storeData.Kv
+	s.totalSizeBytes = size
 	if s.kv == nil {
 		s.kv = make(map[string][]byte)
 	}
 
-	s.logger.Debug("full store loaded", zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)))
+	s.logger.Debug("full store loaded", zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size))
 	return nil
 }
 

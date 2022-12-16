@@ -9,15 +9,16 @@ import (
 
 type VTproto struct{}
 
-func (p *VTproto) Unmarshal(in []byte) (*StoreData, error) {
+func (p *VTproto) Unmarshal(in []byte) (*StoreData, uint64, error) {
 	stateData := &pbstore.StoreData{}
-	if err := unmarshalVT(stateData, in); err != nil {
-		return nil, fmt.Errorf("unmarshal store: %w", err)
+	dataSize, err := unmarshalVT(stateData, in)
+	if err != nil {
+		return nil, 0, fmt.Errorf("unmarshal store: %w", err)
 	}
 	return &StoreData{
 		Kv:             stateData.GetKv(),
 		DeletePrefixes: stateData.GetDeletePrefixes(),
-	}, nil
+	}, dataSize, nil
 }
 
 func (p *VTproto) Marshal(data *StoreData) ([]byte, error) {
@@ -33,7 +34,8 @@ func (p *VTproto) Marshal(data *StoreData) ([]byte, error) {
 // by the vtprotobuf protobuf plugin is ok, but we can greatly improve the allocation and
 // speed with a few optimizations. This function is a 98% copy of the function in
 // ./pb/store_vtproto.pb.go
-func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
+// we've added byte counter too
+func unmarshalVT(m *pbstore.StoreData, dAtA []byte) (dataSize uint64, err error) {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -41,10 +43,10 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
 			if shift >= 64 {
-				return pbstore.ErrIntOverflow
+				return 0, pbstore.ErrIntOverflow
 			}
 			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
+				return 0, io.ErrUnexpectedEOF
 			}
 			b := dAtA[iNdEx]
 			iNdEx++
@@ -56,23 +58,23 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: StoreData: wiretype end group for non-group")
+			return 0, fmt.Errorf("proto: StoreData: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StoreData: illegal tag %d (wire type %d)", fieldNum, wire)
+			return 0, fmt.Errorf("proto: StoreData: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Kv", wireType)
+				return 0, fmt.Errorf("proto: wrong wireType = %d for field Kv", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return pbstore.ErrIntOverflow
+					return 0, pbstore.ErrIntOverflow
 				}
 				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
+					return 0, io.ErrUnexpectedEOF
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
@@ -82,14 +84,14 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 				}
 			}
 			if msglen < 0 {
-				return pbstore.ErrInvalidLength
+				return 0, pbstore.ErrInvalidLength
 			}
 			postIndex := iNdEx + msglen
 			if postIndex < 0 {
-				return pbstore.ErrInvalidLength
+				return 0, pbstore.ErrInvalidLength
 			}
 			if postIndex > l {
-				return io.ErrUnexpectedEOF
+				return 0, io.ErrUnexpectedEOF
 			}
 			if m.Kv == nil {
 				m.Kv = make(map[string][]byte)
@@ -101,10 +103,10 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 				var wire uint64
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
-						return pbstore.ErrIntOverflow
+						return 0, pbstore.ErrIntOverflow
 					}
 					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
+						return 0, io.ErrUnexpectedEOF
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
@@ -118,10 +120,10 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 					var stringLenmapkey uint64
 					for shift := uint(0); ; shift += 7 {
 						if shift >= 64 {
-							return pbstore.ErrIntOverflow
+							return 0, pbstore.ErrIntOverflow
 						}
 						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
+							return 0, io.ErrUnexpectedEOF
 						}
 						b := dAtA[iNdEx]
 						iNdEx++
@@ -132,14 +134,14 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 					}
 					intStringLenmapkey := int(stringLenmapkey)
 					if intStringLenmapkey < 0 {
-						return pbstore.ErrInvalidLength
+						return 0, pbstore.ErrInvalidLength
 					}
 					postStringIndexmapkey := iNdEx + intStringLenmapkey
 					if postStringIndexmapkey < 0 {
-						return pbstore.ErrInvalidLength
+						return 0, pbstore.ErrInvalidLength
 					}
 					if postStringIndexmapkey > l {
-						return io.ErrUnexpectedEOF
+						return 0, io.ErrUnexpectedEOF
 					}
 
 					// @julien do not waste time allocating here
@@ -151,10 +153,10 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 					var mapbyteLen uint64
 					for shift := uint(0); ; shift += 7 {
 						if shift >= 64 {
-							return pbstore.ErrIntOverflow
+							return 0, pbstore.ErrIntOverflow
 						}
 						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
+							return 0, io.ErrUnexpectedEOF
 						}
 						b := dAtA[iNdEx]
 						iNdEx++
@@ -165,14 +167,14 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 					}
 					intMapbyteLen := int(mapbyteLen)
 					if intMapbyteLen < 0 {
-						return pbstore.ErrInvalidLength
+						return 0, pbstore.ErrInvalidLength
 					}
 					postbytesIndex := iNdEx + intMapbyteLen
 					if postbytesIndex < 0 {
-						return pbstore.ErrInvalidLength
+						return 0, pbstore.ErrInvalidLength
 					}
 					if postbytesIndex > l {
-						return io.ErrUnexpectedEOF
+						return 0, io.ErrUnexpectedEOF
 					}
 
 					// @julien do not waste time allocating here
@@ -185,30 +187,31 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 					iNdEx = entryPreIndex
 					skippy, err := skip(dAtA[iNdEx:])
 					if err != nil {
-						return err
+						return 0, err
 					}
 					if (skippy < 0) || (iNdEx+skippy) < 0 {
-						return pbstore.ErrInvalidLength
+						return 0, pbstore.ErrInvalidLength
 					}
 					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
+						return 0, io.ErrUnexpectedEOF
 					}
 					iNdEx += skippy
 				}
 			}
 			m.Kv[mapkey] = mapvalue
+			dataSize += uint64(len(mapkey) + len(mapvalue))
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field DeletePrefixes", wireType)
+				return 0, fmt.Errorf("proto: wrong wireType = %d for field DeletePrefixes", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
-					return pbstore.ErrIntOverflow
+					return 0, pbstore.ErrIntOverflow
 				}
 				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
+					return 0, io.ErrUnexpectedEOF
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
@@ -219,14 +222,14 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 			}
 			intStringLen := int(stringLen)
 			if intStringLen < 0 {
-				return pbstore.ErrInvalidLength
+				return 0, pbstore.ErrInvalidLength
 			}
 			postIndex := iNdEx + intStringLen
 			if postIndex < 0 {
-				return pbstore.ErrInvalidLength
+				return 0, pbstore.ErrInvalidLength
 			}
 			if postIndex > l {
-				return io.ErrUnexpectedEOF
+				return 0, io.ErrUnexpectedEOF
 			}
 
 			// @julien do not waste time allocating here
@@ -237,13 +240,13 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])
 			if err != nil {
-				return err
+				return 0, err
 			}
 			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return pbstore.ErrInvalidLength
+				return 0, pbstore.ErrInvalidLength
 			}
 			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
+				return 0, io.ErrUnexpectedEOF
 			}
 			//m.unknownFields = append(m.unknownFields, dAtA[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
@@ -251,9 +254,9 @@ func unmarshalVT(m *pbstore.StoreData, dAtA []byte) error {
 	}
 
 	if iNdEx > l {
-		return io.ErrUnexpectedEOF
+		return 0, io.ErrUnexpectedEOF
 	}
-	return nil
+	return
 }
 
 func skip(dAtA []byte) (n int, err error) {

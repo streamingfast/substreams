@@ -20,7 +20,9 @@ type Config struct {
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType          string
 
-	appendLimit uint64
+	appendLimit    uint64
+	totalSizeLimit uint64
+	itemSizeLimit  uint64
 }
 
 func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (*Config, error) {
@@ -36,7 +38,9 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 		objStore:           subStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
-		appendLimit:        8_388_608, // 8kb = 8 * 1024 * 1024,  // TODO(colin): keep this hard-coded at 8kb :)
+		appendLimit:        8_388_608,     // 8kb = 8 * 1024 * 1024,
+		totalSizeLimit:     1_073_741_824, // 1GiB
+		itemSizeLimit:      10_485_760,    // 10MiB
 	}, nil
 }
 

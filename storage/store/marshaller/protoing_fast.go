@@ -16,21 +16,22 @@ const DeletePrefixEntryProtoTag = 0x12
 // ProtoingFast is a custom proto marshaller, that will marshal and unmarshall the storeData into a predefined
 // proto struct (see below). The motivation here is that we want to write a proto message, making it readable by
 // other tool with the appropriate message, but want to gain the marshal performance of a custom binary library
+//
 //	message StoreData {
 //		map<string, bytes> kv = 1;
 //		repeated string delete_prefixes = 2;
 //	}
 type ProtoingFast struct{}
 
-func (p *ProtoingFast) Unmarshal(in []byte) (*StoreData, error) {
+func (p *ProtoingFast) Unmarshal(in []byte) (*StoreData, uint64, error) {
 	stateData := &pbsubstreams.StoreData{}
 	if err := proto.Unmarshal(in, stateData); err != nil {
-		return nil, fmt.Errorf("unmarshal store: %w", err)
+		return nil, 0, fmt.Errorf("unmarshal store: %w", err)
 	}
 	return &StoreData{
 		Kv:             stateData.GetKv(),
 		DeletePrefixes: stateData.GetDeletePrefixes(),
-	}, nil
+	}, 0, nil
 }
 
 func (p *ProtoingFast) Marshal(data *StoreData) ([]byte, error) {

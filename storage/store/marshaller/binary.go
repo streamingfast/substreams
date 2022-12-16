@@ -19,16 +19,16 @@ func (k *Binary) Marshal(data *StoreData) ([]byte, error) {
 	return content, nil
 }
 
-func (k *Binary) Unmarshal(in []byte) (*StoreData, error) {
+func (k *Binary) Unmarshal(in []byte) (*StoreData, uint64, error) {
 	kv, err := readMapStringBytes(in)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling  map string bytes kv state: %w", err)
+		return nil, 0, fmt.Errorf("unmarshalling  map string bytes kv state: %w", err)
 	}
 
 	out := &StoreData{
 		Kv: kv,
 	}
-	return out, nil
+	return out, 0, nil
 }
 
 func writeMapStringBytes(entries map[string][]byte) ([]byte, error) {

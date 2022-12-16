@@ -29,8 +29,8 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 	if strings.HasPrefix(key, "__!__") {
 		panic("key prefix __!__ is reserved for internal system use.")
 	}
-	if len(value) > 10*1024*1024 {
-		panic(fmt.Sprintf("key %q attempted to write %d bytes, capped at 10MiB", key, len(value)))
+	if uint64(len(value)) > b.itemSizeLimit {
+		panic(fmt.Sprintf("key %q attempted to write %d bytes (capped at %d)", key, len(value), b.itemSizeLimit))
 	}
 
 	if len(key) == 0 {

@@ -14,12 +14,6 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
    --stop-block +1
 ```
 
-Another option is to run Substreams against a locally deployed Firehose. _Note, Firehose needs to be installed and set up on the target system._
-
-```bash
-substreams run -p -e localhost:9000 substreams.yaml map_transfers --start-block 12370550 --stop-block +1
-```
-
 ### Explanation
 
 #### Substreams Run

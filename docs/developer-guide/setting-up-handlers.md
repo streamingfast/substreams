@@ -14,45 +14,49 @@ cargo init --lib
 Update the generated `Cargo.toml` file to match the following.
 
 {% code title="Cargo.toml" %}
+
 ```rust
 [package]
-name = "substreams-example"
+name = "substreams-template"
 version = "0.1.0"
 description = "Substream template demo project"
 edition = "2021"
 repository = "https://github.com/streamingfast/substreams-template"
 
 [lib]
+name = "substreams"
 crate-type = ["cdylib"]
 
-[target.wasm32-unknown-unknown.dependencies]
-ethabi = "17.0"
+[dependencies]
+ethabi = "17"
 hex-literal = "0.3.4"
-prost = { version = "0.11.0" }
+prost = "0.11"
 # Use latest from https://crates.io/crates/substreams
-substreams = { version = "0.0.20" }
+substreams = "0.5"
 # Use latest from https://crates.io/crates/substreams-ethereum
-substreams-ethereum = { version = "0.2.1" }
+substreams-ethereum = "0.8"
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
+[target.wasm32-unknown-unknown.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }
 
 [build-dependencies]
 anyhow = "1"
-substreams-ethereum = { version = "0.2.1" }
+substreams-ethereum = "0.8"
 
 [profile.release]
 lto = true
 opt-level = 's'
 strip = "debuginfo"
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
 
-The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/) . WASM is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
+The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
 ### **Cargo.toml Breakdown**
 
@@ -90,12 +94,14 @@ Because code is being built with WASM output it's necessary to configure Rust to
 #### Rust Toolchain
 
 {% code title="rust-toolchain.toml" %}
+
 ```toml
 [toolchain]
-channel = "1.60.0"
+channel = "1.65"
 components = [ "rustfmt" ]
 targets = [ "wasm32-unknown-unknown" ]
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -118,10 +124,12 @@ To avoid manually specifying `target wasm32-unknown-unknown` for each `cargo` co
 Use the following content for the file.
 
 {% code title=".cargo/config.toml" %}
+
 ```toml
 [build]
 target = "wasm32-unknown-unknown"
 ```
+
 {% endcode %}
 
 With this config file, `cargo build` is now equivalent to `cargo build --target wasm32-unknown-unknown`.
@@ -148,6 +156,7 @@ Placing a file named `build.rs` in the root of a package will cause Cargo to com
 Create a `build.rs` file in the root of the Substreams project using the following code.
 
 {% code title="build.rs" %}
+
 ```rust
 use anyhow::{Ok, Result};
 use substreams_ethereum::Abigen;
@@ -160,6 +169,7 @@ fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -175,9 +185,11 @@ cargo build --target wasm32-unknown-unknown --release
 Next, create a `mod.rs` file in the abi directory (that was created by the Rust build process) to export the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
+
 ```rust
 pub mod erc721;
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.

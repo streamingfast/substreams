@@ -9,15 +9,9 @@ After a successful build Substreams can be started with the following command, e
 ```
 substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
-   block_to_transfers \
+   map_transfers \
    --start-block 12292922 \
    --stop-block +1
-```
-
-Another option is to run Substreams against a locally deployed Firehose. _Note, Firehose needs to be installed and set up on the target system._
-
-```bash
-substreams run -p -e localhost:9000 substreams.yaml block_to_transfers --start-block 12370550 --stop-block +1
 ```
 
 ### Explanation
@@ -37,7 +31,7 @@ Inform Substreams where to find the `substreams.yaml` configuration file.
 
 #### Module
 
-The `block_to_transfers` module is defined in the manifest and it is the module that will be run by Substreams.
+The `map_transfers` module is defined in the manifest and it is the module that will be run by Substreams.
 
 #### Block Mapping
 
@@ -53,16 +47,16 @@ The following messages will be printed to the terminal for a successfully instal
 ```bash
  substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
-   block_to_transfers \
+   map_transfers \
    --start-block 12292922 \
    --stop-block +1
 2022-05-30T10:52:27.256-0400 INFO (substreams) connecting...
 2022-05-30T10:52:27.389-0400 INFO (substreams) connected
 
 ----------- IRREVERSIBLE BLOCK #12,292,922 (12292922) ---------------
-block_to_transfers: log: NFT Contract bc4ca0eda7647a8ab7c2061c2e118a18a936f13d invoked
+map_transfers: log: NFT Contract bc4ca0eda7647a8ab7c2061c2e118a18a936f13d invoked
 [...]
-block_to_transfers: message "eth.erc721.v1.Transfers": {
+map_transfers: message "eth.erc721.v1.Transfers": {
   "transfers": [
     {
       "from": "AAAAAAAAAAAAAAAAAAAAAAAAAAA=",

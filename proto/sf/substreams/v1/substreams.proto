@@ -34,6 +34,7 @@ message Request {
   Modules modules = 6;
   repeated string output_modules = 7;
   repeated string initial_store_snapshot_for_modules = 8;
+  string output_module = 10;
 }
 
 message Response {

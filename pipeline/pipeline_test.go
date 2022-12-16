@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -70,13 +69,13 @@ func TestPipeline_runExecutor(t *testing.T) {
 func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	pkg := manifest.TestReadManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
 
-	binayrIndex := uint32(0)
+	binaryIndex := uint32(0)
 	for _, module := range pkg.Modules.Modules {
 		if module.Name == name {
-			binayrIndex = module.BinaryIndex
+			binaryIndex = module.BinaryIndex
 		}
 	}
-	binary := pkg.Modules.Binaries[binayrIndex]
+	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
 	wasmModule, err := wasm.NewRuntime(nil).NewModule(
@@ -100,19 +99,6 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 		),
 		"",
 	)
-}
-
-type Obj struct {
-	cursor *bstream.Cursor
-	step   bstream.StepType
-}
-
-func (o *Obj) Cursor() *bstream.Cursor {
-	return o.cursor
-}
-
-func (o *Obj) Step() bstream.StepType {
-	return o.step
 }
 
 func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *bstream.Block {
@@ -158,14 +144,14 @@ func TestSetupSubrequestStores(t *testing.T) {
 		assert.Equal(t, 10, int(partialKV.InitialBlock()))
 	})
 
-	t.Run("fail with multiple output modules", func(t *testing.T) {
-		ctx := withTestRequest(t, "mod1,mod2", 10)
-		p := Pipeline{stores: &Stores{configs: nil}}
-
-		_, err := p.setupSubrequestStores(ctx)
-
-		assert.Equal(t, "invalid number of backprocess leaf store: 2", err.Error())
-	})
+	//t.Run("fail with multiple output modules", func(t *testing.T) {
+	//	ctx := withTestRequest(t, "mod1", 10)
+	//	p := Pipeline{stores: &Stores{configs: nil}}
+	//
+	//	_, err := p.setupSubrequestStores(ctx)
+	//
+	//	assert.Equal(t, "invalid number of backprocess leaf store: 2", err.Error())
+	//})
 }
 
 func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
@@ -183,7 +169,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 			fullKV.Set(0, "k", "v")
 			_, writer, err := fullKV.Save(conf.writtenUpTo)
 			require.NoError(t, err)
-			writer.Write(context.Background())
+			require.NoError(t, writer.Write(context.Background()))
 		}
 	}
 	return confMap
@@ -198,9 +184,11 @@ type testStoreConfig struct {
 func withTestRequest(t *testing.T, outputModule string, startBlock uint64) context.Context {
 	t.Helper()
 	req, err := BuildRequestDetails(&pbsubstreams.Request{
-		OutputModules: strings.Split(outputModule, ","),
+		OutputModule:  outputModule,
 		StartBlockNum: int64(startBlock),
-	}, false, func() (uint64, error) { return 0, nil })
+	}, false, func(name string) bool {
+		return name == outputModule
+	}, func() (uint64, error) { return 0, nil })
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)
 }

@@ -53,7 +53,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	outputStreamNames := strings.Split(args[1], ",")
+	outputStreamName := args[1]
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
@@ -62,7 +62,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
-		sb, err := graph.ModuleInitialBlock(outputStreamNames[0])
+		sb, err := graph.ModuleInitialBlock(outputStreamName)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
 		}
@@ -93,28 +93,30 @@ func runRun(cmd *cobra.Command, args []string) error {
 		StopBlockNum:   stopBlock,
 		ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:        pkg.Modules,
-		OutputModules:  outputStreamNames,
+		OutputModule:   outputStreamName,
 		ProductionMode: mustGetBool(cmd, "production-mode"),
 	}
-	if mustGetBool(cmd, "initial-snapshots") {
-		for _, modName := range req.OutputModules {
-			for _, v := range pkg.Modules.Modules {
-				if modName != v.Name {
-					continue
-				}
 
-				if _, isStore := v.Kind.(*pbsubstreams.Module_KindStore_); isStore {
-					req.InitialStoreSnapshotForModules = append(req.InitialStoreSnapshotForModules, modName)
-				}
-			}
-		}
-	}
+	// TODO: need to handle this case in the refactor
+	//if mustGetBool(cmd, "initial-snapshots") {
+	//	for _, modName := range req.OutputModules {
+	//		for _, v := range pkg.Modules.Modules {
+	//			if modName != v.Name {
+	//				continue
+	//			}
+	//
+	//			if _, isStore := v.Kind.(*pbsubstreams.Module_KindStore_); isStore {
+	//				req.InitialStoreSnapshotForModules = append(req.InitialStoreSnapshotForModules, modName)
+	//			}
+	//		}
+	//	}
+	//}
 
 	if err := pbsubstreams.ValidateRequest(req); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
 
-	ui := tui.New(req, pkg, outputStreamNames)
+	ui := tui.New(req, pkg, []string{outputStreamName})
 	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}

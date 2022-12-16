@@ -36,7 +36,8 @@ func BuildBackProcessor(
 ) (*Backprocessor, error) {
 	var execOutputReader *execout.LinearReader
 	if reqDetails.ShouldStreamCachedOutputs() {
-		requestedModule := outputGraph.RequestedMapperModules()[0]
+		// note: since we are *NOT* in a sub-request and are setting up output module is a map
+		requestedModule := outputGraph.RequestedMapperModule()
 		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
 		execOutputReader = execout.NewLinearReader(

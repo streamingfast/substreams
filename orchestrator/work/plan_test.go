@@ -25,7 +25,7 @@ func TestWorkPlanning(t *testing.T) {
 		upToBlock   uint64
 		subreqSplit int
 		state       storage.ModuleStorageStateMap
-		outMods     string
+		outMod      string
 
 		expectWaitingJobs []*Job
 		expectReadyJobs   []*Job
@@ -37,7 +37,7 @@ func TestWorkPlanning(t *testing.T) {
 			state: TestModStateMap(
 				TestStoreState("B", "0-10"),
 			),
-			outMods: "B",
+			outMod: "B",
 			expectReadyJobs: []*Job{
 				TestJob("B", "0-10", 4),
 			},
@@ -50,43 +50,39 @@ func TestWorkPlanning(t *testing.T) {
 				TestStoreState("As", "0-10,10-20,30-40,40-50,50-60"),
 				TestStoreState("B", "0-10"),
 			),
-			outMods: "As,B",
+			outMod: "As",
 			expectReadyJobs: []*Job{
 				TestJob("As", "0-20", 4),
-				TestJob("B", "0-10", 4),
+				//TestJob("B", "0-10", 4),
 				TestJob("As", "30-50", 3),
 				TestJob("As", "50-60", 2),
 			},
 		},
-		{
-			name:        "test relative priority",
-			upToBlock:   60,
-			subreqSplit: 10,
-			state: TestModStateMap(
-				TestStoreState("G", "0-10,50-60"),
-				TestMapState("B", "0-60"),
-				TestStoreState("As", "0-10,30-40,50-60"),
-				TestStoreState("D", "10-20,50-60"),
-			),
-			outMods: "As,D,G",
-			expectWaitingJobs: []*Job{
-				TestJobDeps("G", "0-10", 3, "As,B,E"),
-				TestJobDeps("G", "50-60", -2, "As,B,E"),
-				TestJobDeps("D", "10-20", 4, "B"),
-				TestJobDeps("D", "50-60", 0, "B"),
-			},
-			expectReadyJobs: []*Job{
-				TestJob("As", "0-10", 6),
-				TestJob("B", "0-60", 6),
-				TestJob("As", "30-40", 3),
-				TestJob("As", "50-60", 1),
-			},
-		},
+		//{
+		//	name:        "test relative priority",
+		//	upToBlock:   60,
+		//	subreqSplit: 10,
+		//	state: TestModStateMap(
+		//		TestStoreState("G", "0-10,50-60"),
+		//		TestMapState("B", "0-60"),
+		//		TestStoreState("As", "0-10,30-40,50-60"),
+		//		TestStoreState("D", "10-20,50-60"),
+		//	),
+		//	outMod: "As,D,G",
+		//	expectWaitingJobs: []*Job{
+		//		TestJobDeps("G", "0-10", 3, "As,B,E"),
+		//		TestJobDeps("G", "50-60", -2, "As,B,E"),
+		//		TestJobDeps("D", "10-20", 4, "B"),
+		//		TestJobDeps("D", "50-60", 0, "B"),
+		//	},
+		//	expectReadyJobs: []*Job{
+		//		TestJob("As", "0-10", 6),
+		//		TestJob("B", "0-60", 6),
+		//		TestJob("As", "30-40", 3),
+		//		TestJob("As", "50-60", 1),
+		//	},
+		//},
 	}
-
-	// TODO(abourget): il faut donner à splitWorkIntoJobs() de quoi de plus slim
-	//  et moins loin.. une `Request` est trop gros, faudrait lui préparer plutôt
-	//  un OutputModuleGraph avec le data nécessaire à tester `splitWorkIntoJobs`.
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -96,7 +92,7 @@ func TestWorkPlanning(t *testing.T) {
 					Modules:  mods,
 					Binaries: []*pbsubstreams.Binary{{}},
 				},
-				OutputModules: strings.Split(test.outMods, ","),
+				OutputModule: test.outMod,
 			})
 			require.NoError(t, err)
 

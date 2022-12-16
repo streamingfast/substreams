@@ -12,15 +12,12 @@ import (
 
 type getRecentFinalBlockFunc func() (uint64, error)
 
-func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, getRecentFinalBlock getRecentFinalBlockFunc) (req *reqctx.RequestDetails, err error) {
+func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, isOutputModule reqctx.IsOutputModuleFunc, getRecentFinalBlock getRecentFinalBlockFunc) (req *reqctx.RequestDetails, err error) {
 	req = &reqctx.RequestDetails{
 		Request:        request,
 		IsSubRequest:   isSubRequest,
 		StopBlockNum:   request.StopBlockNum,
-		IsOutputModule: map[string]bool{},
-	}
-	for _, modName := range request.OutputModules {
-		req.IsOutputModule[modName] = true
+		IsOutputModule: isOutputModule,
 	}
 
 	// FIXME:

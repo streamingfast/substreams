@@ -128,6 +128,7 @@ func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	s := &StoreSquasher{
 		partialsChunks: make(chan block.Ranges, 10),
 		ranges:         []*block.Range{},
+		store:          newTestStore(t, dstore.NewMockStore(nil), 0),
 	}
 	go func() {
 		s.partialsChunks <- block.ParseRanges("0-10")

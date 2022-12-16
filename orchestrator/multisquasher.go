@@ -121,12 +121,12 @@ func (s *MultiSquasher) Launch(ctx context.Context) {
 }
 
 func (s *MultiSquasher) Squash(moduleName string, partialsRanges block.Ranges) error {
-	squashable, ok := s.storeSquashers[moduleName]
+	squashableStore, ok := s.storeSquashers[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in storeSquashers module registry", moduleName)
 	}
 
-	return squashable.squash(partialsRanges)
+	return squashableStore.squash(partialsRanges)
 }
 
 func (s *MultiSquasher) Wait(ctx context.Context) (out store.Map, err error) {
@@ -147,12 +147,12 @@ func (s *MultiSquasher) waitUntilCompleted(ctx context.Context) error {
 	logger.Info("squasher waiting until all are completed",
 		zap.Int("store_count", len(s.storeSquashers)),
 	)
-	for _, squashable := range s.storeSquashers {
+	for _, squashableStore := range s.storeSquashers {
 		logger.Info("shutting down squasher",
-			zap.String("module", squashable.moduleName()),
+			zap.String("module", squashableStore.moduleName()),
 		)
-		if err := squashable.waitForCompletion(ctx); err != nil {
-			return fmt.Errorf("%q completed with err: %w", squashable.moduleName(), err)
+		if err := squashableStore.waitForCompletion(ctx); err != nil {
+			return fmt.Errorf("%q completed with err: %w", squashableStore.moduleName(), err)
 		}
 	}
 	return nil

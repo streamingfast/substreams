@@ -6,7 +6,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func ValidateRequest(request *pbsubstreams.Request, blockType string) error {
+func ValidateRequest(request *pbsubstreams.Request, blockType string, isSubRquest bool) error {
 	if request.StartBlockNum < 0 {
 		// TODO(abourget): remove this check once we support StartBlockNum being negative
 		return fmt.Errorf("negative start block %d is not accepted", request.StartBlockNum)
@@ -14,6 +14,10 @@ func ValidateRequest(request *pbsubstreams.Request, blockType string) error {
 
 	if request.Modules == nil {
 		return fmt.Errorf("no modules found in request")
+	}
+
+	if err := validateOutputModule(request); err != nil {
+		return fmt.Errorf("output module: %w", err)
 	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {
@@ -38,7 +42,30 @@ func ValidateRequest(request *pbsubstreams.Request, blockType string) error {
 				}
 			}
 		}
+		// We want to make sure thate the outputModule is a map for None Sub-Request
+		if !isSubRquest {
+			if mod.Name == request.GetOutputModuleName() {
+				if _, ok := mod.Kind.(*pbsubstreams.Module_KindMap_); !ok {
+					return fmt.Errorf("the output module specified must be of kind 'map'")
+				}
+			}
+		}
+
 	}
 
+	return nil
+}
+
+func validateOutputModule(request *pbsubstreams.Request) error {
+	if request.OutputModule != "" {
+		return nil
+	}
+	outputCount := len(request.OutputModules)
+	if outputCount == 0 {
+		return fmt.Errorf("no output module found in request")
+	}
+	if outputCount > 1 {
+		return fmt.Errorf("multiple output modules is not accepted")
+	}
 	return nil
 }

@@ -2,6 +2,8 @@ package reqctx
 
 import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
+type IsOutputModuleFunc func(name string) bool
+
 type RequestDetails struct {
 	Request *pbsubstreams.Request
 
@@ -11,7 +13,7 @@ type RequestDetails struct {
 	StopBlockNum          uint64
 
 	IsSubRequest   bool
-	IsOutputModule map[string]bool
+	IsOutputModule IsOutputModuleFunc
 }
 
 // Called to determine if we *really* need to save this store snapshot. We don't need
@@ -19,11 +21,11 @@ type RequestDetails struct {
 // leaf stores we've been asked to produce.  We know the scheduler will have
 // created jobs to produce those stores we're skipping here.
 func (d *RequestDetails) SkipSnapshotSave(modName string) bool {
-	return d.IsSubRequest && !d.IsOutputModule[modName]
+	return d.IsSubRequest && !d.IsOutputModule(modName)
 }
 
 func (d *RequestDetails) ShouldReturnWrittenPartialsInTrailer(modName string) bool {
-	return d.IsSubRequest && d.IsOutputModule[modName]
+	return d.IsSubRequest && d.IsOutputModule(modName)
 }
 
 func (d *RequestDetails) ShouldReturnProgressMessages() bool {

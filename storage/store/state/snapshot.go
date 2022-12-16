@@ -11,7 +11,7 @@ import (
 
 type storeSnapshots struct {
 	Completes block.Ranges // Shortest completes first, largest last.
-	Partials  block.Ranges // First partials first, last last
+	Partials  block.Ranges // First partials first, last
 }
 
 func (s *storeSnapshots) Sort() {

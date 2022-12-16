@@ -134,13 +134,8 @@ func (p *Pipeline) GetStoreMap() store.Map {
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
-	outputStoreCount := len(reqDetails.Request.OutputModules)
-	if outputStoreCount > 1 {
-		// currently only support 1 lead stores
-		return nil, fmt.Errorf("invalid number of backprocess leaf store: %d", outputStoreCount)
-	}
 
-	outputModuleName := reqDetails.Request.OutputModules[0]
+	outputModuleName := reqDetails.Request.GetOutputModuleName()
 
 	ttrace.SpanContextFromContext(context.Background())
 	storeMap := store.NewMap()

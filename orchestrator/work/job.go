@@ -39,8 +39,8 @@ func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams
 		StopBlockNum:  j.RequestRange.ExclusiveEndBlock,
 		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
-		Modules:       originalModules,
-		OutputModules: []string{j.ModuleName},
+		Modules:      originalModules,
+		OutputModule: j.ModuleName,
 	}
 }
 

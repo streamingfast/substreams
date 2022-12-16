@@ -55,8 +55,8 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	var err error
 	ctx, span := reqctx.WithSpan(ctx, "running_job")
 	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.StringSlice("module_names", request.OutputModules))
-	span.SetAttributes(attribute.Int64("start_block", int64(request.StartBlockNum)))
+	span.SetAttributes(attribute.String("output_module", request.GetOutputModuleName()))
+	span.SetAttributes(attribute.Int64("start_block", request.StartBlockNum))
 	span.SetAttributes(attribute.Int64("stop_block", int64(request.StopBlockNum)))
 	logger := w.logger
 

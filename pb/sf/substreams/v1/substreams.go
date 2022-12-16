@@ -6,6 +6,15 @@ import (
 	"github.com/streamingfast/bstream"
 )
 
+// GetOutputModuleName is a helper to retrieve the output module name as we transition to a single output
+// the assumption is that the Request has been validated before hence we can assume to there is 1 element in outputModules
+func (x *Request) GetOutputModuleName() string {
+	if x.OutputModule != "" {
+		return x.OutputModule
+	}
+	return x.OutputModules[0]
+}
+
 func StepToProto(step bstream.StepType, finalBlocksOnly bool) (out ForkStep, skip bool) {
 	if finalBlocksOnly {
 		if step.Matches(bstream.StepIrreversible) {
@@ -28,48 +37,25 @@ type ModuleOutputData interface {
 }
 
 func ValidateRequest(req *Request) error {
-	outMods := map[string]bool{}
 	allMods := map[string]bool{}
 	seenStores := map[string]bool{}
+
+	if req.OutputModule == "" && len(req.OutputModules) > 1 {
+		return fmt.Errorf("multiple output modules is not accepted")
+	}
+
 	for _, mod := range req.Modules.Modules {
 		allMods[mod.Name] = true
 		if _, ok := mod.Kind.(*Module_KindStore_); ok {
 			seenStores[mod.Name] = true
 		}
-	}
-	for _, outMod := range req.OutputModules {
-		outMods[outMod] = true
-		if !allMods[outMod] {
-			return fmt.Errorf("output module %q requested but not defined modules graph", outMod)
-		}
+
 	}
 
+	//TODO: should we remove this
 	for _, outMod := range req.InitialStoreSnapshotForModules {
 		if !seenStores[outMod] {
 			return fmt.Errorf("initial store snapshots for module: %q: no such 'store' module defined modules graph", outMod)
-		}
-	}
-
-	if req.ProductionMode {
-		if err := validateProductionMode(req); err != nil {
-			return fmt.Errorf("production_mode: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func validateProductionMode(req *Request) error {
-	if len(req.OutputModules) != 1 {
-		return fmt.Errorf("output_modules need to be a single map module")
-	}
-
-	outModName := req.OutputModules[0]
-	for _, mod := range req.Modules.Modules {
-		if outModName == mod.Name {
-			if _, ok := mod.Kind.(*Module_KindMap_); !ok {
-				return fmt.Errorf("the single output_modules specified needs to be of kind 'map'")
-			}
 		}
 	}
 	return nil

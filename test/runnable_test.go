@@ -19,7 +19,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
@@ -34,7 +33,7 @@ type testRun struct {
 	Cursor                 *bstream.Cursor
 	StartBlock             int64
 	ExclusiveEndBlock      uint64
-	ModuleNames            []string
+	ModuleName             string
 	SubrequestsSplitSize   uint64
 	ParallelSubrequests    uint64
 	NewBlockGenerator      BlockGeneratorFactory
@@ -47,8 +46,8 @@ type testRun struct {
 	TempDir   string
 }
 
-func newTestRun(startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleNames ...string) *testRun {
-	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleNames: moduleNames, LinearHandoffBlockNum: linearHandoffBlock}
+func newTestRun(startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleName string) *testRun {
+	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
 }
 
 func (f *testRun) Run(t *testing.T) error {
@@ -75,7 +74,7 @@ func (f *testRun) Run(t *testing.T) error {
 		StopBlockNum:   f.ExclusiveEndBlock,
 		StartCursor:    opaqueCursor,
 		Modules:        pkg.Modules,
-		OutputModules:  f.ModuleNames,
+		OutputModule:   f.ModuleName,
 		ProductionMode: f.ProductionMode,
 	}
 
@@ -223,7 +222,7 @@ func processRequest(
 	if isSubRequest {
 		ctx = metadata.NewIncomingContext(ctx, metadata.MD{"substreams-partial-mode": []string{"true"}})
 	}
-	return svc.TestBlocks(ctx, request, responseCollector.Collect)
+	return svc.TestBlocks(ctx, isSubRequest, request, responseCollector.Collect)
 }
 
 type TestRunner struct {
@@ -238,7 +237,7 @@ type TestRunner struct {
 	generator TestBlockGenerator
 }
 
-func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, cursor string, _ bool) (service.Streamable, error) {
+func (r *TestRunner) StreamFactory(_ context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool) (service.Streamable, error) {
 	r.pipe = h.(*pipeline.Pipeline)
 	r.Shutter = shutter.New()
 	r.generator = r.blockGeneratorFactory(uint64(startBlockNum), stopBlockNum)
@@ -279,23 +278,4 @@ func (o *Obj) Cursor() *bstream.Cursor {
 
 func (o *Obj) Step() bstream.StepType {
 	return o.step
-}
-
-type TestStoreDelta struct {
-	Operation string      `json:"op"`
-	OldValue  interface{} `json:"old"`
-	NewValue  interface{} `json:"new"`
-}
-
-type TestStoreOutput struct {
-	StoreName string            `json:"name"`
-	Deltas    []*TestStoreDelta `json:"deltas"`
-}
-type TestMapOutput struct {
-	ModuleName string                      `json:"name"`
-	Result     *pbsubstreamstest.MapResult `json:"result"`
-}
-type AssertMapOutput struct {
-	ModuleName string `json:"name"`
-	Result     bool   `json:"result"`
 }

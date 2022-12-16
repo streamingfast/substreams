@@ -156,7 +156,9 @@ func TestBuildRequestDetails(t *testing.T) {
 	req, err := BuildRequestDetails(&pbsubstreams.Request{
 		StartBlockNum:  10,
 		ProductionMode: false,
-	}, true, func() (uint64, error) {
+	}, true, func(name string) bool {
+		return false
+	}, func() (uint64, error) {
 		assert.True(t, true, "should pass here")
 		return 999, nil
 	})
@@ -167,7 +169,9 @@ func TestBuildRequestDetails(t *testing.T) {
 	req, err = BuildRequestDetails(&pbsubstreams.Request{
 		StartBlockNum:  10,
 		ProductionMode: true,
-	}, true, func() (uint64, error) {
+	}, true, func(name string) bool {
+		return true
+	}, func() (uint64, error) {
 		return 999, nil
 	})
 	require.NoError(t, err)

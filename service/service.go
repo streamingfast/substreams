@@ -68,8 +68,8 @@ func New(
 	clientFactory := client.NewFactory(substreamsClientConfig)
 
 	runtimeConfig := config.NewRuntimeConfig(
-		1000, // overriden by Options
-		1000, // overriden by Options
+		1000, // overridden by Options
+		1000, // overridden by Options
 		subrequestSplitSize,
 		parallelSubRequests,
 		stateStore,
@@ -178,7 +178,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.Strings("modules", moduleNames),
-		zap.Strings("output_modules", request.OutputModules),
+		zap.String("output_module", request.GetOutputModuleName()),
 	}
 	if !isSubRequest {
 		fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
@@ -187,9 +187,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 			fields = append(fields, zap.String("user_id", id))
 		}
 	}
-	logger.Info("incoming substreams Block request", fields...)
+	logger.Info("incoming substreams Blockd request", fields...)
 
-	err = s.blocks(ctx, runtimeConfig, request, respFunc, streamSrv)
+	err = s.blocks(ctx, runtimeConfig, isSubRequest, request, respFunc, streamSrv)
 	grpcError = s.toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -199,21 +199,16 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	return grpcError
 }
 
-func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
+func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, isSubRequest bool, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
 	logger := reqctx.Logger(ctx)
 
-	if err := outputmodules.ValidateRequest(request, s.blockType); err != nil {
+	if err := outputmodules.ValidateRequest(request, s.blockType, isSubRequest); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
-	}
-
-	isSubRequest, err := s.isSubRequest(ctx)
-	if err != nil {
-		return err
 	}
 
 	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, isSubRequest)
@@ -223,12 +218,12 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	logger.Debug("executing subrequest",
-		zap.Strings("output_modules", request.OutputModules),
+		zap.String("output_module", request.GetOutputModuleName()),
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 	)
 
-	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, s.getRecentFinalBlock)
+	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, outputGraph.IsOutputModule, s.getRecentFinalBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
@@ -258,12 +253,12 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
 	//  *
 	var execOutWriter *execout.Writer
-	mapperMods := outputGraph.RequestedMapperModulesMap()
-	if len(mapperMods) != 0 && isSubRequest {
+	moduleMapper := outputGraph.RequestedMapperModule()
+	if moduleMapper != nil && isSubRequest {
 		execOutWriter = execout.NewWriter(
 			requestDetails.LinearHandoffBlockNum,
 			requestDetails.StopBlockNum,
-			mapperMods,
+			map[string]bool{moduleMapper.Name: true},
 			execOutputConfigs,
 			isSubRequest,
 		)
@@ -296,9 +291,10 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("request_start_cursor", request.StartCursor),
 		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
-		zap.Strings("outputs", request.OutputModules),
+		zap.String("output_module", request.GetOutputModuleName()),
 	)
-	if err := pipe.Init(ctx); err != nil {
+	if err := pipe.
+		Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
@@ -360,7 +356,7 @@ func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats
 		return reqctx.WithLogger(ctx, logger), metrics.NewNoopStats()
 	}
 
-	// we only want to meaure stats when enabled an on the Main request
+	// we only want to measure stats when enabled an on the Main request
 	if withRequestStats {
 		stats := metrics.NewReqStats(logger)
 		return reqctx.WithReqStats(ctx, stats), stats
@@ -369,10 +365,6 @@ func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats
 }
 
 func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
-	/*
-		FIXME: this entire `if` is not good, the ctx is from the StreamServer so there
-		 is no substreams-partial-mode, the actual flag is substreams-partial-mode-enabled
-	*/
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		partialMode := md.Get("substreams-partial-mode")
 		if len(partialMode) == 1 && partialMode[0] == "true" {

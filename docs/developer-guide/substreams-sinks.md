@@ -14,7 +14,11 @@ An important design aspect of Substreams is the deciiosn to rely on Google Proto
 
 ## **General Requirements**
 
-One of the critical steps involved is the creation of a protobuf that forms data to meet the requirements of a sink. The protobuf is populated with blockchain data captured in a Substreams module and then used as output. Existing sink solutions, such as PostgreSQL, provided by StreamingFast, demonstrate this functionality. It’s important to note that databases are merely one type of sink.
+The first step of having your Substreams ready to be consumed by a particular Sink involves the creation of a `map` module whose output type is a Protobuf accepted by it. This specific Protobuf is populated from your own Substreams Protobuf types, you can see this as a transformation of your types into a format suitable for Sink to ingest.
+
+For example, database-likes Substreams Sinks such as PostgreSQL or MongoDB accepts a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
+
+It’s important to note that databases are merely one type of sink, the sink you are targeting determines what output type you should respect.
 
 The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most of them performing some kind of storage. 
 

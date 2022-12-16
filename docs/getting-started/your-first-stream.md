@@ -39,7 +39,6 @@ The endpoint is required by Substreams to connect to for data retrieval. The dat
 
 The Substreams package being run is also passed to the `substreams` command. [https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg ](https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg)\
 
-
 This example points to the StreamingFast Substreams Template in the form of a `.spkg` file. In full Substreams setups, a configuration file `substreams.yaml` is generally used.
 
 #### Module
@@ -55,4 +54,6 @@ Cease block processing with `--stop-block +1.` The +1 option will request a sing
 
 ### Next steps
 
-At this point, the Substreams CLI is installed and should be functioning correctly. Simple data was sent back to the terminal to provide an idea of what is now possible. The [Developer Guide](broken-reference) provides an in-depth look at Substreams and how to target specific blockchain data.
+At this point, the Substreams CLI is installed and should be functioning correctly. Simple data was sent back to the terminal to provide an idea of the possibilities. The [Developer Guide](https://substreams.streamingfast.io/developer-guide/overview) provides an in-depth look at Substreams and how to target specific blockchain data.
+
+StreamingFast and the Substreams community have provided an assortment of examples to explore and learn from. Find them on the [examples page](https://substreams.streamingfast.io/reference-and-specs/examples) in the Substreams documentation.

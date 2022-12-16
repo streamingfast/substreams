@@ -23,10 +23,11 @@ The manifest below is from the [Substreams Template example](https://github.com/
 {% endhint %}
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}
+
 ```yaml
 specVersion: v0.1.0
 package:
-  name: "substreams_example"
+  name: 'substreams_example'
   version: v0.1.0
 
 imports:
@@ -44,7 +45,7 @@ binaries:
     file: ./target/wasm32-unknown-unknown/release/substreams_example.wasm
 
 modules:
-  - name: block_to_transfers
+  - name: map_transfers
     kind: map
     initialBlock: 12287507
     inputs:
@@ -52,15 +53,15 @@ modules:
     output:
       type: proto:eth.erc721.v1.Transfers
 
-  - name: nft_state
+  - name: store_transfers
     kind: store
     initialBlock: 12287507
     updatePolicy: add
     valueType: int64
     inputs:
-      - map: block_to_transfers
-
+      - map: map_transfers
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -96,29 +97,29 @@ The manifest defines a list of [modules](../concepts/modules.md) used in the Sub
 The modules are Rust functions containing the business logic for the implementation.
 
 {% hint style="info" %}
-**Note**: The manifest in the Substreams Template example lists two modules: `block_to_transfers` and `nft_state.`
+**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The naming convention for Substreams modules is to prefix the name with either `map_` or `store_` depending on the module type.
 {% endhint %}
 
-### **`block_to_transfers`**
+### **`map_transfers`**
 
-The `block_to_transfers` module extracts all ERC721 transfers related to a specific smart contract address. The module receives Ethereum blocks as [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto).
+The `map_transfers` module extracts all ERC721 transfers related to a specific smart contract address. The module receives Ethereum blocks as [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto).
 
-The output for the `blocks_to_transfers` module is a list of ERC721 transfers. The business logic for `block_to_transfers` module is written as a Rust function.
+The output for the `map_transfers` module is a list of ERC721 transfers. The business logic for `map_transfers` module is written as a Rust function.
 
 {% hint style="info" %}
 **Note**: The `initialBlock` is set to `12287507` in the Substreams Template example because the first transfers of tokens originated from the contracts at that block.
 {% endhint %}
 
-### **`nft_state`**
+### **`store_transfers`**
 
-The `nft_state` store module receives transfers in each block extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.&#x20;
+The `store_transfers` store module receives transfers in each block extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.&#x20;
 
 The inputs of the module are protobuf models defined as: `proto:eth.erc721.v1.Transfers`.&#x20;
 
-The `eth.erc721.v1.Transfers` protobuf module represents a list of ERC721 transfers in a  block.&#x20;
+The `eth.erc721.v1.Transfers` protobuf module represents a list of ERC721 transfers in a block.&#x20;
 
 {% hint style="info" %}
 **Note**: The `eth.erc721.v1.Transfers` protobuf module is also used as the output for the `map` module.
 {% endhint %}
 
-The stores `valueType` is `int64` and the merge strategy is `add.`
+The store's `valueType` is `int64` and the merge strategy is `add.`

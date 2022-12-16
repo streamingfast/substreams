@@ -7,6 +7,7 @@ description: StreamingFast Substreams module handler creation
 After the ABI and `Protobuf` Rust code has been generated the handler code needs to be written. The code should be saved into the `src` directory and use the filename `lib.rs.`
 
 {% code title="src/lib.rs" %}
+
 ```rust
 mod abi;
 mod pb;
@@ -63,6 +64,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
     return format!("total:{}:{}", Hex(holder), Hex(TRACKED_CONTRACT));
 }
 ```
+
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -94,16 +96,16 @@ const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13
 Define the `map` module. Here is the module definition from the example Substreams manifest.
 
 ```yaml
-  - name: block_to_transfers
-    kind: map
-    initialBlock: 12287507
-    inputs:
-      - source: sf.ethereum.type.v2.Block
-    output:
-      type: proto:eth.erc721.v1.Transfers
+- name: map_transfers
+  kind: map
+  initialBlock: 12287507
+  inputs:
+    - source: sf.ethereum.type.v2.Block
+  output:
+    type: proto:eth.erc721.v1.Transfers
 ```
 
-Notice the: `name: block_to_transfers`. This name should correspond to our handler function name.
+Notice the: `name: map_transfers`. This name should correspond to our handler function name.
 
 Also notice, there is one input and one output defined.&#x20;
 
@@ -114,7 +116,7 @@ The output is typed as `proto:eth.erc721.v1.Transfers`. This is the custom proto
 ```rust
 /// Extracts transfers events from the contract
 #[substreams::handlers::map]
-fn block_to_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
+fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
     ...
 }
 ```
@@ -159,25 +161,25 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 Now define the `store` module. As a reminder, here is the module definition from the example Substreams manifest.
 
 ```yaml
-  - name: nft_state
-    kind: store
-    initialBlock: 12287507
-    updatePolicy: add
-    valueType: int64
-    inputs:
-      - map: block_to_transfers
+- name: store_transfers
+  kind: store
+  initialBlock: 12287507
+  updatePolicy: add
+  valueType: int64
+  inputs:
+    - map: map_transfers
 ```
 
 {% hint style="info" %}
-_Note: `name: nft_state` will also correspond to the handler function name._
+_Note: `name: store_transfers` will also correspond to the handler function name._
 {% endhint %}
 
-The input corresponds to the output of the `block_to_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code. Resulting in the following function signature.
+The input corresponds to the output of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code. Resulting in the following function signature.
 
 ```rust
 /// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
 #[substreams::handlers::store]
-fn nft_state(transfers: erc721::Transfers, s: store::StoreAddInt64) {
+fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
     ...
 }
 ```
@@ -189,7 +191,7 @@ _Note: the `store` will always receive itself as its own last input._&#x20;
 In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
 
 {% hint style="info" %}
-_Note: ****_&#x20;
+_Note: \*\*\*\*_&#x20;
 
 _**Store Types**_
 
@@ -226,7 +228,7 @@ When an ordinal is specified the order of execution is guaranteed. For one execu
 
 #### Key
 
-Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.&#x20;
+Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.&#x20;
 
 In the example, if the `generate_key` function would simply return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders.&#x20;
 

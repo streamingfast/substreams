@@ -18,7 +18,7 @@ One of the critical steps involved is the creation of a protobuf that forms data
 
 The consuming application, or code, can read protobuf-based data being sent out of Substreams. Protobufs are flexible and the expectations of the consuming application can be matched closely with mindful data design. Substreams will send the data through a map module using a protobuf defined by the developer. The data is then consumed by another application that will route the data to the desired location, or sink.
 
-An understanding of basic Substreams fundamentals is suggested before continuing. Learn more about modules basics in the Substreams documentation at the following link.
+An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules basics in the Substreams documentation at the following link.
 
 https://substreams.streamingfast.io/concept-and-fundamentals/modules
 

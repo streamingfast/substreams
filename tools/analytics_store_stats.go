@@ -39,7 +39,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 	storePath := args[1]
 
-	baseDStore, err := dstore.NewStore(storePath, "", "", false)
+	baseDStore, err := dstore.NewStore(storePath, "zst", "zstd", false)
 	if err != nil {
 		return fmt.Errorf("creating base store: %w", err)
 	}
@@ -253,12 +253,24 @@ func getStore(ctx context.Context, conf *store.Config) (store.Store, []*store.Fi
 		kvFiles = append(kvFiles, file)
 	}
 
+	if len(kvFiles) == 0 {
+		zlog.Debug("store only contains partial files", zap.String("module", conf.Name()), zap.String("hash", conf.ModuleHash()))
+		return nil, nil, EmptyStoreError
+	}
+
 	start = time.Now()
 	sort.Slice(kvFiles, func(i, j int) bool { //reverse sort
 		return kvFiles[i].EndBlock >= kvFiles[j].EndBlock
 	})
 	zlog.Debug("sorting snapshot files", zap.Duration("duration", time.Now().Sub(start)))
-	latestFiles := kvFiles[:5]
+
+	var latestFiles []*store.FileInfo
+	if len(kvFiles) > 5 {
+		latestFiles = kvFiles[:5]
+	} else {
+		latestFiles = kvFiles
+	}
+
 	latestFile := kvFiles[0]
 
 	start = time.Now()

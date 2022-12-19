@@ -1,0 +1,12 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/streamingfast/substreams/pb
+plugins:
+  - name: go
+    out: proto
+    opt: paths=source_relative
+  - name: connect-go
+    out: proto
+    opt: paths=source_relative

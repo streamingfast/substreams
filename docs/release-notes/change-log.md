@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
-* Added `substreams proxy <package>` subcommand to allow calling substreams with a pre-defined package easily from a web page
+* Added `substreams tools proxy <package>` subcommand to allow calling substreams with a pre-defined package easily from a web browser using bufbuild/connect-web
 
 * Lowered GRPC client keep alive frequency, to prevent "Too Many Pings" disconnection issue.
 

@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	ssconnect "github.com/streamingfast/substreams/proto/sf/substreams/v1/substreamsv1connect"
+	"github.com/streamingfast/substreams/tools"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
@@ -101,7 +102,7 @@ func init() {
 	proxyCmd.Flags().String("force-manifest", "", "if non-empty, the requests' modules will be replaced by the modules loaded from this location. Can be a local spkg or yaml file, or a remote (HTTP) spkg file.")
 	proxyCmd.Flags().Uint64("force-start-block", 0, "if non-zero, the requests' start-block will be replaced by this value")
 
-	rootCmd.AddCommand(proxyCmd)
+	tools.Cmd.AddCommand(proxyCmd)
 }
 
 func runProxy(cmd *cobra.Command, args []string) error {

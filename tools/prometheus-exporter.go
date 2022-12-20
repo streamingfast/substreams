@@ -125,7 +125,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 			OutputModules: outputStreamNames,
 		}
 
-		if err := pbsubstreams.ValidateRequest(subReq); err != nil {
+		if err := pbsubstreams.ValidateRequest(subReq, false); err != nil {
 			zlog.Error("validate request", zap.Error(err))
 			markFailure(endpoint, begin)
 			connClose()

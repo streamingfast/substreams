@@ -36,27 +36,59 @@ type ModuleOutputData interface {
 	isModuleOutput_Data()
 }
 
-func ValidateRequest(req *Request) error {
-	allMods := map[string]bool{}
+func ValidateRequest(req *Request, isSubRequest bool) error {
 	seenStores := map[string]bool{}
 
-	if req.OutputModule == "" && len(req.OutputModules) > 1 {
-		return fmt.Errorf("multiple output modules is not accepted")
+	if req.StartBlockNum < 0 {
+		// TODO(abourget): remove this check once we support StartBlockNum being negative
+		return fmt.Errorf("negative start block %d is not accepted", req.StartBlockNum)
 	}
 
+	if req.Modules == nil {
+		return fmt.Errorf("no modules found in request")
+	}
+
+	if err := validateOutputModule(req); err != nil {
+		return fmt.Errorf("output module: %w", err)
+	}
+
+	outputModule := req.GetOutputModuleName()
+	outputModuleFound := false
 	for _, mod := range req.Modules.Modules {
-		allMods[mod.Name] = true
 		if _, ok := mod.Kind.(*Module_KindStore_); ok {
 			seenStores[mod.Name] = true
 		}
-
+		if mod.Name == outputModule {
+			if !isSubRequest {
+				if _, ok := mod.Kind.(*Module_KindStore_); ok {
+					return fmt.Errorf("output module must be of kind 'map'")
+				}
+			}
+			outputModuleFound = true
+		}
+	}
+	if !outputModuleFound {
+		return fmt.Errorf("output module %q not found in modules", outputModule)
 	}
 
-	//TODO: should we remove this
-	for _, outMod := range req.DebugInitialStoreSnapshotForModules {
-		if !seenStores[outMod] {
-			return fmt.Errorf("initial store snapshots for module: %q: no such 'store' module defined modules graph", outMod)
+	for _, storeSnapshot := range req.DebugInitialStoreSnapshotForModules {
+		if !seenStores[storeSnapshot] {
+			return fmt.Errorf("initial store snapshots for module: %q: no such 'store' module defined modules graph", storeSnapshot)
 		}
+	}
+	return nil
+}
+
+func validateOutputModule(req *Request) error {
+	if req.OutputModule != "" {
+		return nil
+	}
+	outputCount := len(req.OutputModules)
+	if outputCount == 0 {
+		return fmt.Errorf("no output module found in request")
+	}
+	if outputCount > 1 {
+		return fmt.Errorf("multiple output modules is not accepted")
 	}
 	return nil
 }

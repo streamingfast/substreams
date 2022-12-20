@@ -23,12 +23,9 @@ func init() {
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
-
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().BoolP("debug-initial-snapshots", "i", false, "Load an initial snapshot at start block, before continuing processing. Available only in development mode (production mode = false)")
-
 	runCmd.Flags().Bool("production-mode", false, "Enable production mode, with high-speed forward processing: limits stream to a single mapper module.")
-
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -53,7 +50,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	outputStreamName := args[1]
+	outputModule := args[1]
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
@@ -62,7 +59,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
-		sb, err := graph.ModuleInitialBlock(outputStreamName)
+		sb, err := graph.ModuleInitialBlock(outputModule)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
 		}
@@ -93,31 +90,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 		StopBlockNum:   stopBlock,
 		ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:        pkg.Modules,
-		OutputModule:   outputStreamName,
-		OutputModules:  []string{outputStreamName}, //added for backwards compatibility, will be removed
+		OutputModule:   outputModule,
+		OutputModules:  []string{outputModule}, //added for backwards compatibility, will be removed
 		ProductionMode: mustGetBool(cmd, "production-mode"),
 	}
 
-	// TODO: need to handle this case in the refactor
-	//if !req.ProductionMode && mustGetBool(cmd, "debug-initial-snapshots") {
-	//	for _, modName := range req.OutputModules {
-	//		for _, v := range pkg.Modules.Modules {
-	//			if modName != v.Name {
-	//				continue
-	//			}
-	//
-	//			if _, isStore := v.Kind.(*pbsubstreams.Module_KindStore_); isStore {
-	//				req.DebugInitialStoreSnapshotForModules = append(req.DebugInitialStoreSnapshotForModules, modName)
-	//			}
-	//		}
-	//	}
-	//}
-
-	if err := pbsubstreams.ValidateRequest(req); err != nil {
+	if err := pbsubstreams.ValidateRequest(req, false); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
 
-	ui := tui.New(req, pkg, []string{outputStreamName})
+	ui := tui.New(req, pkg, []string{outputModule})
 	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}

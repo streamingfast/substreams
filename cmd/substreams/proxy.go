@@ -70,7 +70,7 @@ func (cs *ConnectServer) Blocks(
 	}
 	defer connClose()
 
-	if err := pbsubstreams.ValidateRequest(newReq); err != nil {
+	if err := pbsubstreams.ValidateRequest(newReq, false); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
 

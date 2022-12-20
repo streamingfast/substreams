@@ -6,9 +6,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Firehose integration
+### Output Module
 
-* Service now needs to pass a `client.Factory` instead of some client configuration.
+We only support 1 output module when running a substreams, moreover the output module must be of kind `map`. Multiple factors have motivated this change:
+
+- Recently we have seen incorrect usage of `store` module. A `store` module was not intended to be used as a persistent long term storage,  `store` modules were conceived as a place to aggregate data for later steps in computation. Using it as a persistent storage make the store unmanageable. 
+- Parallel procssing does not support a `store` as it's last step.
+
+*Note*
+We added `output_module` to the Substream request and kept  `output_modules` to remain backwards compatible. If an `output_module` is specified we will honor that module. If not we will check `output_modules` to ensure there is only 1 output module   
+
+*Migration Path*
+
+If you are currently using a `store` module as your output store. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and return the deltas.
+
+### Production vs Development Mode
+
+We introduce `production` and `development` mode when running substreams. 
+The mode impacts how the `substreams` get executed, specifically:
+
+ - the time to first byte 
+ - the speed at which large ranges get executed
+ - the module logs sent back to the client
+
+The difference between the modes are:
+
+- Forward Processing is enabled in `production` mode but *not* in `development` mode. As such the time to first byte in `development` mode is faster 
+- In `development` the client will receive all the logs of the executed `modules`. While in `production` mode the client will only receive the logs of the output module
+- In `development` mode you may request specific `store` snapshot that are in the execution tree 
+
+### Parallel Processing
+
+There are 2 steps while parallel processing: back processing and forward processing. 
+
+Back processing, consists of executing in parallel block ranges from the module initial block up to the start block of the request. 
+If the start block of the request matches module initial block, there is no back processing to perform. 
+
+Forward processing, consist of executing in parallel block ranges from the start 
+block of the request up to last known final block (the irreversible block) or the stop block of the request, depending on which is smaller.
+Foward processing significantly improves the performance of the Substreams, but we loose the ability to stream the module logs.
+
+Back processing will  occur in `development` and `production` mode, while the forward processing only occurs in `production` mode. 
+
+
+![parallel processing](../assets/substreams_processing.png)
+
+
+### Library
+
+- Added `production_mode` to Substream Request
+- Added `output_module` tp Substream Request. Eve
+
+### CLI
+
+- Added command `substreams tools analytics store-stats` to get statistic for a given store.
+
+
 
 * `--initial-snapshots` flag has been renamed to `--debug-initial-snapshots` and can only be activated in development mode (ie: when `production-mode` flag is false).
 

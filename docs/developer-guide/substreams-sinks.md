@@ -28,7 +28,7 @@ The configuration of this storage layer and the requirements of it is your respo
 
 An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules basics in the Substreams documentation at the following link.
 
-https://substreams.streamingfast.io/concept-and-fundamentals/modules
+[https://substreams.streamingfast.io/concept-and-fundamentals/modules](https://substreams.streamingfast.io/concept-and-fundamentals/modules)
 
 ## **Existing & Commnuity Sinks**
 
@@ -36,18 +36,21 @@ StreamingFast values external contributions for Substreams sinks. If your team h
 
 The `substreams-eth-block-meta` example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
 
-https://github.com/streamingfast/substreams-eth-block-meta
+[https://github.com/streamingfast/substreams-eth-block-meta](https://github.com/streamingfast/substreams-eth-block-meta)
 
 StreamingFast provides several tools to assist Substreams developers interested in persisting data to databases; each can be found in its official GitHub repository.
 
 **PostgreSQL**
-https://github.com/streamingfast/substreams-sink-postgres
+
+[https://github.com/streamingfast/substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres)
 
 **MongoDB**
-https://github.com/streamingfast/substreams-sink-mongodb
+
+[https://github.com/streamingfast/substreams-sink-mongodb](https://github.com/streamingfast/substreams-sink-mongodb)
 
 **File Based Storage**
-https://github.com/streamingfast/substreams-sink-files
+
+[https://github.com/streamingfast/substreams-sink-files](https://github.com/streamingfast/substreams-sink-files)
 
 ## **Build a Sink**
 

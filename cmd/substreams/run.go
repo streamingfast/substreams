@@ -94,6 +94,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:        pkg.Modules,
 		OutputModule:   outputStreamName,
+		OutputModules:  []string{outputStreamName}, //added for backwards compatibility, will be removed
 		ProductionMode: mustGetBool(cmd, "production-mode"),
 	}
 

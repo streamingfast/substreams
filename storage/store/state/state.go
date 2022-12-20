@@ -34,9 +34,9 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 		return nil, fmt.Errorf("cannot have saved last store before module's init block")
 	}
 
-	backProcessStartBlock := modInitBlock
+	parallelProcessStartBlock := modInitBlock
 	if completeSnapshot != nil {
-		backProcessStartBlock = completeSnapshot.ExclusiveEndBlock
+		parallelProcessStartBlock = completeSnapshot.ExclusiveEndBlock
 		out.InitialCompleteRange = (*FullStoreFile)(block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock))
 
 		if completeSnapshot.ExclusiveEndBlock == workUpToBlockNum {
@@ -44,7 +44,7 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 		}
 	}
 
-	for ptr := backProcessStartBlock; ptr < workUpToBlockNum; {
+	for ptr := parallelProcessStartBlock; ptr < workUpToBlockNum; {
 		end := utils.MinOf(ptr-ptr%storeSaveInterval+storeSaveInterval, workUpToBlockNum)
 		newPartial := block.NewRange(ptr, end)
 		if !snapshots.ContainsPartial(newPartial) {

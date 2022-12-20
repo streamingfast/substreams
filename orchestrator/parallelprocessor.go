@@ -17,7 +17,7 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
-type Backprocessor struct {
+type ParallelProcessor struct {
 	plan             *work.Plan
 	scheduler        *Scheduler
 	squasher         *MultiSquasher
@@ -25,7 +25,7 @@ type Backprocessor struct {
 	execOutputReader *execout.LinearReader
 }
 
-func BuildBackProcessor(
+func BuildParallelProcessor(
 	ctx context.Context,
 	reqDetails *reqctx.RequestDetails,
 	runtimeConfig config.RuntimeConfig,
@@ -33,7 +33,7 @@ func BuildBackProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
-) (*Backprocessor, error) {
+) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
 	if reqDetails.ShouldStreamCachedOutputs() {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
@@ -86,7 +86,7 @@ func BuildBackProcessor(
 
 	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
 
-	return &Backprocessor{
+	return &ParallelProcessor{
 		plan:             plan,
 		scheduler:        scheduler,
 		squasher:         squasher,
@@ -95,7 +95,7 @@ func BuildBackProcessor(
 	}, nil
 }
 
-func (b *Backprocessor) Run(ctx context.Context) (storeMap store.Map, err error) {
+func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
 	if b.execOutputReader != nil {
 		b.execOutputReader.Launch(ctx)
 	}

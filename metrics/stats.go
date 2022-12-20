@@ -13,8 +13,8 @@ import (
 )
 
 type Stats interface {
-	StartBackProcessing()
-	EndBackProcessing()
+	StartParallelProcessing()
+	EndParallelProcessing()
 	RecordBlock(ref bstream.BlockRef)
 	RecordFlush(elapsed time.Duration)
 	RecordStoreSquasherProgress(module string, blockNum uint64)
@@ -32,8 +32,8 @@ func NewNoopStats() Stats {
 
 type noopstats struct{}
 
-func (n noopstats) StartBackProcessing()                                       {}
-func (n noopstats) EndBackProcessing()                                         {}
+func (n noopstats) StartParallelProcessing()                                   {}
+func (n noopstats) EndParallelProcessing()                                     {}
 func (n noopstats) Shutdown()                                                  {}
 func (n noopstats) Start(each time.Duration)                                   {}
 func (n noopstats) RecordBlock(ref bstream.BlockRef)                           {}
@@ -46,28 +46,28 @@ func (n noopstats) RecordStoreSquasherProgress(module string, blockNum uint64) {
 
 func NewReqStats(logger *zap.Logger) Stats {
 	return &stats{
-		Shutter:           shutter.New(),
-		blockRate:         dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
-		flushDurationRate: dmetrics.NewAvgDurationCounter(1*time.Second, time.Second, "flush duration"),
-		bytesWrittenRate:  dmetrics.MustNewAvgRateCounter(1*time.Second, 1*time.Second, "bytes written"),
-		bytesReadRate:     dmetrics.MustNewAvgRateCounter(1*time.Second, 1*time.Second, "bytes read"),
-		outputCacheHit:    uint64(0),
-		outputCacheMiss:   uint64(0),
-		backprocessing:    newBackprocessStats(),
-		logger:            logger,
+		Shutter:            shutter.New(),
+		blockRate:          dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
+		flushDurationRate:  dmetrics.NewAvgDurationCounter(1*time.Second, time.Second, "flush duration"),
+		bytesWrittenRate:   dmetrics.MustNewAvgRateCounter(1*time.Second, 1*time.Second, "bytes written"),
+		bytesReadRate:      dmetrics.MustNewAvgRateCounter(1*time.Second, 1*time.Second, "bytes read"),
+		outputCacheHit:     uint64(0),
+		outputCacheMiss:    uint64(0),
+		parallelProcessing: newParallelProcessingStats(),
+		logger:             logger,
 	}
 }
 
 type stats struct {
 	*shutter.Shutter
-	blockRate         *dmetrics.AvgRateCounter
-	flushDurationRate *dmetrics.AvgDurationCounter
-	bytesReadRate     *dmetrics.AvgRateCounter
-	bytesWrittenRate  *dmetrics.AvgRateCounter
-	lastBlock         bstream.BlockRef
-	outputCacheMiss   uint64
-	outputCacheHit    uint64
-	backprocessing    *backprocessStats
+	blockRate          *dmetrics.AvgRateCounter
+	flushDurationRate  *dmetrics.AvgDurationCounter
+	bytesReadRate      *dmetrics.AvgRateCounter
+	bytesWrittenRate   *dmetrics.AvgRateCounter
+	lastBlock          bstream.BlockRef
+	outputCacheMiss    uint64
+	outputCacheHit     uint64
+	parallelProcessing *parallelProcessingStats
 
 	logger *zap.Logger
 }
@@ -97,16 +97,16 @@ func (s *stats) RecordOutputCacheMiss() {
 	s.outputCacheMiss++
 }
 
-func (s *stats) StartBackProcessing() {
-	s.backprocessing.start(time.Now())
+func (s *stats) StartParallelProcessing() {
+	s.parallelProcessing.start(time.Now())
 }
 
-func (s *stats) EndBackProcessing() {
-	s.backprocessing.stop(time.Now())
+func (s *stats) EndParallelProcessing() {
+	s.parallelProcessing.stop(time.Now())
 }
 
 func (s *stats) RecordStoreSquasherProgress(moduleName string, blockNum uint64) {
-	s.backprocessing.squashStoreProgress(moduleName, blockNum)
+	s.parallelProcessing.squashStoreProgress(moduleName, blockNum)
 }
 
 func (s *stats) Start(each time.Duration) {
@@ -149,7 +149,7 @@ func (s *stats) getZapFields() []zap.Field {
 		zap.Uint64("output_cache_miss", s.outputCacheMiss),
 		zap.Stringer("bytes_written", s.bytesWrittenRate),
 		zap.Stringer("bytes_read", s.bytesReadRate),
-		zap.Object("backprocessing", s.backprocessing),
+		zap.Object("parallelProcessing", s.parallelProcessing),
 	)
 
 	return fields
@@ -160,7 +160,7 @@ func (s *stats) Shutdown() {
 	s.Shutter.Shutdown(nil)
 }
 
-type backprocessStats struct {
+type parallelProcessingStats struct {
 	sync.RWMutex
 
 	startOnce      sync.Once
@@ -171,31 +171,31 @@ type backprocessStats struct {
 	stopAt  *time.Time
 }
 
-func newBackprocessStats() *backprocessStats {
-	return &backprocessStats{
+func newParallelProcessingStats() *parallelProcessingStats {
+	return &parallelProcessingStats{
 		storeSquashers: map[string]uint64{},
 	}
 }
 
-func (b *backprocessStats) start(t0 time.Time) {
+func (b *parallelProcessingStats) start(t0 time.Time) {
 	b.startOnce.Do(func() {
 		b.startAt = &t0
 	})
 }
 
-func (b *backprocessStats) stop(t1 time.Time) {
+func (b *parallelProcessingStats) stop(t1 time.Time) {
 	b.startOnce.Do(func() {
 		b.stopAt = &t1
 	})
 }
 
-func (b *backprocessStats) squashStoreProgress(moduleName string, blockNum uint64) {
+func (b *parallelProcessingStats) squashStoreProgress(moduleName string, blockNum uint64) {
 	b.Lock()
 	defer b.Unlock()
 
 	b.storeSquashers[moduleName] = blockNum
 }
-func (b *backprocessStats) status() string {
+func (b *parallelProcessingStats) status() string {
 	if b.stopAt != nil {
 		return "ran"
 	}
@@ -204,7 +204,7 @@ func (b *backprocessStats) status() string {
 	}
 	return "not_started"
 }
-func (b *backprocessStats) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+func (b *parallelProcessingStats) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	status := b.status()
 	enc.AddString("status", status)
 	if status == "not_stated" {

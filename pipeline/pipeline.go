@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type backprocessingStore struct {
+type parallelProcessingStore struct {
 	name            string
 	initialBlockNum uint64
 }
@@ -45,7 +45,7 @@ type Pipeline struct {
 
 	stores         *Stores
 	execoutStorage *execout.Configs
-	partialStores  []*backprocessingStore
+	partialStores  []*parallelProcessingStore
 
 	gate *gate
 
@@ -110,7 +110,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 			return fmt.Errorf("failed to load stores: %w", err)
 		}
 	} else {
-		if storeMap, err = p.runBackProcessAndSetupStores(ctx); err != nil {
+		if storeMap, err = p.runParallelProcess(ctx); err != nil {
 			return fmt.Errorf("failed setup request: %w", err)
 		}
 	}
@@ -145,7 +145,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 			partialStore := storeConfig.NewPartialKV(reqDetails.RequestStartBlockNum, logger)
 			storeMap.Set(partialStore)
 
-			p.partialStores = append(p.partialStores, &backprocessingStore{
+			p.partialStores = append(p.partialStores, &parallelProcessingStore{
 				name:            partialStore.Name(),
 				initialBlockNum: partialStore.InitialBlock(),
 			})
@@ -166,14 +166,15 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 	return storeMap, nil
 }
 
-func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(ctx, "backprocess")
+// runParallelProcess
+func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, err error) {
+	ctx, span := reqctx.WithSpan(ctx, "parallelprocess")
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
-	backprocessor, err := orchestrator.BuildBackProcessor(
+	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		p.ctx,
 		reqDetails,
 		p.runtimeConfig,
@@ -183,17 +184,17 @@ func (p *Pipeline) runBackProcessAndSetupStores(ctx context.Context) (storeMap s
 		p.stores.configs,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("building backprocessor: %w", err)
+		return nil, fmt.Errorf("building parallel processor: %w", err)
 	}
 
-	logger.Info("starting back processing")
+	logger.Info("starting parallel processing")
 
-	reqStats.StartBackProcessing()
-	storeMap, err = backprocessor.Run(ctx)
+	reqStats.StartParallelProcessing()
+	storeMap, err = parallelProcessor.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("backprocess run: %w", err)
+		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}
-	reqStats.EndBackProcessing()
+	reqStats.EndParallelProcessing()
 
 	p.partialStores = nil
 
@@ -264,14 +265,14 @@ func (p *Pipeline) appendModuleOutputs(moduleOutput *pbsubstreams.ModuleOutput) 
 }
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {
 	var progress []*pbsubstreams.ModuleProgress
-	for _, backprocessStore := range p.partialStores {
+	for _, parallelProcessStore := range p.partialStores {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
-			Name: backprocessStore.name,
+			Name: parallelProcessStore.name,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: backprocessStore.initialBlockNum,
+							StartBlock: parallelProcessStore.initialBlockNum,
 							EndBlock:   clock.Number,
 						},
 					},

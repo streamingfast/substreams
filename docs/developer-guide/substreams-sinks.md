@@ -16,17 +16,17 @@ At a low-level Substreams consumes data through a gRPC streaming service. Consum
 
 ## **General Requirements**
 
-The first step of having your Substreams ready to be consumed by a particular Sink involves the creation of a `map` module whose output type is a Protobuf accepted by it. This specific Protobuf is populated from your own Substreams Protobuf types, you can see this as a transformation of your types into a format suitable for Sink to ingest.
+The first step of having Substreams consumed by a particular sink involves the creation of a `map` module; whose output type is a protobuf (accepted by the sink). This specific protobuf is populated from Substreams protobuf types; a transformation of types into a format suitable for ingestion by sinks.
 
-For example, database-likes Substreams Sinks such as PostgreSQL or MongoDB accepts a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
+For example, database-likes Substreams sinks such as PostgreSQL or MongoDB accepts a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
 
-It’s important to note that databases are merely one type of sink, the sink you are targeting determines what output type you should respect.
+It’s important to note that databases are only one type of sink. The sink being targeted determines what output type should be respected.
 
-The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most of them performing some kind of storage.
+The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage mechanism.
 
-The configuration of this storage layer and the requirements of it is your responsibility. Each Substreams Sink should document the specific infrastructure required for running the `sink`. You should read the documentation about the particular sink you are using to understand correctly its behavior and requirements.
+The configuration of this storage layer and the requirements of it the responsibility of the Substreams developer. Each Substreams sink should document the specific infrastructure required for running the `sink`. Read the documentation about each sink to understand its behavior and requirements.
 
-An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules basics in the Substreams documentation at the following link.
+An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules in the Substreams documentation.
 
 [https://substreams.streamingfast.io/concept-and-fundamentals/modules](https://substreams.streamingfast.io/concept-and-fundamentals/modules)
 
@@ -56,8 +56,10 @@ StreamingFast provides several tools to assist Substreams developers interested 
 
 StreamingFast provides tools allowing developers to route blockchain data to a few different types of data storage sinks, or means of ingestion. The types of sinks with tools provided by StreamingFast aren’t the only options for Substreams developers. Existing applications, databases, and other tools can be fed by blockchain data captured and output by Substreams.
 
-Developers can get inspiration on how to write their own sink by looking at sinks provided by StreamingFast today. One example could be a database, such as Oracle, that doesn’t currently have tools in place. Developers should be able to review the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct your own data-sinking solution.
+Developers can get inspiration on how to write their own sink by looking at sinks provided by StreamingFast, today. One example could be a database, such as Oracle, that doesn’t currently have tools in place. Developers should be able to review the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
 
-Reiterating from above, protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store the Substreams data in a myriad of different capacities.
+Reiterating from above, protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store data provided by Substreams in a myriad of different capacities.
 
-Through careful design of the Substreams manifest, modules, and protobufs developers can craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules. Developers need to examine and account for the format and any requirements of the end target they want their data routed. The specifics of how data is ingested by the targeted sink will determine the design of the output from Substreams.
+Through careful design of the Substreams manifest, modules, and protobufs developers can craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
+
+Developers need to examine and account for the format and any requirements of the end target they want their data routed. The specifics of how data is ingested by the targeted sink will determine the design of the output from Substreams.

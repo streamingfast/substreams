@@ -26,6 +26,7 @@ func Test_ValidateRequest(t *testing.T) {
 		{"single store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store", false)), false, "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
 		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map", false)), true, "sf.substreams.v1.test.Block", nil},
 		{"single store output module is  accepted for none sub-request", req(1, withOutputModule("output_mod", "map", false)), true, "sf.substreams.v1.test.Block", nil},
+		{name: "debug initial snapshots not accepted in production mode", request: req(1, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), expect: fmt.Errorf("debug initial snapshots not accepted in production mode")},
 	}
 
 	for _, test := range tests {
@@ -54,6 +55,20 @@ type reqOption func(*pbsubstreams.Request) *pbsubstreams.Request
 func withOutputModule(outputModule, kind string, legacy bool) reqOption {
 	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
 		addOutputModule(req, outputModule, kind, legacy)
+		return req
+	}
+}
+
+func withProductionMode() reqOption {
+	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
+		req.ProductionMode = true
+		return req
+	}
+}
+
+func withDebugInitialSnapshotForModules(modules []string) reqOption {
+	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
+		req.DebugInitialStoreSnapshotForModules = modules
 		return req
 	}
 }

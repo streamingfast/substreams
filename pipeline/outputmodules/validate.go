@@ -7,6 +7,11 @@ import (
 )
 
 func ValidateRequest(request *pbsubstreams.Request, blockType string, isSubRquest bool) error {
+	if request.ProductionMode {
+		if request.DebugInitialStoreSnapshotForModules != nil && len(request.DebugInitialStoreSnapshotForModules) > 0 {
+			return fmt.Errorf("debug initial store snapshot feature is not supported in production mode")
+		}
+	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {
 		return fmt.Errorf("modules validation failed: %w", err)

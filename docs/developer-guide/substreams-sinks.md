@@ -18,11 +18,11 @@ At a low-level Substreams consumes data through a gRPC streaming service. Consum
 
 The first step of having Substreams consumed by a particular sink involves the creation of a `map` module; whose output type is a protobuf (accepted by the sink). This specific protobuf is populated from Substreams protobuf types; a transformation of types into a format suitable for ingestion by sinks.
 
-For example, database-like Substreams sinks such as PostgreSQL or MongoDB accepts a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
+For example, database-like Substreams sinks such as PostgreSQL or MongoDB accept a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
 
 It’s important to note that databases are only one type of sink. The sink being targeted determines what output type should be respected.
 
-The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage mechanism.
+The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage.
 
 The configuration of this storage layer and the requirements of it the responsibility of the Substreams developer. Each Substreams sink should document the specific infrastructure required for running the `sink`. Read the documentation about each sink to understand its behavior and requirements.
 

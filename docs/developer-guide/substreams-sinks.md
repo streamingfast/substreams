@@ -2,7 +2,7 @@
 
 ## **Introduction**
 
-The data captured from a blockchain with Substreams can be routed to multiple types of sinks. A sink is the final destination for data acquired through Substreams. Examples are a database, Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data can be routed anywhere a developer can imagine.
+The data captured from a blockchain with Substreams can be routed to multiple types of sinks. A sink is the final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data can be routed anywhere a developer can imagine.
 
 StreamingFast provides a few examples, libraries, and tools to assist Substreams developers with routing blockchain data to sinks.
 

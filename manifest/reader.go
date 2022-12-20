@@ -254,6 +254,11 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 // ValidateModules is run both by the client _and_ the server.
 func ValidateModules(mods *pbsubstreams.Modules) error {
 	var sumCode int
+
+	if mods == nil {
+		return fmt.Errorf("no modules found in request")
+	}
+
 	for _, binary := range mods.Binaries {
 		sumCode += len(binary.Content)
 	}

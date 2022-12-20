@@ -55,7 +55,7 @@ Back processing will  occur in `development` and `production` mode, while the fo
 ### Library
 
 - Added `production_mode` to Substream Request
-- Added `output_module` tp Substream Request. Eve
+- Added `output_module` to Substream Request
 
 ### CLI
 

@@ -24,7 +24,7 @@ It’s important to note that databases are only one type of sink. The sink bein
 
 The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage.
 
-The configuration of this storage layer and the requirements of it the responsibility of the Substreams developer. Each Substreams sink should document the specific infrastructure required for running the `sink`. Read the documentation about each sink to understand its behavior and requirements.
+The configuration of this storage layer and the requirements of it are the responsibility of the Substreams developer. Each Substreams sink should document the specific infrastructure required for running the `sink`. Read the documentation about each sink to understand its behavior and requirements.
 
 An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules in the Substreams documentation.
 

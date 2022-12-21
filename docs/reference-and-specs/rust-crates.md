@@ -2,18 +2,20 @@
 description: StreamingFast Substreams Rust APIs
 ---
 
-# Rust APIs
+# Rust crates
 
 ### Substreams crates
 
-The official[`Substreams crate`](https://crates.io/crates/substreams) assists developers with creating module handlers.
+The official [`substreams` crate](https://crates.io/crates/substreams) assists developers with creating module handlers.
 
 There are also chain-specific `substreams-[network]` crates available:
 
 * [`substreams-ethereum`](https://crates.io/crates/substreams-ethereum) for Ethereum and other Ethereum-compatible chains
 * [`substreams-solana`](https://crates.io/crates/substreams-solana) for Solana
 
-Substreams support for NEAR, Cosmos Hub, and Osmosis is currently in development. Chain-specific libraries provide optional helpers, however the Substreams crate is sufficient to start for most setups.
+For Substreams where no crate is available, you can use the `spkg` released for the chain, which contains the Block protobuf model, and generate the Rust structs yourself.
+
+*
 
 ### Third-party libraries
 

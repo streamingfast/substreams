@@ -12,13 +12,19 @@ This documentation serves as the main resource for understanding and working wit
 
 ### Where to Start
 
-The best places to begin the journey are to watch the [introduction video](concept-and-fundamentals/introduction-video.md), read more about [what Substreams is](concepts/definition.md), study the [conceptual diagram](concept-and-fundamentals/visual-diagram.md), and then read through some [fundamentals](concept-and-fundamentals/fundamentals.md).
+\[insert video]
+
+The best places to begin the journey are to watch the [introduction video](broken-reference), read more about [what Substreams is](concepts/definition.md), study the [conceptual diagram](concept-and-fundamentals/visual-diagram.md), and then read through some [fundamentals](concept-and-fundamentals/fundamentals.md).
 
 For developers looking to get started right away, first [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md) with Substreams.
 
 Additional information is available for understanding [modules](concepts/modules.md), and sample code with explanations can be found in the [Developer Guide](developer-guide/overview.md) to further explore actual Substreams implementations.&#x20;
 
 Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly creating your very own blockchain data streaming solution.
+
+### Network model
+
+\[insert the Conceptual diagram thing here]
 
 ### Community
 

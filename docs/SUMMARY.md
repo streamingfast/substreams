@@ -37,7 +37,7 @@
 * [Packages](reference-and-specs/packages.md)
 * [Using the CLI](reference-and-specs/using-the-cli.md)
 * [Authentication](reference-and-specs/authentication.md)
-* [Rust APIs](reference-and-specs/rust-api.md)
+* [Rust crates](reference-and-specs/rust-crates.md)
 * [Examples](reference-and-specs/examples.md)
 * [Advanced](advanced/README.md)
   * [Graph-Node Setup](reference-and-specs/advanced/graph-node-setup.md)

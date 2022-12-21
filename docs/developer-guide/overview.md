@@ -16,7 +16,7 @@ The Substreams Developer Guide explains the process of building a Substreams imp
 **Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study.
 {% endhint %}
 
-If you haven't done so already, reviewing the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) and [modules overview](../concept-and-fundamentals/modules.md) is helpful for getting up and running quickly.
+If you haven't done so already, reviewing the Substreams [fundamentals](../concepts-and-fundamentals/fundamentals.md) and [modules overview](../concepts-and-fundamentals/modules.md) is helpful for getting up and running quickly.
 
 #### Substreams Examples
 

@@ -2,11 +2,11 @@
 
 * [Substreams](README.md)
 
-## Concept & Fundamentals
+## Concepts & Fundamentals
 
-* [Benefits & Comparisons](concepts/definition.md)
-* [Modules Overview](concept-and-fundamentals/modules.md)
-* [Fundamentals](concept-and-fundamentals/fundamentals.md)
+* [Benefits & Comparisons](concepts-and-fundamentals/benefits.md)
+* [Modules Overview](concepts-and-fundamentals/modules.md)
+* [Fundamentals](concepts-and-fundamentals/fundamentals.md)
 
 ## Getting Started
 

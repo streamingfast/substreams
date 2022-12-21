@@ -90,7 +90,7 @@ The `protobuf.importPaths` contains the paths to the protobufs for the current S
 
 ## Module Definitions
 
-The manifest defines a list of [modules](../concept-and-fundamentals/modules.md) used in the Substreams implementation.
+The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams implementation.
 
 The modules are Rust functions containing the business logic for the implementation.
 

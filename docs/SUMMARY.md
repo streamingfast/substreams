@@ -4,7 +4,7 @@
 
 ## Concept & Fundamentals
 
-* [Benefits & Comparisons](concept-and-fundamentals/benefits.md)
+* [Benefits & Comparisons](concepts/definition.md)
 * [Modules Overview](concepts/modules.md)
   * [Module Types](concept-and-fundamentals/modules/module-types.md)
   * [Inputs](concept-and-fundamentals/modules/inputs.md)

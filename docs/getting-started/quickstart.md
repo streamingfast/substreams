@@ -1,12 +1,25 @@
 ---
-description: StreamingFast Substreams chain-agnostic tutorial and examples
+description: Get off the ground quickly with Substreams by StreamingFast
 ---
 
 # Quickstart
 
 ## Authentication
 
-A StreamingFast authentication token is required to connect to the Substreams server. See the [ authentication](../reference-and-specs/authentication.md) section for details.
+Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io)
+
+Get an API **Token** with:
+
+{% code overflow="wrap" %}
+```bash
+export STREAMINGFAST_KEY=server_123123 # Make this your own
+export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
+```
+{% endcode %}
+
+{% hint style="info" %}
+**Note**: See the [ authentication](../reference-and-specs/authentication.md) section for details.&#x20;
+{% endhint %}
 
 ## Run Your First Substreams
 
@@ -39,8 +52,6 @@ Data is available for any blockchain with a functional Firehose endpoint, either
 {% hint style="info" %}
 **Note**: The remaining documentation assumes the Substreams CLI has been installed along with all other required dependencies, and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
 {% endhint %}
-
-Reading through the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) is also suggested to understand how all of the different technologies work together.
 
 ### **Basics**
 
@@ -97,30 +108,10 @@ $ cargo add substreams-solana
 ```
 
 {% hint style="success" %}
-**Tip**: Crates should be used if they are available for the target blockchain.
+**Tip**: Crates should be used if they are available for the target blockchain.\
+\
+Alternatively, you can generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. See [Rust crates](../reference-and-specs/rust-crates.md) for details.
 {% endhint %}
-
-When a crate is not available you should reference a package.&#x20;
-
-* Packages contain protobuf definitions only.&#x20;
-* Packages do not contain any generated Rust code.&#x20;
-* Packages are not required in the Substreams manifest.
-
-You can use the packages provided by StreamingFast for their development initiatives.
-
-**Package for the Ethereum blockchain**
-
-[https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg)
-
-**Package for the Solana blockchain**
-
-[https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)
-
-{% hint style="info" %}
-**Note**: Fully developed Substreams modules can be packaged and used when creating new Substreams modules.&#x20;
-{% endhint %}
-
-Additional information on [Substreams packages](../reference-and-specs/packages.md) is available in the documentation.
 
 ## **Examples**
 

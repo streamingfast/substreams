@@ -13,7 +13,10 @@ There are also chain-specific `substreams-[network]` crates available:
 * [`substreams-ethereum`](https://crates.io/crates/substreams-ethereum) for Ethereum and other Ethereum-compatible chains
 * [`substreams-solana`](https://crates.io/crates/substreams-solana) for Solana
 
-For Substreams where no crate is available, you can use the `spkg` released for the chain, which contains the Block protobuf model, and generate the Rust structs yourself.
+For Substreams where no crate is available, you can use the `spkg` released for the chain, which contains the Block protobuf model, and generate the Rust structs yourself:
+
+```bash
+```
 
 *
 

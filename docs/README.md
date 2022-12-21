@@ -25,7 +25,7 @@ Read about Substreams' [Benefits and Comparison](concept-and-fundamentals/benefi
 Get started quickly by:
 
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
-* Going through the [Quick Start](getting-started/chain-agnostic-tutorial.md)
+* Going through the [Quick Start](getting-started/quickstart.md)
 
 Learn more about [Modules](concept-and-fundamentals/modules.md), or head into the [Developer Guide](developer-guide/overview.md).
 

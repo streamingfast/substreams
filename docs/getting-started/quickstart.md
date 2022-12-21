@@ -2,7 +2,31 @@
 description: StreamingFast Substreams chain-agnostic tutorial and examples
 ---
 
-# Chain-agnostic Tutorial
+# Quickstart
+
+## Authentication
+
+A StreamingFast authentication token is required to connect to the Substreams server. See the [ authentication](../reference-and-specs/authentication.md) section for details.
+
+## Run Your First Substreams
+
+{% hint style="warning" %}
+_Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to continue._
+{% endhint %}
+
+Once authenticated, run your first Substreams with:
+
+{% code overflow="wrap" %}
+```bash
+$ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
+```
+{% endcode %}
+
+This [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer, targeting the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developer-guide/modules/setting-up-handlers.md).
+
+{% hint style="info" %}
+You prefer to stream with third-party languages? Try [Python here](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python).
+{% endhint %}
 
 ## Chain-agnostic Substreams
 

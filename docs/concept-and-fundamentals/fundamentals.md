@@ -6,7 +6,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 ### Working with Substreams Fundamentals
 
-Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, [Rust modules](modules.md), and [protobufs](../developer-guide/creating-protobuf-schemas.md).
+Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/command-line-interface.md), configuration files, [Rust modules](modules.md), and [protobufs](../developer-guide/creating-protobuf-schemas.md).
 
 This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, [WASM](https://webassembly.org/), and Substreams CLI.
 

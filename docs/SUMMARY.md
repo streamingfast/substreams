@@ -10,10 +10,8 @@
 
 ## Getting Started
 
-* [Prerequisites](getting-started/prerequisites.md)
 * [Installing the CLI](getting-started/installing-the-cli.md)
-* [Start Streaming](getting-started/your-first-stream.md)
-* [Chain-agnostic Tutorial](getting-started/chain-agnostic-tutorial.md)
+* [Quickstart](getting-started/quickstart.md)
 
 ## Developer Guide
 
@@ -33,15 +31,15 @@
 ## Reference & Specs
 
 * [Chains & Endpoints](reference-and-specs/chains-and-endpoints.md)
+* [CLI Reference](reference-and-specs/command-line-interface.md)
+* [Authentication](reference-and-specs/authentication.md)
 * [Manifests](reference-and-specs/manifests.md)
 * [Packages](reference-and-specs/packages.md)
-* [Using the CLI](reference-and-specs/using-the-cli.md)
-* [Authentication](reference-and-specs/authentication.md)
 * [Rust crates](reference-and-specs/rust-crates.md)
-* [Examples](reference-and-specs/examples.md)
 * [Advanced](advanced/README.md)
   * [Graph-Node Setup](reference-and-specs/advanced/graph-node-setup.md)
   * [Running Substreams locally](advanced/running-locally.md)
+* [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)
 
 ## Release notes

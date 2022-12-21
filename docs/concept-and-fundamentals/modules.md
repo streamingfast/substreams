@@ -4,7 +4,7 @@ description: StreamingFast Substreams modules overview
 
 # Modules Overview
 
-### What are Modules?
+## What are Modules?
 
 Modules are a crucial aspect of working with Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
 
@@ -36,12 +36,16 @@ All of the modules are executed as a directed acyclic graph (DAG) each time a ne
 **Note:** The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution.
 {% endhint %}
 
-### Single Output
+## Single Output
 
 Modules have a _**single typed output.**_ Modules are typed to inform consumers of the types of data to expect and also how to interpret the bytes being sent.
 
 {% hint style="success" %}
 **Tip**: Data that is output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.
 {% endhint %}
+
+## Next steps
+
+Read more about [modules in the developer guide](../developer-guide/modules/).
 
 ####

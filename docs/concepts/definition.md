@@ -34,15 +34,10 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
 * composable down to individual modules,
 * a solution that enables the community to build higher-order modules with great ease,
 * being fed by deterministic blockchain data and is therefore deterministic.
-
-### Limitations of Substreams
-
-#### _Substreams is**:**_
-
-* _not_ a relational database,
-* _not_ a REST service,
-* _not_ concerned directly with how data is queried,
-* _not_ a general-purpose _non-deterministic_ event stream processor.
+* _**not**_ a relational database,
+* _**not**_ a REST service,
+* _**not**_ concerned directly with how data is queried,
+* not a general-purpose _non-deterministic_ event stream processor.
 
 ### **Substreams Deep Dive**
 

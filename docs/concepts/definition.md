@@ -37,12 +37,12 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
 
 ### Limitations of Substreams
 
-#### _Substreams is **NOT:**_
+#### _Substreams is**:**_
 
-* a relational database,
-* a REST service,
-* concerned directly with how data is stored,
-* a general-purpose _non-deterministic_ event stream processor.
+* _not_ a relational database,
+* _not_ a REST service,
+* _not_ concerned directly with how data is queried,
+* _not_ a general-purpose _non-deterministic_ event stream processor.
 
 ### **Substreams Deep Dive**
 

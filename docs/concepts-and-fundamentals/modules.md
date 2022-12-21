@@ -16,7 +16,7 @@ Modules have one or more inputs. The inputs can be in the form of a `map` or `st
 Substreams modules data interaction diagram
 {% endembed %}
 
-In the diagram shown above the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_counter` store module tracks the number of transfers that have occurred.
+In the diagram shown above the `transfer_map` module extracts all transfers in each `Block,` and the `transfer_counter` store module tracks the number of transfers that have occurred.
 
 {% hint style="info" %}
 **Note:** Multiple inputs are made possible because blockchains are clocked.&#x20;
@@ -43,6 +43,34 @@ Modules have a _**single typed output.**_ Modules are typed to inform consumers 
 {% hint style="success" %}
 **Tip**: Data that is output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.
 {% endhint %}
+
+## Modules: Map vs. Store
+
+Most non-trivial Substreams development initiatives will require the use of both maps and store modules and more than one of each. The exact number, responsibilities, and how modules communicate will depend on many factors specific to the developer’s desired, final Substreams solution.
+
+The two module types are commonly used together to construct the directed acyclic graph outlined in the Substreams manifest. Map and store modules are very different in their use and how they work. Understanding these differences is important for harnessing the full power of Substreams.
+
+Map modules are used for data extraction, filtering, and transformation. They should be used when direct extraction is needed avoiding the need to reuse them later in the pipeline. Extracting model data from an event or function's inputs are good examples.
+
+For performance considerations, developers should use a single map, instead of multiple maps that extract single events. It's better to perform as much extraction as possible from a singular, top-level map module and then pass the data around for consumption by other Substreasms modules. This is the most straightforward, simplistic, and recommended approach for both the backend and consumer development experience.
+
+A few notable facts and use cases for working map modules include:
+
+Need input 01
+Need input 02
+Need input 03
+Need input 04
+Need input 05
+
+Store modules are used for aggregation of values and to temporarily persist state that exists across a block. Stores should not be used for temporary, free-form data persistence. Unbounded stores are discouraged; meaning they shouldn't be used as an infinite bucket to dump data into.
+
+A few notable facts and use cases for working store modules include:
+
+Stores should only be used when reading data from another Substreams module that is downstream.
+Stores cannot be output as a stream, except in development mode.
+Stores are used to implement the Dynamic Data Sources pattern from Subgraphs; keeping track of contracts that were created, in order to filter the next block with that information.
+Do not use stores to query anything from them downstream of the Substreams output. For that, use a sink and shape the data for proper querying.
+Need input 05
 
 ## Next steps
 

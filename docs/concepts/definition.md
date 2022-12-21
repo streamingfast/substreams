@@ -20,8 +20,6 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
   Substreams brings a handful of new concepts to the wider ecosystem surrounding The Graph and its subgraphs.
 * **Blockchain Infused Large-scale Data**\
   Substreams was inspired by traditional large-scale data systems now _fused_ with the novelties of blockchain.
-* **Protobuf**\
-  ****Substreams leverage&#x20;
 * **Rust & Protobufs**\
   Substreams are defined in modules written in the Rust programming language and utilize Google Protocol Buffer technology.
 * **Reduced Archive Node Reliance**\
@@ -40,12 +38,6 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
 * _**not**_ a REST service,
 * _**not**_ concerned directly with how data is queried,
 * not a general-purpose _non-deterministic_ event stream processor.
-
-### Comparison: Substreams vs Other Engines
-
-Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
-
-It has a logs-based architecture (the Firehose), and allows for user-defined custom code to be sent to a Substreams server(s), for streaming and/or ad-hoc querying of the available data.
 
 ### **Substreams Deep Dive**
 
@@ -69,7 +61,9 @@ The Substreams _engine_ is completely agnostic of underlying blockchain protocol
 
 For example, different protocols have different chain-specific extensions, such as Ethereum, which expose `eth_calls`.
 
-####
+#### Substreams & Sparkle
+
+Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). The current Substreams iteration enables greater composability, provides similar powers of parallelization. Basically, Substreams is a _much_ simpler model to work with.
 
 #### Quick Facts
 
@@ -81,4 +75,20 @@ The _word_ Substreams refers to:
 * _streams_ composed from imported modules, blended, enriched or refined together (as in _sub_ or downstream component),
 * a manifest or package will usually contain more than one module, and/or import one or more modules. It is therefore fitting to talk about a package being a _Substreams_ package.
 
-###
+### Problem
+
+Web3 development has been highly centered around saving data to blockchain ledgers. Everything from buying Bitcoin or an NFT to trading cryptocurrencies is rooted in committing transaction data to blockchain ledgers.
+
+Searching through the linear transaction data in the ledgers hasn’t historically seen the same level of development effort. Finding and aggregating blockchain data can be difficult, time-consuming, costly, and computationally intensive. Before Substreams was created, blazing fast, easy and efficient searchability of blockchain data was simply not possible.
+
+### Solution
+
+A revolutionary approach to data extraction from blockchain nodes, called Firehose, provides massive levels of previously unseen data availability to Substreams. Requests can be made for single blocks at any point in the blockchain ledger. The data inside each block is fully searchable down to the transaction event level. Substreams processes many blocks at once, in parallel, enabling developers to instantly isolate and locate any data in full blockchain ledgers without the need for linear processing.
+
+The Rust programming language is used by the developer to define data of interest available in the blockchain. Substreams can route data to a myriad of stores including file systems, relational databases, and even straight into an application’s user interface.
+
+### Substreams vs Other Streaming Engines
+
+Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
+
+It has a logs-based architecture (the Firehose), and allows for user-defined custom code to be sent to a Substreams server(s), for streaming and/or ad-hoc querying of the available data.

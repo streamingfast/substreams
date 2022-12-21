@@ -86,7 +86,7 @@ Protobufs essentially provide the API to the targeted data, usually associated w
 
 ### **Writing Rust Modules for Substreams**
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM (1).png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM.png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
 
 Designing an overall strategy for how to manage and transform data is the first thing developers will do when creating a Substreams implementation. Substreams modules are processed by the engine with the relationships between them defined in the manifest.&#x20;
 

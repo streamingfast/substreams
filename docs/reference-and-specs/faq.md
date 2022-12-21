@@ -96,10 +96,6 @@ Yes! Find StreamingFast on their official YouTube account.
 
 StreamingFast was originally called dfuse. The company changed the name and is in the process of phasing the old brand out.
 
-### What is Sparkle?
-
-Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). Substreams enables greater composability, yet provides similar powers of parallelization. Sparkle is deprecated.
-
 ### **Who is StreamingFast?**
 
 StreamingFast is a protocol infrastructure company that provides a massively scalable architecture for streaming blockchain data. StreamingFast is one of the core developers working alongside The Graph Foundation.

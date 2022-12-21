@@ -22,7 +22,7 @@ Reading through the Substreams [fundamentals](../concept-and-fundamentals/fundam
 
 The most basic approach to working with Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine should process. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
-The command shown below demonstrates modules targeting the Ethereum blockchain, passing the package for the Substreams Template, and instructing the compute engine to execute the `map_basic_eth` Rust function.
+The command shown below demonstrates modules targeting the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
 
 {% code overflow="wrap" %}
 ```bash

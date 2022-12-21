@@ -5,10 +5,7 @@
 ## Concept & Fundamentals
 
 * [Benefits & Comparisons](concepts/definition.md)
-* [Modules Overview](concepts/modules.md)
-  * [Module Types](concept-and-fundamentals/modules/module-types.md)
-  * [Inputs](concept-and-fundamentals/modules/inputs.md)
-  * [Outputs](concept-and-fundamentals/modules/outputs.md)
+* [Modules Overview](concept-and-fundamentals/modules.md)
 * [Fundamentals](concept-and-fundamentals/fundamentals.md)
 
 ## Getting Started
@@ -24,8 +21,12 @@
 * [Dependency Installation](developer-guide/installation-requirements.md)
 * [Manifest](developer-guide/creating-your-manifest.md)
 * [Protobuf Schemas](developer-guide/creating-protobuf-schemas.md)
-* [Module Handlers](developer-guide/setting-up-handlers.md)
-* [Module Handler Creation](developer-guide/writing-module-handlers.md)
+* [Modules](developer-guide/modules/README.md)
+  * [Module Types](developer-guide/modules/types.md)
+  * [Inputs](developer-guide/modules/inputs.md)
+  * [Outputs](developer-guide/modules/outputs.md)
+  * [Module Handlers](developer-guide/modules/setting-up-handlers.md)
+  * [Module Handler Creation](developer-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developer-guide/running-substreams.md)
 * [Substreams Sinks](developer-guide/substreams-sinks.md)
 

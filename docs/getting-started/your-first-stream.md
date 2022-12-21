@@ -22,7 +22,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 ```
 {% endcode %}
 
-This [`run`](../reference-and-specs/using-the-cli.md#run) command starts a consumer, targeting the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developer-guide/setting-up-handlers.md).
+This [`run`](../reference-and-specs/using-the-cli.md#run) command starts a consumer, targeting the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developer-guide/modules/setting-up-handlers.md).
 
 {% hint style="info" %}
 See also: [Using the CLI documentation](../reference-and-specs/using-the-cli.md).

@@ -23,7 +23,6 @@ The manifest below is from the [Substreams Template example](https://github.com/
 {% endhint %}
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}
-
 ```yaml
 specVersion: v0.1.0
 package:
@@ -61,7 +60,6 @@ modules:
     inputs:
       - map: map_transfers
 ```
-
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -70,7 +68,7 @@ View this file in the repo by visiting the following link.
 
 ## Manifest Walkthrough
 
-### `imports.eth`&#x20;
+### `imports.eth`
 
 Substreams consumes blocks and depends on a Substreams [package](../reference-and-specs/packages.md) matching the target blockchain. The package is referenced by `imports.`
 
@@ -80,10 +78,10 @@ Substreams consumes blocks and depends on a Substreams [package](../reference-an
 
 ### `protobuf.files`
 
-The `protobuf.files` contains a list of protobuf files for the current Substreams implementation.&#x20;
+The `protobuf.files` contains a list of protobuf files for the current Substreams implementation.
 
 {% hint style="info" %}
-**Note**: The Substreams Template references the Ethereum-specific `erc721.proto` protobuf while the Solana SPL Token Transfers example references the Solana-specific `solana_spl.proto`.&#x20;
+**Note**: The Substreams Template references the Ethereum-specific `erc721.proto` protobuf while the Solana SPL Token Transfers example references the Solana-specific `solana_spl.proto`.
 {% endhint %}
 
 ### `protobuf.importPaths`
@@ -92,7 +90,7 @@ The `protobuf.importPaths` contains the paths to the protobufs for the current S
 
 ## Module Definitions
 
-The manifest defines a list of [modules](../concepts/modules.md) used in the Substreams implementation.&#x20;
+The manifest defines a list of [modules](../concept-and-fundamentals/modules.md) used in the Substreams implementation.
 
 The modules are Rust functions containing the business logic for the implementation.
 
@@ -112,11 +110,11 @@ The output for the `map_transfers` module is a list of ERC721 transfers. The bus
 
 ### **`store_transfers`**
 
-The `store_transfers` store module receives transfers in each block extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.&#x20;
+The `store_transfers` store module receives transfers in each block extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.
 
-The inputs of the module are protobuf models defined as: `proto:eth.erc721.v1.Transfers`.&#x20;
+The inputs of the module are protobuf models defined as: `proto:eth.erc721.v1.Transfers`.
 
-The `eth.erc721.v1.Transfers` protobuf module represents a list of ERC721 transfers in a block.&#x20;
+The `eth.erc721.v1.Transfers` protobuf module represents a list of ERC721 transfers in a block.
 
 {% hint style="info" %}
 **Note**: The `eth.erc721.v1.Transfers` protobuf module is also used as the output for the `map` module.

@@ -227,7 +227,7 @@ The key takeaways at this point are:
 
 Understanding map and store modules is the next step to understanding how to design and craft a fully directed acyclic graph in the Substreams manifest.
 
-Additional information is available for understanding [modules](../concepts/modules.md), and sample code with explanations can be found in the [Developer Guide](../developer-guide/overview.md).&#x20;
+Additional information is available for understanding [modules](../concept-and-fundamentals/modules.md), and sample code with explanations can be found in the [Developer Guide](../developer-guide/overview.md).&#x20;
 
 Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 

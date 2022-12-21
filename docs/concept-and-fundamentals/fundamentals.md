@@ -6,7 +6,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 ### Working with Substreams Fundamentals
 
-Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, [Rust modules](../concepts/modules.md), and [protobufs](../developer-guide/creating-protobuf-schemas.md).
+Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/using-the-cli.md), configuration files, [Rust modules](modules.md), and [protobufs](../developer-guide/creating-protobuf-schemas.md).
 
 This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, [WASM](https://webassembly.org/), and Substreams CLI.
 
@@ -30,7 +30,7 @@ Note: _The Substreams engine is responsible for running data transformations def
 
 Developers send commands, flags, and a reference to the manifest configuration file through the Substreams CLI to the Substreams engine.&#x20;
 
-Developers create the data transformation strategies in Substreams “[module handlers](../developer-guide/setting-up-handlers.md)” defined using the [Rust programming language](https://www.rust-lang.org/). The module handlers act on protobuf-based data models referenced from within the Substreams manifest. Learn more about the protobufs for the different blockchains in the [chains and endpoints](../reference-and-specs/chains-and-endpoints.md) section of the Substreams documentation.
+Developers create the data transformation strategies in Substreams “[module handlers](../developer-guide/modules/setting-up-handlers.md)” defined using the [Rust programming language](https://www.rust-lang.org/). The module handlers act on protobuf-based data models referenced from within the Substreams manifest. Learn more about the protobufs for the different blockchains in the [chains and endpoints](../reference-and-specs/chains-and-endpoints.md) section of the Substreams documentation.
 
 ### **How Substreams Modules Communicate**
 
@@ -68,7 +68,7 @@ View the Rust module handlers in the lib.rs file in the repo by visiting the fol
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
 
-[Protocol buffers](https://developers.google.com/protocol-buffers), or protobufs, are the data models operated on by the [Rust-based module handler functions](../developer-guide/writing-module-handlers.md). Data models are defined and outlined in the protobufs.&#x20;
+[Protocol buffers](https://developers.google.com/protocol-buffers), or protobufs, are the data models operated on by the [Rust-based module handler functions](../developer-guide/modules/writing-module-handlers.md). Data models are defined and outlined in the protobufs.&#x20;
 
 {% hint style="info" %}
 **Note:** _Protobufs include the names of the data objects and the fields contained and accessible within them._&#x20;

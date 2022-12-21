@@ -13,10 +13,10 @@ The Substreams Developer Guide explains the process of building a Substreams imp
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study.&#x20;
+**Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study.
 {% endhint %}
 
-If you haven't done so already, reviewing the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) and [modules overview](../concepts/modules.md) is helpful for getting up and running quickly.
+If you haven't done so already, reviewing the Substreams [fundamentals](../concept-and-fundamentals/fundamentals.md) and [modules overview](../concept-and-fundamentals/modules.md) is helpful for getting up and running quickly.
 
 #### Substreams Examples
 
@@ -24,7 +24,7 @@ StreamingFast and the Substreams community have provided an array of different e
 
 #### Substreams Template for Dev Guide
 
-The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).
 
 #### Substreams for Solana
 

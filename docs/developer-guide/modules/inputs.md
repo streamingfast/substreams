@@ -56,7 +56,7 @@ The `map` inputs type __ is defined in the Substreams manifest as seen below. Th
     - map: my_map
 ```
 
-Additional information regarding `maps` is located in the Substreams [modules documentation](../../concepts/modules.md#the-map-module-type).
+Additional information regarding `maps` is located in the Substreams [modules documentation](../../concept-and-fundamentals/modules.md#the-map-module-type).
 
 ## Input type `store`
 

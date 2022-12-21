@@ -24,6 +24,8 @@ The most basic approach to working with Substreams is through the CLI, passing a
 
 The command shown below demonstrates modules targeting the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
 
+#### **Basic Ethereum command line call**
+
 {% code overflow="wrap" %}
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 10000001 --stop-block +1

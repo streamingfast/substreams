@@ -6,21 +6,39 @@ description: StreamingFast Substreams documentation
 
 ### Welcome to Substreams Docs
 
-Substreams is a new technology developed by StreamingFast working with [The Graph Foundation](https://thegraph.com/). The product provides extremely fast consumption and processing of indexed blockchain data.
+Substreams is a powerful blockchain indexing technology, developed for [The Graph Network](https://thegraph.com).
 
-This documentation serves as the main resource for understanding and working with StreamingFast Substreams.
+Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.
+
+Substreams has all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
 ### Where to Start
 
-\[insert video]
+A short, dense 25 minutes intro to Substreams, and what it means for the blockchain ecosystem:
 
-The best places to begin the journey are to watch the [introduction video](broken-reference), read more about [what Substreams is](concepts/definition.md), study the [conceptual diagram](concept-and-fundamentals/visual-diagram.md), and then read through some [fundamentals](concept-and-fundamentals/fundamentals.md).
+{% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
+A walk-though of Firehose features, Substreams modules, with a sample Rust module and the vision for the future.
+{% endembed %}
 
-For developers looking to get started right away, first [install the CLI tool](getting-started/installing-the-cli.md) and then [start streaming](getting-started/your-first-stream.md) with Substreams.
+Read about Substreams' [Benefits and Comparison](concept-and-fundamentals/benefits).
 
-Additional information is available for understanding [modules](concepts/modules.md), and sample code with explanations can be found in the [Developer Guide](developer-guide/overview.md) to further explore actual Substreams implementations.&#x20;
+Get started quickly by:
+* [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
+* Going through the [Quick Start](getting-started/chain-agnostic-tutorial.md)
 
-Finally, visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly creating your very own blockchain data streaming solution.
+Learn more about [Modules](concepts/modules.md), or head into the [Developer Guide](developer-guide/overview.md).
+
+Find pre-built Substreams here:
+* [Substreams Template](https://github.com/streamingfast/substreams-template): gets you off the ground quickly
+* [Substreams Playground](https://github.com/streamingfast/substreams-playground): a collection of already-built Substreams, and examples.
+
+
+### Network model
+
+<img src="../.gitbook/assets/substreams.excalidraw (1).svg" alt="StreamingFast Substreams high-level conceptual diagram" class="gitbook-drawing">
+
+Substreams has two perspectives as illustrated in the high-level visual diagram seen below. One perspective is from the Substreams engine itself. The other perspective is from that of an end-user developer. &#x20;
+
 
 ### Network model
 

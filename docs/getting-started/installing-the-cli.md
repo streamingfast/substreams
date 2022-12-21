@@ -10,6 +10,10 @@ The Substreams command line interface (CLI) is the main means of interacting wit
 
 The CLI allows you to connect to Substreams endpoints, stream data in real time, and package custom Substreams modules.
 
+{% hint style="info" %}
+_**Important**: Check the_ [_official Github repository_](https://github.com/streamingfast/substreams/releases) _to get the **latest CLI release available**._&#x20;
+{% endhint %}
+
 #### Homebrew Installation
 
 ```
@@ -23,10 +27,6 @@ brew install streamingfast/tap/substreams
 LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest | awk '/download.url.*linux/ {print $2}' | sed 's/"//g')
 curl -L  $LINK  | tar zxf -
 ```
-
-{% hint style="warning" %}
-_Important: Check the_ [_official Github repository_](https://github.com/streamingfast/substreams/releases) _to get the latest CLI release available._&#x20;
-{% endhint %}
 
 #### Substreams Source Installation
 

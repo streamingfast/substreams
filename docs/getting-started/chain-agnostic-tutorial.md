@@ -42,29 +42,47 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.ya
 
 Each blockchain has specific requirements for its data definition so the code in the module handlers will need to be updated accordingly.
 
-### **Endpoints**
-
-The `-e` flag specifics the blockchain endpoint that should be used for the Substreams module. All available blockchain endpoints are explained in greater detail in the Substreams [chains and endpoints](../reference-and-specs/chains-and-endpoints.md) documentation.
-
-Notice that the StreamingFast Firehose Ethereum endpoint is `mainnet.eth.streamingfast.io:443`, and the StreamingFast Solana endpoint is available at `mainnet.sol.streamingfast.io:443`.&#x20;
-
-Local Firehose installations can also be used in place of the endpoints provided by StreamingFast. Refer to the [Firehose documentation](https://firehose.streamingfast.io/) for additional information on installation and operation.
-
 ### **Crates & Packages**
 
-Crates provided by StreamingFast contain generated Rust code, and other helper methods, to assist developers working with each chain’s Block model.&#x20;
+Create a `Cargo.toml` at the root of your project:
+
+```toml
+[package]
+name = "substreams-ethereum-tutorial"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+substreams = "0.5.0"
+prost = "0.11"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"
+```
+
+Install the create for the chain you are working with. These contain the protobuf models for the specific chain as well as helper code around them.
+
+```bash
+$ cargo add substreams-ethereum # or
+$ cargo add substreams-solana 
+```
 
 {% hint style="success" %}
-**Tip**: Crates should be used if they are available for the blockchain targeted by the Substreams developer.
+**Tip**: Crates should be used if they are available for the target blockchain.
 {% endhint %}
 
-When a crate is not available Substreams developers should reference a package.&#x20;
+When a crate is not available you should reference a package.&#x20;
 
 * Packages contain protobuf definitions only.&#x20;
 * Packages do not contain any generated Rust code.&#x20;
 * Packages are not required in the Substreams manifest.
 
-Substreams developers can use the packages provided by StreamingFast for their development initiatives.
+You can use the packages provided by StreamingFast for their development initiatives.
 
 **Package for the Ethereum blockchain**
 
@@ -84,19 +102,7 @@ Additional information on [Substreams packages](../reference-and-specs/packages.
 
 ### Examples Overview
 
-The following examples help developers better understand how Substreams works across different blockchains. Each example targets a specific blockchain and contains configuration information and code specific to the targeted chain.
-
-The differences are somewhat subtle so taking time to examine and study the details will improve the understanding of how to work with Substreams across different blockchains.
-
-Both of the examples contain the same base-level functionality and nearly identical code. Each example defines one very basic map module and custom protobuf definition.&#x20;
-
-Sample data is extracted from the chain-specific Block protobuf. A field in the custom protobuf is set with the extracted data and used as the output for the map module.
-
-The map module returns the protobuf populated with the data extracted from the chain-specific Block. In real-world, and more complex examples, the map would pass the protobuf to another Substreams map or store module.&#x20;
-
 The relationships for the flow of data are defined in the Substreams manifest. Further information is available in the documentation for [defining complex data strategies](../reference-and-specs/manifests.md) through manifest files.
-
-Each example contains comments in the module handler expanding on other key notable differences. Take a moment to review and study the code and associated comments provided.
 
 ### Ethereum Example
 
@@ -109,10 +115,6 @@ After the Git repo has been cloned, take a moment to explore the codebase. Note 
 Also notice the module handler, defined in [lib.rs](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs), and the custom protobuf definition in the proto directory named [basicexample.proto](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto).
 
 Note that the module handler in the lib.rs file for the Ethereum example has code specific to the blockchain being targeted. The block structure for Ethereum blocks can be seen in the following code excerpt.
-
-{% hint style="success" %}
-**Tip**: To better understand the chain-agnostic nature of Substreams be sure to read through, explore, and study the Solana example also explained in this documentation.
-{% endhint %}
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
@@ -139,7 +141,7 @@ The steps to follow for working with the example include the following:&#x20;
 * compiling the example with the Rust compiler,&#x20;
 * and sending commands to the Substreams CLI.
 
-To generate the protobufs open a terminal at the root directory of the example then issue the following command.
+At the root of the example project, generate your structs from protobuf specified in the YAML:
 
 {% code overflow="wrap" %}
 ```bash
@@ -147,17 +149,17 @@ substreams protogen substreams-ethereum-tutorial.yaml
 ```
 {% endcode %}
 
-To compile the example issue the following command to the same terminal.
+Then compile with:
 
 ```shell
 cargo build --release --target wasm32-unknown-unknown
 ```
 
-After running the `protogen` and `build` commands the example is ready to run. Issue the following `run` command to the same terminal to start the Ethereum example.
+You're now ready to run:
 
 {% code overflow="wrap" %}
 ```bash
-substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-example.yaml map_basic_eth --start-block 1000000 --stop-block +1
+substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 1000000 --stop-block +1
 ```
 {% endcode %}
 
@@ -177,9 +179,7 @@ Notice the Solana module handler is accessing the `previous_blockhash` `blockhas
 
 The Ethereum example's module handler accessed the `ver` and `number`. These are differences in the block model for each of the blockchains.
 
-{% hint style="info" %}
-**Note**: It's important to study the architecture and data structures of the blockchain being targeted by the Substreams developer. Retrieving data from the blocks for each chain is an important element for Substreams development; and as mentioned the block model will differ.
-{% endhint %}
+****
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust

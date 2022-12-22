@@ -56,7 +56,7 @@ Map modules are used for data extraction, filtering, and transformation. They sh
 
 For performance considerations, developers should use a single map, instead of multiple maps that extract single events/functions. It's better to perform as much extraction as possible from a singular, top-level map module and then pass the data around for consumption by other Substreams modules. This is the most straightforward, simplistic, and recommended approach for both the backend and consumer development experience.
 
-A few notable facts and use cases for working map modules include:
+Notable facts and use cases for working map modules include:
 
 - Extracting model data from an event or a function's inputs.
 - Reading data from a block and transforming said data into a custom protobuf structure.
@@ -66,7 +66,7 @@ A few notable facts and use cases for working map modules include:
 
 Store modules are used for aggregation of values and to temporarily persist state that exists across a block. Stores should not be used for temporary, free-form data persistence. Unbounded stores are discouraged; meaning they shouldn't be used as an infinite bucket to dump data into.
 
-A few notable facts and use cases for working store modules include:
+Notable facts and use cases for working store modules include:
 
 - Stores should only be used when reading data from another downstream Substreams module.
 - Stores cannot be outputted as a stream, except in development mode.

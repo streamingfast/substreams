@@ -72,6 +72,9 @@ func mustGetStringSlice(cmd *cobra.Command, flagName string) []string {
 	if err != nil {
 		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
 	}
+	if len(val) == 0 {
+		return nil
+	}
 	return val
 }
 func mustGetInt64(cmd *cobra.Command, flagName string) int64 {

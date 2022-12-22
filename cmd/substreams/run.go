@@ -109,7 +109,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validate request: %w", err)
 	}
 	toPrint := debugModulesOutput
-	if len(toPrint) == 0 {
+	if toPrint == nil {
 		toPrint = []string{outputModule}
 	}
 

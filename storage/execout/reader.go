@@ -67,6 +67,9 @@ func (r *LinearReader) run(ctx context.Context) error {
 			if item == nil {
 				return nil
 			}
+			if item.BlockNum < r.requestStartBlock {
+				continue
+			}
 
 			blockScopedData, err := toBlockScopedData(r.module, item)
 			err = r.responseFunc(substreams.NewBlockScopedDataResponse(blockScopedData))

@@ -37,11 +37,11 @@ The difference between the modes are:
 
 #### Examples:
 
-(given a substreams with these dependencies: [block] --> [map_pools] --> [store_pools] --> [map_transactions])
+(given a substreams with these dependencies: [block] --> [map_pools] --> [store_pools] --> [map_transfers])
 
-* Running `substreams run substreams.yaml map_transactions -s 1000 -t +5` would only print the outputs and logs from the `map_transactions` module between blocks 1000 and 1005.
-* Running `substreams run substreams.yaml map_transactions -s 1000 -t +5 --debug-modules-output=map_pools,map_transactions,store_pools` would print the outputs of those 3 modules.
-* Running `substreams run substreams.yaml map_transactions -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools`
+* Running `substreams run substreams.yaml map_transfers` will only print the outputs and logs from the `map_transfers` module. 
+* Running `substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools` will print the outputs of those 3 modules.
+* Running `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` will print all the entries in store_pools at block 999, then continue with outputs and logs from `map_transfers` in blocks 1000 to 1004.
 
 ### Parallel Processing
 

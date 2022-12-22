@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type parallelProcessingStore struct {
+type processingModule struct {
 	name            string
 	initialBlockNum uint64
 }
@@ -45,7 +45,8 @@ type Pipeline struct {
 
 	stores         *Stores
 	execoutStorage *execout.Configs
-	partialStores  []*parallelProcessingStore
+
+	processingModule *processingModule
 
 	gate *gate
 
@@ -98,11 +99,8 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 		}
 	})
 
-	// DESTROY Init
-	// TODO(abourget):
-	//  when in a SubRequest, the caller should call `setupSubrequestStores` and take the result, assign it
-	//  to the `stores.SetStoreMap()` and also keep track of the `partialStores` (extracted from looping through
-	//  that map)
+	p.setupProcessingModule(reqDetails)
+
 	var storeMap store.Map
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
@@ -131,6 +129,17 @@ func (p *Pipeline) GetStoreMap() store.Map {
 	return p.stores.StoreMap
 }
 
+func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
+	for _, module := range reqDetails.Request.Modules.Modules {
+		if reqDetails.IsOutputModule(module.Name) {
+			p.processingModule = &processingModule{
+				name:            module.GetName(),
+				initialBlockNum: reqDetails.RequestStartBlockNum,
+			}
+		}
+	}
+}
+
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
@@ -144,11 +153,6 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 		if name == outputModuleName {
 			partialStore := storeConfig.NewPartialKV(reqDetails.RequestStartBlockNum, logger)
 			storeMap.Set(partialStore)
-
-			p.partialStores = append(p.partialStores, &parallelProcessingStore{
-				name:            partialStore.Name(),
-				initialBlockNum: partialStore.InitialBlock(),
-			})
 		} else {
 			fullStore := storeConfig.NewFullKV(logger)
 
@@ -196,7 +200,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 	}
 	reqStats.EndParallelProcessing()
 
-	p.partialStores = nil
+	p.processingModule = nil
 
 	return storeMap, nil
 }
@@ -265,14 +269,14 @@ func (p *Pipeline) appendModuleOutputs(moduleOutput *pbsubstreams.ModuleOutput) 
 }
 func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {
 	var progress []*pbsubstreams.ModuleProgress
-	for _, parallelProcessStore := range p.partialStores {
+	if p.processingModule != nil {
 		progress = append(progress, &pbsubstreams.ModuleProgress{
-			Name: parallelProcessStore.name,
+			Name: p.processingModule.name,
 			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
 				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
 					ProcessedRanges: []*pbsubstreams.BlockRange{
 						{
-							StartBlock: parallelProcessStore.initialBlockNum,
+							StartBlock: p.processingModule.initialBlockNum,
 							EndBlock:   clock.Number,
 						},
 					},

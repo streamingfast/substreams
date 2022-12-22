@@ -27,7 +27,7 @@ The mode impacts how the `substreams` get executed, specifically:
 
  - the time to first byte 
  - the speed at which large ranges get executed
- - the module logs sent back to the client
+ - the module logs and outputs sent back to the client
 
 The difference between the modes are:
 
@@ -60,10 +60,9 @@ Back processing will  occur in `development` and `production` mode, while the fo
 ### CLI
 
 - Added command `substreams tools analytics store-stats` to get statistic for a given store.
-
-
-
-* `--initial-snapshots` flag has been renamed to `--debug-initial-snapshots` and can only be activated in development mode (ie: when `production-mode` flag is false).
+* added `--debug-modules-output` (comma-separated module names) (unavailable in production-mode)
+* added `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in production-mode)
+* removed flag `--initial-snapshots` (bool) 
 
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 

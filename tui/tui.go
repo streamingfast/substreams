@@ -162,8 +162,14 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 		if ui.decorateOutput {
 			fmt.Println("Snapshot data dump complete")
 		}
+
+	case *pbsubstreams.Response_Session:
+		if ui.decorateOutput {
+			fmt.Printf("TraceID: %s\n", m.Session.TraceId)
+		}
+
 	default:
-		fmt.Println("Unsupported response")
+		fmt.Println("Unsupported response", m)
 	}
 	return nil
 }

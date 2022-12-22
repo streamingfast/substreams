@@ -52,6 +52,10 @@ func ValidateRequest(req *Request, isSubRequest bool) error {
 		return fmt.Errorf("output module: %w", err)
 	}
 
+	if req.DebugInitialStoreSnapshotForModules != nil && req.ProductionMode {
+		return fmt.Errorf("cannot set 'debug-modules-initial-snapshot' in 'production-mode'")
+	}
+
 	outputModule := req.GetOutputModuleName()
 	outputModuleFound := false
 	for _, mod := range req.Modules.Modules {

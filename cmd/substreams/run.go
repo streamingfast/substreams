@@ -58,9 +58,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
-	if debugModulesInitialSnapshot != nil && productionMode {
-		return fmt.Errorf("cannot set 'debug-modules-initial-snapshot' in 'production-mode'")
-	}
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {

@@ -64,7 +64,13 @@ Notable facts and use cases for working map modules include:
 
 ### Store Modules
 
-Store modules are used for aggregation of values and to temporarily persist state that exists across a block. Stores should not be used for temporary, free-form data persistence. Unbounded stores are discouraged; meaning they shouldn't be used as an infinite bucket to dump data into.
+Store modules are used for aggregation of values and to temporarily persist state that exists across a block.
+
+{% hint style="info" %}
+**Note:** Stores should not be used for temporary, free-form data persistence.
+{% endhint %}
+
+Unbounded stores are discouraged. Stores shouldn't be used as an infinite bucket to dump data into.
 
 Notable facts and use cases for working store modules include:
 

@@ -120,6 +120,16 @@ func (ui *TUI) Cancel() {
 	// a Shutter or something
 }
 
+func (ui *TUI) filterOutputModules(in []*pbsubstreams.ModuleOutput) (out []*pbsubstreams.ModuleOutput) {
+	for _, mo := range in {
+		if _, ok := ui.msgTypes[mo.Name]; ok {
+			out = append(out, mo)
+		}
+	}
+
+	return
+}
+
 func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreams.Response_Data:
@@ -129,15 +139,16 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 		if m.Data == nil {
 			return nil
 		}
-		if len(m.Data.Outputs) == 0 {
+		outputs := ui.filterOutputModules(m.Data.Outputs)
+		if len(outputs) == 0 {
 			return nil
 		}
 		ui.seenFirstData = true
 		if ui.decorateOutput {
 			ui.ensureTerminalUnlocked()
-			return ui.decoratedBlockScopedData(m.Data)
+			return ui.decoratedBlockScopedData(outputs, m.Data.Clock)
 		} else {
-			return ui.jsonBlockScopedData(m.Data)
+			return ui.jsonBlockScopedData(outputs, m.Data.Clock)
 		}
 	case *pbsubstreams.Response_Progress:
 		if ui.seenFirstData {

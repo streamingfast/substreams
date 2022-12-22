@@ -27,13 +27,21 @@ The mode impacts how the `substreams` get executed, specifically:
 
  - the time to first byte 
  - the speed at which large ranges get executed
- - the module logs sent back to the client
+ - the module logs and outputs sent back to the client
 
 The difference between the modes are:
 
 - Forward Processing is enabled in `production` mode but *not* in `development` mode. As such the time to first byte in `development` mode is faster 
 - In `development` the client will receive all the logs of the executed `modules`. While in `production` mode the client will only receive the logs of the output module
 - In `development` mode you may request specific `store` snapshot that are in the execution tree 
+
+#### Examples:
+
+(given a substreams with these dependencies: [block] --> [map_pools] --> [store_pools] --> [map_transfers])
+
+* Running `substreams run substreams.yaml map_transfers` will only print the outputs and logs from the `map_transfers` module. 
+* Running `substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools` will print the outputs of those 3 modules.
+* Running `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` will print all the entries in store_pools at block 999, then continue with outputs and logs from `map_transfers` in blocks 1000 to 1004.
 
 ### Parallel Processing
 
@@ -60,10 +68,9 @@ Back processing will  occur in `development` and `production` mode, while the fo
 ### CLI
 
 - Added command `substreams tools analytics store-stats` to get statistic for a given store.
-
-
-
-* `--initial-snapshots` flag has been renamed to `--debug-initial-snapshots` and can only be activated in development mode (ie: when `production-mode` flag is false).
+* added `--debug-modules-output` (comma-separated module names) (unavailable in production-mode)
+* added `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in production-mode)
+* removed flag `--initial-snapshots` (bool) 
 
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 

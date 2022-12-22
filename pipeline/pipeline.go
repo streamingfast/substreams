@@ -246,7 +246,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	if !hasValidOutput {
 		return nil
 	}
-	if p.isOutputModule(executor.Name()) {
+	if p.isOutputModule(executor.Name()) || !reqctx.Details(ctx).Request.GetProductionMode() {
 		p.appendModuleOutputs(moduleOutput)
 	}
 	if err := execOutput.Set(executorName, outputBytes); err != nil {

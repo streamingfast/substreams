@@ -102,10 +102,10 @@ Examples: (given the dependencies: `[block] --> [map_pools] --> [store_pools] --
 
 ### Parallel Processing
 
-There are 2 steps while parallel processing: back processing and forward processing.
+There are two steps involved during parallel processing are back processing and forward processing.
 
-Back processing, consists of executing in parallel block ranges from the module initial block up to the start block of the request. If the start block of the request matches module initial block, no back processing is performed.
+Back processing consists of executing in parallel block ranges, from the module's initial block, up to the start block of the request. If the start block of the request matches the module's initial block no back processing is performed.
 
-Forward processing, consists of executing in parallel block ranges from the start block of the request up to last known final block (the irreversible block) or the stop block of the request, depending on which is smaller. Foward processing significantly improves the performance of the Substreams, but the ability to stream the module logs is lost.
+Forward processing consists of executing in parallel block ranges from the start block of the request up to last known final block, also called an irreversible block, or the stop block of the request depending on which is smaller. Foward processing significantly improves the performance of Substreams, however the ability to stream module logs is lost.
 
-Back processing will occur in development and production mode, while the forward processing only occurs in production mode.
+Back processing will occur in both development and production modes. Forward processing only occurs in production mode.

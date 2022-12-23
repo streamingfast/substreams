@@ -235,11 +235,10 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	execOutputConfigMap, err := execout.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), logger)
+	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), runtimeConfig.ExecOutputSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
-	execOutputConfigs := execout.NewConfigs(runtimeConfig.ExecOutputSaveInterval, execOutputConfigMap, logger)
 
 	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {

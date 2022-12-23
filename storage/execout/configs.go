@@ -18,20 +18,8 @@ type Configs struct {
 	logger                 *zap.Logger
 }
 
-func NewConfigs(execOutputSaveInterval uint64, confMap map[string]*Config, logger *zap.Logger) *Configs {
-	return &Configs{
-		execOutputSaveInterval: execOutputSaveInterval,
-		ConfigMap:              confMap,
-		logger:                 logger,
-	}
-}
-
-func (c *Configs) NewFile(moduleName string, targetRange *block.BoundedRange) *File {
-	return c.ConfigMap[moduleName].NewFile(targetRange)
-}
-
-func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, logger *zap.Logger) (out map[string]*Config, err error) {
-	out = make(map[string]*Config)
+func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, execOutputSaveInterval uint64, logger *zap.Logger) (*Configs, error) {
+	out := make(map[string]*Config)
 	for _, mod := range allRequestedModules {
 		conf, err := NewConfig(
 			mod.Name,
@@ -46,5 +34,14 @@ func NewConfigMap(baseObjectStore dstore.Store, allRequestedModules []*pbsubstre
 		}
 		out[mod.Name] = conf
 	}
-	return out, nil
+
+	return &Configs{
+		execOutputSaveInterval: execOutputSaveInterval,
+		ConfigMap:              out,
+		logger:                 logger,
+	}, nil
+}
+
+func (c *Configs) NewFile(moduleName string, targetRange *block.BoundedRange) *File {
+	return c.ConfigMap[moduleName].NewFile(targetRange)
 }

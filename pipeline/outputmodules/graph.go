@@ -80,15 +80,6 @@ func computeOutputModule(mods []*pbsubstreams.Module, outputModule string) *pbsu
 
 }
 
-func computeRequestedMapper(mods []*pbsubstreams.Module, outputModule string) *pbsubstreams.Module {
-	for _, module := range mods {
-		if module.Name == outputModule && module.GetKindMap() != nil {
-			return module
-		}
-	}
-	return nil
-}
-
 func computeSchedulableModules(stores []*pbsubstreams.Module, outputModule *pbsubstreams.Module, productionMode bool) []*pbsubstreams.Module {
 	if !productionMode { // dev never schedules maps, all stores are in there
 		return stores

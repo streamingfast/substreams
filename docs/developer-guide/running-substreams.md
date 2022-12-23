@@ -82,20 +82,20 @@ The example output shown above contains data for different transfers from data i
 
 ### Development Mode
 
-- Logs
-- Forward processing (not available)
-- sub-topic 3
+Production and development modes impact how Substreams get executed including:
 
-### Production Mode
+- the time to the first byte,
+- the speed at which large ranges get executed,
+- and the module logs and outputs are sent back to the client.
 
-- sub-topic 1
-- sub-topic 2
-- sub-topic 3
+Differences between production and development modes include:
 
-### User Implications
+- Forward Processing is enabled in production mode but not in development mode. As such the time to first byte in development mode is faster.
+- In development mode, the client will receive all the logs of the executed modules. While in production mode the client will only receive the logs of the output module.
+- In development mode, you may request specific store snapshots that are in the execution tree.
 
-- sub-topic 1
-- sub-topic 2
-- sub-topic 3
+Examples: (given the dependencies: `[block] --> [map_pools] --> [store_pools] --> [map_transfers])`
 
-What else?
+- Running substreams run substreams.yaml map_transfers will only print the outputs and logs from the map_transfers module.
+- Running substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools will print the outputs of those 3 modules.
+- Running substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools will print all the entries in store_pools at block 999, then continue with outputs and logs from map_transfers in blocks 1000 to 1004.

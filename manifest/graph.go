@@ -203,7 +203,7 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, erro
 	return res, nil
 }
 
-func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbsubstreams.Module, error) {
+func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*pbsubstreams.Module, error) {
 	alreadyAdded := map[string]bool{}
 	topologicalIndex := map[string]int{}
 
@@ -217,27 +217,25 @@ func (g *ModuleGraph) StoresDownTo(moduleNames []string) ([]*pbsubstreams.Module
 	}
 
 	var res []*pbsubstreams.Module
-	for _, moduleName := range moduleNames {
-		if _, found := g.moduleIndex[moduleName]; !found {
-			return nil, fmt.Errorf("could not find module %s in graph", moduleName)
-		}
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
 
-		_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-		for i, d := range distances {
-			if d >= 0 { // connected node or myself
-				module := g.indexIndex[i]
-				if module.GetKindStore() == nil {
-					continue
-				}
-
-				if _, ok := alreadyAdded[module.Name]; ok {
-					continue
-				}
-
-				res = append(res, module)
-				alreadyAdded[module.Name] = true
+	for i, d := range distances {
+		if d >= 0 { // connected node or myself
+			module := g.indexIndex[i]
+			if module.GetKindStore() == nil {
+				continue
 			}
+
+			if _, ok := alreadyAdded[module.Name]; ok {
+				continue
+			}
+
+			res = append(res, module)
+			alreadyAdded[module.Name] = true
 		}
 	}
 
@@ -286,7 +284,7 @@ func (g *ModuleGraph) ParentStoresOf(moduleName string) ([]*pbsubstreams.Modules
 	return nil, nil
 }
 
-func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Module, error) {
+func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbsubstreams.Module, error) {
 	alreadyAdded := map[string]bool{}
 	topologicalIndex := map[string]int{}
 
@@ -300,23 +298,21 @@ func (g *ModuleGraph) ModulesDownTo(moduleNames []string) ([]*pbsubstreams.Modul
 	}
 
 	var res []*pbsubstreams.Module
-	for _, moduleName := range moduleNames {
-		if _, found := g.moduleIndex[moduleName]; !found {
-			return nil, fmt.Errorf("could not find module %s in graph", moduleName)
-		}
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
 
-		_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
+	_, distances := graph.ShortestPaths(g, g.moduleIndex[moduleName])
 
-		for i, d := range distances {
-			if d >= 0 { // connected node or myself
-				module := g.indexIndex[i]
-				if _, ok := alreadyAdded[module.Name]; ok {
-					continue
-				}
-
-				res = append(res, module)
-				alreadyAdded[module.Name] = true
+	for i, d := range distances {
+		if d >= 0 { // connected node or myself
+			module := g.indexIndex[i]
+			if _, ok := alreadyAdded[module.Name]; ok {
+				continue
 			}
+
+			res = append(res, module)
+			alreadyAdded[module.Name] = true
 		}
 	}
 

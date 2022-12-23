@@ -253,12 +253,12 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
 	//  *
 	var execOutWriter *execout.Writer
-	moduleMapper := outputGraph.RequestedMapperModule()
-	if moduleMapper != nil && isSubRequest {
+	outputModule := outputGraph.OutputModule()
+	if outputModule.GetKindMap() != nil && isSubRequest {
 		execOutWriter = execout.NewWriter(
 			requestDetails.LinearHandoffBlockNum,
 			requestDetails.StopBlockNum,
-			map[string]bool{moduleMapper.Name: true},
+			map[string]bool{outputModule.Name: true},
 			execOutputConfigs,
 			isSubRequest,
 		)

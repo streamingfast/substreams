@@ -25,6 +25,7 @@ type ParallelProcessor struct {
 	execOutputReader *execout.LinearReader
 }
 
+// BuildParallelProcessor is only called on tier1
 func BuildParallelProcessor(
 	ctx context.Context,
 	reqDetails *reqctx.RequestDetails,
@@ -35,9 +36,13 @@ func BuildParallelProcessor(
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
+
 	if reqDetails.ShouldStreamCachedOutputs() {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
-		requestedModule := outputGraph.RequestedMapperModule()
+		requestedModule := outputGraph.OutputModule()
+		if requestedModule.GetKindStore() != nil {
+			panic("logic error: should not get a store as outputModule on tier 1")
+		}
 		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
 		execOutputReader = execout.NewLinearReader(

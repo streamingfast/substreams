@@ -99,3 +99,13 @@ Examples: (given the dependencies: `[block] --> [map_pools] --> [store_pools] --
 - Running substreams run substreams.yaml map_transfers will only print the outputs and logs from the map_transfers module.
 - Running substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools will print the outputs of those 3 modules.
 - Running substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools will print all the entries in store_pools at block 999, then continue with outputs and logs from map_transfers in blocks 1000 to 1004.
+
+### Parallel Processing
+
+There are 2 steps while parallel processing: back processing and forward processing.
+
+Back processing, consists of executing in parallel block ranges from the module initial block up to the start block of the request. If the start block of the request matches module initial block, no back processing is performed.
+
+Forward processing, consists of executing in parallel block ranges from the start block of the request up to last known final block (the irreversible block) or the stop block of the request, depending on which is smaller. Foward processing significantly improves the performance of the Substreams, but the ability to stream the module logs is lost.
+
+Back processing will occur in development and production mode, while the forward processing only occurs in production mode.

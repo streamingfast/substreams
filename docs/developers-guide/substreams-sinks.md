@@ -34,7 +34,7 @@ An understanding of basic Substreams fundamentals is expected before continuing.
 
 [https://substreams.streamingfast.io/concept-and-fundamentals/modules](https://substreams.streamingfast.io/concept-and-fundamentals/modules)
 
-## **Existing and commnuity sinks**
+## **Existing and community sinks**
 
 StreamingFast values external contributions for Substreams sinks. If your team has created a sink, please contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so we can add it to the documentation!
 

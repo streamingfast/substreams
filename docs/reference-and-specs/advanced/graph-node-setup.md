@@ -12,7 +12,7 @@ Substreams is capable of working in conjunction with graph-node. In addition, Su
 
 The first step to get up and running with graph-node and Substreams is to clone the StreamingFast graph-node-dev repository on Github.&#x20;
 
-The following command can be used to clone the repo directly.
+The following command can be used to clone the repository directly.
 
 ```
 git clone git@github.com:streamingfast/graph-node-dev.git

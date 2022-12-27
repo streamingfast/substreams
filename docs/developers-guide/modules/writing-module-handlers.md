@@ -65,7 +65,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 ```
 {% endcode %}
 
-View this file in the repo:
+View this file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
 

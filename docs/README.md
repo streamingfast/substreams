@@ -20,19 +20,19 @@ A short, dense 25 minutes intro to Substreams, and what it means for the blockch
 A walk-though of Firehose features, Substreams modules, with a sample Rust module and the vision for the future.
 {% endembed %}
 
-Read about Substreams' [Benefits and Comparison](concept-and-fundamentals/benefits/).
+Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefits/).
 
 Get started quickly by:
 
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
-* Going through the [Quick Start](getting-started/quickstart.md)
+* Going through the [Quick start](getting-started/quickstart.md)
 
-Learn more about [Modules](concepts-and-fundamentals/modules.md), or head into the [Developer Guide](developer-guide/overview.md).
+Learn more about [modules](concepts-and-fundamentals/modules.md), or head into the [developer guide](developer-guide/overview.md).
 
 Find pre-built Substreams here:
 
-* [Substreams Template](https://github.com/streamingfast/substreams-template): gets you off the ground quickly
-* [Substreams Playground](https://github.com/streamingfast/substreams-playground): a collection of already-built Substreams, and examples.
+* [Substreams template](https://github.com/streamingfast/substreams-template): gets you off the ground quickly.
+* [Substreams playground](https://github.com/streamingfast/substreams-playground): a collection of already-built Substreams, and examples.
 
 ### Network model
 

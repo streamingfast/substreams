@@ -14,13 +14,13 @@
 
 ### Benefits&#x20;
 
-* **Store & Process Blockchain Data**\
+* **Store and Process Blockchain Data**\
   Substreams employs extremely powerful parallelization techniques to process huge, ever-growing blockchain histories. It can then be used to populate any kind of data store or real-time system.
 * **Streaming-First**\
   Substreams inherit from the extremely low latency extraction provided by the underlying Firehose, making it the fastest blockchain indexing technology on the market.
-* **Save Time & Money**\
+* **Save Time and Money**\
   Substreams can be scaled horizontally resulting in a massive reduction of processing time, saving wait time and lost opportunities.
-* **Community Effort & Composability**\
+* **Community Effort and Composability**\
   Communities can combine Substreams modules to form compounding levels of data richness and refinement.
 * **Protobuf**\
   ****Substreams leverage the power of the protobuf ecosystem, for quick data modeling and integration with a large number of programming languages.
@@ -49,7 +49,7 @@ Substreams provides extremely high-performance indexing by virtue of paralleliza
 
 Substreams is horizontally scalable presenting the opportunity to reduce processing time simply by adding more computing power, or machines.
 
-#### Substreams & Firehose
+#### Substreams and Firehose
 
 Substreams has all the benefits of Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 

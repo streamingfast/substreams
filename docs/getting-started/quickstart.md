@@ -1,5 +1,5 @@
 ---
-description: Get off the ground with Substreams by StreamingFast
+description: Get off the ground using Substreams by StreamingFast
 ---
 
 # Quickstart
@@ -8,7 +8,7 @@ description: Get off the ground with Substreams by StreamingFast
 
 Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io)
 
-Get an API **Token** with:
+Get an API **Token** using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -27,7 +27,7 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 _Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to continue._
 {% endhint %}
 
-Once authenticated, run your first Substreams with:
+Once authenticated, run your first Substreams using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -38,24 +38,24 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 This [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer, targeting the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md).
 
 {% hint style="info" %}
-You prefer to stream with third-party languages? Try [Python here](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python).
+If you prefer streaming using third-party languages, try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example.
 {% endhint %}
 
 ## Platform independent Substreams
 
-Substreams is platform independent, meaning developers can work with many different blockchains.&#x20;
+Substreams is platform independent, meaning you can use many different blockchains.&#x20;
 
 Developers will typically target a specific blockchain and build a Substreams module targeted toward the chosen chain.&#x20;
 
-Data is available for any blockchain with a functional Firehose endpoint, either installed and [set up on-premise](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
+Data is available for any blockchain that has a functional Firehose endpoint, either installed and [set up on-premise](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
 
 {% hint style="info" %}
-**Note**: The remaining documentation assumes the Substreams CLI has been installed along with all other required dependencies, and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
+**Note**: The remaining documentation assumes the Substreams CLI and all other required dependencies have been installed and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
 {% endhint %}
 
 ### **Basics**
 
-The most basic approach to working with Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine should process. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+The most basic approach to using Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine should process. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
 The command demonstrates modules targeting the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
 
@@ -100,7 +100,7 @@ opt-level = 's'
 strip = "debuginfo"
 ```
 
-Install the create for the chain you are working with. These contain the protobuf models for the specific chain as well as helper code around them.
+Install the Rust crate for the desired chain. The crates have the protobuf models for the specific chain as well as helper code.
 
 ```bash
 $ cargo add substreams-ethereum # or
@@ -142,10 +142,10 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 ```
 {% endcode %}
 
-The steps to follow for working with the example include the following:&#x20;
+The steps to follow for using the example include the following:&#x20;
 
 * running the command to generate the required protobufs,
-* compiling the example with the Rust compiler,&#x20;
+* using the Rust compiler to compile the example,&#x20;
 * and sending commands to the Substreams CLI.
 
 At the root of the example project, generate your structs from protobuf specified in the YAML:
@@ -156,7 +156,7 @@ substreams protogen substreams-ethereum-tutorial.yaml
 ```
 {% endcode %}
 
-Then compile with:
+Then compile using:
 
 ```shell
 cargo build --release --target wasm32-unknown-unknown
@@ -172,7 +172,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.
 
 ### Solana example
 
-The procedure for working with the Solana example is very similar to working with the Ethereum example.&#x20;
+The procedure for using the Solana example is very similar to the Ethereum example.&#x20;
 
 Clone or download the Solana example codebase. Find the example in the official GitHub repository.
 
@@ -198,7 +198,7 @@ fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExam
 ```
 {% endcode %}
 
-Follow the same steps used for the Ethereum example to work with the Solana example.
+Follow the same steps used for the Ethereum example for the Solana example.
 
 When issuing the following command to run the Solana example take note of the different endpoint, map module name, and manifest filename.
 
@@ -212,19 +212,19 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yam
 
 The key takeaways at this point are:
 
-1. Substreams is platform independent and can be used with many different blockchains.
+1. Substreams is platform independent and can be used across many different blockchains.
 2. Block data for each blockchain follows a different structure and model.
-3. Each blockchain has a different endpoint associated with it.
-4. Each blockchain has a different package associated with it.
+3. Each blockchain has a different endpoint.
+4. Each blockchain has a different package.
 5. Custom protobufs are created to pass data from one module to another.
 
 {% hint style="info" %}
-**Note**: Gaining a basic understanding of how Substreams works with multiple blockchains will enable developers to graduate to build even more complex solutions.&#x20;
+**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains will enable developers to graduate to build even more complex solutions.&#x20;
 {% endhint %}
 
 Understanding map and store modules is the next step to understanding how to design and craft a fully directed acyclic graph in the Substreams manifest.
 
-Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md), and sample code with explanations can be found in the [Developer's Guide](../developers-guide/overview.md).&#x20;
+Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md), and sample code can be found in the [Developer's Guide](../developers-guide/overview.md).&#x20;
 
 Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
 
@@ -238,7 +238,7 @@ Error: rpc error: code = InvalidArgument desc = validate request: input source "
 ```
 {% endcode %}
 
-A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible with another. The error seen above is informing the developer of this issue.
+A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible. The error seen above is informing the developer of this issue.
 
 To resolve the problem, double-check the code and settings within the Substreams codebase against the endpoint that's being sent to the Substreams CLI. The error is from an Ethereum codebase requesting Solana Blocks.&#x20;
 

@@ -6,9 +6,7 @@ description: StreamingFast Substreams CLI installation
 
 ### Substreams CLI installation
 
-The Substreams command line interface (CLI) is the main means of interacting with and using the product.
-
-The Substreams CLI lets you connect to Substreams endpoints, stream data in real-time, and package custom Substreams modules.
+The Substreams CLI lets you connect to Substreams endpoints, stream data in real time, and package custom Substreams modules.
 
 {% hint style="info" %}
 _**Important**: Check the_ [_official Github repository_](https://github.com/streamingfast/substreams/releases) _to get the **latest Substreams CLI release that is available**._&#x20;

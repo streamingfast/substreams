@@ -4,17 +4,17 @@ description: StreamingFast Substreams fundamental knowledge
 
 # Fundamentals
 
-### Substreams Fundamentals
+### Working with Substreams Fundamentals
 
-You will create and touch several pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [Substreams command line interface](../reference-and-specs/command-line-interface.md), configuration files, [modules](modules.md), and [protobufs](../developers-guide/creating-protobuf-schemas.md).
+Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/command-line-interface.md), configuration files, [Rust modules](modules.md), and [protobufs](../developers-guide/creating-protobuf-schemas.md).
 
-The documentation explains how the different pieces fit together.
+This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, [WASM](https://webassembly.org/), and Substreams CLI.
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
 ### Key Steps
 
-* Identify smart contract addresses of interest including wallets, and decentralized exchanges (DEXs).
+* Identify smart contract addresses of interest including wallets, decentralized exchanges (DEXs), etc.
 * Identify data, and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update substreams manifest, point to protobufs and handlers.
@@ -60,7 +60,7 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
-View the protobuf file in the repository:
+View the protobuf file in the repo:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 

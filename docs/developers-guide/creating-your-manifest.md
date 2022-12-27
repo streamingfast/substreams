@@ -16,7 +16,7 @@ Every Substreams implementation contains one manifest. The manifest is a YAML-ba
 
 ## Example manifest
 
-The manifest below is from the [Substreams Template example](https://github.com/streamingfast/substreams-template) accompanying the developer guide.
+The manifest below is from the [Substreams Template example](https://github.com/streamingfast/substreams-template) accompanying the Developer's Guide.
 
 {% hint style="info" %}
 **Note**: The example manifest below is specific to the Ethereum blockchain. The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml) specific to the Solana blockchain.

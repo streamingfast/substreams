@@ -50,5 +50,5 @@ substreams version dev
 ```
 
 {% hint style="info" %}
-_Note:_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._
+_Note:_ [_Gitpod_](../developers-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._
 {% endhint %}

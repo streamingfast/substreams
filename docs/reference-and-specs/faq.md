@@ -50,7 +50,7 @@ Developers can create their own Substreams implementations in a variety of ways.
 
 [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
 
-The Substreams documentation also provides a Developer Guide to assist with understanding and working with Substreams.
+The Substreams documentation also provides a Developer's Guide to assist with understanding and working with Substreams.
 
 [https://substreams.streamingfast.io/developer-guide/overview](https://substreams.streamingfast.io/developer-guide/overview)
 

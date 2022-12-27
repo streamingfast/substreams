@@ -27,7 +27,7 @@ Get started quickly by:
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
 * Going through the [Quick start](getting-started/quickstart.md).
 
-Learn more about [modules](concepts-and-fundamentals/modules.md), or head into the [developer guide](developer-guide/overview.md).
+Learn more about [modules](concepts-and-fundamentals/modules.md), or head into the [Developer's Guide](developers-guide/overview.md).
 
 Find pre-built Substreams here:
 

@@ -13,20 +13,20 @@
 * [Installing the Substreams CLI](getting-started/installing-the-cli.md)
 * [Quickstart](getting-started/quickstart.md)
 
-## Developer Guide
+## Developer's Guide
 
-* [Overview](developer-guide/overview.md)
-* [Dependency installation](developer-guide/installation-requirements.md)
-* [Manifest](developer-guide/creating-your-manifest.md)
-* [Protobuf schemas](developer-guide/creating-protobuf-schemas.md)
-* [Modules](developer-guide/modules/README.md)
-  * [Module types](developer-guide/modules/types.md)
-  * [Inputs](developer-guide/modules/inputs.md)
-  * [Outputs](developer-guide/modules/outputs.md)
-  * [Module handlers](developer-guide/modules/setting-up-handlers.md)
-  * [Module handler creation](developer-guide/modules/writing-module-handlers.md)
-* [Running substreams](developer-guide/running-substreams.md)
-* [Substreams sinks](developer-guide/substreams-sinks.md)
+* [Overview](developers-guide/overview.md)
+* [Dependency installation](developers-guide/installation-requirements.md)
+* [Manifest](developers-guide/creating-your-manifest.md)
+* [Protobuf schemas](developers-guide/creating-protobuf-schemas.md)
+* [Modules](developers-guide/modules/README.md)
+  * [Module types](developers-guide/modules/types.md)
+  * [Inputs](developers-guide/modules/inputs.md)
+  * [Outputs](developers-guide/modules/outputs.md)
+  * [Module handlers](developers-guide/modules/setting-up-handlers.md)
+  * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
+* [Running Substreams](developers-guide/running-substreams.md)
+* [Substreams sinks](developers-guide/substreams-sinks.md)
 
 ## Reference & Specs
 

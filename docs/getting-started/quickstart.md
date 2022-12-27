@@ -35,7 +35,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 ```
 {% endcode %}
 
-This [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer, targeting the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developer-guide/modules/setting-up-handlers.md).
+This [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer, targeting the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md).
 
 {% hint style="info" %}
 You prefer to stream with third-party languages? Try [Python here](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python).
@@ -224,7 +224,7 @@ The key takeaways at this point are:
 
 Understanding map and store modules is the next step to understanding how to design and craft a fully directed acyclic graph in the Substreams manifest.
 
-Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md), and sample code with explanations can be found in the [Developer Guide](../developer-guide/overview.md).&#x20;
+Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md), and sample code with explanations can be found in the [Developer's Guide](../developers-guide/overview.md).&#x20;
 
 Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 

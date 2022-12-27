@@ -1,5 +1,5 @@
 ---
-description: StreamingFast graph-node-dev setup documentation
+description: StreamingFast graph-node setup
 ---
 
 # Graph-node setup

@@ -14,7 +14,7 @@ Developers do not need a dedicated installation of Firehose to work with Substre
 
 ### **Can I use Substreams in my subgraph?**
 
-Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for working with graph-node and subgraphs.
+Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for working with Graph Node and subgraphs.
 
 [https://substreams.streamingfast.io/reference-and-specs/graph-node-setup](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup)
 

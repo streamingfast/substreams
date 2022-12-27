@@ -13,7 +13,7 @@ Protobuf definitions and public endpoints are provided for each of the supported
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_:_ Endpoints serve protobuf models specific to the underlying protocol and must match the `source:` field for the module. _Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint **is not possible**._
+**Important**_:_ Endpoints serve protobuf models specific to the underlying protocol and must match the `source:` field for the module. _Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint **is not an option**._
 {% endhint %}
 
 | Blockchain Protocol | Proto model                                                                                                                                     | Latest package                                                                                                        |

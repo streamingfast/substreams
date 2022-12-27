@@ -70,7 +70,7 @@ Yes, Substreams is an open-source project and available to the public for free.
 
 Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 
-### Is it possible to continuously listen for new blocks with Substreams?
+### Can I listen for new blocks with Substreams?
 
 Specifying a stop block value of zero (0), the default enables transparent handoff from historical to real-time blocks.
 

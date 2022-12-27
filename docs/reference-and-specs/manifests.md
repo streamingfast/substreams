@@ -213,7 +213,7 @@ Valid only for `kind: store`.
 
 Specifies the merge strategy for two contiguous partial stores produced by parallelized operations.&#x20;
 
-Possible values for `modules[].updatePolicy` are as follows.
+Values for `modules[].updatePolicy` are as follows.
 
 * `set` (last key wins merge strategy)
 * `set_if_not_exists` (first key wins merge strategy)
@@ -228,7 +228,7 @@ Valid only for `kind: store`.
 
 Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store.&#x20;
 
-Possible values for `modules[].valueTypes` are as follows.
+Values for `modules[].valueTypes` are as follows.
 
 * `bigfloat`
 * `bigint`

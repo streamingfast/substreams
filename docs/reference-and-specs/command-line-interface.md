@@ -30,7 +30,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
-Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
+Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, to provide you with output at the requested start block quickly, while keeping snapshots along the way, in case you want to process it again.
 
 Example output of `gravatar_updates` starting at block 6200807.
 
@@ -54,7 +54,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 Notice the `-o` (or `--output`), that can alter the output format. The options are:
 
 * `ui`, a nicely formatted, UI-driven interface, with progress information, and execution logs.
-* `json`, an indented stream of data, with no progress information nor logs, but just data output for blocks following the start block.
+* `json`, an indented stream of data, with no progress information nor logs, only data output for blocks following the start block.
 * `jsonl`, same as `json` but with each output on a single line.
 
 ### `pack`

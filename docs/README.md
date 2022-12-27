@@ -47,7 +47,7 @@ Substreams has two perspectives as illustrated in the high-level visual diagram:
 
 _**Need help? Reach out!**_
 
-Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
+Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 
 * [StreamingFast Discord](https://discord.gg/mYPcRAzeVN)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
@@ -56,7 +56,7 @@ Substreams is an open-source community effort, so feel free to suggest new topic
 
 ### Contributing
 
-First refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
+Please first refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
 
 ### License
 

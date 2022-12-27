@@ -81,7 +81,7 @@ Alternatively, stores can be set to deltas mode as illustrated in the following 
 
 ### Module modes
 
-There are **two possible modes** that can be defined for modules.
+There are **two modes** that can be defined for modules.
 
 * `get`
 * `delta`

@@ -4,13 +4,13 @@ description: Running the StreamingFast Substreams service locally
 
 # Running Substreams locally
 
-It's possible to run Substreams locally by running StreamingFast Firehose on the same machine.
+You can run Substreams locally by running StreamingFast Firehose on the same machine.
 
 ### Download Firehose
 
-Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).&#x20;
+Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).
 
-The full source code is available in the official [Firehose GitHub repository](https://github.com/streamingfast/firehose-ethereum).&#x20;
+The full source code is available in the official [Firehose GitHub repository](https://github.com/streamingfast/firehose-ethereum).
 
 Firehose can be built from source or installed using a [Firehose Docker release](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum).
 
@@ -30,7 +30,7 @@ fireeth tools generate-irreversible-index ./localblocks ./localirr 6810000 68197
 
 ### Write a config file
 
-Use the following for the Firehose configuration file. Additional information is available in the [Firehose documentation](https://firehose.streamingfast.io/).&#x20;
+Use the following for the Firehose configuration file. Additional information is available in the [Firehose documentation](https://firehose.streamingfast.io/).
 
 {% code title="config.yaml" %}
 ```yaml

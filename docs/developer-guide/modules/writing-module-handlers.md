@@ -129,7 +129,7 @@ This macro decorates our handler function as a map. There is also a macro used t
 
 The goal of the `map` being built is for extracting ERC721 transfers from a given block.
 
-This can be achieved by finding all the `Transfer` events that are emitted by the tracked contract. As events are found they will be decoded into `Transfer` objects.
+This can be achieved by finding all the `Transfer` events that are emitted by the contract that is currently being tracked. As events are found they will be decoded into `Transfer` objects.
 
 ```rust
 /// Extracts transfers events from the contract

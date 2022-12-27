@@ -11,11 +11,11 @@ Modules can receive inputs of three types: `source`, `map`, and `store`.
 An Input of type `source` represents a chain-specific, Firehose-provisioned protobuf object.
 
 {% hint style="info" %}
-**Note**_**:** Find the supported protocols and their corresponding message types in the_ [_Chains & Inputs documentation_](../../reference-and-specs/chains-and-endpoints.md)_._
+**Note**_**:** _ Find the supported protocols and their corresponding message types in the [Chains and inputs documentation](../../reference-and-specs/chains-and-endpoints.md).
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**: Ethereum-based Substreams implementations would specify `sf.ethereum.type.v2.Block.`&#x20;
+**Tip**: Ethereum-based Substreams modules would specify `sf.ethereum.type.v2.Block.`&#x20;
 {% endhint %}
 
 {% hint style="info" %}
@@ -46,7 +46,7 @@ An Input of type `map` represents the output of another `map` module.&#x20;
 The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
 
 {% hint style="warning" %}
-**Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's known as a circular dependency, and is not desired.
+**Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's known as a circular dependency, and is not wanted.
 {% endhint %}
 
 The `map` inputs type __ is defined in the Substreams manifest as seen below. The name of the map is chosen by the developer and should be representative of the logic contained within.

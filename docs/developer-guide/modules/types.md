@@ -70,7 +70,7 @@ _The complete store will be represented as if processing had been done linearly,
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_**:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is currently being written._
+**Important**_**:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is being written._
 
 _To read from a store a downstream module is created with one of its inputs pointing to the store module's output._
 {% endhint %}

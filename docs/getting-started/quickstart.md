@@ -162,7 +162,7 @@ Then compile with:
 cargo build --release --target wasm32-unknown-unknown
 ```
 
-You're now ready to run:
+You're ready to run:
 
 {% code overflow="wrap" %}
 ```bash

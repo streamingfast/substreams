@@ -154,7 +154,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 }
 ```
 
-Now define the `store` module. As a reminder, here is the module definition from the example Substreams manifest.
+Define the `store` module. As a reminder, here is the module definition from the example Substreams manifest.
 
 ```yaml
 - name: store_transfers

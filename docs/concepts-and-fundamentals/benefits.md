@@ -23,9 +23,9 @@
 * **Community Effort and Composability**\
   Communities can combine Substreams modules to form compounding levels of data richness and refinement.
 * **Protobuf**\
-  ****Substreams uses the power of the protobuf ecosystem, for quick data modeling and integration with a large number of programming languages.
+  ****Substreams leverage the power of the protobuf ecosystem, for quick data modeling and integration with a large number of programming languages.
 * **Rust**\
-  Substreams modules are written in the Rust programming language, using a wide array of third-party libraries that compile to WASM, to manipulate blockchain data on-the-fly.
+  Substreams modules are written in the Rust programming language, leveraging a wide array of third-party libraries that compile to WASM, to manipulate blockchain data on-the-fly.
 * **Blockchain Infused Large-scale Data**\
   Substreams was inspired by traditional large-scale data systems now _fused_ with the novelties of blockchain.
 

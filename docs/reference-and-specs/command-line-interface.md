@@ -2,13 +2,11 @@
 description: StreamingFast Substreams command line interface (CLI)
 ---
 
-# Using the CLI
+# CLI Reference
 
 The Substreams command line interface (CLI) is the user interface and central access point for working with Substreams.
 
 The Substreams CLI exposes many commands to developers enabling a range of functionality. Each command is explained in further detail.
-
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-31 at 2.40.08 PM.png" alt=""><figcaption><p>Substreams command-line interface screenshot</p></figcaption></figure>
 
 {% hint style="info" %}
 _Note: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL._
@@ -25,7 +23,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
    module_name
 ```
 
-#### Run Command Breakdown
+#### Run Command breakdown
 
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running our Substreams
 * `-t +1` (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
@@ -118,7 +116,7 @@ graph TD;
 ```
 ````
 
-The code will  a graphic similar to&#x20;
+The code will a graphic similar to
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
 Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to edit mode.

@@ -73,7 +73,7 @@ Handlers compile down to a WASM module. Explicitly specify the target`asm32-unkn
 
 #### `ethabi`
 
-The `ethabi` crate will be used to decode events from the Application binary interface (ABI) and is required for `substreams-ethereum` ABI functionality.
+The `ethabi` crate will be used to decode events from the Application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
 
 #### `hex-literal`
 

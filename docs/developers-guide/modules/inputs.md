@@ -105,7 +105,7 @@ Get mode provides a key/value store that is readily queryable and guaranteed to 
 
 Modules using delta mode are [protobuf objects](../../../proto/sf/substreams/v1/substreams.proto#L124) and contain all the changes that have occurred in the `store` module available in the same block.&#x20;
 
-Delta mode enables developers with the ability to loop through keys decoding old and new values that were mutated in the module.
+Delta mode enables developers with the ability to loop through keys decoding values that were mutated in the module.
 
 #### Store deltas example
 

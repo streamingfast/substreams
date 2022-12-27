@@ -24,8 +24,8 @@ Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefi
 
 Get started quickly by:
 
-* [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
-* Going through the [Quick start](getting-started/quickstart.md)
+* [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
+* Going through the [Quick start](getting-started/quickstart.md).
 
 Learn more about [modules](concepts-and-fundamentals/modules.md), or head into the [developer guide](developer-guide/overview.md).
 
@@ -38,9 +38,9 @@ Find pre-built Substreams here:
 
 <img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
 
-Substreams has two perspectives as illustrated in the high-level visual diagram seen below:
+Substreams has two perspectives as illustrated in the high-level visual diagram:
 
-1. The Substreams engine itself
+1. The Substreams engine
 2. The end-user developer and consumer
 
 ### Community

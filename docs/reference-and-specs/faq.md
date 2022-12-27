@@ -10,11 +10,11 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
 
 ### **Do I need Firehose to use Substreams?**
 
-Developers do not need a dedicated installation of Firehose to work with Substreams. StreamingFast provides a public Firehose endpoint made available to developers.
+Developers do not need a dedicated installation of Firehose to use Substreams. StreamingFast provides a public Firehose endpoint made available to developers.
 
 ### **Can I use Substreams in my subgraph?**
 
-Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for working with graph-node and subgraphs.
+Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for using graph-node and subgraphs.
 
 [https://substreams.streamingfast.io/reference-and-specs/graph-node-setup](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup)
 
@@ -24,19 +24,19 @@ No, Substreams is provided as a developer preview.
 
 ### **What is the Substreams CLI?**
 
-The Substreams command line interface (CLI) is the main tool that developers use to interact with the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for working with the CLI is available in the Substreams documentation.
+The Substreams command line interface (CLI) is the main tool that developers use to use the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for using the CLI is available in the Substreams documentation.
 
 [https://substreams.streamingfast.io/reference-and-specs/using-the-cli](https://substreams.streamingfast.io/reference-and-specs/using-the-cli)
 
 ### **How do I get a Substreams authentication token?**
 
-Authentication tokens are required to work with Substreams and connect to the public Firehose endpoint. Full instructions for obtaining a StreamingFast authentication token are available in the Substreams documentation.
+Authentication tokens are required to use Substreams and connect to the public Firehose endpoint. Full instructions for obtaining a StreamingFast authentication token are available in the Substreams documentation.
 
 [https://substreams.streamingfast.io/reference-and-specs/authentication](https://substreams.streamingfast.io/reference-and-specs/authentication)
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
-The StreamingFast team is available in Discord to assist with problems related to obtaining or using authentication tokens.&#x20;
+The StreamingFast team is available in Discord to resolve problems related to obtaining or using authentication tokens.&#x20;
 
 [https://discord.gg/Ugc7KtkA](https://discord.gg/Ugc7KtkA)
 
@@ -50,13 +50,13 @@ Developers can create their own Substreams implementations in a variety of ways.
 
 [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
 
-The Substreams documentation also provides a Developer's Guide to assist with understanding and working with Substreams.
+The Substreams documentation also provides a Developer's Guide to assist in understanding and using Substreams.
 
 [https://substreams.streamingfast.io/developer-guide/overview](https://substreams.streamingfast.io/developer-guide/overview)
 
 ### **What is Substreams for?**
 
-Substreams works in conjunction with StreamingFast Firehose to enable extremely fast access and processing capabilities of blockchain data. Substreams is used for transforming rich blockchain data and exposing it to the needs of application developers.
+Substreams and Firehose work together to provide access and processing capabilities for blockchain data. Substreams is used for transforming rich blockchain data and exposing it to the needs of application developers.
 
 Additional information is available on the What is Substreams page in the documentation.
 
@@ -70,7 +70,7 @@ Yes, Substreams is an open-source project and available to the public for free.
 
 Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 
-### Can I listen for new blocks with Substreams?
+### Can I listen for new blocks using Substreams?
 
 Specifying a stop block value of zero (0), the default enables transparent handoff from historical to real-time blocks.
 
@@ -116,4 +116,4 @@ Additional information is available at the following link.
 
 ### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
 
-Check that the module's output type fits with the `protobuf` definition. Sometimes the renamed the `protobuf` package isn't updated in the `substreams.yaml` manifest's `module.output.type` field for correct alignment.
+Check that the module's output type matches the `protobuf` definition. Sometimes the renamed  `protobuf` package isn't updated in the `substreams.yaml` manifest's `module.output.type` field for correct alignment.

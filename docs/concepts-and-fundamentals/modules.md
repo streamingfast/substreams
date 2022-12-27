@@ -6,7 +6,7 @@ description: StreamingFast Substreams modules overview
 
 ## What are modules?
 
-Modules are a crucial aspect of working with Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
+Modules are an important part of Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
 
 In further detail, modules are small pieces of Rust code running in a WebAssembly (WASM) virtual machine. Modules coexist within the stream of blocks sent by the Substreams compute engine arriving from a blockchain node.&#x20;
 
@@ -27,7 +27,7 @@ Blockchains allow synchronization between multiple execution streams opening up 
 Modules can also take in multiple inputs as seen in the `counters` store example diagram. Two modules feed into a `store`, effectively tracking multiple `counters`.
 
 {% embed url="https://mermaid.ink/svg/pako:eNqdkE1qAzEMha9itE4GsnWgi5KcINmNh6LamozJeGxsuSGE3L1KW1PIptCdnnjv088NbHQEGk4Z06SOu61ZlHqfoz33JdZsSasydsQTZaqh42ui7mPTvT4cg1qvX1TA9HbxPLmMF5zLv_KOUiyev8JPvF60fm5-J22sC1MufeGYZVDTQ8M07C-jdf4AwAoC5YDeyWtuD5wBOSGQAS2loxHrzAbMchdrTQ6Z9s4LBfQo-9EKsHI8XBcLmnOlZtp5lE-HH9f9EylZic0" %}
-Modules with multiple inputs diagram
+Multiple module inputs diagram
 {% endembed %}
 
 All of the modules are executed as a directed acyclic graph (DAG) each time a new `Block` is processed.

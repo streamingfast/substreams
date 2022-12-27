@@ -4,17 +4,17 @@ description: StreamingFast Substreams fundamental knowledge
 
 # Fundamentals
 
-### Working with Substreams Fundamentals
+### Substreams Fundamentals
 
-Developers working with Substreams will create and touch many separate pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [command line interface](../reference-and-specs/command-line-interface.md), configuration files, [Rust modules](modules.md), and [protobufs](../developers-guide/creating-protobuf-schemas.md).
+You will create and touch several pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [Substreams command line interface](../reference-and-specs/command-line-interface.md), configuration files, [modules](modules.md), and [protobufs](../developers-guide/creating-protobuf-schemas.md).
 
-This documentation aims to outline information to further help developers working with Substreams. Specifically, how the multitude of different pieces fit together including the manifest, protobufs, Rust modules, module handlers, [WASM](https://webassembly.org/), and Substreams CLI.
+The documentation explains how the different pieces fit together.
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
 ### Key Steps
 
-* Identify smart contract addresses of interest including wallets, decentralized exchanges (DEXs), etc.
+* Identify smart contract addresses of interest including wallets, and decentralized exchanges (DEXs).
 * Identify data, and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update substreams manifest, point to protobufs and handlers.
@@ -60,7 +60,7 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
-View the protobuf file in the repo:
+View the protobuf file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 
@@ -82,13 +82,13 @@ In object-oriented programming terminology, the protobufs are the objects or obj
 
 _**Firehose and Substreams treat the data as the API.**_
 
-Protobufs essentially provide the API to the targeted data, usually associated with a smart contract address.
+Protobufs provide the API to the targeted data for a smart contract address.
 
 ### **Writing Rust Modules for Substreams**
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM.png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
 
-Designing an overall strategy for how to manage and transform data is the first thing developers will do when creating a Substreams implementation. Substreams modules are processed by the engine with the relationships between them defined in the manifest.&#x20;
+Designing an overall strategy for how to manage and transform data is the first thing developers will do when creating a Substreams implementation. Substreams modules are processed by the engine using the relationships defined in the manifest.&#x20;
 
 The design and complexity of the modules and the way they work together will be based on the smart contracts and data being targeted by the developer.&#x20;
 

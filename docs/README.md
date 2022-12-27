@@ -17,7 +17,7 @@ Substreams have all the benefits of StreamingFast Firehose, like low-cost cachin
 A short, dense 25-minute intro to Substreams, and what it means for the blockchain ecosystem:
 
 {% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
-A walk-though of Firehose features, Substreams modules, with a sample Rust module and the vision for the future.
+A walkthrough of Firehose features, Substreams modules, including a sample Rust module and the vision for the future.
 {% endembed %}
 
 Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefits/).
@@ -38,7 +38,7 @@ Find pre-built Substreams here:
 
 <img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
 
-Substreams has two perspectives as illustrated in the high-level visual diagram:
+Substreams can be viewed from two perspectives as illustrated in the high-level visual diagram:
 
 1. The Substreams engine perspective.
 2. The end-user developer and consumer perspective.
@@ -64,4 +64,4 @@ Substreams is currently licensed under [Apache 2.0](../LICENSE/).
 
 ### Disclaimer
 
-The content in this documentation was created with StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is currently in development and the associated documentation may become outdated in some areas. Please feel free to reach out to report issues or outages.
+The content in this documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is currently in development and the associated documentation may become outdated in some areas. Please feel free to reach out to report issues or outages.

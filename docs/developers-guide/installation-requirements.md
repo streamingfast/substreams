@@ -6,9 +6,9 @@ description: StreamingFast Substreams dependency installation
 
 ## Dependencies overview
 
-Working with Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](broken-reference) page.
+Using Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](broken-reference) page.
 
-Instructions and links are provided to assist with the installation of the required dependencies for Substreams.
+Instructions and links are provided to assist in the installation of the required dependencies for Substreams.
 
 {% hint style="success" %}
 **Tip**: Instructions are provided for cloud-based Gitpod setups.
@@ -18,7 +18,7 @@ Instructions and links are provided to assist with the installation of the requi
 
 ### `substreams` CLI installation
 
-The Substreams CLI is required and is the primary user interface for working with Substreams.
+The Substreams CLI is required and is the primary user interface for using Substreams.
 
 {% hint style="success" %}
 **Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page.
@@ -37,17 +37,17 @@ source $HOME/.cargo/env # to configure your current shell
 
 ### Buf installation
 
-Buf simplifies the generation of typed structures in any language. Buf works with a remote builder executed on the Buf server, so an internet connection is required to generate Rust bindings from Protobuf definitions.
+Buf simplifies the generation of typed structures in any language. Buf uses a remote builder executed on the Buf server, so an internet connection is required to generate Rust bindings from Protobuf definitions.
 
 Visit the [Buf website](https://buf.build/) for additional information and [installation instructions](https://docs.buf.build/installation).
 
 {% hint style="info" %}
-**Note**_:_ [_Substreams packages_](../reference-and-specs/packages.md) _are compatible with_ [_Buf images_](https://docs.buf.build/reference/images)_._
+**Note**_:_ [Substreams packages](../reference-and-specs/packages.md) and [Buf images](https://docs.buf.build/reference/images) are compatible.
 {% endhint %}
 
-## Cloud-based environment with Gitpod
+## Gitpod cloud-based environment
 
-Follow the steps to use [Gitpod](https://www.gitpod.io/) with Substreams.
+Follow the steps for using [Gitpod](https://www.gitpod.io/) and Substreams.
 
 1. Copy the [substreams-template repository](https://github.com/streamingfast/substreams-template/generate).
 2. Obtain a StreamingFast authentication key from: [https://app.streamingfast.io/](https://app.streamingfast.io/).

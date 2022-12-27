@@ -4,18 +4,18 @@ description: StreamingFast Substreams packages reference
 
 # Packages
 
-## Working with Substreams packages
+## Using Substreams packages
 
 A Substreams _package_ is a **single file** containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code, and the module's DAG definition.&#x20;
 
 Substreams packages are protobuf-serialized files. The standard extension for Substreams packages is **`.spkg`**.
 
 {% hint style="success" %}
-**Tip**: Packages simplify the process of working with Substreams and allow developers to _begin streaming immediately_!
+**Tip**: Packages simplify the process of using Substreams and allow developers to _begin streaming immediately_!
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This enables Substreams packages to be used with multiple code generation tools as a source for schema definitions.
+**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This enables Substreams packages to be used across multiple code generation tools as a source for schema definitions.
 {% endhint %}
 
 ### Creating packages

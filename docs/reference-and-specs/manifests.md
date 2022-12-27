@@ -6,7 +6,7 @@ description: StreamingFast Substreams manifest reference
 
 ## What is a Substreams manifest?
 
-The manifest is the high-level outline for a Substreams implementation. The manifest file is used for defining properties specific to the current implementation and identifying the dependencies between the inputs and outputs of modules.
+The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current implementation and identifying the dependencies between the inputs and outputs of modules.
 
 This page provides a reference guide of _all_ fields and values used in a Substreams manifest.
 
@@ -18,7 +18,7 @@ Excerpt pulled from the example Substreams manifest.
 specVersion: v0.1.0
 ```
 
-Simply use `v0.1.0` for the `specVersion` field.
+Use `v0.1.0` for the `specVersion` field.
 
 ### Package
 

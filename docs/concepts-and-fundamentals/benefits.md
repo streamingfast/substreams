@@ -13,24 +13,24 @@ description: StreamingFast Substreams benefits and comparisons
 * being fed by deterministic blockchain data and is therefore deterministic.
 * _**not**_ a relational database,
 * _**not**_ a REST service,
-* _**not**_ concerned directly with how data is queried,
+* _**not**_ concerned directly about how data is queried,
 * not a general-purpose _non-deterministic_ event stream processor.
 
 ### Benefits&#x20;
 
-* **Store and Process Blockchain Data**\
+* **Store and process blockchain data**\
   Substreams employs extremely powerful parallelization techniques to process huge, ever-growing blockchain histories. It can then be used to populate any kind of data store or real-time system.
-* **Streaming-First**\
+* **Streaming-first**\
   Substreams inherit from the extremely low latency extraction provided by the underlying Firehose, making it the fastest blockchain indexing technology on the market.
-* **Save Time and Money**\
+* **Save time and money**\
   Substreams can be scaled horizontally resulting in a massive reduction of processing time, saving wait time and lost opportunities.
-* **Community Effort and Composability**\
+* **Community effort and composability**\
   Communities can combine Substreams modules to form compounding levels of data richness and refinement.
 * **Protobuf**\
-  ****Substreams uses the power of the protobuf ecosystem, for data modeling and integration with a large number of programming languages.
+  ****Substreams uses the power of the protobuf ecosystem, for data modeling and integration for a large number of programming languages.
 * **Rust**\
   Substreams modules are written in the Rust programming language, using a wide array of third-party libraries that compile to WASM, to manipulate blockchain data on-the-fly.
-* **Blockchain Infused Large-scale Data**\
+* **Blockchain infused Large-scale data**\
   Substreams was inspired by conventional large-scale data systems now _fused_ with the novelties of blockchain.
 
 ### Comparison to other engines

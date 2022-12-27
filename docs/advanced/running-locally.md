@@ -16,7 +16,7 @@ Firehose can be built from source or installed using a [Firehose Docker release]
 
 ### Get some data
 
-The following code will instruct Firehose to generate merged blocks files to use with Substreams.
+The following code will instruct Firehose to generate merged blocks files for Substreams.
 
 ```bash
 # Downloads 2.6GB of data
@@ -59,7 +59,7 @@ Start Firehose and pass it the config file.
 $ fireeth start -c config.yaml
 ```
 
-### Run Substreams with Firehose
+### Running Substreams and Firehose
 
 Run the `substreams` command against the Firehose deployment using the following command.
 

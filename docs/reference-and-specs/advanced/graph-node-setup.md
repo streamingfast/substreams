@@ -6,13 +6,13 @@ description: StreamingFast graph-node setup
 
 ## Graph-node setup
 
-Substreams is capable of working in conjunction with graph-node. In addition, Substreams-based subgraphs can be pushed into graph-node setups.
+Substreams and graph-node can be used together. Substreams-based subgraphs can be pushed into graph-node setups.
 
 #### **StreamingFast graph-node dev**
 
-The first step to get up and running with graph-node and Substreams is to clone the StreamingFast graph-node-dev repository on Github.&#x20;
+First, clone the StreamingFast graph-node-dev repository on Github.&#x20;
 
-The following command can be used to clone the repo directly.
+The following command can be used to clone the repository directly.
 
 ```
 git clone git@github.com:streamingfast/graph-node-dev.git
@@ -60,7 +60,7 @@ Additional information for PostgreSQL installation can be found in the official 
 
 #### **NodeJS dependencies**
 
-Using Substreams with graph-node requires several Node.js dependencies. Start Docker and issue the following command to the terminal window to begin the installation process.
+Using Substreams and graph-node together requires several Node.js dependencies. Start Docker and issue the following command to the terminal window to begin the installation process.
 
 ```
 yarn install
@@ -71,7 +71,7 @@ yarn install
 Running the up.sh shell script included in the graph-node-dev repository will start the Docker containers for PostgreSQL and the IPFS node.
 
 {% hint style="info" %}
-**Note**: The `-c` flag can be added when running the up.sh shell script to clean any persistent folders associated with PostgreSQL, IPFS nodes, and other similar services before starting them.
+**Note**: The `-c` flag can be added when running the up.sh shell script to clean any persistent folders for PostgreSQL, IPFS nodes, and other similar services before starting them.
 {% endhint %}
 
 ```
@@ -104,7 +104,7 @@ The following shell script starts the services for Solana.
 
 #### The Graph Protocol graph-node
 
-The graph-node repository from The Graph is also required for working with StreamingFast graph-node-dev. The repository can be cloned to the target machine by issuing the following command to the terminal.
+The graph-node repository from The Graph is also required to use StreamingFast graph-node-dev. The repository can be cloned to the target machine by issuing the following command to the terminal.
 
 ```
 git clone https://github.com/graphprotocol/graph-node
@@ -141,7 +141,7 @@ After the subgraph manifest has been pushed to IPFS the subgraph can be deployed
 The following command should be issued using a new terminal window to deploy the subgraph.
 
 {% hint style="info" %}
-**Note**: http can be installed using Homebrew with the httpie command.
+**Note**: http can be installed using Homebrew using the httpie command.
 {% endhint %}
 
 ```

@@ -8,7 +8,7 @@ description: StreamingFast Substreams examples
 
 #### Substreams template for dev guide
 
-The accompanying template associated with the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+The accompanying template for the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
 
 #### Uniswap-v3
 

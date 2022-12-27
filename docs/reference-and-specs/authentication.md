@@ -14,7 +14,7 @@ An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will g
 
 The API key is required for obtaining an authentication token. Register for an authentication key at [`app.streamingfast.io`](https://app.streamingfast.io).&#x20;
 
-The StreamingFast team is generally available on [Discord](https://discord.gg/jZwqxJAvRs) and can assist with API key __ generation there as well.
+The StreamingFast team is available on [Discord](https://discord.gg/jZwqxJAvRs) to help you get an API key.
 
 ### Request your authentication token
 
@@ -37,14 +37,14 @@ export SUBSTREAMS_API_TOKEN="your_token"
 By default the `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token.
 
 {% hint style="info" %}
-_**Note**:_ **Authentication Token Env Flag**
+**Note**_:_ **Authentication Token Env Flag**
 
-The default behavior of the `substreams run` command can use a custom ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar.`
+The default behavior of the `substreams run` command can use a custom ENV var name that has the Authentication token using the flag `--substreams-api-token-envvar.`
 {% endhint %}
 
 ### Environment variable script
 
-The following `bash` function can be run from the command line to obtain a token. The following function can be placed in the `.bashrc` file, located in the computer's home directory.&#x20;
+The following `bash` function can be run from the command line to obtain a token. The following function is placed in the `.bashrc` file, located in the computer's home directory.&#x20;
 
 ```bash
 # Ask us on Discord for a key

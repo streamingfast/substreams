@@ -6,7 +6,7 @@ description: StreamingFast Substreams Rust APIs
 
 ### Substreams crates
 
-The official [`substreams` crate](https://crates.io/crates/substreams) assists developers with creating module handlers.
+The official [`substreams` crate](https://crates.io/crates/substreams) assists developers in creating module handlers.
 
 There are also chain-specific `substreams-[network]` crates available:
 

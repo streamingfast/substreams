@@ -24,7 +24,7 @@ StreamingFast and the Substreams community have provided an array of different e
 
 #### Substreams template for Developer's Guide
 
-The accompanying template associated with the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).
+The accompanying template for the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).
 
 #### Substreams for Solana
 
@@ -34,6 +34,6 @@ A basic Substreams implementation for the Solana blockchain that demonstrates ho
 
 ### StreamingFast Discord for Substreams
 
-Connect with the StreamingFast core developers on Discord to find answers to questions and get assistance with authentication and other Substreams issues.
+Talk to the StreamingFast core developers on Discord to find answers to questions and get assistance for authentication and other Substreams issues.
 
 [https://discord.gg/mYPcRAzeVN](https://discord.gg/mYPcRAzeVN)

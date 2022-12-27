@@ -138,10 +138,9 @@ modules {
 
 ### Help
 
-The commands and a brief explanation are also provided in the Substreams CLI application. To access the help at any time simply execute the `substreams` command, in a terminal, and pass a flag of `-h`.
+The commands and a brief explanation are also provided in the Substreams CLI application. To view the help reference at any time, simply execute the `substreams` command in a terminal and pass an `-h` flag.
 
-Output similar to the following will appear in the terminal.
-
+{% code title="Substreams help" overflow="wrap" %}
 ```
 Usage:
   substreams [command]
@@ -164,3 +163,4 @@ Flags:
 
 Use "substreams [command] --help" for more information about a command.
 ```
+{% endcode %}

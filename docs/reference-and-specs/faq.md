@@ -14,7 +14,7 @@ Developers do not need a dedicated installation of Firehose to work with Substre
 
 ### **Can I use Substreams in my subgraph?**
 
-Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for working with Graph Node and subgraphs.
+Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for working with graph-node and subgraphs.
 
 [https://substreams.streamingfast.io/reference-and-specs/graph-node-setup](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup)
 
@@ -24,7 +24,7 @@ Substreams is provided as a developer preview at this point in time. StreamingFa
 
 ### **What is the Substreams CLI?**
 
-The Substreams command line interface, or CLI, is the central access point that developers use to interact with the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for working with the CLI is available in the Substreams documentation.
+The Substreams command line interface (CLI) is the main tool that developers use to interact with the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for working with the CLI is available in the Substreams documentation.
 
 [https://substreams.streamingfast.io/reference-and-specs/using-the-cli](https://substreams.streamingfast.io/reference-and-specs/using-the-cli)
 

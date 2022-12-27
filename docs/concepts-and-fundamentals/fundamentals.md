@@ -78,7 +78,7 @@ Many of the protobuf definitions have already been created, such as the [erc721 
 
 Custom smart contracts targeted by developers, such as [UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), will have protobuf definitions that have already been created for them by others. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
 
-In object-oriented programming terminology, the protobufs are the objects or object models. In front-end web development terms, protobufs are similar to the REST, or other data access API.&#x20;
+In object-oriented programming terminology, the protobufs are the objects or object models. In front-end web development terms, protobufs are similar to the REST, or other data API.&#x20;
 
 _**Firehose and Substreams treat the data as the API.**_
 

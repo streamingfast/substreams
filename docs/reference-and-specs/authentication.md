@@ -8,7 +8,7 @@ description: StreamingFast Substreams authentication reference
 
 A StreamingFast authentication token is required for connecting to the Substreams server.
 
-An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will grant access to the StreamingFast infrastructure.
+An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will grant entry into the StreamingFast infrastructure.
 
 ### Obtain your API key
 

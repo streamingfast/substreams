@@ -2,9 +2,9 @@
 description: StreamingFast Substreams modules overview
 ---
 
-# Modules Overview
+# Modules overview
 
-## What are Modules?
+## What are modules?
 
 Modules are a crucial aspect of working with Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
 

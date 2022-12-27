@@ -4,19 +4,19 @@ description: StreamingFast Substreams authentication reference
 
 # Authentication
 
-### Substreams Authentication
+### Substreams authentication
 
 A StreamingFast authentication token is required for connecting to the Substreams server.
 
 An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) that will grant access to the StreamingFast infrastructure.
 
-### Obtain API key
+### Obtain your API key
 
 The API key is required for obtaining an authentication token. Register for an authentication key at [`app.streamingfast.io`](https://app.streamingfast.io).&#x20;
 
 The StreamingFast team is generally available on [Discord](https://discord.gg/jZwqxJAvRs) and can assist with API key __ generation there as well.
 
-### Request Authentication Token
+### Request your authentication token
 
 An authentication token must be requested after successfully obtaining the API key.
 
@@ -26,7 +26,7 @@ Use the following command to request the authentication token using the Streamin
 curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key":"your-secret-key"}'
 ```
 
-### Set Environment Variable
+### Set your environment variable
 
 The token should be set as an ENV variable through the terminal using the following command. _Note, be sure to surround the token in quotes as seen in the code below._&#x20;
 
@@ -37,14 +37,12 @@ export SUBSTREAMS_API_TOKEN="your_token"
 By default the `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token.
 
 {% hint style="info" %}
-_Note:_
+_**Note**:_ **Authentication Token Env Flag**
 
-_**Authentication Token Env Flag**_
-
-_The default behavior of the `substreams run` command can use a custom ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar.`_
+The default behavior of the `substreams run` command can use a custom ENV var name that has the Authentication token with the flag `--substreams-api-token-envvar.`
 {% endhint %}
 
-### Environment Variable Script
+### Environment variable script
 
 The following `bash` function can be run from the command line to obtain a token. The following function can be placed in the `.bashrc` file, located in the computer's home directory.&#x20;
 

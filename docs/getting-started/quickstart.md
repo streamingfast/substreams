@@ -21,7 +21,7 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 **Note**: See the [ authentication](../reference-and-specs/authentication.md) section for details.&#x20;
 {% endhint %}
 
-## Run Your First Substreams
+## Run your first Substreams
 
 {% hint style="warning" %}
 _Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to continue._
@@ -41,9 +41,9 @@ This [`run`](../reference-and-specs/command-line-interface.md#run) command start
 You prefer to stream with third-party languages? Try [Python here](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python).
 {% endhint %}
 
-## Chain-agnostic Substreams
+## Platform independent Substreams
 
-Substreams is chain agnostic, meaning developers can work with many different blockchains.&#x20;
+Substreams is platform independent, meaning developers can work with many different blockchains.&#x20;
 
 Developers will typically target a specific blockchain and build a Substreams module targeted toward the chosen chain.&#x20;
 
@@ -77,7 +77,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.ya
 
 Each blockchain has specific requirements for its data definition so the code in the module handlers will need to be updated accordingly.
 
-### **Crates & Packages**
+### **Crates and packages**
 
 Create a `Cargo.toml` at the root of your project:
 
@@ -115,11 +115,11 @@ Alternatively, you can generate the Rust structs from one of the chain-specific 
 
 ## **Examples**
 
-### Examples Overview
+### Examples overview
 
 The relationships for the flow of data are defined in the Substreams manifest. Further information is available in the documentation for [defining complex data strategies](../reference-and-specs/manifests.md) through manifest files.
 
-### Ethereum Example
+### Ethereum example
 
 Clone or download the Ethereum example codebase to get started. Find the example in the official GitHub repository.
 
@@ -135,16 +135,8 @@ Note that the module handler in the lib.rs file for the Ethereum example has cod
 ```rust
 #[substreams::handlers::map]
 fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
-    // Extract data from the Ethereum Block and log to the console.
-    // The data available in the Block directly represents the related protobuf.
-    // The full data model for an Ethereum Block is available at the following link.
-    // https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto
     log::info!("block.ver: {:#?}", block.ver);
     log::info!("block.number: {:#?}", block.number);
-
-    // Copy the data in the Block's version field and return it to caller.
-    // Substreams developers will typically pass extracted data through a custom
-    // protobuf to a store module.
     Ok(basicexample::BasicExampleProtoData {version: block.ver})
 }
 ```
@@ -178,7 +170,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.
 ```
 {% endcode %}
 
-### Solana Example
+### Solana example
 
 The procedure for working with the Solana example is very similar to working with the Ethereum example.&#x20;
 
@@ -194,23 +186,13 @@ Notice the Solana module handler is accessing the `previous_blockhash` `blockhas
 
 The Ethereum example's module handler accessed the `ver` and `number`. These are differences in the block model for each of the blockchains.
 
-****
-
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
 #[substreams::handlers::map]
 fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
-    // Extract data from the Solana Block and log to the console.
-    // The data available in the Block directly represents the related protobuf.
-    // The full data model for a Solona Block is available at the following link.
-    // https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto
     log::info!("block.previous_blockhash: {:#?}", block.previous_blockhash);
     log::info!("block.blockhash: {:#?}", block.blockhash);
     log::info!("block.slot: {:#?}", block.slot);
-
-    // Copy the data in the Block's blockhash field and return it to caller.
-    // Substreams developers will typically pass extracted data through a custom
-    // protobuf to a store module.
     Ok(basicexample::BasicExampleProtoData {blockhash: block.blockhash})
 }
 ```
@@ -226,11 +208,11 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yam
 ```
 {% endcode %}
 
-## **Next Steps**
+## **Next steps**
 
 The key takeaways at this point are:
 
-1. Substreams is chain-agnostic and can be used with many different blockchains.
+1. Substreams is platform independent and can be used with many different blockchains.
 2. Block data for each blockchain follows a different structure and model.
 3. Each blockchain has a different endpoint associated with it.
 4. Each blockchain has a different package associated with it.
@@ -246,9 +228,9 @@ Additional information is available for understanding [modules](../concepts-and-
 
 Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
 
-## **Troubleshooting & Errors**
+## **Troubleshooting and errors**
 
-### **Requesting Block types from the wrong chain endpoint**
+### **Requesting block types from the wrong chain endpoint**
 
 {% code overflow="wrap" %}
 ```shell

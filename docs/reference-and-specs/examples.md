@@ -4,9 +4,9 @@ description: StreamingFast Substreams examples
 
 # Examples
 
-### Substreams Examples
+### Substreams examples
 
-#### Substreams Template for Dev Guide
+#### Substreams template for dev guide
 
 The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
 
@@ -34,19 +34,19 @@ First draft for extraction of the SPL token on the Solana blockchain.&#x20;
 
 [https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
 
-#### Substreams Rust Client Example
+#### Substreams Rust client example
 
 Substreams example to consume data from the compute engine, written in Rust.
 
 [https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust](https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust)
 
-#### Substreams Python Client Example
+#### Substreams Python client example
 
 Substreams example to consume data from the compute engine, written in Python.
 
 [https://github.com/streamingfast/substreams-playground/tree/master/consumers/python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python)
 
-#### PancakeSwap Direct to Database Example
+#### PancakeSwap direct to database example
 
 An E2E indexer for PancakeSwap written in the Go programming language.
 

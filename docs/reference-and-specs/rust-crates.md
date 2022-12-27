@@ -18,8 +18,6 @@ For Substreams where no crate is available, you can use the `spkg` released for 
 ```bash
 ```
 
-*
-
 ### Third-party libraries
 
 Any third-party library capable of compiling `wasm32` can be used for execution in Substreams services.&#x20;

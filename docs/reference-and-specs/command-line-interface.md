@@ -2,14 +2,14 @@
 description: StreamingFast Substreams command line interface (CLI)
 ---
 
-# CLI Reference
+# CLI reference
 
 The Substreams command line interface (CLI) is the user interface and central access point for working with Substreams.
 
 The Substreams CLI exposes many commands to developers enabling a range of functionality. Each command is explained in further detail.
 
 {% hint style="info" %}
-_Note: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL._
+**Note**: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL.
 {% endhint %}
 
 ### **`run`**

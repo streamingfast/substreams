@@ -4,13 +4,13 @@ description: StreamingFast Substreams manifest reference
 
 # Manifests
 
-## What is a Substreams Manifest?
+## What is a Substreams manifest?
 
 The manifest is the high-level outline for a Substreams implementation. The manifest file is used for defining properties specific to the current implementation and identifying the dependencies between the inputs and outputs of modules.
 
 This page provides a reference guide of _all_ fields and values used in a Substreams manifest.
 
-### Specification Version
+### Specification version
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -35,7 +35,7 @@ package:
     More detailed docs for the package.
 ```
 
-#### Package Name
+#### Package name
 
 The `package.name` field is used to identify the package.&#x20;
 
@@ -48,7 +48,7 @@ The `package.name` field also infers the filename when the `pack` command is run
   * Separate words with `_`
   * Starts with `a-z` or `A-Z` and can contain numbers thereafter
 
-#### Package Version
+#### Package version
 
 The `package.version` field identifies the package for the Substreams implementation.
 
@@ -60,7 +60,7 @@ The `package.version` field identifies the package for the Substreams implementa
 
 The `package.url` field identifies and helps users discover the source of the Substreams package.
 
-#### Package Doc
+#### Package doc
 
 The `package.doc` field is the documentation string of the package. The first line is a short description; longer documentation should follow a blank line.
 

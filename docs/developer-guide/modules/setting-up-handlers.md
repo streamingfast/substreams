@@ -2,7 +2,7 @@
 description: StreamingFast Substreams module handlers
 ---
 
-# Module Handlers
+# Module handlers
 
 To begin creating the custom module handlers initialize a new Rust project.
 
@@ -14,7 +14,6 @@ cargo init --lib
 Update the generated `Cargo.toml` file to match the following.
 
 {% code title="Cargo.toml" %}
-
 ```rust
 [package]
 name = "substreams-template"
@@ -49,16 +48,15 @@ lto = true
 opt-level = 's'
 strip = "debuginfo"
 ```
-
 {% endcode %}
 
-View this file in the repo by visiting the following link.
+View the file in the repo:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
 
 The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format that can be run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
-### **Cargo.toml Breakdown**
+### **Cargo.toml breakdown**
 
 To build the Rust dynamic system library, after the `package`, specify the following.
 
@@ -69,7 +67,7 @@ To build the Rust dynamic system library, after the `package`, specify the follo
 crate-type = ["cdylib"]
 ```
 
-The next definition in the TOML file is for `dependencies`.&#x20;
+The next definition in the TOML file is for `dependencies`.
 
 Handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` using `[target.wasm32-unknown-unknown.dependencies]`.
 
@@ -91,57 +89,53 @@ The `substreams-ethereum` crate offers all the Ethereum constructs including blo
 
 Because code is being built with WASM output it's necessary to configure Rust to target the correct architecture. Create and add a rust-toolchain.toml file at the root of the Substreams directory.
 
-#### Rust Toolchain
+#### Rust toolchain
 
 {% code title="rust-toolchain.toml" %}
-
 ```toml
 [toolchain]
 channel = "1.65"
 components = [ "rustfmt" ]
 targets = [ "wasm32-unknown-unknown" ]
 ```
-
 {% endcode %}
 
-View this file in the repo by visiting the following link.
+View this file in the repo:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml)
 
-The code can now be built.
+The code can now be built using:
 
 ```rust
 cargo build --target wasm32-unknown-unknown --release
 ```
 
 {% hint style="info" %}
-**Rust Build Target**
+**Rust build target**
 
-Notice when `cargo build` is run the `target` is `wasm32-unknown-unknown.` This specification is important, since the goal is to generate compiled WASM code.&#x20;
+Notice when `cargo build` is run the `target` is `wasm32-unknown-unknown.` This specification is important since the goal is to generate compiled WASM code.
 
-To avoid manually specifying `target wasm32-unknown-unknown` for each `cargo` command create a file named `config.toml` in the `.cargo` directory at the root of the Substreams project.&#x20;
+To avoid manually specifying `target wasm32-unknown-unknown` for each `cargo` command, create a file named `config.toml` in the `.cargo` directory at the root of the Substreams project.
 
-Use the following content for the file.
+The content for the file should be:
 
 {% code title=".cargo/config.toml" %}
-
 ```toml
 [build]
 target = "wasm32-unknown-unknown"
 ```
-
 {% endcode %}
 
-With this config file, `cargo build` is now equivalent to `cargo build --target wasm32-unknown-unknown`.
+With the config file in place the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`.
 {% endhint %}
 
-### ABI Generation
+### ABI generation
 
 In order to make it easy and type-safe to work with smart contracts, the `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contract's ABI.
 
 Insert the contract ABI JSON file in the Substreams project in an `abi` directory.
 
-{% file src="../.gitbook/assets/erc721.json" %}
+{% file src="../../.gitbook/assets/erc721.json" %}
 
 Next, add a Rust build script.
 
@@ -156,7 +150,6 @@ Placing a file named `build.rs` in the root of a package will cause Cargo to com
 Create a `build.rs` file in the root of the Substreams project using the following code.
 
 {% code title="build.rs" %}
-
 ```rust
 use anyhow::{Ok, Result};
 use substreams_ethereum::Abigen;
@@ -169,7 +162,6 @@ fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 ```
-
 {% endcode %}
 
 View this file in the repo by visiting the following link.
@@ -185,11 +177,9 @@ cargo build --target wasm32-unknown-unknown --release
 Next, create a `mod.rs` file in the abi directory (that was created by the Rust build process) to export the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
-
 ```rust
 pub mod erc721;
 ```
-
 {% endcode %}
 
 View this file in the repo by visiting the following link.

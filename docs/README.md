@@ -12,7 +12,7 @@ Substreams enables developers to write Rust modules, composing data streams alon
 
 Substreams have all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
-### Where to Start
+### Where to start
 
 A short, dense 25 minutes intro to Substreams, and what it means for the blockchain ecosystem:
 

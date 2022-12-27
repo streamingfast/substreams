@@ -2,27 +2,13 @@
 description: StreamingFast graph-node-dev setup documentation
 ---
 
-# Graph-Node Setup
+# Graph-Node setup
 
-### Graph-Node Setup
+## Graph-Node setup
 
 Substreams is capable of working in conjunction with graph-node. In addition, Substreams-based subgraphs can be pushed into graph-node setups.
 
-#### **Requirements**
-
-* Basic Linux knowledge & SUDO shell privileges&#x20;
-* Disk space, RAM, internet connection
-* Up-to-date & running Ubuntu server instance&#x20;
-* Working Docker installation
-* The Graph & StreamingFast authentication tokens
-* NodeJS
-* NPM & Yarn
-* Local IPFS node
-* PostgreSQL installation
-* Cloned repo for The Graph’s Graph Node
-* Cloned repo of StreamingFast Graph Node Dev
-
-#### **StreamingFast Graph Node Dev**
+#### **StreamingFast graph-node dev**
 
 The first step to get up and running with graph-node and Substreams is to clone the StreamingFast graph-node-dev repository on Github.&#x20;
 
@@ -34,7 +20,7 @@ git clone git@github.com:streamingfast/graph-node-dev.git
 
 <details>
 
-<summary><strong>Docker Setup</strong></summary>
+<summary><strong>Docker setup</strong></summary>
 
 Docker is required to use StreamingFast graph-node-dev. Make sure the target machine has a functional Docker installation in place prior to proceeding.
 
@@ -46,7 +32,7 @@ Additional information for Docker installation can be found in the official Dock
 
 <details>
 
-<summary><strong>NodeJS, NPM &#x26; Yarn Setup</strong></summary>
+<summary><strong>NodeJS, NPM and Yarn setup</strong></summary>
 
 Node Package Manager (NPM) and Yarn are required to use StreamingFast graph-node-dev. Links with additional information and setup instructions for both are provided below.
 
@@ -72,7 +58,7 @@ Additional information for PostgreSQL installation can be found in the official 
 
 </details>
 
-#### **NodeJS Dependencies**
+#### **NodeJS dependencies**
 
 Using Substreams with graph-node requires several Node.js dependencies. Start Docker and issue the following command to the terminal window to begin the installation process.
 
@@ -80,19 +66,19 @@ Using Substreams with graph-node requires several Node.js dependencies. Start Do
 yarn install
 ```
 
-#### Database and IPFS Node Script
+#### Database and IPFS node script
 
 Running the up.sh shell script included in the graph-node-dev repository will start the Docker containers for PostgreSQL and the IPFS node.
 
 {% hint style="info" %}
-**Note**: The -c flag can be added when running the up.sh shell script to clean any persistent folders associated with PostgreSQL, IPFS nodes, and other similar services before starting them.
+**Note**: The `-c` flag can be added when running the up.sh shell script to clean any persistent folders associated with PostgreSQL, IPFS nodes, and other similar services before starting them.
 {% endhint %}
 
 ```
 ./up.sh
 ```
 
-#### Firehose Services (Optional)
+#### Optional Firehose services
 
 To test subgraphs pulling data from Firehose a connection must be established based on the network being consumed such as Ethereum or Solana.
 
@@ -116,7 +102,7 @@ The following shell script starts the services for Solana.
 ./pf-sol.sh
 ```
 
-#### The Graph Protocol Graph Node
+#### The Graph Protocol graph-node
 
 The graph-node repository from The Graph is also required for working with StreamingFast graph-node-dev. The repository can be cloned to the target machine by issuing the following command to the terminal.
 
@@ -140,7 +126,7 @@ The following command should be issued using a new terminal window to start up g
 GRAPH_LOG=trace cargo run -- --config config/graph-node.eth-ropsten.toml --ipfs "localhost:5001"
 ```
 
-**Subgraph Deployment**
+**Subgraph deployment**
 
 The **** subgraph manifest file needs to be pushed to the local IPFS node.&#x20;
 
@@ -191,7 +177,7 @@ shard = "primary"
 indexers = [ "default" ]
 ```
 
-#### Further Information
+#### Further information
 
 Additional information and setup instructions for The Graph's graph-node can be found in The Graph Academy documentation.
 

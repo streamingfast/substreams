@@ -2,9 +2,9 @@
 description: StreamingFast Substreams protobuf schemas
 ---
 
-# Protobuf Schemas
+# Protobuf schemas
 
-### Protobuf Overview
+### Protobuf overview
 
 Substreams uses Protocol Buffers (protobufs) as the API for data models specific to each blockchain. Each manifest defines references to the protobufs for the Substreams implementation.
 
@@ -16,9 +16,7 @@ Find more about Protocol Buffers here, and some tutorials here.
 
 ### Protobuf Basics
 
-Protobufs are Google's language-neutral extensible mechanism for serializing structured data.
-
-Additional information can be found for Protocol Buffers by visiting the links provided below.
+> Protobufs are Google's language-neutral extensible mechanism for serializing structured data.
 
 **Google Protocol Buffer Documentation**
 
@@ -28,7 +26,7 @@ Additional information can be found for Protocol Buffers by visiting the links p
 
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 
-### Protobuf Definition
+### Protobuf definition
 
 Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) representing a list of ERC721 transfers.
 
@@ -60,7 +58,7 @@ View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 
-#### Identifying Data types
+#### Identifying data types
 
 The ERC721 smart contract associated with the Substreams Template example contains a Transfer event. The event is targeted by creating an associated protobuf.
 
@@ -80,7 +78,7 @@ Multitudes of more specific data types exist in the Ethereum smart contract ecos
 **Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
 {% endhint %}
 
-### Generating Protobufs
+### Generating protobufs
 
 The Substreams CLI is used to generate the associated Rust code for the protobuf.
 
@@ -94,7 +92,7 @@ substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams
 ```
 {% endcode %}
 
-The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)\`\`
+The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)
 
 The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
@@ -110,7 +108,7 @@ View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
 
-### Protobuf & Rust Optional Fields
+### Protobuf and Rust optional fields
 
 Protocol buffers define fields' type using either usual primitive data types, such as integers, booleans, and floats ([full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) or one of complex data types `message`, `enum`, `oneof` or `map`.
 
@@ -141,8 +139,8 @@ Scenarios that are known to always contain a value can use the `.unwrap()` call 
 **Note**: Be 100% sure that the field is always present, otherwise Substreams will panic and never complete, being stuck on this block forever.
 {% endhint %}
 
-Additional information is available for \`prost\`, the tool generating the Rust code from Protobuf definitions, in its official GitHub repository.
+Additional information is available for `prost`, the tool generating the Rust code from Protobuf definitions, in its official GitHub repository.
 
 [https://github.com/tokio-rs/prost](https://github.com/tokio-rs/prost)
 
-Learn more about [Rust Option](https://doc.rust-lang.org/rust-by-example/std/option.html) in its official documentation.
+_Learn more about_[ _Option_](https://doc.rust-lang.org/rust-by-example/std/option.html) _in the official Rust documentation._

@@ -1,4 +1,4 @@
-# Benefits & Comparisons
+# Benefits and comparisons
 
 ### Substreams is
 
@@ -29,15 +29,15 @@
 * **Blockchain Infused Large-scale Data**\
   Substreams was inspired by traditional large-scale data systems now _fused_ with the novelties of blockchain.
 
-### Comparison to Other Engines
+### Comparison to other engines
 
 Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
 
 It has a logs-based architecture (the Firehose), and allows for user-defined custom code to be sent to a Substreams server(s), for streaming and/or ad-hoc querying of the available data.
 
-### **Other Features**
+### **Other features**
 
-#### Composition Through Community
+#### Composition through community
 
 Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
 
@@ -45,7 +45,7 @@ Substreams enables blockchain developers to write Rust modules that compose data
 
 Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion. These powerful parallelization techniques enable efficient processing of enormous blockchain histories.
 
-#### Horizontally Scalable
+#### Horizontally scalable
 
 Substreams is horizontally scalable presenting the opportunity to reduce processing time simply by adding more computing power, or machines.
 

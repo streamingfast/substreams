@@ -4,12 +4,12 @@ description: StreamingFast Substreams developer guide overview
 
 # Overview
 
-### Developer Guide
+### Developer guide
 
-The Substreams Developer Guide explains the process of building a Substreams implementation that tracks the ERC721 holder count for an Ethereum smart contract.
+The Substreams developer guide explains the process of building a Substreams module that tracks the ERC721 holder count for an Ethereum smart contract.
 
 {% hint style="success" %}
-**Tip**_:_ The Substreams developer guide is currently focused on an Ethereum Substreams implementation. The majority of the development tasks and workflow are agnostic to each blockchain being targeted by the Substreams developer.
+**Tip**_:_ The Substreams developer guide is currently focused on an Ethereum Substreams module. The majority of the development tasks and workflow are agnostic to each blockchain being targeted by the Substreams developer.
 {% endhint %}
 
 {% hint style="info" %}
@@ -18,11 +18,11 @@ The Substreams Developer Guide explains the process of building a Substreams imp
 
 If you haven't done so already, reviewing the Substreams [fundamentals](../concepts-and-fundamentals/fundamentals.md) and [modules overview](../concepts-and-fundamentals/modules.md) is helpful for getting up and running quickly.
 
-#### Substreams Examples
+#### Substreams examples
 
 StreamingFast and the Substreams community have provided an array of different examples to explore and learn from. Find the full list on the [examples page](https://substreams.streamingfast.io/reference-and-specs/examples) of the Substreams documentation.
 
-#### Substreams Template for Dev Guide
+#### Substreams template for dev guide
 
 The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).
 

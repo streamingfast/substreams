@@ -29,7 +29,7 @@ The `source` inputs type __ is defined in the Substreams manifest as seen below.
     - source: sf.ethereum.type.v2.Block
 ```
 
-#### Clock Object
+#### Clock object
 
 The `sf.substreams.v1.Clock` object is another source type available on any of the supported chains.
 
@@ -79,14 +79,14 @@ Alternatively, stores can be set to deltas mode as illustrated in the following 
       mode: deltas
 ```
 
-### Module Modes
+### Module modes
 
 There are **two possible modes** that can be defined for modules.
 
 * `get`
 * `delta`
 
-### Store Constraints
+### Store constraints
 
 Constraints for stores are defined as follows.
 
@@ -98,7 +98,7 @@ Constraints for stores are defined as follows.
 Get mode provides a key/value store that is readily queryable and guaranteed to be in sync with the block being processed.&#x20;
 
 {% hint style="success" %}
-**Tip**_**:** `get` mode is the default mode for modules._
+**Tip**_**:**_ `get` mode is the default mode for modules.
 {% endhint %}
 
 ### `delta` mode
@@ -107,10 +107,11 @@ Modules using delta mode are [protobuf objects](../../../proto/sf/substreams/v1/
 
 Delta mode enables developers with the ability to loop through keys decoding old and new values that were mutated in the module.
 
-#### Store Deltas Example
+#### Store deltas example
 
 The following code example illustrates the protobuf model for StoreDeltas.
 
+{% code overflow="wrap" lineNumbers="true" %}
 ```protobuf
 message StoreDeltas {
   repeated StoreDelta deltas = 1;
@@ -130,3 +131,4 @@ message StoreDelta {
   bytes new_value = 5;
 }
 ```
+{% endcode %}

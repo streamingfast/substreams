@@ -14,7 +14,7 @@ Every Substreams implementation contains one manifest. The manifest is a YAML-ba
 **Tip**: Additional detailed information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
 {% endhint %}
 
-## Example Manifest
+## Example manifest
 
 The manifest below is from the [Substreams Template example](https://github.com/streamingfast/substreams-template) accompanying the developer guide.
 
@@ -66,7 +66,7 @@ View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml)
 
-## Manifest Walkthrough
+## Manifest walkthrough
 
 ### `imports.eth`
 
@@ -88,7 +88,7 @@ The `protobuf.files` contains a list of protobuf files for the current Substream
 
 The `protobuf.importPaths` contains the paths to the protobufs for the current Substreams implementation.
 
-## Module Definitions
+## Module definitions
 
 The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams implementation.
 

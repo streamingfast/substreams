@@ -2,16 +2,14 @@
 description: StreamingFast Substreams module types
 ---
 
-# Module Types
+# Module types
 
-
-
-Substreams developers use two types of modules, `map` and `store`.&#x20;
+Substreasms has two types of modules, `map` and `store`.&#x20;
 
 * Map modules are simple functions, that receive bytes as input, an output bytes. These bytes are encoded protobuf messages.
 * Store modules are stateful, saving and tracking data through the use of simple key-value stores.
 
-### Store Modules
+### Store modules
 
 Store modules write to key-value stores.&#x20;
 
@@ -21,16 +19,16 @@ Store modules write to key-value stores.&#x20;
 
 Stores that declare their own data types will expose methods capable of mutating keys within the store.
 
-### Core Principle Usage of Stores
+### Core principle usage of stores
 
 * Do not store keys in stores _unless they are to be read by a downstream module_. Substreams stores are a means to do aggregations, but it is not a storage layer.
 * Do not store all transfers of a chain in a `store` module, rather, output them in a mapper and have a downstream system store them for a quick query.
 
-### Important Store Properties
+### Important store properties
 
 The two important store properties are `valueType,`and `updatePolicy`.
 
-#### `valueType` Property
+#### `valueType` property
 
 The `valueType` property instructs the Substreams runtime of the data that will be saved to the `stores`.
 
@@ -44,7 +42,7 @@ The `valueType` property instructs the Substreams runtime of the data that will 
 | `bigint`                       | A string-serialized integer, with precision of any depth                         |
 | `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits      |
 
-#### `updatePolicy` Property
+#### `updatePolicy` property
 
 The `updatePolicy` property determines what methods are available in the runtime.&#x20;
 
@@ -89,7 +87,7 @@ For example, the price for a token could change after transaction B and transact
 
 For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 
-### Store Modes
+### Store modes
 
 Data can be consumed in one of two modes when declaring a `store` as an input to a module.
 
@@ -98,23 +96,23 @@ Data can be consumed in one of two modes when declaring a `store` as an input to
 Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. The `stores` can be readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
 
 {% hint style="success" %}
-_**Tip:** Lookups are local, in-memory, and extremely fast!_
+**Tip:** Lookups are local, in-memory, and extremely fast!
 {% endhint %}
 
 {% hint style="info" %}
-_**Note:** Store method behavior is defined as:_
+**Note:** Store method behavior is defined as:
 
-_The `get_last` method is the fastest because it queries the store directly._&#x20;
+The `get_last` method is the fastest because it queries the store directly.&#x20;
 
-_The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block._&#x20;
+The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
 
-_The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed._
+The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
 {% endhint %}
 
-#### `deltas Mode`
+#### `deltas mode`
 
 Deltas mode provides the module with _all_ _the_ _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys mutated during that specific block become available.
 
 {% hint style="info" %}
-_**Note:** When a store is set as an input to the module, it is read-only and cannot be modified, updated, or mutated in any way._
+**Note:** When a store is set as an input to the module, it is read-only and cannot be modified, updated, or mutated in any way.
 {% endhint %}

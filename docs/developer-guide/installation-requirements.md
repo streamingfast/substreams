@@ -2,9 +2,9 @@
 description: StreamingFast Substreams dependency installation
 ---
 
-# Dependency Installation
+# Dependency installation
 
-## Dependencies Overview
+## Dependencies overview
 
 Working with Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](broken-reference) page.
 
@@ -16,15 +16,15 @@ Instructions and links are provided below to assist with the installation of the
 
 ## Local installation
 
-### `substreams` CLI Installation
+### `substreams` CLI installation
 
 The CLI is required and is the primary user interface for working with Substreams.
 
 {% hint style="success" %}
-**Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page\_.\_
+**Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page.
 {% endhint %}
 
-### Rust Installation
+### Rust installation
 
 Developing Substreams modules requires a working [Rust](https://www.rust-lang.org/) compilation environment.
 
@@ -35,9 +35,9 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env # to configure your current shell
 ```
 
-### Buf Installation
+### Buf installation
 
-Buf simplifies the generation of typed structures in any language. Buf works with remote builder executed on Buf server, so an internet connection is required when generating Rust bindings from Protobuf definitions.
+Buf simplifies the generation of typed structures in any language. Buf works with a remote builder executed on the Buf server, so an internet connection is required to generate Rust bindings from Protobuf definitions.
 
 Visit the [Buf website](https://buf.build/) for additional information and [installation instructions](https://docs.buf.build/installation).
 

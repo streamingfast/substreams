@@ -37,7 +37,7 @@
 * [Packages](reference-and-specs/packages.md)
 * [Rust crates](reference-and-specs/rust-crates.md)
 * [Advanced](advanced/README.md)
-  * [Graph-Node setup](reference-and-specs/advanced/graph-node-setup.md)
+  * [Graph-node setup](reference-and-specs/advanced/graph-node-setup.md)
   * [Running Substreams locally](advanced/running-locally.md)
 * [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)

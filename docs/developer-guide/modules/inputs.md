@@ -11,11 +11,11 @@ Modules can receive inputs of three types: `source`, `map`, and `store`.
 An Input of type `source` represents a chain-specific, Firehose-provisioned protobuf object.
 
 {% hint style="info" %}
-**Note**_**:** _ Find the supported protocols and their corresponding message types in the [Chains and inputs documentation](../../reference-and-specs/chains-and-endpoints.md).
+**Note**_**:** Find the supported protocols and their corresponding message types in the_ [_Chains & Inputs documentation_](../../reference-and-specs/chains-and-endpoints.md)_._
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**: Ethereum-based Substreams modules would specify `sf.ethereum.type.v2.Block.`&#x20;
+**Tip**: Ethereum-based Substreams implementations would specify `sf.ethereum.type.v2.Block.`&#x20;
 {% endhint %}
 
 {% hint style="info" %}

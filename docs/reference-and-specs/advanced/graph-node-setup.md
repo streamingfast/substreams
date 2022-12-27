@@ -2,9 +2,9 @@
 description: StreamingFast graph-node-dev setup documentation
 ---
 
-# Graph-Node setup
+# Graph-node setup
 
-## Graph-Node setup
+## Graph-node setup
 
 Substreams is capable of working in conjunction with graph-node. In addition, Substreams-based subgraphs can be pushed into graph-node setups.
 

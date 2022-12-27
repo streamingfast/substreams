@@ -54,7 +54,7 @@ The Substreams manifest references the modules, the handlers defined within them
 
 Directed acyclic graphs contain nodes, in this case, modules, that communicate in only one direction, passing from one node, or module, to another.
 
-The Substreams engine creates the “compute graph”, or “dependency graph” at runtime through commands sent to the CLI using code in modules referenced by the manifest.
+The Substreams engine creates the “compute graph”, or “dependency graph” at runtime through commands sent to the Substreams CLI using code in modules referenced by the manifest.
 
 ### **Protobufs for Substreams**
 

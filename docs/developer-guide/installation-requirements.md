@@ -18,7 +18,7 @@ Instructions and links are provided to assist with the installation of the requi
 
 ### `substreams` CLI installation
 
-The CLI is required and is the primary user interface for working with Substreams.
+The Substreams CLI is required and is the primary user interface for working with Substreams.
 
 {% hint style="success" %}
 **Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page.

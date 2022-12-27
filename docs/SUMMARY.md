@@ -10,7 +10,7 @@
 
 ## Getting Started
 
-* [Installing the CLI](getting-started/installing-the-cli.md)
+* [Installing the Substreams CLI](getting-started/installing-the-cli.md)
 * [Quickstart](getting-started/quickstart.md)
 
 ## Developer Guide
@@ -31,7 +31,7 @@
 ## Reference & Specs
 
 * [Chains and endpoints](reference-and-specs/chains-and-endpoints.md)
-* [CLI reference](reference-and-specs/command-line-interface.md)
+* [Substreams CLI reference](reference-and-specs/command-line-interface.md)
 * [Authentication](reference-and-specs/authentication.md)
 * [Manifests](reference-and-specs/manifests.md)
 * [Packages](reference-and-specs/packages.md)

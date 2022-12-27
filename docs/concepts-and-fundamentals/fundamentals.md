@@ -14,7 +14,7 @@ This documentation aims to outline information to further help developers workin
 
 ### Key Steps
 
-* Identify smart contract addresses of interest including wallets, and decentralized exchanges (DEXs).
+* Identify smart contract addresses of interest including wallets, decentralized exchanges (DEXs), etc.
 * Identify data, and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update substreams manifest, point to protobufs and handlers.
@@ -60,7 +60,7 @@ The Substreams engine creates the “compute graph”, or “dependency graph”
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
-View the protobuf file in the repository:
+View the protobuf file in the repo:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 

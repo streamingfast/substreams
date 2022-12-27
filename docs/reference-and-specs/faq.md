@@ -20,7 +20,7 @@ Yes, Substreams compliments and extend the capabilities and functionalities of s
 
 ### **Can I use Substreams for production deployments?**
 
-Substreams is provided as a developer preview at this point in time. StreamingFast is working to enable a fully production-ready solution.
+No, Substreams is provided as a developer preview.
 
 ### **What is the Substreams CLI?**
 

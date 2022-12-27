@@ -178,7 +178,7 @@ Clone or download the Solana example codebase. Find the example in the official 
 
 [https://github.com/streamingfast/substreams-solana-tutorial](https://github.com/streamingfast/substreams-solana-tutorial)
 
-After cloning the Solana example, take a moment to review the repository. Key differences from the Ethereum example should begin to stand out immediately.
+After cloning the Solana example, take a moment to look through the repository. Key differences from the Ethereum example should begin to stand out immediately.
 
 A very important difference between the two examples is the module handler code. Blockchains each have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
 
@@ -242,4 +242,4 @@ A common mistake when first getting started is requesting data for one chain, su
 
 To resolve the problem, double-check the code and settings within the Substreams codebase against the endpoint that's being sent to the Substreams CLI. The error is from an Ethereum codebase requesting Solana Blocks.&#x20;
 
-The solution is to review the codebase and determine what blockchain the code and configuration require as opposed to what is being sent to the Substreams CLI.
+Look through the codebase to see what is required by the blockchain configuration for your code. The blocks that are expected are different than what is being sent to the Substreams CLI.

@@ -62,7 +62,7 @@ modules:
 ```
 {% endcode %}
 
-View this file in the repository:
+View this file in the repo by visiting the following link.
 
 [https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml)
 

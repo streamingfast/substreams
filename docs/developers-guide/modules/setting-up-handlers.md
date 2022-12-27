@@ -140,11 +140,11 @@ Insert the contract ABI JSON file in the Substreams project in an `abi` director
 Next, add a Rust build script.
 
 {% hint style="info" %}
-**Rust Build Script**
+**Note: Rust Build Script**
 
-Just before a package is built, Cargo will compile a build script into an executable (if it has not already been built). It will then run the script, which may perform any number of tasks.
+Before a package is built, Cargo will compile a build script into an executable (if it has not already been built). It will then run the script, which may perform any number of tasks.
 
-Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it just before building the package.
+Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it before building the package.
 {% endhint %}
 
 Create a `build.rs` file in the root of the Substreams project using the following code.

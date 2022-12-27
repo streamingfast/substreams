@@ -54,7 +54,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 Notice the `-o` (or `--output`), that can alter the output format. The options are:
 
 * `ui`, a nicely formatted, UI-driven interface, with progress information, and execution logs.
-* `json`, an indented stream of data, with no progress information nor logs, but just data output for blocks following the start block.
+* `json`, an indented stream of data, with no progress information nor logs, only data output for blocks following the start block.
 * `jsonl`, same as `json` but with each output on a single line.
 
 ### `pack`

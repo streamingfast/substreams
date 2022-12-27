@@ -16,7 +16,7 @@ Modules have one or more inputs. The inputs can be in the form of a `map` or `st
 Substreams modules data interaction diagram
 {% endembed %}
 
-In the diagram shown above the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_counter` store module tracks the number of transfers that have occurred.
+The diagram shows the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_counter` store module tracks the number of transfers that have occurred.
 
 {% hint style="info" %}
 **Note:** Multiple inputs are made possible because blockchains are clocked.&#x20;

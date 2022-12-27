@@ -30,7 +30,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 * `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
-Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
+Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
 
 Example output of `gravatar_updates` starting at block 6200807.
 

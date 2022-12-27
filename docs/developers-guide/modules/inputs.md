@@ -49,7 +49,7 @@ The object's type is defined in the [`output.type`](../../reference-and-specs/ma
 **Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's known as a circular dependency, and is not wanted.
 {% endhint %}
 
-The `map` inputs type __ is defined in the Substreams manifest as seen below. The name of the map is chosen by the developer and should be representative of the logic contained within.
+The `map` inputs type __ is defined in the Substreams manifest as seen below. The name of the map is chosen by the developer and is representative of the logic contained within.
 
 ```yaml
   inputs:
@@ -62,7 +62,7 @@ Additional information regarding `maps` is located in the Substreams [modules do
 
 An Input of type `store` represents the state of another store used with the Substreams implementation being created.
 
-The `store` inputs type __ is defined in the Substreams manifest as seen below. Similar to maps, stores should be named appropriately indicating the logic contained within them.
+The `store` inputs type __ is defined in the Substreams manifest as seen below. Similar to maps, stores are named appropriately, indicating the logic contained within them.
 
 Store modules are set to `get` mode by default as illustrated in the following manifest code excerpt.
 

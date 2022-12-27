@@ -126,7 +126,7 @@ target = "wasm32-unknown-unknown"
 ```
 {% endcode %}
 
-With the config file in place the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`.
+With the configuration file in place the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`.
 {% endhint %}
 
 ### ABI generation

@@ -6,7 +6,7 @@ description: StreamingFast Substreams modules overview
 
 ## What are modules?
 
-Modules are an important part of Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
+Modules are a crucial aspect of working with Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
 
 In further detail, modules are small pieces of Rust code running in a WebAssembly (WASM) virtual machine. Modules coexist within the stream of blocks sent by the Substreams compute engine arriving from a blockchain node.&#x20;
 

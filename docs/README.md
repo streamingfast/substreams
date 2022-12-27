@@ -22,7 +22,7 @@ A walk-though of Firehose features, Substreams modules, with a sample Rust modul
 
 Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefits/).
 
-Get started quickly by:
+Get started by:
 
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
 * Going through the [Quickstart](getting-started/quickstart.md).
@@ -31,7 +31,7 @@ Learn more about [modules](concepts-and-fundamentals/modules.md), or head into t
 
 Find pre-built Substreams here:
 
-* [Substreams template](https://github.com/streamingfast/substreams-template): gets you off the ground quickly.
+* [Substreams template](https://github.com/streamingfast/substreams-template): gets you off the ground.
 * [Substreams playground](https://github.com/streamingfast/substreams-playground): a collection of already-built Substreams, and examples.
 
 ### Network model diagram
@@ -47,7 +47,7 @@ Substreams has two perspectives as illustrated in the high-level visual diagram:
 
 _**Need help? Reach out!**_
 
-Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Please contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
+Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback wherever it could be helpful. Contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 
 * [StreamingFast Discord](https://discord.gg/mYPcRAzeVN)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
@@ -56,7 +56,7 @@ Substreams is an open-source community effort, so feel free to suggest new topic
 
 ### Contributing
 
-Please first refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
+First refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
 
 ### License
 

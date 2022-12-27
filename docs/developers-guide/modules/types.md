@@ -22,7 +22,7 @@ Stores that declare their own data types will expose methods capable of mutating
 ### Core principle usage of stores
 
 * Do not store keys in stores _unless they are to be read by a downstream module_. Substreams stores are a means to do aggregations, but it is not a storage layer.
-* Do not store all transfers of a chain in a `store` module, rather, output them in a mapper and have a downstream system store them for a quick query.
+* Do not store all transfers of a chain in a `store` module, rather, output them in a mapper and have a downstream system store them for querying.
 
 ### Important store properties
 
@@ -85,7 +85,7 @@ For example, the price for a token can change after transaction B and transactio
 **Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-For instances that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
+For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 
 ### Store modes
 

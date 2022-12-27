@@ -1,5 +1,5 @@
 ---
-description: Get off the ground quickly with Substreams by StreamingFast
+description: Get off the ground with Substreams by StreamingFast
 ---
 
 # Quickstart
@@ -226,7 +226,7 @@ Understanding map and store modules is the next step to understanding how to des
 
 Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md), and sample code with explanations can be found in the [Developer's Guide](../developers-guide/overview.md).&#x20;
 
-Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running quickly.
+Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
 
 ## **Troubleshooting and errors**
 

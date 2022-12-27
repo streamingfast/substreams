@@ -28,7 +28,7 @@ The Substreams CLI is required and is the primary user interface for working wit
 
 Developing Substreams modules requires a working [Rust](https://www.rust-lang.org/) compilation environment.
 
-There are [several ways to install Rust](https://www.rust-lang.org/tools/install)**.** Using `curl` from the terminal is the quickest and easiest.
+There are [several ways to install Rust](https://www.rust-lang.org/tools/install)**.** Using `curl` is one option:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

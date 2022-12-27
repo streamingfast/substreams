@@ -24,7 +24,7 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 ## Run your first Substreams
 
 {% hint style="warning" %}
-_Important: The Substreams CLI must be_ [_installed_](installing-the-cli.md) _to continue._
+_**Important**: The Substreams CLI **must** be_ [_installed_](installing-the-cli.md) _to continue._
 {% endhint %}
 
 Once authenticated, run your first Substreams using:

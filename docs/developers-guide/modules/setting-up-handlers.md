@@ -131,7 +131,7 @@ With the configuration file in place the `cargo build` command is now equivalent
 
 ### ABI generation
 
-In order to make it easy and type-safe to work with smart contracts, the `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contract's ABI.
+The `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contract's ABI.
 
 Insert the contract ABI JSON file in the Substreams project in an `abi` directory.
 

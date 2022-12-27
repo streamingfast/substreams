@@ -8,7 +8,7 @@ description: StreamingFast Substreams benefits and comparisons
 
 * a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose,
 * a highly cacheable and parallelizable remote code execution framework,
-* a solution that enables the community to build higher-order modules with great ease,
+* a solution that enables the community to build higher-order modules,
 * composable down to individual modules,
 * being fed by deterministic blockchain data and is therefore deterministic.
 * _**not**_ a relational database,

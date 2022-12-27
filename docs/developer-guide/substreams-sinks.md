@@ -12,7 +12,7 @@ StreamingFast provides a few examples, libraries, and tools to assist Substreams
 
 ## **Basics**
 
-Data captured and processed by Substreams can be stored in many different ways through sinks. A Substreams developer’s imagination is really the only limitation. Immediate and typical storage types could be a database or flat files however Substreams data can be piped into other desired locations required by a new or existing application or architecture.
+Data captured and processed by Substreams can be stored in many different ways through sinks. A Substreams developer’s imagination is really the only limitation. Immediate and typical storage types can be a database or flat files however Substreams data can be piped into other desired locations required by a new or existing application or architecture.
 
 An important design aspect of Substreams is the decision to rely on Google Protocol Buffers, also called protobufs, for data packaging and transmission. Protobufs provide a data-centric, technology stack, and language agnostic approach to working with data that is passed from one application to another. The application-agnostic, data centric capabilities of protobufs give developers the opportunity to package and route data captured by Substreams to other sources, including sinks.
 

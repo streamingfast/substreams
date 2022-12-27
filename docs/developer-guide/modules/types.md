@@ -79,7 +79,7 @@ _To read from a store a downstream module is created with one of its inputs poin
 
 Ordinals allow a key/value store to have multiple versions of a key within a single block. The store APIs contain different methods of `ordinal` or `ord`.
 
-For example, the price for a token could change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
+For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
 {% hint style="warning" %}
 **Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.

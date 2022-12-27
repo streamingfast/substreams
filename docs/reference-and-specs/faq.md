@@ -20,7 +20,7 @@ Yes, Substreams compliments and extend the capabilities and functionalities of s
 
 ### **Can I use Substreams for production deployments?**
 
-Substreams is provided as a developer preview at this point in time. StreamingFast is working to enable a fully production-ready solution in the very near future.
+Substreams is provided as a developer preview at this point in time. StreamingFast is working to enable a fully production-ready solution.
 
 ### **What is the Substreams CLI?**
 
@@ -68,11 +68,11 @@ Yes, Substreams is an open-source project and available to the public for free.
 
 ### **How would a developer access the information returned from a call to Substreams from a web-based UI?**
 
-Right now, it’s only command line. Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Eventually, Substreams will reach Subgraphs (as a data source), and at that point, Subgraphs makes a GraphQL available for web consumption. Also, other sinks might expose APIs for web browsers. It’s just not Substreams’ responsibility.
+Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 
 ### Is it possible to continuously listen for new blocks with Substreams?
 
-Specifying a stop block value of zero (0), the default, enables transparent handoff from historical to real-time blocks.
+Specifying a stop block value of zero (0), the default enables transparent handoff from historical to real-time blocks.
 
 ### **Does StreamingFast have a Discord?**
 

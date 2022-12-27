@@ -4,17 +4,17 @@ description: StreamingFast Substreams documentation
 
 # Substreams
 
-### Welcome to Substreams Docs
+### Welcome to Substreams Documentation
 
 Substreams is a powerful blockchain indexing technology, developed for [The Graph Network](https://thegraph.com).
 
-Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.
+Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion.
 
 Substreams have all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
 ### Where to start
 
-A short, dense 25 minute intro to Substreams, and what it means for the blockchain ecosystem:
+A short, dense 25-minute intro to Substreams, and what it means for the blockchain ecosystem:
 
 {% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
 A walk-though of Firehose features, Substreams modules, with a sample Rust module and the vision for the future.
@@ -25,7 +25,7 @@ Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefi
 Get started quickly by:
 
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
-* Going through the [Quick start](getting-started/quickstart.md).
+* Going through the [Quickstart](getting-started/quickstart.md).
 
 Learn more about [modules](concepts-and-fundamentals/modules.md), or head into the [Developer's Guide](developers-guide/overview.md).
 
@@ -34,14 +34,14 @@ Find pre-built Substreams here:
 * [Substreams template](https://github.com/streamingfast/substreams-template): gets you off the ground quickly.
 * [Substreams playground](https://github.com/streamingfast/substreams-playground): a collection of already-built Substreams, and examples.
 
-### Network model
+### Network model diagram
 
 <img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
 
 Substreams has two perspectives as illustrated in the high-level visual diagram:
 
-1. The Substreams engine
-2. The end-user developer and consumer
+1. The Substreams engine perspective.
+2. The end-user developer and consumer perspective.
 
 ### Community
 

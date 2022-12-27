@@ -65,7 +65,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 ```
 {% endcode %}
 
-View this file in the repository:
+View this file in the repo:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
 
@@ -217,13 +217,13 @@ During execution, the `add` operation may be called multiple times, for multiple
 
 Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 
-When an ordinal is specified, the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in this example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
+When an ordinal is specified the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in this example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
 
 #### Key
 
 Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.
 
-In the example, if the `generate_key` function would return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders.
+In the example, if the `generate_key` function would simply return a key that is the `TRACKED_CONTRACT` address it would not be unique between different token holders.
 
 If the `generate_key` function returned a key containing only the holder's address it would be unique amongst holders. Issues would be encountered however when attempting to track multiple contracts.
 

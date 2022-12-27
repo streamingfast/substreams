@@ -21,7 +21,7 @@ The diagram shows the `transfer_map` module extracts all transfers in each `Bloc
 {% hint style="info" %}
 **Note:** You can use multiple inputs because blockchains are clocked.&#x20;
 
-Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable traditional streaming engines.
+Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable conventional streaming engines.
 {% endhint %}
 
 Modules can also take in multiple inputs as seen in the `counters` store example diagram. Two modules feed into a `store`, effectively tracking multiple `counters`.

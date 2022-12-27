@@ -4,10 +4,10 @@ description: StreamingFast Substreams module types
 
 # Module types
 
-Substreams has two types of modules, `map` and `store`.&#x20;
+Substreasms has two types of modules, `map` and `store`.&#x20;
 
-* Map modules are functions that receive bytes as input and output. These bytes are encoded protobuf messages.
-* Store modules are stateful, saving and tracking data through the use of key-value stores.
+* Map modules are simple functions, that receive bytes as input, an output bytes. These bytes are encoded protobuf messages.
+* Store modules are stateful, saving and tracking data through the use of simple key-value stores.
 
 ### Store modules
 
@@ -85,7 +85,7 @@ For example, the price for a token can change after transaction B and transactio
 **Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can use a zero value.
+For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 
 ### Store modes
 

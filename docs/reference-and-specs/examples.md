@@ -12,7 +12,7 @@ The accompanying template associated with the developer guide is[ ](https://gith
 
 #### Uniswap-v3
 
-Substreams-based Uniswap-v3 Subgraph and Substreams. The Uniswap Substreams example is in beta.
+Substreams-based Uniswap-v3 Subgraph and Substreams. The Uniswap Substreams example is currently in beta.
 
 [https://github.com/streamingfast/substreams-uniswap-v3](https://github.com/streamingfast/substreams-uniswap-v3)
 

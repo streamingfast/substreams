@@ -18,7 +18,7 @@ Excerpt pulled from the example Substreams manifest.
 specVersion: v0.1.0
 ```
 
-Simply use `v0.1.0` for the `specVersion` field.
+Use `v0.1.0` for the `specVersion` field.
 
 ### Package
 

@@ -1,6 +1,10 @@
+---
+description: StreamingFast Substreams benefits and comparisons
+---
+
 # Benefits and comparisons
 
-### Substreams is
+### Substreams is:
 
 * a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose,
 * a highly cacheable and parallelizable remote code execution framework,
@@ -31,9 +35,9 @@
 
 ### Comparison to other engines
 
-Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
+Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ, and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
 
-It has a logs-based architecture (the Firehose), and allows for user-defined custom code to be sent to a Substreams server(s), for streaming and/or ad-hoc querying of the available data.
+It has a logs-based architecture, Firehose, and allows for user-defined custom code to be sent to Substreams, for streaming and/or ad hoc querying of the available data.
 
 ### **Other features**
 
@@ -43,11 +47,11 @@ Substreams enables blockchain developers to write Rust modules that compose data
 
 #### Parallelization
 
-Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion. These powerful parallelization techniques enable efficient processing of enormous blockchain histories.
+Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion. These powerful parallelization techniques enable the efficient processing of enormous blockchain histories.
 
 #### Horizontally scalable
 
-Substreams is horizontally scalable presenting the opportunity to reduce processing time simply by adding more computing power, or machines.
+Substreams is horizontally scalable presenting the opportunity to reduce the processing time by adding more computing power, or machines.
 
 #### Substreams and Firehose
 

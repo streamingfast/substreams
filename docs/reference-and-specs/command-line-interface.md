@@ -138,7 +138,7 @@ modules {
 
 ### Help
 
-The commands and a brief explanation are also provided in the Substreams CLI application. To view the help reference at any time, simply execute the `substreams` command in a terminal and pass an `-h` flag.
+The commands and a brief explanation are also provided in the Substreams CLI application. To view the help reference at any time, execute the `substreams` command in a terminal and passing the `-h` flag.
 
 {% code title="Substreams help" overflow="wrap" %}
 ```

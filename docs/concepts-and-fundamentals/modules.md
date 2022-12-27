@@ -24,7 +24,7 @@ The diagram shows the `transfer_map` module extracts all transfers in each `Bloc
 Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable traditional streaming engines.
 {% endhint %}
 
-Modules can also take in multiple inputs as seen in the `counters` store example diagram below. Two modules feed into a `store`, effectively tracking multiple `counters`.
+Modules can also take in multiple inputs as seen in the `counters` store example diagram. Two modules feed into a `store`, effectively tracking multiple `counters`.
 
 {% embed url="https://mermaid.ink/svg/pako:eNqdkE1qAzEMha9itE4GsnWgi5KcINmNh6LamozJeGxsuSGE3L1KW1PIptCdnnjv088NbHQEGk4Z06SOu61ZlHqfoz33JdZsSasydsQTZaqh42ui7mPTvT4cg1qvX1TA9HbxPLmMF5zLv_KOUiyev8JPvF60fm5-J22sC1MufeGYZVDTQ8M07C-jdf4AwAoC5YDeyWtuD5wBOSGQAS2loxHrzAbMchdrTQ6Z9s4LBfQo-9EKsHI8XBcLmnOlZtp5lE-HH9f9EylZic0" %}
 Modules with multiple inputs diagram

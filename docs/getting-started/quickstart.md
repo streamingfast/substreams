@@ -57,7 +57,7 @@ Data is available for any blockchain with a functional Firehose endpoint, either
 
 The most basic approach to working with Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine should process. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
-The command shown below demonstrates modules targeting the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
+The command demonstrates modules targeting the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
 
 #### **Basic Ethereum command line call**
 

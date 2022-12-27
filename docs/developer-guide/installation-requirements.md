@@ -8,10 +8,10 @@ description: StreamingFast Substreams dependency installation
 
 Working with Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](broken-reference) page.
 
-Instructions and links are provided below to assist with the installation of the required dependencies for Substreams.
+Instructions and links are provided to assist with the installation of the required dependencies for Substreams.
 
 {% hint style="success" %}
-**Tip**: Instructions are provided [below](installation-requirements.md#cloud-based-gitpod-installation) for cloud-based Gitpod setups.
+**Tip**: Instructions are provided for cloud-based Gitpod setups.
 {% endhint %}
 
 ## Local installation
@@ -47,7 +47,7 @@ Visit the [Buf website](https://buf.build/) for additional information and [inst
 
 ## Cloud-based environment with Gitpod
 
-Follow the steps below to use [Gitpod](https://www.gitpod.io/) with Substreams.
+Follow the steps to use [Gitpod](https://www.gitpod.io/) with Substreams.
 
 1. Copy the [substreams-template repository](https://github.com/streamingfast/substreams-template/generate).
 2. Obtain a StreamingFast authentication key from: [https://app.streamingfast.io/](https://app.streamingfast.io/).

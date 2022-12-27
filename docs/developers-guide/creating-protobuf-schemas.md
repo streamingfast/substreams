@@ -110,9 +110,9 @@ View this file in the repo by visiting the following link.
 
 ### Protobuf and Rust optional fields
 
-Protocol buffers define fields' type using either standard primitive data types, such as integers, booleans, and floats, see a [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types, or a complex data type such as `message`, `enum`, `oneof` or `map`.
+Protocol buffers define fields' type using either usual primitive data types, such as integers, booleans, and floats ([full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) or one of complex data types `message`, `enum`, `oneof` or `map`.
 
-Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. For fields that reference other complex `messages` Rust generates the corresponding `message` type wrapped with an `Option` enum type, and will use the `None` variant if the field is not present in the message.
+Any primitive data types in a message will generate the corresponding Rust type (`String` for `string`, `u64` for `uint64`, etc.) and will assign the default value of the corresponding Rust type if the field is not present in a message (empty string for `String`, 0 for integer types, `false` for `bool`, etc.). For a field that references other complex type `messages` , Rust will generate the corresponding `message` type wrapped with an `Option` enum type and will use `None` variant if the field is not present in the message.
 
 The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
 

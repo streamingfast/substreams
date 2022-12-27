@@ -14,7 +14,7 @@ Substreams have all the benefits of StreamingFast Firehose, like low-cost cachin
 
 ### Where to start
 
-A short, dense 25 minutes intro to Substreams, and what it means for the blockchain ecosystem:
+A short, dense 25 minute intro to Substreams, and what it means for the blockchain ecosystem:
 
 {% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
 A walk-though of Firehose features, Substreams modules, with a sample Rust module and the vision for the future.

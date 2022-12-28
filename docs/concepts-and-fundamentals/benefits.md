@@ -31,7 +31,7 @@ description: StreamingFast Substreams benefits and comparisons
 * **Rust**\
   Substreams modules are written in the Rust programming language, using a wide array of third-party libraries that compile to WASM, to manipulate blockchain data on-the-fly.
 * **Blockchain infused Large-scale data**\
-  Substreams was inspired by conventional large-scale data systems now _fused_ with the novelties of blockchain.
+  Substreams was inspired by conventional large-scale data systems _fused_ with the novelties of blockchain.
 
 ### Comparison to other engines
 

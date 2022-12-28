@@ -66,7 +66,7 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 {% hint style="info" %}
 **Note**_**:** _ The **merge strategy** is applied **during** parallel processing.&#x20;
 
-* A module has built two partial stores containing keys for segment A (blocks 0-1000) and segment B (blocks 1000-2000) and is now prepared to merge them into a complete store.
+* A module has built two partial stores containing keys for segment A (blocks 0-1000) and segment B (blocks 1000-2000) and is prepared to merge them into a complete store.
 * The complete store will be represented as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
 {% endhint %}
 
@@ -78,12 +78,12 @@ A downstream module is created to read from a store by using one of its inputs t
 
 ### Ordinals
 
-Ordinals allow a key/value store to have multiple versions of a key within a single block. The store APIs contain different methods of `ordinal` or `ord`.
+Ordinals allow a key-value store to have multiple versions of a key within a single block. The store APIs contain different methods of `ordinal` or `ord`.
 
 For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
 {% hint style="warning" %}
-**Important**: Ordinals _**must be set each time a key is set**_ and _**it's only possible to set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
+**Important**: Ordinals _**must be set every time a key is set**_ and _**it's only possible to set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
 In situations where a single key per block is required and ordering in the store is not important, the ordinal will use a value of zero.
@@ -94,7 +94,7 @@ It's possible to consume data in one of two modes when declaring a `store` as an
 
 #### `get Mode`
 
-Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. Readily query `stores` using the `get_at`, `get_last` and `get_first` methods.
+Get mode provides the module with the key-value store guaranteed to be in sync up to the block being processed. Readily query `stores` using the `get_at`, `get_last` and `get_first` methods.
 
 {% hint style="success" %}
 **Tip:** Lookups are local, in-memory, and extremely high-speed!

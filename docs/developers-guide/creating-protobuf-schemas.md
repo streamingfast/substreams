@@ -54,7 +54,7 @@ message Transfer {
 ```
 {% endcode %}
 
-View this file in the repo by visiting the following link.
+View this file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 
@@ -72,7 +72,7 @@ The protobuf file serves as the interface between the module handlers and the da
 **Note**: The Substreams Template example targets Transfer events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
 {% endhint %}
 
-Multitudes of more specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers can create more refined and complex protobufs based on the many custom data types that exist in the blockchain they are targeting.
+Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers can create more refined and complex protobufs based on the many custom data types that exist in the blockchain they are targeting.
 
 {% hint style="success" %}
 **Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
@@ -104,19 +104,19 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View this file in the repo by visiting the following link.
+View this file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
 
 ### Protobuf and Rust optional fields
 
-Protocol buffers define fields' type using either usual primitive data types, such as integers, booleans, and floats ([full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) or one of complex data types `message`, `enum`, `oneof` or `map`.
+Protocol buffers define fields' type using either standard primitive data types, such as integers, booleans, and floats, view a [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types, or a complex data type such as `message`, `enum`, `oneof` or `map`.
 
-Any primitive data types in a message will generate the corresponding Rust type (`String` for `string`, `u64` for `uint64`, etc.) and will assign the default value of the corresponding Rust type if the field is not present in a message (empty string for `String`, 0 for integer types, `false` for `bool`, etc.). For a field that references other complex type `messages` , Rust will generate the corresponding `message` type wrapped with an `Option` enum type and will use `None` variant if the field is not present in the message.
+Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. For fields that reference other complex `messages` Rust generates the corresponding `message` type wrapped with an `Option` enum type, and will use the `None` variant if the field is not present in the message.
 
-The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field that has a value and a field that has not been set. The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
+The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field containing a value and a field that has not been set. The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
 
-The Rust `match` keyword can be used to compare the value of an `Option` with a `Some` or `None` variant. Here a code snippet that can be used to deal with a type wrapped in an `Option`:
+is The Rust `match` keyword can be used to compare the value of an `Option` with a `Some` or `None` variant. Here is a code snippet that can be used to deal with a type wrapped in an `Option`:
 
 ```rust
 match person.Location {
@@ -125,7 +125,7 @@ match person.Location {
 }
 ```
 
-If you are only interested in dealing with the presence of a value, use the `if let` statement to only have to deal with the `Some(x)` arm of the `match` code shown above:
+If you are only interested in dealing with the presence of a value, use the `if let` statement to handle the `Some(x)` arm of the `match` code.
 
 ```rust
 if let Some(location) = person.location {
@@ -133,7 +133,7 @@ if let Some(location) = person.location {
 }
 ```
 
-Scenarios that are known to always contain a value can use the `.unwrap()` call on the `Option` to obtain the wrapped data. This is true if you control the creation of the messages yourself or if the field is documented as always being present
+If a value is present use the `.unwrap()` call on the `Option` to obtain the wrapped data. This is true if you control the creation of the messages yourself or if the field is documented as always being present
 
 {% hint style="info" %}
 **Note**: Be 100% sure that the field is always present, otherwise Substreams will panic and never complete, being stuck on this block forever.

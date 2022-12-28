@@ -64,7 +64,7 @@ StreamingFast provides tools allowing developers to route blockchain data to a f
 **Tip**: Developers can get inspiration on how to write their own sink by looking at sinks provided by StreamingFast, today. One example could be a database, such as Oracle, that does not have tools in place. Developers can look at the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
 {% endhint %}
 
-Reiterating from above, protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store data provided by Substreams in a myriad of different capacities.
+Protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store data provided by Substreams in a myriad of different capacities.
 
 {% hint style="info" %}
 **Note**: Through careful design of the Substreams manifest, modules, and protobufs developers can craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.

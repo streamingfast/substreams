@@ -120,11 +120,9 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 {% hint style="info" %}
 **Note**: **Rust Macros**
 
-Notice the `#[substreams::handlers::map]` above the function, this is a Rust "macro" that is provided by the substreams crate.
+Notice the `#[substreams::handlers::map]` on top of the function? It's a Rust "_macro_" provided by the Substreams crate.
 
-This macro decorates our handler function as a map. There is also a macro used to decorate the handler of kind store represented as follows.
-
-`#[substreams::handlers::store]`
+The macro decorates the handler function as a map. Store modules are specified using the syntax: `#[substreams::handlers::store]`
 {% endhint %}
 
 The goal of the `map` being built is for extracting ERC721 transfers from a given block.

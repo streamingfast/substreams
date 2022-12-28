@@ -238,7 +238,7 @@ Error: rpc error: code = InvalidArgument desc = validate request: input source "
 ```
 {% endcode %}
 
-A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible. The error seen above is informing the developer of this issue.
+A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible. The error is informing you about this issue.
 
 To resolve the problem, double-check the code and settings within the Substreams codebase against the endpoint that's being sent to the Substreams CLI. The error is from an Ethereum codebase requesting Solana Blocks.&#x20;
 

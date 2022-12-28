@@ -125,7 +125,7 @@ target = "wasm32-unknown-unknown"
 ```
 {% endcode %}
 
-With the configuration file in place, the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`, so you don't have to specify the target manually each time you build.
+With the configuration file in place, the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`, so you don't have to specify the target manually every time you build.
 {% endhint %}
 
 ### ABI generation
@@ -142,7 +142,7 @@ Next, add a Rust build script.
 **Note: Rust build script**
 
 * Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process that performs a variety of tasks.
-* To cause Cargo to compile and execute a script before building a package, place a file called `build.rs` in the root of the package.
+* To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
 {% endhint %}
 
 Create a `build.rs` file in the root of the Substreams project using the following code.

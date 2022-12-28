@@ -100,7 +100,7 @@ opt-level = 's'
 strip = "debuginfo"
 ```
 
-Install the Rust crate for the desired chain. The crates have the protobuf models for the specific chain as well as helper code.
+Install the Rust crate for the chain you want to use. The crates have the protobuf models for the specific chains and helper code.
 
 ```bash
 $ cargo add substreams-ethereum # or

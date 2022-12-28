@@ -4,7 +4,7 @@ description: StreamingFast Substreams command line interface (CLI)
 
 # Substreams CLI reference
 
-The Substreams command line interface (CLI) is the user interface and central access point for using Substreams.
+The Substreams command line interface (CLI) is the user interface and main tool for using Substreams.
 
 The Substreams CLI exposes many commands to developers enabling a range of features. Each command is explained in further detail.
 

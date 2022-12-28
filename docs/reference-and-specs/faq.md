@@ -66,7 +66,7 @@ Additional information is available on the What is Substreams page in the docume
 
 Yes, Substreams is an open-source project and available to the public for free.
 
-### **How would a developer access the information returned from a call to Substreams from a web-based UI?**
+### **How does a developer access the information returned from a call to Substreams from a web-based UI?**
 
 Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 

@@ -15,7 +15,7 @@ An Input of type `source` represents a chain-specific, Firehose-provisioned prot
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**: Ethereum-based Substreams modules would specify `sf.ethereum.type.v2.Block.`&#x20;
+**Tip**: Ethereum-based Substreams modules specify `sf.ethereum.type.v2.Block.`&#x20;
 {% endhint %}
 
 {% hint style="info" %}

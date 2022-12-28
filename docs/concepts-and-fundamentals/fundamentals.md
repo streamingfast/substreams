@@ -37,10 +37,10 @@ Developers create the data transformation strategies in Substreams “[module ha
 The Substreams engine runs the code defined by developers in the Rust-based module handlers.&#x20;
 
 {% hint style="info" %}
-**Note**: _**Substreams modules have a uni-directional flow of data**_. Data is passed from one module to another, but only in a single direction.&#x20;
+**Note**: _**Substreams modules have a uni-directional data flow**_. Data is passed from one module to another, but only in a single direction.&#x20;
 {% endhint %}
 
-The flow of data is defined in the [Substreams manifest](../reference-and-specs/manifests.md) through the “inputs” and “outputs” fields of the configuration file. These fields generally reference the protobuf definitions for the targeted blockchain data. The flow of data is also defined using the “inputs” field to send data directly from one module to another.
+The data flow is defined in the [Substreams manifest](../reference-and-specs/manifests.md) through the “inputs” and “outputs” fields of the configuration file. These fields reference the protobuf definitions for blockchain data. The data flow is also defined using the “inputs” field to send data directly from one module to another.
 
 ### **What is a Substreams DAG?**
 

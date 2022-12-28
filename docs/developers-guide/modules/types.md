@@ -4,10 +4,10 @@ description: StreamingFast Substreams module types
 
 # Module types
 
-Substreasms has two types of modules, `map` and `store`.&#x20;
+Substreams uses two types of modules, `map` and `store`.&#x20;
 
-* Map modules are simple functions, that receive bytes as input, an output bytes. These bytes are encoded protobuf messages.
-* Store modules are stateful, saving and tracking data through the use of simple key-value stores.
+* Map modules are functions that receive bytes as input and output. These bytes are encoded protobuf messages.
+* Store modules are stateful, saving and tracking data through the use of key-value stores.
 
 ### Store modules
 
@@ -60,19 +60,19 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 
 
 {% hint style="info" %}
-_**Note**: all update policies provide the `delete_prefix` method._
+**Note**: all update policies provide the `delete_prefix` method.
 {% endhint %}
 
 {% hint style="info" %}
-**Note**_**:** The **merge strategy** is applied **during** parallel processing. A module that has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store._
+**Note**_**:** _ The **merge strategy** is applied **during** parallel processing. A module that has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store.
 
-_The complete store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly._
+The complete store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly.
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_**:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is being written._
+**Important**_**:** _ To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is being written.
 
-_To read from a store a downstream module is created with one of its inputs pointing to the store module's output._
+A downstream module is created to read from a store by using one of its inputs to point to the output of the store module.
 {% endhint %}
 
 ### Ordinals
@@ -85,7 +85,7 @@ For example, the price for a token can change after transaction B and transactio
 **Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
+For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can use a zero value.
 
 ### Store modes
 
@@ -96,17 +96,15 @@ Data can be consumed in one of two modes when declaring a `store` as an input to
 Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. The `stores` can be readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
 
 {% hint style="success" %}
-**Tip:** Lookups are local, in-memory, and extremely fast!
+**Tip:** Lookups are local, in-memory, and extremely high-speed!
 {% endhint %}
 
 {% hint style="info" %}
 **Note:** Store method behavior is defined as:
 
-The `get_last` method is the fastest because it queries the store directly.&#x20;
-
-The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
-
-The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
+* The `get_last` method is the fastest because it queries the store directly.&#x20;
+* The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+* The `get_at` method will unwind deltas up to a specific ordinal, ensuring values for keys set midway through a block can still be reached.
 {% endhint %}
 
 #### `deltas mode`

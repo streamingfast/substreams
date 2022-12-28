@@ -18,7 +18,7 @@ Substreams-based Uniswap-v3 Subgraph and Substreams. The Uniswap Substreams exam
 
 #### PancakeSwap Substreams
 
-Substreams example for tracking PancakeSwap on BSC Mainnet. _No support is currently provided for this example._
+Substreams example for tracking PancakeSwap on BSC Mainnet. _**No support is provided for the PancakeSwap example or endpoint.**_
 
 [https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap)
 

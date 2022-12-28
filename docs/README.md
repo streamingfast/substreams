@@ -56,12 +56,12 @@ Substreams is an open-source community effort, so feel free to suggest new topic
 
 ### Contributing
 
-First refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
+Refer to the general [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md) for additional information.
 
 ### License
 
-Substreams is currently licensed under [Apache 2.0](../LICENSE/).
+Substreams is licensed under [Apache 2.0](../LICENSE/).
 
 ### Disclaimer
 
-The content in this documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is currently in development and the associated documentation may become outdated in some areas. Please feel free to reach out to report issues or outages.
+The content in this documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is in development and the associated documentation will become outdated. [Reach out ](https://discord.gg/mYPcRAzeVN)to report issues or outages.

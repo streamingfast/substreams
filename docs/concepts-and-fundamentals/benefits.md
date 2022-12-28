@@ -19,7 +19,7 @@ description: StreamingFast Substreams benefits and comparisons
 ### Benefits&#x20;
 
 * **Store and process blockchain data**\
-  Substreams uses advanced parallelization techniques to efficiently process large, constantly expanding blockchain histories. The processed data is then available for populating various types of data stores or real-time systems.
+  Substreams uses advanced parallelization techniques to efficiently process large, constantly expanding blockchain histories. The processed data is then available for populating various types of datastores or real-time systems.
 * **Streaming-first**\
   Substreams inherit from the extremely low latency extraction provided by the underlying Firehose, making it the fastest blockchain indexing technology on the market.
 * **Save time and money**\

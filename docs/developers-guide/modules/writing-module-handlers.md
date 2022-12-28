@@ -71,7 +71,7 @@ View this file in the repository:
 
 ### **Module handler breakdown**
 
-Each logical section of the `lib.rs` file is outlined and described in greater detail below.
+Each logical section of the `lib.rs` file is outlined and described in greater detail.
 
 Import the necessary modules.
 
@@ -201,7 +201,7 @@ If the `from` address field and the `to` address field is not a null address, th
 
 ### Store concepts
 
-When writing to a store, there are three concepts to consider that include `ordinal`, `key` and `value`. Additional information for each is provided below.
+When writing to a store, there are three concepts to consider that include `ordinal`, `key` and `value`. Additional information for each is provided.
 
 #### Ordinal
 

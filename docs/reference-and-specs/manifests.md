@@ -202,7 +202,7 @@ If all the inputs have the same `initialBlock` the field can be omitted and its 
 
 #### `modules[].kind`
 
-There are two module types associated with `modules[].kind` as indicated below.
+There are two module types associated with `modules[].kind`:
 
 * `map`
 * `store`

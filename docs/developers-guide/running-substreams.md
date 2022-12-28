@@ -2,9 +2,9 @@
 description: Running StreamingFast Substreams for the first time
 ---
 
-# Running Substreams
+# Running substreams
 
-After a successful build, you can start Substreams using:
+After a successful build Substreams can be started with the following command, explained in greater detail below.
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \
@@ -38,7 +38,7 @@ The `map_transfers` module is defined in the manifest and it is the module that 
 Start mapping at the specific block 12292922 by using passing the flag and block number.\
 `--start-block 12292922`
 
-Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block will be 12292923.
+Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
 
 ### Successful Substreams results
 

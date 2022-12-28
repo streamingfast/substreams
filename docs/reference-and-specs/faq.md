@@ -64,7 +64,7 @@ Additional information is available on the What is Substreams page in the docume
 
 ### **Is Substreams free?**
 
-Yes, Substreams is an open-source project and is available to the public for free.
+Yes, Substreams is an open source project and is available to the public for free.
 
 ### **How does a developer reach the information returned from a call to Substreams from a web-based UI?**
 

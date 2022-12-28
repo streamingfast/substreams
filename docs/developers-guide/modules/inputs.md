@@ -11,18 +11,18 @@ Modules can receive inputs of three types: `source`, `map`, and `store`.
 An Input of type `source` represents a chain-specific, Firehose-provisioned protobuf object.
 
 {% hint style="info" %}
-**Note**_**:** _ Find the supported protocols and their corresponding message types in the [Chains and inputs documentation](../../reference-and-specs/chains-and-endpoints.md).
+**Note**_**:** _ Learn more about the supported protocols and their corresponding message types in the [Chains and inputs documentation](../../reference-and-specs/chains-and-endpoints.md).
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**: Ethereum-based Substreams modules would specify `sf.ethereum.type.v2.Block.`&#x20;
+**Tip**: Ethereum-based Substreams modules specify `sf.ethereum.type.v2.Block.`&#x20;
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: Each of the different blockchains will reference a different Block specific to the chain being targeted. For example, Solana references its Block object as `sf.solana.type.v1.Block`.&#x20;
+**Note**: Each of the different blockchains will reference a different `Block` specific to the chain being targeted. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`.&#x20;
 {% endhint %}
 
-The `source` inputs type __ is defined in the Substreams manifest as seen below. As previously mentioned, it's crucial to make sure the correct Block object for the chain being targeted has been specified.
+The `source` inputs type __ is defined in the Substreams manifest. It is important to specify the correct Block object for the targeted chain.
 
 ```yaml
   inputs:
@@ -35,9 +35,9 @@ The `sf.substreams.v1.Clock` object is another source type available on any of t
 
 The `sf.substreams.v1.Clock` represents:
 
-* the block number,&#x20;
-* a block ID,&#x20;
-* and a block timestamp.
+* Block number
+* Block ID
+* Block timestamp
 
 ## Input type `map`
 
@@ -46,10 +46,10 @@ An Input of type `map` represents the output of another `map` module.&#x20;
 The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
 
 {% hint style="warning" %}
-**Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's known as a circular dependency, and is not wanted.
+**Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's called a circular dependency, and is not wanted.
 {% endhint %}
 
-The `map` inputs type __ is defined in the Substreams manifest as seen below. The name of the map is chosen by the developer and is representative of the logic contained within.
+The `map` inputs type __ is defined in the Substreams manifest. The name of the map is chosen by the developer and is representative of the logic contained within.
 
 ```yaml
   inputs:
@@ -62,16 +62,16 @@ Additional information regarding `maps` is located in the Substreams [modules do
 
 An Input of type `store` represents the state of another store used with the Substreams implementation being created.
 
-The `store` inputs type __ is defined in the Substreams manifest as seen below. Similar to maps, stores are named appropriately, indicating the logic contained within them.
+The `store` inputs type __ is defined in the Substreams manifest. Similar to maps, stores are named appropriately, indicating the logic contained within them.
 
-Store modules are set to `get` mode by default as illustrated in the following manifest code excerpt.
+Store modules are set to `get` mode by default as illustrated in the manifest code excerpt.
 
 ```yaml
   inputs:
     - store: my_store # defaults to mode: get
 ```
 
-Alternatively, stores can be set to deltas mode as illustrated in the following manifest code excerpt.
+Alternatively, stores can be set to deltas mode as illustrated in the manifest code excerpt.
 
 ```yaml
   inputs:
@@ -88,7 +88,7 @@ There are **two modes** that can be defined for modules.
 
 ### Store constraints
 
-Constraints for stores are defined as follows.
+Constraints for stores are defined as:
 
 * Stores received as `inputs` are read-only.
 * Stores cannot depend on themselves.
@@ -109,7 +109,7 @@ Delta mode enables developers with the ability to loop through keys decoding val
 
 #### Store deltas example
 
-The following code example illustrates the protobuf model for StoreDeltas.
+Code example illustrating the protobuf model for StoreDeltas:
 
 {% code overflow="wrap" lineNumbers="true" %}
 ```protobuf

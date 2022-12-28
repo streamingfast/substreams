@@ -36,7 +36,7 @@ An understanding of basic Substreams fundamentals is expected before continuing.
 
 ## **Existing and community sinks**
 
-StreamingFast values external contributions for Substreams sinks. If your team has created a sink, please contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so it will be included in the Substreams documentation!
+StreamingFast values external contributions for Substreams sinks. If your team has created a sink, contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so it will be included in the Substreams documentation!
 
 The `substreams-eth-block-meta` example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
 

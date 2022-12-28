@@ -86,7 +86,7 @@ For example, the price for a token can change after transaction B and transactio
 **Important**: Ordinals _**must be set every time a key is set**_ and _**it's only possible to set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-In situations where a single key for a block is required and ordering in the store is not important, the ordinal will use a value of zero.
+In situations where a single key per block is required and ordering in the store is not important, the ordinal will use a value of zero.
 
 ### Store modes
 

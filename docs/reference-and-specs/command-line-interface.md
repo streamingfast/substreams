@@ -9,7 +9,7 @@ The Substreams command line interface (CLI) is the user interface and main tool 
 The Substreams CLI exposes many commands to developers enabling a range of features. Commands are explained in further detail.
 
 {% hint style="info" %}
-**Note**: When a package is specified it's possible to use:&#x20;
+**Note**: When a package is specified you can use:&#x20;
 
 * a local `substreams.yaml` file
 * a local `.spkg`&#x20;
@@ -31,7 +31,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
 * `-t +1` (or `--stop-block`) only requests a single block (the stop block will be the manifest's `initialBlock` + 1)
-* `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). It's possible to use a `.spkg` or `substreams.yaml` file.
+* `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
 Passing a different `-s` (or `--start-block`) will run any prior modules at high speed. This provides output at the requested start block while keeping snapshots along the way, in case you want to process it again.

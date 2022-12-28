@@ -6,7 +6,7 @@ description: StreamingFast Substreams chains and endpoints
 
 ## Supported blockchains and protobuf models
 
-Protobuf definitions and public endpoints are provided for each of the supported protocols and chains.&#x20;
+Protobuf definitions and public endpoints are provided for the supported protocols and chains.&#x20;
 
 {% hint style="success" %}
 **Tip**: All of the endpoints listed on this page require [authentication](authentication.md) before use.
@@ -39,4 +39,4 @@ Protobuf definitions and public endpoints are provided for each of the supported
 
 ## Other
 
-It's possible to support other blockchains for Substreams through Firehose instrumentation. Additional information is available in the [official Firehose documentation](https://firehose.streamingfast.io/).
+You can support other blockchains for Substreams through Firehose instrumentation. Additional information is available in the [official Firehose documentation](https://firehose.streamingfast.io/).

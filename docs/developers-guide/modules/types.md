@@ -83,14 +83,14 @@ Ordinals allow a key-value store to have multiple versions of a key within a sin
 For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
 {% hint style="warning" %}
-**Important**: Ordinals _**must be set every time a key is set**_ and _**it's only possible to set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
+**Important**: Ordinals _**must be set every time a key is set**_ and _**you can only set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-In situations where a single key per block is required and ordering in the store is not important, the ordinal will use a value of zero.
+In situations where a single key for a block is required and ordering in the store is not important, the ordinal will use a value of zero.
 
 ### Store modes
 
-It's possible to consume data in one of two modes when declaring a `store` as an input to a module.
+You can consume data in one of two modes when declaring a `store` as an input to a module.
 
 #### `get Mode`
 
@@ -113,5 +113,5 @@ Get mode provides the module with the key-value store guaranteed to be in sync u
 Deltas mode provides the module with _all_ _the_ _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys mutated during that specific block become available.
 
 {% hint style="info" %}
-**Note:** When a `store` is set as an input to the module, it is read-only and it's not possible to modify, update or mutate them.
+**Note:** When a `store` is set as an input to the module, it is read-only and you cannot modify, update or mutate them.
 {% endhint %}

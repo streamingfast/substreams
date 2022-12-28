@@ -23,7 +23,7 @@ description: StreamingFast Substreams benefits and comparisons
 * **Streaming-first**\
   Substreams inherit from the extremely low latency extraction provided by the underlying Firehose, making it the fastest blockchain indexing technology on the market.
 * **Save time and money**\
-  It's possible to horizontally scale Substreams, significantly reducing processing time and increasing efficiency by reducing wait time and missed opportunities.
+  You can horizontally scale Substreams, significantly reducing processing time and increasing efficiency by reducing wait time and missed opportunities.
 * **Community effort and composability**\
   Communities are able to combine Substreams modules to form compounding levels of data richness and refinement.
 * **Protobuf**\

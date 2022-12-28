@@ -6,13 +6,13 @@ description: Working with StreamingFast Substreams sinks
 
 ## **Introduction**
 
-It's possible to route the data captured from a blockchain with Substreams to multiple types of sinks. A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data and it's possible to route data anywhere you're able to imagine.
+You can route the data captured from a blockchain with Substreams to multiple types of sinks. A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data and you can route data anywhere you're able to imagine.
 
 StreamingFast provides a few examples, libraries, and tools to assist you with routing blockchain data to sinks.
 
 ## **Basics**
 
-Databases and flat files are standard storage types however it's possible to pipe Substreams data into other locations required by a new or existing application or architecture.
+Databases and flat files are standard storage types however you can pipe Substreams data into other locations required by a new or existing application or architecture.
 
 An important design aspect of Substreams is the decision to rely on Google Protocol Buffers, also called protobufs, for data packaging and transmission. Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to working with data that is passed from one application to another. The platform-independent, data-centric capabilities of protobufs give you the opportunity to package and route data captured by Substreams to other sources, including sinks.
 

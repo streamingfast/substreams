@@ -43,7 +43,7 @@ The `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment v
 {% hint style="info" %}
 **Note**_:_ **Authentication Token Env Flag**
 
-By default, the `substreams run` command uses an environment variable for the authentication token. It's possible to specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
+By default, the `substreams run` command uses an environment variable for the authentication token. You can specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
 {% endhint %}
 
 ### Environment variable script

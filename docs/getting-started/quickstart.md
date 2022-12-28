@@ -43,7 +43,7 @@ If you prefer streaming using third-party languages, try the [Python](https://gi
 
 ## Platform independent Substreams
 
-Substreams is platform independent, meaning it's possible to use many different blockchains.&#x20;
+Substreams is platform independent, meaning you can use many different blockchains.&#x20;
 
 Developers will typically target a specific blockchain and build a Substreams module targeted toward the chosen chain.&#x20;
 

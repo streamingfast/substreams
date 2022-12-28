@@ -110,9 +110,9 @@ The Substreams packager will load files in any of the listed `importPaths`.
 **Note**: The `imports` section of the manifest will also affect which `.proto` files end up in the package.
 {% endhint %}
 
-They are packaged with the modules to help clients decode the incoming streams, but are not sent to the Substreams server in network requests.
+Protobufs are packaged with the modules to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
 
-Refer to [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
+Refer to the [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
 ### Binaries
 

@@ -223,7 +223,7 @@ Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_d
 
 In the example, if the `generate_key` function will return a key that is the `TRACKED_CONTRACT` address it will not be unique between different token holders.
 
-If the `generate_key` function returns a key containing only the holder's address it will be unique amongst holders. Issues will be encountered when attempting to track multiple contracts.
+The `generate_key` function will return a unique key for holders if it contains only the holder's address. Issues will be encountered when attempting to track multiple contracts.
 
 #### Value
 

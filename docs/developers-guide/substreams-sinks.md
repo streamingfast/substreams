@@ -20,7 +20,7 @@ At a low-level Substreams consumes data through a gRPC streaming service. Consum
 
 ## **General requirements**
 
-The first step of having Substreams consumed by a particular sink involves the creation of a `map` module; whose output type is a protobuf (accepted by the sink). This specific protobuf is populated from Substreams protobuf types; a transformation of types into a format suitable for ingestion by sinks.
+The first step of having Substreams consumed by a particular sink involves the creation of a `map` module; whose output type is a protobuf (accepted by the sink). This specific protobuf is populated from Substreams protobuf types; a transformation of types into a format suitable for loading into sinks.
 
 For example, database-like Substreams sinks such as PostgreSQL or MongoDB accept a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
 
@@ -28,7 +28,7 @@ It’s important to note that databases are only one type of sink. The sink bein
 
 The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage.
 
-The configuration of the storage layer and its requirements are your responsibility. Each Substreams sink will document the specific infrastructure required for running the `sink`. Read the documentation for each sink to understand its behavior and requirements.
+The configuration of the storage layer and its requirements are your responsibility. StreamingFast  will document the infrastructure required for running a Substreams `sink`. Read the documentation to understand the behavior and requirements for the other sink types.
 
 An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules in the Substreams documentation.
 
@@ -58,7 +58,7 @@ StreamingFast provides several tools that assist database persistence for Substr
 
 ## **Build a sink**
 
-StreamingFast provides tools allowing you to route blockchain data to a few different types of data storage sinks, or means of ingestion. The types of sinks with tools provided by StreamingFast aren’t the only options. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
+StreamingFast provides tools allowing you to route blockchain data to a few different types of data storage sinks, or means of importation. The types of sinks with tools provided by StreamingFast aren’t the only options. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
 
 {% hint style="success" %}
 **Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, that does not have Substreams sink tools in place. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.

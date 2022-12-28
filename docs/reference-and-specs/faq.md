@@ -56,7 +56,7 @@ The Substreams documentation also provides a Developer's Guide to assist in unde
 
 ### **What is Substreams for?**
 
-Substreams and Firehose work together to index and process blockchain data. Substreams is used for transforming rich blockchain data and exposing it to the needs of application developers.
+Substreams and Firehose work together to provide access and processing capabilities for blockchain data. Substreams is used for transforming rich blockchain data and exposing it to the needs of application developers.
 
 Additional information is available on the What is Substreams page in the documentation.
 
@@ -66,7 +66,7 @@ Additional information is available on the What is Substreams page in the docume
 
 Yes, Substreams is an open-source project and available to the public for free.
 
-### **How does a developer reach the information returned from a call to Substreams from a web-based UI?**
+### **How would a developer access the information returned from a call to Substreams from a web-based UI?**
 
 Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 

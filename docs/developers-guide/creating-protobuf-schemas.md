@@ -65,7 +65,7 @@ The ERC721 smart contract associated with the Substreams Template example contai
 The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.
 
 {% hint style="success" %}
-**Tip**: Protobufs are chain agnostic and can be defined and used for various blockchains. The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications. The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
+**Tip**: Protobufs are platform-independent and can be defined and used for various blockchains. The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications. The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
 {% endhint %}
 
 {% hint style="info" %}

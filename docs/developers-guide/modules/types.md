@@ -4,10 +4,10 @@ description: StreamingFast Substreams module types
 
 # Module types
 
-Substreams has two types of modules, `map` and `store`.&#x20;
+Substreasms has two types of modules, `map` and `store`.&#x20;
 
-* Map modules are functions that receive bytes as input and output. These bytes are encoded protobuf messages.
-* Store modules are stateful, saving and tracking data through the use of key-value stores.
+* Map modules are simple functions, that receive bytes as input, an output bytes. These bytes are encoded protobuf messages.
+* Store modules are stateful, saving and tracking data through the use of simple key-value stores.
 
 ### Store modules
 
@@ -85,7 +85,7 @@ For example, the price for a token can change after transaction B and transactio
 **Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can use a zero value.
+For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
 
 ### Store modes
 
@@ -96,7 +96,7 @@ Data can be consumed in one of two modes when declaring a `store` as an input to
 Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. The `stores` can be readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
 
 {% hint style="success" %}
-**Tip:** Lookups are local, in-memory, and extremely high-speed!
+**Tip:** Lookups are local, in-memory, and extremely fast!
 {% endhint %}
 
 {% hint style="info" %}
@@ -106,7 +106,7 @@ The `get_last` method is the fastest because it queries the store directly.&#x20
 
 The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
 
-The `get_at` method will unwind deltas up to a specific ordinal, ensuring values for keys set midway through a block can still be reached.
+The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
 {% endhint %}
 
 #### `deltas mode`

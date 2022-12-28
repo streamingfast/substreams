@@ -182,7 +182,9 @@ After cloning the Solana example, take a moment to look through the repository. 
 
 A very important difference between the two examples is the module handler code. Blockchains each have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
 
-Notice the Solana module handler is using the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams. The Ethereum example's module handler uses the `ver` and `number`. These are differences in the block model for each of the blockchains.
+Notice the Solana module handler is accessing the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams.&#x20;
+
+The Ethereum example's module handler accessed the `ver` and `number`. These are differences in the block model for each of the blockchains.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust

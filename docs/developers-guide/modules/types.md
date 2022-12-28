@@ -64,9 +64,10 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 {% endhint %}
 
 {% hint style="info" %}
-**Note**_**:** _ The **merge strategy** is applied **during** parallel processing. A module that has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store.
+**Note**_**:** _ The **merge strategy** is applied **during** parallel processing.&#x20;
 
-The complete store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly.
+* A module has built two partial stores containing keys for segment A (blocks 0-1000) and segment B (blocks 1000-2000) and is now prepared to merge them into a complete store.
+* The complete store will be represented as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
 {% endhint %}
 
 {% hint style="warning" %}

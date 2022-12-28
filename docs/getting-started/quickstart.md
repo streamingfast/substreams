@@ -6,7 +6,7 @@ description: Get off the ground using Substreams by StreamingFast
 
 ## Authentication
 
-Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io)
+Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io).
 
 Get an API **Token** using:
 

@@ -221,7 +221,7 @@ When an ordinal is specified, the order of execution is guaranteed. For one exec
 
 #### Key
 
-Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.
+Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.
 
 In the example, if the `generate_key` function will return a key that is the `TRACKED_CONTRACT` address it will not be unique between different token holders.
 

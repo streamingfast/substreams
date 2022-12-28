@@ -23,7 +23,7 @@ An Input of type `source` represents a chain-specific, Firehose-provisioned prot
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: Each of the different blockchains will reference a different `Block` specific to the chain being targeted. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`.&#x20;
+**Note**: The different blockchains will reference a different `Block`. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`.&#x20;
 {% endhint %}
 
 The `source` inputs type __ is defined in the Substreams manifest. It is important to specify the correct Block object for the targeted chain.
@@ -99,7 +99,7 @@ Constraints for stores are defined as:
 
 ### `get` mode
 
-Get mode provides a key/value store that is readily queryable and guaranteed to be in sync with the block being processed.&#x20;
+Get mode provides a key-value store that is readily queryable and guaranteed to be in sync with the block being processed.&#x20;
 
 {% hint style="success" %}
 **Tip**_**:**_ `get` mode is the default mode for modules.

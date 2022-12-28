@@ -6,15 +6,13 @@ description: StreamingFast graph-node setup
 
 ## Graph-node setup
 
-Substreams and graph-node can be used together. Substreams-based subgraphs can be pushed into graph-node setups.
+Substreams and `graph-node` can be used together. Substreams-based subgraphs can be pushed into `graph-node` setups.
 
-#### **StreamingFast graph-node dev**
+#### **StreamingFast graph-node-dev**
 
-First, clone the StreamingFast graph-node-dev repository on Github.&#x20;
+Clone the StreamingFast `graph-node-dev` repository on Github:
 
-The following command can be used to clone the repository directly.
-
-```
+```bash
 git clone git@github.com:streamingfast/graph-node-dev.git
 ```
 
@@ -22,7 +20,7 @@ git clone git@github.com:streamingfast/graph-node-dev.git
 
 <summary><strong>Docker setup</strong></summary>
 
-Docker is required to use StreamingFast graph-node-dev. Make sure the target machine has a functional Docker installation in place prior to proceeding.
+Docker is required to use StreamingFast `graph-node-dev`. Make sure your machine has a functional Docker installation in place prior to proceeding.
 
 Additional information for Docker installation can be found in the official Docker documentation.
 
@@ -34,7 +32,7 @@ Additional information for Docker installation can be found in the official Dock
 
 <summary><strong>NodeJS, NPM and Yarn setup</strong></summary>
 
-Node Package Manager (NPM) and Yarn are required to use StreamingFast graph-node-dev. Links with additional information and setup instructions for both are provided below.
+Node Package Manager (NPM) and Yarn are required to use StreamingFast `graph-node-dev`.
 
 Additional information for NodeJS and NPM installation can be found in the official NPM documentation.
 
@@ -48,9 +46,9 @@ Additional information for Yarn installation can be found in the official yarn d
 
 <details>
 
-<summary>PostgreSQL Setup</summary>
+<summary>PostgreSQL setup</summary>
 
-PostgreSQL is required to use StreamingFast graph-node-dev. Make sure the target machine has a fully functional PostgreSQL installation in place prior to proceeding.
+PostgreSQL is required to use StreamingFast `graph-node-dev`. Make sure the target machine has a fully functional PostgreSQL installation in place prior to proceeding.
 
 Additional information for PostgreSQL installation can be found in the official PostgreSQL documentation.
 
@@ -60,7 +58,7 @@ Additional information for PostgreSQL installation can be found in the official 
 
 #### **NodeJS dependencies**
 
-Using Substreams and graph-node together requires several Node.js dependencies. Start Docker and issue the following command to the terminal window to begin the installation process.
+Using Substreams and `graph-node` together requires multiple Node.js dependencies. Install the dependencies using:
 
 ```
 yarn install
@@ -68,13 +66,13 @@ yarn install
 
 #### Database and IPFS node script
 
-Running the up.sh shell script included in the graph-node-dev repository will start the Docker containers for PostgreSQL and the IPFS node.
+To start the Docker containers for PostgreSQL and the IPFS node, run the `up.sh` shell script included in the `graph-node-dev` repository.
 
 {% hint style="info" %}
 **Note**: The `-c` flag can be added when running the up.sh shell script to clean any persistent folders for PostgreSQL, IPFS nodes, and other similar services before starting them.
 {% endhint %}
 
-```
+```bash
 ./up.sh
 ```
 
@@ -82,47 +80,47 @@ Running the up.sh shell script included in the graph-node-dev repository will st
 
 To test subgraphs pulling data from Firehose a connection must be established based on the network being consumed such as Ethereum or Solana.
 
-Shell scripts are included in the graph-node-dev repository to set up the port-forward to the peering services for Ethereum, Binance Smart Chain, and Solana.
+Shell scripts are included in the `graph-node-dev` repository to set up the port-forward to the peering services for Ethereum, Binance Smart Chain, and Solana.
 
-The following shell script starts the services for Ethereum.
+The `./pf-eth.sh` shell script starts the services for Ethereum.
 
-```
+```bash
 ./pf-eth.sh
 ```
 
-The following shell script starts the services for Binance Smart Chain.
+The `./pf-bsc.sh` shell script also starts the services for Binance Smart Chain.
 
-```
+```bash
 ./pf-bsc.sh
 ```
 
-The following shell script starts the services for Solana.
+The `./pf-sol.sh` shell script starts the services for Solana.
 
-```
+```bash
 ./pf-sol.sh
 ```
 
-#### The Graph Protocol graph-node
+#### The Graph Protocol `graph-node`
 
-The graph-node repository from The Graph is also required to use StreamingFast graph-node-dev. The repository can be cloned to the target machine by issuing the following command to the terminal.
+The `graph-node` repository from [The Graph](https://thegraph.com/) is also required to use StreamingFast `graph-node-dev`. Clone the `graph-node` repository on Github:
 
 ```
 git clone https://github.com/graphprotocol/graph-node
 ```
 
-**Running graph-node**
+**Running `graph-node`**
 
-The graph-node is ready to be run at this stage.&#x20;
+You're ready to run `graph-node` at this stage.&#x20;
 
-Run the graph-node from its root directory. The config/graph-node.eth-ropsten.toml configuration file references the graph-node repository directory and the paths need to be updated accordingly.
+Run `graph-node` from its root directory. The `config/graph-node.eth-ropsten.toml` configuration file references the `graph-node` repository directory. Update the paths accordingly.
 
 {% hint style="info" %}
-**Note**: Some system environment variables (ENV VARS), such as STREAMING\_FAST\_API\_TOKEN, may need to be setup to successfully connect to the Firehose and Substreams services.&#x20;
+**Note**: To successfully connect to the Firehose and Substreams services, you may need to set up certain system environment variables, such as `STREAMING_FAST_API_TOKEN`.
 {% endhint %}
 
-The following command should be issued using a new terminal window to start up graph-node.
+Start up `graph-node` using:
 
-```
+```bash
 GRAPH_LOG=trace cargo run -- --config config/graph-node.eth-ropsten.toml --ipfs "localhost:5001"
 ```
 
@@ -130,30 +128,31 @@ GRAPH_LOG=trace cargo run -- --config config/graph-node.eth-ropsten.toml --ipfs 
 
 The **** subgraph manifest file needs to be pushed to the local IPFS node.&#x20;
 
-The following command should be issued using a new terminal window to push the subgraph to IPFS.
+Push the subgraph to IPFS using:
 
-```
+```bash
 ipfs add substreams/ethereum/mainnet-network.yaml
 ```
 
 After the subgraph manifest has been pushed to IPFS the subgraph can be deployed.
 
-The following command should be issued using a new terminal window to deploy the subgraph.
-
 {% hint style="info" %}
-**Note**: http can be installed using Homebrew using the httpie command.
+**Note**: http can be installed using Homebrew through the httpie command.
 {% endhint %}
 
-```
+Deploy the subgraph using:
+
+```bash
 export i=QmUFVjzLeSRAjUNnNcdC4LEM3kncZwand2fj7gbNBjVV4A
 http -I post http://localhost:8020/ jsonrpc="2.0" id="1" method="subgraph_create" params:="{\"name\": \""$i"\"}" && http -I post http://localhost:8020/ jsonrpc="2.0" id="1" method="subgraph_deploy" params:="{\"name\": \""$i"\", \"ipfs_hash\": \""$i"\", \"version_label\": \"1\"}"
 ```
 
 #### `config-firehose.toml`
 
-The config-firehose.toml file assumes the dependencies are provided by `docker-compose up` (started through `up.sh` invocations).
+The `config-firehose.toml` file assumes that the dependencies are provided by `docker-compose up`, which is started through `up.sh` invocations.
 
-```
+{% code title="config-firehose.toml" overflow="wrap" lineNumbers="true" %}
+```rust
 [[general]
 
 [store]
@@ -176,17 +175,18 @@ provider = [
 shard = "primary"
 indexers = [ "default" ]
 ```
+{% endcode %}
 
 #### Further information
 
-Additional information and setup instructions for The Graph's graph-node can be found in The Graph Academy documentation.
+For more information and setup instructions for The Graph's `graph-node`, refer to The Graph Academy documentation.
 
 [https://docs.thegraph.academy/official-docs/indexer/testnet/graph-protocol-testnet-baremetal/3\_deployandconfiguregraphnode](https://docs.thegraph.academy/official-docs/indexer/testnet/graph-protocol-testnet-baremetal/3\_deployandconfiguregraphnode)
 
-Additional information on subgraphs can be found in The Graph's subgraph documentation.
+You can find more information on subgraphs in The Graph's subgraph documentation."
 
 [https://thegraph.com/docs/en/developing/creating-a-subgraph/](https://thegraph.com/docs/en/developing/creating-a-subgraph/)
 
-Additional information on StreamingFast graph-node-dev can be found in the official graph-node-dev repository.
+You can find more information on StreamingFast `graph-node-dev` in the official `graph-node-dev` repository.
 
 [https://github.com/streamingfast/graph-node-dev](https://github.com/streamingfast/graph-node-dev)

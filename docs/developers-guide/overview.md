@@ -9,18 +9,18 @@ description: StreamingFast Substreams Developer's Guide overview
 The Substreams Developer's Guide explains the process of building a Substreams module that tracks the ERC721 holder count for an Ethereum smart contract.
 
 {% hint style="success" %}
-**Tip**_:_ The Substreams Developer's Guide is focused on an Ethereum Substreams module. The majority of the development tasks and workflow are agnostic to each blockchain being targeted by the Substreams developer.
+**Tip**_:_ The Substreams Developer's Guide is focused on an Ethereum Substreams module. The development tasks and workflow are independent of the blockchain that you're targeting.
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study.
+**Note**: Example Substreams implementations for [Solana](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens), Aptos, and other chains are available for reference and study. Find a full list on the [examples page](https://substreams.streamingfast.io/reference-and-specs/examples) of the Substreams documentation.
 {% endhint %}
 
 If you haven't done so already, reviewing the Substreams [fundamentals](../concepts-and-fundamentals/fundamentals.md) and [modules overview](../concepts-and-fundamentals/modules.md) is helpful for getting up and running quickly.
 
 #### Substreams examples
 
-StreamingFast and the Substreams community have provided an array of different examples to explore and learn from. Find the full list on the [examples page](https://substreams.streamingfast.io/reference-and-specs/examples) of the Substreams documentation.
+StreamingFast and the Substreams community have provided an array of different examples to explore and learn from.
 
 #### Substreams template for Developer's Guide
 

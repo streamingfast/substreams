@@ -32,18 +32,18 @@ package:
   doc: |
     Documentation heading for the package.
 
-    More detailed docs for the package.
+    More detailed documentation for the package.
 ```
 
 #### Package name
 
 The `package.name` field is used to identify the package.&#x20;
 
-The `package.name` field also infers the filename when the `pack` command is run using `substreams.yaml` as a flag for the Substreams package.
+The `package.name` field infers the filename when the `pack` command is run using `substreams.yaml` as a flag for the Substreams package.
 
-* The `name` must match the following regular expression. \
+* The `name` must match the regular expression. \
   `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`
-* The regular expression translates to the following rules.
+* The regular expression translates to:
   * 64 characters maximum
   * Separate words with `_`
   * Starts with `a-z` or `A-Z` and can contain numbers thereafter
@@ -53,7 +53,7 @@ The `package.name` field also infers the filename when the `pack` command is run
 The `package.version` field identifies the package for the Substreams implementation.
 
 {% hint style="info" %}
-**Note**: `package.version` _must_ respect [Semantic Versioning, version 2.0](https://semver.org/)
+**Note**: `package.version` _**must**_ respect [Semantic Versioning, version 2.0](https://semver.org/)
 {% endhint %}
 
 #### Package URL
@@ -85,7 +85,7 @@ The _value_ should be a pointer to a Substreams manifest or a Substreams [packag
 
 The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
 
-Imports will differ across each blockchain. For example, Substreams implementations that target Ethereum will reference an appropriate spkg file created for that blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the target chain.
+Imports will differ across different blockchains. For example, Substreams implementations that target Ethereum will reference an appropriate spkg file created for that blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the target chain.
 
 ### Protobuf
 
@@ -110,9 +110,9 @@ The Substreams packager will load files in any of the listed `importPaths`.
 **Note**: The `imports` section of the manifest will also affect which `.proto` files end up in the package.
 {% endhint %}
 
-They are packaged with the modules to help clients decode the incoming streams, but are not sent to the Substreams server in network requests.
+Protobufs are packaged with the modules to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
 
-Refer to [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
+Refer to the [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
 ### Binaries
 
@@ -182,7 +182,7 @@ Excerpt pulled from the example Substreams manifest.
 
 The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply to the `package.name` field.
 
-It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Each package should have a unique name.
+It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Packages need to use unique names.
 
 {% hint style="info" %}
 _Note: `modules[].name` also corresponds to the **name of the Rust function** that will be invoked on the compiled WASM code upon execution. It is the same function that will be defined. `#[substreams::handlers::map]`(or`store`) in your Rust code._
@@ -256,11 +256,11 @@ inputs:
     - map: my_map
 ```
 
-`inputs` is a list of _input_ structures. For each object, one of three keys is required. The inputs key types are:
+The `inputs` field is a list of _input_ structures. One of three keys is required for every object. The `inputs` key types are:
 
-* `source,`
-* `store` (also used to define `mode` keys),
-* and `map`.
+* `source`
+* `store,` also used to define `mode` keys
+* `map`
 
 #### `modules[].output`
 

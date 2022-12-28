@@ -110,7 +110,7 @@ The first unknown is the system that you are compiling on, and the second is the
 
 “Compile on almost any machine, run on almost any machine.”
 
-Additional information is available at the following link.
+Additional information is available in this Github issue for WASM-bindgen:
 
 [https://github.com/rustwasm/wasm-bindgen/issues/979](https://github.com/rustwasm/wasm-bindgen/issues/979)
 

@@ -129,7 +129,7 @@ Take a moment to explore the codebase. Note the chain name used through the diff
 
 Also notice the module handler, defined in [lib.rs](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs), and the custom protobuf definition in the proto directory named [basicexample.proto](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto).
 
-Note that the module handler in the lib.rs file for the Ethereum example has code specific to the blockchain being targeted. The block structure for Ethereum blocks is viewable in the following code excerpt.
+Note that the module handler in the lib.rs file for the Ethereum example has code specific to the blockchain being targeted. The block structure for Ethereum blocks is viewable in the code excerpt.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
@@ -142,7 +142,7 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 ```
 {% endcode %}
 
-The steps to follow for using the example include the following:&#x20;
+The steps to follow for using the example include:&#x20;
 
 * running the command to generate the required protobufs,
 * using the Rust compiler to compile the example,&#x20;
@@ -198,7 +198,7 @@ fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExam
 
 Follow the same steps used for the Ethereum example for the Solana example.
 
-When issuing the following command to run the Solana example take note of the different endpoint, map module name, and manifest filename.
+Take note of the different endpoint, map module name, and manifest filename in the command:
 
 {% code overflow="wrap" %}
 ```basic

@@ -11,7 +11,7 @@ To begin creating the custom module handlers initialize a new Rust project.
 cargo init --lib
 ```
 
-Update the generated `Cargo.toml` file to match the following.
+Update the generated `Cargo.toml` file using:
 
 {% code title="Cargo.toml" %}
 ```rust
@@ -58,7 +58,7 @@ The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org
 
 ### **Cargo.toml breakdown**
 
-To build the Rust dynamic system library, after the `package`, specify the following.
+To build the Rust dynamic system library, after the `package`, using:
 
 ```rust
 ...
@@ -145,7 +145,7 @@ Next, add a Rust build script.
 * To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
 {% endhint %}
 
-Create a `build.rs` file in the root of the Substreams project using the following code.
+Create a `build.rs` file in the root of the Substreams project using:
 
 {% code title="build.rs" %}
 ```rust
@@ -162,7 +162,7 @@ fn main() -> Result<(), anyhow::Error> {
 ```
 {% endcode %}
 
-View this file in the repo by visiting the following link.
+View this file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/build.rs](https://github.com/streamingfast/substreams-template/blob/develop/build.rs)
 

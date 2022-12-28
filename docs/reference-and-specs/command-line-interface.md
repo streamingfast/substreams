@@ -9,7 +9,11 @@ The Substreams command line interface (CLI) is the user interface and main tool 
 The Substreams CLI exposes many commands to developers enabling a range of features. Commands are explained in further detail.
 
 {% hint style="info" %}
-**Note**: When a package is specified it's possible to use any of the following: local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL.
+**Note**: When a package is specified it's possible to use:&#x20;
+
+* a local `substreams.yaml` file
+* a local `.spkg`&#x20;
+* or a remote `.spkg` URL
 {% endhint %}
 
 ### **`run`**
@@ -54,7 +58,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 Notice the `-o` (or `--output`), which will alter the output format. The options are:
 
 * `ui`, a nicely formatted, UI-driven interface, that displays progress information and execution logs.
-* `json`, an indented stream of data, that does not display progress information or logs, only data output for blocks following the start block.
+* `json`, an indented stream of data, that does not display progress information or logs, only data output for blocks proceeding the start block.
 * `jsonl`, same as `json` showing every individual output on a single line.
 
 ### `pack`

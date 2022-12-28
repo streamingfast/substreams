@@ -69,7 +69,7 @@ yarn install
 To start the Docker containers for PostgreSQL and the IPFS node, run the `up.sh` shell script included in the `graph-node-dev` repository.
 
 {% hint style="info" %}
-**Note**: The `-c` flag can be added when running the up.sh shell script to clean any persistent folders for PostgreSQL, IPFS nodes, and other similar services before starting them.
+**Note**: The `-c` flag can be added when running the up.sh shell script to clean any persistent directories for PostgreSQL, IPFS nodes, and other similar services before starting them.
 {% endhint %}
 
 ```bash

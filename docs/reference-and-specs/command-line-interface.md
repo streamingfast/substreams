@@ -4,7 +4,7 @@ description: StreamingFast Substreams command line interface (CLI)
 
 # Substreams CLI reference
 
-The Substreams command line interface (CLI) is the user interface and main tool for using Substreams.
+The Substreams command line interface (CLI) is the user interface and central access point for using Substreams.
 
 The Substreams CLI exposes many commands to developers enabling a range of features. Each command is explained in further detail.
 
@@ -100,7 +100,7 @@ Hash: 11fd70768029bebce3741b051c15191d099d2436
 The `graph` command prints out a visual graph of the package in the _mermaid-js_ format.
 
 {% hint style="info" %}
-**Note**: see [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor.
+_Note: see_ [_https://mermaid.live/_](https://mermaid.live/) _for a live mermaid-js editor._
 {% endhint %}
 
 ````bash
@@ -116,10 +116,10 @@ graph TD;
 ```
 ````
 
-The code will create a graphic similar to
+The code will a graphic similar to
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
-Mermaid generated graph diagram
+Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to edit mode.
 {% endembed %}
 
 ### `inspect`

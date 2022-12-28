@@ -213,7 +213,7 @@ Ordinal represents the order in which the `store` operations will be applied.
 
 The `store` handler will be called once per `block.`
 
-During execution, the `add` operation may be called multiple times, for multiple reasons, such as finding a relevant event or seeing a call that triggered a method call.
+During execution, the `add` operation can be called multiple times, for multiple reasons, such as finding a relevant event or seeing a call that triggered a method call.
 
 Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 

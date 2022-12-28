@@ -6,7 +6,7 @@ description: Get off the ground using Substreams by StreamingFast
 
 ## Authentication
 
-Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io).
+Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io)
 
 Get an API **Token** using:
 
@@ -178,7 +178,7 @@ Clone or download the Solana example codebase. Find the example in the official 
 
 [https://github.com/streamingfast/substreams-solana-tutorial](https://github.com/streamingfast/substreams-solana-tutorial)
 
-After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example should begin to stand out immediately.
+After cloning the Solana example, take a moment to look through the repository. Key differences from the Ethereum example should begin to stand out immediately.
 
 A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
 
@@ -208,7 +208,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yam
 
 ## **Next steps**
 
-The takeaways at this point are:
+The key takeaways at this point are:
 
 1. Substreams is platform independent and is used across many different blockchains.
 2. Block data for individual blockchains follows a different structure and model.

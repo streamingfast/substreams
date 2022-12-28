@@ -115,7 +115,7 @@ You're ready to run `graph-node` at this stage.&#x20;
 Run `graph-node` from its root directory. The `config/graph-node.eth-ropsten.toml` configuration file references the `graph-node` repository directory. Update the paths accordingly.
 
 {% hint style="info" %}
-**Note**: To successfully connect to the Firehose and Substreams services, you may need to set up certain system environment variables, such as `STREAMING_FAST_API_TOKEN`.
+**Note**: To successfully connect to the Firehose and Substreams services, you might need to set up certain system environment variables, such as `STREAMING_FAST_API_TOKEN`.
 {% endhint %}
 
 Start up `graph-node` using:

@@ -4,7 +4,7 @@ description: StreamingFast Substreams module handler creation
 
 # Module handler creation
 
-After the ABI and `Protobuf` Rust code has been generated the handler code needs to be written. The code should be saved into the `src` directory and use the filename `lib.rs.`
+After generating the ABI and Protobuf Rust code, you need to write the handler code. Save the code into the `src` directory and use the filename `lib.rs`.
 
 {% code title="src/lib.rs" overflow="wrap" lineNumbers="true" %}
 ```rust
@@ -118,11 +118,10 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 ```
 
 {% hint style="info" %}
-**Note**: **Rust Macros**
+**Note**: **Rust macros**
 
-Notice the `#[substreams::handlers::map]` on top of the function? It's a Rust "_macro_" provided by the Substreams crate.
-
-The macro decorates the handler function as a map. Store modules are specified using the syntax: `#[substreams::handlers::store]`
+* Did you notice the `#[substreams::handlers::map]` on top of the function? It is a Rust "macro" provided by the `Substreams` crate.
+* The macro decorates the handler function as a map. Store modules are specified using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
 The goal of the `map` being built is for extracting ERC721 transfers from a given block.
@@ -184,11 +183,10 @@ fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
 
 {% hint style="info" %}
-**Note**: **Store Types**
+**Note**: **Store types**
 
-The last parameter of a `store` module function should always be the writable store itself.
-
-The type of the writable store is based on the `store` module `updatePolicy` and `valueType`.
+* The writable store should always be the last parameter of a store module function.
+* The type of the writable store is determined by the `updatePolicy` and `valueType` of the store module.
 {% endhint %}
 
 The goal of the `store` in this example is to track a holder's current NFT count for the contract supplied. This tracking is achieved through the analysis of transfers.

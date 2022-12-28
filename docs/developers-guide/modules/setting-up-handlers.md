@@ -139,10 +139,11 @@ Insert the contract ABI JSON file in the Substreams project in an `abi` director
 Next, add a Rust build script.
 
 {% hint style="info" %}
-**Note: Rust build script**
+**Note: Rust Build Script**
 
-* Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process and can perform a variety of tasks.
-* To cause Cargo to compile and execute a script before building a package, place a file called `build.rs` in the root of the package.
+Before a package is built, Cargo will compile a build script into an executable (if it has not already been built). It will then run the script, which may perform any number of tasks.
+
+Placing a file named `build.rs` in the root of a package will cause Cargo to compile that script and execute it before building the package.
 {% endhint %}
 
 Create a `build.rs` file in the root of the Substreams project using the following code.
@@ -172,7 +173,7 @@ Run the build script to generate the ABI directory and files.
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-Create a `mod.rs` file in the abi directory (that was created by the Rust build process) to export the generated Rust code.
+Next, create a `mod.rs` file in the abi directory (that was created by the Rust build process) to export the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
 ```rust
@@ -184,4 +185,4 @@ View this file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs)
 
-The next step is to [write the module handlers](writing-module-handlers.md).
+The next step in the Substreams setup process is to write the actual module handlers themselves.

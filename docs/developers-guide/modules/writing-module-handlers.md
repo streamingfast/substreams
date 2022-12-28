@@ -71,9 +71,9 @@ View this file in the repository:
 
 ### **Module handler breakdown**
 
-The logical sections of the `lib.rs` file are outlined and described in greater detail.
+Each logical section of the `lib.rs` file is outlined and described in greater detail.
 
-Imports the necessary modules.
+Import the necessary modules.
 
 ```rust
 mod abi;
@@ -84,13 +84,13 @@ use substreams::{log, store, Hex};
 use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS, Event};
 ```
 
-Store the tracked contract in the example in a `constant`.
+Store the contract being tracked in the example as a `constant`.
 
 ```rust
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 ```
 
-Defines the `map` module.
+Define the `map` module. Here is the module definition from the example Substreams manifest.
 
 ```yaml
 - name: map_transfers
@@ -102,15 +102,13 @@ Defines the `map` module.
     type: proto:eth.erc721.v1.Transfers
 ```
 
-Notice the: `name: map_transfers`. This name should correspond to the handler function name.
+Notice the: `name: map_transfers`. This name should correspond to our handler function name.
 
-Also notice, there is one input and one output definition.
+Also notice, there is one input and one output defined.
 
-The input uses the standard Ethereum Block, `sf.ethereum.type.v2.Block,` provided by the `substreams-ethereum` crate.
+The input has a type of `sf.ethereum.type.v2.Block`, a standard Ethereum block provided by the `substreams-ethereum` crate.
 
-The output is uses the type `proto:eth.erc721.v1.Transfers`. which is a custom protobuf definition provided by the generated Rust code.&#x20;
-
-The following function signature is produced:
+The output is typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code. Resulting in the following function signature.
 
 ```rust
 #[substreams::handlers::map]
@@ -122,11 +120,11 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 {% hint style="info" %}
 **Note**: **Rust macros**
 
-* Did you notice the `#[substreams::handlers::map]` on top of the function? It is a Rust "macro" provided by the Substreams crate.
+* Did you notice the `#[substreams::handlers::map]` on top of the function? It is a Rust "macro" provided by the `Substreams` crate.
 * The macro decorates the handler function as a map. Store modules are specified using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The `map` extracts ERC721 transfers from a Block. This is accomplished by finding all the `Transfer` events that are emitted by the tracked contract. As events are found they will be decoded into `Transfer` objects.
+The goal of the `map` being built is for extracting ERC721 transfers from a given block. It is accomplished by finding all the `Transfer` events that are emitted by the tracked contract. As events are found they will be decoded into `Transfer` objects.
 
 ```rust
 /// Extracts transfers events from the contract
@@ -201,11 +199,7 @@ If the `from` address field and the `to` address field is not a null address, th
 
 ### Store concepts
 
-When writing to a store, there are three concepts to consider that include:&#x20;
-
-* `ordinal`
-* `key`
-* `value`
+When writing to a store, there are three concepts to consider that include `ordinal`, `key` and `value`. Additional information for each is provided.
 
 #### Ordinal
 

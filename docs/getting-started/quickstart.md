@@ -47,7 +47,7 @@ Substreams is platform independent, meaning it's possible to use many different 
 
 Developers will typically target a specific blockchain and build a Substreams module targeted toward the chosen chain.&#x20;
 
-Data is available for any blockchain that has a functional Firehose endpoint, either installed and [set up on-premise](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
+Data is available for any blockchain that has a functional Firehose endpoint, installed and [set up on-premise](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
 
 {% hint style="info" %}
 **Note**: The remaining documentation assumes the Substreams CLI and all other required dependencies have been installed and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;

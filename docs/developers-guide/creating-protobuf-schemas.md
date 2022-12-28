@@ -108,7 +108,7 @@ View this file in the repository:
 
 ### Protobuf and Rust optional fields
 
-Protocol buffers define fields' type using either standard primitive data types, such as integers, booleans, and floats, view a [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types, or a complex data type such as `message`, `enum`, `oneof` or `map`.
+Protocol buffers define fields' type using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the Google Protocol Buffers documentation.
 
 Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. For fields that reference other complex `messages` Rust generates the corresponding `message` type wrapped with an `Option` enum type, and will use the `None` variant if the field is not present in the message.
 

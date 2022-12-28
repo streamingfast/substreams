@@ -6,7 +6,7 @@ description: StreamingFast Substreams command line interface (CLI)
 
 The Substreams command line interface (CLI) is the user interface and main tool for using Substreams.
 
-The Substreams CLI exposes many commands to developers enabling a range of features. Commands are explained in further detail.
+The Substreams CLI exposes many commands to developers enabling a range of features. Each command is explained in further detail.
 
 {% hint style="info" %}
 **Note**: When a package is specified it's possible to use any of the following: local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL.
@@ -55,7 +55,7 @@ Notice the `-o` (or `--output`), which will alter the output format. The options
 
 * `ui`, a nicely formatted, UI-driven interface, that displays progress information and execution logs.
 * `json`, an indented stream of data, that does not display progress information or logs, only data output for blocks following the start block.
-* `jsonl`, same as `json` showing every individual output on a single line.
+* `jsonl`, same as `json` displaying each output on a single line.
 
 ### `pack`
 

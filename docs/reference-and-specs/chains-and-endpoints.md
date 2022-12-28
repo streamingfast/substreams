@@ -6,14 +6,14 @@ description: StreamingFast Substreams chains and endpoints
 
 ## Supported blockchains and protobuf models
 
-Protobuf definitions and public endpoints are provided for each of the supported protocols and chains below.&#x20;
+Protobuf definitions and public endpoints are provided for each of the supported protocols and chains.&#x20;
 
 {% hint style="success" %}
 **Tip**: All of the endpoints listed on this page require [authentication](authentication.md) before use.
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_:_ Endpoints serve protobuf models specific to the underlying protocol and must match the `source:` field for the module. _Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint **is not an option**._
+**Important**_:_ Endpoints serve protobuf models specific to the underlying protocol and must match the `source:` field for the module. _Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint **does not work**._
 {% endhint %}
 
 | Blockchain Protocol | Proto model                                                                                                                                     | Latest package                                                                                                        |

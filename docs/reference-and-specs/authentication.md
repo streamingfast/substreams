@@ -43,12 +43,12 @@ By default the `substreams run` command will check the `SUBSTREAMS_API_TOKEN` en
 {% hint style="info" %}
 **Note**_:_ **Authentication Token Env Flag**
 
-By default, the `substreams run` command uses an environment variable for the authentication token. You can specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
+By default, the `substreams run` command uses an environment variable for the authentication token. It's possible to specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
 {% endhint %}
 
 ### Environment variable script
 
-The following `bash` function can be run from the command line to obtain a token. The function is placed in the `.bashrc` file, located in your computer's home directory.&#x20;
+Run the `bash` function from the command line to obtain a token. The function will be placed in the `.bashrc` file, located in your computer's home directory.&#x20;
 
 ```bash
 # Ask us on Discord for a key

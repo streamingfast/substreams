@@ -4,10 +4,10 @@ description: StreamingFast Substreams module types
 
 # Module types
 
-Substreasms has two types of modules, `map` and `store`.&#x20;
+Substreams uses two types of modules, `map` and `store`.&#x20;
 
-* Map modules are simple functions, that receive bytes as input, an output bytes. These bytes are encoded protobuf messages.
-* Store modules are stateful, saving and tracking data through the use of simple key-value stores.
+* Map modules are functions that receive bytes as input and output. These bytes are encoded protobuf messages.
+* Store modules are stateful, saving and tracking data through the use of key-value stores.
 
 ### Store modules
 
@@ -32,15 +32,15 @@ The two important store properties are `valueType,`and `updatePolicy`.
 
 The `valueType` property instructs the Substreams runtime of the data that will be saved to the `stores`.
 
-| Value                          | Description                                                                      |
-| ------------------------------ | -------------------------------------------------------------------------------- |
-| `bytes`                        | A simple list of bytes                                                           |
-| `string`                       | A UTF-8 string                                                                   |
-| `proto:fully.qualified.Object` | Bytes that can be decoded using the protobuf definition `fully.qualified.Object` |
-| `int64`                        | A string-serialized integer, that uses int64 arithmetic operations               |
-| `float64`                      | A string-serialized floating point value, using float64 arithmetic operations    |
-| `bigint`                       | A string-serialized integer, with precision of any depth                         |
-| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits      |
+| Value                          | Description                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `bytes`                        | A simple list of bytes                                                        |
+| `string`                       | A UTF-8 string                                                                |
+| `proto:fully.qualified.Object` | Decode bytes using the protobuf definition `fully.qualified.Object`           |
+| `int64`                        | A string-serialized integer, that uses int64 arithmetic operations            |
+| `float64`                      | A string-serialized floating point value, using float64 arithmetic operations |
+| `bigint`                       | A string-serialized integer, with precision of any depth                      |
+| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits   |
 
 #### `updatePolicy` property
 
@@ -60,19 +60,20 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 
 
 {% hint style="info" %}
-_**Note**: all update policies provide the `delete_prefix` method._
+**Note**: all update policies provide the `delete_prefix` method.
 {% endhint %}
 
 {% hint style="info" %}
-**Note**_**:** The **merge strategy** is applied **during** parallel processing. A module that has built two partial stores with keys for segment A, blocks 0-1000, and a contiguous segment B, blocks 1000-2000, and is ready to merge those two partial stores to make it a complete store._
+**Note**_**:** _ The **merge strategy** is applied **during** parallel processing.&#x20;
 
-_The complete store will be represented as if processing had been done linearly, that is processing from block 0 up to 2000 linearly._
+* A module has built two partial stores containing keys for segment A (blocks 0-1000) and segment B (blocks 1000-2000) and is now prepared to merge them into a complete store.
+* The complete store will be represented as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_**:** To preserve the parallelization capabilities of the system Substreams can never read what it has written or read from a store that is being written._
+**Important**_**:** _ To preserve the parallelization capabilities of the system, Substreams is not permitted to read what it has written or read from a store that is being written.
 
-_To read from a store a downstream module is created with one of its inputs pointing to the store module's output._
+A downstream module is created to read from a store by using one of its inputs to point to the output of the store module.
 {% endhint %}
 
 ### Ordinals
@@ -82,31 +83,29 @@ Ordinals allow a key/value store to have multiple versions of a key within a sin
 For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
 {% hint style="warning" %}
-**Important**: Ordinals _**must be set each time a key is set**_ and _**keys can only be set in increasing ordinal order**_, or with an ordinal equal to the previous.
+**Important**: Ordinals _**must be set each time a key is set**_ and _**it's only possible to set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-For scenarios that require only a single key per block, and ordering in the store isn't important, the ordinal can simply use a zero value.
+In situations where a single key per block is required and ordering in the store is not important, the ordinal will use a value of zero.
 
 ### Store modes
 
-Data can be consumed in one of two modes when declaring a `store` as an input to a module.
+It's possible to consume data in one of two modes when declaring a `store` as an input to a module.
 
 #### `get Mode`
 
-Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. The `stores` can be readily queried by methods such as `get_at`, `get_last` and `get_first.`&#x20;
+Get mode provides the module with the _key/value_ store guaranteed to be in sync up to the block being processed. Readily query `stores` using the `get_at`, `get_last` and `get_first` methods.
 
 {% hint style="success" %}
-**Tip:** Lookups are local, in-memory, and extremely fast!
+**Tip:** Lookups are local, in-memory, and extremely high-speed!
 {% endhint %}
 
 {% hint style="info" %}
 **Note:** Store method behavior is defined as:
 
-The `get_last` method is the fastest because it queries the store directly.&#x20;
-
-The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
-
-The `get_at` method will unwind deltas up to a certain ordinal. This ensures values for keys set midway through a block can still be accessed.
+* The `get_last` method is the fastest because it queries the store directly.&#x20;
+* The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+* The `get_at` method will unwind deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
 {% endhint %}
 
 #### `deltas mode`
@@ -114,5 +113,5 @@ The `get_at` method will unwind deltas up to a certain ordinal. This ensures val
 Deltas mode provides the module with _all_ _the_ _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys mutated during that specific block become available.
 
 {% hint style="info" %}
-**Note:** When a store is set as an input to the module, it is read-only and cannot be modified, updated, or mutated in any way.
+**Note:** When a `store` is set as an input to the module, it is read-only and it's not possible to modify, update or mutate them.
 {% endhint %}

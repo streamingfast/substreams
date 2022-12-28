@@ -6,13 +6,13 @@ description: Working with StreamingFast Substreams sinks
 
 ## **Introduction**
 
-The data captured from a blockchain with Substreams can be routed to multiple types of sinks. A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data can be routed anywhere a developer can imagine.
+It's possible to route the data captured from a blockchain with Substreams to multiple types of sinks. A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data and it's possible to route data anywhere a developer is able to imagine.
 
 StreamingFast provides a few examples, libraries, and tools to assist Substreams developers with routing blockchain data to sinks.
 
 ## **Basics**
 
-Data captured and processed by Substreams can be stored in many different ways through sinks. A Substreams developer’s imagination is really the only limitation. Immediate and typical storage types can be a database or flat files however Substreams data can be piped into other locations required by a new or existing application or architecture.
+Databases and flat files are standard storage types however it's possible to pipe Substreams data into other locations required by a new or existing application or architecture.
 
 An important design aspect of Substreams is the decision to rely on Google Protocol Buffers, also called protobufs, for data packaging and transmission. Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to working with data that is passed from one application to another. The platform-independent, data-centric capabilities of protobufs give developers the opportunity to package and route data captured by Substreams to other sources, including sinks.
 
@@ -36,13 +36,13 @@ An understanding of basic Substreams fundamentals is expected before continuing.
 
 ## **Existing and community sinks**
 
-StreamingFast values external contributions for Substreams sinks. If your team has created a sink, please contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so we can add it to the documentation!
+StreamingFast values external contributions for Substreams sinks. If your team has created a sink, please contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so it will be included in the Substreams documentation!
 
 The `substreams-eth-block-meta` example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
 
 [https://github.com/streamingfast/substreams-eth-block-meta](https://github.com/streamingfast/substreams-eth-block-meta)
 
-StreamingFast provides several tools to assist Substreams developers interested in persisting data to databases. Each tool can be found in its official GitHub repository.
+StreamingFast provides several tools to assist Substreams developers interested in persisting data to databases. Each tool is located in its official GitHub repository.
 
 **PostgreSQL**
 
@@ -58,16 +58,16 @@ StreamingFast provides several tools to assist Substreams developers interested 
 
 ## **Build a sink**
 
-StreamingFast provides tools allowing developers to route blockchain data to a few different types of data storage sinks, or means of ingestion. The types of sinks with tools provided by StreamingFast aren’t the only options for Substreams developers. Existing applications, databases, and other tools can be fed by blockchain data captured and output by Substreams.
+StreamingFast provides tools allowing developers to route blockchain data to a few different types of data storage sinks, or means of ingestion. The types of sinks with tools provided by StreamingFast aren’t the only options for Substreams developers. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
 
 {% hint style="success" %}
-**Tip**: Developers can get inspiration on how to write their own sink by looking at sinks provided by StreamingFast, today. One example could be a database, such as Oracle, that does not have tools in place. Developers can look at the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
+**Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example could be a database, such as Oracle, that does not have Substreams sink tools in place. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
 {% endhint %}
 
 Protobufs are designed by the developer. The protobufs are used to transfer data out of Substreams to the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling developers to capture, further process, use and store data provided by Substreams in a myriad of different capacities.
 
 {% hint style="info" %}
-**Note**: Through careful design of the Substreams manifest, modules, and protobufs developers can craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
+**Note**: Through careful design of the Substreams manifest, modules, and protobufs developers will be able to craft their output data in many ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
 {% endhint %}
 
 Developers need to examine and account for the format and any requirements of the end target they want their data routed. The specifics of how data is ingested by the targeted sink will determine the design of the output from Substreams.

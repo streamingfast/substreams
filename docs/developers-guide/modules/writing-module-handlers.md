@@ -124,9 +124,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 * The macro decorates the handler function as a map. Store modules are specified using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The goal of the `map` being built is for extracting ERC721 transfers from a given block.
-
-This can be achieved by finding all the `Transfer` events that are emitted by the tracked contract. As events are found they will be decoded into `Transfer` objects.
+The goal of the `map` being built is for extracting ERC721 transfers from a given block. It is accomplished by finding all the `Transfer` events that are emitted by the tracked contract. As events are found they will be decoded into `Transfer` objects.
 
 ```rust
 /// Extracts transfers events from the contract

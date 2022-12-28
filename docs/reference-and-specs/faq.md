@@ -4,7 +4,7 @@ description: StreamingFast Substreams frequently asked questions
 
 # FAQ
 
-### **What is Substreams?**
+### is **What is Substreams?**
 
 Substreams is an exceptionally powerful processing engine capable of consuming streams of rich blockchain data. Substreams refines and shapes the data for painless digestion by end-user applications, such as decentralized exchanges.
 
@@ -12,13 +12,13 @@ Substreams is an exceptionally powerful processing engine capable of consuming s
 
 Developers do not need a dedicated installation of Firehose to use Substreams. StreamingFast provides a public Firehose endpoint made available to developers.
 
-### **Can I use Substreams in my subgraph?**
+### **Is it possible to use Substreams in my subgraph?**
 
 Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for using graph-node and subgraphs.
 
 [https://substreams.streamingfast.io/reference-and-specs/graph-node-setup](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup)
 
-### **Can I use Substreams for production deployments?**
+### **Is it possible to use Substreams for production deployments?**
 
 No, Substreams is provided as a developer preview.
 
@@ -46,7 +46,7 @@ The Substreams documentation also provides general instructions surrounding auth
 
 ### **How do I create a Substreams implementation?**
 
-Developers can create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground that has examples to use as a reference and starting point.
+Developers will create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground that has examples to use as a reference and starting point.
 
 [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
 
@@ -64,13 +64,13 @@ Additional information is available on the What is Substreams page in the docume
 
 ### **Is Substreams free?**
 
-Yes, Substreams is an open-source project and available to the public for free.
+Yes, Substreams is an open-source project and is available to the public for free.
 
 ### **How does a developer reach the information returned from a call to Substreams from a web-based UI?**
 
 Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 
-### Can I listen for new blocks using Substreams?
+### Is it possible to listen for new blocks using Substreams?
 
 Specifying a stop block value of zero (0), the default enables transparent handoff from historical to real-time blocks.
 
@@ -94,11 +94,11 @@ Yes! Find StreamingFast on their official YouTube account.
 
 ### **Who is dfuse?**
 
-StreamingFast was originally called dfuse. The company changed the name and is in the process of phasing the old brand out.
+StreamingFast was originally called dfuse. The company changed its name and is in the process of phasing the old brand out.
 
 ### What is Sparkle?
 
-Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). Substreams enables greater composability, yet provides similar powers of parallelization. Sparkle is deprecated.
+Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). Substreams enables greater composability, and provides similar powers of parallelization. Sparkle is deprecated.
 
 ### **Who is StreamingFast?**
 

@@ -37,20 +37,20 @@ Developers create the data transformation strategies in Substreams “[module ha
 The Substreams engine runs the code defined by developers in the Rust-based module handlers.&#x20;
 
 {% hint style="info" %}
-**Note**: _**Substreams modules have a uni-directional flow of data**_. The data can be passed from one module to another, but only in a single direction.&#x20;
+**Note**: _**Substreams modules have a uni-directional flow of data**_. Data is passed from one module to another, but only in a single direction.&#x20;
 {% endhint %}
 
-The flow of data is defined in the [Substreams manifest](../reference-and-specs/manifests.md) through the “inputs” and “outputs” fields of the configuration file. These fields generally reference the protobuf definitions for the targeted blockchain data. The flow of data can also be defined using the “inputs” field to send data directly from one module to another.
+The flow of data is defined in the [Substreams manifest](../reference-and-specs/manifests.md) through the “inputs” and “outputs” fields of the configuration file. These fields generally reference the protobuf definitions for the targeted blockchain data. The flow of data is also defined using the “inputs” field to send data directly from one module to another.
 
 ### **What is a Substreams DAG?**
 
 Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).&#x20;
 
 {% hint style="info" %}
-_**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs; a one directional flow._
+**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs. DAGs work through a one directional flow.
 {% endhint %}
 
-The Substreams manifest references the modules, the handlers defined within them, and lays out the intention of how each is used by the Substreams engine.&#x20;
+The Substreams manifest references the modules, and the handlers defined within them and forms the intention of how each is used by the Substreams engine.&#x20;
 
 Directed acyclic graphs contain nodes, in this case, modules, that communicate in only one direction, passing from one node, or module, to another.
 
@@ -74,7 +74,7 @@ View the Rust module handlers in the lib.rs file:
 **Note:** _Protobufs include the names of the data objects and the fields contained and accessible within them._&#x20;
 {% endhint %}
 
-Many of the protobuf definitions have already been created, such as the [erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), that can be used by developers creating Substreams data transformation strategies.
+Many of the protobuf definitions have already been created, such as the [erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), that are used by developers creating Substreams data transformation strategies.
 
 Custom smart contracts targeted by developers, such as [UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), will have protobuf definitions that have already been created for them by others. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
 

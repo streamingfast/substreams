@@ -19,13 +19,13 @@ description: StreamingFast Substreams benefits and comparisons
 ### Benefits&#x20;
 
 * **Store and process blockchain data**\
-  Substreams employs extremely powerful parallelization techniques to process huge, ever-growing blockchain histories. It can then be used to populate any kind of data store or real-time system.
+  Substreams uses advanced parallelization techniques to efficiently process large, constantly expanding blockchain histories. The processed data is then available for populating various types of data stores or real-time systems.
 * **Streaming-first**\
   Substreams inherit from the extremely low latency extraction provided by the underlying Firehose, making it the fastest blockchain indexing technology on the market.
 * **Save time and money**\
-  Substreams can be scaled horizontally resulting in a massive reduction of processing time, saving wait time and lost opportunities.
+  It's possible to horizontally scale Substreams, significantly reducing processing time and increasing efficiency by reducing wait time and missed opportunities.
 * **Community effort and composability**\
-  Communities can combine Substreams modules to form compounding levels of data richness and refinement.
+  Communities are able to combine Substreams modules to form compounding levels of data richness and refinement.
 * **Protobuf**\
   ****Substreams uses the power of the protobuf ecosystem, for data modeling and integration for a large number of programming languages.
 * **Rust**\
@@ -35,9 +35,9 @@ description: StreamingFast Substreams benefits and comparisons
 
 ### Comparison to other engines
 
-Substreams is a streaming engine, that can be compared to Fluvio, Kafka, Apache Spark, RabbitMQ, and other such technologies, where a blockchain node (a deterministic data source) acts as the _producer_.
+Substreams is a streaming engine similar to Fluvio, Kafka, Apache Spark, and RabbitMQ, where a blockchain node serving as a deterministic data source acts as the producer.
 
-It has a logs-based architecture, Firehose, and allows for user-defined custom code to be sent to Substreams, for streaming and/or ad hoc querying of the available data.
+Substreams has a logs-based architecture through Firehose, which allows users to send custom code for streaming and ad hoc querying of the available data.
 
 ### **Other features**
 
@@ -55,7 +55,7 @@ Substreams is horizontally scalable presenting the opportunity to reduce the pro
 
 #### Substreams and Firehose
 
-Substreams has all the benefits of Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+Substreams has all the benefits of Firehose, including low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
 The Substreams _engine_ is completely platform-independent of underlying blockchain protocols and works solely on data extracted from nodes using the Firehose.
 

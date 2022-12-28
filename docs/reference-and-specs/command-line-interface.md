@@ -4,12 +4,12 @@ description: StreamingFast Substreams command line interface (CLI)
 
 # Substreams CLI reference
 
-The Substreams command line interface (CLI) is the user interface and central access point for using Substreams.
+The Substreams command line interface (CLI) is the user interface and main tool for using Substreams.
 
 The Substreams CLI exposes many commands to developers enabling a range of features. Each command is explained in further detail.
 
 {% hint style="info" %}
-**Note**: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL.
+**Note**: When a package is specified it's possible to use any of the following: local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL.
 {% endhint %}
 
 ### **`run`**
@@ -25,9 +25,9 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 
 #### Run Command breakdown
 
-* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running our Substreams
-* `-t +1` (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
-* `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
+* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
+* `-t +1` (or `--stop-block`) only requests a single block (the stop block will be the manifest's `initialBlock` + 1)
+* `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). It's possible to use a `.spkg` or `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
 Passing a different `-s` (or `--start-block`) will run any prior modules at high speed. This provides output at the requested start block while keeping snapshots along the way, in case you want to process it again.
@@ -51,7 +51,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 ...
 ```
 
-Notice the `-o` (or `--output`), which can alter the output format. The options are:
+Notice the `-o` (or `--output`), which will alter the output format. The options are:
 
 * `ui`, a nicely formatted, UI-driven interface, that displays progress information and execution logs.
 * `json`, an indented stream of data, that does not display progress information or logs, only data output for blocks following the start block.
@@ -100,7 +100,7 @@ Hash: 11fd70768029bebce3741b051c15191d099d2436
 The `graph` command prints out a visual graph of the package in the _mermaid-js_ format.
 
 {% hint style="info" %}
-_Note: see_ [_https://mermaid.live/_](https://mermaid.live/) _for a live mermaid-js editor._
+**Note**: see [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor.
 {% endhint %}
 
 ````bash
@@ -116,10 +116,10 @@ graph TD;
 ```
 ````
 
-The code will a graphic similar to
+The code will create a graphic similar to
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
-Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to edit mode.
+Mermaid generated graph diagram
 {% endembed %}
 
 ### `inspect`

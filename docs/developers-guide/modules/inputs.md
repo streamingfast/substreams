@@ -4,7 +4,11 @@ description: StreamingFast Substreams module inputs
 
 # Inputs
 
-Modules can receive inputs of three types: `source`, `map`, and `store`.
+Modules receive inputs of three types:&#x20;
+
+* `source`
+* `map`
+* `store`
 
 ## Input type `source`
 
@@ -46,7 +50,7 @@ An Input of type `map` represents the output of another `map` module.&#x20;
 The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
 
 {% hint style="warning" %}
-**Important**_**:** _ Map modules _**cannot depend on themselves**_. Modules that attempt to do so create what's called a circular dependency, and is not wanted.
+**Important**_**:** _ It's not possible for __ Map modules _**to depend on themselves**_. When modules depend on themselves they create a circular dependency.
 {% endhint %}
 
 The `map` inputs type __ is defined in the Substreams manifest. The name of the map is chosen by the developer and is representative of the logic contained within.
@@ -64,14 +68,14 @@ An Input of type `store` represents the state of another store used with the Sub
 
 The `store` inputs type __ is defined in the Substreams manifest. Similar to maps, stores are named appropriately, indicating the logic contained within them.
 
-Store modules are set to `get` mode by default as illustrated in the manifest code excerpt.
+Store modules are set to `get` mode by default using:
 
 ```yaml
   inputs:
     - store: my_store # defaults to mode: get
 ```
 
-Alternatively, stores can be set to deltas mode as illustrated in the manifest code excerpt.
+Alternatively, set `stores` to `deltas` mode using:
 
 ```yaml
   inputs:
@@ -81,7 +85,7 @@ Alternatively, stores can be set to deltas mode as illustrated in the manifest c
 
 ### Module modes
 
-There are **two modes** that can be defined for modules.
+There are **two modes** defined for modules.
 
 * `get`
 * `delta`

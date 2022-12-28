@@ -65,14 +65,14 @@ The ERC721 smart contract associated with the Substreams Template example contai
 The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.
 
 {% hint style="success" %}
-**Tip**: Protobufs are platform-independent and can be defined and used for various blockchains. The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications. The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
+**Tip**: Protobufs are platform-independent and are defined and used for various blockchains. The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications. The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
 {% endhint %}
 
 {% hint style="info" %}
 **Note**: The Substreams Template example targets Transfer events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
 {% endhint %}
 
-Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers can create more refined and complex protobufs based on the many custom data types that exist in the blockchain they are targeting.
+Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers will create more refined and complex protobufs based on the many custom data types that exist in the blockchain they are targeting.
 
 {% hint style="success" %}
 **Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
@@ -116,7 +116,7 @@ Any primitive data types in a message will generate the corresponding Rust type,
 
 The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field containing a value and a field that has not been set. The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
 
-is The Rust `match` keyword can be used to compare the value of an `Option` with a `Some` or `None` variant. Here is a code snippet that can be used to deal with a type wrapped in an `Option`:
+The Rust `match` keyword is used to compare the value of an `Option` with a `Some` or `None` variant. Handle a type wrapped `Option` using:
 
 ```rust
 match person.Location {

@@ -38,10 +38,10 @@ Find pre-built Substreams here:
 
 <img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
 
-Substreams can be viewed from two perspectives as illustrated in the high-level visual diagram:
+Substreams is viewable from two perspectives as illustrated in the high-level visual diagram:
 
-1. The Substreams engine perspective.
-2. The end-user developer and consumer perspective.
+1. The perspective of the Substreams engine.
+2. The perspective of the end-user developer and consumer.
 
 ### Community
 

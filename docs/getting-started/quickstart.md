@@ -43,7 +43,7 @@ If you prefer streaming using third-party languages, try the [Python](https://gi
 
 ## Platform independent Substreams
 
-Substreams is platform independent, meaning you can use many different blockchains.&#x20;
+Substreams is platform independent, meaning it's possible to use many different blockchains.&#x20;
 
 Developers will typically target a specific blockchain and build a Substreams module targeted toward the chosen chain.&#x20;
 
@@ -110,7 +110,7 @@ $ cargo add substreams-solana
 {% hint style="success" %}
 **Tip**: Crates should be used if they are available for the target blockchain.\
 \
-Alternatively, you can generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. See [Rust crates](../reference-and-specs/rust-crates.md) for details.
+Alternatively, generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. See [Rust crates](../reference-and-specs/rust-crates.md) for details.
 {% endhint %}
 
 ## **Examples**
@@ -129,7 +129,7 @@ Take a moment to explore the codebase. Note the chain name used through the diff
 
 Also notice the module handler, defined in [lib.rs](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs), and the custom protobuf definition in the proto directory named [basicexample.proto](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto).
 
-Note that the module handler in the lib.rs file for the Ethereum example has code specific to the blockchain being targeted. The block structure for Ethereum blocks can be seen in the following code excerpt.
+Note that the module handler in the lib.rs file for the Ethereum example has code specific to the blockchain being targeted. The block structure for Ethereum blocks is viewable in the following code excerpt.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
@@ -182,9 +182,7 @@ After cloning the Solana example, take a moment to look through the repository. 
 
 A very important difference between the two examples is the module handler code. Blockchains each have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
 
-Notice the Solana module handler is accessing the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams.&#x20;
-
-The Ethereum example's module handler accessed the `ver` and `number`. These are differences in the block model for each of the blockchains.
+Notice the Solana module handler is using the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams. The Ethereum example's module handler uses the `ver` and `number`. These are differences in the block model for each of the blockchains.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
@@ -212,7 +210,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yam
 
 The key takeaways at this point are:
 
-1. Substreams is platform independent and can be used across many different blockchains.
+1. Substreams is platform independent and it's used across many different blockchains.
 2. Block data for each blockchain follows a different structure and model.
 3. Each blockchain has a different endpoint.
 4. Each blockchain has a different package.
@@ -224,7 +222,7 @@ The key takeaways at this point are:
 
 Understanding map and store modules is the next step to understanding how to design and craft a fully directed acyclic graph in the Substreams manifest.
 
-Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md), and sample code can be found in the [Developer's Guide](../developers-guide/overview.md).&#x20;
+Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's Guide](../developers-guide/overview.md).&#x20;
 
 Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
 

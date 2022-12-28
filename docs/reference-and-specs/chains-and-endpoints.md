@@ -39,4 +39,4 @@ Protobuf definitions and public endpoints are provided for each of the supported
 
 ## Other
 
-Other blockchains can be supported for Substreams through Firehose instrumentation. Additional information is available in the [official Firehose documentation](https://firehose.streamingfast.io/).
+It's possible to support other blockchains for Substreams through Firehose instrumentation. Additional information is available in the [official Firehose documentation](https://firehose.streamingfast.io/).

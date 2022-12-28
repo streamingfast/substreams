@@ -2,9 +2,9 @@
 description: Running StreamingFast Substreams for the first time
 ---
 
-# Running substreams
+# Running Substreams
 
-After a successful build Substreams can be started with the following command, explained in greater detail below.
+After a successful build, start Substreams using:
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \
@@ -38,7 +38,7 @@ The `map_transfers` module is defined in the manifest and it is the module that 
 Start mapping at the specific block 12292922 by using passing the flag and block number.\
 `--start-block 12292922`
 
-Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
+Cease block processing with `--stop-block +1.` The +1 option will request a single block. In the example, the next block will be 12292923.
 
 ### Successful Substreams results
 
@@ -76,4 +76,4 @@ map_transfers: message "eth.erc721.v1.Transfers": {
 }
 ```
 
-The example output contains data for different transfers from data in the blockchain. These transfers can also be [verified on Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).
+The example output contains data for different transfers from data in the blockchain. The transfers are verifiable [on Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).

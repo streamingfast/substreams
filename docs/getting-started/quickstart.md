@@ -75,7 +75,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.ya
 ```
 {% endcode %}
 
-Each blockchain has specific requirements for its data definition so the code in the module handlers will need to be updated accordingly.
+Different blockchains have specific requirements for their data definitions. The code in the module handlers will need to be updated accordingly for the different blockchains.
 
 ### **Crates and packages**
 
@@ -180,9 +180,9 @@ Clone or download the Solana example codebase. Find the example in the official 
 
 After cloning the Solana example, take a moment to look through the repository. Key differences from the Ethereum example should begin to stand out immediately.
 
-A very important difference between the two examples is the module handler code. Blockchains each have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
+A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
 
-Notice the Solana module handler is using the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams. The Ethereum example's module handler uses the `ver` and `number`. These are differences in the block model for each of the blockchains.
+Notice the Solana module handler is using the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams. The Ethereum example's module handler uses the `ver` and `number`. These are differences in the block model for the separate blockchains.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
@@ -210,17 +210,17 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yam
 
 The key takeaways at this point are:
 
-1. Substreams is platform independent and it's used across many different blockchains.
-2. Block data for each blockchain follows a different structure and model.
-3. Each blockchain has a different endpoint.
-4. Each blockchain has a different package.
+1. Substreams is platform independent and is used across many different blockchains.
+2. Block data for individual blockchains follows a different structure and model.
+3. Individual blockchains have different endpoints.
+4. Individual blockchains have different packages.
 5. Custom protobufs are created to pass data from one module to another.
 
 {% hint style="info" %}
-**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains will enable developers to graduate to build even more complex solutions.&#x20;
+**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains will enable you to graduate to build even more complex solutions!
 {% endhint %}
 
-Understanding map and store modules is the next step to understanding how to design and craft a fully directed acyclic graph in the Substreams manifest.
+Understanding map and store modules is important for understanding how to design and craft a fully directed acyclic graph in your Substreams manifest.
 
 Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's Guide](../developers-guide/overview.md).&#x20;
 

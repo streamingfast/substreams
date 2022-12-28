@@ -6,13 +6,11 @@ description: StreamingFast Substreams protobuf schemas
 
 ### Protobuf overview
 
-Substreams uses Protocol Buffers (protobufs) as the API for data models specific to each blockchain. Each manifest defines references to the protobufs for the Substreams implementation.
+Substreams uses Protocol Buffers (protobufs) as the API for data models specific to the different blockchains. Manifests define references to the protobufs for the Substreams module.
 
 {% hint style="success" %}
 **Tip**: Protobufs define the input and output for modules.
 {% endhint %}
-
-Find more about Protocol Buffers here, and some tutorials here.
 
 ### Protobuf Basics
 

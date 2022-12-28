@@ -47,10 +47,10 @@ The data flow is defined in the [Substreams manifest](../reference-and-specs/man
 Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).&#x20;
 
 {% hint style="info" %}
-**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs. DAGs work through a one directional flow.
+**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs. DAGs work through a one-directional flow.
 {% endhint %}
 
-The Substreams manifest references the modules, and the handlers defined within them and forms the intention of how each is used by the Substreams engine.&#x20;
+The Substreams manifest references the modules, and the handlers defined within them and form the intention of how they are used by the Substreams engine.&#x20;
 
 Directed acyclic graphs contain nodes, in this case, modules, that communicate in only one direction, passing from one node, or module, to another.
 

@@ -23,7 +23,7 @@ An Input of type `source` represents a chain-specific, Firehose-provisioned prot
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: Each of the different blockchains will reference a different `Block` specific to the chain being targeted. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`.&#x20;
+**Note**: The different blockchains will reference a different `Block`. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`.&#x20;
 {% endhint %}
 
 The `source` inputs type __ is defined in the Substreams manifest. It is important to specify the correct Block object for the targeted chain.

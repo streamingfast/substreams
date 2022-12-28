@@ -110,7 +110,7 @@ The output for the `map_transfers` module is a list of ERC721 transfers. The bus
 
 ### **`store_transfers`**
 
-The `store_transfers` store module receives transfers in each block extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.
+The `store_transfers` store module receives transfers in the blocks extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.
 
 The inputs of the module are protobuf models defined as: `proto:eth.erc721.v1.Transfers`.
 

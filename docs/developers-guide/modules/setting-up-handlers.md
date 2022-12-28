@@ -111,11 +111,10 @@ cargo build --target wasm32-unknown-unknown --release
 ```
 
 {% hint style="info" %}
-**Rust build target**
+**Note: Rust build target**
 
-Notice when `cargo build` is run the `target` is `wasm32-unknown-unknown.` This specification is important since the goal is to generate compiled WASM code.
-
-To avoid manually specifying `target wasm32-unknown-unknown` for each `cargo` command, create a file named `config.toml` in the `.cargo` directory at the root of the Substreams project.
+* When running `cargo build`, the target is set to `wasm32-unknown-unknown`, which is important because it specifies that the goal is to generate compiled WebAssembly (WASM) code.
+* To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a file called `config.toml` in the `.cargo` directory at the root of the Substreams project. This will allow the target to be set automatically for all `cargo` commands
 
 The content for the file will be:
 
@@ -126,7 +125,7 @@ target = "wasm32-unknown-unknown"
 ```
 {% endcode %}
 
-With the configuration file in place the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`.
+With the configuration file in place, the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`, so you don't have to specify the target manually each time you build.
 {% endhint %}
 
 ### ABI generation

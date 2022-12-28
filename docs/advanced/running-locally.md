@@ -28,7 +28,7 @@ fireeth tools download-from-firehose \
 fireeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
 
-### Write a config file
+### Write a configuration file
 
 Use this code for the Firehose configuration file. Additional information is available in the [Firehose documentation](https://firehose.streamingfast.io/).
 

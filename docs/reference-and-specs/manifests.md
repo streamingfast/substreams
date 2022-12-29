@@ -62,7 +62,7 @@ The `package.url` field identifies and helps users discover the source of the Su
 
 #### Package doc
 
-The `package.doc` field is the documentation string of the package. The first line is a short description; longer documentation proceeds a blank line.
+The `package.doc` field is the documentation string of the package. The first line is a short description; longer documentation should follow a blank line.
 
 ### Imports
 
@@ -81,7 +81,7 @@ imports:
   prices: ../eth-token/substreams.yaml
 ```
 
-The _value_ is a pointer to a Substreams manifest or a Substreams [package](packages.md).
+The _value_ should be a pointer to a Substreams manifest or a Substreams [package](packages.md).
 
 The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
 

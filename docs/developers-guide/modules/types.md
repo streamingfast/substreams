@@ -34,7 +34,7 @@ The `valueType` property instructs the Substreams runtime of the data that will 
 
 | Value                          | Description                                                                   |
 | ------------------------------ | ----------------------------------------------------------------------------- |
-| `bytes`                        | A simple list of bytes                                                        |
+| `bytes`                        | A basic list of bytes                                                         |
 | `string`                       | A UTF-8 string                                                                |
 | `proto:fully.qualified.Object` | Decode bytes using the protobuf definition `fully.qualified.Object`           |
 | `int64`                        | A string-serialized integer, that uses int64 arithmetic operations            |

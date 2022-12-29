@@ -28,7 +28,7 @@ curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key":"y
 
 ### Set your environment variable
 
-Set the token as an ENV variable through the terminal using:&#x20;
+The token should be set as an ENV variable through the terminal using the command:&#x20;
 
 ```bash
 export SUBSTREAMS_API_TOKEN="your_token"
@@ -43,8 +43,7 @@ The `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment v
 {% hint style="info" %}
 **Note**_:_ **Authentication Token Env Flag**
 
-* By default, the `substreams run` command uses an environment variable for the authentication token.&#x20;
-* You can specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
+By default, the `substreams run` command uses an environment variable for the authentication token. You can specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
 {% endhint %}
 
 ### Environment variable script

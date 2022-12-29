@@ -58,7 +58,7 @@ View this file in the repository:
 
 #### Identifying data types
 
-The ERC721 smart contract associated with the Substreams Template example contains a Transfer event. The event is targeted by creating an associated protobuf.
+The ERC721 smart contract associated with the Substreams Template example contains a Transfer event. You can reach the event data through a custom protobuf.
 
 The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.
 
@@ -67,10 +67,10 @@ The protobuf file serves as the interface between the module handlers and the da
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: The Substreams Template example targets Transfer events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
+**Note**: The Substreams Template example extracts `Transfer` events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
 {% endhint %}
 
-Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Developers will create more refined and complex protobufs based on the many custom data types that exist in the blockchain they are targeting.
+Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. You will create more refined and complex protobufs based on the many custom data types that exist in the blockchain.
 
 {% hint style="success" %}
 **Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).

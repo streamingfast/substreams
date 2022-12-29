@@ -87,7 +87,7 @@ The `substreams` crate offers all the basic building blocks for the handlers.
 
 The `substreams-ethereum` crate offers all the Ethereum constructs including blocks, transactions, eth, and useful `ABI` decoding capabilities.
 
-Because code is being built with WASM output it's necessary to configure Rust to target the correct architecture. Create and add a rust-toolchain.toml file at the root of the Substreams directory.
+Because code is being built with WASM output it's necessary to configure Rust to match the correct architecture. Create and add a `rust-toolchain.toml` file at the root of the Substreams directory.
 
 #### Rust toolchain
 

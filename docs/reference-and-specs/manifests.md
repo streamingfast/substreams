@@ -62,7 +62,7 @@ The `package.url` field identifies and helps users discover the source of the Su
 
 #### Package doc
 
-The `package.doc` field is the documentation string of the package. The first line is a short description; longer documentation should follow a blank line.
+The `package.doc` field is the documentation string of the package. The first line is a short description; longer documentation proceeds a blank line.
 
 ### Imports
 
@@ -81,11 +81,11 @@ imports:
   prices: ../eth-token/substreams.yaml
 ```
 
-The _value_ should be a pointer to a Substreams manifest or a Substreams [package](packages.md).
+The _value_ is a pointer to a Substreams manifest or a Substreams [package](packages.md).
 
 The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
 
-Imports will differ across different blockchains. For example, Substreams implementations that target Ethereum will reference an appropriate spkg file created for that blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the target chain.
+Imports will differ across different blockchains. For example, Substreams modules that use Ethereum will reference an appropriate spkg file created for that blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the chain.
 
 ### Protobuf
 

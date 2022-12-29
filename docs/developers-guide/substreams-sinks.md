@@ -24,7 +24,7 @@ The first step of having Substreams consumed by a particular sink involves the c
 
 For example, database-like Substreams sinks such as PostgreSQL or MongoDB accept a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
 
-It’s important to note that databases are only one type of sink. The sink being targeted determines what output type should be respected.
+It’s important to note that databases are only one type of sink. The sink determines what output type will be respected.
 
 The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage.
 
@@ -70,4 +70,4 @@ You will design protobufs to use for transferring data out of Substreams into th
 **Note**: Through careful design of the Substreams manifest, modules, and protobufs you will be able to craft your output data in a variety of ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
 {% endhint %}
 
-You need to examine and account for the format and any requirements of the end target they want their data routed. The specifics of how data is ingested by the targeted sink will determine the design of the output from Substreams.
+You need to examine and account for the format and any requirements of the end environment you want your data routed. The specifics of how data is ingested by the sink will determine the design of the output from Substreams.

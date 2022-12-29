@@ -16,7 +16,7 @@ Install Firehose locally from source or by using a [Firehose Docker release](htt
 
 ### Get some data
 
-Instruct Firehose to generate merged blocks files for Substreams using:
+Instruct Firehose to generate merged blocks files for Substreams by using:
 
 ```bash
 # Downloads 2.6GB of data
@@ -53,7 +53,7 @@ start:
 
 ### Run `firehose`
 
-Start Firehose passing it the config file using:
+Start Firehose passing it the `config.yaml` file by using:
 
 ```bash
 $ fireeth start -c config.yaml
@@ -61,7 +61,7 @@ $ fireeth start -c config.yaml
 
 ### Running Substreams and Firehose
 
-Run the `substreams` command for the Firehose deployment using:
+Run the `substreams` command for the Firehose deployment by using:
 
 ```bash
 substreams run -p -e localhost:9000  # ...

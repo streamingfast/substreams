@@ -1,5 +1,5 @@
 ---
-description: Get off the ground using Substreams by StreamingFast
+description: Get off the ground by using Substreams by StreamingFast
 ---
 
 # Quickstart
@@ -8,7 +8,7 @@ description: Get off the ground using Substreams by StreamingFast
 
 Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io).
 
-Get an API **Token** using:
+Get an API **Token** by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -27,7 +27,7 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 _**Important**: The Substreams CLI **must** be_ [_installed_](installing-the-cli.md) _to continue._
 {% endhint %}
 
-After you have authenticated, you're ready to run your first Substreams using:
+After you have authenticated, you're ready to run your first Substreams by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -35,10 +35,10 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 ```
 {% endcode %}
 
-The [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) will be streamed to the requesting client.
+The [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) will be streamed to the requesting client.
 
 {% hint style="info" %}
-If you prefer streaming using third-party languages, try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example.
+Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages
 {% endhint %}
 
 ## Platform independent Substreams
@@ -55,9 +55,9 @@ Data is available for any blockchain exposing an operational Firehose endpoint, 
 
 ### **Basics**
 
-The most basic approach to using Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+The most basic approach to use Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
-The command demonstrates modules using the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
+The commands demonstrate how Substreams modules work by using the selected blockchain and instructing the compute engine to execute the `map_basic_eth` or `map_basic_sol` Rust functions.
 
 #### **Basic Ethereum command line call**
 
@@ -144,13 +144,13 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 ```
 {% endcode %}
 
-The steps to follow for using the example include:&#x20;
+The steps to follow to use the example include:&#x20;
 
-* running the command to generate the required protobufs,
-* using the Rust compiler to compile the example,&#x20;
-* and sending commands to the Substreams CLI.
+* Running the command to generate the required protobufs
+* Compiling the example by using the Rust compiler
+* Sending commands to the Substreams CLI
 
-At the root of the example project, generate your structs from protobuf specified in the YAML:
+At the root of the example project, you will generate the structs from the protobuf specified in the YAML file by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -158,13 +158,13 @@ substreams protogen substreams-ethereum-tutorial.yaml
 ```
 {% endcode %}
 
-Then compile using:
+Compile the project by using:
 
 ```shell
 cargo build --release --target wasm32-unknown-unknown
 ```
 
-You're ready to run:
+Run the project by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -174,7 +174,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.
 
 ### Solana example
 
-The procedure for using the Solana example is very similar to the Ethereum example.&#x20;
+The procedure to use the Solana example is very similar to the Ethereum example.&#x20;
 
 Clone or download the Solana example codebase. Find the example in the official GitHub repository.
 
@@ -182,9 +182,9 @@ Clone or download the Solana example codebase. Find the example in the official 
 
 After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example will stand out immediately.
 
-A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
+A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle although others are not.
 
-Notice the Solana module handler is using the `previous_blockhash` `blockhash` and `slot` fields of the block passed into the module handler by Substreams. The Ethereum example's module handler uses the `ver` and `number`. These are differences in the block model for the separate blockchains.
+Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the block passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields. The disparities in the field names are due to differences in the block model for the separate blockchains.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust

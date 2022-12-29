@@ -95,7 +95,7 @@ The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md
 The modules are Rust functions containing the business logic for the implementation.
 
 {% hint style="info" %}
-**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The official naming convention for Substreams modules prefixes the module name using `map_` or `store_` depending on the type.
+**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The official naming convention for Substreams modules prefixes the module name by using `map_` or `store_` depending on the type.
 {% endhint %}
 
 ### **`map_transfers`**

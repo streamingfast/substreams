@@ -58,7 +58,7 @@ Additional information for PostgreSQL installation can be found in the official 
 
 #### **NodeJS dependencies**
 
-Using Substreams and `graph-node` together requires multiple Node.js dependencies. Install the dependencies using:
+The use of Substreams and `graph-node` together requires multiple Node.js dependencies. Install the dependencies by using:
 
 ```
 yarn install
@@ -118,7 +118,7 @@ Run `graph-node` from its root directory. The `config/graph-node.eth-ropsten.tom
 **Note**: To successfully connect to the Firehose and Substreams services, you might need to set up certain system environment variables, such as `STREAMING_FAST_API_TOKEN`.
 {% endhint %}
 
-Start up `graph-node` using:
+Start up `graph-node` by using:
 
 ```bash
 GRAPH_LOG=trace cargo run -- --config config/graph-node.eth-ropsten.toml --ipfs "localhost:5001"
@@ -128,7 +128,7 @@ GRAPH_LOG=trace cargo run -- --config config/graph-node.eth-ropsten.toml --ipfs 
 
 The **** subgraph manifest file needs to be pushed to the local IPFS node.&#x20;
 
-Push the subgraph to IPFS using:
+Push the subgraph to IPFS by using:
 
 ```bash
 ipfs add substreams/ethereum/mainnet-network.yaml
@@ -137,10 +137,10 @@ ipfs add substreams/ethereum/mainnet-network.yaml
 After the subgraph manifest has been pushed to IPFS the subgraph can be deployed.
 
 {% hint style="info" %}
-**Note**: http can be installed using Homebrew through the httpie command.
+**Note**: http can be installed by using Homebrew through the httpie command.
 {% endhint %}
 
-Deploy the subgraph using:
+Deploy the subgraph by using:
 
 ```bash
 export i=QmUFVjzLeSRAjUNnNcdC4LEM3kncZwand2fj7gbNBjVV4A

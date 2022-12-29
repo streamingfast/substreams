@@ -29,7 +29,7 @@ description: StreamingFast Substreams benefits and comparisons
 * **Protobuf**\
   ****Substreams uses the power of the protobuf ecosystem, for data modeling and integration for a large number of programming languages.
 * **Rust**\
-  Substreams modules are written in the Rust programming language, using a wide array of third-party libraries compilable to WASM, to manipulate blockchain data on-the-fly.
+  Substreams modules are written in the Rust programming language, by using a wide array of third-party libraries compilable to WASM, to manipulate blockchain data on-the-fly.
 * **Blockchain infused Large-scale data**\
   Substreams was inspired by conventional large-scale data systems _fused_ with the novelties of blockchain.
 
@@ -57,7 +57,7 @@ Substreams is horizontally scalable presenting the opportunity to reduce the pro
 
 Substreams has all the benefits of Firehose, including low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
-The Substreams _engine_ is completely platform-independent of underlying blockchain protocols and works solely on data extracted from nodes using the Firehose.
+The Substreams _engine_ is completely platform-independent of underlying blockchain protocols and works solely on data extracted from nodes by using Firehose.
 
 For example, different protocols have different chain-specific extensions, such as Ethereum, which expose `eth_calls`.
 

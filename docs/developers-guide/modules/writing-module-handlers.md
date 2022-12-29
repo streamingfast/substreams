@@ -123,7 +123,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 **Note**: **Rust macros**
 
 * Did you notice the `#[substreams::handlers::map]` on top of the function? It is a Rust "macro" provided by the Substreams crate.
-* The macro decorates the handler function as a map. Store modules are specified using the syntax `#[substreams::handlers::store]`.
+* The macro decorates the handler function as a map. Store modules are specified by using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
 The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events emitted by the tracked contract. As the events are found they will be decoded into `Transfer` objects.
@@ -265,7 +265,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 Both handler functions have been written.
 
-One handler function for extracting relevent transfers, and a second to store the token count per recipient.
+One handler function for extracting relevant transfers, and a second to store the token count per recipient.
 
 Build Substreams to continue the setup process.
 
@@ -273,4 +273,4 @@ Build Substreams to continue the setup process.
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-The next step is to run Substreams with all of the changes made using the generated code.
+The next step is to run Substreams with all of the changes made by using the generated code.

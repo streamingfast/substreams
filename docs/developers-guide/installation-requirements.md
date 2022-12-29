@@ -6,19 +6,17 @@ description: StreamingFast Substreams dependency installation
 
 ## Dependencies overview
 
-Using Substreams requires a number of different applications and tools. A full list is provided on the Substreams [prerequisites](broken-reference) page.
-
-Instructions and links are provided to assist in the installation of the required dependencies for Substreams.
+Substreams requires a number of different applications and tools. Instructions and links are provided to assist in the installation of the required dependencies for Substreams.
 
 {% hint style="success" %}
-**Tip**: Instructions are provided for cloud-based Gitpod setups.
+**Tip**: Instructions are also provided for cloud-based Gitpod setups.
 {% endhint %}
 
 ## Local installation
 
 ### `substreams` CLI installation
 
-The Substreams CLI is required and is the primary user interface for using Substreams.
+The Substreams CLI is required and is the primary Substreams user interface.
 
 {% hint style="success" %}
 **Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page.
@@ -28,7 +26,7 @@ The Substreams CLI is required and is the primary user interface for using Subst
 
 Developing Substreams modules requires a working [Rust](https://www.rust-lang.org/) compilation environment.
 
-There are [several ways to install Rust](https://www.rust-lang.org/tools/install)**.** Using `curl` is one option:
+There are [several ways to install Rust](https://www.rust-lang.org/tools/install)**.**  Install Rust through `curl` by using:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -47,7 +45,7 @@ Visit the [Buf website](https://buf.build/) for additional information and [inst
 
 ## Gitpod cloud-based environment
 
-Follow the steps for using [Gitpod](https://www.gitpod.io/) and Substreams.
+Follow the steps to use [Gitpod](https://www.gitpod.io/) for Substreams.
 
 1. Copy the [substreams-template repository](https://github.com/streamingfast/substreams-template/generate).
 2. Obtain a StreamingFast authentication key from: [https://app.streamingfast.io/](https://app.streamingfast.io/).

@@ -11,7 +11,7 @@ To begin creating the custom module handlers initialize a new Rust project.
 cargo init --lib
 ```
 
-Update the generated `Cargo.toml` file using:
+Update the generated `Cargo.toml` file by using:
 
 {% code title="Cargo.toml" %}
 ```rust
@@ -58,7 +58,7 @@ The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org
 
 ### **Cargo.toml breakdown**
 
-To build the Rust dynamic system library, after the `package`, using:
+Build the Rust dynamic system library after the `package` by using:
 
 ```rust
 ...
@@ -69,7 +69,7 @@ crate-type = ["cdylib"]
 
 The next definition in the TOML file is for `dependencies`.
 
-Handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` using `[target.wasm32-unknown-unknown.dependencies]`.
+Handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` by using `[target.wasm32-unknown-unknown.dependencies]`.
 
 #### `ethabi`
 
@@ -104,7 +104,7 @@ View the `rust-toolchain.toml` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml)
 
-Build the code using:
+Build the code by using:
 
 ```rust
 cargo build --target wasm32-unknown-unknown --release
@@ -145,7 +145,7 @@ Next, add a Rust build script.
 * To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
 {% endhint %}
 
-Create a `build.rs` file in the root of the Substreams project using:
+Create a `build.rs` file in the root of the Substreams project by using:
 
 {% code title="build.rs" %}
 ```rust

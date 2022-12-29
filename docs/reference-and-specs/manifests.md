@@ -39,7 +39,7 @@ package:
 
 The `package.name` field is used to identify the package.&#x20;
 
-The `package.name` field infers the filename when the `pack` command is run using `substreams.yaml` as a flag for the Substreams package.
+The `package.name` field infers the filename when the `pack` command is run by using `substreams.yaml` as a flag for the Substreams package.
 
 * The `name` must match the regular expression. \
   `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`
@@ -69,7 +69,7 @@ The `package.doc` field is the documentation string of the package. The first li
 The `imports` section references WASM code, compiled protobuf definitions, and module definitions.&#x20;
 
 {% hint style="success" %}
-**Tip**: Imported modules can be referred to using a key later in the `modules` section.
+**Tip**: Imported modules can be referred to later in the `modules` section through the use of a key.
 {% endhint %}
 
 Excerpt pulled from the example Substreams manifest.
@@ -85,7 +85,7 @@ The _value_ is a pointer to a Substreams manifest or a Substreams [package](pack
 
 The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
 
-Imports will differ across different blockchains. For example, Substreams modules using Ethereum will reference an appropriate spkg file created for the Ethereum blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the selected chain.
+Imports will differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching spkg file created for the Ethereum blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the selected chain.
 
 ### Protobuf
 
@@ -241,7 +241,7 @@ Values for `modules[].valueTypes` are as follows.
 
 An identifier defined in the [`binaries`](manifests.md#binaries) section of the Substreams manifest.
 
-The `modules[].binary` module will execute using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
+The `modules[].binary` module will execute by using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
 
 #### `modules[].inputs`
 

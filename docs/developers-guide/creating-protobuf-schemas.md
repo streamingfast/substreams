@@ -76,7 +76,7 @@ The protobuf file serves as the interface between the module handlers and the da
 Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. You will create more refined and complex protobufs based on the many custom data types existing in the blockchain.
 
 {% hint style="success" %}
-**Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
+**Tip**_:_ The use of fully qualified protobuf file paths reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
 {% endhint %}
 
 ### Generating protobufs
@@ -111,7 +111,7 @@ View the `mod.rs` file in the repository:
 
 ### Protobuf and Rust optional fields
 
-Protocol buffers define fields' type using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the Google Protocol Buffers documentation.
+Protocol buffers define fields' type by using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the Google Protocol Buffers documentation.
 
 Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. &#x20;
 
@@ -120,10 +120,10 @@ Rust generates the corresponding `message` type wrapped with an `Option` enum ty
 The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. `Option` allows developers to distinguish between a field containing a value versus a field not set with a value.&#x20;
 
 {% hint style="info" %}
-**Note**: The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
+**Note**: The standard approach to represent nullable data in Rust is to wrap optional values in `Option<T>`.
 {% endhint %}
 
-The Rust `match` keyword is used to compare the value of an `Option` with a `Some` or `None` variant. Handle a type wrapped `Option` using:
+The Rust `match` keyword is used to compare the value of an `Option` with a `Some` or `None` variant. Handle a type wrapped `Option` in Rust by using:
 
 ```rust
 match person.Location {

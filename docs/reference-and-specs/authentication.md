@@ -20,7 +20,7 @@ The StreamingFast team is available on [Discord](https://discord.gg/jZwqxJAvRs) 
 
 An authentication token must be requested after successfully obtaining the API key.
 
-Request the authentication token using your StreamingFast API key through curl:
+Request the authentication token by using your StreamingFast API key through curl:
 
 ```bash
 curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key":"your-secret-key"}'
@@ -28,7 +28,7 @@ curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key":"y
 
 ### Set your environment variable
 
-Set the token as an ENV variable through the terminal using:&#x20;
+Set the token as an ENV variable through the terminal by using:&#x20;
 
 ```bash
 export SUBSTREAMS_API_TOKEN="your_token"
@@ -44,7 +44,7 @@ The `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment v
 **Note**_:_ **Authentication Token Env Flag**
 
 * By default, the `substreams run` command uses an environment variable for the authentication token.&#x20;
-* You can specify a custom environment variable name using the `--substreams-api-token-envvar` flag.
+* You can specify a custom environment variable name by using the `--substreams-api-token-envvar` flag.
 {% endhint %}
 
 ### Environment variable script
@@ -61,7 +61,7 @@ function sftoken {
 }
 ```
 
-Load the key into the `SUBSTREAMS_API_TOKEN` environment variable using:
+Load the key into the `SUBSTREAMS_API_TOKEN` environment variable by using:
 
 ```bash
 sftoken

@@ -14,7 +14,7 @@ Developers do not need a dedicated installation of Firehose to use Substreams. S
 
 ### **Is it possible to use Substreams in my subgraph?**
 
-Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for using graph-node and subgraphs.
+Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for graph-node and subgraphs.
 
 [https://substreams.streamingfast.io/reference-and-specs/graph-node-setup](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup)
 
@@ -24,7 +24,7 @@ No, Substreams is provided as a developer preview.
 
 ### **What is the Substreams CLI?**
 
-The Substreams command line interface (CLI) is the main tool developers use to use the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for using the CLI is available in the Substreams documentation.
+The Substreams command line interface (CLI) is the main tool developers use to use the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for the CLI is available in the Substreams documentation.
 
 [https://substreams.streamingfast.io/reference-and-specs/using-the-cli](https://substreams.streamingfast.io/reference-and-specs/using-the-cli)
 
@@ -36,7 +36,7 @@ Authentication tokens are required to use Substreams and connect to the public F
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
-The StreamingFast team is available in Discord to resolve problems related to obtaining or using authentication tokens.&#x20;
+The StreamingFast team is available in Discord to resolve problems related to obtaining or by using authentication tokens.&#x20;
 
 [https://discord.gg/Ugc7KtkA](https://discord.gg/Ugc7KtkA)
 
@@ -44,13 +44,13 @@ The Substreams documentation also provides general instructions surrounding auth
 
 [https://substreams.streamingfast.io/reference-and-specs/authentication](https://substreams.streamingfast.io/reference-and-specs/authentication)
 
-### **How do I create a Substreams implementation?**
+### **How do I create a Substreams module?**
 
 Developers will create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground containing examples to use as a reference and starting point.
 
 [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
 
-The Substreams documentation also provides a Developer's Guide to assist in understanding and using Substreams.
+The Substreams documentation provides a Developer's Guide to assist you to understand and use Substreams.
 
 [https://substreams.streamingfast.io/developer-guide/overview](https://substreams.streamingfast.io/developer-guide/overview)
 
@@ -70,7 +70,7 @@ Yes, Substreams is an open source project and is available to the public for fre
 
 Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
 
-### Is it possible to listen for new blocks using Substreams?
+### Is it possible to listen for new blocks?
 
 Specifying a stop block value of zero (0), the default enables transparent handoff from historical to real-time blocks.
 

@@ -68,14 +68,14 @@ An Input of type `store` represents the state of another store used with the Sub
 
 The `store` inputs type __ is defined in the Substreams manifest. Similar to maps, stores are named appropriately, indicating the logic contained within them.
 
-Store modules are set to `get` mode by default using:
+Store modules are set to `get` mode by default by using:
 
 ```yaml
   inputs:
     - store: my_store # defaults to mode: get
 ```
 
-Alternatively, set `stores` to `deltas` mode using:
+Alternatively, set `stores` to `deltas` mode by using:
 
 ```yaml
   inputs:
@@ -107,7 +107,7 @@ Get mode provides a key-value store readily queryable and guaranteed to be in sy
 
 ### `delta` mode
 
-Modules using delta mode are [protobuf objects](../../../proto/sf/substreams/v1/substreams.proto#L124) and contain all the changes occurring in the `store` module available in the same block.&#x20;
+Delta mode modules are [protobuf objects](../../../proto/sf/substreams/v1/substreams.proto#L124) containing all the changes occurring in the `store` module available in the same block.&#x20;
 
 Delta mode enables you to loop through keys and decoding values mutated in the module.
 

@@ -4,7 +4,7 @@ description: Running StreamingFast Substreams for the first time
 
 # Running Substreams
 
-After a successful build, start Substreams using:
+After a successful build, start Substreams by using:
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \

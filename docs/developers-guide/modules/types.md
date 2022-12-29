@@ -32,15 +32,15 @@ The two important store properties are `valueType,`and `updatePolicy`.
 
 The `valueType` property instructs the Substreams runtime of the data to be saved in the `stores`.
 
-| Value                          | Description                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------------- |
-| `bytes`                        | A basic list of bytes                                                         |
-| `string`                       | A UTF-8 string                                                                |
-| `proto:fully.qualified.Object` | Decode bytes using the protobuf definition `fully.qualified.Object`           |
-| `int64`                        | A string-serialized integer using int64 arithmetic operations                 |
-| `float64`                      | A string-serialized floating point value, using float64 arithmetic operations |
-| `bigint`                       | A string-serialized integer, with precision of any depth                      |
-| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits   |
+| Value                          | Description                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `bytes`                        | A basic list of bytes                                                            |
+| `string`                       | A UTF-8 string                                                                   |
+| `proto:fully.qualified.Object` | Decode bytes by using the protobuf definition `fully.qualified.Object`           |
+| `int64`                        | A string-serialized integer by using int64 arithmetic operations                 |
+| `float64`                      | A string-serialized floating point value, used for float64 arithmetic operations |
+| `bigint`                       | A string-serialized integer, with precision of any depth                         |
+| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits      |
 
 #### `updatePolicy` property
 
@@ -94,7 +94,7 @@ You can consume data in one of two modes when declaring a `store` as an input to
 
 #### `get Mode`
 
-Get mode provides the module with the key-value store guaranteed to be in sync up to the block being processed. Readily query `stores` using the `get_at`, `get_last` and `get_first` methods.
+The `get mode` function provides the module with a key-value store that is guaranteed to be synchronized up to the block being processed. It's possible to query `stores` by using the `get_at`, `get_last` and `get_first` methods.
 
 {% hint style="success" %}
 **Tip:** Lookups are local, in-memory, and extremely high-speed!

@@ -9,7 +9,7 @@ description: StreamingFast Substreams chains and endpoints
 Protobuf definitions and public endpoints are provided for the supported protocols and chains.&#x20;
 
 {% hint style="success" %}
-**Tip**: All of the endpoints listed on this page require [authentication](authentication.md) before use.
+**Tip**: All of the endpoints listed in the documentation require [authentication](authentication.md) before use.
 {% endhint %}
 
 {% hint style="warning" %}

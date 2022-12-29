@@ -7,7 +7,7 @@ description: StreamingFast Substreams module handlers
 To begin creating the custom module handlers initialize a new Rust project.
 
 ```bash
-# This is to create a barebones rust library
+# Creates a barebones rust library
 cargo init --lib
 ```
 
@@ -100,7 +100,7 @@ targets = [ "wasm32-unknown-unknown" ]
 ```
 {% endcode %}
 
-View this file in the repository:
+View the `rust-toolchain.toml` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml)
 
@@ -114,9 +114,9 @@ cargo build --target wasm32-unknown-unknown --release
 **Note: Rust build target**
 
 * When running `cargo build`, the target is set to `wasm32-unknown-unknown`, which is important because it specifies that the goal is to generate compiled WebAssembly (WASM) code.
-* To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a file called `config.toml` in the `.cargo` directory at the root of the Substreams project. This will allow the target to be set automatically for all `cargo` commands
+* To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a file called `config.toml` in the `.cargo` directory at the root of the Substreams project. The `config.toml` file allows the target to be set automatically for all `cargo` commands.
 
-The content for the file will be:
+The content for the `config.toml` file is:
 
 {% code title=".cargo/config.toml" %}
 ```toml
@@ -132,7 +132,7 @@ With the configuration file in place, the `cargo build` command is now equivalen
 
 The `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contract's ABI.
 
-Insert the contract ABI JSON file in the Substreams project in an `abi` directory.
+Place the contract ABI JSON file in the Substreams project in an `abi` directory.
 
 {% file src="../../.gitbook/assets/erc721.json" %}
 
@@ -162,7 +162,7 @@ fn main() -> Result<(), anyhow::Error> {
 ```
 {% endcode %}
 
-View this file in the repository:
+View the `build.rs` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/build.rs](https://github.com/streamingfast/substreams-template/blob/develop/build.rs)
 
@@ -180,7 +180,7 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View this file in the repository:
+View the `mod.rs` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs)
 

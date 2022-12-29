@@ -47,7 +47,7 @@ Substreams is viewable from two perspectives as illustrated in the high-level vi
 
 _**Need help? Reach out!**_
 
-Substreams is an open-source community effort, so feel free to suggest new topics, report issues, and provide feedback. Contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
+Substreams is an open source community effort, so feel free to suggest new topics, report issues, and provide feedback. Contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 
 * [StreamingFast Discord](https://discord.gg/mYPcRAzeVN)
 * [The Graph Discord](https://discord.gg/vtvv7FP)
@@ -64,4 +64,4 @@ Substreams is licensed under [Apache 2.0](../LICENSE/).
 
 ### Disclaimer
 
-The content in this documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is in development and the associated documentation will become outdated. [Reach out ](https://discord.gg/mYPcRAzeVN)to report issues or outages.
+The content in the Substreams documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is in active development and the associated documentation becomes outdated. [Reach out ](https://discord.gg/mYPcRAzeVN)to report problems or service interruptions.

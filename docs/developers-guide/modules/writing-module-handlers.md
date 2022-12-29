@@ -65,7 +65,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 ```
 {% endcode %}
 
-View this file in the repository:
+View the `lib.rs` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
 
@@ -102,7 +102,7 @@ Defines the `map` module.
     type: proto:eth.erc721.v1.Transfers
 ```
 
-Notice the: `name: map_transfers`. This name should correspond to the handler function name.
+Notice the: `name: map_transfers`. The module in the manifest name matches the handler function name.
 
 Also notice, there is one input and one output definition.
 
@@ -126,7 +126,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 * The macro decorates the handler function as a map. Store modules are specified using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The `map` extracts ERC721 transfers from a Block. This is accomplished by finding all the `Transfer` events that are emitted by the tracked contract. As events are found they will be decoded into `Transfer` objects.
+The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events that are emitted by the tracked contract. As the events are found they will be decoded into `Transfer` objects.
 
 ```rust
 /// Extracts transfers events from the contract
@@ -167,7 +167,7 @@ Define the `store` module. As a reminder, here is the module definition from the
 _Note: `name: store_transfers` will also correspond to the handler function name._
 {% endhint %}
 
-The input corresponds to the output of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. This is the custom protobuf definition and is provided by the generated Rust code.
+The input corresponds to the output of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. The custom protobuf definition is provided by the generated Rust code.
 
 ```rust
 #[substreams::handlers::store]
@@ -180,24 +180,24 @@ fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 **Note**: __ the `store` will always receive itself as its own last input.
 {% endhint %}
 
-In this example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
+In the example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
 
 {% hint style="info" %}
 **Note**: **Store types**
 
-* The writable store should always be the last parameter of a store module function.
+* The writable store will always be the last parameter of a store module function.
 * The type of the writable store is determined by the `updatePolicy` and `valueType` of the store module.
 {% endhint %}
 
-The goal of the `store` in this example is to track a holder's current NFT count for the contract supplied. This tracking is achieved through the analysis of transfers.
+The goal of the `store` in the example is to track a holder's current NFT count for the contract supplied. The tracking is achieved through the analysis of transfers.
 
 **Transfer in detail**
 
-If the transfer's `from` address field contains the null address (`0x0000000000000000000000000000000000000000`), and the `to` address field is not the null address, the `to` address field is minting a token, so the count should be incremented.
+If the transfer's `from` address field contains the null address (`0x0000000000000000000000000000000000000000`), and the `to` address field is not the null address, the `to` address field is minting a token, so the count will be incremented.
 
-If the transfer's `from` address field is not the null address, _and_ the `to` address field is the null address, the `from` address field is burning a token, so the count should be decremented.
+If the transfer's `from` address field is not the null address, _and_ the `to` address field is the null address, the `from` address field is burning a token, so the count will be decremented.
 
-If the `from` address field and the `to` address field is not a null address, the count should be decremented of the `from` address, and increment the count of the `to` address for basic transfers.
+If the `from` address field and the `to` address field is not a null address, the count will be decremented of the `from` address, and increment the count of the `to` address for basic transfers.
 
 ### Store concepts
 
@@ -213,15 +213,15 @@ Ordinal represents the order in which the `store` operations will be applied.
 
 The `store` handler will be called once per `block.`
 
-During execution, the `add` operation may be called multiple times, for multiple reasons, such as finding a relevant event or seeing a call that triggered a method call.
+During execution, the `add` operation can be called multiple times, for multiple reasons, such as finding a relevant event or seeing a call that triggered a method call.
 
 Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 
-When an ordinal is specified, the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in this example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
+When an ordinal is specified, the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in the example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
 
 #### Key
 
-Stores are [key/value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.
+Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.
 
 In the example, if the `generate_key` function will return a key that is the `TRACKED_CONTRACT` address it will not be unique between different token holders.
 

@@ -48,14 +48,14 @@ The `updatePolicy` property determines what methods are available in the runtime
 
 The `updatePolicy` also defines the merging strategy for identical keys found in two contiguous stores produced through parallel processing.
 
-| Method              | Supported Value Types                    | Merge strategy\*                                                                                                                                                                                             |
-| ------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `set`               | `bytes`, `string`, `proto:...`           | The last key wins                                                                                                                                                                                            |
-| `set_if_not_exists` | `bytes`, `string`, `proto:...`           | The first key wins                                                                                                                                                                                           |
-| `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up                                                                                                                                                                                         |
-| `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept                                                                                                                                                                                     |
-| `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept                                                                                                                                                                                    |
-| `append`            | `string`, `bytes`                        | Both keys are concatenated in order. Appended values are limited to 8Kb. For aggregation patterns, [see this example](https://github.com/streamingfast/substreams-uniswap-v3/blob/develop/src/lib.rs#L760).  |
+| Method              | Supported Value Types                    | Merge strategy\*                                                                                                                                                                                                                   |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set`               | `bytes`, `string`, `proto:...`           | The last key wins                                                                                                                                                                                                                  |
+| `set_if_not_exists` | `bytes`, `string`, `proto:...`           | The first key wins                                                                                                                                                                                                                 |
+| `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up                                                                                                                                                                                                               |
+| `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept                                                                                                                                                                                                           |
+| `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept                                                                                                                                                                                                          |
+| `append`            | `string`, `bytes`                        | Both keys are concatenated in order. Appended values are limited to 8Kb.  Aggregation pattern examples are available in the [`lib.rs`](https://github.com/streamingfast/substreams-uniswap-v3/blob/develop/src/lib.rs#L760) file.  |
 
 
 
@@ -104,7 +104,7 @@ Get mode provides the module with the key-value store guaranteed to be in sync u
 **Note:** Store method behavior is defined as:
 
 * The `get_last` method is the fastest because it queries the store directly.&#x20;
-* The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in this block.&#x20;
+* The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.&#x20;
 * The `get_at` method will unwind deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
 {% endhint %}
 

@@ -12,7 +12,7 @@ Get an API **Token** using:
 
 {% code overflow="wrap" %}
 ```bash
-export STREAMINGFAST_KEY=server_123123 # Make this your own
+export STREAMINGFAST_KEY=server_123123 # Use your own key
 export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
 ```
 {% endcode %}
@@ -35,7 +35,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 ```
 {% endcode %}
 
-This [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer, using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the given [spkg package](../reference-and-specs/packages.md), starting at the given block, and stopping after processing one block. It will stream the output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md).
+The [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) will be streamed to the requesting client.
 
 {% hint style="info" %}
 If you prefer streaming using third-party languages, try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example.
@@ -208,7 +208,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yam
 
 ## **Next steps**
 
-The takeaways at this point are:
+The takeaways are:
 
 1. Substreams is platform independent and is used across many different blockchains.
 2. Block data for individual blockchains follows a different structure and model.
@@ -236,7 +236,7 @@ Error: rpc error: code = InvalidArgument desc = validate request: input source "
 ```
 {% endcode %}
 
-A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible. The error is informing you about this issue.
+A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible. The RPC error is informing you about the Block data disparity issue.
 
 To resolve the problem, double-check the code and settings within the Substreams codebase against the endpoint that's being sent to the Substreams CLI. The error is from an Ethereum codebase requesting Solana Blocks.&#x20;
 

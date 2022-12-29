@@ -15,7 +15,7 @@ Substreams packages are protobuf-serialized files. The standard extension for Su
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. This enables Substreams packages to be used across multiple code generation tools as a source for schema definitions.
+**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSe. Substreams packages can be used across multiple code generation tools as a source for schema definitions.
 {% endhint %}
 
 ### Creating packages

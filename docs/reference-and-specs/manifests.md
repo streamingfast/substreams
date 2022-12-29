@@ -8,7 +8,7 @@ description: StreamingFast Substreams manifest reference
 
 The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current implementation and identifying the dependencies between the inputs and outputs of modules.
 
-This page provides a reference guide of _all_ fields and values used in a Substreams manifest.
+The Substreams manifest reference documentation provides a guide for _all_ fields and values used in a Substreams manifest.
 
 ### Specification version
 
@@ -185,11 +185,11 @@ The identifier for the module, starting with a letter, followed by a maximum of 
 It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Packages need to use unique names.
 
 {% hint style="info" %}
-_Note: `modules[].name` also corresponds to the **name of the Rust function** that will be invoked on the compiled WASM code upon execution. It is the same function that will be defined. `#[substreams::handlers::map]`(or`store`) in your Rust code._
+**Note**_:_ `modules[].name` also corresponds to the **name of the Rust function** that will be invoked on the compiled WASM code upon execution. It is the same function that will be defined. `#[substreams::handlers::map]`(or`store`) in your Rus_t code._
 {% endhint %}
 
 {% hint style="success" %}
-_Tip: When importing another package, all module names will be prefixed with the package's name and a colon. This prefixing ensures that there will be no name clashes across multiple imported packages and nearly any names can be safely used._
+**Tip**_:_ When importing another package, all module names will be prefixed with the package's name and a colon. Prefixing ensures that there will be no name clashes across multiple imported packages and nearly any names can be safely used.
 {% endhint %}
 
 #### `modules[].initialBlock`
@@ -239,9 +239,9 @@ Values for `modules[].valueTypes` are as follows.
 
 #### `modules[].binary`
 
-An identifier defined in the [`binaries`](manifests.md#binaries) section.
+An identifier defined in the [`binaries`](manifests.md#binaries) section of the Substreams manifest.
 
-The `modules[].binary` module will execute using the code provided. This allows multiple WASM definitions for different modules enabling caching while iterating on the WASM code.
+The `modules[].binary` module will execute using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
 
 #### `modules[].inputs`
 

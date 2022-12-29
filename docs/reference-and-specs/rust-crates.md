@@ -19,8 +19,8 @@ If a crate is not available for Substreams, you can use the `spkg` release for t
 
 Any third-party library capable of compiling `wasm32` can be used for execution in Substreams services.&#x20;
 
-Some libraries include kernel syscalls or other operations that are not available in the Substreams execution environment and cannot be compiled to WASM. Keep this in mind when selecting libraries to include in your Substreams project.
+Some libraries include kernel syscalls or other operations that are not available in the Substreams execution environment and cannot be compiled to WASM. The internal functionality of third-party libraries is an important consideration when using them with Substreams.
 
-Here's a very inexhaustive list of things people found useful:
+Useful information people found using third-party libraries with Substreams:
 
 * [`tiny_keccak`](https://docs.rs/tiny-keccak): an implementation of Keccak-derived functions specified in FIPS-202, SP800-185, and KangarooTwelve.

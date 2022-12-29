@@ -34,7 +34,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 * `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
-Passing a different `-s` (or `--start-block`) will run any prior modules at high speed. This provides output at the requested start block while keeping snapshots along the way, in case you want to process it again.
+Passing a different `-s` (or `--start-block`) runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
 
 Example output of `gravatar_updates` starting at block 6200807.
 
@@ -81,7 +81,7 @@ Package name: solana_spl_transfers
 Version: v0.5.2
 Doc: Solana SPL Token Transfers stream
 
-  This streams out SPL token transfers to the nearest human being.
+  Stream SPL token transfers to the nearest human being.
 
 Modules:
 ----
@@ -128,7 +128,7 @@ Mermaid generated graph diagram
 
 ### `inspect`
 
-This command goes deep into the file structure of a package (`yaml` or `spkg`). The `inspect` command is used mostly for debugging, _or for the curious ;)_
+The `inspect` command reaches deep into the file structure of a package (`yaml` or `spkg`). The `inspect` command is used mostly for debugging, _or for the curious ;)_
 
 ```
 $ substreams inspect ./substreams.yaml | less

@@ -22,7 +22,7 @@ First, start the Substreams CLI tool passing it a `run` command.
 
 #### Firehose URI
 
-The server address is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
+The server address is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address, which is a running Firehose instance.\
 `-e mainnet.eth.streamingfast.io:443`
 
 #### Substreams YAML configuration file

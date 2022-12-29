@@ -52,7 +52,7 @@ Substreams modules are composed through a [directed acyclic graph](https://en.wi
 
 The Substreams manifest references the modules, and the handlers defined within them and form the intention of how they are used by the Substreams engine.&#x20;
 
-Directed acyclic graphs contain nodes, in this case, modules, that communicate in only one direction, passing from one node, or module, to another.
+Directed acyclic graphs contain nodes. The nodes in the graph are modules that communicate in only one direction, passing from one node, or module, to another.
 
 The Substreams engine creates the “compute graph”, or “dependency graph” at run time through commands sent to the Substreams CLI using code in modules referenced by the manifest.
 

@@ -30,9 +30,9 @@ fireeth tools generate-irreversible-index ./localblocks ./localirr 6810000 68197
 
 ### Write a configuration file
 
-Use this code for the Firehose configuration file. Additional information is available in the [Firehose documentation](https://firehose.streamingfast.io/).
+Use the code in the `config.yaml` file for the Firehose configuration file. Additional information for configuration is available in the [Firehose documentation](https://firehose.streamingfast.io/).
 
-{% code title="config.yaml" lineNumbers="true" %}
+{% code title="config.yaml" overflow="wrap" lineNumbers="true" %}
 ```yaml
 start:
   args:

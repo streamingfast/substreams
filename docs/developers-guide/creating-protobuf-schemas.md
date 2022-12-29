@@ -52,7 +52,7 @@ message Transfer {
 ```
 {% endcode %}
 
-View this file in the repository:
+View the `erc721.proto` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 
@@ -63,7 +63,10 @@ The ERC721 smart contract associated with the Substreams Template example contai
 The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.
 
 {% hint style="success" %}
-**Tip**: Protobufs are platform-independent and are defined and used for various blockchains. The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications. The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
+**Tip**: Protobufs are platform-independent and are defined and used for various blockchains.&#x20;
+
+* The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.&#x20;
+* The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
 {% endhint %}
 
 {% hint style="info" %}
@@ -102,7 +105,7 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View this file in the repository:
+View the `mod.rs` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
 
@@ -131,14 +134,16 @@ if let Some(location) = person.location {
 }
 ```
 
-If a value is present use the `.unwrap()` call on the `Option` to obtain the wrapped data. This is true if you control the creation of the messages yourself or if the field is documented as always being present
+If a value is present, use the `.unwrap()` call on the `Option` to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
 
 {% hint style="info" %}
-**Note**: Be 100% sure that the field is always present, otherwise Substreams will panic and never complete, being stuck on this block forever.
+**Note**: You need to be absolutely sure that the field is always defined, otherwise Substreams will panic and never complete, being stuck on a block indefinitely.
 {% endhint %}
 
-Additional information is available for `prost`, the tool generating the Rust code from Protobuf definitions, in its official GitHub repository.
+_**PROST!**_ is a tool for generating Rust code from Protobuf definitions. Additional information for `prost` is available in the project's official GitHub repository.
 
 [https://github.com/tokio-rs/prost](https://github.com/tokio-rs/prost)
 
-_Learn more about_[ _Option_](https://doc.rust-lang.org/rust-by-example/std/option.html) _in the official Rust documentation._
+Learn more about[ Option](https://doc.rust-lang.org/rust-by-example/std/option.html) in the official Rust documentation.
+
+[https://doc.rust-lang.org/rust-by-example/std/option.html](https://doc.rust-lang.org/rust-by-example/std/option.html)

@@ -110,7 +110,7 @@ git clone https://github.com/graphprotocol/graph-node
 
 **Running `graph-node`**
 
-You're ready to run `graph-node` at this stage.&#x20;
+You're now ready to run `graph-node!`
 
 Run `graph-node` from its root directory. The `config/graph-node.eth-ropsten.toml` configuration file references the `graph-node` repository directory. Update the paths accordingly.
 

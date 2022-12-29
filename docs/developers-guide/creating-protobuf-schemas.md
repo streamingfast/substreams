@@ -6,15 +6,13 @@ description: StreamingFast Substreams protobuf schemas
 
 ### Protobuf overview
 
-Substreams uses Protocol Buffers (protobufs) as the API for data models specific to the different blockchains. Manifests define references to the protobufs for the Substreams module.
+Substreams uses Google Protocol Buffers extensively. Protocol Buffers (protobufs) are used as the API for data models specific to the different blockchains. Manifests contain references to the protobufs for your Substreams module.
 
 {% hint style="success" %}
 **Tip**: Protobufs define the input and output for modules.
 {% endhint %}
 
-### Protobuf Basics
-
-> Protobufs are Google's language-neutral extensible mechanism for serializing structured data.
+Learn more about the details of Google Protocol Buffers in the official documentation provided by Google.
 
 **Google Protocol Buffer Documentation**
 
@@ -24,12 +22,12 @@ Substreams uses Protocol Buffers (protobufs) as the API for data models specific
 
 [https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
 
-### Protobuf definition
+### Protobuf definition for Substreams
 
 Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) representing a list of ERC721 transfers.
 
 {% hint style="info" %}
-**Note**: The Transfers protobuf in the Substreams Template example is located in the proto directory.
+**Note**: The `Transfers` protobuf in the Substreams Template example is located in the proto directory.
 {% endhint %}
 
 {% code title="eth/erc721/v1/erc721.proto" lineNumbers="true" %}

@@ -1,14 +1,14 @@
 ---
-description: Working with StreamingFast Substreams sinks
+description: StreamingFast Substreams data sinks
 ---
 
 # Substreams sinks
 
 ## **Introduction**
 
-You can route the data captured from a blockchain with Substreams to multiple types of sinks. A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data and you can route data anywhere you're able to imagine.
+You can route the data captured from a blockchain by using Substreams to multiple types of sinks. A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data and you can route data anywhere you're able to imagine.
 
-StreamingFast provides a few examples, libraries, and tools to assist you with routing blockchain data to sinks.
+StreamingFast provides a few examples, libraries, and tools to assist you when routing blockchain data to sinks.
 
 ## **Basics**
 
@@ -16,7 +16,7 @@ Databases and flat files are standard storage types however you can pipe Substre
 
 An important design aspect of Substreams is the decision to rely on Google Protocol Buffers, also called protobufs, for data packaging and transmission.&#x20;
 
-Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to working with data passed from one application to another.
+Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to using data that is passed from one application to another.
 
 {% hint style="success" %}
 **Tip**: The platform-independent, data-centric capabilities of protobufs give you the opportunity to package and route data captured by Substreams to other sources, including sinks.
@@ -66,7 +66,7 @@ StreamingFast provides several tools to assist database persistence for Substrea
 
 ## **Build a sink**
 
-StreamingFast provides tools allowing you to route blockchain data to a few different types of data storage sinks, or means of importation. The types of sinks with tools provided by StreamingFast aren’t the only options. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
+StreamingFast provides tools allowing you to route blockchain data to a few different types of data storage sinks, or means of importation; however StreamingFast sink tools aren’t the only options. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
 
 {% hint style="success" %}
 **Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, lacking Substreams sink tools. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.

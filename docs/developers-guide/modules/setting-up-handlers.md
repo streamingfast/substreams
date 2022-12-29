@@ -87,7 +87,7 @@ The `substreams` crate offers all the basic building blocks for the handlers.
 
 The `substreams-ethereum` crate offers all the Ethereum constructs including blocks, transactions, eth, and useful `ABI` decoding capabilities.
 
-Because code is being built with WASM output it's necessary to configure Rust to match the correct architecture. Create and add a `rust-toolchain.toml` file at the root of the Substreams directory.
+Because code is being built by WASM output it's necessary to configure Rust to match the correct architecture. Create and add a `rust-toolchain.toml` file at the root of the Substreams directory.
 
 #### Rust toolchain
 
@@ -125,7 +125,7 @@ target = "wasm32-unknown-unknown"
 ```
 {% endcode %}
 
-With the configuration file in place, the `cargo build` command is now equivalent to `cargo build --target wasm32-unknown-unknown`, so you don't have to specify the target manually every time you build.
+The `config.toml` configuration file updates the default `cargo build` command to `cargo build --target wasm32-unknown-unknown` eliminating the need to specify the target manually every time you build.
 {% endhint %}
 
 ### ABI generation

@@ -58,7 +58,7 @@ View the `erc721.proto` file in the repository:
 
 #### Identifying data types
 
-The ERC721 smart contract associated with the Substreams Template example contains a Transfer event. You can reach the event data through a custom protobuf.
+The ERC721 smart contract used in the Substreams Template example contains a `Transfer` event. You can use the event data through a custom protobuf.
 
 The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.
 
@@ -70,7 +70,7 @@ The protobuf file serves as the interface between the module handlers and the da
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: The Substreams Template example extracts `Transfer` events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
+**Note**: The Substreams Template example extracts `Transfer` events from the Bored Ape Yacht Club smart contract which is located on the Ethereum blockchain.
 {% endhint %}
 
 Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Complex protobufs are created and refined based on the various data types used across the different blockchains.
@@ -115,15 +115,15 @@ Protocol buffers define fields' type by using standard primitive data types, suc
 
 Any primitive data types in a message generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. &#x20;
 
-Rust generates the corresponding `message` type wrapped with an `Option` enum type for fields referencing other complex `messages`. The `None` variant is used if the field is not present in the message.
+Rust generates the corresponding `message` type wrapped by an `Option` enum type for fields referencing other complex `messages`. The `None` variant is used if the field is not present in the message.
 
-The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. `Option` allows developers to distinguish between a field containing a value versus a field not set with a value.&#x20;
+The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. `Option` allows developers to distinguish between a field containing a value versus a field not assigned a value.&#x20;
 
 {% hint style="info" %}
 **Note**: The standard approach to represent nullable data in Rust is to wrap optional values in `Option<T>`.
 {% endhint %}
 
-The Rust `match` keyword is used to compare the value of an `Option` with a `Some` or `None` variant. Handle a type wrapped `Option` in Rust by using:
+The Rust `match` keyword is used to compare the value of an `Option` to a `Some` or `None` variant. Handle a type wrapped `Option` in Rust by using:
 
 ```rust
 match person.Location {
@@ -132,7 +132,7 @@ match person.Location {
 }
 ```
 
-If you are only interested in dealing with the presence of a value, use the `if let` statement to handle the `Some(x)` arm of the `match` code.
+If you are only interested in finding the presence of a value, use the `if let` statement to handle the `Some(x)` arm of the `match` code.
 
 ```rust
 if let Some(location) = person.location {

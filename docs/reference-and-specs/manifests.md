@@ -45,8 +45,8 @@ The `package.name` field infers the filename when the `pack` command is run by u
   `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`
 * The regular expression translates to:
   * 64 characters maximum
-  * Separate words with `_`
-  * Starts with `a-z` or `A-Z` and can contain numbers thereafter
+  * Separate words by using `_`
+  * Starts by using `a-z` or `A-Z` and can contain numbers thereafter
 
 #### Package version
 
@@ -83,7 +83,7 @@ imports:
 
 The _value_ is a pointer to a Substreams manifest or a Substreams [package](packages.md).
 
-The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
+The filename can be absolute or relative or a remote path prefixed by `http://` or `https://`.
 
 Imports differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching spkg file created for the Ethereum blockchain. Solana, and other blockchains, reference a different spkg or resources specific to the selected chain.
 
@@ -110,7 +110,7 @@ The Substreams packager loads files in any of the listed `importPaths`.
 **Note**: The `imports` section of the manifest also affects which `.proto` files end up in the package.
 {% endhint %}
 
-Protobufs are packaged with the modules to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
+Protobufs and modules are packaged together to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
 
 Refer to the [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
 
@@ -140,10 +140,10 @@ The binary used in the modules section of the manifest can be overridden by defi
 
 #### `binaries[name].type`
 
-The type of code and implied VM for execution.
+The type of code and implied virtual machine for execution.
 
 {% hint style="info" %}
-**Note:** At there is only one VM available with a value of: `wasm/rust-v1`.
+**Note:** There is only one virtual machine available that uses a value of: `wasm/rust-v1`.
 {% endhint %}
 
 #### `binaries[name].file`
@@ -180,7 +180,7 @@ Excerpt pulled from the example Substreams manifest.
 
 #### `modules[].name`
 
-The identifier for the module, starting with a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply to the `package.name` field.
+The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply to the `package.name` field.
 
 It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Packages need to use unique names.
 
@@ -189,7 +189,7 @@ It is the reference identifier used on the command line and in [`inputs`](manife
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**_:_ When importing another package, all module names are prefixed with the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and nearly any names can be safely used.
+**Tip**_:_ When importing another package, all module names are prefixed by the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and nearly any names can be safely used.
 {% endhint %}
 
 #### `modules[].initialBlock`
@@ -202,7 +202,7 @@ If all the inputs have the same `initialBlock` the field can be omitted and its 
 
 #### `modules[].kind`
 
-There are two module types associated with `modules[].kind`:
+There are two module types for `modules[].kind`:
 
 * `map`
 * `store`

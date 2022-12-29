@@ -39,8 +39,8 @@ The `valueType` property instructs the Substreams runtime of the data to be save
 | `proto:fully.qualified.Object` | Decode bytes by using the protobuf definition `fully.qualified.Object`           |
 | `int64`                        | A string-serialized integer by using int64 arithmetic operations                 |
 | `float64`                      | A string-serialized floating point value, used for float64 arithmetic operations |
-| `bigint`                       | A string-serialized integer, with precision of any depth                         |
-| `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits      |
+| `bigint`                       | A string-serialized integer, supporting precision of any depth                   |
+| `bigfloat`                     | A string-serialized floating point value, supporting precision up to 100 digits  |
 
 #### `updatePolicy` property
 
@@ -83,7 +83,7 @@ Ordinals allow a key-value store to have multiple versions of a key within a sin
 For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B _and between B and D._&#x20;
 
 {% hint style="warning" %}
-**Important**: Ordinals _**must be set every time a key is set**_ and _**you can only set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
+**Important**: Ordinals _**must be set every time a key is set**_ and _**you can only set keys in increasing ordinal order**_, or by using an ordinal equal to the previous.
 {% endhint %}
 
 In situations where a single key for a block is required and ordering in the store is not important, the ordinal uses a value of zero.

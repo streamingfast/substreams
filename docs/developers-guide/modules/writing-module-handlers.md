@@ -219,7 +219,7 @@ The `add` operation may be called multiple times during execution, for various r
 **Note**: Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 {% endhint %}
 
-If an ordinal is specified, the order of execution is guaranteed. In the example, when the store handler is executed with a given set of inputs, such as a list of transfers, it emits the same number of `add` calls and ordinal values for the execution.
+If an ordinal is specified, the order of execution is guaranteed. In the example, when the store handler is executed by a given set of inputs, such as a list of transfers, it emits the same number of `add` calls and ordinal values for the execution.
 
 #### Key
 

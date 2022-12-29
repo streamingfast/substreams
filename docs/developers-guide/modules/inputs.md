@@ -64,7 +64,7 @@ Additional information regarding `maps` is located in the Substreams [modules do
 
 ## Input type `store`
 
-An Input of type `store` represents the state of another store used with the Substreams implementation being created.
+An Input of type `store` represents the state of another store used by the Substreams implementation being created.
 
 The `store` inputs type __ is defined in the Substreams manifest. Similar to maps, stores are named appropriately, indicating the logic contained within them.
 

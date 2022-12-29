@@ -50,7 +50,7 @@ strip = "debuginfo"
 ```
 {% endcode %}
 
-View the file in the repository:
+View the `Cargo.toml` file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
 

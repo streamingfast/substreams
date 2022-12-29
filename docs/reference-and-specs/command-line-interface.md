@@ -11,9 +11,9 @@ The Substreams CLI exposes many commands to developers enabling a range of featu
 {% hint style="info" %}
 **Note**: When a package is specified you can use:&#x20;
 
-* Local `substreams.yaml` files
-* Local `.spkg's`
-* Remote `.spkg` URLs
+* Local `substreams.yaml` configuration files
+* Local `.spkg` package files
+* Remote `.spkg` package URLs
 {% endhint %}
 
 ### **`run`**
@@ -31,7 +31,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
 * `-t +1` (or `--stop-block`) only requests a single block (the stop block is the manifest's `initialBlock` + 1)
-* `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` file.
+* `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
 Passing a different `-s` (or `--start-block`) runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
@@ -73,7 +73,7 @@ Successfully wrote "your-package-v0.1.0.spkg".
 
 ### `info`
 
-The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
+The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` configuration files.
 
 ```bash
 $ substreams info ./substreams.yaml

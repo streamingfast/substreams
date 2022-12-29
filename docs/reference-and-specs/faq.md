@@ -116,4 +116,4 @@ Additional information is available in the Github issue for WASM-bindgen:
 
 ### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
 
-Check to make sure the module's output type matches the `protobuf` definition. In some cases, the renamed  `protobuf` package isn't updated in the `substreams.yaml` manifest's `module.output.type` field for correct alignment.
+Check to make sure the module's output type matches the `protobuf` definition. In some cases, the renamed  `protobuf` package isn't updated in the `substreams.yaml` manifest file's `module.output.type` field for correct alignment.

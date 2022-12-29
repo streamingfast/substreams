@@ -66,14 +66,14 @@ The protobuf file serves as the interface between the module handlers and the da
 **Tip**: Protobufs are platform-independent and are defined and used for various blockchains.&#x20;
 
 * The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.&#x20;
-* The size and scope of the Substreams implementation will dictate the number of and complexity of protobufs.
+* The size and scope of the Substreams implementation dictates the number of and complexity of protobufs.
 {% endhint %}
 
 {% hint style="info" %}
 **Note**: The Substreams Template example extracts `Transfer` events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
 {% endhint %}
 
-Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. You will create more refined and complex protobufs based on the many custom data types existing in the blockchain.
+Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Complex protobufs are created and refined based on the various data types used across the different blockchains.
 
 {% hint style="success" %}
 **Tip**_:_ The use of fully qualified protobuf file paths reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
@@ -113,7 +113,7 @@ View the `mod.rs` file in the repository:
 
 Protocol buffers define fields' type by using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the Google Protocol Buffers documentation.
 
-Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. &#x20;
+Any primitive data types in a message generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. &#x20;
 
 Rust generates the corresponding `message` type wrapped with an `Option` enum type for fields referencing other complex `messages`. The `None` variant is used if the field is not present in the message.
 
@@ -143,7 +143,7 @@ if let Some(location) = person.location {
 If a value is present, use the `.unwrap()` call on the `Option` to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
 
 {% hint style="info" %}
-**Note**: You need to be absolutely sure the field is always defined, otherwise Substreams will panic and never complete, being stuck on a block indefinitely.
+**Note**: You need to be absolutely sure the field is always defined, otherwise Substreams panics and never completes, being stuck on a block indefinitely.
 {% endhint %}
 
 _**PROST!**_ is a tool for generating Rust code from Protobuf definitions. Additional information for `prost` is available in the project's official GitHub repository.

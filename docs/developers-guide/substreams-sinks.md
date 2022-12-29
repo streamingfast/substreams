@@ -31,12 +31,12 @@ The first step of having Substreams consumed by a particular sink involves the c
 For example, database-like Substreams sinks such as PostgreSQL or MongoDB accept a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
 
 {% hint style="success" %}
-**Tip**: Databases are only one type of sink. The sink determines what output type will be respected.
+**Tip**: Databases are only one type of sink. The sink determines the output type to be respected.
 {% endhint %}
 
-The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage.
+The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most perform some kind of storage.
 
-The configuration of the storage layer and its requirements are your responsibility. StreamingFast  will document the infrastructure required for running a Substreams `sink`. Read the documentation to understand the behavior and requirements for the other sink types.
+The configuration of the storage layer and its requirements are your responsibility. StreamingFast  provides documentation for the infrastructure required by various Substreams `sinks.` Read the documentation to understand the behavior and requirements for the other `sink` types.
 
 An understanding of basic Substreams fundamentals is expected before continuing. Learn more about modules in the Substreams documentation.
 
@@ -44,7 +44,7 @@ An understanding of basic Substreams fundamentals is expected before continuing.
 
 ## **Existing and community sinks**
 
-StreamingFast values external contributions for Substreams sinks. If your team has created a sink, contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so it will be included in the Substreams documentation!
+StreamingFast values external contributions for Substreams sinks. If your team has created a sink, contact the StreamingFast team [through Discord](https://discord.gg/mYPcRAzeVN) so it gets included in the Substreams documentation!
 
 The `substreams-eth-block-meta` example demonstrates sinks in action. Check out the source code in the project’s official GitHub repository.
 
@@ -72,10 +72,10 @@ StreamingFast provides tools allowing you to route blockchain data to a few diff
 **Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, lacking Substreams sink tools. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
 {% endhint %}
 
-You will design protobufs to use for transferring data out of Substreams into the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling you to capture, further process, use and store data provided by Substreams in different capacities.
+Protobufs are designed to use for transferring data out of Substreams into the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling you to capture, further process, use and store data provided by Substreams in different capacities.
 
 {% hint style="info" %}
-**Note**: Through careful design of the Substreams manifest, modules, and protobufs you will be able to craft your output data in a variety of ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
+**Note**: Through careful design of the Substreams manifest, modules, and protobufs you can craft your output data in a variety of ways. One option, as seen in the PostgreSQL example is through a single output protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
 {% endhint %}
 
-You need to examine and account for the format and any requirements of the end environment you want your data routed. The specifics of how data is ingested by the sink will determine the design of the output from Substreams.
+You need to examine and account for the format and any requirements of the end environment you want your data routed. The specifics of how data is ingested by the sink determine the design of the output from Substreams.

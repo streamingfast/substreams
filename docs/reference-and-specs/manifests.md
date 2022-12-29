@@ -85,7 +85,7 @@ The _value_ is a pointer to a Substreams manifest or a Substreams [package](pack
 
 The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
 
-Imports will differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching spkg file created for the Ethereum blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the selected chain.
+Imports differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching spkg file created for the Ethereum blockchain. Solana, and other blockchains, reference a different spkg or resources specific to the selected chain.
 
 ### Protobuf
 
@@ -104,10 +104,10 @@ protobuf:
     - ../../external-proto
 ```
 
-The Substreams packager will load files in any of the listed `importPaths`.
+The Substreams packager loads files in any of the listed `importPaths`.
 
 {% hint style="info" %}
-**Note**: The `imports` section of the manifest will also affect which `.proto` files end up in the package.
+**Note**: The `imports` section of the manifest also affects which `.proto` files end up in the package.
 {% endhint %}
 
 Protobufs are packaged with the modules to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
@@ -151,7 +151,7 @@ The type of code and implied VM for execution.
 The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the directory the manifest is located in; typically the root of the Substreams implementation.
 
 {% hint style="success" %}
-**Tip**: The WASM file referenced by the `binary` field will be picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the Substreams CLI.
+**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the Substreams CLI.
 {% endhint %}
 
 ### Modules
@@ -189,14 +189,14 @@ It is the reference identifier used on the command line and in [`inputs`](manife
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**_:_ When importing another package, all module names will be prefixed with the package's name and a colon. Prefixing ensures there will be no name clashes across multiple imported packages and nearly any names can be safely used.
+**Tip**_:_ When importing another package, all module names are prefixed with the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and nearly any names can be safely used.
 {% endhint %}
 
 #### `modules[].initialBlock`
 
-The initial block for the module is where Substreams is will begin processing data for a particular module. The runtime will simply never process blocks prior to the one for any given module.
+The initial block for the module is where Substreams begins processing data for a particular module. The runtime never processes blocks prior to the one for any given module.
 
-If all the inputs have the same `initialBlock` the field can be omitted and its value will be inferred by its dependent [`inputs`](manifests.md#modules-.inputs).
+If all the inputs have the same `initialBlock` the field can be omitted and its value is inferred by its dependent [`inputs`](manifests.md#modules-.inputs).
 
 `initialBlock` becomes mandatory when inputs have _different_ values.
 
@@ -241,7 +241,7 @@ Values for `modules[].valueTypes` are as follows.
 
 An identifier defined in the [`binaries`](manifests.md#binaries) section of the Substreams manifest.
 
-The `modules[].binary` module will execute by using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
+The `modules[].binary` module executes by using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
 
 #### `modules[].inputs`
 
@@ -273,4 +273,4 @@ output:
     type: proto:eth.erc721.v1.Transfers
 ```
 
-The value for `type` will always be prefixed with `proto:` followed by a definition specified in the protobuf definitions, and referenced in the [`protobuf`](manifests.md#protobuf) section.
+The value for `type` is always prefixed using `proto:` followed by a definition specified in the protobuf definitions, and referenced in the `protobuf` section of the Substreams manifest.

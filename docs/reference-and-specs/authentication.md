@@ -38,7 +38,7 @@ export SUBSTREAMS_API_TOKEN="your_token"
 **Tip**: Surround the token in quotes.&#x20;
 {% endhint %}
 
-The `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token by default.
+The `substreams run` command checks the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token by default.
 
 {% hint style="info" %}
 **Note**_:_ **Authentication Token Env Flag**
@@ -49,7 +49,7 @@ The `substreams run` command will check the `SUBSTREAMS_API_TOKEN` environment v
 
 ### Environment variable script
 
-Run the `bash` function from the command line to obtain a token. The function will be placed in the `.bashrc` file, located in your computer's home directory.&#x20;
+Run the `bash` function from the command line to obtain a token. The function is placed in the `.bashrc` file, located in your computer's home directory.&#x20;
 
 ```bash
 # Ask us on Discord for a key

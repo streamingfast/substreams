@@ -6,7 +6,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 ### Substreams Fundamentals
 
-You will create and touch several pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [Substreams command line interface](../reference-and-specs/command-line-interface.md), configuration files, [modules](modules.md), and [protobufs](../developers-guide/creating-protobuf-schemas.md).
+Substreams development requires the use of several different pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [Substreams command line interface](../reference-and-specs/command-line-interface.md), [modules](modules.md), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types
 
 The documentation explains how the different pieces fit together.
 
@@ -88,7 +88,7 @@ Protobufs provide an API to the data for smart contract addresses.
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM.png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
 
-Designing an overall strategy for how to manage and transform data is the first thing developers will do when creating a Substreams implementation. Substreams modules are processed by the engine through the use of the relationships defined in the manifest.&#x20;
+Designing an overall strategy for how to manage and transform data is the first step in Substreams development. Substreams modules are processed by the engine through the use of the relationships defined in the manifest.&#x20;
 
 {% hint style="info" %}
 _**Note**:_ Substreams modules work together by passing data from one module to another until finally returning an output transformed according to the rules in the manifest, modules, and module handler functions.&#x20;

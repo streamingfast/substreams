@@ -46,7 +46,7 @@ The Substreams documentation also provides general instructions surrounding auth
 
 ### **How do I create a Substreams module?**
 
-Developers will create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground containing examples to use as a reference and starting point.
+Developers create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground containing examples to use as a reference and starting point.
 
 [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
 
@@ -68,7 +68,7 @@ Yes, Substreams is an open source project and is available to the public for fre
 
 ### **How does a developer reach the information returned from a call to Substreams from a web-based UI?**
 
-Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams will reach Subgraphs, as a data source, and make GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not Substreams’ responsibility.
+Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams reaches Subgraphs, as a data source, and makes GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not the responsibility of Substreams.
 
 ### Is it possible to listen for new blocks?
 

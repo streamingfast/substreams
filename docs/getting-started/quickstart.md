@@ -35,7 +35,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 ```
 {% endcode %}
 
-The [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) will be streamed to the requesting client.
+The [`run`](../reference-and-specs/command-line-interface.md#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
 
 {% hint style="info" %}
 Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages
@@ -45,7 +45,7 @@ Try the [Python](https://github.com/streamingfast/substreams-playground/tree/mas
 
 Substreams is platform independent, meaning you can use many different blockchains.&#x20;
 
-Developers will typically use a specific blockchain and build a Substreams module tailored to the selected chain.&#x20;
+Developers select a specific blockchain and build a Substreams module tailored to the selected chain.&#x20;
 
 Data is available for any blockchain exposing an operational Firehose endpoint, installed and set up in [an on-premises environment](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), or [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
 
@@ -75,7 +75,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.ya
 ```
 {% endcode %}
 
-Different blockchains have specific requirements for their data definitions. The code in the module handlers will need to be updated accordingly for the different blockchains.
+Different blockchains have specific requirements for their data definitions. The code in the module handlers needs to be updated to match the expectations of the different blockchains.
 
 ### **Crates and packages**
 
@@ -150,7 +150,7 @@ The steps to follow to use the example include:&#x20;
 * Compiling the example by using the Rust compiler
 * Sending commands to the Substreams CLI
 
-At the root of the example project, you will generate the structs from the protobuf specified in the YAML file by using:
+Generate the structs from the protobuf specified in the YAML file by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -180,9 +180,9 @@ Clone or download the Solana example codebase. Find the example in the official 
 
 [https://github.com/streamingfast/substreams-solana-tutorial](https://github.com/streamingfast/substreams-solana-tutorial)
 
-After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example will stand out immediately.
+After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example stand out immediately.
 
-A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle although others are not.
+A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin were constructed and designed differently. Some of the differences are small and subtle although others are not.
 
 Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the block passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields. The disparities in the field names are due to differences in the block model for the separate blockchains.
 
@@ -219,10 +219,10 @@ The takeaways are:
 5. Custom protobufs are created to pass data from one module to another.
 
 {% hint style="info" %}
-**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains will enable you to graduate to build even more complex solutions!
+**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains enables you to graduate to build even more complex solutions!
 {% endhint %}
 
-Understanding map and store modules is important for understanding how to design and craft a fully directed acyclic graph in your Substreams manifest.
+Understanding map and store modules are important for learning how to design and craft a fully directed acyclic graph in your Substreams manifest.
 
 Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's Guide](../developers-guide/overview.md).&#x20;
 

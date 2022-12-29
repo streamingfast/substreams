@@ -17,7 +17,7 @@ Store modules write to key-value stores.&#x20;
 **Note**: To ensure successful and proper parallelization store modules are not permitted to read any of their own data or values.
 {% endhint %}
 
-Stores declaring their own data types will expose methods capable of mutating keys within the store.
+Stores declaring their own data types expose methods capable of mutating keys within the store.
 
 ### Core principle usage of stores
 
@@ -67,7 +67,7 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 **Note**_**:** _ The **merge strategy** is applied **during** parallel processing.&#x20;
 
 * A module has built two partial stores containing keys for segment A (blocks 0-1000) and segment B (blocks 1000-2000) and is prepared to merge them into a complete store.
-* The complete store will be represented as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
+* The complete store is represented acting as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
 {% endhint %}
 
 {% hint style="warning" %}
@@ -86,7 +86,7 @@ For example, the price for a token can change after transaction B and transactio
 **Important**: Ordinals _**must be set every time a key is set**_ and _**you can only set keys in increasing ordinal order**_, or with an ordinal equal to the previous.
 {% endhint %}
 
-In situations where a single key for a block is required and ordering in the store is not important, the ordinal will use a value of zero.
+In situations where a single key for a block is required and ordering in the store is not important, the ordinal uses a value of zero.
 
 ### Store modes
 
@@ -104,8 +104,8 @@ The `get mode` function provides the module with a key-value store that is guara
 **Note:** Store method behavior is defined as:
 
 * The `get_last` method is the fastest because it queries the store directly.&#x20;
-* The `get_first` method will first go through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.&#x20;
-* The `get_at` method will unwind deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
+* The `get_first` method first goes through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.&#x20;
+* The `get_at` method unwinds deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
 {% endhint %}
 
 #### `deltas mode`

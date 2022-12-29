@@ -108,9 +108,9 @@ Also notice, there is one input and one output definition.
 
 The input uses the standard Ethereum Block, `sf.ethereum.type.v2.Block,` provided by the `substreams-ethereum` crate.
 
-The output is uses the type `proto:eth.erc721.v1.Transfers`. which is a custom protobuf definition provided by the generated Rust code.&#x20;
+The output uses the type `proto:eth.erc721.v1.Transfers` which is a custom protobuf definition provided by the generated Rust code.&#x20;
 
-The function signature is produced:
+The function signature produced is:
 
 ```rust
 #[substreams::handlers::map]
@@ -126,8 +126,9 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 * The macro decorates the handler function as a map. Store modules are specified by using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events emitted by the tracked contract. As the events are found they will be decoded into `Transfer` objects.
+The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events emitted by the tracked contract. As the events are found they are decoded into `Transfer` objects.
 
+{% code overflow="wrap" %}
 ```rust
 /// Extracts transfers events from the contract
 #[substreams::handlers::map]
@@ -150,6 +151,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
     })
 }
 ```
+{% endcode %}
 
 Define the `store` module. As a reminder, here is the module definition from the example Substreams manifest.
 
@@ -164,7 +166,7 @@ Define the `store` module. As a reminder, here is the module definition from the
 ```
 
 {% hint style="info" %}
-_Note: `name: store_transfers` will also correspond to the handler function name._
+**Note:** `name: store_transfers` corresponds to the handler function name.
 {% endhint %}
 
 The input corresponds to the output of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. The custom protobuf definition is provided by the generated Rust code.
@@ -177,7 +179,7 @@ fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 ```
 
 {% hint style="info" %}
-**Note**: __ the `store` will always receive itself as its own last input.
+**Note**: __ the `store` always receives itself as its own last input.
 {% endhint %}
 
 In the example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
@@ -185,7 +187,7 @@ In the example the `store` module uses an `updatePolicy` set to `add` and a `val
 {% hint style="info" %}
 **Note**: **Store types**
 
-* The writable store will always be the last parameter of a store module function.
+* The writable store is always the last parameter of a store module function.
 * The type of the writable store is determined by the `updatePolicy` and `valueType` of the store module.
 {% endhint %}
 
@@ -193,11 +195,9 @@ The goal of the `store` in the example is to track a holder's current NFT count 
 
 **Transfer in detail**
 
-If the transfer's `from` address field contains the null address (`0x0000000000000000000000000000000000000000`), and the `to` address field is not the null address, the `to` address field is minting a token, so the count will be incremented.
-
-If the transfer's `from` address field is not the null address, _and_ the `to` address field is the null address, the `from` address field is burning a token, so the count will be decremented.
-
-If the `from` address field and the `to` address field is not a null address, the count will be decremented of the `from` address, and increment the count of the `to` address for basic transfers.
+* If the "`from`" address of the `transfer` is the `null` address (`0x0000000000000000000000000000000000000000`) and the "`to`" address is not the `null` address, the "`to`" address is minting a token, which results in the `count` being incremented.
+* If the "`from`" address of the `transfer` is not the `null` address and the "`to`" address is the `null` address, the "`from`" address has burned a token, which results in the `count` being decremented.
+* If both the "`from`" and the "`to`" address is not the `null` address, the `count` is decremented from the "`from`" address and incremented for the "`to`" address.
 
 ### Store concepts
 
@@ -209,9 +209,9 @@ When writing to a store, there are three important concepts to consider:&#x20;
 
 #### Ordinal
 
-Ordinal represents the order in which the `store` operations will be applied.
+Ordinal represents the order in which the `store` operations are applied.
 
-The `store` handler will be called once per `block.`
+The `store` handler is called once per `block.`
 
 The `add` operation may be called multiple times during execution, for various reasons such as discovering a relevant event or encountering a call responsible for triggering a method call.
 
@@ -219,18 +219,18 @@ The `add` operation may be called multiple times during execution, for various r
 **Note**: Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 {% endhint %}
 
-If an ordinal is specified, the order of execution is guaranteed. In the example, when the store handler is executed with a given set of inputs, such as a list of transfers, it will emit the same number of `add` calls and ordinal values for one execution.
+If an ordinal is specified, the order of execution is guaranteed. In the example, when the store handler is executed with a given set of inputs, such as a list of transfers, it emits the same number of `add` calls and ordinal values for the execution.
 
 #### Key
 
 Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure it is unique _and flexible_.
 
-If the generate\_key function in the example returns the TRACKED\_CONTRACT address as the key, it will not be unique among different token holders.
+If the generate\_key function in the example returns the TRACKED\_CONTRACT address as the key, it is not unique among different token holders.
 
-The `generate_key` function will return a unique key for holders if it contains only the holder's address.
+The `generate_key` function returns a unique key for holders if it contains only the holder's address.
 
 {% hint style="warning" %}
-**Important**: Issues will be encountered when attempting to track multiple contracts.
+**Important**: Issues are expected when attempting to track multiple contracts.
 {% endhint %}
 
 #### Value

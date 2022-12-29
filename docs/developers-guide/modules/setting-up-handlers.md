@@ -54,7 +54,7 @@ View the file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
 
-The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
+The Rust code is compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
 ### **Cargo.toml breakdown**
 
@@ -73,11 +73,11 @@ Handlers compile down to a WASM module. Explicitly specify the target`asm32-unkn
 
 #### `ethabi`
 
-The `ethabi` crate will be used to decode events from the Application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
+The `ethabi` crate is used to decode events from the Application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
 
 #### `hex-literal`
 
-The `hex-literal` crate will be used to define bytes from hexadecimal string literal at compile time.
+The `hex-literal` crate is used to define bytes from hexadecimal string literal at compile time.
 
 #### `substreams`
 

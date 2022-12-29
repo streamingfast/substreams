@@ -55,7 +55,7 @@ Data is available for any blockchain that has a functional Firehose endpoint, in
 
 ### **Basics**
 
-The most basic approach to using Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine should process. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+The most basic approach to using Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine processes. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
 The command demonstrates modules targeting the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
 
@@ -108,7 +108,7 @@ $ cargo add substreams-solana
 ```
 
 {% hint style="success" %}
-**Tip**: Crates should be used if they are available for the target blockchain.\
+**Tip**: Crates are used if they are available for the target blockchain.\
 \
 Alternatively, generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. See [Rust crates](../reference-and-specs/rust-crates.md) for details.
 {% endhint %}
@@ -178,7 +178,7 @@ Clone or download the Solana example codebase. Find the example in the official 
 
 [https://github.com/streamingfast/substreams-solana-tutorial](https://github.com/streamingfast/substreams-solana-tutorial)
 
-After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example should begin to stand out immediately.
+After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example will stand out immediately.
 
 A very important difference between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin will be constructed and designed differently. Some of the differences are small and subtle while others are not.
 

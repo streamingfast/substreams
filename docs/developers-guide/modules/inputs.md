@@ -99,7 +99,7 @@ Constraints for stores are defined as:
 
 ### `get` mode
 
-Get mode provides a key-value store that is readily queryable and guaranteed to be in sync with the block being processed.&#x20;
+Get mode provides a key-value store readily queryable and guaranteed to be in sync with the block being processed.&#x20;
 
 {% hint style="success" %}
 **Tip**_**:**_ `get` mode is the default mode for modules.
@@ -107,9 +107,9 @@ Get mode provides a key-value store that is readily queryable and guaranteed to 
 
 ### `delta` mode
 
-Modules using delta mode are [protobuf objects](../../../proto/sf/substreams/v1/substreams.proto#L124) and contain all the changes that have occurred in the `store` module available in the same block.&#x20;
+Modules using delta mode are [protobuf objects](../../../proto/sf/substreams/v1/substreams.proto#L124) and contain all the changes occurring in the `store` module available in the same block.&#x20;
 
-Delta mode enables developers with the ability to loop through keys decoding values that were mutated in the module.
+Delta mode enables you to loop through keys and decoding values mutated in the module.
 
 #### Store deltas example
 

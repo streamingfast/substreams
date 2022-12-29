@@ -47,7 +47,7 @@ Substreams is platform independent, meaning you can use many different blockchai
 
 Developers will typically use a specific blockchain and build a Substreams module tailored to the selected chain.&#x20;
 
-Data is available for any blockchain that has a functional Firehose endpoint, installed and set up in [an on-premises environment](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), or [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
+Data is available for any blockchain exposing an operational Firehose endpoint, installed and set up in [an on-premises environment](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), or [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
 
 {% hint style="info" %}
 **Note**: The remaining documentation assumes the Substreams CLI and all other required dependencies have been installed and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
@@ -55,7 +55,7 @@ Data is available for any blockchain that has a functional Firehose endpoint, in
 
 ### **Basics**
 
-The most basic approach to using Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, that the compute engine processes. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+The most basic approach to using Substreams is through the CLI, passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
 The command demonstrates modules using the Ethereum blockchain and instructing the compute engine to execute the `map_basic_eth` Rust function.
 
@@ -129,7 +129,9 @@ Take a moment to explore the codebase. Note the chain name used through the diff
 
 Also notice the module handler, defined in [lib.rs](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs), and the custom protobuf definition in the proto directory named [basicexample.proto](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto).
 
-Note that the module handler in the lib.rs file for the Ethereum example has code specific to that blockchain. The block structure for Ethereum blocks is viewable in the code excerpt.
+{% hint style="info" %}
+**Note**: The module handler in the lib.rs file for the Ethereum example has code specific to the blockchain. The block structure for Ethereum blocks is viewable in the code excerpt.
+{% endhint %}
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust
@@ -236,8 +238,8 @@ Error: rpc error: code = InvalidArgument desc = validate request: input source "
 ```
 {% endcode %}
 
-A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note that data from one chain is not compatible. The RPC error is informing you about the Block data disparity issue.
+A common mistake when first getting started is requesting data for one chain, such as Ethereum, and providing an incorrect chain endpoint, for a different blockchain. It's important to note, data from one chain is not compatible with the others. The RPC error is informing you about the Block data disparity issue.
 
-To resolve the problem, double-check the code and settings within the Substreams codebase against the endpoint that's being sent to the Substreams CLI. The error is from an Ethereum codebase requesting Solana Blocks.&#x20;
+To resolve the problem, double-check the code and settings within the Substreams codebase against the endpoint being sent to the Substreams CLI. The error is from an Ethereum codebase requesting Solana Blocks.&#x20;
 
-Look through the codebase to see what is required by the blockchain configuration for your code. The blocks that are expected are different than what is being sent to the Substreams CLI.
+Look through the codebase to see what is required by the blockchain configuration for your code. The blocks you're expecting are different than what is being sent to the Substreams CLI.

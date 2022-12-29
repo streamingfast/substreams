@@ -16,7 +16,7 @@ Modules have one or more inputs. The inputs can be in the form of a `map` or `st
 Substreams modules data interaction diagram
 {% endembed %}
 
-The diagram shows the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_counter` store module tracks the number of transfers that have occurred.
+The diagram shows how the `transfer_map` module extracts the transfers in a `Block`, tracking the total number of transfers.
 
 {% hint style="info" %}
 **Note:** You can use multiple inputs because blockchains are clocked.&#x20;
@@ -30,7 +30,7 @@ Modules can also take in multiple inputs as seen in the `counters` store example
 Multiple module inputs diagram
 {% endembed %}
 
-All of the modules are executed as a directed acyclic graph (DAG) each time a new `Block` is processed.
+All of the modules are executed as a directed acyclic graph (DAG) every time a new `Block` is processed.
 
 {% hint style="info" %}
 **Note:** The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution.
@@ -41,7 +41,7 @@ All of the modules are executed as a directed acyclic graph (DAG) each time a ne
 Modules have a _**single typed output.**_ Modules are typed to inform consumers of the types of data to expect and also how to interpret the bytes being sent.
 
 {% hint style="success" %}
-**Tip**: Data that is output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.
+**Tip**: Data output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.
 {% endhint %}
 
 ## Next steps

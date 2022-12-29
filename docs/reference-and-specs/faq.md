@@ -24,7 +24,7 @@ No, Substreams is provided as a developer preview.
 
 ### **What is the Substreams CLI?**
 
-The Substreams command line interface (CLI) is the main tool that developers use to use the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for using the CLI is available in the Substreams documentation.
+The Substreams command line interface (CLI) is the main tool developers use to use the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for using the CLI is available in the Substreams documentation.
 
 [https://substreams.streamingfast.io/reference-and-specs/using-the-cli](https://substreams.streamingfast.io/reference-and-specs/using-the-cli)
 
@@ -46,7 +46,7 @@ The Substreams documentation also provides general instructions surrounding auth
 
 ### **How do I create a Substreams implementation?**
 
-Developers will create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground that has examples to use as a reference and starting point.
+Developers will create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground containing examples to use as a reference and starting point.
 
 [https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
 
@@ -102,11 +102,11 @@ Substreams is the successor of [StreamingFast Sparkle](https://github.com/stream
 
 ### **Who is StreamingFast?**
 
-StreamingFast is a protocol infrastructure company that provides a massively scalable architecture for streaming blockchain data. StreamingFast is one of the core developers working alongside The Graph Foundation.
+StreamingFast is a protocol infrastructure company providing a massively scalable architecture for streaming blockchain data. StreamingFast is one of the core developers working alongside The Graph Foundation.
 
 ### Why the `wasm32-unknown-unknown` target?
 
-The first unknown is the system that you are compiling on, and the second is the system you are targeting.
+The first unknown is the system you are compiling on, and the second is the system you are targeting.
 
 “Compile on almost any machine, run on almost any machine.”
 
@@ -116,4 +116,4 @@ Additional information is available in the Github issue for WASM-bindgen:
 
 ### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
 
-Check that the module's output type matches the `protobuf` definition. Sometimes the renamed  `protobuf` package isn't updated in the `substreams.yaml` manifest's `module.output.type` field for correct alignment.
+Check to make sure the module's output type matches the `protobuf` definition. In some cases, the renamed  `protobuf` package isn't updated in the `substreams.yaml` manifest's `module.output.type` field for correct alignment.

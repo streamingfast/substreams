@@ -6,7 +6,7 @@ description: StreamingFast Substreams module types
 
 Substreams uses two types of modules, `map` and `store`.&#x20;
 
-* Map modules are functions that receive bytes as input and output. These bytes are encoded protobuf messages.
+* Map modules are functions receiving bytes as input and output. These bytes are encoded protobuf messages.
 * Store modules are stateful, saving and tracking data through the use of key-value stores.
 
 ### Store modules
@@ -17,7 +17,7 @@ Store modules write to key-value stores.&#x20;
 **Note**: To ensure successful and proper parallelization store modules are not permitted to read any of their own data or values.
 {% endhint %}
 
-Stores that declare their own data types will expose methods capable of mutating keys within the store.
+Stores declaring their own data types will expose methods capable of mutating keys within the store.
 
 ### Core principle usage of stores
 
@@ -30,14 +30,14 @@ The two important store properties are `valueType,`and `updatePolicy`.
 
 #### `valueType` property
 
-The `valueType` property instructs the Substreams runtime of the data that will be saved to the `stores`.
+The `valueType` property instructs the Substreams runtime of the data to be saved in the `stores`.
 
 | Value                          | Description                                                                   |
 | ------------------------------ | ----------------------------------------------------------------------------- |
 | `bytes`                        | A basic list of bytes                                                         |
 | `string`                       | A UTF-8 string                                                                |
 | `proto:fully.qualified.Object` | Decode bytes using the protobuf definition `fully.qualified.Object`           |
-| `int64`                        | A string-serialized integer, that uses int64 arithmetic operations            |
+| `int64`                        | A string-serialized integer using int64 arithmetic operations                 |
 | `float64`                      | A string-serialized floating point value, using float64 arithmetic operations |
 | `bigint`                       | A string-serialized integer, with precision of any depth                      |
 | `bigfloat`                     | A string-serialized floating point value, with a precision up to 100 digits   |
@@ -71,7 +71,7 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_**:** _ To preserve the parallelization capabilities of the system, Substreams is not permitted to read what it has written or read from a store that is being written.
+**Important**_**:** _ To preserve the parallelization capabilities of the system, Substreams is not permitted to read what it has written or read from a store actively being written.
 
 A downstream module is created to read from a store by using one of its inputs to point to the output of the store module.
 {% endhint %}
@@ -110,7 +110,7 @@ Get mode provides the module with the key-value store guaranteed to be in sync u
 
 #### `deltas mode`
 
-Deltas mode provides the module with _all_ _the_ _changes_ that occurred in the source `store` module. Updates, creates, and deletes of the different keys mutated during that specific block become available.
+Deltas mode provides the module with _all_ _the_ _changes_ occurring in the source `store` module. Updates, creates, and deletes of the keys mutated during the block processing become available.
 
 {% hint style="info" %}
 **Note:** When a `store` is set as an input to the module, it is read-only and you cannot modify, update or mutate them.

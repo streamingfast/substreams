@@ -6,10 +6,10 @@ description: StreamingFast Substreams Developer's Guide overview
 
 ### Developer's Guide
 
-The Substreams Developer's Guide explains the process of building a Substreams module that tracks the ERC721 holder count for an Ethereum smart contract.
+The Substreams Developer's Guide explains the process of building a Substreams module responsible for tracking the ERC721 holder count for an Ethereum smart contract.
 
 {% hint style="success" %}
-**Tip**_:_ The Substreams Developer's Guide is focused on an Ethereum Substreams module. The development tasks and workflow are independent of the blockchain that you've selected for your project.
+**Tip**_:_ The Substreams Developer's Guide is focused on an Ethereum Substreams module. The development tasks and workflow are independent of the blockchain selected for your project.
 {% endhint %}
 
 {% hint style="info" %}
@@ -28,7 +28,7 @@ The accompanying template for the Developer's Guide is[ ](https://github.com/str
 
 #### Substreams for Solana
 
-A basic Substreams implementation for the Solana blockchain that demonstrates how to reference the chain-specific SPKG, endpoints, and data models.
+A basic Substreams implementation for the Solana blockchain demonstrates how to reference the chain-specific SPKG, endpoints, and data models.
 
 [https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
 

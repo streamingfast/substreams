@@ -31,7 +31,7 @@ Inform Substreams where to find the `substreams.yaml` configuration file.
 
 #### Module
 
-The `map_transfers` module is defined in the manifest and it is the module that will be run by Substreams.
+The `map_transfers` module is defined in the manifest and it is the module run by Substreams.
 
 #### Block mapping
 

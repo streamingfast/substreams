@@ -60,7 +60,7 @@ Refer to the general [StreamingFast contribution guide](https://github.com/strea
 
 ### License
 
-Substreams is licensed under [Apache 2.0](../LICENSE/).
+Substreams is licensed as [Apache 2.0](../LICENSE/).
 
 ### Disclaimer
 

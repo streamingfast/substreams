@@ -35,7 +35,7 @@ substreams = "0.5"
 # Use latest from https://crates.io/crates/substreams-ethereum
 substreams-ethereum = "0.8"
 
-# Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
+# Required so ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 [target.wasm32-unknown-unknown.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }
 
@@ -54,7 +54,7 @@ View the file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
 
-The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format that is run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
+The Rust code will be compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
 
 ### **Cargo.toml breakdown**
 
@@ -113,7 +113,7 @@ cargo build --target wasm32-unknown-unknown --release
 {% hint style="info" %}
 **Note: Rust build target**
 
-* When running `cargo build`, the target is set to `wasm32-unknown-unknown`, which is important because it specifies that the goal is to generate compiled WebAssembly (WASM) code.
+* When running `cargo build` the target is set to `wasm32-unknown-unknown`, which is important because it specifies the goal is to generate compiled WebAssembly (WASM) code.
 * To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a file called `config.toml` in the `.cargo` directory at the root of the Substreams project. The `config.toml` file allows the target to be set automatically for all `cargo` commands.
 
 The content for the `config.toml` file is:
@@ -141,7 +141,7 @@ Next, add a Rust build script.
 {% hint style="info" %}
 **Note: Rust build script**
 
-* Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process that performs a variety of tasks.
+* Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process responsible for performing a variety of tasks.
 * To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
 {% endhint %}
 
@@ -172,7 +172,7 @@ Run the build script to generate the ABI directory and files.
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-Create a `mod.rs` file in the abi directory (that was created by the Rust build process) to export the generated Rust code.
+Create a `mod.rs` file in the ABI directory, which is created by the Rust build process. The `mod.rs` file is responsible for exporting the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
 ```rust

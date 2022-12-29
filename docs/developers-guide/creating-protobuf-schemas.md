@@ -73,7 +73,7 @@ The protobuf file serves as the interface between the module handlers and the da
 **Note**: The Substreams Template example extracts `Transfer` events associated with the Bored Ape Yacht Club smart contract, located on the Ethereum blockchain.
 {% endhint %}
 
-Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. You will create more refined and complex protobufs based on the many custom data types that exist in the blockchain.
+Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. You will create more refined and complex protobufs based on the many custom data types existing in the blockchain.
 
 {% hint style="success" %}
 **Tip**_:_ Using fully qualified paths for protobuf files reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
@@ -113,9 +113,15 @@ View the `mod.rs` file in the repository:
 
 Protocol buffers define fields' type using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the Google Protocol Buffers documentation.
 
-Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. For fields that reference other complex `messages` Rust generates the corresponding `message` type wrapped with an `Option` enum type, and will use the `None` variant if the field is not present in the message.
+Any primitive data types in a message will generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and will assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. &#x20;
 
-The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. It allows developers to distinguish between a field containing a value and a field that has not been set. The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
+Rust generates the corresponding `message` type wrapped with an `Option` enum type for fields referencing other complex `messages`. The `None` variant is used if the field is not present in the message.
+
+The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. `Option` allows developers to distinguish between a field containing a value versus a field not set with a value.&#x20;
+
+{% hint style="info" %}
+**Note**: The standard approach to represent nullable data when using Rust is by wrapping optional values in `Option<T>`.
+{% endhint %}
 
 The Rust `match` keyword is used to compare the value of an `Option` with a `Some` or `None` variant. Handle a type wrapped `Option` using:
 
@@ -137,7 +143,7 @@ if let Some(location) = person.location {
 If a value is present, use the `.unwrap()` call on the `Option` to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
 
 {% hint style="info" %}
-**Note**: You need to be absolutely sure that the field is always defined, otherwise Substreams will panic and never complete, being stuck on a block indefinitely.
+**Note**: You need to be absolutely sure the field is always defined, otherwise Substreams will panic and never complete, being stuck on a block indefinitely.
 {% endhint %}
 
 _**PROST!**_ is a tool for generating Rust code from Protobuf definitions. Additional information for `prost` is available in the project's official GitHub repository.

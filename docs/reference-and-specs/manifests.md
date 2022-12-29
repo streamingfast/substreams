@@ -85,7 +85,7 @@ The _value_ is a pointer to a Substreams manifest or a Substreams [package](pack
 
 The filename can be absolute or relative or a remote path starting with `http://` or `https://`.
 
-Imports will differ across different blockchains. For example, Substreams modules that use Ethereum will reference an appropriate spkg file created for that blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the chain.
+Imports will differ across different blockchains. For example, Substreams modules using Ethereum will reference an appropriate spkg file created for the Ethereum blockchain. Solana, and other blockchains, will reference a different spkg or resources specific to the selected chain.
 
 ### Protobuf
 
@@ -185,11 +185,11 @@ The identifier for the module, starting with a letter, followed by a maximum of 
 It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Packages need to use unique names.
 
 {% hint style="info" %}
-**Note**_:_ `modules[].name` also corresponds to the **name of the Rust function** that will be invoked on the compiled WASM code upon execution. It is the same function that will be defined. `#[substreams::handlers::map]`(or`store`) in your Rus_t code._
+**Note**_:_ `modules[].name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. It's the same `#[substreams::handlers::map]` as defined in the Rus_t code._ Maps and stores both work in the same fashion.
 {% endhint %}
 
 {% hint style="success" %}
-**Tip**_:_ When importing another package, all module names will be prefixed with the package's name and a colon. Prefixing ensures that there will be no name clashes across multiple imported packages and nearly any names can be safely used.
+**Tip**_:_ When importing another package, all module names will be prefixed with the package's name and a colon. Prefixing ensures there will be no name clashes across multiple imported packages and nearly any names can be safely used.
 {% endhint %}
 
 #### `modules[].initialBlock`

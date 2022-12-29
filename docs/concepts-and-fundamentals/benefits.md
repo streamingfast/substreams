@@ -8,7 +8,7 @@ description: StreamingFast Substreams benefits and comparisons
 
 * a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose,
 * a highly cacheable and parallelizable remote code execution framework,
-* a solution that enables the community to build higher-order modules,
+* a solution enabling the community to build higher-order modules,
 * composable down to individual modules,
 * being fed by deterministic blockchain data and is therefore deterministic.
 * _**not**_ a relational database,
@@ -29,7 +29,7 @@ description: StreamingFast Substreams benefits and comparisons
 * **Protobuf**\
   ****Substreams uses the power of the protobuf ecosystem, for data modeling and integration for a large number of programming languages.
 * **Rust**\
-  Substreams modules are written in the Rust programming language, using a wide array of third-party libraries that compile to WASM, to manipulate blockchain data on-the-fly.
+  Substreams modules are written in the Rust programming language, using a wide array of third-party libraries compilable to WASM, to manipulate blockchain data on-the-fly.
 * **Blockchain infused Large-scale data**\
   Substreams was inspired by conventional large-scale data systems _fused_ with the novelties of blockchain.
 
@@ -43,7 +43,7 @@ Substreams has a logs-based architecture through Firehose, which allows users to
 
 #### Composition through community
 
-Substreams enables blockchain developers to write Rust modules that compose data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
+Substreams enables you to write Rust modules composing data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
 
 #### Parallelization
 

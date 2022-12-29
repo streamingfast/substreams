@@ -52,7 +52,7 @@ Substreams modules are composed through a [directed acyclic graph](https://en.wi
 
 The Substreams manifest references the modules, and the handlers defined within them and form the intention of how they are used by the Substreams engine.&#x20;
 
-Directed acyclic graphs contain nodes. The nodes in the graph are modules that communicate in only one direction, passing from one node, or module, to another.
+Directed acyclic graphs contain nodes. The nodes in the graph are modules communicating in _only_ _one direction_, passing from one node, or module, to another.
 
 The Substreams engine creates the “compute graph”, or “dependency graph” at run time through commands sent to the Substreams CLI using code in modules referenced by the manifest.
 
@@ -74,7 +74,7 @@ View the Rust module handlers in the lib.rs file:
 **Note:** _Protobufs include the names of the data objects and the fields contained and accessible within them._&#x20;
 {% endhint %}
 
-Many of the protobuf definitions have already been created, such as the [erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), that are used by developers creating Substreams data transformation strategies.
+Many of the protobuf definitions have already been created, such as the [erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), used by developers creating Substreams data transformation strategies.
 
 Custom smart contracts, such as [UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), have protobuf definitions. The custom data models are referenced in the Substreams manifest and made available to module handler functions.&#x20;
 

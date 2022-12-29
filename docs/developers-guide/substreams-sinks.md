@@ -14,7 +14,13 @@ StreamingFast provides a few examples, libraries, and tools to assist you with r
 
 Databases and flat files are standard storage types however you can pipe Substreams data into other locations required by a new or existing application or architecture.
 
-An important design aspect of Substreams is the decision to rely on Google Protocol Buffers, also called protobufs, for data packaging and transmission. Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to working with data that is passed from one application to another. The platform-independent, data-centric capabilities of protobufs give you the opportunity to package and route data captured by Substreams to other sources, including sinks.
+An important design aspect of Substreams is the decision to rely on Google Protocol Buffers, also called protobufs, for data packaging and transmission.&#x20;
+
+Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to working with data passed from one application to another.
+
+{% hint style="success" %}
+**Tip**: The platform-independent, data-centric capabilities of protobufs give you the opportunity to package and route data captured by Substreams to other sources, including sinks.
+{% endhint %}
 
 At a low-level Substreams consumes data through a gRPC streaming service. Consumers receive streams of data scoped to a single block as requests are sent.
 
@@ -24,7 +30,9 @@ The first step of having Substreams consumed by a particular sink involves the c
 
 For example, database-like Substreams sinks such as PostgreSQL or MongoDB accept a module's output of type [substreams.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto#L5).
 
-It’s important to note that databases are only one type of sink. The sink determines what output type will be respected.
+{% hint style="success" %}
+**Tip**: Databases are only one type of sink. The sink determines what output type will be respected.
+{% endhint %}
 
 The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most will perform some kind of storage.
 
@@ -42,7 +50,7 @@ The `substreams-eth-block-meta` example demonstrates sinks in action. Check out 
 
 [https://github.com/streamingfast/substreams-eth-block-meta](https://github.com/streamingfast/substreams-eth-block-meta)
 
-StreamingFast provides several tools that assist database persistence for Substreams.
+StreamingFast provides several tools to assist database persistence for Substreams.
 
 **PostgreSQL**
 
@@ -61,7 +69,7 @@ StreamingFast provides several tools that assist database persistence for Substr
 StreamingFast provides tools allowing you to route blockchain data to a few different types of data storage sinks, or means of importation. The types of sinks with tools provided by StreamingFast aren’t the only options. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
 
 {% hint style="success" %}
-**Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, that does not have Substreams sink tools in place. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
+**Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, lacking Substreams sink tools. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct a custom data-sinking solution.
 {% endhint %}
 
 You will design protobufs to use for transferring data out of Substreams into the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling you to capture, further process, use and store data provided by Substreams in different capacities.

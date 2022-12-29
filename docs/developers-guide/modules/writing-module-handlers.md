@@ -126,7 +126,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 * The macro decorates the handler function as a map. Store modules are specified using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events that are emitted by the tracked contract. As the events are found they will be decoded into `Transfer` objects.
+The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events emitted by the tracked contract. As the events are found they will be decoded into `Transfer` objects.
 
 ```rust
 /// Extracts transfers events from the contract
@@ -201,7 +201,7 @@ If the `from` address field and the `to` address field is not a null address, th
 
 ### Store concepts
 
-When writing to a store, there are three concepts to consider that include:&#x20;
+When writing to a store, there are three important concepts to consider:&#x20;
 
 * `ordinal`
 * `key`
@@ -213,19 +213,25 @@ Ordinal represents the order in which the `store` operations will be applied.
 
 The `store` handler will be called once per `block.`
 
-During execution, the `add` operation can be called multiple times, for multiple reasons, such as finding a relevant event or seeing a call that triggered a method call.
+The `add` operation may be called multiple times during execution, for various reasons such as discovering a relevant event or encountering a call responsible for triggering a method call.
 
-Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
+{% hint style="info" %}
+**Note**: Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
+{% endhint %}
 
-When an ordinal is specified, the order of execution is guaranteed. For one execution of the `store` handler for given inputs, in the example a list of transfers, the code will emit the same number of `add` calls and ordinal values.
+If an ordinal is specified, the order of execution is guaranteed. In the example, when the store handler is executed with a given set of inputs, such as a list of transfers, it will emit the same number of `add` calls and ordinal values for one execution.
 
 #### Key
 
-Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure that it is unique _and flexible_.
+Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure it is unique _and flexible_.
 
-In the example, if the `generate_key` function will return a key that is the `TRACKED_CONTRACT` address it will not be unique between different token holders.
+If the generate\_key function in the example returns the TRACKED\_CONTRACT address as the key, it will not be unique among different token holders.
 
-The `generate_key` function will return a unique key for holders if it contains only the holder's address. Issues will be encountered when attempting to track multiple contracts.
+The `generate_key` function will return a unique key for holders if it contains only the holder's address.
+
+{% hint style="warning" %}
+**Important**: Issues will be encountered when attempting to track multiple contracts.
+{% endhint %}
 
 #### Value
 
@@ -259,7 +265,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 Both handler functions have been written.
 
-One handler function for extracting transfers that are of interest, and a second to store the token count per recipient.
+One handler function for extracting relevent transfers, and a second to store the token count per recipient.
 
 Build Substreams to continue the setup process.
 
@@ -267,4 +273,4 @@ Build Substreams to continue the setup process.
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-The next step is to run Substreams with all of the changes made using the code that's been generated.
+The next step is to run Substreams with all of the changes made using the generated code.

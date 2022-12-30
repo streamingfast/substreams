@@ -4,7 +4,7 @@ description: StreamingFast Substreams CLI installation documentation
 
 # Installing the Substreams CLI
 
-## `substreams` CLI installation
+## Installation overview
 
 Connect to endpoints, stream data in real time, and package custom modules.
 

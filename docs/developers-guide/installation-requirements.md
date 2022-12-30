@@ -16,10 +16,10 @@ Substreams requires a number of different applications and tools. Instructions a
 
 ### `substreams` CLI installation
 
-The Substreams CLI is required and is the primary Substreams user interface.
+The [`substreams` CLI](../reference-and-specs/command-line-interface.md) is required and is the primary Substreams user interface.
 
 {% hint style="success" %}
-**Tip**: Full setup instructions are available on the [installing the Substreams CLI](../getting-started/installing-the-cli.md) page.
+**Tip**: Full setup instructions are available on the [installing the `substreams` CLI](../getting-started/installing-the-cli.md) page.
 {% endhint %}
 
 ### Rust installation

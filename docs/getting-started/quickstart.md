@@ -24,7 +24,7 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 ## Run your first Substreams
 
 {% hint style="warning" %}
-**Important**: The Substreams CLI [**must** **be installed** ](installing-the-cli.md)**to continue**.
+**Important**: The [`substreams` CLI](../reference-and-specs/command-line-interface.md) [**must** **be installed** ](installing-the-cli.md)**to continue**.
 {% endhint %}
 
 After you have authenticated, you're ready to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) your first Substreams by using:
@@ -50,12 +50,12 @@ Developers select a specific blockchain and build a Substreams module tailored t
 Data is available for any blockchain exposing an operational Firehose endpoint, installed and set up in [an on-premises environment](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), or [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
 
 {% hint style="info" %}
-**Note**: The remaining documentation assumes the Substreams CLI and all other required dependencies have been installed and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
+**Note**: The remaining documentation assumes the [`substreams` CLI](../reference-and-specs/command-line-interface.md) and all other required dependencies have been installed and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
 {% endhint %}
 
 ### **Basics**
 
-The most basic approach to use Substreams is through the Substreams CLI, passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+The most basic approach to use Substreams is through the [`substreams` CLI](../reference-and-specs/command-line-interface.md), passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
 The commands demonstrate how Substreams modules work by using the selected blockchain and instructing the compute engine to execute the `map_basic_eth` or `map_basic_sol` Rust functions, also called "module handlers".
 
@@ -146,7 +146,7 @@ To use the example, follow these steps:
 
 1. Run the command to generate the required protobufs
 2. Compile the example using the Rust compiler
-3. Send commands to the Substreams CLI"
+3. Send commands to the [`substreams` CLI](../reference-and-specs/command-line-interface.md)
 
 Generate the structs from the protobuf specified in the `substreams-ethereum-tutorial.yaml` configuration file by using the `protogen` command:
 
@@ -237,6 +237,6 @@ Error: rpc error: code = InvalidArgument desc = validate request: input source "
 ```
 {% endcode %}
 
-To avoid requesting data for the wrong blockchain, make sure to double-check the endpoint being sent to the Substreams CLI against the code and settings within the Substreams codebase. It is important to note that data from one blockchain is not compatible with others, and the RPC error you are receiving is indicating a block data disparity issue.&#x20;
+To avoid requesting data for the wrong blockchain, make sure to double-check the endpoint being sent to the [`substreams`CLI](../reference-and-specs/command-line-interface.md) against the code and settings within the Substreams codebase. It is important to note that data from one blockchain is not compatible with others, and the RPC error you are receiving is indicating a block data disparity issue.&#x20;
 
-To resolve this problem, review the codebase to ensure it meets the requirements of the blockchain configuration for your code. The error occurs when the codebase expects blocks from Ethereum, but the Substreams CLI is receiving blocks from Solana instead.
+To resolve this problem, review the codebase to ensure it meets the requirements of the blockchain configuration for your code. The error occurs when the codebase expects blocks from Ethereum, but the [`substreams`CLI](../reference-and-specs/command-line-interface.md) is receiving blocks from Solana instead.

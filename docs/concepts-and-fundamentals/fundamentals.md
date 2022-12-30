@@ -6,7 +6,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 ## Fundamentals overview
 
-Substreams development involves using several different pieces of technology, including the [Substreams engine](fundamentals.md#the-substreams-engine), [Substreams command line interface (CLI)](../reference-and-specs/command-line-interface.md), [modules](modules.md), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types. The documentation explains how these pieces fit together.
+Substreams development involves using several different pieces of technology, including the [Substreams engine](fundamentals.md#the-substreams-engine), [`substreams` command line interface (CLI)](../reference-and-specs/command-line-interface.md), [modules](modules.md), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types. The documentation explains how these pieces fit together.
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
@@ -17,7 +17,7 @@ Substreams development involves using several different pieces of technology, in
 * Identify data and define and create protobufs.
 * Write Rust Substreams event handler functions.
 * Update the Substreams manifest to reference the protobufs and handlers.
-* Use the Substreams CLI to issue commands.
+* Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands.
 
 ### **The Substreams engine**
 
@@ -27,7 +27,7 @@ The Substreams engine serves as the CPU or brain of the Substreams system, handl
 **Note**: The Substreams engine is responsible for running developer-defined data transformations to process blockchain data.
 {% endhint %}
 
-Developers use the Substreams CLI to send commands, flags, and a reference to the manifest configuration file to the Substreams engine. They create data transformation strategies in Substreams "module handlers" using the Rust programming language, which act on protobuf-based data models referenced from within the Substreams manifest.&#x20;
+Developers use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands, flags, and a reference to the manifest configuration file to the Substreams engine. They create data transformation strategies in Substreams "module handlers" using the Rust programming language, which act on protobuf-based data models referenced from within the Substreams manifest.&#x20;
 
 ### **Substreams module communication**
 
@@ -47,7 +47,7 @@ Substreams modules are composed through a [directed acyclic graph](https://en.wi
 **Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs. DAGs work through a one-directional flow.
 {% endhint %}
 
-The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine. Directed acyclic graphs contain nodes, which in this case are modules communicating in only one direction, passing from one node or module to another. The Substreams engine creates the "compute graph" or "dependency graph" at run time through commands sent to the Substreams CLI using the code in modules referenced by the manifest.
+The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine. Directed acyclic graphs contain nodes, which in this case are modules communicating in only one direction, passing from one node or module to another. The Substreams engine creates the "compute graph" or "dependency graph" at run time through commands sent to the [`substreams` CLI](../reference-and-specs/command-line-interface.md) using the code in modules referenced by the manifest.
 
 ### **Protobufs for Substreams**
 

@@ -4,12 +4,12 @@ description: StreamingFast Substreams CLI installation documentation
 
 # Installing the Substreams CLI
 
-## Substreams CLI installation
+## `substreams` CLI installation
 
 Connect to endpoints, stream data in real time, and package custom modules.
 
 {% hint style="success" %}
-**Tip**_:_ Check the [official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest Substreams CLI release available**.&#x20;
+**Tip**_:_ Check the [official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest** [**`substreams` CLI**](../reference-and-specs/command-line-interface.md) **release available**.&#x20;
 {% endhint %}
 
 #### Homebrew installation

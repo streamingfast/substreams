@@ -26,9 +26,9 @@ Yes, Substreams compliments and extend the capabilities and functionalities of s
 
 No, Substreams is provided as a developer preview.
 
-### **What is the Substreams CLI?**
+### **What is the `substreams` CLI?**
 
-The Substreams command line interface (CLI) is the main tool developers use to use the Substreams engine. The Substreams CLI provides a range of features, commands, and flags. Additional information for the CLI is available in the Substreams documentation.
+The [`substreams` command line interface (CLI)](command-line-interface.md) is the main tool developers use to use the Substreams engine. The [`substreams` CLI](command-line-interface.md) provides a range of features, commands, and flags. Additional information for the [`substreams` CLI](command-line-interface.md) is available in the Substreams documentation.
 
 [https://substreams.streamingfast.io/reference-and-specs/using-the-cli](https://substreams.streamingfast.io/reference-and-specs/using-the-cli)
 

@@ -79,10 +79,10 @@ Several specific data types exist in the Ethereum smart contract ecosystem, some
 
 ### Generating protobufs
 
-The Substreams CLI is used to generate the associated Rust code for the protobuf.
+The [`substreams` CLI](../reference-and-specs/command-line-interface.md) is used to generate the associated Rust code for the protobuf.
 
 {% hint style="success" %}
-**Tip**: Notice the `protogen` command and Substreams manifest passed into the Substreams CLI.
+**Tip**: Notice the `protogen` command and Substreams manifest passed into the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
 {% endhint %}
 
 {% code overflow="wrap" %}

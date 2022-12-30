@@ -20,7 +20,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 
 #### Substreams `run`
 
-First, start the Substreams CLI tool passing it a `run` command.
+First, start the [`substreams` CLI](../reference-and-specs/command-line-interface.md) passing it a `run` command.
 
 #### Firehose URI
 

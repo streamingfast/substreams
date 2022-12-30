@@ -4,11 +4,11 @@ description: StreamingFast Substreams command line interface (CLI)
 
 # Substreams CLI reference
 
-## Substreams CLI reference overview
+## `substreams` CLI reference overview
 
-The Substreams command line interface (CLI) is the Substreams user interface and primary tool for sending requests and receiving data.
+The `substreams` command line interface (CLI) is the primary user interface and main tool for sending requests and receiving data.
 
-The Substreams CLI exposes many commands to developers enabling a range of features.&#x20;
+The `substreams` CLI exposes many commands to developers enabling a range of features.&#x20;
 
 {% hint style="info" %}
 **Note**: When a package is specified you can use:&#x20;
@@ -161,7 +161,7 @@ modules {
 
 ### Help
 
-To view a list of available commands and brief explanations in the Substreams CLI, run the [`substreams`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface) command in a terminal and pass the `-h` flag. You can use this help reference at any time.
+To view a list of available commands and brief explanations in the `substreams` CLI, run the `substreams` command in a terminal passing the `-h` flag. You can use this help reference at any time.
 
 {% code title="help option" overflow="wrap" %}
 ```bash

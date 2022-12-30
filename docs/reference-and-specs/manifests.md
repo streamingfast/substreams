@@ -151,7 +151,7 @@ The type of code and implied virtual machine for execution.
 The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the directory the manifest is located in; typically the root of the Substreams module.
 
 {% hint style="success" %}
-**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the Substreams CLI.
+**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the [`substreams` CLI](command-line-interface.md).
 {% endhint %}
 
 ### Modules

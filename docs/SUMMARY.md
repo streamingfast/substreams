@@ -5,7 +5,7 @@
 ## Concepts & Fundamentals
 
 * [Benefits and comparisons](concepts-and-fundamentals/benefits.md)
-* [Modules overview](concepts-and-fundamentals/modules.md)
+* [Modules basics](concepts-and-fundamentals/modules.md)
 * [Fundamentals](concepts-and-fundamentals/fundamentals.md)
 
 ## Getting Started

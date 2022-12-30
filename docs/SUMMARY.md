@@ -22,7 +22,7 @@
 * [Modules](developers-guide/modules/README.md)
   * [Module types](developers-guide/modules/types.md)
   * [Inputs](developers-guide/modules/inputs.md)
-  * [Outputs](developers-guide/modules/outputs.md)
+  * [Output](developers-guide/modules/outputs.md)
   * [Module handlers](developers-guide/modules/setting-up-handlers.md)
   * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developers-guide/running-substreams.md)

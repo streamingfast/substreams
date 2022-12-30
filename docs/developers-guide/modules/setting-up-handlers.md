@@ -6,14 +6,14 @@ description: StreamingFast Substreams module handlers
 
 ## Module handlers overview
 
-To begin creating the custom module handlers initialize a new Rust project.
+To begin creating the custom module handlers initialize a new Rust project by using the `cargo` `init` command.
 
 ```bash
 # Creates a barebones rust library
 cargo init --lib
 ```
 
-Update the generated `Cargo.toml` file by using:
+Update the generated [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) file by using:
 
 {% code title="Cargo.toml" %}
 ```rust
@@ -52,13 +52,13 @@ strip = "debuginfo"
 ```
 {% endcode %}
 
-View the `Cargo.toml` file in the repository:
+View the [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
 
-The Rust code is compiled into [WebAssembly (WASM)](https://webassembly.org/). WASM is a binary instruction format run in a virtual machine. When the Rust code is compiled a `.so` file is generated.
+You compile the Rust code into [WebAssembly (WASM)](https://webassembly.org/), a binary instruction format that runs in a virtual machine. The compilation process generates a .so file.
 
-### **Cargo.toml breakdown**
+### **`Cargo.toml` configuration file breakdown**
 
 Build the Rust dynamic system library after the `package` by using:
 
@@ -69,27 +69,29 @@ Build the Rust dynamic system library after the `package` by using:
 crate-type = ["cdylib"]
 ```
 
-The next definition in the TOML file is for `dependencies`.
+The next definition in the `Cargo.toml` configuration file is for `dependencies`.
 
-Handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` by using `[target.wasm32-unknown-unknown.dependencies]`.
+{% hint style="info" %}
+**Note**: Module handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` by using `[target.wasm32-unknown-unknown.dependencies]`.
+{% endhint %}
 
 #### `ethabi`
 
-The `ethabi` crate is used to decode events from the Application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
+The `ethabi` crate is used to decode events from the application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
 
 #### `hex-literal`
 
-The `hex-literal` crate is used to define bytes from hexadecimal string literal at compile time.
+The `hex-literal` crate is used to define bytes from hexadecimal string literals at compile time.
 
 #### `substreams`
 
-The `substreams` crate offers all the basic building blocks for the handlers.
+The [`substreams` crate](https://docs.rs/substreams/latest/substreams/) offers all the basic building blocks for the module handlers.
 
 #### `substreams-ethereum`
 
-The `substreams-ethereum` crate offers all the Ethereum constructs including blocks, transactions, eth, and useful `ABI` decoding capabilities.
+The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core) offers all the Ethereum constructs including blocks, transactions, eth, and useful ABI decoding capabilities.
 
-Because code is being built by WASM output it's necessary to configure Rust to match the correct architecture. Create and add a `rust-toolchain.toml` file at the root of the Substreams directory.
+Because code is being built by WASM output it's necessary to configure Rust to match the correct architecture. Create and add a [`rust-toolchain.toml`](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml) configuration file at the root of your Substreams directory.
 
 #### Rust toolchain
 
@@ -102,7 +104,7 @@ targets = [ "wasm32-unknown-unknown" ]
 ```
 {% endcode %}
 
-View the `rust-toolchain.toml` file in the repository:
+View the [`rust-toolchain.toml`](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml)
 
@@ -115,10 +117,10 @@ cargo build --target wasm32-unknown-unknown --release
 {% hint style="info" %}
 **Note: Rust build target**
 
-* When running `cargo build` the target is set to `wasm32-unknown-unknown`, which is important because it specifies the goal is to generate compiled WebAssembly (WASM) code.
-* To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a file called `config.toml` in the `.cargo` directory at the root of the Substreams project. The `config.toml` file allows the target to be set automatically for all `cargo` commands.
+* When running `cargo build` the target is set to `wasm32-unknown-unknown`, which is important because it specifies the goal is to generate compiled WASM code.
+* To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a `config.toml` configuration file in the `.cargo` directory at the root of the Substreams project. The `config.toml` configuration file allows the target to be set automatically for all `cargo` commands.
 
-The content for the `config.toml` file is:
+The content for the `config.toml` configuration file is:
 
 {% code title=".cargo/config.toml" %}
 ```toml
@@ -132,9 +134,9 @@ The `config.toml` configuration file updates the default `cargo build` command t
 
 ### ABI generation
 
-The `substreams-ethereum` crate offers an `Abigen` API to generate Rust types from a contract's ABI.
+The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core) offers an [`Abigen`](https://docs.rs/substreams-ethereum-abigen/latest/substreams\_ethereum\_abigen/) API to generate Rust types from a smart contract's ABI.
 
-Place the contract ABI JSON file in the Substreams project in an `abi` directory.
+Place the contract's ABI JSON file in the Substreams project in an `abi` directory.
 
 {% file src="../../.gitbook/assets/erc721.json" %}
 
@@ -147,7 +149,7 @@ Next, add a Rust build script.
 * To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
 {% endhint %}
 
-Create a `build.rs` file in the root of the Substreams project by using:
+Create a [`build.rs`](https://github.com/streamingfast/substreams-template/blob/develop/build.rs) build script file in the root of the Substreams project by using:
 
 {% code title="build.rs" %}
 ```rust
@@ -164,7 +166,7 @@ fn main() -> Result<(), anyhow::Error> {
 ```
 {% endcode %}
 
-View the `build.rs` file in the repository:
+View the [`build.rs`](https://github.com/streamingfast/substreams-template/blob/develop/build.rs) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/build.rs](https://github.com/streamingfast/substreams-template/blob/develop/build.rs)
 
@@ -174,7 +176,7 @@ Run the build script to generate the ABI directory and files.
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-Create a `mod.rs` file in the ABI directory, which is created by the Rust build process. The `mod.rs` file is responsible for exporting the generated Rust code.
+Create a [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) export file in the ABI directory, which is created by the Rust build process. The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) export file is responsible for exporting the generated Rust code.
 
 {% code title="src/abi/mod.rs" %}
 ```rust
@@ -182,8 +184,8 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View the `mod.rs` file in the repository:
+View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs)
 
-The next step is to [write the module handlers](writing-module-handlers.md).
+You're now ready to [write the module handlers](writing-module-handlers.md).

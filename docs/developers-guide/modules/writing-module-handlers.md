@@ -6,7 +6,7 @@ description: StreamingFast Substreams module handler creation
 
 ## Module handler creation overview
 
-After generating the ABI and Protobuf Rust code, you need to write the handler code. Save the code into the `src` directory and use the filename `lib.rs`.
+After generating the ABI and protobuf Rust code, you need to write the handler code. Save the code into the `src` directory and use the filename [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs).
 
 {% code title="src/lib.rs" overflow="wrap" lineNumbers="true" %}
 ```rust
@@ -67,15 +67,15 @@ fn generate_key(holder: &Vec<u8>) -> String {
 ```
 {% endcode %}
 
-View the `lib.rs` file in the repository:
+View the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
 
 ### **Module handler breakdown**
 
-The logical sections of the `lib.rs` file are outlined and described in greater detail.
+The logical sections of the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file are outlined and described in greater detail.
 
-Imports the necessary modules.
+Import the necessary modules.
 
 ```rust
 mod abi;
@@ -92,7 +92,7 @@ Store the tracked contract in the example in a `constant`.
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 ```
 
-Defines the `map` module.
+Define the `map` module.
 
 ```yaml
 - name: map_transfers
@@ -104,13 +104,11 @@ Defines the `map` module.
     type: proto:eth.erc721.v1.Transfers
 ```
 
-Notice the: `name: map_transfers`. The module in the manifest name matches the handler function name.
+Notice the: `name: map_transfers`, the module in the manifest name matches the handler function name. Also notice, there is one [`inputs`](inputs.md) and one [`output`](outputs.md) definition.
 
-Also notice, there is one input and one output definition.
+The [`inputs`](inputs.md) uses the standard Ethereum Block, `sf.ethereum.type.v2.Block,` provided by the [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core).
 
-The input uses the standard Ethereum Block, `sf.ethereum.type.v2.Block,` provided by the `substreams-ethereum` crate.
-
-The output uses the type `proto:eth.erc721.v1.Transfers` which is a custom protobuf definition provided by the generated Rust code.&#x20;
+The output uses the `type` `proto:eth.erc721.v1.Transfers` which is a custom protobuf definition provided by the generated Rust code.&#x20;
 
 The function signature produced is:
 
@@ -124,11 +122,11 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 {% hint style="info" %}
 **Note**: **Rust macros**
 
-* Did you notice the `#[substreams::handlers::map]` on top of the function? It is a Rust "macro" provided by the Substreams crate.
-* The macro decorates the handler function as a map. Store modules are specified by using the syntax `#[substreams::handlers::store]`.
+* Did you notice the `#[substreams::handlers::map]` on top of the function? It is a [Rust macro](https://doc.rust-lang.org/book/ch19-06-macros.html) provided by the [`substreams` crate](https://docs.rs/substreams/latest/substreams/).
+* The macro decorates the handler function as a `map.` Define `store` modules by using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The `map` extracts ERC721 transfers from a Block. The code finds all the `Transfer` events emitted by the tracked contract. As the events are found they are decoded into `Transfer` objects.
+The `map` extracts ERC721 transfers from a `Block` object. The code finds all the `Transfer` events emitted by the tracked smart contract. As the events are found they are decoded into `Transfer` objects.
 
 {% code overflow="wrap" %}
 ```rust
@@ -155,7 +153,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 ```
 {% endcode %}
 
-Define the `store` module. As a reminder, here is the module definition from the example Substreams manifest.
+Define the `store` module.&#x20;
 
 ```yaml
 - name: store_transfers
@@ -171,7 +169,7 @@ Define the `store` module. As a reminder, here is the module definition from the
 **Note:** `name: store_transfers` corresponds to the handler function name.
 {% endhint %}
 
-The input corresponds to the output of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. The custom protobuf definition is provided by the generated Rust code.
+The `inputs` corresponds to the `output` of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. The custom protobuf definition is provided by the generated Rust code.
 
 ```rust
 #[substreams::handlers::store]
@@ -184,34 +182,34 @@ fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 **Note**: __ the `store` always receives itself as its own last input.
 {% endhint %}
 
-In the example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable store typed as `StoreAddInt64`.
+In the example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable `store` typed as `StoreAddInt64`.
 
 {% hint style="info" %}
 **Note**: **Store types**
 
-* The writable store is always the last parameter of a store module function.
-* The type of the writable store is determined by the `updatePolicy` and `valueType` of the store module.
+* The writable `store` is always the last parameter of a `store` module function.
+* The `type` of the writable `store` is determined by the `updatePolicy` and `valueType` of the `store` module.
 {% endhint %}
 
-The goal of the `store` in the example is to track a holder's current NFT count for the contract supplied. The tracking is achieved through the analysis of transfers.
+The goal of the `store` in the example is to track a holder's current NFT `count` for the smart contract provided. The tracking is achieved through the analysis of `Transfers`.
 
-**Transfer in detail**
+**`Transfers` in detail**
 
 * If the "`from`" address of the `transfer` is the `null` address (`0x0000000000000000000000000000000000000000`) and the "`to`" address is not the `null` address, the "`to`" address is minting a token, which results in the `count` being incremented.
 * If the "`from`" address of the `transfer` is not the `null` address and the "`to`" address is the `null` address, the "`from`" address has burned a token, which results in the `count` being decremented.
 * If both the "`from`" and the "`to`" address is not the `null` address, the `count` is decremented from the "`from`" address and incremented for the "`to`" address.
 
-### Store concepts
+### `store` concepts
 
-When writing to a store, there are three important concepts to consider:&#x20;
+When writing to a `store`, there are three important concepts to consider:&#x20;
 
 * `ordinal`
 * `key`
 * `value`
 
-#### Ordinal
+#### `ordinal`
 
-Ordinal represents the order in which the `store` operations are applied.
+`ordinal` represents the order in which the `store` operations are applied.
 
 The `store` handler is called once per `block.`
 
@@ -221,23 +219,23 @@ The `add` operation may be called multiple times during execution, for various r
 **Note**: Blockchain execution models are linear. Operations to add must be added linearly and deterministically.
 {% endhint %}
 
-If an ordinal is specified, the order of execution is guaranteed. In the example, when the store handler is executed by a given set of inputs, such as a list of transfers, it emits the same number of `add` calls and ordinal values for the execution.
+If an `ordinal` is specified, the order of execution is guaranteed. In the example, when the `store` handler is executed by a given set of `inputs`, such as a list of `Transfers`, it emits the same number of `add` calls and `ordinal` values for the execution.
 
-#### Key
+#### `key`
 
-Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a key to ensure it is unique _and flexible_.
+Stores are [key-value stores](https://en.wikipedia.org/wiki/Key%E2%80%93value\_database). Care needs to be taken when crafting a `key` to ensure it is unique **and flexible**.
 
-If the generate\_key function in the example returns the TRACKED\_CONTRACT address as the key, it is not unique among different token holders.
+If the `generate_key` function in the example returns the `TRACKED_CONTRACT` address as the `key`, it is not unique among different token holders.
 
-The `generate_key` function returns a unique key for holders if it contains only the holder's address.
+The `generate_key` function returns a unique `key` for holders if it contains only the holder's address.
 
 {% hint style="warning" %}
 **Important**: Issues are expected when attempting to track multiple contracts.
 {% endhint %}
 
-#### Value
+#### `value`
 
-The value being stored. The type is dependent on the store type being used.
+The value being stored. The `type` is dependent on the `store` `type` being used.
 
 {% code overflow="wrap" %}
 ```rust

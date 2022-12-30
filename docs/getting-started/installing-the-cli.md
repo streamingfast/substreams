@@ -40,13 +40,18 @@ go install -v ./cmd/substreams
 
 ### Validation of installation
 
-Start Substreams by using the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) passing the version flag to ensure everything is working as expected.
+Run the [`substreams` CLI](../reference-and-specs/command-line-interface.md) passing the `--version` flag to check the success of the installation.
 
 ```bash
 substreams --version
-substreams version dev # The output displayed in the terminal
+```
+
+A successful installation will print the version that you have installed.
+
+```bash
+substreams version dev
 ```
 
 {% hint style="info" %}
-**Note**: You can use [Gitpod](../developers-guide/installation-requirements.md) instead of a local installation.
+**Note**: You can also use [Gitpod](../developers-guide/installation-requirements.md) instead of a local installation.
 {% endhint %}

@@ -4,7 +4,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 # Fundamentals
 
-## Fundamentals
+## Fundamentals overview
 
 Substreams development requires the use of several different pieces of technology including the [Substreams engine](fundamentals.md#the-substreams-engine), [Substreams command line interface](../reference-and-specs/command-line-interface.md), [modules](modules.md), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types
 

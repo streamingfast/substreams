@@ -80,19 +80,19 @@ Specifying a stop block value of zero (0), the default enables transparent hando
 
 ### **Does StreamingFast have a Discord?**
 
-Yes! Join the StreamingFast Discord!
+Yes, join the StreamingFast Discord.
 
 [https://discord.gg/Ugc7KtkA](https://discord.gg/mYPcRAzeVN)
 
 ### **Is StreamingFast on Twitter?**
 
-Yes! Find StreamingFast on their official Twitter account.
+Yes, find StreamingFast on their official Twitter account.
 
 [https://twitter.com/streamingfastio](https://twitter.com/streamingfastio)
 
 ### **Is StreamingFast on YouTube?**
 
-Yes! Find StreamingFast on their official YouTube account.
+Yes, find StreamingFast on their official YouTube account.
 
 [https://www.youtube.com/c/streamingfast](https://www.youtube.com/c/streamingfast)
 

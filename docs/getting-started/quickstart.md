@@ -219,7 +219,7 @@ The takeaways are:
 5. Custom protobufs are created to pass data from one module to another.
 
 {% hint style="info" %}
-**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains enables you to graduate to build even more complex solutions!
+**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains enables you to graduate to build even more complex solutions.
 {% endhint %}
 
 Understanding map and store modules are important for learning how to design and craft a fully directed acyclic graph in your Substreams manifest.

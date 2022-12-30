@@ -45,7 +45,7 @@ Substreams is viewable from two perspectives as illustrated in the high-level vi
 
 ### Community
 
-_**Need help? Reach out!**_
+_**Need help? Reach out.**_
 
 Substreams is an open source community effort, so feel free to suggest new topics, report issues, and provide feedback. Contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
 

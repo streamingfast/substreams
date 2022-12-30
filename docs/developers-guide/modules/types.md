@@ -99,7 +99,7 @@ You can consume data in one of two modes when declaring a `store` as an input to
 The `get mode` function provides the module with a key-value store that is guaranteed to be synchronized up to the block being processed. It's possible to query `stores` by using the `get_at`, `get_last` and `get_first` methods.
 
 {% hint style="success" %}
-**Tip:** Lookups are local, in-memory, and extremely high-speed!
+**Tip:** Lookups are local, in-memory, and extremely high-speed.
 {% endhint %}
 
 {% hint style="info" %}

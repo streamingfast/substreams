@@ -50,7 +50,7 @@ message Transfer {
 ```
 {% endcode %}
 
-View the `erc721.proto` file in the repository:
+View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
 
@@ -68,7 +68,7 @@ The protobuf file serves as the interface between the module handlers and the da
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: The Substreams Template example extracts `Transfer` events from the Bored Ape Yacht Club smart contract which is located on the Ethereum blockchain.
+**Note**: The Substreams Template example extracts `Transfer` events from the [Bored Ape Yacht Club smart contract](https://etherscan.io/address/0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d) which is located on the Ethereum blockchain.
 {% endhint %}
 
 Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base modules. Complex protobufs are created and refined based on the various data types used across the different blockchains.
@@ -91,7 +91,7 @@ substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams
 ```
 {% endcode %}
 
-The Rust code is generated and saved into [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)
+The pairing code is generated and saved into the [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)Rust file.
 
 The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
@@ -103,25 +103,25 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View the `mod.rs` file in the repository:
+View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file in the repository:
 
 [https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
 
 ### Protobuf and Rust optional fields
 
-Protocol buffers define fields' type by using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the Google Protocol Buffers documentation.
+Protocol buffers define fields' type by using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the [Google Protocol Buffers documentation](https://developers.google.com/protocol-buffers/docs/overview).
 
-Any primitive data types in a message generate the corresponding Rust type,`String` for `string`, `u64` for `uint64,` and assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for `String`, 0 for integer types, `false` for `bool`. &#x20;
+Any primitive data types in a message generate the corresponding Rust type,[`String`](https://doc.rust-lang.org/std/string/struct.String.html) for `string`, `u64` for `uint64,` and assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for [`String`](https://doc.rust-lang.org/std/string/struct.String.html), 0 for integer types, `false` for `bool`. &#x20;
 
-Rust generates the corresponding `message` type wrapped by an `Option` enum type for fields referencing other complex `messages`. The `None` variant is used if the field is not present in the message.
+Rust generates the corresponding `message` type wrapped by an [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) enum type for fields referencing other complex `messages`. The [`None`](https://doc.rust-lang.org/std/option/) variant is used if the field is not present in the message.
 
-The `Option` enum is used to represent the presence (`Some(x)`) or absence (`None`) of a value in Rust. `Option` allows developers to distinguish between a field containing a value versus a field not assigned a value.&#x20;
+The [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) [`enum`](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html) is used to represent the presence through [`Some(x)`](https://doc.rust-lang.org/std/option/) or absence through [`None`](https://doc.rust-lang.org/std/option/) of a value in Rust. [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) allows developers to distinguish between a field containing a value versus a field without an assigned a value.&#x20;
 
 {% hint style="info" %}
-**Note**: The standard approach to represent nullable data in Rust is to wrap optional values in `Option<T>`.
+**Note**: The standard approach to represent nullable data in Rust is to wrap optional values in [`Option<T>`](https://doc.rust-lang.org/rust-by-example/std/option.html).
 {% endhint %}
 
-The Rust `match` keyword is used to compare the value of an `Option` to a `Some` or `None` variant. Handle a type wrapped `Option` in Rust by using:
+The Rust [`match`](https://doc.rust-lang.org/rust-by-example/flow\_control/match.html) keyword is used to compare the value of an [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) to a [`Some`](https://doc.rust-lang.org/std/option/) or [`None`](https://doc.rust-lang.org/std/option/) variant. Handle a type wrapped [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) in Rust by using:
 
 ```rust
 match person.Location {
@@ -130,7 +130,7 @@ match person.Location {
 }
 ```
 
-If you are only interested in finding the presence of a value, use the `if let` statement to handle the `Some(x)` arm of the `match` code.
+If you are only interested in finding the presence of a value, use the [`if let`](https://doc.rust-lang.org/rust-by-example/flow\_control/if\_let.html) statement to handle the [`Some(x)`](https://doc.rust-lang.org/std/option/) arm of the [`match`](https://doc.rust-lang.org/rust-by-example/flow\_control/match.html) code.
 
 ```rust
 if let Some(location) = person.location {
@@ -138,16 +138,16 @@ if let Some(location) = person.location {
 }
 ```
 
-If a value is present, use the `.unwrap()` call on the `Option` to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
+If a value is present, use the [`.unwrap()`](https://doc.rust-lang.org/rust-by-example/error/option\_unwrap.html) call on the [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
 
 {% hint style="info" %}
-**Note**: You need to be absolutely sure the field is always defined, otherwise Substreams panics and never completes, being stuck on a block indefinitely.
+**Note**: You need to be **absolutely sure** **the field is always defined**, otherwise Substreams panics and never completes, getting stuck on a block indefinitely.
 {% endhint %}
 
-_**PROST!**_ is a tool for generating Rust code from Protobuf definitions. Additional information for `prost` is available in the project's official GitHub repository.
+_**PROST!**_ is a tool for generating Rust code from protobuf definitions. [Learn more about `prost`](https://github.com/tokio-rs/prost) in the project's official GitHub repository.
 
 [https://github.com/tokio-rs/prost](https://github.com/tokio-rs/prost)
 
-Learn more about[ Option](https://doc.rust-lang.org/rust-by-example/std/option.html) in the official Rust documentation.
+[Learn more about `Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) in the official Rust documentation.
 
 [https://doc.rust-lang.org/rust-by-example/std/option.html](https://doc.rust-lang.org/rust-by-example/std/option.html)

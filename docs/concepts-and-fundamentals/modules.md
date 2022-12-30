@@ -8,7 +8,7 @@ description: StreamingFast Substreams modules overview
 
 Modules are an important part of Substreams, offering hooks into the execution of the Substreams compute engine. You can create Substreams data manipulation and transformation strategies within modules.
 
-Modules are small pieces of Rust code running in a WebAssembly (WASM) virtual machine. They coexist within the stream of blocks sent by the Substreams compute engine, which arrives from a blockchain node.
+Modules are small pieces of Rust code running in a [WebAssembly (WASM)](https://webassembly.org/) virtual machine. They coexist within the stream of blocks sent by the Substreams compute engine, which arrives from a blockchain node.
 
 Modules have one or more inputs, which can be in the form of a `map` or `store`, or a `Block` or `Clock` object received from the blockchain's data source.
 

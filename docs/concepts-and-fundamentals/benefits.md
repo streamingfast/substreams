@@ -4,47 +4,61 @@ description: StreamingFast Substreams benefits and comparisons
 
 # Benefits and comparisons
 
-## Substreams:
+## Substreams is:
 
-* Is a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose
-* Is a highly cacheable and parallelizable remote code execution framework
-* Enables the community to build higher-order modules that are composable down to individual modules
-* Is fed by deterministic blockchain data and is therefore deterministic
-* Is not a relational database
-* Is not a REST service
-* Is not concerned directly about how data is queried
-* Is not a general-purpose non-deterministic event stream processor
+* a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose,
+* a highly cacheable and parallelizable remote code execution framework,
+* a solution enabling the community to build higher-order modules,
+* composable down to individual modules,
+* being fed by deterministic blockchain data and is therefore deterministic.
+* _**not**_ a relational database,
+* _**not**_ a REST service,
+* _**not**_ concerned directly about how data is queried,
+* not a general-purpose _non-deterministic_ event stream processor.
 
-### Substreams offers several benefits:
+### Benefits&#x20;
 
-* The ability to store and process blockchain data using advanced parallelization techniques, making the processed data available for various types of datastores or real-time systems.
-* A streaming-first approach that inherits low latency extraction from StreamingFast Firehose, making it the fastest blockchain indexing technology on the market.
-* The ability to save time and money by horizontally scaling Substreams and increasing efficiency by reducing processing time and wait time.
-* The ability for communities to combine Substreams modules to form compounding levels of data richness and refinement.
-* The use of the protobuf ecosystem for data modeling and integration in a variety of programming languages.
-* The use of the Rust programming language and a wide array of third-party libraries compilable to WASM to manipulate blockchain data on-the-fly.
-* Inspiration from conventional large-scale data systems fused with the novelties of blockchain.
+* **Store and process blockchain data**\
+  Substreams uses advanced parallelization techniques to efficiently process large, constantly expanding blockchain histories. The processed data is then available for populating various types of datastores or real-time systems.
+* **Streaming-first**\
+  Substreams inherit from the extremely low latency extraction provided by the underlying Firehose, making it the fastest blockchain indexing technology on the market.
+* **Save time and money**\
+  You can horizontally scale Substreams, significantly reducing processing time and increasing efficiency by reducing wait time and missed opportunities.
+* **Community effort and composability**\
+  Communities are able to combine Substreams modules to form compounding levels of data richness and refinement.
+* **Protobuf**\
+  ****Substreams uses the power of the protobuf ecosystem, for data modeling and integration for a large number of programming languages.
+* **Rust**\
+  Substreams modules are written in the Rust programming language, by using a wide array of third-party libraries compilable to WASM, to manipulate blockchain data on-the-fly.
+* **Blockchain infused Large-scale data**\
+  Substreams was inspired by conventional large-scale data systems _fused_ with the novelties of blockchain.
 
 ### Comparison to other engines
 
-Substreams is a streaming engine similar to Fluvio, Kafka, Apache Spark, and RabbitMQ, where a blockchain node serving as a deterministic data source acts as the producer. Its logs-based architecture through Firehose allows users to send custom code for streaming and ad hoc querying of the available data.
+Substreams is a streaming engine similar to Fluvio, Kafka, Apache Spark, and RabbitMQ, where a blockchain node serving as a deterministic data source acts as the producer.
+
+Substreams has a logs-based architecture through Firehose, which allows users to send custom code for streaming and ad hoc querying of the available data.
 
 ### **Other features**
 
 #### Composition through community
 
-Substreams allows you to write Rust modules that compose data streams alongside the community. The end result of these community-developed solutions is more meaningful blockchain data.
+Substreams enables you to write Rust modules composing data streams alongside the community. The end result of community-developed solutions provides far more meaningful blockchain data than ever before.
 
 #### Parallelization
 
-Substreams' powerful parallelization techniques enable efficient processing of enormous blockchain histories, providing extremely high-performance indexing in a streaming-first fashion.
+Substreams provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion. These powerful parallelization techniques enable the efficient processing of enormous blockchain histories.
 
 #### Horizontally scalable
 
-Substreams is horizontally scalable, offering the opportunity to reduce processing time by adding more computing power or machines.
+Substreams is horizontally scalable presenting the opportunity to reduce the processing time by adding more computing power, or machines.
 
 #### Substreams and Firehose
 
-Substreams offers all the benefits of Firehose, including low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorg handling. It is platform-independent of underlying blockchain protocols and works solely on data extracted from nodes using Firehose. For example, different protocols have different chain-specific extensions, such as Ethereum's eth\_calls."
+Substreams has all the benefits of Firehose, including low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+
+The Substreams _engine_ is completely platform-independent of underlying blockchain protocols and works solely on data extracted from nodes by using Firehose.
+
+For example, different protocols have different chain-specific extensions, such as Ethereum, which expose `eth_calls`.
 
 ###

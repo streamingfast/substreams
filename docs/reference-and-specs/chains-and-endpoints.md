@@ -17,7 +17,9 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_:_ Endpoints serve protobuf models specific to the underlying protocol and must match the `source:` field for the module. _Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint **does not work**._
+**Important**_:_ Endpoints serve protobuf models specific to the underlying blockchain protocol and must match the `source:` field for the module.&#x20;
+
+**Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint does not work!**
 {% endhint %}
 
 | Blockchain Protocol | Proto model                                                                                                                                     | Latest package                                                                                                        |
@@ -41,6 +43,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
 * **Aptos Testnet**: `testnet.aptos.streamingfast.io:443`
 
-## Other
+## Others
 
-You can support other blockchains for Substreams through Firehose instrumentation. Additional information is available in the [official Firehose documentation](https://firehose.streamingfast.io/).
+You can support other blockchains for Substreams through Firehose instrumentation. Learn more in the [official Firehose documentation](https://firehose.streamingfast.io/).

@@ -34,13 +34,13 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
 * `-t +1` or `--stop-block` only requests a single block; the stop block is the manifest's `initialBlock` + 1.
 * `substreams.yaml` is the path where you have defined your [Substreams manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
-* `module_name` is the module we want to run, referring to the module name [defined in the Substreams manifest](manifests.md#modules-.name).
+* `module_name` is the module we want to `run`, referring to the module name [defined in the Substreams manifest](manifests.md#modules-.name).
 
 Passing a different `-s` or `--start-block` runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
 
 #### Run example with output
 
-Example output of the `gravatar_updates` module starting at block 6200807.
+Example output of the `gravatar_updates` module starting at block `6200807`.
 
 {% code title="run and output" overflow="wrap" %}
 ```bash
@@ -62,7 +62,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 {% endcode %}
 
 {% hint style="info" %}
-**Note**: The `-o` or `--output` alters the output format.&#x20;
+**Note**: The `-o` or `--output` flag alters the output format.&#x20;
 {% endhint %}
 
 The available options are:

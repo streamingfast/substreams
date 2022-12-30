@@ -40,11 +40,11 @@ go install -v ./cmd/substreams
 
 ### Validation of installation
 
-Run passing the version flag to ensure everything is working as expected.
+Start Substreams by using the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) passing the version flag to ensure everything is working as expected.
 
 ```bash
 substreams --version
-substreams version dev
+substreams version dev # The output displayed in the terminal
 ```
 
 {% hint style="info" %}

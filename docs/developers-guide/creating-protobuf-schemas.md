@@ -64,14 +64,14 @@ The protobuf file serves as the interface between the module handlers and the da
 **Tip**: Protobufs are platform-independent and are defined and used for various blockchains.&#x20;
 
 * The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.&#x20;
-* The size and scope of the Substreams implementation dictates the number of and complexity of protobufs.
+* The size and scope of the Substreams module dictates the number of and complexity of protobufs.
 {% endhint %}
 
 {% hint style="info" %}
 **Note**: The Substreams Template example extracts `Transfer` events from the Bored Ape Yacht Club smart contract which is located on the Ethereum blockchain.
 {% endhint %}
 
-Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base implementations. Complex protobufs are created and refined based on the various data types used across the different blockchains.
+Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base modules. Complex protobufs are created and refined based on the various data types used across the different blockchains.
 
 {% hint style="success" %}
 **Tip**_:_ The use of fully qualified protobuf file paths reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).

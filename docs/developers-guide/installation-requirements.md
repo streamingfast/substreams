@@ -53,6 +53,6 @@ Follow the steps to use [Gitpod](https://www.gitpod.io/) for Substreams.
 4. Configure a `STREAMINGFAST_KEY` variable in the [Gitpod account settings](https://gitpod.io/variables).
 5. Open the repository as a [Gitpod workspace](https://gitpod.io/workspaces).
 6. The Substreams Template includes a `Makefile` simplifying the installation process.
-   1. Running `make build` rebuilds the Substreams implementation. _Run the command after making changes to the code._
+   1. Running `make build` rebuilds the Substreams module. _Run the command after making changes to the code._
    2. `make stream` runs the stream for a few blocks.\
-      Edit `Makefile` to change the invocation as changes are made to the Substreams implementation.
+      Edit `Makefile` to change the invocation as changes are made to the Substreams module.

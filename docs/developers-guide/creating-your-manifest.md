@@ -6,9 +6,9 @@ description: StreamingFast Substreams manifest
 
 ## Overview
 
-The manifest contains the details for the various aspects and components of a Substreams implementation.
+The manifest contains the details for the various aspects and components of a Substreams module.
 
-Every Substreams implementation contains one manifest. The manifest is a YAML-based file and provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
+Every Substreams module contains one manifest. The manifest is a YAML-based file and provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
 
 {% hint style="success" %}
 **Tip**: Additional detailed information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
@@ -78,7 +78,7 @@ Substreams consumes blocks and depends on a Substreams [package](../reference-an
 
 ### `protobuf.files`
 
-The `protobuf.files` contains a list of protobuf files for the current Substreams implementation.
+The `protobuf.files` contains a list of protobuf files for the current Substreams module.
 
 {% hint style="info" %}
 **Note**: The Substreams Template references the Ethereum-specific `erc721.proto` protobuf while the Solana SPL Token Transfers example references the Solana-specific `solana_spl.proto`.
@@ -86,13 +86,13 @@ The `protobuf.files` contains a list of protobuf files for the current Substream
 
 ### `protobuf.importPaths`
 
-The `protobuf.importPaths` contains the paths to the protobufs for the current Substreams implementation.
+The `protobuf.importPaths` contains the paths to the protobufs for the current Substreams module.
 
 ## Module definitions
 
-The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams implementation.
+The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams module.
 
-The modules are Rust functions containing the business logic for the implementation.
+The modules are Rust functions containing the business logic for the module.
 
 {% hint style="info" %}
 **Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The official naming convention for Substreams modules prefixes the module name by using `map_` or `store_` depending on the type.

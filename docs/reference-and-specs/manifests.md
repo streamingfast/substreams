@@ -6,7 +6,7 @@ description: StreamingFast Substreams manifest reference
 
 ## What is a Substreams manifest?
 
-The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current implementation and identifying the dependencies between the inputs and outputs of modules.
+The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current Substreams module and identifying the dependencies between the inputs and outputs of modules.
 
 The Substreams manifest reference documentation provides a guide for _all_ fields and values used in a Substreams manifest.
 
@@ -26,7 +26,7 @@ Excerpt pulled from the example Substreams manifest.
 
 ```yaml
 package:
-  name: module_name_for_implementation
+  name: module_name_for_project
   version: v0.5.0
   url: https://github.com/streamingfast/substreams-playground
   doc: |
@@ -50,7 +50,7 @@ The `package.name` field infers the filename when the `pack` command is run by u
 
 #### Package version
 
-The `package.version` field identifies the package for the Substreams implementation.
+The `package.version` field identifies the package for the Substreams module.
 
 {% hint style="info" %}
 **Note**: `package.version` _**must**_ respect [Semantic Versioning, version 2.0](https://semver.org/)
@@ -89,7 +89,7 @@ Imports differ across different blockchains. For example, Ethereum-based Substre
 
 ### Protobuf
 
-The `protobuf` section points to the Protocol Buffer definitions used by the modules in the Substreams implementation.
+The `protobuf` section points to the Protocol Buffer definitions used by the modules in the Substreams module.
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -148,7 +148,7 @@ The type of code and implied virtual machine for execution.
 
 #### `binaries[name].file`
 
-The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the directory the manifest is located in; typically the root of the Substreams implementation.
+The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the directory the manifest is located in; typically the root of the Substreams module.
 
 {% hint style="success" %}
 **Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the Substreams CLI.

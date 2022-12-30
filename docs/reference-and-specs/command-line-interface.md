@@ -22,25 +22,28 @@ The Substreams CLI exposes many commands to developers enabling a range of featu
 
 The `run` command connects to a Substreams endpoint and begins processing data.
 
-```
+{% code title="run command" overflow="wrap" %}
+```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \
    -t +1 \
    ./substreams.yaml \
    module_name
 ```
+{% endcode %}
 
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
-* `-t +1` (or `--stop-block`) only requests a single block (the stop block is the manifest's `initialBlock` + 1)
-* `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
-* `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
+* `-t +1` or `--stop-block` only requests a single block; the stop block is the manifest's `initialBlock` + 1.
+* `substreams.yaml` is the path where you have defined your [Substreams manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
+* `module_name` is the module we want to run, referring to the module name [defined in the Substreams manifest](manifests.md#modules-.name).
 
-Passing a different `-s` (or `--start-block`) runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
+Passing a different `-s` or `--start-block` runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
 
 #### Run example with output
 
-Example output of `gravatar_updates` starting at block 6200807.
+Example output of the `gravatar_updates` module starting at block 6200807.
 
-```
+{% code title="run and output" overflow="wrap" %}
+```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 \
     https://github.com/Jannis/gravity-substream/releases/download/v0.0.1/gravity-v0.1.0.spkg \
     gravatar_updates -o json
@@ -56,8 +59,11 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 }
 ...
 ```
+{% endcode %}
 
-Notice how the `-o` (or `--output`), alters the output format.&#x20;
+{% hint style="info" %}
+**Note**: The `-o` or `--output` alters the output format.&#x20;
+{% endhint %}
 
 The available options are:
 
@@ -69,16 +75,19 @@ The available options are:
 
 The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file.
 
+{% code title="pack command" overflow="wrap" %}
 ```bash
 $ substreams pack ./substreams.yaml
 ...
 Successfully wrote "your-package-v0.1.0.spkg".
 ```
+{% endcode %}
 
 ### `info`
 
 The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` configuration files.
 
+{% code title="info command" overflow="wrap" %}
 ```bash
 $ substreams info ./substreams.yaml
 Package name: solana_spl_transfers
@@ -102,17 +111,20 @@ Value Type: proto:solana.spl.v1.TokenTransfers
 Update Policy: UPDATE_POLICY_SET
 Hash: 11fd70768029bebce3741b051c15191d099d2436
 ```
+{% endcode %}
 
 ### `graph`
 
-The `graph` command prints out a visual graph of the package in the _mermaid-js_ format.
+The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html).
 
 {% hint style="info" %}
 **Note**: see [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor.
 {% endhint %}
 
+{% code title="graph command" overflow="wrap" %}
 ````bash
-$ substreams graph ./substreams.yaml                         [±master ●●]
+$ substreams graph ./substreams.yaml     
+                    [±master ●●]
 Mermaid graph:
 
 ```mermaid
@@ -123,6 +135,7 @@ graph TD;
   spl_transfers --> transfer_store
 ```
 ````
+{% endcode %}
 
 The code creates a graphic similar to:
 
@@ -132,9 +145,10 @@ Mermaid generated graph diagram
 
 ### `inspect`
 
-The `inspect` command reaches deep into the file structure of a package (`yaml` or `spkg`). The `inspect` command is used mostly for debugging, _or for the curious ;)_
+The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious_._
 
-```
+{% code title="inspect command" overflow="wrap" %}
+```bash
 $ substreams inspect ./substreams.yaml | less
 proto_files {
 ...
@@ -143,14 +157,17 @@ modules {
     name: "my_module_name"
 ...
 ```
+{% endcode %}
 
 ### Help
 
-The commands and a brief explanation are provided in the Substreams CLI. Run the `substreams` command in a terminal passing the `-h` flag to view the help reference at any time.
+To view a list of available commands and brief explanations in the Substreams CLI, run the [`substreams`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface) command in a terminal and pass the `-h` flag. You can use this help reference at any time.
 
+{% code title="help option" overflow="wrap" %}
 ```bash
 substreams -h
 ```
+{% endcode %}
 
 {% code title="Substreams help" overflow="wrap" %}
 ```bash

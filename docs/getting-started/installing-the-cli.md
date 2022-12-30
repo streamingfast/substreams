@@ -1,12 +1,12 @@
 ---
-description: StreamingFast Substreams CLI installation
+description: StreamingFast Substreams CLI installation documentation
 ---
 
 # Installing the Substreams CLI
 
-### Substreams CLI installation
+## Substreams CLI installation
 
-The Substreams CLI lets you connect to Substreams endpoints, stream data in real time, and package custom Substreams modules.
+Connect to endpoints, stream data in real time, and package custom modules.
 
 {% hint style="success" %}
 **Tip**_:_ Check the [official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest Substreams CLI release available**.&#x20;
@@ -26,7 +26,7 @@ LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/la
 curl -L  $LINK  | tar zxf -
 ```
 
-#### Substreams source installation
+#### Installation from source
 
 ```bash
 git clone https://github.com/streamingfast/substreams
@@ -38,9 +38,9 @@ go install -v ./cmd/substreams
 **Important**: Add $HOME/go/bin to the system path if it's not already present.
 {% endhint %}
 
-### Substreams CLI install validation
+### Validation of installation
 
-Run Substreams passing it the version flag to ensure the Substreams CLI is working as expected.
+Run passing the version flag to ensure everything is working as expected.
 
 ```bash
 substreams --version
@@ -48,5 +48,5 @@ substreams version dev
 ```
 
 {% hint style="info" %}
-**Note**: You can use [Gitpod](../developers-guide/installation-requirements.md) for Substreams instead of a local installation.
+**Note**: You can use [Gitpod](../developers-guide/installation-requirements.md) instead of a local installation.
 {% endhint %}

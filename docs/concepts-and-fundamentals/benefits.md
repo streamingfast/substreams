@@ -4,7 +4,7 @@ description: StreamingFast Substreams benefits and comparisons
 
 # Benefits and comparisons
 
-### Substreams is:
+## Substreams is:
 
 * a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose,
 * a highly cacheable and parallelizable remote code execution framework,

@@ -4,7 +4,7 @@ description: StreamingFast Substreams documentation
 
 # Substreams
 
-### Welcome to Substreams Documentation
+## Welcome to Substreams Documentation
 
 Substreams is a powerful blockchain indexing technology, developed for [The Graph Network](https://thegraph.com).
 

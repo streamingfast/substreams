@@ -4,7 +4,11 @@ description: StreamingFast Substreams chains and endpoints
 
 # Chains and endpoints
 
-## Supported blockchains and protobuf models
+## Chains and endpoints overview
+
+The different blockchains have separate endpoints that Substreams uses. You will use the endpoint that matches the blockchain you've selected for your development initiative.
+
+### Supported blockchains and protobuf models
 
 Protobuf definitions and public endpoints are provided for the supported protocols and chains.&#x20;
 

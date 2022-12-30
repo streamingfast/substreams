@@ -4,7 +4,7 @@ description: StreamingFast Substreams packages reference
 
 # Packages
 
-## Substreams packages
+## Substreams packages overview
 
 A Substreams _package_ is a **single file** containing all dependencies, protobuf definitions (as FileDescriptors), compiled WASM code, and the module's DAG definition.&#x20;
 

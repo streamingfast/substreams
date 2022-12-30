@@ -4,6 +4,8 @@ description: StreamingFast Substreams module types
 
 # Module types
 
+## Module types overview
+
 Substreams uses two types of modules, `map` and `store`.&#x20;
 
 * Map modules are functions receiving bytes as input and output. These bytes are encoded protobuf messages.

@@ -4,6 +4,8 @@ description: StreamingFast Substreams module handlers
 
 # Module handlers
 
+## Module handlers overview
+
 To begin creating the custom module handlers initialize a new Rust project.
 
 ```bash

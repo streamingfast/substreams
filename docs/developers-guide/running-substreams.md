@@ -4,6 +4,8 @@ description: Running StreamingFast Substreams for the first time
 
 # Running Substreams
 
+## Running Substreams overview
+
 After a successful build, start Substreams by using:
 
 ```bash

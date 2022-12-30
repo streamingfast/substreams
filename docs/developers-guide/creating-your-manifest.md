@@ -4,7 +4,7 @@ description: StreamingFast Substreams manifest
 
 # Manifest
 
-## Overview
+## Manifest Overview
 
 The manifest contains the details for the various aspects and components of a Substreams module.
 

@@ -4,7 +4,7 @@ description: StreamingFast Substreams protobuf schemas
 
 # Protobuf schemas
 
-### Protobuf overview
+## Protobuf overview
 
 Substreams uses Google Protocol Buffers extensively. Protocol Buffers (protobufs) are used as the API for data models specific to the different blockchains. Manifests contain references to the protobufs for your Substreams module.
 

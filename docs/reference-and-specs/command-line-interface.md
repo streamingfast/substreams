@@ -4,9 +4,11 @@ description: StreamingFast Substreams command line interface (CLI)
 
 # Substreams CLI reference
 
+## Substreams CLI reference overview
+
 The Substreams command line interface (CLI) is the Substreams user interface and primary tool for sending requests and receiving data.
 
-The Substreams CLI exposes many commands to developers enabling a range of features. The Substreams commands available for you to use are explained in further detail in the proceeding Substreams CLI documentation.
+The Substreams CLI exposes many commands to developers enabling a range of features.&#x20;
 
 {% hint style="info" %}
 **Note**: When a package is specified you can use:&#x20;
@@ -27,14 +29,14 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
    module_name
 ```
 
-#### Run Command breakdown
-
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
 * `-t +1` (or `--stop-block`) only requests a single block (the stop block is the manifest's `initialBlock` + 1)
 * `substreams.yaml` is the path where you have defined your [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
 * `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
 
 Passing a different `-s` (or `--start-block`) runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
+
+#### Run example with output
 
 Example output of `gravatar_updates` starting at block 6200807.
 
@@ -55,7 +57,9 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 ...
 ```
 
-Notice how the `-o` (or `--output`), alters the output format. The available options are:
+Notice how the `-o` (or `--output`), alters the output format.&#x20;
+
+The available options are:
 
 * `ui`, a nicely formatted, UI-driven interface, displaying progress information and execution logs.
 * `json`, an indented stream of data, **not** displaying progress information or logs, only data output for blocks proceeding the start block.

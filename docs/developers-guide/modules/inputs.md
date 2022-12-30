@@ -4,6 +4,8 @@ description: StreamingFast Substreams module inputs
 
 # Inputs
 
+## Inputs overview
+
 Modules receive inputs of three types:&#x20;
 
 * `source`

@@ -4,6 +4,8 @@ description: StreamingFast Substreams module handler creation
 
 # Module handler creation
 
+## Module handler creation overview
+
 After generating the ABI and Protobuf Rust code, you need to write the handler code. Save the code into the `src` directory and use the filename `lib.rs`.
 
 {% code title="src/lib.rs" overflow="wrap" lineNumbers="true" %}

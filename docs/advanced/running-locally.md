@@ -4,6 +4,8 @@ description: Running the StreamingFast Substreams service locally
 
 # Running Substreams locally
 
+## Local Substreams overview
+
 Run Substreams locally by running StreamingFast Firehose on the same machine.
 
 ### Download Firehose

@@ -4,7 +4,11 @@ description: StreamingFast Substreams frequently asked questions
 
 # FAQ
 
-### is **What is Substreams?**
+## **Substreams FAQ overview**
+
+You can find answers to common Substreams questions in the FAQ documentation. If the answer you're looking for is not included [contact the StreamingFast team](https://discord.gg/mYPcRAzeVN) through Discord to get help.
+
+### **What is Substreams?**
 
 Substreams is an exceptionally powerful processing engine capable of consuming streams of rich blockchain data. Substreams refines and shapes the data for painless digestion by end-user applications, such as decentralized exchanges.
 

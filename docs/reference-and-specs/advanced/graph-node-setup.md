@@ -4,7 +4,7 @@ description: StreamingFast graph-node setup
 
 # Graph-node setup
 
-## Graph-node setup
+## Graph-node setup overview
 
 Substreams and `graph-node` can be used together. Substreams-based subgraphs can be pushed into `graph-node` setups.
 

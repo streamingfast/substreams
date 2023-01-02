@@ -93,7 +93,7 @@ The pairing code is generated and saved into the [`src/pb/eth.erc721.v1.rs`](htt
 
 The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
-{% code title="src/pb/mod.rs" %}
+{% code title="src/pb/mod.rs" overflow="wrap" lineNumbers="true" %}
 ```rust
 #[path = "eth.erc721.v1.rs"]
 #[allow(dead_code)]
@@ -101,9 +101,7 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs)
+View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file in the repository.
 
 ### Protobuf and Rust optional fields
 

@@ -75,6 +75,7 @@ The logical sections of the [`lib.rs`](https://github.com/streamingfast/substrea
 
 Import the necessary modules.
 
+{% code title="lib.rs excerpt" overflow="wrap" %}
 ```rust
 mod abi;
 mod pb;
@@ -83,15 +84,19 @@ use pb::erc721;
 use substreams::{log, store, Hex};
 use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS, Event};
 ```
+{% endcode %}
 
 Store the tracked contract in the example in a `constant`.
 
+{% code title="lib.rs excerpt" %}
 ```rust
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 ```
+{% endcode %}
 
 Define the `map` module.
 
+{% code title="manifest excerpt" %}
 ```yaml
 - name: map_transfers
   kind: map
@@ -101,6 +106,7 @@ Define the `map` module.
   output:
     type: proto:eth.erc721.v1.Transfers
 ```
+{% endcode %}
 
 Notice the: `name: map_transfers`, the module in the manifest name matches the handler function name. Also notice, there is one [`inputs`](inputs.md) and one [`output`](outputs.md) definition.
 
@@ -110,12 +116,14 @@ The output uses the `type` `proto:eth.erc721.v1.Transfers` which is a custom pro
 
 The function signature produced is:
 
+{% code title="lib.rs excerpt" %}
 ```rust
 #[substreams::handlers::map]
 fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
     ...
 }
 ```
+{% endcode %}
 
 {% hint style="info" %}
 **Note**: **Rust macros**
@@ -124,7 +132,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 * The macro decorates the handler function as a `map.` Define `store` modules by using the syntax `#[substreams::handlers::store]`.
 {% endhint %}
 
-The `map` extracts ERC721 transfers from a `Block` object. The code finds all the `Transfer` events emitted by the tracked smart contract. As the events are found they are decoded into `Transfer` objects.
+The `map` extracts ERC721 transfers from a _`Block`_ object. The code finds all the `Transfer` `events` emitted by the tracked smart contract. As the events are encountered they are decoded into `Transfer` objects.
 
 {% code overflow="wrap" %}
 ```rust
@@ -153,6 +161,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 
 Define the `store` module.&#x20;
 
+{% code title="manifest excerpt" %}
 ```yaml
 - name: store_transfers
   kind: store
@@ -162,6 +171,7 @@ Define the `store` module.&#x20;
   inputs:
     - map: map_transfers
 ```
+{% endcode %}
 
 {% hint style="info" %}
 **Note:** `name: store_transfers` corresponds to the handler function name.
@@ -169,12 +179,14 @@ Define the `store` module.&#x20;
 
 The `inputs` corresponds to the `output` of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. The custom protobuf definition is provided by the generated Rust code.
 
+{% code title="" %}
 ```rust
 #[substreams::handlers::store]
 fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
     ...
 }
 ```
+{% endcode %}
 
 {% hint style="info" %}
 **Note**: __ the `store` always receives itself as its own last input.
@@ -235,7 +247,7 @@ The `generate_key` function returns a unique `key` for holders if it contains on
 
 The value being stored. The `type` is dependent on the `store` `type` being used.
 
-{% code overflow="wrap" %}
+{% code title="lib.rs excerpt" overflow="wrap" %}
 ```rust
 #[substreams::handlers::store]
 fn store_transfers(transfers: erc721::Transfers, s: StoreAddInt64) {
@@ -263,11 +275,11 @@ fn generate_key(holder: &Vec<u8>) -> String {
 
 Both handler functions have been written.
 
-One handler function for extracting relevant transfers, and a second to store the token count per recipient.
+One handler function for extracting relevant _`transfers`_, and a second to store the token count per recipient.
 
 Build Substreams to continue the setup process.
 
-```
+```bash
 cargo build --target wasm32-unknown-unknown --release
 ```
 

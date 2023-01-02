@@ -93,7 +93,7 @@ Because code is being built by WASM output it's necessary to configure Rust to m
 
 #### Rust toolchain
 
-{% code title="rust-toolchain.toml" %}
+{% code title="rust-toolchain.toml" overflow="wrap" lineNumbers="true" %}
 ```toml
 [toolchain]
 channel = "1.65"
@@ -106,7 +106,7 @@ View the [`rust-toolchain.toml`](https://github.com/streamingfast/substreams-tem
 
 Build the code by using:
 
-```rust
+```bash
 cargo build --target wasm32-unknown-unknown --release
 ```
 
@@ -168,7 +168,7 @@ cargo build --target wasm32-unknown-unknown --release
 
 Create a [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) export file in the ABI directory, which is created by the Rust build process. The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) export file is responsible for exporting the generated Rust code.
 
-{% code title="src/abi/mod.rs" %}
+{% code title="src/abi/mod.rs" lineNumbers="true" %}
 ```rust
 pub mod erc721;
 ```

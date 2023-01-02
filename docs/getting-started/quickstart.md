@@ -81,6 +81,7 @@ Different blockchains have specific requirements for their data definitions. The
 
 Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project:
 
+{% code title="Cargo.toml" overflow="wrap" lineNumbers="true" %}
 ```toml
 [package]
 name = "substreams-ethereum-tutorial"
@@ -99,16 +100,24 @@ lto = true
 opt-level = 's'
 strip = "debuginfo"
 ```
+{% endcode %}
 
-Install the Rust crate for the chain you want to use. The crates have the protobuf models for the specific chains and helper code. Run the `cargo` `add` command to obtain the Substreams crates.
+Install the Rust crate for the chain you want to use. The crates have the protobuf models for the specific chains and helper code. Run the `cargo` `add` command to obtain the Substreams crates and specify the name of the crate for the blockchain you want to use.
+
+Acquire the Ethereum crate for Substreams by using:
 
 ```bash
-$ cargo add substreams-ethereum # or
-$ cargo add substreams-solana 
+$ cargo add substreams-ethereum
+```
+
+Acquire the Solana crate for Substreams by using:
+
+```
+$ cargo add substreams-solana
 ```
 
 {% hint style="success" %}
-**Tip**: Crates are used if they are available for the chosen blockchain.\
+**Tip**: Crates are used when they are available for the chosen blockchain.\
 \
 Alternatively, generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. [Read through the Rust crates documentation](../reference-and-specs/rust-crates.md) for details.
 {% endhint %}
@@ -178,7 +187,7 @@ After cloning the Solana example, take a moment to look through the repository. 
 
 A very important distinction between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum, Solana, or even Bitcoin are constructed and designed differently. Some of the differences are small and subtle, others are not.
 
-Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the block passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields. The disparities in the field names are due to differences in the block model for the separate blockchains.
+Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the _`block`_ passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields of the _`block`_ it receives. The disparities in the field names are due to differences in the block model for the separate blockchains.
 
 {% code title="src/lib.rs" overflow="wrap" %}
 ```rust

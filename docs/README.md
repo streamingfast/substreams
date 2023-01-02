@@ -62,3 +62,9 @@ Substreams uses the [Apache 2.0](../LICENSE/) license.
 ### Disclaimer
 
 The content in the Substreams documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is in active development and the associated documentation becomes outdated. [Contact StreamingFast](https://discord.gg/mYPcRAzeVN) to report problems or service interruptions.
+
+#### Style guide
+
+The Substreams documentation uses the [Google developer documentation style guide](https://developers.google.com/style) for its style and formatting.
+
+\

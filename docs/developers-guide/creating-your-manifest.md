@@ -19,7 +19,7 @@ Every Substreams module contains one manifest. The manifest is a YAML-based file
 The manifest from the [Substreams Template example](https://github.com/streamingfast/substreams-template) is used in the Substreams documentation.
 
 {% hint style="info" %}
-**Note**: The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain. The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml) specific to the Solana blockchain.
+**Note**: The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain. The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest specific to the Solana blockchain](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml).
 {% endhint %}
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}
@@ -62,9 +62,7 @@ modules:
 ```
 {% endcode %}
 
-View the `substreams.yaml` file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml)
+View the [`substreams.yaml`](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) file in the repository.
 
 ## Manifest walkthrough
 

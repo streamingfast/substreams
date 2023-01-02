@@ -38,7 +38,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 The [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
 
 {% hint style="info" %}
-Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages
+Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages.
 {% endhint %}
 
 ## Platform independent Substreams
@@ -79,7 +79,7 @@ Different blockchains have specific requirements for their data definitions. The
 
 ### **Crates and packages**
 
-Create a `Cargo.toml` at the root of your project:
+Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project:
 
 ```toml
 [package]
@@ -119,16 +119,14 @@ The relationships for the flow of data are defined in the Substreams manifest. F
 
 ### Ethereum example
 
-Clone or download the Ethereum example codebase to get started. The example[ is located in the official GitHub repository](https://github.com/streamingfast/substreams-ethereum-tutorial).
-
-[https://github.com/streamingfast/substreams-ethereum-tutorial](https://github.com/streamingfast/substreams-ethereum-tutorial)
+Clone or download the Ethereum example codebase to get started. The example is located in the official [Substreams Ethereum Tutorial GitHub repository](https://github.com/streamingfast/substreams-ethereum-tutorial).
 
 Take a moment to explore the codebase. Take note of the chain name used through the different files including the [manifest](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/substreams-ethereum-tutorial.yaml), and the [TOML build configuration file](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml).&#x20;
 
 Also take note of the module handler, defined in [`lib.rs`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs), and the custom protobuf definition in the proto directory named [`basicexample.proto`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto).
 
 {% hint style="info" %}
-**Note**: The module handler in the [`lib.rs`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs) file for the Ethereum example has code specific to the blockchain. The block structure for Ethereum blocks can be viewed in the code excerpt.
+**Note**: The module handler in the [`lib.rs`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs) file for the Ethereum example has code specific to the blockchain. The basic block structure for Ethereum blocks can be viewed in the code excerpt.
 {% endhint %}
 
 {% code title="src/lib.rs" overflow="wrap" %}
@@ -144,11 +142,11 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 
 To use the example, follow these steps:
 
-1. Run the command to generate the required protobufs
-2. Compile the example using the Rust compiler
-3. Send commands to the [`substreams` CLI](../reference-and-specs/command-line-interface.md)
+1. Run the command to generate the required protobufs.
+2. Compile the example using the Rust compiler.
+3. Send commands to the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
 
-Generate the structs from the protobuf specified in the `substreams-ethereum-tutorial.yaml` configuration file by using the `protogen` command:
+Generate the structs from the protobuf specified in the [`substreams-ethereum-tutorial.yaml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/substreams-ethereum-tutorial.yaml) configuration file by using the `protogen` command:
 
 {% code overflow="wrap" %}
 ```bash
@@ -158,7 +156,7 @@ substreams protogen substreams-ethereum-tutorial.yaml
 
 Compile the project by using:
 
-```shell
+```bash
 cargo build --release --target wasm32-unknown-unknown
 ```
 
@@ -174,13 +172,11 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.
 
 The procedure to use the Solana example is very similar to the Ethereum example.&#x20;
 
-Clone or download the Solana example codebase. The example is [located in the official GitHub repository](https://github.com/streamingfast/substreams-solana-tutorial).
-
-[https://github.com/streamingfast/substreams-solana-tutorial](https://github.com/streamingfast/substreams-solana-tutorial)
+Clone or download the Solana example codebase. The example is located in the official [Substreams Solana Tutorial GitHub repository](https://github.com/streamingfast/substreams-solana-tutorial).
 
 After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example stand out immediately.
 
-A very important distinction between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum or even Bitcoin are constructed and designed differently. Some of the differences are small and subtle although others are not.
+A very important distinction between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum, Solana, or even Bitcoin are constructed and designed differently. Some of the differences are small and subtle, others are not.
 
 Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the block passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields. The disparities in the field names are due to differences in the block model for the separate blockchains.
 
@@ -223,7 +219,7 @@ Here are some takeaways:
 Understanding map and store modules are important for learning how to design and craft a fully directed acyclic graph in your Substreams manifest.
 {% endhint %}
 
-Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's Guide](../developers-guide/overview.md).&#x20;
+Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's guide](../developers-guide/overview.md).&#x20;
 
 Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
 

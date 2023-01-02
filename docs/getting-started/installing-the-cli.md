@@ -53,5 +53,5 @@ substreams version dev
 ```
 
 {% hint style="info" %}
-**Note**: You can also use [Gitpod](../developers-guide/installation-requirements.md) instead of a local installation.
+**Note**: You can [also use Gitpod](../developers-guide/installation-requirements.md) instead of a local installation.
 {% endhint %}

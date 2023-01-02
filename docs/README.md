@@ -20,25 +20,27 @@ Learn about Substreams in a short, dense 25-minute intro and understand its impa
 A walkthrough of Firehose features, Substreams modules, including a sample Rust module and StreamingFast's vision.
 {% endembed %}
 
-Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefits/).
+Learn important facts about Substreams by [reading the Benefits and comparison](concept-and-fundamentals/benefits/).
 
-Get started using Substreams by:
+The primary ways to use Substreams include:
 
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
-* Going through the [Quickstart](getting-started/quickstart.md).
+* [Going through the Quickstart](getting-started/quickstart.md).
 
-Learn more about [modules](concepts-and-fundamentals/modules.md), or study the [Developer's guide](developers-guide/overview.md).
+After installing Substreams and reviewing the Quickstart:
+
+* You can [learn more about modules](concepts-and-fundamentals/modules.md), and then [study the Developer's guide](developers-guide/overview.md).
 
 Find pre-built Substreams by using the following resources:
 
-* [Substreams Template](https://github.com/streamingfast/substreams-template): gets you off the ground.
-* [Substreams Playground](https://github.com/streamingfast/substreams-playground): a collection of Substreams modules, and examples.
+* [Substreams Template](https://github.com/streamingfast/substreams-template) - gets you off the ground.
+* [Substreams Playground](https://github.com/streamingfast/substreams-playground) - a collection of Substreams modules, and examples.
 
 ### Network model diagram
 
 <img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
 
-You can view Substreams from two perspectives, as illustrated in the high-level visual diagram: the perspective of the Substreams engine and the perspective of the end-user developer and consumer.
+**You can view Substreams from two perspectives** as illustrated in the high-level visual diagram. It can be viewed through the perspective of the **Substreams engine** itself and also the perspective of the **end-user developer and consumer**.
 
 ### Community
 

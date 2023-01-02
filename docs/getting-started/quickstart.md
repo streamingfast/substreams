@@ -149,7 +149,7 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 ```
 {% endcode %}
 
-To use the example, follow these steps:
+Follow this sequence of steps to use the example:
 
 1. Run the command to generate the required protobufs.
 2. Compile the example using the Rust compiler.
@@ -201,7 +201,7 @@ fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExam
 ```
 {% endcode %}
 
-Follow the same steps used for the Ethereum example to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) the Solana example.
+Follow the same steps [used for the Ethereum example](quickstart.md#ethereum-example) to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) the Solana example.
 
 {% code overflow="wrap" %}
 ```basic
@@ -215,7 +215,7 @@ Note: The Solana example has a different endpoint, module name, and manifest fil
 
 ## **Next steps**
 
-Here are some important takeaways:
+Some important things to remember when using Substreams include:
 
 * Substreams can be used across multiple blockchains, as it is platform independent.
 * Each blockchain has its own unique structure and model for block data.
@@ -225,12 +225,14 @@ Here are some important takeaways:
 {% hint style="info" %}
 **Note**: Gaining a basic understanding of how Substreams works across multiple blockchains enables you to graduate to build even more complex solutions.
 
-Understanding map and store modules are important for learning how to design and craft a fully directed acyclic graph in your Substreams manifest.
+Understanding `map` and `store` modules are important for learning how to design and craft a DAG in your Substreams manifest.
 {% endhint %}
 
-Additional information is available for understanding [modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's guide](../developers-guide/overview.md).&#x20;
+Additional information is available for [understanding modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's guide](../developers-guide/overview.md).&#x20;
 
-Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
+{% hint style="success" %}
+**Tip**: Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
+{% endhint %}
 
 ## **Troubleshooting and errors**
 
@@ -244,4 +246,6 @@ Error: rpc error: code = InvalidArgument desc = validate request: input source "
 
 To avoid requesting data for the wrong blockchain, make sure to double-check the endpoint being sent to the [`substreams`CLI](../reference-and-specs/command-line-interface.md) against the code and settings within the Substreams codebase. It is important to note that data from one blockchain is not compatible with others, and the RPC error you are receiving is indicating a block data disparity issue.&#x20;
 
-To resolve this problem, review the codebase to ensure it meets the requirements of the blockchain configuration for your code. The error occurs when the codebase expects blocks from Ethereum, but the [`substreams`CLI](../reference-and-specs/command-line-interface.md) is receiving blocks from Solana instead.
+{% hint style="warning" %}
+**Important**: To resolve this problem, review the codebase to ensure it meets the requirements of the blockchain configuration for your code. The error occurs when the codebase expects blocks from Ethereum, but the [`substreams`CLI](../reference-and-specs/command-line-interface.md) is receiving blocks from Solana instead.
+{% endhint %}

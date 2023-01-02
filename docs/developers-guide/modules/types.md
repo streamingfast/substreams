@@ -8,23 +8,23 @@ description: StreamingFast Substreams module types
 
 Substreams uses two types of modules, `map` and `store`.&#x20;
 
-* Map modules are functions receiving bytes as input and output. These bytes are encoded protobuf messages.
-* Store modules are stateful, saving and tracking data through the use of key-value stores.
+* `map` modules are functions receiving bytes as input and output. These bytes are encoded protobuf messages.
+* `store` modules are stateful, saving and tracking data through the use of key-value stores.
 
-### Store modules
+### `store` modules
 
-Store modules write to key-value stores.&#x20;
+`store` modules write to key-value stores.&#x20;
 
 {% hint style="info" %}
-**Note**: To ensure successful and proper parallelization store modules are not permitted to read any of their own data or values.
+**Note**: To ensure successful and proper parallelization `store` modules are not permitted to read any of their own data or values.
 {% endhint %}
 
-Stores declaring their own data types expose methods capable of mutating keys within the store.
+Stores declaring their own data types expose methods capable of mutating keys within the `store`.
 
 ### Core principle usage of stores
 
-* Do not store keys in stores **unless they are to be read by a downstream module**. Substreams stores are a means to do aggregations, but it is not a storage layer.
-* Do not store all transfers of a chain in a `store` module, rather, output them in a mapper and have a downstream system store them for querying.
+* Do not save keys in stores **unless they are going to be read by a downstream module**. Substreams stores are a way to aggregate data, but they are **not meant to be a storage layer**.
+* Do not save all transfers of a chain in a `store` module, rather, output them in a `map` and have a downstream system store them for querying.
 
 ### Important store properties
 
@@ -62,18 +62,18 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 
 
 {% hint style="info" %}
-**Note**: all update policies provide the `delete_prefix` method.
+**Note**: All update policies provide the `delete_prefix` method.
 {% endhint %}
 
 {% hint style="info" %}
 **Note**_**:** _ The merge strategy is **applied during parallel processing**.&#x20;
 
-* A module has built two partial stores containing keys for segment A (blocks 0-1000) and segment B (blocks 1000-2000) and is prepared to merge them into a complete store.
+* A module has built two partial stores containing keys for segment A, blocks 0-1000, and segment B, blocks 1000-2000, and is prepared to merge them into a complete store.
 * The complete store is represented acting as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_**:** _ To preserve the parallelization capabilities of the system, Substreams is not permitted to read what it has written or read from a `store` actively being written.
+**Important**_**:** _ To preserve the parallelization capabilities of the system, **Substreams is not permitted to read what it has written or read from a `store` actively being written**.
 
 A downstream module is created to read from a store by using one of its inputs to point to the output of the `store` module.
 {% endhint %}
@@ -103,7 +103,7 @@ The `get mode` function provides the module with a key-value store that is guara
 {% endhint %}
 
 {% hint style="info" %}
-**Note:** `store` method behavior is defined as:
+**Note:**  The definition of `store` method behavior is:
 
 * The `get_last` method is the fastest because it queries the store directly.&#x20;
 * The `get_first` method first goes through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.&#x20;

@@ -4,9 +4,9 @@ description: StreamingFast Substreams module inputs
 
 # Inputs
 
-## Inputs overview
+## `inputs` overview
 
-Modules receive inputs of three types:&#x20;
+Modules receive `inputs` of three types:&#x20;
 
 * `source`
 * `map`
@@ -22,10 +22,12 @@ An `inputs` of type `source` represents a chain-specific, Firehose-provisioned p
 
 The `source` `inputs` type __ is defined in the Substreams manifest. It is important to specify the correct `Block` object for the chain.
 
+{% code title="manifest excerpt" %}
 ```yaml
   inputs:
     - source: sf.ethereum.type.v2.Block
 ```
+{% endcode %}
 
 #### `Clock` object
 
@@ -47,12 +49,14 @@ The object's type is defined in the [`output.type`](../../reference-and-specs/ma
 **Important**_**:**_ `map` modules _**cannot depend on themselves**_. When modules depend on themselves they create an unwanted circular dependency.
 {% endhint %}
 
-You define the `map` `inputs` type in the Substreams manifest and choose a name for the `map` that reflecting the logic contained within it.
+You define the `map` `inputs` type in the Substreams manifest and choose a name for the `map` reflecting the logic contained within it.
 
+{% code title="manifest excerpt" %}
 ```yaml
   inputs:
     - map: my_map
 ```
+{% endcode %}
 
 [Learn more about `maps`](../../concepts-and-fundamentals/modules.md#the-map-module-type) in the Substreams modules documentation.
 
@@ -64,29 +68,31 @@ The developer defines the `store` `inputs` type in the Substreams manifest and g
 
 Store modules are set to `get` mode by default:
 
+{% code title="manifest excerpt" %}
 ```yaml
   inputs:
     - store: my_store # defaults to mode: get
 ```
+{% endcode %}
 
 Alternatively, set `stores` to `deltas` mode by using:
 
+{% code title="manifest excerpt" %}
 ```yaml
   inputs:
     - store: my_delta_store
       mode: deltas
 ```
+{% endcode %}
 
 ### Module `mode`
 
-There are **two types of `mode`** defined for modules.
+Substreams uses two types of `mode` for modules:
 
 * `get`
 * `delta`
 
 ### Store constraints
-
-Constraints for a `store` are defined by using:
 
 * A `store` can only receive `inputs` as read-only.
 * A `store` cannot depend on itself.

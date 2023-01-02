@@ -211,7 +211,7 @@ The goal of the `store` in the example is to track a holder's current NFT `count
 
 ### `store` concepts
 
-When writing to a `store`, there are three important concepts to consider:&#x20;
+There are three important things to consider when writing to a `store`:
 
 * `ordinal`
 * `key`

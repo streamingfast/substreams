@@ -112,11 +112,11 @@ Build the code by using:
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-{% hint style="info" %}
-**Note: Rust build target**
+**Rust build target**
 
-* When running `cargo build` the target is set to `wasm32-unknown-unknown`, which is important because it specifies the goal is to generate compiled WASM code.
-* To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a `config.toml` configuration file in the `.cargo` directory at the root of the Substreams project. The `config.toml` configuration file allows the target to be set automatically for all `cargo` commands.
+When running `cargo build` the target is set to `wasm32-unknown-unknown`, which is important because it specifies the goal is to generate compiled WASM code.
+
+To avoid having to specify the target `wasm32-unknown-unknown` for every `cargo` command, create a `config.toml` configuration file in the `.cargo` directory at the root of the Substreams project. The `config.toml` configuration file allows the target to be set automatically for all `cargo` commands.
 
 The content for the `config.toml` configuration file is:
 
@@ -128,7 +128,6 @@ target = "wasm32-unknown-unknown"
 {% endcode %}
 
 The `config.toml` configuration file updates the default `cargo build` command to `cargo build --target wasm32-unknown-unknown` eliminating the need to specify the target manually every time you build.
-{% endhint %}
 
 ### ABI generation
 
@@ -136,12 +135,11 @@ The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-c
 
 Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FerQrzMtqELZRGAdugCR2%2Fuploads%2FEPcZ7g7wnrxCKQxD8Vbc%2Ferc721.json?alt=media\&token=42863ee3-fabb-421f-964e-040eb389032f) in the Substreams project in the `abi` directory.
 
-{% hint style="info" %}
-**Note: Rust build script**
+**Rust build script**
 
-* Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process responsible for performing a variety of tasks.
-* To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
-{% endhint %}
+Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process responsible for performing a variety of tasks.
+
+To cause Cargo to compile and run a script before building a package, place a file called `build.rs` in the root of the package.
 
 Create a [`build.rs`](https://github.com/streamingfast/substreams-template/blob/develop/build.rs) build script file in the root of the Substreams project by using:
 

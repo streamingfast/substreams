@@ -17,7 +17,7 @@ Substreams development involves using several different pieces of technology, in
 * Identifying data and defining and creating protobufs.
 * Writing Rust Substreams module handler functions.
 * Updating the Substreams manifest to reference the protobufs and module handlers.
-* Using the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands.
+* Using the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands and view results.
 
 ### **The Substreams engine**
 
@@ -27,7 +27,7 @@ The Substreams engine serves as the CPU or brain of the Substreams system, handl
 **Note**: The Substreams engine is responsible for running developer-defined data transformations to process blockchain data.
 {% endhint %}
 
-Developers use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands, flags, and a reference to the manifest configuration file to the Substreams engine. They create data transformation strategies in Substreams "module handlers" using the Rust programming language, which act on protobuf-based data models referenced from within the Substreams manifest.&#x20;
+Developers use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands, flags, and a reference to the manifest configuration file to the Substreams engine. They create data transformation strategies in Substreams "_module handlers_" using the Rust programming language, which acts on protobuf-based data models referenced from within the Substreams manifest.&#x20;
 
 ### **Substreams module communication**
 
@@ -44,18 +44,21 @@ The data flow is [defined in the Substreams manifest](../reference-and-specs/man
 Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).&#x20;
 
 {% hint style="info" %}
-**Note**: The flow of data from one module to another is determined by the fundamental rules and principles of DAGs. DAGs work through a one-directional flow.
+**Note**: In DAGs, data flows from one module to another in a one-directional manner, governed by the fundamental rules and principles of DAGs.
 {% endhint %}
 
-The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine. Directed acyclic graphs contain nodes, which in this case are modules communicating in only one direction, passing from one node or module to another. The Substreams engine creates the "compute graph" or "dependency graph" at run time through commands sent to the [`substreams` CLI](../reference-and-specs/command-line-interface.md) using the code in modules referenced by the manifest.
+The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine.&#x20;
+
+Directed acyclic graphs contain nodes, which in this case are modules communicating in only one direction, passing from one node or module to another.&#x20;
+
+The Substreams engine creates the "_compute graph_" or "_dependency graph_" at run time through commands sent to the [`substreams` CLI](../reference-and-specs/command-line-interface.md) using the code in modules referenced by the manifest.
 
 ### **Protobufs for Substreams**
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
-View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) protobuf file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
-
-View the Rust module handlers in the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
+* View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) protobuf file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
+* View the Rust module handlers in the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
 
 [Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 

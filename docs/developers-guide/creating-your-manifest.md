@@ -11,7 +11,7 @@ The manifest contains the details for the various aspects and components of a Su
 Every Substreams module contains one manifest. The manifest is a YAML-based file and provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
 
 {% hint style="success" %}
-**Tip**: Additional detailed information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
+**Tip**: Additional [detailed information for manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
 {% endhint %}
 
 ## Example manifest
@@ -19,7 +19,10 @@ Every Substreams module contains one manifest. The manifest is a YAML-based file
 The manifest from the [Substreams Template example](https://github.com/streamingfast/substreams-template) is used in the Substreams documentation.
 
 {% hint style="info" %}
-**Note**: The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain. The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest specific to the Solana blockchain](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml).
+**Note**: Learn more about Substreams manifests and different blockchains through the examples provided by StreamingFast.
+
+* The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain.&#x20;
+* The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest specific to the Solana blockchain](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml).
 {% endhint %}
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}

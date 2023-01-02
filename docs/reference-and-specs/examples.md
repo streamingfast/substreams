@@ -12,42 +12,32 @@ The accompanying template for the Developer's Guide is[ ](https://github.com/str
 
 #### Uniswap-v3
 
-Substreams-based Uniswap-v3 Subgraph and Substreams. The Uniswap Substreams example is in beta.
-
-[https://github.com/streamingfast/substreams-uniswap-v3](https://github.com/streamingfast/substreams-uniswap-v3)
+Substreams-based Uniswap-v3 Subgraph and Substreams. [The Uniswap Substreams example ](https://github.com/streamingfast/substreams-uniswap-v3)is in beta.
 
 #### PancakeSwap Substreams
 
-Substreams example for tracking PancakeSwap on BSC Mainnet. _**No support is provided for the PancakeSwap example or endpoint.**_
+Substreams [example for tracking PancakeSwap on BSC Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap).&#x20;
 
-[https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap)
+{% hint style="warning" %}
+**Important**: **No support is provided** for the PancakeSwap example or endpoint.
+{% endhint %}
 
 #### ETH Token Substreams
 
-Substreams example tracking ERC-20 tokens on the Ethereum Mainnet.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token](https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token)
+Substreams [example tracking ERC-20 tokens on the Ethereum Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token).
 
 #### Solana SPL Tokens
 
-First draft for extraction of the SPL token on the Solana blockchain.&#x20;
-
-[https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
+First draft for [extraction of the SPL token on the Solana blockchain](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens).&#x20;
 
 #### Substreams Rust client example
 
-Substreams example to consume data from the compute engine, written in Rust.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust](https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust)
+Substreams example to [consume data from the compute engine](https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust), written in Rust.
 
 #### Substreams Python client example
 
-Substreams example to consume data from the compute engine, written in Python.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/consumers/python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python)
+Substreams example to [consume data from the compute engine](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python), written in Python.
 
 #### PancakeSwap direct to database example
 
-An E2E indexer for PancakeSwap written in the Go programming language.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode](https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode)
+An[ E2E indexer for PancakeSwap](https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode) written in the Go programming language.

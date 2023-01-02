@@ -18,9 +18,7 @@ Developers do not need a dedicated installation of Firehose to use Substreams. S
 
 ### **Is it possible to use Substreams in my subgraph?**
 
-Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the Substreams documentation for graph-node and subgraphs.
-
-[https://substreams.streamingfast.io/reference-and-specs/graph-node-setup](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup)
+Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the [Substreams documentation for graph-node and subgraphs](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup).
 
 ### **Is it possible to use Substreams for production deployments?**
 
@@ -30,41 +28,25 @@ No, Substreams is provided as a developer preview.
 
 The [`substreams` command line interface (CLI)](command-line-interface.md) is the main tool developers use to use the Substreams engine. The [`substreams` CLI](command-line-interface.md) provides a range of features, commands, and flags. Additional information for the [`substreams` CLI](command-line-interface.md) is available in the Substreams documentation.
 
-[https://substreams.streamingfast.io/reference-and-specs/using-the-cli](https://substreams.streamingfast.io/reference-and-specs/using-the-cli)
-
 ### **How do I get a Substreams authentication token?**
 
-Authentication tokens are required to use Substreams and connect to the public Firehose endpoint. Full instructions for obtaining a StreamingFast authentication token are available in the Substreams documentation.
-
-[https://substreams.streamingfast.io/reference-and-specs/authentication](https://substreams.streamingfast.io/reference-and-specs/authentication)
+Authentication tokens are required to use Substreams and connect to the public Firehose endpoint. Full [instructions for obtaining a StreamingFast authentication token](https://substreams.streamingfast.io/reference-and-specs/authentication) are available in the Substreams documentation.
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
-The StreamingFast team is available in Discord to resolve problems related to obtaining or by using authentication tokens.&#x20;
+The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/Ugc7KtkA) related to obtaining or by using authentication tokens.&#x20;
 
-[https://discord.gg/Ugc7KtkA](https://discord.gg/Ugc7KtkA)
-
-The Substreams documentation also provides general instructions surrounding authentication tokens.
-
-[https://substreams.streamingfast.io/reference-and-specs/authentication](https://substreams.streamingfast.io/reference-and-specs/authentication)
+The Substreams documentation also [provides general instructions surrounding authentication](https://substreams.streamingfast.io/reference-and-specs/authentication) tokens.
 
 ### **How do I create a Substreams module?**
 
-Developers create their own Substreams implementations in a variety of ways. StreamingFast provides the Substreams Playground containing examples to use as a reference and starting point.
+Developers create their own Substreams implementations in a variety of ways. StreamingFast [provides the Substreams Playground](https://github.com/streamingfast/substreams-playground) containing examples to use as a reference and starting point.
 
-[https://github.com/streamingfast/substreams-playground](https://github.com/streamingfast/substreams-playground)
-
-The Substreams documentation provides a Developer's Guide to assist you to understand and use Substreams.
-
-[https://substreams.streamingfast.io/developer-guide/overview](https://substreams.streamingfast.io/developer-guide/overview)
+The Substreams documentation [provides a Developer's guide](https://substreams.streamingfast.io/developer-guide/overview) to assist you to understand and use Substreams.
 
 ### **What is Substreams for?**
 
 Substreams and Firehose work together to index and process blockchain data. Substreams is used for transforming rich blockchain data and exposing it to the needs of application developers.
-
-Additional information is available on the What is Substreams page in the documentation.
-
-[https://substreams.streamingfast.io/concept-and-fundamentals/definition](https://substreams.streamingfast.io/concept-and-fundamentals/definition)
 
 ### **Is Substreams free?**
 
@@ -80,25 +62,19 @@ Specifying a stop block value of zero (0), the default enables transparent hando
 
 ### **Does StreamingFast have a Discord?**
 
-Yes, join the StreamingFast Discord.
-
-[https://discord.gg/Ugc7KtkA](https://discord.gg/mYPcRAzeVN)
+Yes, [join the StreamingFast Discord](https://discord.gg/Ugc7KtkA).
 
 ### **Is StreamingFast on Twitter?**
 
-Yes, find StreamingFast on their official Twitter account.
-
-[https://twitter.com/streamingfastio](https://twitter.com/streamingfastio)
+Yes, [find StreamingFast on their official Twitter account](https://twitter.com/streamingfastio).
 
 ### **Is StreamingFast on YouTube?**
 
-Yes, find StreamingFast on their official YouTube account.
-
-[https://www.youtube.com/c/streamingfast](https://www.youtube.com/c/streamingfast)
+Yes, [find StreamingFast on their official YouTube account](https://www.youtube.com/c/streamingfast).
 
 ### **Who is dfuse?**
 
-StreamingFast was originally called dfuse. The company changed its name and is in the process of phasing the old brand out.
+StreamingFast was originally called dfuse. The company changed its name and is in the process of rebranding the company.
 
 ### What is Sparkle?
 
@@ -114,9 +90,7 @@ The first unknown is the system you are compiling on, and the second is the syst
 
 “Compile on almost any machine, run on almost any machine.”
 
-Additional information is available in the Github issue for WASM-bindgen:
-
-[https://github.com/rustwasm/wasm-bindgen/issues/979](https://github.com/rustwasm/wasm-bindgen/issues/979)
+Additional information [is available in the Github issue for WASM-bindgen](https://github.com/rustwasm/wasm-bindgen/issues/979).
 
 ### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
 

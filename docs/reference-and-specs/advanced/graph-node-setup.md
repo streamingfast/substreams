@@ -22,9 +22,7 @@ git clone git@github.com:streamingfast/graph-node-dev.git
 
 Docker is required to use StreamingFast `graph-node-dev`. Make sure your machine has a functional Docker installation in place prior to proceeding.
 
-Additional information for Docker installation can be found in the official Docker documentation.
-
-[https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/)
+Additional information for Docker installation can be [found in the official Docker documentation](https://docs.docker.com/engine/install/).
 
 </details>
 
@@ -34,13 +32,9 @@ Additional information for Docker installation can be found in the official Dock
 
 Node Package Manager (NPM) and Yarn are required to use StreamingFast `graph-node-dev`.
 
-Additional information for NodeJS and NPM installation can be found in the official NPM documentation.
+Additional information for NodeJS and NPM installation can be [found in the official NPM documentation](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
 
-[https://docs.npmjs.com/downloading-and-installing-node-js-and-npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
-
-Additional information for Yarn installation can be found in the official yarn documentation.
-
-[https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable)
+Additional information for Yarn installation can be [found in the official yarn documentation](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable).
 
 </details>
 
@@ -50,9 +44,7 @@ Additional information for Yarn installation can be found in the official yarn d
 
 PostgreSQL is required to use StreamingFast `graph-node-dev`. Make sure your computer has a fully functional PostgreSQL installation in place prior to proceeding.
 
-Additional information for PostgreSQL installation can be found in the official PostgreSQL documentation.
-
-[https://www.postgresql.org/download/](https://www.postgresql.org/download/)
+Additional information for PostgreSQL installation can be [found in the official PostgreSQL documentation](https://www.postgresql.org/download/).
 
 </details>
 
@@ -120,9 +112,11 @@ Run `graph-node` from its root directory. The `config/graph-node.eth-ropsten.tom
 
 Start up `graph-node` by using:
 
+{% code overflow="wrap" %}
 ```bash
 GRAPH_LOG=trace cargo run -- --config config/graph-node.eth-ropsten.toml --ipfs "localhost:5001"
 ```
+{% endcode %}
 
 **Subgraph deployment**
 
@@ -179,14 +173,8 @@ indexers = [ "default" ]
 
 #### Further information
 
-For more information and setup instructions for The Graph's `graph-node`, refer to The Graph Academy documentation.
+For more information and setup instructions for The Graph's `graph-node`, [refer to The Graph Academy documentation](https://docs.thegraph.academy/official-docs/indexer/testnet/graph-protocol-testnet-baremetal/3\_deployandconfiguregraphnode).
 
-[https://docs.thegraph.academy/official-docs/indexer/testnet/graph-protocol-testnet-baremetal/3\_deployandconfiguregraphnode](https://docs.thegraph.academy/official-docs/indexer/testnet/graph-protocol-testnet-baremetal/3\_deployandconfiguregraphnode)
+You can [find more information on subgraphs](https://thegraph.com/docs/en/developing/creating-a-subgraph/) in The Graph's subgraph documentation.
 
-You can find more information on subgraphs in The Graph's subgraph documentation."
-
-[https://thegraph.com/docs/en/developing/creating-a-subgraph/](https://thegraph.com/docs/en/developing/creating-a-subgraph/)
-
-You can find more information on StreamingFast `graph-node-dev` in the official `graph-node-dev` repository.
-
-[https://github.com/streamingfast/graph-node-dev](https://github.com/streamingfast/graph-node-dev)
+You can [find more information on StreamingFast `graph-node-dev`](https://github.com/streamingfast/graph-node-dev) in the official `graph-node-dev` repository.

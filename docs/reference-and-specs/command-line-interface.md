@@ -78,6 +78,13 @@ The `pack` command builds a shippable, importable package from a `substreams.yam
 {% code title="pack command" overflow="wrap" %}
 ```bash
 $ substreams pack ./substreams.yaml
+```
+{% endcode %}
+
+The output of the `pack` command will print a message resembling:
+
+{% code title="pack command" overflow="wrap" %}
+```bash
 ...
 Successfully wrote "your-package-v0.1.0.spkg".
 ```
@@ -90,6 +97,13 @@ The `info` command prints out the contents of a package for inspection. It works
 {% code title="info command" overflow="wrap" %}
 ```bash
 $ substreams info ./substreams.yaml
+```
+{% endcode %}
+
+The output of the `info` command will print a message resembling:
+
+{% code title="info output" overflow="wrap" %}
+```bash
 Package name: solana_spl_transfers
 Version: v0.5.2
 Doc: Solana SPL Token Transfers stream
@@ -117,8 +131,8 @@ Hash: 11fd70768029bebce3741b051c15191d099d2436
 
 The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html).
 
-{% hint style="info" %}
-**Note**: see [https://mermaid.live/](https://mermaid.live/) for a live mermaid-js editor.
+{% hint style="success" %}
+**Tip**: [Mermaid Live Editor](https://mermaid.live/) is the visual editor used by Substreams.
 {% endhint %}
 
 {% code title="graph command" overflow="wrap" %}
@@ -137,7 +151,7 @@ graph TD;
 ````
 {% endcode %}
 
-The code creates a graphic similar to:
+The `graph` command will result in a graphic resembling:
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
 Mermaid generated graph diagram
@@ -150,7 +164,14 @@ The `inspect` command reaches deep into the file structure of a `yaml` configura
 {% code title="inspect command" overflow="wrap" %}
 ```bash
 $ substreams inspect ./substreams.yaml | less
-proto_files {
+```
+{% endcode %}
+
+The output of the `inspect` command will print a message resembling:
+
+{% code title="inspect output" overflow="wrap" %}
+```bash
+proto_files 
 ...
 modules {
   modules {
@@ -169,7 +190,9 @@ substreams -h
 ```
 {% endcode %}
 
-{% code title="Substreams help" overflow="wrap" %}
+The output of the `help` command will print a message resembling:
+
+{% code title="help output" overflow="wrap" %}
 ```bash
 Usage:
   substreams [command]

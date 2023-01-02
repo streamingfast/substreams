@@ -67,9 +67,7 @@ fn generate_key(holder: &Vec<u8>) -> String {
 ```
 {% endcode %}
 
-View the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs)
+View the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the repository.
 
 ### **Module handler breakdown**
 

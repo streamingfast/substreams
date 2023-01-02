@@ -16,11 +16,11 @@ Learn more about the details of Google Protocol Buffers in the official document
 
 **Google Protocol Buffer Documentation**
 
-[https://developers.google.com/protocol-buffers](https://developers.google.com/protocol-buffers)
+[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.&#x20;
 
 **Google Protocol Buffer Tutorial**
 
-[https://developers.google.com/protocol-buffers/docs/tutorials](https://developers.google.com/protocol-buffers/docs/tutorials)
+[Explore examples and additional learning material](https://developers.google.com/protocol-buffers/docs/tutorials) for Google Protocol Buffers provided by Google.
 
 ### Protobuf definition for Substreams
 
@@ -50,9 +50,7 @@ message Transfer {
 ```
 {% endcode %}
 
-View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto)
+[View the `erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) file in the official Substreams Template example repository.
 
 #### Identifying data types
 
@@ -146,8 +144,4 @@ If a value is present, use the [`.unwrap()`](https://doc.rust-lang.org/rust-by-e
 
 _**PROST!**_ is a tool for generating Rust code from protobuf definitions. [Learn more about `prost`](https://github.com/tokio-rs/prost) in the project's official GitHub repository.
 
-[https://github.com/tokio-rs/prost](https://github.com/tokio-rs/prost)
-
 [Learn more about `Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) in the official Rust documentation.
-
-[https://doc.rust-lang.org/rust-by-example/std/option.html](https://doc.rust-lang.org/rust-by-example/std/option.html)

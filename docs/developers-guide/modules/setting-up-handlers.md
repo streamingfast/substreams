@@ -52,9 +52,7 @@ strip = "debuginfo"
 ```
 {% endcode %}
 
-View the [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml)
+View the [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) file in the repository.
 
 You compile the Rust code into [WebAssembly (WASM)](https://webassembly.org/), a binary instruction format that runs in a virtual machine. The compilation process generates a .so file.
 
@@ -69,7 +67,7 @@ Build the Rust dynamic system library after the `package` by using:
 crate-type = ["cdylib"]
 ```
 
-The next definition in the `Cargo.toml` configuration file is for `dependencies`.
+The next definition in the [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) configuration file is for `dependencies`.
 
 {% hint style="info" %}
 **Note**: Module handlers compile down to a WASM module. Explicitly specify the target`asm32-unknown-unknown` by using `[target.wasm32-unknown-unknown.dependencies]`.
@@ -104,9 +102,7 @@ targets = [ "wasm32-unknown-unknown" ]
 ```
 {% endcode %}
 
-View the [`rust-toolchain.toml`](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml)
+View the [`rust-toolchain.toml`](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml) file in the repository.
 
 Build the code by using:
 
@@ -136,11 +132,7 @@ The `config.toml` configuration file updates the default `cargo build` command t
 
 The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core) offers an [`Abigen`](https://docs.rs/substreams-ethereum-abigen/latest/substreams\_ethereum\_abigen/) API to generate Rust types from a smart contract's ABI.
 
-Place the contract's ABI JSON file in the Substreams project in an `abi` directory.
-
-{% file src="../../.gitbook/assets/erc721.json" %}
-
-Next, add a Rust build script.
+Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FerQrzMtqELZRGAdugCR2%2Fuploads%2FEPcZ7g7wnrxCKQxD8Vbc%2Ferc721.json?alt=media\&token=42863ee3-fabb-421f-964e-040eb389032f) in the Substreams project in an `abi` directory.
 
 {% hint style="info" %}
 **Note: Rust build script**
@@ -166,9 +158,7 @@ fn main() -> Result<(), anyhow::Error> {
 ```
 {% endcode %}
 
-View the [`build.rs`](https://github.com/streamingfast/substreams-template/blob/develop/build.rs) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/build.rs](https://github.com/streamingfast/substreams-template/blob/develop/build.rs)
+View the [`build.rs`](https://github.com/streamingfast/substreams-template/blob/develop/build.rs) file in the repository.
 
 Run the build script to generate the ABI directory and files.
 
@@ -184,8 +174,6 @@ pub mod erc721;
 ```
 {% endcode %}
 
-View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) file in the repository:
-
-[https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs)
+View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) file in the repository.
 
 You're now ready to [write the module handlers](writing-module-handlers.md).

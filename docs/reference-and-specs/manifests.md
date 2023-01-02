@@ -6,17 +6,19 @@ description: StreamingFast Substreams manifest reference
 
 ## Substreams manifest overview
 
-The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current Substreams module and identifying the dependencies between the inputs and outputs of modules.
+The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current Substreams module and identifying the dependencies between the `inputs` and `outputs` of modules.
 
-The Substreams manifest reference documentation provides a guide for _all_ fields and values used in a Substreams manifest.
+The Substreams manifest reference documentation **provides a guide for all fields and values** used in a Substreams manifest.
 
 ### Specification version
 
-Excerpt pulled from the example Substreams manifest.
+&#x20; Excerpt pulled from the example Substreams manifest.
 
+{% code title="manifest excerpt" %}
 ```yaml
 specVersion: v0.1.0
 ```
+{% endcode %}
 
 Use `v0.1.0` for the `specVersion` field.
 
@@ -24,6 +26,7 @@ Use `v0.1.0` for the `specVersion` field.
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="" overflow="wrap" %}
 ```yaml
 package:
   name: module_name_for_project
@@ -34,6 +37,7 @@ package:
 
     More detailed documentation for the package.
 ```
+{% endcode %}
 
 #### Package name
 
@@ -53,7 +57,7 @@ The `package.name` field infers the filename when the `pack` command is run by u
 The `package.version` field identifies the package for the Substreams module.
 
 {% hint style="info" %}
-**Note**: `package.version` _**must**_ respect [Semantic Versioning, version 2.0](https://semver.org/)
+**Note**: The`package.version` **must respect** [Semantic Versioning, version 2.0](https://semver.org/)
 {% endhint %}
 
 #### Package URL
@@ -62,37 +66,40 @@ The `package.url` field identifies and helps users discover the source of the Su
 
 #### Package doc
 
-The `package.doc` field is the documentation string of the package. The first line is a short description; longer documentation proceeds a blank line.
+The `package.doc` field is the documentation string of the package. The first line is a short description and longer documentation proceeds a blank line.
 
 ### Imports
 
 The `imports` section references WASM code, compiled protobuf definitions, and module definitions.&#x20;
 
 {% hint style="success" %}
-**Tip**: Imported modules can be referred to later in the `modules` section through the use of a key.
+**Tip**: Imported modules can be referred to later in the `modules` section of the manifest through the use of a key.
 {% endhint %}
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="manifest excerpt" %}
 ```yaml
 imports:
   ethereum: substreams-ethereum-v1.0.0.spkg
   tokens: ../eth-token/substreams.yaml
   prices: ../eth-token/substreams.yaml
 ```
+{% endcode %}
 
-The _value_ is a pointer to a Substreams manifest or a Substreams [package](packages.md).
+The **value is a pointer** to a Substreams manifest or a Substreams [package](packages.md).
 
 The filename can be absolute or relative or a remote path prefixed by `http://` or `https://`.
 
-Imports differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching spkg file created for the Ethereum blockchain. Solana, and other blockchains, reference a different spkg or resources specific to the selected chain.
+Imports differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching `spkg` file created for the Ethereum blockchain. Solana, and other blockchains, reference a different `spkg` or resources specific to the chosen chain.
 
 ### Protobuf
 
-The `protobuf` section points to the Protocol Buffer definitions used by the modules in the Substreams module.
+The `protobuf` section points to the Google Protocol Buffer (protobuf) definitions used by the Rust modules in the Substreams module.
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="manifest excerpt" %}
 ```yaml
 protobuf:
   files:
@@ -103,16 +110,17 @@ protobuf:
     - ./proto
     - ../../external-proto
 ```
+{% endcode %}
 
 The Substreams packager loads files in any of the listed `importPaths`.
 
 {% hint style="info" %}
-**Note**: The `imports` section of the manifest also affects which `.proto` files end up in the package.
+**Note**: The `imports` section of the manifest also affects which `.proto` files are used in the final Substreams package.
 {% endhint %}
 
 Protobufs and modules are packaged together to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
 
-Refer to the [standard protobuf documentation](https://developers.google.com/protocol-buffers/docs/proto3) for more information about Protocol Buffers.
+[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.&#x20;
 
 ### Binaries
 
@@ -120,12 +128,13 @@ The `binaries` field specifies the WASM binary code to use when executing module
 
 The `modules[].binary` field uses a default value of `default`.&#x20;
 
-{% hint style="info" %}
-**Note**_:_ Defining the `default` binary is required when creating a Substreams manifest.
+{% hint style="warning" %}
+**Important**_:_ Defining the `default` binary is required when creating a Substreams manifest.
 {% endhint %}
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="manifest excerpt" %}
 ```yaml
 binaries:
   default:
@@ -135,8 +144,13 @@ binaries:
     type: wasm/rust-v1
     file: ./snapshot_of_my_package.wasm
 ```
+{% endcode %}
 
-The binary used in the modules section of the manifest can be overridden by defining user-specified binaries through a name. Illustrated in the manifest excerpt above by the `other binary.`
+The binary used in the modules section of the manifest can be overridden by defining user-specified binaries through a name.&#x20;
+
+{% hint style="info" %}
+**Note**: An example of other binary is illustrated in the preceding manifest excerpt.
+{% endhint %}
 
 #### `binaries[name].type`
 
@@ -148,7 +162,11 @@ The type of code and implied virtual machine for execution.
 
 #### `binaries[name].file`
 
-The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the directory the manifest is located in; typically the root of the Substreams module.
+The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the manifest's directory.
+
+{% hint style="info" %}
+**Note**: The standard location of the compiled WASM module is the root directory of the Substreams module.
+{% endhint %}
 
 {% hint style="success" %}
 **Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the [`substreams` CLI](command-line-interface.md).
@@ -158,6 +176,7 @@ The path points to a locally compiled [WASM module](https://webassembly.github.i
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="" %}
 ```yaml
   - name: events_extractor
     kind: map
@@ -177,6 +196,7 @@ Excerpt pulled from the example Substreams manifest.
       - source: sf.ethereum.type.v2.Block
       - map: events_extractor
 ```
+{% endcode %}
 
 #### `modules[].name`
 
@@ -247,6 +267,7 @@ The `modules[].binary` module executes by using the code provided. Multiple WASM
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="manifest excerpt" %}
 ```yaml
 inputs:
     - source: sf.ethereum.type.v2.Block
@@ -255,6 +276,7 @@ inputs:
     - store: my_store # defaults to mode: get
     - map: my_map
 ```
+{% endcode %}
 
 The `inputs` field is a list of _input_ structures. One of three keys is required for every object. The `inputs` key types are:
 

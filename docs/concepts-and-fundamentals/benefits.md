@@ -45,6 +45,6 @@ Substreams is horizontally scalable, offering the opportunity to reduce processi
 
 #### Substreams and Firehose
 
-Substreams offers all the benefits of Firehose, including low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorg handling. It is platform-independent of underlying blockchain protocols and works solely on data extracted from nodes using Firehose. For example, different protocols have different chain-specific extensions, such as Ethereum's `eth_calls`."
+Substreams offers all the benefits of Firehose, including low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorg handling. It is platform-independent of underlying blockchain protocols and works solely on data extracted from nodes using Firehose. For example, different protocols have different chain-specific extensions, such as Ethereum's `eth_calls`.
 
 ###

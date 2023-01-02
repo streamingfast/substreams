@@ -20,6 +20,7 @@ Install Firehose locally from source or by using a [Firehose Docker release](htt
 
 Instruct Firehose to generate merged blocks files for Substreams by using:
 
+{% code overflow="wrap" %}
 ```bash
 # Downloads 2.6GB of data
 fireeth tools download-from-firehose \
@@ -29,6 +30,7 @@ fireeth tools download-from-firehose \
 # You can skip this one:
 fireeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
+{% endcode %}
 
 ### Write a configuration file
 
@@ -66,7 +68,7 @@ $ fireeth start -c config.yaml
 Run the `substreams` command for the Firehose deployment by using:
 
 ```bash
-substreams run -p -e localhost:9000  # ...
+substreams run -p -e localhost:9000
 ```
 
 Use the `-p` flag to specify plaintext mode when running the command for the local Firehose server in an insecure manner.

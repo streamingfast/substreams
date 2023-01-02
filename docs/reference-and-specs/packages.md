@@ -20,7 +20,7 @@ Substreams packages are protobuf-serialized files. The standard extension for Su
 
 ### Creating packages
 
-Packages are created by using the `substreams pack` command, passing the Substreams manifest file.
+Packages are created by using the `substreams` [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) command, passing the Substreams manifest file.
 
 ```
 substreams pack ./substreams.yaml

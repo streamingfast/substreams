@@ -31,7 +31,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 ```
 {% endcode %}
 
-* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams
+* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams.
 * `-t +1` or `--stop-block` only requests a single block; the stop block is the manifest's `initialBlock` + 1.
 * `substreams.yaml` is the path where you have defined your [Substreams manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
 * `module_name` is the module we want to `run`, referring to the module name [defined in the Substreams manifest](manifests.md#modules-.name).
@@ -48,7 +48,7 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 ```
 {% endcode %}
 
-Example output of the `gravatar_updates` module starting at block `6200807`.
+The output of the `gravatar_updates` module starting at block `6200807` will print a message resembling:
 
 {% code title="run output" %}
 ```bash
@@ -70,7 +70,7 @@ Example output of the `gravatar_updates` module starting at block `6200807`.
 **Note**: The `-o` or `--output` flag alters the output format.&#x20;
 {% endhint %}
 
-The available options are:
+The available output display options are:
 
 * `ui`, a nicely formatted, UI-driven interface, displaying progress information and execution logs.
 * `json`, an indented stream of data, **not** displaying progress information or logs, only data output for blocks proceeding the start block.

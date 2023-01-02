@@ -10,7 +10,7 @@ The manifest is the high-level outline for a Substreams module. The manifest fil
 
 The Substreams manifest reference documentation **provides a guide for all fields and values** used in a Substreams manifest.
 
-### Specification version
+### `specVersion`
 
 &#x20; Excerpt pulled from the example Substreams manifest.
 
@@ -22,7 +22,7 @@ specVersion: v0.1.0
 
 Use `v0.1.0` for the `specVersion` field.
 
-### Package
+### `package`
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -39,7 +39,7 @@ package:
 ```
 {% endcode %}
 
-#### Package name
+#### `package.name`
 
 The `package.name` field is used to identify the package.&#x20;
 
@@ -52,7 +52,7 @@ The `package.name` field infers the filename when the `pack` command is run by u
   * Separate words by using `_`
   * Starts by using `a-z` or `A-Z` and can contain numbers thereafter
 
-#### Package version
+#### `package.version`
 
 The `package.version` field identifies the package for the Substreams module.
 
@@ -60,15 +60,15 @@ The `package.version` field identifies the package for the Substreams module.
 **Note**: The`package.version` **must respect** [Semantic Versioning, version 2.0](https://semver.org/)
 {% endhint %}
 
-#### Package URL
+#### package.url
 
 The `package.url` field identifies and helps users discover the source of the Substreams package.
 
-#### Package doc
+#### package.doc
 
 The `package.doc` field is the documentation string of the package. The first line is a short description and longer documentation proceeds a blank line.
 
-### Imports
+### `imports`
 
 The `imports` section references WASM code, compiled protobuf definitions, and module definitions.&#x20;
 
@@ -93,7 +93,7 @@ The filename can be absolute or relative or a remote path prefixed by `http://` 
 
 Imports differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching `spkg` file created for the Ethereum blockchain. Solana, and other blockchains, reference a different `spkg` or resources specific to the chosen chain.
 
-### Protobuf
+### `protobuf`
 
 The `protobuf` section points to the Google Protocol Buffer (protobuf) definitions used by the Rust modules in the Substreams module.
 
@@ -122,7 +122,7 @@ Protobufs and modules are packaged together to help Substreams clients decode th
 
 [Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.&#x20;
 
-### Binaries
+### `binaries`
 
 The `binaries` field specifies the WASM binary code to use when executing modules.&#x20;
 
@@ -176,7 +176,7 @@ The path points to a locally compiled [WASM module](https://webassembly.github.i
 
 Excerpt pulled from the example Substreams manifest.
 
-{% code title="" %}
+{% code title="manifest excerpt" %}
 ```yaml
   - name: events_extractor
     kind: map
@@ -198,7 +198,7 @@ Excerpt pulled from the example Substreams manifest.
 ```
 {% endcode %}
 
-#### `modules[].name`
+#### Module `name`
 
 The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply to the `package.name` field.
 
@@ -212,7 +212,7 @@ It is the reference identifier used on the command line and in [`inputs`](manife
 **Tip**_:_ When importing another package, all module names are prefixed by the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and nearly any names can be safely used.
 {% endhint %}
 
-#### `modules[].initialBlock`
+#### Module `initialBlock`
 
 The initial block for the module is where Substreams begins processing data for a particular module. The runtime never processes blocks prior to the one for any given module.
 
@@ -220,14 +220,14 @@ If all the inputs have the same `initialBlock` the field can be omitted and its 
 
 `initialBlock` becomes mandatory when inputs have _different_ values.
 
-#### `modules[].kind`
+#### Module `kind`
 
 There are two module types for `modules[].kind`:
 
 * `map`
 * `store`
 
-#### `modules[].updatePolicy`
+#### Module `updatePolicy`
 
 Valid only for `kind: store`.
 
@@ -242,7 +242,7 @@ Values for `modules[].updatePolicy` are as follows.
 * `min` (min between two keys' values)
 * `max` (max between two keys' values)
 
-#### `modules[].valueType`
+#### Module `valueType`
 
 Valid only for `kind: store`.
 
@@ -257,13 +257,13 @@ Values for `modules[].valueTypes` are as follows.
 * `string`
 * `proto:path.to.custom.protobuf.Model`
 
-#### `modules[].binary`
+#### Module `binary`
 
 An identifier defined in the [`binaries`](manifests.md#binaries) section of the Substreams manifest.
 
 The `modules[].binary` module executes by using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
 
-#### `modules[].inputs`
+#### Module `inputs`
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -278,13 +278,15 @@ inputs:
 ```
 {% endcode %}
 
-The `inputs` field is a list of _input_ structures. One of three keys is required for every object. The `inputs` key types are:
+The `inputs` field is a list of _input_ structures. One of three keys is required for every object.&#x20;
+
+The `inputs` key types are:
 
 * `source`
 * `store,` used to define `mode` keys
 * `map`
 
-#### `modules[].output`
+#### Module `output`
 
 Valid only for `kind: map`.
 

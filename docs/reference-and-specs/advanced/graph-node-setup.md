@@ -52,7 +52,7 @@ Additional information for PostgreSQL installation can be [found in the official
 
 The use of Substreams and `graph-node` together requires multiple Node.js dependencies. Install the dependencies by using:
 
-```
+```bash
 yarn install
 ```
 
@@ -171,7 +171,7 @@ indexers = [ "default" ]
 ```
 {% endcode %}
 
-#### Further information
+#### Additional information
 
 For more information and setup instructions for The Graph's `graph-node`, [refer to The Graph Academy documentation](https://docs.thegraph.academy/official-docs/indexer/testnet/graph-protocol-testnet-baremetal/3\_deployandconfiguregraphnode).
 

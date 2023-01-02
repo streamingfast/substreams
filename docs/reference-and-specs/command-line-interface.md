@@ -6,7 +6,7 @@ description: StreamingFast Substreams command line interface (CLI)
 
 ## `substreams` CLI reference overview
 
-The `substreams` command line interface (CLI) is the primary user interface and main tool for sending requests and receiving data.
+The `substreams` command line interface (CLI) is the primary user interface and the main tool for sending requests and receiving data.
 
 The `substreams` CLI exposes many commands to developers enabling a range of features.&#x20;
 
@@ -40,13 +40,18 @@ Passing a different `-s` or `--start-block` runs prior modules at a higher speed
 
 #### Run example with output
 
-Example output of the `gravatar_updates` module starting at block `6200807`.
-
-{% code title="run and output" overflow="wrap" %}
+{% code title="substreams run " overflow="wrap" %}
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 \
     https://github.com/Jannis/gravity-substream/releases/download/v0.0.1/gravity-v0.1.0.spkg \
     gravatar_updates -o json
+```
+{% endcode %}
+
+Example output of the `gravatar_updates` module starting at block `6200807`.
+
+{% code title="run output" %}
+```bash
 {
   "updates": [
     {
@@ -83,7 +88,7 @@ $ substreams pack ./substreams.yaml
 
 The output of the `pack` command will print a message resembling:
 
-{% code title="pack command" overflow="wrap" %}
+{% code title="pack output" overflow="wrap" %}
 ```bash
 ...
 Successfully wrote "your-package-v0.1.0.spkg".

@@ -13,14 +13,14 @@ There are also chain-specific `substreams-[network]` crates available:
 * [`substreams-ethereum`](https://crates.io/crates/substreams-ethereum) for Ethereum and other Ethereum-compatible chains
 * [`substreams-solana`](https://crates.io/crates/substreams-solana) for Solana
 
-If a crate is not available for Substreams, you can use the `spkg` release for the chain, which includes the `Block` Protobuf model, and generate the Rust structs yourself.
+If a crate is not available for Substreams, you can use the `spkg` release for the chain, which includes the `Block` protobuf model, and generate the Rust structs yourself.
 
 ### Third-party libraries
 
 Any third-party library capable of compiling `wasm32` can be used for execution in Substreams services.&#x20;
 
-Some libraries include kernel syscalls or other operations not available in the Substreams execution environment and cannot be compiled to WASM. The internal functionality of third-party libraries is an important consideration for Substreams development.
+Some libraries include kernel syscalls or other operations unavailable in the Substreams execution environment and cannot be compiled to WASM. The internal functionality of third-party libraries is an essential consideration for Substreams development.
 
-Useful information people found through the use of third-party libraries and Substreams together:
+Helpful information people found through the use of third-party libraries and Substreams together include:
 
 * [`tiny_keccak`](https://docs.rs/tiny-keccak): an implementation of Keccak-derived functions specified in FIPS-202, SP800-185, and KangarooTwelve.

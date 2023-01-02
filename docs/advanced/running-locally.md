@@ -65,7 +65,7 @@ $ fireeth start -c config.yaml
 
 ### Running Substreams and Firehose
 
-Run the `substreams` command for the Firehose deployment by using:
+Run the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Firehose deployment by using:
 
 ```bash
 substreams run -p -e localhost:9000

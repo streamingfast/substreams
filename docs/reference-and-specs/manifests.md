@@ -281,7 +281,7 @@ inputs:
 The `inputs` field is a list of _input_ structures. One of three keys is required for every object. The `inputs` key types are:
 
 * `source`
-* `store,` also used to define `mode` keys
+* `store,` used to define `mode` keys
 * `map`
 
 #### `modules[].output`
@@ -290,9 +290,11 @@ Valid only for `kind: map`.
 
 Excerpt pulled from the example Substreams manifest.
 
+{% code title="manifest excerpt" %}
 ```yaml
 output:
     type: proto:eth.erc721.v1.Transfers
 ```
+{% endcode %}
 
 The value for `type` is always prefixed using `proto:` followed by a definition specified in the protobuf definitions, and referenced in the `protobuf` section of the Substreams manifest.

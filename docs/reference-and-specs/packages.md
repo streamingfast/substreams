@@ -11,18 +11,18 @@ A Substreams _package_ is a **single file** containing all dependencies, protobu
 Substreams packages are protobuf-serialized files. The standard extension for Substreams packages is **`.spkg`**.
 
 {% hint style="success" %}
-**Tip**: Packages simplify the use of Substreams and allow developers to _begin streaming immediately._
+**Tip**: Packages expedite the use of Substreams and allow developers to **begin streaming immediately**_._
 {% endhint %}
 
 {% hint style="info" %}
-**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSe. Substreams packages can be used across multiple code generation tools as a source for schema definitions.
+**Note**: [Substreams packages](../../proto/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard `protobuf` FileDescriptorSet. Substreams packages can be used across multiple code generation tools as a source for schema definitions.
 {% endhint %}
 
 ### Creating packages
 
-Packages are created by using the `substreams` [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) command, passing the Substreams manifest file.
+Packages are created by using the `substreams`[`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) command, passing the Substreams manifest file.
 
-```
+```bash
 substreams pack ./substreams.yaml
 ```
 

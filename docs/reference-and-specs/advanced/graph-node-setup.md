@@ -96,7 +96,7 @@ The `./pf-sol.sh` shell script starts the services for Solana.
 
 The `graph-node` repository from [The Graph](https://thegraph.com/) is also required to use StreamingFast `graph-node-dev`. Clone the `graph-node` repository on Github:
 
-```
+```bash
 git clone https://github.com/graphprotocol/graph-node
 ```
 

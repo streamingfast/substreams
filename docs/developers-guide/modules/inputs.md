@@ -33,9 +33,9 @@ The `sf.substreams.v1.Clock` object is another source type available on any of t
 
 The `sf.substreams.v1.Clock` represents:
 
-* `Block` number
-* `Block` ID
-* `Block` timestamp
+* `Block` `number`
+* `Block` `ID`
+* `Block` `timestamp`
 
 ## `inputs` type `map`
 
@@ -86,7 +86,7 @@ There are **two types of `mode`** defined for modules.
 
 ### Store constraints
 
-Constraints for a `store` are defined as:
+Constraints for a `store` are defined by using:
 
 * A `store` can only receive `inputs` as read-only.
 * A `store` cannot depend on itself.
@@ -105,11 +105,11 @@ Constraints for a `store` are defined as:
 
 `delta` mode enables you to loop through keys and decode values mutated in the module.
 
-#### `store` `deltas` example
+#### `store` `deltas`
 
-The protobuf model for `StoreDeltas`:
+The protobuf model for `StoreDeltas` is defined by using:
 
-{% code overflow="wrap" lineNumbers="true" %}
+{% code overflow="wrap" %}
 ```protobuf
 message StoreDeltas {
   repeated StoreDelta deltas = 1;

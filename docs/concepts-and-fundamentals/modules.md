@@ -44,6 +44,6 @@ Modules have a single typed output, which is typed to inform consumers of the ty
 
 ## Next steps
 
-Learn more about [modules in the Developer's Guide](../developers-guide/modules/).
+Learn more about [modules in the Developer's guide](../developers-guide/modules/).
 
 ####

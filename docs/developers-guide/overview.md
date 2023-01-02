@@ -6,7 +6,7 @@ description: StreamingFast Substreams Developer's guide overview
 
 ## Developer's guide
 
-The Substreams Developer's Guide explains the process of building a Substreams module responsible for tracking the ERC721 holder count for an Ethereum smart contract.
+The Substreams Developer's guide explains the process of building a Substreams module responsible for tracking the ERC721 holder count for an Ethereum smart contract.
 
 {% hint style="success" %}
 **Tip**_:_ The Substreams Developer's guide is focused on an Ethereum Substreams module. The development tasks and workflow are independent of the blockchain selected for your project.

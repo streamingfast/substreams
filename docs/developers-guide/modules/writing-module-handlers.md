@@ -114,7 +114,7 @@ The [`inputs`](inputs.md) uses the standard Ethereum Block, `sf.ethereum.type.v2
 
 The output uses the `type` `proto:eth.erc721.v1.Transfers` which is a custom protobuf definition provided by the generated Rust code.&#x20;
 
-The function signature produced is:
+The function signature produced resembles:
 
 {% code title="lib.rs excerpt" %}
 ```rust
@@ -134,7 +134,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 
 The `map` extracts ERC721 transfers from a _`Block`_ object. The code finds all the `Transfer` `events` emitted by the tracked smart contract. As the events are encountered they are decoded into `Transfer` objects.
 
-{% code overflow="wrap" %}
+{% code title="lib.rs excerpt" overflow="wrap" %}
 ```rust
 /// Extracts transfers events from the contract
 #[substreams::handlers::map]
@@ -179,7 +179,7 @@ Define the `store` module.&#x20;
 
 The `inputs` corresponds to the `output` of the `map_transfers` `map` module typed as `proto:eth.erc721.v1.Transfers`. The custom protobuf definition is provided by the generated Rust code.
 
-{% code title="" %}
+{% code title="lib.rs excerpt" %}
 ```rust
 #[substreams::handlers::store]
 fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {

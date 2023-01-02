@@ -22,14 +22,14 @@ A walkthrough of Firehose features, Substreams modules, including a sample Rust 
 
 Read about Substreams' [Benefits and comparison](concept-and-fundamentals/benefits/).
 
-Get started by:
+Get started using Substreams by:
 
 * [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
 * Going through the [Quickstart](getting-started/quickstart.md).
 
 Learn more about [modules](concepts-and-fundamentals/modules.md), or study the [Developer's guide](developers-guide/overview.md).
 
-Find pre-built Substreams:
+Find pre-built Substreams by using the following resources:
 
 * [Substreams Template](https://github.com/streamingfast/substreams-template): gets you off the ground.
 * [Substreams Playground](https://github.com/streamingfast/substreams-playground): a collection of Substreams modules, and examples.

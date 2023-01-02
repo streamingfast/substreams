@@ -45,7 +45,7 @@ Visit the [Buf website](https://buf.build/) for additional information and [inst
 
 ## Gitpod cloud-based environment
 
-Follow the steps to use [Gitpod](https://www.gitpod.io/) for Substreams.
+Follow the steps to use [Gitpod](https://www.gitpod.io/) for Substreams:
 
 1. Copy the [substreams-template repository](https://github.com/streamingfast/substreams-template/generate).
 2. Obtain a StreamingFast authentication key from: [https://app.streamingfast.io/](https://app.streamingfast.io/).

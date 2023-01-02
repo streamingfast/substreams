@@ -4,26 +4,26 @@ description: StreamingFast Substreams benefits and comparisons
 
 # Benefits and comparisons
 
-## Substreams:
+## Important Substreams facts include:
 
-* Is a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose.
-* Is a highly cacheable and parallelizable remote code execution framework.
-* Enables the community to build higher-order modules that are composable down to individual modules.
-* Is fed by deterministic blockchain data and is therefore deterministic.
-* Is not a relational database.
-* Is not a REST service.
-* Is not concerned directly about how data is queried.
-* Is not a general-purpose non-deterministic event stream processor.
+* It provides a streaming-first system based on gRPC, protobuf, and the StreamingFast Firehose.
+* It supports a highly cacheable and parallelizable remote code execution framework.
+* It enables the community to build higher-order modules that are composable down to individual modules.
+* Deterministic blockchain data is fed to Substreams, **making it deterministic**.
+* It is **not** a relational database.
+* It is **not** a REST service.
+* It is **not** concerned directly about how data is queried.
+* It is **not** a general-purpose non-deterministic event stream processor.
 
-### Substreams offers several benefits:
+### Substreams offers several benefits including:
 
-* The ability to store and process blockchain data using advanced parallelization techniques, making the processed data available for various types of datastores or real-time systems.
-* A streaming-first approach that inherits low latency extraction from StreamingFast Firehose, making it the fastest blockchain indexing technology on the market.
+* The ability to store and process blockchain data using advanced parallelization techniques, making the processed data available for various types of data stores or real-time systems.
+* A streaming-first approach that inherits low latency extraction from StreamingFast Firehose.
 * The ability to save time and money by horizontally scaling and increasing efficiency by reducing processing time and wait time.
 * The ability for communities to combine Substreams modules to form compounding levels of data richness and refinement.
 * The use of protobufs for data modeling and integration in a variety of programming languages.
 * The use of the Rust programming language and a wide array of third-party libraries compilable with WASM to manipulate blockchain data on-the-fly.
-* Inspiration from conventional large-scale data systems fused with the novelties of blockchain.
+* Inspiration from conventional large-scale data systems fused into the novelties of blockchain technology.
 
 ### Comparison to other engines
 

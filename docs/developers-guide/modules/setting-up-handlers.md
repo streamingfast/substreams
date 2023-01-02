@@ -15,7 +15,7 @@ cargo init --lib
 
 Update the generated [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) file by using:
 
-{% code title="Cargo.toml" %}
+{% code title="Cargo.toml" overflow="wrap" lineNumbers="true" %}
 ```rust
 [package]
 name = "substreams-template"
@@ -60,12 +60,14 @@ You compile the Rust code into [WebAssembly (WASM)](https://webassembly.org/), a
 
 Build the Rust dynamic system library after the `package` by using:
 
-```rust
+{% code title="Cargo.toml excerpt" %}
+```toml
 ...
 
 [lib]
 crate-type = ["cdylib"]
 ```
+{% endcode %}
 
 The next definition in the [`Cargo.toml`](https://github.com/streamingfast/substreams-template/blob/develop/Cargo.toml) configuration file is for `dependencies`.
 
@@ -132,7 +134,7 @@ The `config.toml` configuration file updates the default `cargo build` command t
 
 The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core) offers an [`Abigen`](https://docs.rs/substreams-ethereum-abigen/latest/substreams\_ethereum\_abigen/) API to generate Rust types from a smart contract's ABI.
 
-Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FerQrzMtqELZRGAdugCR2%2Fuploads%2FEPcZ7g7wnrxCKQxD8Vbc%2Ferc721.json?alt=media\&token=42863ee3-fabb-421f-964e-040eb389032f) in the Substreams project in an `abi` directory.
+Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FerQrzMtqELZRGAdugCR2%2Fuploads%2FEPcZ7g7wnrxCKQxD8Vbc%2Ferc721.json?alt=media\&token=42863ee3-fabb-421f-964e-040eb389032f) in the Substreams project in the `abi` directory.
 
 {% hint style="info" %}
 **Note: Rust build script**
@@ -143,7 +145,7 @@ Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-pr
 
 Create a [`build.rs`](https://github.com/streamingfast/substreams-template/blob/develop/build.rs) build script file in the root of the Substreams project by using:
 
-{% code title="build.rs" %}
+{% code title="build.rs" overflow="wrap" lineNumbers="true" %}
 ```rust
 use anyhow::{Ok, Result};
 use substreams_ethereum::Abigen;

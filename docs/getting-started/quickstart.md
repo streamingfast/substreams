@@ -57,9 +57,9 @@ Data is available for any blockchain exposing an operational Firehose endpoint, 
 
 The most basic approach to use Substreams is through the [`substreams` CLI](../reference-and-specs/command-line-interface.md), passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
-The commands demonstrate how Substreams modules work by using the selected blockchain and instructing the compute engine to execute the `map_basic_eth` or `map_basic_sol` Rust functions, also called "module handlers".
+The commands demonstrate how Substreams modules work by using the selected blockchain and instructing the compute engine to execute the `map_basic_eth` or `map_basic_sol` Rust functions, also called "_module handlers_".
 
-#### **The** [**`run`**](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) **command for Ethereum**
+Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Ethereum example by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -67,7 +67,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.
 ```
 {% endcode %}
 
-#### **The** [**`run`**](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) **command for Solana**
+Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Solana example by using:
 
 {% code overflow="wrap" %}
 ```bash
@@ -79,7 +79,7 @@ Different blockchains have specific requirements for their data definitions. The
 
 ### **Crates and packages**
 
-Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project:
+Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project.
 
 {% code title="Cargo.toml" overflow="wrap" lineNumbers="true" %}
 ```toml
@@ -112,7 +112,7 @@ $ cargo add substreams-ethereum
 
 Acquire the Solana crate for Substreams by using:
 
-```
+```bash
 $ cargo add substreams-solana
 ```
 
@@ -215,7 +215,7 @@ Note: The Solana example has a different endpoint, module name, and manifest fil
 
 ## **Next steps**
 
-Here are some takeaways:
+Here are some important takeaways:
 
 * Substreams can be used across multiple blockchains, as it is platform independent.
 * Each blockchain has its own unique structure and model for block data.

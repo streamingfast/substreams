@@ -10,14 +10,14 @@ Substreams development involves using several different pieces of technology, in
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
-### To use Substreams:
+### The process to use Substreams includes:
 
-* Choose the blockchain you're interested in.
-* Identify interesting smart contract addresses, including wallets and decentralized exchanges (DEXs).
-* Identify data and define and create protobufs.
-* Write Rust Substreams event handler functions.
-* Update the Substreams manifest to reference the protobufs and handlers.
-* Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands.
+* Choosing the blockchain to capture and process data.
+* Identifying interesting smart contract addresses, including wallets and decentralized exchanges (DEXs).
+* Identifying data and defining and creating protobufs.
+* Writing Rust Substreams module handler functions.
+* Updating the Substreams manifest to reference the protobufs and module handlers.
+* Using the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands.
 
 ### **The Substreams engine**
 

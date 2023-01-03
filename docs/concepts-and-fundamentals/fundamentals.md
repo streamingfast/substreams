@@ -57,10 +57,10 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 <figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
+[Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
+
 * View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) protobuf file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
 * View the Rust module handlers in the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
-
-[Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 
 {% hint style="info" %}
 **Note:** Protobufs include the names of the data objects and the fields contained and accessible within them.
@@ -70,17 +70,15 @@ Many protobuf definitions have already been created, such as [the erc721 token m
 
 Custom smart contracts, [like UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), also have protobuf definitions that are referenced in the Substreams manifest and made available to module handler functions. Protobufs provide an API to the data for smart contract addresses.
 
-{% hint style="success" %}
-**Tip**: In object-oriented programming terminology, protobufs are the objects or object models. In front-end web development, they are similar to REST or other data APIs.
-{% endhint %}
+In object-oriented programming terminology, protobufs are the objects or object models. In front-end web development, they are similar to REST or other data APIs.
 
-{% hint style="info" %}
-**Note**: Firehose and Substreams **treat the data as the API**.
+{% hint style="success" %}
+**Tip**: Firehose and Substreams **treat the data as the API**.
 {% endhint %}
 
 ### **Substreams Rust modules**
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM.png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM (1).png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
 
 The first step in Substreams development is to design an overall strategy for managing and transforming data. The Substreams engine processes modules by using the relationships defined in the manifest.
 
@@ -88,4 +86,4 @@ The first step in Substreams development is to design an overall strategy for ma
 **Note**_:_ Substreams modules work together by passing data from one module to another until they finally return an output transformed according to the rules in the manifest, modules, and module handler functions.
 {% endhint %}
 
-Two types of module handlers, `maps`, and `stores`, are defined within Rust modules. These two module types work together to sort, sift, temporarily store, and transform blockchain data from smart contracts for use in data sinks like databases or subgraphs.&#x20;
+Modules define two types of module handlers: `map` and `store`. These two types work together to sort, sift, temporarily store, and transform blockchain data from `Block` objects and smart contracts for use in data sinks such as databases or subgraphs.

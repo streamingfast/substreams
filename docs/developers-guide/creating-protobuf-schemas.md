@@ -65,9 +65,7 @@ The protobuf file serves as the interface between the module handlers and the da
 * The size and scope of the Substreams module dictates the number of and complexity of protobufs.
 {% endhint %}
 
-{% hint style="info" %}
-**Note**: The Substreams Template example extracts `Transfer` events from the [Bored Ape Yacht Club smart contract](https://etherscan.io/address/0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d) which is located on the Ethereum blockchain.
-{% endhint %}
+The Substreams Template example extracts `Transfer` events from the [Bored Ape Yacht Club smart contract](https://etherscan.io/address/0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d) which is located on the Ethereum blockchain.
 
 Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base modules. Complex protobufs are created and refined based on the various data types used across the different blockchains.
 
@@ -79,9 +77,7 @@ Several specific data types exist in the Ethereum smart contract ecosystem, some
 
 The [`substreams` CLI](../reference-and-specs/command-line-interface.md) is used to generate the associated Rust code for the protobuf.
 
-{% hint style="success" %}
-**Tip**: Notice the `protogen` command and Substreams manifest passed into the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
-{% endhint %}
+Notice the `protogen` command and Substreams manifest passed into the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
 
 {% code overflow="wrap" %}
 ```bash

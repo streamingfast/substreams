@@ -12,13 +12,13 @@ Connect to endpoints, stream data in real time, and package custom modules.
 **Tip**_:_ [Check the official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest** [**`substreams` CLI**](../reference-and-specs/command-line-interface.md) **release available**.&#x20;
 {% endhint %}
 
-### Homebrew installation
+#### Homebrew installation
 
 ```
 brew install streamingfast/tap/substreams
 ```
 
-### Pre-compiled binary installation
+#### Pre-compiled binary installation
 
 ```bash
 # Use correct binary for your platform
@@ -26,7 +26,7 @@ LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/la
 curl -L  $LINK  | tar zxf -
 ```
 
-### Installation from source
+#### Installation from source
 
 ```bash
 git clone https://github.com/streamingfast/substreams
@@ -38,7 +38,7 @@ go install -v ./cmd/substreams
 **Important**: Add $HOME/go/bin to the system path if it's not already present.
 {% endhint %}
 
-## Validation of installation
+### Validation of installation
 
 Run the [`substreams` CLI](../reference-and-specs/command-line-interface.md) passing the `--version` flag to check the success of the installation.
 

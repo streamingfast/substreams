@@ -59,18 +59,14 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 | `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept                                                                                                                                                                                                        |
 | `append`            | `string`, `bytes`                        | Both keys are concatenated in order. Appended values are limited to 8Kb.  Aggregation pattern examples are available in the [`lib.rs`](https://github.com/streamingfast/substreams-uniswap-v3/blob/develop/src/lib.rs#L760) file |
 
-
-
-{% hint style="info" %}
-**Note**: All update policies provide the `delete_prefix` method.
+{% hint style="success" %}
+**Tip**: All update policies provide the `delete_prefix` method.
 {% endhint %}
 
-{% hint style="info" %}
-**Note**_**:** _ The merge strategy is **applied during parallel processing**.&#x20;
+The merge strategy is **applied during parallel processing**.&#x20;
 
 * A module has built two partial stores containing keys for segment A, blocks 0-1000, and segment B, blocks 1000-2000, and is prepared to merge them into a complete store.
 * The complete store is represented acting as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
-{% endhint %}
 
 {% hint style="warning" %}
 **Important**_**:** _ To preserve the parallelization capabilities of the system, **Substreams is not permitted to read what it has written or read from a `store` actively being written**.
@@ -102,13 +98,11 @@ The `get mode` function provides the module with a key-value store that is guara
 **Tip:** Lookups are local, in-memory, and **extremely high-speed**.
 {% endhint %}
 
-{% hint style="info" %}
-**Note:**  The definition of `store` method behavior is:
+The definition of `store` method behavior is:
 
 * The `get_last` method is the fastest because it queries the store directly.&#x20;
 * The `get_first` method first goes through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.&#x20;
 * The `get_at` method unwinds deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
-{% endhint %}
 
 #### `deltas mode`
 

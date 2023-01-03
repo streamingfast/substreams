@@ -48,18 +48,9 @@ The [`substreams-eth-block-meta`](https://github.com/streamingfast/substreams-et
 
 StreamingFast provides several tools to assist database persistence for Substreams.
 
-**PostgreSQL**
-
-A command line tool to [sync a Substreams with a PosgreSQL database](https://github.com/streamingfast/substreams-sink-postgres).
-
-**MongoDB**
-
-A command line tool to [sync a Substream with a MongoDB database](https://github.com/streamingfast/substreams-sink-mongodb).\
-
-
-**File-based storage**
-
-a command line tool to [sync a Substreams to file-based storage](https://github.com/streamingfast/substreams-sink-files).
+* **PostgreSQL:** A command line tool to [sync a Substreams with a PosgreSQL database](https://github.com/streamingfast/substreams-sink-postgres)
+* **MongoDB:** A command line tool to [sync a Substream with a MongoDB database](https://github.com/streamingfast/substreams-sink-mongodb)
+* **File-based storage:** A command line tool to [sync a Substreams to file-based storage](https://github.com/streamingfast/substreams-sink-files)
 
 ## **Build a sink**
 

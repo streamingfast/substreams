@@ -125,12 +125,13 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 ```
 {% endcode %}
 
-{% hint style="info" %}
-**Note**: **Rust macros**
+### **Rust macros**
 
-* Did you notice the `#[substreams::handlers::map]` on top of the function? It is a [Rust macro](https://doc.rust-lang.org/book/ch19-06-macros.html) provided by the [`substreams` crate](https://docs.rs/substreams/latest/substreams/).
-* The macro decorates the handler function as a `map.` Define `store` modules by using the syntax `#[substreams::handlers::store]`.
-{% endhint %}
+Did you notice the `#[substreams::handlers::map]` on top of the function? It is a [Rust macro](https://doc.rust-lang.org/book/ch19-06-macros.html) provided by the [`substreams` crate](https://docs.rs/substreams/latest/substreams/).
+
+The macro decorates the handler function as a `map.` Define `store` modules by using the syntax `#[substreams::handlers::store]`.
+
+### Module handler function
 
 The `map` extracts ERC721 transfers from a _`Block`_ object. The code finds all the `Transfer` `events` emitted by the tracked smart contract. As the events are encountered they are decoded into `Transfer` objects.
 

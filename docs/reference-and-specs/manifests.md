@@ -1,10 +1,10 @@
 ---
-description: StreamingFast Substreams manifest reference
+description: StreamingFast Substreams manifests reference
 ---
 
 # Manifests
 
-## Substreams manifest overview
+## Manifests overview
 
 The manifest is the high-level outline for a Substreams module. The manifest file is used for defining properties specific to the current Substreams module and identifying the dependencies between the `inputs` and `outputs` of modules.
 
@@ -43,14 +43,15 @@ package:
 
 The `package.name` field is used to identify the package.&#x20;
 
-The `package.name` field infers the filename when the `pack` command is run by using `substreams.yaml` as a flag for the Substreams package.
+The `package.name` field infers the filename when the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) command is run by using `substreams.yaml` as a flag for the Substreams package.
 
-* The `name` must match the regular expression. \
-  `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`
-* The regular expression translates to:
-  * 64 characters maximum
-  * Separate words by using `_`
-  * Starts by using `a-z` or `A-Z` and can contain numbers thereafter
+The content of the `name` field must match the regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`
+
+The regular expression ruleset translates to the following:
+
+* 64 characters maximum
+* Separate words by using `_`
+* Starts by using `a-z` or `A-Z` and can contain numbers thereafter
 
 #### `package.version`
 
@@ -149,30 +150,24 @@ binaries:
 The binary used in the modules section of the manifest can be overridden by defining user-specified binaries through a name.&#x20;
 
 {% hint style="info" %}
-**Note**: An example of other binary is illustrated in the preceding manifest excerpt.
+**Note**: An example of `other` binary is illustrated in the preceding manifest excerpt.
 {% endhint %}
 
 #### `binaries[name].type`
 
-The type of code and implied virtual machine for execution.
-
-{% hint style="info" %}
-**Note:** There is only one virtual machine available that uses a value of: `wasm/rust-v1`.
-{% endhint %}
+The type of code and implied virtual machine for execution. There is **only one virtual machine available** that uses a value of: **`wasm/rust-v1`**.
 
 #### `binaries[name].file`
 
-The path points to a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths are absolute or relative to the manifest's directory.
-
-{% hint style="info" %}
-**Note**: The standard location of the compiled WASM module is the root directory of the Substreams module.
-{% endhint %}
+The `binaries[name].file` field references a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths for the `binaries[name].file` field are absolute or relative to the manifest's directory. The **standard location** of the compiled WASM module is the **root directory** of the Substreams module.
 
 {% hint style="success" %}
-**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the `pack` and `run` commands through the [`substreams` CLI](command-line-interface.md).
+**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) and [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) commands through the [`substreams` CLI](command-line-interface.md).
 {% endhint %}
 
 ### Modules
+
+There is one map module, named _`events_transfer`_, defined in the Substreams manifest excerpt.
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -200,25 +195,23 @@ Excerpt pulled from the example Substreams manifest.
 
 #### Module `name`
 
-The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The same rules apply to the `package.name` field.
+The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The [same rules applied to the `package.name`](manifests.md#package.name) field applies to the module `name`.
 
-It is the reference identifier used on the command line and in [`inputs`](manifests.md#modules-.inputs). Packages need to use unique names.
+The module `name` is the reference identifier used on the command line for the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command. The module `name` is also used in the [`inputs`](manifests.md#modules-.inputs) defined in the Substreams manifest.
 
-{% hint style="info" %}
-**Note**_:_ `modules[].name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. It's the same `#[substreams::handlers::map]` as defined in the Rus_t code._ Maps and stores both work in the same fashion.
-{% endhint %}
+The module `name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. The module `name` is the same `#[substreams::handlers::map]` as defined in the Rust __ code_._ Maps and stores both work in the same fashion.
 
-{% hint style="success" %}
-**Tip**_:_ When importing another package, all module names are prefixed by the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and nearly any names can be safely used.
+{% hint style="warning" %}
+**Important**_:_ When importing another package, all module names are prefixed by the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and almost any name can be safely used for a module `name`.
 {% endhint %}
 
 #### Module `initialBlock`
 
-The initial block for the module is where Substreams begins processing data for a particular module. The runtime never processes blocks prior to the one for any given module.
+The initial block for the module is where Substreams begins processing data for a module. The runtime never processes blocks prior to the one for any given module.
 
-If all the inputs have the same `initialBlock` the field can be omitted and its value is inferred by its dependent [`inputs`](manifests.md#modules-.inputs).
+If all the inputs have the same `initialBlock`, the field can be omitted and its value is inferred by its dependent [`inputs`](manifests.md#modules-.inputs).
 
-`initialBlock` becomes mandatory when inputs have _different_ values.
+`initialBlock` becomes **mandatory** **when inputs have different values**.
 
 #### Module `kind`
 
@@ -229,26 +222,26 @@ There are two module types for `modules[].kind`:
 
 #### Module `updatePolicy`
 
-Valid only for `kind: store`.
-
 Specifies the merge strategy for two contiguous partial stores produced by parallelized operations.&#x20;
 
-Values for `modules[].updatePolicy` are as follows.
+The values for `modules[].updatePolicy` are defined using specific rules stating:
 
-* `set` (last key wins merge strategy)
-* `set_if_not_exists` (first key wins merge strategy)
-* `append` (concatenates two keys' values)
-* `add` (sum the two keys' values)
-* `min` (min between two keys' values)
-* `max` (max between two keys' values)
+* `set`, the last key wins the merge strategy
+* `set_if_not_exists`, the first key wins the merge strategy
+* `append`, concatenates two keys' values
+* `add`, sum the two keys' values
+* `min`, min between two keys' values
+* `max`, max between two keys' values
 
 #### Module `valueType`
 
-Valid only for `kind: store`.
+{% hint style="success" %}
+Tip:  The module `updatePolicy` field is only available for modules of `kind: store`.
+{% endhint %}
 
-Specifies the data type of all keys in the `store`, and determines the WASM imports available to the module to write to the store.&#x20;
+Specifies the data type of all keys in the `store`, and determines what WASM imports are available to the module and are able to write to the `store`.&#x20;
 
-Values for `modules[].valueTypes` are as follows.
+The values for `modules[].valueTypes` can use various types including:
 
 * `bigfloat`
 * `bigint`
@@ -257,11 +250,15 @@ Values for `modules[].valueTypes` are as follows.
 * `string`
 * `proto:path.to.custom.protobuf.Model`
 
+{% hint style="success" %}
+Tip:  The module `valueType` field is only available for modules of `kind: store`.
+{% endhint %}
+
 #### Module `binary`
 
-An identifier defined in the [`binaries`](manifests.md#binaries) section of the Substreams manifest.
+An identifier you can define in the [`binaries`](manifests.md#binaries) section of the Substreams manifest.
 
-The `modules[].binary` module executes by using the code provided. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
+The `modules[].binary` module executes the code provided within the binary being file referenced. Multiple WASM definitions allow different modules to enable caching while iterating on the WASM code.
 
 #### Module `inputs`
 
@@ -278,17 +275,15 @@ inputs:
 ```
 {% endcode %}
 
-The `inputs` field is a list of _input_ structures. One of three keys is required for every object.&#x20;
+The `inputs` field is a **list of input structures**. One of three keys is required for every object.&#x20;
 
-The `inputs` key types are:
+The key types for `inputs` include:
 
 * `source`
 * `store,` used to define `mode` keys
 * `map`
 
 #### Module `output`
-
-Valid only for `kind: map`.
 
 Excerpt pulled from the example Substreams manifest.
 
@@ -300,3 +295,7 @@ output:
 {% endcode %}
 
 The value for `type` is always prefixed using `proto:` followed by a definition specified in the protobuf definitions, and referenced in the `protobuf` section of the Substreams manifest.
+
+{% hint style="success" %}
+**Tip**:  The module `output` field is only available for modules of `kind: map`.
+{% endhint %}

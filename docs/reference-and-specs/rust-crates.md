@@ -6,14 +6,14 @@ description: StreamingFast Substreams Rust APIs
 
 ## Rust crates overview
 
-The official [`substreams` crate](https://crates.io/crates/substreams) helps developers create module handlers.
+The official [`substreams` crate](https://crates.io/crates/substreams) helps developers create module handlers and also chain-specific crates available.
 
-There are also chain-specific `substreams-[network]` crates available:
+* Use the [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum) for Ethereum and other Ethereum-compatible chains.
+* Use the [`substreams-solana` crate](https://crates.io/crates/substreams-solana) for the Solana blockchain.
 
-* [`substreams-ethereum`](https://crates.io/crates/substreams-ethereum) for Ethereum and other Ethereum-compatible chains
-* [`substreams-solana`](https://crates.io/crates/substreams-solana) for Solana
-
-If a crate is not available for Substreams, you can use the `spkg` release for the chain, which includes the `Block` protobuf model, and generate the Rust structs yourself.
+{% hint style="info" %}
+**Note**: If a crate is not available for Substreams, you can use the `spkg` release for the chain, which includes the `Block` protobuf model, and generate the Rust structs yourself.
+{% endhint %}
 
 ### Third-party libraries
 

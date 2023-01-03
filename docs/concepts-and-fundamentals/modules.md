@@ -1,5 +1,5 @@
 ---
-description: StreamingFast Substreams modules overview
+description: StreamingFast Substreams modules basics
 ---
 
 # Modules basics
@@ -34,7 +34,7 @@ Every time a new `Block` is processed, all of the modules are executed as a dire
 **Note:** The top-level data source is always a protocol's `Block` protobuf model, which is deterministic in its execution.
 {% endhint %}
 
-### Single Output
+### Single output
 
 Modules have a single typed output, which is typed to inform consumers of the types of data to expect and how to interpret the bytes being sent.
 
@@ -46,15 +46,15 @@ Modules have a single typed output, which is typed to inform consumers of the ty
 
 Most non-trivial Substreams development initiatives will require the use of both `map` and `store` modules and more than one of each. The exact number, responsibilities, and how modules communicate will depend on many factors specific to the developer’s desired, final Substreams development effort.
 
-The two module types are commonly used together to construct the directed acyclic graph (DAG) outlined in the Substreams manifest. Map and store modules are very different in their use and how they work. Understanding these differences is vital for harnessing the full power of Substreams.
+The two module types are commonly used together to construct the directed acyclic graph (DAG) outlined in the Substreams manifest. The two module types are very different in their use and how they work. Understanding these differences is vital for harnessing the full power of Substreams.
 
-### Map Modules
+### `map` modules
 
 `map` modules are used for data extraction, filtering, and transformation. They should be used when direct extraction is needed avoiding the need to reuse them later in the DAG.
 
 For performance considerations, you should use a single `map`, instead of multiple maps that extract single events or functions. It's better to perform the maximum amount of extraction from a single top-level `map` module and then pass the data to be consumed by other Substreams modules. This is the most straightforward, simplistic, and recommended approach for the backend and consumer development experiences.
 
-Notable facts and use cases for functional `map` modules include:
+A few important facts and use cases for functional `map` modules include:
 
 * Extracting model data from an event or a function's inputs.
 * Reading data from a block and transforming said data into a custom protobuf structure.

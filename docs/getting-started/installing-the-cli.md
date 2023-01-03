@@ -6,7 +6,7 @@ description: StreamingFast Substreams CLI installation documentation
 
 ## Install the `substreams` CLI
 
-Connect to endpoints, stream data in real time, and package custom modules.
+Used for connecting to endpoints, streaming data in real time, and packaging custom modules.
 
 {% hint style="success" %}
 **Tip**_:_ [Check the official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest** [**`substreams` CLI**](../reference-and-specs/command-line-interface.md) **release available**.&#x20;

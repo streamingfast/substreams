@@ -77,11 +77,11 @@ The next definition in the [`Cargo.toml`](https://github.com/streamingfast/subst
 
 #### `ethabi`
 
-The `ethabi` crate is used to decode events from the application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
+The [`ethabi` crate ](https://crates.io/crates/ethabi)is used to decode events from the application binary interface (ABI) and is required for `substreams-ethereum` ABI capabilities.
 
 #### `hex-literal`
 
-The `hex-literal` crate is used to define bytes from hexadecimal string literals at compile time.
+The [`hex-literal` crate ](https://crates.io/crates/hex-literal)is used to define bytes from hexadecimal string literals at compile time.
 
 #### `substreams`
 
@@ -93,7 +93,7 @@ The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-c
 
 Because code is being built by WASM output it's necessary to configure Rust to match the correct architecture. Create and add a [`rust-toolchain.toml`](https://github.com/streamingfast/substreams-template/blob/develop/rust-toolchain.toml) configuration file at the root of your Substreams directory.
 
-#### Rust toolchain
+### Rust toolchain
 
 {% code title="rust-toolchain.toml" overflow="wrap" lineNumbers="true" %}
 ```toml
@@ -112,7 +112,7 @@ Build the code by using:
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-**Rust build target**
+### **Rust build target**
 
 When running `cargo build` the target is set to `wasm32-unknown-unknown`, which is important because it specifies the goal is to generate compiled WASM code.
 
@@ -135,7 +135,7 @@ The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-c
 
 Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FerQrzMtqELZRGAdugCR2%2Fuploads%2FEPcZ7g7wnrxCKQxD8Vbc%2Ferc721.json?alt=media\&token=42863ee3-fabb-421f-964e-040eb389032f) in the Substreams project in the `abi` directory.
 
-**Rust build script**
+### **Rust build script**
 
 Before building a package, Cargo compiles a build script into an executable if it has not already been built. The build script runs as part of the build process responsible for performing a variety of tasks.
 

@@ -17,19 +17,17 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 ```
 {% endcode %}
 
-{% hint style="info" %}
-**Note**: See the [ authentication](../reference-and-specs/authentication.md) section for details.&#x20;
-{% endhint %}
+See the[ authentication](../reference-and-specs/authentication.md) page for details.&#x20;
 
 ## Run your first Substreams
 
-{% hint style="warning" %}
-**Important**: The [`substreams` CLI](../reference-and-specs/command-line-interface.md) [**must** **be installed** ](installing-the-cli.md)**to continue**.
+{% hint style="success" %}
+**Tip**: The [`substreams` CLI](../reference-and-specs/command-line-interface.md) [**must** **be installed** ](installing-the-cli.md)**to continue**.
 {% endhint %}
 
 After you have authenticated, you're ready to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) your first Substreams by using:
 
-{% code overflow="wrap" %}
+{% code title="substreams run" overflow="wrap" %}
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
@@ -37,8 +35,8 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 
 The [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
 
-{% hint style="info" %}
-Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages.
+{% hint style="success" %}
+**Tip**: Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages.
 {% endhint %}
 
 ## Platform independent Substreams
@@ -55,13 +53,15 @@ Data is available for any blockchain exposing an operational Firehose endpoint, 
 
 ### **Basics**
 
-The most basic approach to use Substreams is through the [`substreams` CLI](../reference-and-specs/command-line-interface.md), passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing. The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+The most basic approach to use Substreams is through the [`substreams` CLI](../reference-and-specs/command-line-interface.md), passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing.&#x20;
+
+The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
 
 The commands demonstrate how Substreams modules work by using the selected blockchain and instructing the compute engine to execute the `map_basic_eth` or `map_basic_sol` Rust functions, also called "_module handlers_".
 
 Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Ethereum example by using:
 
-{% code overflow="wrap" %}
+{% code title="etheruem substreams run" overflow="wrap" %}
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 10000001 --stop-block +1
 ```
@@ -69,7 +69,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.
 
 Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Solana example by using:
 
-{% code overflow="wrap" %}
+{% code title="solana substreams run" overflow="wrap" %}
 ```bash
 substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.yaml map_basic_sol
 ```
@@ -77,7 +77,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.ya
 
 Different blockchains have specific requirements for their data definitions. The code in the module handlers needs to be updated to match the expectations of the separate blockchains.
 
-### **Crates and packages**
+## **Crates and packages**
 
 Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project.
 
@@ -122,7 +122,7 @@ $ cargo add substreams-solana
 Alternatively, generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. [Read through the Rust crates documentation](../reference-and-specs/rust-crates.md) for details.
 {% endhint %}
 
-## Examples overview
+## Quickstart examples overview
 
 The relationships for the flow of data are defined in the Substreams manifest. Further information is available in the documentation for [defining complex data strategies](../reference-and-specs/manifests.md) through manifest files.
 
@@ -157,7 +157,7 @@ Follow this sequence of steps to use the example:
 
 Generate the structs from the protobuf specified in the [`substreams-ethereum-tutorial.yaml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/substreams-ethereum-tutorial.yaml) configuration file by using the `protogen` command:
 
-{% code overflow="wrap" %}
+{% code title="substreams protogen" overflow="wrap" %}
 ```bash
 substreams protogen substreams-ethereum-tutorial.yaml
 ```
@@ -230,9 +230,7 @@ Understanding `map` and `store` modules are important for learning how to design
 
 Additional information is available for [understanding modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's guide](../developers-guide/overview.md).&#x20;
 
-{% hint style="success" %}
-**Tip**: Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to get up and running.
-{% endhint %}
+Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to expedite the process of getting up and running.
 
 ## **Troubleshooting and errors**
 

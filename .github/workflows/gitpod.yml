@@ -10,6 +10,7 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    if: "${{ !startsWith(github.event.head_commit.message, 'GitBook: [#') }}"
     steps:
       - uses: actions/checkout@v2
 

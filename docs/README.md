@@ -8,9 +8,9 @@ description: StreamingFast Substreams documentation
 
 Substreams is a powerful blockchain indexing technology, developed for [The Graph Network](https://thegraph.com).
 
-Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion.
-
-Substreams have all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+> Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion.
+>
+> Substreams have all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
 
 ### Where to start
 
@@ -20,12 +20,12 @@ Learn about Substreams in a short, dense 25-minute intro and understand its impa
 A walkthrough of Firehose features, Substreams modules, including a sample Rust module and StreamingFast's vision.
 {% endembed %}
 
-Learn important facts about Substreams by [reading the Benefits and comparison](concept-and-fundamentals/benefits/).
+Learn essential facts about Substreams through [reading the Benefits and comparison](concept-and-fundamentals/benefits/).
 
 The primary ways to use Substreams include:
 
-* [Installing the `substreams` CLI](getting-started/installing-the-cli.md).
-* [Going through the Quickstart](getting-started/quickstart.md).
+* [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
+* [Going through the Quickstart](getting-started/quickstart.md)
 
 After installing Substreams and reviewing the Quickstart:
 
@@ -33,8 +33,8 @@ After installing Substreams and reviewing the Quickstart:
 
 Find pre-built Substreams by using the following resources:
 
-* [Substreams Template](https://github.com/streamingfast/substreams-template) - gets you off the ground.
-* [Substreams Playground](https://github.com/streamingfast/substreams-playground) - a collection of Substreams modules, and examples.
+* The [Substreams Template](https://github.com/streamingfast/substreams-template) helps expedite the process of getting you up and running.
+* The [Substreams Playground](https://github.com/streamingfast/substreams-playground) is a collection of Substreams modules and examples.
 
 ### Network model diagram
 
@@ -66,5 +66,3 @@ The content in the Substreams documentation was created through StreamingFast's 
 #### Style guide
 
 The Substreams documentation uses the [Google developer documentation style guide](https://developers.google.com/style) for its style and formatting.
-
-\

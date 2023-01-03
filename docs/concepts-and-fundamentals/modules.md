@@ -22,7 +22,7 @@ The diagram shows how the `transfer_map` module extracts the transfers in a `Blo
 **Note:** You can use multiple inputs in blockchains because they are clocked, which allows for synchronization between multiple execution streams and improved performance compared to conventional streaming engines.
 {% endhint %}
 
-As seen in the counters store example diagram, modules can also take in multiple inputs. In this case, two modules feed into a `store`, effectively tracking multiple `counters`.
+As seen in the `counters` `store` example diagram, modules can also take in multiple inputs. In this case, two modules feed into a `store`, effectively tracking multiple `counters`.
 
 {% embed url="https://mermaid.ink/svg/pako:eNqdkE1qAzEMha9itE4GsnWgi5KcINmNh6LamozJeGxsuSGE3L1KW1PIptCdnnjv088NbHQEGk4Z06SOu61ZlHqfoz33JdZsSasydsQTZaqh42ui7mPTvT4cg1qvX1TA9HbxPLmMF5zLv_KOUiyev8JPvF60fm5-J22sC1MufeGYZVDTQ8M07C-jdf4AwAoC5YDeyWtuD5wBOSGQAS2loxHrzAbMchdrTQ6Z9s4LBfQo-9EKsHI8XBcLmnOlZtp5lE-HH9f9EylZic0" %}
 Multiple module inputs diagram
@@ -31,7 +31,7 @@ Multiple module inputs diagram
 Every time a new `Block` is processed, all of the modules are executed as a directed acyclic graph (DAG).
 
 {% hint style="info" %}
-**Note:** The top-level data source is always a protocol's `Block` protobuf model, which is deterministic in its execution.
+**Note:** The protocol's Block protobuf model always serves as the top-level data source and executes deterministically.
 {% endhint %}
 
 ### Single output
@@ -44,7 +44,7 @@ Modules have a single typed output, which is typed to inform consumers of the ty
 
 ### `map` versus `store` modules
 
-Most non-trivial Substreams development initiatives will require the use of both `map` and `store` modules and more than one of each. The exact number, responsibilities, and how modules communicate will depend on many factors specific to the developer’s desired, final Substreams development effort.
+To develop most non-trivial Substreams, you will need to use multiple `map` and `store` modules. The specific number, responsibilities, and communication methods for these modules will depend on the developer's specific goals for the Substreams development effort.
 
 The two module types are commonly used together to construct the directed acyclic graph (DAG) outlined in the Substreams manifest. The two module types are very different in their use and how they work. Understanding these differences is vital for harnessing the full power of Substreams.
 
@@ -52,20 +52,20 @@ The two module types are commonly used together to construct the directed acycli
 
 `map` modules are used for data extraction, filtering, and transformation. They should be used when direct extraction is needed avoiding the need to reuse them later in the DAG.
 
-For performance considerations, you should use a single `map`, instead of multiple maps that extract single events or functions. It's better to perform the maximum amount of extraction from a single top-level `map` module and then pass the data to be consumed by other Substreams modules. This is the most straightforward, simplistic, and recommended approach for the backend and consumer development experiences.
+To optimize performance, you should use a single `map` module instead of multiple `map` modules to extract single events or functions. It is more efficient to perform the maximum amount of extraction in a single top-level `map` module and then pass the data to other Substreams modules for consumption. This is the recommended, simplest approach for both backend and consumer development experiences.
 
-A few important facts and use cases for functional `map` modules include:
+Functional `map` modules have several important use cases and facts to consider, including:
 
-* Extracting model data from an event or a function's inputs.
-* Reading data from a block and transforming said data into a custom protobuf structure.
-* Filtering out events or functions on any given number of contracts.
+* Extracting model data from an event or function's inputs.
+* Reading data from a block and transforming it into a custom protobuf structure.
+* Filtering out events or functions for any given number of contracts.
 
 ### `store` modules
 
-`store` modules are used for the aggregation of values and to persist state that exists across a block temporarily.
+`store` modules are used for the aggregation of values and to persist state that temporarily exists across a block.
 
-{% hint style="info" %}
-**Note:** Stores should not be used for temporary, free-form data persistence.
+{% hint style="warning" %}
+**Important:** Stores should not be used for temporary, free-form data persistence.
 {% endhint %}
 
 Unbounded `store` modules are discouraged. `store` modules shouldn't be used as an infinite bucket to dump data into.

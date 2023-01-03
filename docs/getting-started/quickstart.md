@@ -77,7 +77,7 @@ substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.ya
 
 Different blockchains have specific requirements for their data definitions. The code in the module handlers needs to be updated to match the expectations of the separate blockchains.
 
-### **Crates and packages**
+## **Crates and packages**
 
 Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project.
 
@@ -122,7 +122,7 @@ $ cargo add substreams-solana
 Alternatively, generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. [Read through the Rust crates documentation](../reference-and-specs/rust-crates.md) for details.
 {% endhint %}
 
-## Examples overview
+## Quickstart examples overview
 
 The relationships for the flow of data are defined in the Substreams manifest. Further information is available in the documentation for [defining complex data strategies](../reference-and-specs/manifests.md) through manifest files.
 

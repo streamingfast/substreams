@@ -44,7 +44,7 @@ Developers create their own Substreams implementations in a variety of ways. Str
 
 The Substreams documentation [provides a Developer's guide](https://substreams.streamingfast.io/developer-guide/overview) to assist you to understand and use Substreams.
 
-### **What is Substreams for?**
+### **What is Substreams used for?**
 
 Substreams and Firehose work together to index and process blockchain data. Substreams is used for transforming rich blockchain data and exposing it to the needs of application developers.
 
@@ -74,11 +74,11 @@ Yes, [find StreamingFast on their official YouTube account](https://www.youtube.
 
 ### **Who is dfuse?**
 
-StreamingFast was originally called dfuse. The company changed its name and is in the process of rebranding the company.
+StreamingFast was originally called dfuse. The company changed its name and is in the process of rebranding.
 
 ### What is Sparkle?
 
-Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). Substreams enables greater composability, and provides similar powers of parallelization. Sparkle is deprecated.
+Substreams is the successor of [StreamingFast Sparkle](https://github.com/streamingfast/sparkle). Substreams enables greater composability, and provides similar parallelization capabilities. Sparkle is deprecated.
 
 ### **Who is StreamingFast?**
 

@@ -10,11 +10,13 @@ Run Substreams locally by running StreamingFast Firehose on the same machine.
 
 ### Download Firehose
 
-Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).
-
 The full source code is available in the official [Firehose GitHub repository](https://github.com/streamingfast/firehose-ethereum).
 
 Install Firehose locally from source or by using a [Firehose Docker release](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum).
+
+{% hint style="success" %}
+**Tip**: Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).
+{% endhint %}
 
 ### Get some data
 
@@ -65,7 +67,7 @@ $ fireeth start -c config.yaml
 
 ### Running Substreams and Firehose
 
-Run the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Firehose deployment by using:
+Start Substreams by using the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for your Firehose deployment.
 
 ```bash
 substreams run -p -e localhost:9000

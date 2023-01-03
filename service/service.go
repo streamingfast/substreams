@@ -293,8 +293,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
 		zap.String("output_module", request.GetOutputModuleName()),
 	)
-	if err := pipe.
-		Init(ctx); err != nil {
+	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 

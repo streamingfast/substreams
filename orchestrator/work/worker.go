@@ -72,6 +72,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	w.logger.Info("launching remote worker",
 		zap.Int64("start_block_num", request.StartBlockNum),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
+		zap.String("output_module", request.GetOutputModuleName()),
 	)
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)

@@ -4,9 +4,9 @@ description: StreamingFast Substreams parallel execution
 
 # Parallel execution
 
-Parallel execution is the process of a Substreams module's code executing multiple segments of blockchain data simultaneously. Substreams modules are executed in parallel, rapidly producing data for consumption in end-user applications. Parallel Execution enables Substreams' highly effecient blockchain data processing capabilities.
+Parallel execution is the process of a Substreams module's code executing multiple segments of blockchain data simultaneously in a forward or backward direction. Substreams modules can be executed in parallel, rapidly producing data for consumption in end-user applications. Parallel execution enables Substreams' highly efficient blockchain data processing capabilities.
 
-Parallel execution occurs when a requested module's start block is further back in the blockchain's history than the requested start block. For example, if a module starts at block 12,000,000 and a user requests data at block 15,000,000, parallel execution is used. This applies to both the development and production modes of Substreams operation. Parallel execution is performed for the full range of blocks when Substreams is in production mode.
+Parallel execution occurs when a requested module's start block is further back in the blockchain's history than the requested start block. For example, if a module starts at block 12,000,000 and a user requests data at block 15,000,000, parallel execution is used. This applies to both the development and production modes of Substreams operation.
 
 Parallel execution addresses the problem of the slow single linear execution of a module. Instead of running a module in a linear fashion, one block after the other without leveraging full computing power, N number of workers are executed over a different segment of the chain. It means data can be pushed back to the user N times faster than cases using a single worker.
 
@@ -17,3 +17,9 @@ The single map_transfer module will fulfill a request from 0 - 75,000. The serve
 The three pairs will be simultaneously executed by the server handling caching of the output of the store. For stores, an additional step will combine the store keys across multiple segments producing a unified and linear view of the store's state.
 
 Assuming a chain has 16,000,000 blocks, which translates to 640 segments of 25K blocks. The server currently has a limited amount of concurrency. In theory, 640 concurrent workers could be spawned. In practice, the number of concurrent workers depends on the capabilities of the service provider. For the production endpoint, StreamingFast sets the concurrency to 15 to ensure fair usage of resources for the free service.
+
+## Production versus development mode for parallel execution diagram
+
+The amount of parallel processing for the two modes is illustrated in the diagram. Production mode results in more parallel processing than development mode for the requested range. In contrast, development mode consists of more linear processing. Another important note is, forward processing only occurs in production mode.
+
+<figure><img src="https://github.com/streamingfast/substreams/raw/develop/docs/assets/substreams_processing.png" alt=""><figcaption><p>Substreams production versus development mode for parallel execution digram</p></figcaption></figure>

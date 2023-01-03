@@ -103,11 +103,11 @@ Specific attributes of development modes include:
 
 ## Production and development parallel execution examples
 
-In most cases, you will run production mode, using a Substreams sink. Development mode is enabled by default in the CLI unless -p is specified. It's important to remember the -p flag is passed to the substreams CLI only in development mode.
+In most cases, you will run production mode, using a Substreams sink. Development mode is enabled by default in the CLI unless -p is specified.
 
 Examples: (given the dependencies: `[block] --> [map_pools] --> [store_pools] --> [map_transfers])`
 
-- Running the `substreams run substreams.yaml map_transfers` command will only print the `map_transfers` module's outputs and logs.
+- Running the `substreams run substreams.yaml map_transfers` command `run` in development mode and only print the `map_transfers` module's outputs and logs.
 - Running the `substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools` command will print the outputs of the `map_pools`, `map_transfers`, and `store_pools` modules.
 - Running the `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` command will print all the entries in the `store_pools` module at block 999, then continue with outputs and logs from the `map_transfers` module in blocks 1000 through 1004.
 

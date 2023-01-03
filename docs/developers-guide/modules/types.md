@@ -16,7 +16,7 @@ Substreams uses two types of modules, `map` and `store`.&#x20;
 `store` modules write to key-value stores.&#x20;
 
 {% hint style="info" %}
-**Note**: To ensure successful and proper parallelization `store` modules are not permitted to read any of their own data or values.
+**Note**: To ensure successful and proper parallelization can occur, `store` modules are not permitted to read any of their own data or values.
 {% endhint %}
 
 Stores declaring their own data types expose methods capable of mutating keys within the `store`.

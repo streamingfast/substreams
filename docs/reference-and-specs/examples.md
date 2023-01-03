@@ -4,50 +4,40 @@ description: StreamingFast Substreams examples
 
 # Examples
 
-### Substreams Examples
+## Substreams examples
 
-#### Substreams Template for Dev Guide
+#### Substreams template for dev guide
 
-The accompanying template associated with the developer guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+The accompanying template for the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
 
 #### Uniswap-v3
 
-Substreams-based Uniswap-v3 Subgraph and Substreams. The Uniswap Substreams example is currently in beta.
-
-[https://github.com/streamingfast/substreams-uniswap-v3](https://github.com/streamingfast/substreams-uniswap-v3)
+Substreams-based Uniswap-v3 Subgraph and Substreams. [The Uniswap Substreams example ](https://github.com/streamingfast/substreams-uniswap-v3)is in beta.
 
 #### PancakeSwap Substreams
 
-Substreams example for tracking PancakeSwap on BSC Mainnet. _No support is currently provided for this example._
+Substreams [example for tracking PancakeSwap on BSC Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap).&#x20;
 
-[https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap)
+{% hint style="warning" %}
+**Important**: **No support is provided** for the PancakeSwap example or endpoint.
+{% endhint %}
 
 #### ETH Token Substreams
 
-Substreams example tracking ERC-20 tokens on the Ethereum Mainnet.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token](https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token)
+Substreams [example tracking ERC-20 tokens on the Ethereum Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token).
 
 #### Solana SPL Tokens
 
-First draft for extraction of the SPL token on the Solana blockchain.&#x20;
+First draft for [extraction of the SPL token on the Solana blockchain](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens).&#x20;
 
-[https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens)
+#### Substreams Rust client example
 
-#### Substreams Rust Client Example
+Substreams example to [consume data from the compute engine](https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust), written in Rust.
 
-Substreams example to consume data from the compute engine, written in Rust.
+#### Substreams Python client example
 
-[https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust](https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust)
+Substreams example to [consume data from the compute engine](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python), written in Python.
 
-#### Substreams Python Client Example
+#### PancakeSwap direct to database example
 
-Substreams example to consume data from the compute engine, written in Python.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/consumers/python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python)
-
-#### PancakeSwap Direct to Database Example
-
-An E2E indexer for PancakeSwap written in the Go programming language.
-
-[https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode](https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode)
+An[ E2E indexer for PancakeSwap](https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode) written in the Go programming language.

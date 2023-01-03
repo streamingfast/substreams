@@ -1,26 +1,24 @@
 ---
-description: StreamingFast Substreams CLI installation
+description: StreamingFast Substreams CLI installation documentation
 ---
 
-# Installing the CLI
+# Installing the Substreams CLI
 
-### CLI Installation
+## Installation overview
 
-The Substreams command line interface (CLI) is the main means of interacting with and using the product.
+Connect to endpoints, stream data in real time, and package custom modules.
 
-The CLI allows you to connect to Substreams endpoints, stream data in real time, and package custom Substreams modules.
-
-{% hint style="info" %}
-_**Important**: Check the_ [_official Github repository_](https://github.com/streamingfast/substreams/releases) _to get the **latest CLI release available**._&#x20;
+{% hint style="success" %}
+**Tip**_:_ [Check the official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest** [**`substreams` CLI**](../reference-and-specs/command-line-interface.md) **release available**.&#x20;
 {% endhint %}
 
-#### Homebrew Installation
+#### Homebrew installation
 
 ```
 brew install streamingfast/tap/substreams
 ```
 
-#### Pre-compiled Binary Installation
+#### Pre-compiled binary installation
 
 ```bash
 # Use correct binary for your platform
@@ -28,7 +26,7 @@ LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/la
 curl -L  $LINK  | tar zxf -
 ```
 
-#### Substreams Source Installation
+#### Installation from source
 
 ```bash
 git clone https://github.com/streamingfast/substreams
@@ -40,15 +38,20 @@ go install -v ./cmd/substreams
 **Important**: Add $HOME/go/bin to the system path if it's not already present.
 {% endhint %}
 
-### CLI Install Validation
+### Validation of installation
 
-Run Substreams passing it the version flag to ensure the CLI is working as expected.
+Run the [`substreams` CLI](../reference-and-specs/command-line-interface.md) passing the `--version` flag to check the success of the installation.
 
 ```bash
 substreams --version
+```
+
+A successful installation will print the version that you have installed.
+
+```bash
 substreams version dev
 ```
 
 {% hint style="info" %}
-_Note:_ [_Gitpod_](../developer-guide/installation-requirements.md) _can also be used for Substreams rather than local installations._
+**Note**: You can [also use Gitpod](../developers-guide/installation-requirements.md) instead of a local installation.
 {% endhint %}

@@ -24,15 +24,16 @@ func init() {
 	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
-	runCmd.Flags().BoolP("debug-initial-snapshots", "i", false, "Load an initial snapshot at start block, before continuing processing. Available only in development mode (production mode = false)")
-	runCmd.Flags().Bool("production-mode", false, "Enable production mode, with high-speed forward processing: limits stream to a single mapper module.")
+	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
+	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
+	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	rootCmd.AddCommand(runCmd)
 }
 
 // runCmd represents the command to run substreams remotely
 var runCmd = &cobra.Command{
 	Use:          "run <manifest> <module_name>",
-	Short:        "Stream modules from a given package on a remote endpoint",
+	Short:        "Stream module outputs from a given package on a remote endpoint",
 	RunE:         runRun,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
@@ -50,12 +51,20 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	outputModule := args[1]
+	productionMode := mustGetBool(cmd, "production-mode")
+	debugModulesOutput := mustGetStringSlice(cmd, "debug-modules-output")
+	if debugModulesOutput != nil && productionMode {
+		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
+	}
+
+	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
 		return fmt.Errorf("creating module graph: %w", err)
 	}
+
+	outputModule := args[1]
 
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
@@ -85,21 +94,26 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	req := &pbsubstreams.Request{
-		StartBlockNum:  startBlock,
-		StartCursor:    mustGetString(cmd, "cursor"),
-		StopBlockNum:   stopBlock,
-		ForkSteps:      []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
-		Modules:        pkg.Modules,
-		OutputModule:   outputModule,
-		OutputModules:  []string{outputModule}, //added for backwards compatibility, will be removed
-		ProductionMode: mustGetBool(cmd, "production-mode"),
+		StartBlockNum:                       startBlock,
+		StartCursor:                         mustGetString(cmd, "cursor"),
+		StopBlockNum:                        stopBlock,
+		ForkSteps:                           []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
+		Modules:                             pkg.Modules,
+		OutputModule:                        outputModule,
+		OutputModules:                       []string{outputModule}, //added for backwards compatibility, will be removed
+		ProductionMode:                      productionMode,
+		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
 	}
 
 	if err := pbsubstreams.ValidateRequest(req, false); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
+	toPrint := debugModulesOutput
+	if toPrint == nil {
+		toPrint = []string{outputModule}
+	}
 
-	ui := tui.New(req, pkg, []string{outputModule})
+	ui := tui.New(req, pkg, toPrint)
 	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}

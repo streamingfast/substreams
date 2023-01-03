@@ -115,7 +115,7 @@ func TestProductionMode_StartBlock_Before_LinearBlock_And_FirstBoundary(t *testi
 	require.NoError(t, run.Run(t))
 
 	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 9, strings.Count(mapOutput, "\n"))
+	assert.Equal(t, 3, strings.Count(mapOutput, "\n"))
 	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 }
 

@@ -4,22 +4,25 @@ description: StreamingFast Substreams manifest
 
 # Manifest
 
-## Overview
+## Manifest Overview
 
-The manifest contains the details for the various aspects and components of a Substreams implementation.
+The manifest contains the details for the various aspects and components of a Substreams module.
 
-Every Substreams implementation contains one manifest. The manifest is a YAML-based file and provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
+Every Substreams module contains one manifest. The manifest is a YAML-based file and provides vital insights into the blockchain being targeted, the design of the data flow, the names and types of modules, and locations and names for protobuf definitions.
 
 {% hint style="success" %}
-**Tip**: Additional detailed information for [manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
+**Tip**: Additional [detailed information for manifests](../reference-and-specs/manifests.md) is available in the Substreams reference section.
 {% endhint %}
 
-## Example Manifest
+## Example manifest
 
-The manifest below is from the [Substreams Template example](https://github.com/streamingfast/substreams-template) accompanying the developer guide.
+The manifest from the [Substreams Template example](https://github.com/streamingfast/substreams-template) is used in the Substreams documentation.
 
 {% hint style="info" %}
-**Note**: The example manifest below is specific to the Ethereum blockchain. The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml) specific to the Solana blockchain.
+**Note**: Learn more about Substreams manifests and different blockchains through the examples provided by StreamingFast.
+
+* The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain.&#x20;
+* The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest specific to the Solana blockchain](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml).
 {% endhint %}
 
 {% code title="substreams.yaml" overflow="wrap" lineNumbers="true" %}
@@ -62,11 +65,9 @@ modules:
 ```
 {% endcode %}
 
-View this file in the repo by visiting the following link.
+View the [`substreams.yaml`](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) file in the repository.
 
-[https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml)
-
-## Manifest Walkthrough
+## Manifest walkthrough
 
 ### `imports.eth`
 
@@ -78,7 +79,7 @@ Substreams consumes blocks and depends on a Substreams [package](../reference-an
 
 ### `protobuf.files`
 
-The `protobuf.files` contains a list of protobuf files for the current Substreams implementation.
+The `protobuf.files` contains a list of protobuf files for the current Substreams module.
 
 {% hint style="info" %}
 **Note**: The Substreams Template references the Ethereum-specific `erc721.proto` protobuf while the Solana SPL Token Transfers example references the Solana-specific `solana_spl.proto`.
@@ -86,16 +87,16 @@ The `protobuf.files` contains a list of protobuf files for the current Substream
 
 ### `protobuf.importPaths`
 
-The `protobuf.importPaths` contains the paths to the protobufs for the current Substreams implementation.
+The `protobuf.importPaths` contains the paths to the protobufs for the current Substreams module.
 
-## Module Definitions
+## Module definitions
 
-The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams implementation.
+The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams module.
 
-The modules are Rust functions containing the business logic for the implementation.
+The modules are Rust functions containing the business logic for the module.
 
 {% hint style="info" %}
-**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The naming convention for Substreams modules is to prefix the name with either `map_` or `store_` depending on the module type.
+**Note**: The manifest in the Substreams Template example lists two modules: `map_transfers` and `store_transfers.` The official naming convention for Substreams modules prefixes the module name by using `map_` or `store_` depending on the type.
 {% endhint %}
 
 ### **`map_transfers`**
@@ -110,7 +111,7 @@ The output for the `map_transfers` module is a list of ERC721 transfers. The bus
 
 ### **`store_transfers`**
 
-The `store_transfers` store module receives transfers in each block extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.
+The `store_transfers` store module receives transfers in the blocks extracted by the mapper. The store is a `count` of ERC721 tokens for a holder.
 
 The inputs of the module are protobuf models defined as: `proto:eth.erc721.v1.Transfers`.
 

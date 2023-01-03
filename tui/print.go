@@ -16,9 +16,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) error {
+func (ui *TUI) decoratedBlockScopedData(outputs []*pbsubstreams.ModuleOutput, clock *pbsubstreams.Clock) error {
+
 	var s []string
-	for _, out := range output.Outputs {
+	for _, out := range outputs {
 		for _, log := range out.DebugLogs {
 			s = append(s, fmt.Sprintf("%s: log: %s\n", out.Name, log))
 		}
@@ -28,7 +29,7 @@ func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) er
 			if len(data.MapOutput.Value) != 0 {
 				msgDesc := ui.msgDescs[out.Name]
 				msgType := ui.msgTypes[out.Name]
-				cnt := ui.decodeDynamicMessage(msgType, msgDesc, output.Clock.Number, out.Name, data.MapOutput)
+				cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, data.MapOutput)
 				cnt = ui.prettyFormat(cnt, true)
 				if out.Cached {
 					s = append(s, cachedValues(out.Name))
@@ -40,7 +41,7 @@ func (ui *TUI) decoratedBlockScopedData(output *pbsubstreams.BlockScopedData) er
 				if out.Cached {
 					s = append(s, cachedValues(out.Name))
 				}
-				s = append(s, ui.renderDecoratedDeltas(out.Name, output.Clock.Number, data.DebugStoreDeltas.Deltas, false)...)
+				s = append(s, ui.renderDecoratedDeltas(out.Name, clock.Number, data.DebugStoreDeltas.Deltas, false)...)
 			}
 		}
 	}
@@ -119,15 +120,15 @@ func indent(in []byte) []byte {
 	return bytes.Replace(in, []byte("\n"), []byte("\n    "), -1)
 }
 
-func (ui *TUI) jsonBlockScopedData(output *pbsubstreams.BlockScopedData) error {
-	for _, out := range output.Outputs {
+func (ui *TUI) jsonBlockScopedData(outputs []*pbsubstreams.ModuleOutput, clock *pbsubstreams.Clock) error {
+	for _, out := range outputs {
 		switch data := out.Data.(type) {
 
 		case *pbsubstreams.ModuleOutput_MapOutput:
 			if len(data.MapOutput.Value) != 0 {
 				msgDesc := ui.msgDescs[out.Name]
 				msgType := ui.msgTypes[out.Name]
-				cnt := ui.decodeDynamicMessage(msgType, msgDesc, output.Clock.Number, out.Name, data.MapOutput)
+				cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, data.MapOutput)
 				cnt = ui.prettyFormat(cnt, true)
 				if out.Cached {
 					fmt.Println(cachedValues(out.Name))
@@ -139,7 +140,7 @@ func (ui *TUI) jsonBlockScopedData(output *pbsubstreams.BlockScopedData) error {
 				if out.Cached {
 					fmt.Println(cachedValues(out.Name))
 				}
-				if err := ui.printJSONBlockDeltas(out.Name, output.Clock.Number, data.DebugStoreDeltas.Deltas); err != nil {
+				if err := ui.printJSONBlockDeltas(out.Name, clock.Number, data.DebugStoreDeltas.Deltas); err != nil {
 					return fmt.Errorf("print json deltas: %w", err)
 				}
 			}

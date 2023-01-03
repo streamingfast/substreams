@@ -19,7 +19,7 @@ Substreams modules data interaction diagram
 The diagram shows how the `transfer_map` module extracts the transfers in a `Block` and tracks the total number of transfers.
 
 {% hint style="info" %}
-**Note:** Because blockchains are clocked, you can use multiple inputs. This allows synchronization between multiple execution streams, resulting in improved performance over comparable conventional streaming engines.
+**Note:** You can use multiple inputs in blockchains because they are clocked, which allows for synchronization between multiple execution streams and improved performance compared to conventional streaming engines.
 {% endhint %}
 
 As seen in the counters store example diagram, modules can also take in multiple inputs. In this case, two modules feed into a `store`, effectively tracking multiple `counters`.

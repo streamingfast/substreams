@@ -39,7 +39,7 @@ Every time a new `Block` is processed, all of the modules are executed as a dire
 Modules have a single typed output, which is typed to inform consumers of the types of data to expect and how to interpret the bytes being sent.
 
 {% hint style="success" %}
-**Tip**: Subsequent modules use data output from one module as input, forming a chain of data flow from module to module.
+**Tip**: In subsequent modules, input from one module's data output is used to form a chain of data flow from module to module.
 {% endhint %}
 
 ### `map` versus `store` modules

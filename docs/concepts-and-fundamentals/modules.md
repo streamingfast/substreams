@@ -42,6 +42,41 @@ Modules have a single typed output, which is typed to inform consumers of the ty
 **Tip**: Subsequent modules use data output from one module as input, forming a chain of data flow from module to module.
 {% endhint %}
 
+## Modules: Map vs. Store
+
+Most non-trivial Substreams development initiatives will require the use of both map and store modules and more than one of each. The exact number, responsibilities, and how modules communicate will depend on many factors specific to the developer’s desired, final Substreams solution.
+
+The two module types are commonly used together to construct the directed acyclic graph (DAG) outlined in the Substreams manifest. Map and store modules are very different in their use and how they work. Understanding these differences is important for harnessing the full power of Substreams.
+
+### Map Modules
+
+Map modules are used for data extraction, filtering, and transformation. They should be used when direct extraction is needed avoiding the need to reuse them later in the DAG.
+
+For performance considerations, you should use a single map, instead of multiple maps that extract single events or functions. It's better to perform the maximum amount of extraction from a single top-level map module and then pass the data to be consumed by other Substreams modules. This is the most straightforward, simplistic, and the recommended approach for the backend and consumer development experiences.
+
+Notable facts and use cases for functional map modules include:
+
+- Extracting model data from an event or a function's inputs.
+- Reading data from a block and transforming said data into a custom protobuf structure.
+- Filtering out events or functions on any given number of contracts.
+
+### Store Modules
+
+Store modules are used for the aggregation of values and to temporarily persist state that exists across a block.
+
+{% hint style="info" %}
+**Note:** Stores should not be used for temporary, free-form data persistence.
+{% endhint %}
+
+Unbounded stores are discouraged. Stores shouldn't be used as an infinite bucket to dump data into.
+
+Notable facts and use cases for working store modules include:
+
+- Stores should only be used when reading data from another downstream Substreams module.
+- Stores cannot be output as a stream, except in development mode.
+- Stores are used to implement the Dynamic Data Sources pattern from Subgraphs, keeping track of contracts created to filter the next block with that information.
+- Do not use stores to query anything from them downstream of the Substreams output, use a sink and shape the data for proper querying.
+
 ## Next steps
 
 Learn more about [modules in the Developer's guide](../developers-guide/modules/).

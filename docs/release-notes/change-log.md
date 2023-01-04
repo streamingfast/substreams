@@ -6,71 +6,110 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Output Module
+This upcoming release is going to bring significant changes on how Substreams are developed, consumed and speed of execution. Note that there is **no** breaking changes related to your Substreams' Rust code, only breaking changes will be about how Substreams are run and available features/flags.
 
-We only support 1 output module when running a substreams, moreover the output module must be of kind `map`. Multiple factors have motivated this change:
+Here the highlights of elements that will change in next release:
 
-- Recently we have seen incorrect usage of `store` module. A `store` module was not intended to be used as a persistent long term storage,  `store` modules were conceived as a place to aggregate data for later steps in computation. Using it as a persistent storage make the store unmanageable. 
-- Parallel procssing does not support a `store` as it's last step.
+- [Production vs Development Mode](#production-vs-development-mode)
+- [Single Output Module](#single-module-output)
+- [Output Module must be of type `map`](#output-module-must-be-of-type-map)
+- [`InitialSnapshots` is now a `development` mode feature only](#initialsnapshots-is-now-a-development-mode-feature-only)
+- [Enhanced Parallel Execution](#enhanced-parallel-execution)
 
-*Note*
-We added `output_module` to the Substream request and kept  `output_modules` to remain backwards compatible. If an `output_module` is specified we will honor that module. If not we will check `output_modules` to ensure there is only 1 output module   
+In this rest of this post, we are going to go through each of them in greater details and the implications they have for you. Full changelog is available after.
+### Production vs development mode
 
-*Migration Path*
+We introduce an execution mode when running Substreams, either `production` mode or `development` mode. The execution mode impacts how the Substreams get executed, specifically:
 
-If you are currently using a `store` module as your output store. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and return the deltas.
-
-### Production vs Development Mode
-
-We introduce `production` and `development` mode when running substreams. 
-The mode impacts how the `substreams` get executed, specifically:
-
- - the time to first byte 
- - the speed at which large ranges get executed
- - the module logs and outputs sent back to the client
+ - The time to first byte
+ - The module logs and outputs sent back to the client
+ - How parallel execution is applied through the requested range
 
 The difference between the modes are:
 
-- Forward Processing is enabled in `production` mode but *not* in `development` mode. As such the time to first byte in `development` mode is faster 
-- In `development` the client will receive all the logs of the executed `modules`. While in `production` mode the client will only receive the logs of the output module
-- In `development` mode you may request specific `store` snapshot that are in the execution tree 
+- In `development` mode, the client will receive all the logs of the executed `modules`. In `production` mode, logs are not available at all.
+- In `development` mode, module's are always re-executed from request's start block meaning now that logs will always be visible to the user. In `production` mode, if a module's output is found in cache, module execution is skipped completely and data is returned directly.
+- In `development` mode, only backward parallel execution can be effective. In `production` mode, both backward parallel execution and forward parallel execution can be effective. See [Parallel Processing](#parallel-processing) section for further details about parallel execution.
+- In `development` mode, every module's output is returned back in the response but only root module is displayed by default in `substreams` CLI (configurable via a flag). In `production` mode, only root module's output is returned. See [Output Module](#output-module) section for further details about changes related to output.
+- In `development` mode, you may request specific `store` snapshot that are in the execution tree via the `substreams` CLI `--debug-modules-initial-snapshots` flag. In `production` mode, this feature is not available.
 
-#### Examples:
+The execution mode is specified at that gRPC request level and is the default mode is `development`. The `substreams` CLI tool being a development tool foremost, we do not expect people to activate production mode (`-p`) when using it outside for maybe testing purposes.
 
-(given a substreams with these dependencies: [block] --> [map_pools] --> [store_pools] --> [map_transfers])
+If today's you have `sink` code making the gRPC request yourself and are using that for production consumption, ensure that field `production_mode` in your Substreams request is set to `true`. StreamingFast provided `sink` like [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres), [https://github.com/streamingfast/substreams-sink-files](https://github.com/streamingfast/substreams-sink-files) and others have already by updated to use `production_mode` by default.
 
-* Running `substreams run substreams.yaml map_transfers` will only print the outputs and logs from the `map_transfers` module. 
+Final note, we recommend to run the production mode against a compiled `.spkg` file that should ideally be released and versioned. This is to ensure stable modules' hashes and leverage cached output properly.
+
+### Single module output
+
+We now only support 1 output module when running a Substreams, while prior this release, it was possible to have multiple ones.
+
+- Only a single module can now be requested, previous version allowed to request N modules.
+- Only `map` module can now be requested, previous version allowed `map` and `store` to be requested.
+- `InitialSnapshots` is now forbidden in `production` mode and still allowed in `development` mode.
+- In `development` mode, the server sends back output for all executed modules (by default the CLI displays only requested module's output).
+
+> *Note* We added `output_module` to the Substreams request and kept `output_modules` to remain backwards compatible for a while. If an `output_module` is specified we will honor that module. If not we will check `output_modules` to ensure there is only 1 output module. In a future release, we are going to remove `output_modules` altogether.
+
+With the introduction of `development` vs `production` mode, we added a change in behavior to reduce frictions this changes has on debugging. Indeed, in `development` mode, all executed modules's output will be sent be to the user. This includes the requested output module as well as all its dependencies. The `substreams` CLI has been adjusted to show only the output of the requested output module by default. The new `substreams` CLI flag `-debug-modules-output` can be used to control which modules' output is actually displayed by the CLI.
+
+> *Migration Path* If you are currently requesting more than one module, refactor your Substreams code so that a single `map` module aggregates all the required information from your different dependencies in one output.
+
+### Output module must be of type `map`
+
+It is now forbidden to request a `store` module as the output module of the Substreams request. The output module must now be of kind `map`. Different factors have motivated this change:
+
+- Recently we have seen incorrect usage of `store` module. A `store` module was not intended to be used as a persistent long term storage, `store` modules were conceived as a place to aggregate data for later steps in computation. Using it as a persistent storage make the store unmanageable.
+- We had always expected users to consume a `map` module which would return data formatted according to a final `sink` spec which will then permanently store the extracted data. We never envisioned `store` to act as long term storage.
+- Forward parallel execution does not support a `store` as its last step.
+
+> *Migration Path* If you are currently using a `store` module as your output store. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and return the deltas.
+
+#### Examples
+
+Let's assume a Substreams with these dependencies: `[block] --> [map_pools] --> [store_pools] --> [map_transfers]`
+
+* Running `substreams run substreams.yaml map_transfers` will only print the outputs and logs from the `map_transfers` module.
 * Running `substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools` will print the outputs of those 3 modules.
+
+### `InitialSnapshots` is now a `development` mode feature only
+
+Now that a `store` cannot be requested as the output module, the `InitialSnapshots` did not make sense anymore to be available. Moreover, we have seen people using it to retrieve the initial state and then continue syncing. While it's a fair use case, we always wanted people to perform the synchronization using the streaming primitive and not by using `store` as long term storage.
+
+However, the `InitialSnapshots` is a useful tool for debugging what a store contains at a given block. So we decided to keep it in `development` mode only where you can request the snapshot of a `store` module when doing your request. In the Substreams' request/response, `initial_store_snapshot_for_modules` has been renamed to `debug_initial_store_snapshot_for_modules`, `snapshot_data` to `debug_snapshot_data` and `snapshot_complete` to `debug_snapshot_complete`.
+
+> *Migration Path* If you were relying on `InitialSnapshots` feature in production. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and then synchronize the full state on the consuming side.
+
+#### Examples
+
+Let's assume a Substreams with these dependencies: `[block] --> [map_pools] --> [store_pools] --> [map_transfers]`
+
 * Running `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` will print all the entries in store_pools at block 999, then continue with outputs and logs from `map_transfers` in blocks 1000 to 1004.
 
-### Parallel Processing
+### Enhanced parallel execution
 
-There are 2 steps while parallel processing: back processing and forward processing. 
+There are 2 ways of while parallel processing: back processing and forward processing.
 
-Back processing, consists of executing in parallel block ranges from the module initial block up to the start block of the request. 
-If the start block of the request matches module initial block, there is no back processing to perform. 
+Back processing, consists of executing in parallel block ranges from the module initial block up to the start block of the request.
+If the start block of the request matches module initial block, there is no back processing to perform.
 
-Forward processing, consist of executing in parallel block ranges from the start 
+Forward processing, consist of executing in parallel block ranges from the start
 block of the request up to last known final block (the irreversible block) or the stop block of the request, depending on which is smaller.
-Foward processing significantly improves the performance of the Substreams, but we loose the ability to stream the module logs.
+Forward processing significantly improves the performance of the Substreams, but we loose the ability to stream the module logs.
 
-Back processing will  occur in `development` and `production` mode, while the forward processing only occurs in `production` mode. 
-
+Back processing will  occur in `development` and `production` mode, while the forward processing only occurs in `production` mode.
 
 ![parallel processing](../assets/substreams_processing.png)
 
-
 ### Library
 
-- Added `production_mode` to Substream Request
-- Added `output_module` to Substream Request
+- Added `production_mode` to Substreams Request
+- Added `output_module` to Substreams Request
 
 ### CLI
 
 - Added command `substreams tools analytics store-stats` to get statistic for a given store.
-* (**Breaking**) added `--debug-modules-output` (comma-separated module names) (unavailable in production-mode) 
-* (**Breaking**) added `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in production-mode) 
-* (**Breaking**) removed flag `--initial-snapshots` (bool) 
+- Added `--debug-modules-output` (comma-separated module names) (unavailable in `production` mode)
+* **Breaking** Renamed flag `--initial-snapshots` to `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in `production` mode)
 
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 

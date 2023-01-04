@@ -68,9 +68,9 @@ Back processing will  occur in `development` and `production` mode, while the fo
 ### CLI
 
 - Added command `substreams tools analytics store-stats` to get statistic for a given store.
-* added `--debug-modules-output` (comma-separated module names) (unavailable in production-mode)
-* added `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in production-mode)
-* removed flag `--initial-snapshots` (bool) 
+* (**Breaking**) added `--debug-modules-output` (comma-separated module names) (unavailable in production-mode) 
+* (**Breaking**) added `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in production-mode) 
+* (**Breaking**) removed flag `--initial-snapshots` (bool) 
 
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 

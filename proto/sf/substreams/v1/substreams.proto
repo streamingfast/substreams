@@ -33,7 +33,10 @@ message Request {
 
   Modules modules = 6;
   repeated string output_modules = 7;
-  repeated string debug_initial_store_snapshot_for_modules = 8; // Available only in developer mode
+
+  // Available only in developer mode
+  repeated string debug_initial_store_snapshot_for_modules = 8;
+
   string output_module = 10;
 }
 
@@ -41,8 +44,12 @@ message Response {
   oneof message {
     SessionInit session = 5; // Always sent first
     ModulesProgress progress = 1; // Progress of data preparation, before sending in the stream of `data` events.
-    InitialSnapshotData debug_snapshot_data = 2; // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
-    InitialSnapshotComplete debug_snapshot_complete = 3; // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+
+    // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+    InitialSnapshotData debug_snapshot_data = 2;
+    // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+    InitialSnapshotComplete debug_snapshot_complete = 3;
+
     BlockScopedData data = 4;
   }
 }

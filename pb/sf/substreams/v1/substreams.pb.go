@@ -154,10 +154,11 @@ type Request struct {
 	// * turns off support for `initial_store_snapshot_for_modules`,
 	// * still streams output linearly, with a cursor, but at higher speeds
 	// * and purges log outputs from responses.
-	ProductionMode                      bool     `protobuf:"varint,9,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
-	Modules                             *Modules `protobuf:"bytes,6,opt,name=modules,proto3" json:"modules,omitempty"`
-	OutputModules                       []string `protobuf:"bytes,7,rep,name=output_modules,json=outputModules,proto3" json:"output_modules,omitempty"`
-	DebugInitialStoreSnapshotForModules []string `protobuf:"bytes,8,rep,name=debug_initial_store_snapshot_for_modules,json=debugInitialStoreSnapshotForModules,proto3" json:"debug_initial_store_snapshot_for_modules,omitempty"` // Available only in developer mode
+	ProductionMode bool     `protobuf:"varint,9,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
+	Modules        *Modules `protobuf:"bytes,6,opt,name=modules,proto3" json:"modules,omitempty"`
+	OutputModules  []string `protobuf:"bytes,7,rep,name=output_modules,json=outputModules,proto3" json:"output_modules,omitempty"`
+	// Available only in developer mode
+	DebugInitialStoreSnapshotForModules []string `protobuf:"bytes,8,rep,name=debug_initial_store_snapshot_for_modules,json=debugInitialStoreSnapshotForModules,proto3" json:"debug_initial_store_snapshot_for_modules,omitempty"`
 	OutputModule                        string   `protobuf:"bytes,10,opt,name=output_module,json=outputModule,proto3" json:"output_module,omitempty"`
 }
 
@@ -365,11 +366,13 @@ type Response_Progress struct {
 }
 
 type Response_DebugSnapshotData struct {
-	DebugSnapshotData *InitialSnapshotData `protobuf:"bytes,2,opt,name=debug_snapshot_data,json=debugSnapshotData,proto3,oneof"` // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+	// Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+	DebugSnapshotData *InitialSnapshotData `protobuf:"bytes,2,opt,name=debug_snapshot_data,json=debugSnapshotData,proto3,oneof"`
 }
 
 type Response_DebugSnapshotComplete struct {
-	DebugSnapshotComplete *InitialSnapshotComplete `protobuf:"bytes,3,opt,name=debug_snapshot_complete,json=debugSnapshotComplete,proto3,oneof"` // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+	// Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+	DebugSnapshotComplete *InitialSnapshotComplete `protobuf:"bytes,3,opt,name=debug_snapshot_complete,json=debugSnapshotComplete,proto3,oneof"`
 }
 
 type Response_Data struct {

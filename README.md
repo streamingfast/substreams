@@ -16,20 +16,6 @@ Substreams has all the benefits of StreamingFast Firehose, like low-cost caching
 
 Full documentation for installing, running and working with Substreams is available at: https://substreams.streamingfast.io.
 
-## Tooling
-
-### Store Analytics
-
-Store Analytics is a tool that allows you to analyze the data stored in your Substreams store.
-
-Usage
-
-```bash
-$ substreams tools analytics store-stats <path to your spkg file> <path to your store folder>
-```
-
-Note: this tool might currently take a long time to run, depending on the size of your store. We will work on improving its performance in the future, if necessary.
-
 ## Contributing
 
 **Please first refer to the general

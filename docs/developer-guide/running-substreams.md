@@ -95,7 +95,7 @@ Differences between production and development modes include:
 - Forward parallel execution is enabled in production mode and disabled in development mode.
 - The time required to reach the first byte in development mode is faster than in production mode.
 
-Specific attributes of development modes include:
+Specific attributes of development mode include:
 
 - The client will receive all of the executed module's logs.
 - It's possible to request specific store snapshots in the execution tree.
@@ -107,9 +107,9 @@ In most cases, you will run production mode, using a Substreams sink. Developmen
 
 Examples: (given the dependencies: `[block] --> [map_pools] --> [store_pools] --> [map_transfers])`
 
-- Running the `substreams run substreams.yaml map_transfers` command `run` in development mode and only print the `map_transfers` module's outputs and logs.
-- Running the `substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools` command will print the outputs of the `map_pools`, `map_transfers`, and `store_pools` modules.
-- Running the `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` command will print all the entries in the `store_pools` module at block 999, then continue with outputs and logs from the `map_transfers` module in blocks 1000 through 1004.
+- Running the `substreams run substreams.yaml map_transfers` command executes in development mode and only prints the `map_transfers` module's outputs and logs.
+- Running the `substreams run substreams.yaml map_transfers --debug-modules-output=map_pools,map_transfers,store_pools` command executes in development mode and only prints the outputs of the `map_pools`, `map_transfers`, and `store_pools` modules.
+- Running the `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` command executes in development mode and prints all the entries in the `store_pools` module at block 999, then continues with outputs and logs from the `map_transfers` module in blocks 1000 through 1004.
 
 ## Backward and forward parallel execution steps
 

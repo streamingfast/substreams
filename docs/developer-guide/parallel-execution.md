@@ -18,8 +18,8 @@ The three pairs will be simultaneously executed by the server handling caching o
 
 Assuming a chain has 16,000,000 blocks, which translates to 640 segments of 25K blocks. The server currently has a limited amount of concurrency. In theory, 640 concurrent workers could be spawned. In practice, the number of concurrent workers depends on the capabilities of the service provider. For the production endpoint, StreamingFast sets the concurrency to 15 to ensure fair usage of resources for the free service.
 
-## Production versus development mode for parallel execution diagram
+## Production versus development mode for parallel execution
 
-The amount of parallel processing for the two modes is illustrated in the diagram. Production mode results in more parallel processing than development mode for the requested range. In contrast, development mode consists of more linear processing. Another important note is, forward processing only occurs in production mode.
+The amount of parallel execution for the two modes is illustrated in the diagram. Production mode results in more parallel processing than development mode for the requested range. In contrast, development mode consists of more linear processing. Another important note is, foward parallel execution only occurs in production mode.
 
 <figure><img src="https://github.com/streamingfast/substreams/raw/develop/docs/assets/substreams_processing.png" alt=""><figcaption><p>Substreams production versus development mode for parallel execution digram</p></figcaption></figure>

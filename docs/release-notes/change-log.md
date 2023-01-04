@@ -29,13 +29,13 @@ The difference between the modes are:
 
 - In `development` mode, the client will receive all the logs of the executed `modules`. In `production` mode, logs are not available at all.
 - In `development` mode, module's are always re-executed from request's start block meaning now that logs will always be visible to the user. In `production` mode, if a module's output is found in cache, module execution is skipped completely and data is returned directly.
-- In `development` mode, only backward parallel execution can be effective. In `production` mode, both backward parallel execution and forward parallel execution can be effective. See [Parallel Processing](#parallel-processing) section for further details about parallel execution.
-- In `development` mode, every module's output is returned back in the response but only root module is displayed by default in `substreams` CLI (configurable via a flag). In `production` mode, only root module's output is returned. See [Output Module](#output-module) section for further details about changes related to output.
+- In `development` mode, only backward parallel execution can be effective. In `production` mode, both backward parallel execution and forward parallel execution can be effective. See [Enhanced parallel execution](#enhanced-parallel-execution) section for further details about parallel execution.
+- In `development` mode, every module's output is returned back in the response but only root module is displayed by default in `substreams` CLI (configurable via a flag). In `production` mode, only root module's output is returned.
 - In `development` mode, you may request specific `store` snapshot that are in the execution tree via the `substreams` CLI `--debug-modules-initial-snapshots` flag. In `production` mode, this feature is not available.
 
 The execution mode is specified at that gRPC request level and is the default mode is `development`. The `substreams` CLI tool being a development tool foremost, we do not expect people to activate production mode (`-p`) when using it outside for maybe testing purposes.
 
-If today's you have `sink` code making the gRPC request yourself and are using that for production consumption, ensure that field `production_mode` in your Substreams request is set to `true`. StreamingFast provided `sink` like [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres), [https://github.com/streamingfast/substreams-sink-files](https://github.com/streamingfast/substreams-sink-files) and others have already by updated to use `production_mode` by default.
+If today's you have `sink` code making the gRPC request yourself and are using that for production consumption, ensure that field `production_mode` in your Substreams request is set to `true`. StreamingFast provided `sink` like [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres), [substreams-sink-files](https://github.com/streamingfast/substreams-sink-files) and others have already been updated to use `production_mode` by default.
 
 Final note, we recommend to run the production mode against a compiled `.spkg` file that should ideally be released and versioned. This is to ensure stable modules' hashes and leverage cached output properly.
 
@@ -48,21 +48,21 @@ We now only support 1 output module when running a Substreams, while prior this 
 - `InitialSnapshots` is now forbidden in `production` mode and still allowed in `development` mode.
 - In `development` mode, the server sends back output for all executed modules (by default the CLI displays only requested module's output).
 
-> *Note* We added `output_module` to the Substreams request and kept `output_modules` to remain backwards compatible for a while. If an `output_module` is specified we will honor that module. If not we will check `output_modules` to ensure there is only 1 output module. In a future release, we are going to remove `output_modules` altogether.
+> **Note** We added `output_module` to the Substreams request and kept `output_modules` to remain backwards compatible for a while. If an `output_module` is specified we will honor that module. If not we will check `output_modules` to ensure there is only 1 output module. In a future release, we are going to remove `output_modules` altogether.
 
 With the introduction of `development` vs `production` mode, we added a change in behavior to reduce frictions this changes has on debugging. Indeed, in `development` mode, all executed modules's output will be sent be to the user. This includes the requested output module as well as all its dependencies. The `substreams` CLI has been adjusted to show only the output of the requested output module by default. The new `substreams` CLI flag `-debug-modules-output` can be used to control which modules' output is actually displayed by the CLI.
 
-> *Migration Path* If you are currently requesting more than one module, refactor your Substreams code so that a single `map` module aggregates all the required information from your different dependencies in one output.
+> **Migration Path** If you are currently requesting more than one module, refactor your Substreams code so that a single `map` module aggregates all the required information from your different dependencies in one output.
 
 ### Output module must be of type `map`
 
-It is now forbidden to request a `store` module as the output module of the Substreams request. The output module must now be of kind `map`. Different factors have motivated this change:
+It is now forbidden to request a `store` module as the output module of the Substreams request, the requested output module must now be of kind `map`. Different factors have motivated this change:
 
 - Recently we have seen incorrect usage of `store` module. A `store` module was not intended to be used as a persistent long term storage, `store` modules were conceived as a place to aggregate data for later steps in computation. Using it as a persistent storage make the store unmanageable.
 - We had always expected users to consume a `map` module which would return data formatted according to a final `sink` spec which will then permanently store the extracted data. We never envisioned `store` to act as long term storage.
 - Forward parallel execution does not support a `store` as its last step.
 
-> *Migration Path* If you are currently using a `store` module as your output store. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and return the deltas.
+> **Migration Path** If you are currently using a `store` module as your output store. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and return the deltas.
 
 #### Examples
 
@@ -77,7 +77,7 @@ Now that a `store` cannot be requested as the output module, the `InitialSnapsho
 
 However, the `InitialSnapshots` is a useful tool for debugging what a store contains at a given block. So we decided to keep it in `development` mode only where you can request the snapshot of a `store` module when doing your request. In the Substreams' request/response, `initial_store_snapshot_for_modules` has been renamed to `debug_initial_store_snapshot_for_modules`, `snapshot_data` to `debug_snapshot_data` and `snapshot_complete` to `debug_snapshot_complete`.
 
-> *Migration Path* If you were relying on `InitialSnapshots` feature in production. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and then synchronize the full state on the consuming side.
+> **Migration Path** If you were relying on `InitialSnapshots` feature in production. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and then synchronize the full state on the consuming side.
 
 #### Examples
 
@@ -87,18 +87,19 @@ Let's assume a Substreams with these dependencies: `[block] --> [map_pools] --> 
 
 ### Enhanced parallel execution
 
-There are 2 ways of while parallel processing: back processing and forward processing.
+There are 2 ways parallel execution can happen either backward or forward.
 
-Back processing, consists of executing in parallel block ranges from the module initial block up to the start block of the request.
-If the start block of the request matches module initial block, there is no back processing to perform.
+Backward parallel execution consists of executing in parallel block ranges from the module's start block up to the start block of the request. If the start block of the request matches module's start block, there is no backward parallel execution to perform. Also, this is happening only for dependencies of type `store` which means that if you depends only on other `map` modules, no backward parallel execution happens.
 
-Forward processing, consist of executing in parallel block ranges from the start
-block of the request up to last known final block (the irreversible block) or the stop block of the request, depending on which is smaller.
-Forward processing significantly improves the performance of the Substreams, but we loose the ability to stream the module logs.
+Forward parallel execution consists of executing in parallel block ranges from the start block of the request up to last known final block (a.k.a the irreversible block) or the stop block of the request, depending on which is smaller. Forward parallel execution significantly improves the performance of the Substreams as we execute your module in advanced through the chain history in parallel. What we stream you back is the cached output of your module's execution which means essentially that we stream back to you data written in flat files. This gives a major performance boost because in almost all cases, the data will be already for you to consume.
 
-Back processing will  occur in `development` and `production` mode, while the forward processing only occurs in `production` mode.
+Forward parallel execution happens only in `production` mode is always disabled when in `development` mode. Moreover, since we read back data from cache, it means that logs of your modules will never be accessible as we do not store them.
+
+Backward parallel execution still occurs in `development` and `production` mode. The diagram below gives details about when parallel execution happen.
 
 ![parallel processing](../assets/substreams_processing.png)
+
+You can see that in `production` mode, parallel execution happens before the Substreams request range as well as within the requested range. While in `development` mode, we can see that parallel execution happens only before the Substreams request range, so between module's start block and start block of requested range (backward parallel execution only).
 
 ### Library
 

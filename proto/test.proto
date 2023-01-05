@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+// run:
+//   go install -v ./cmd/substreams && substreams dyngrpc
+// then, in another tab, run:
+//   grpcurl -plaintext -proto test.proto -d '{"input": "boo123"}' localhost:7878 sf.mycustomer.v1.Eth.Transfers
+
+package sf.mycustomer.v1;
+
+service Eth {
+  rpc Transfers(Request) returns (stream Response);
+}
+
+message Request {
+  string input = 1;
+}
+
+message Response {
+  string output = 1;
+}

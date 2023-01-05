@@ -9,17 +9,31 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/mattn/go-isatty"
+	"github.com/streamingfast/shutter"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+//go:generate go-enum -f=$GOFILE --nocase --marshal --names
+
+// ENUM(
+//
+//	TUI
+//	JSON
+//	JSONL
+//
+// )
+type OutputMode uint
+
 type TUI struct {
+	shutter *shutter.Shutter
+
 	req               *pbsubstreams.Request
 	pkg               *pbsubstreams.Package
 	outputStreamNames []string
 
 	// Output mode flags
 	isTerminal        bool
-	decorateOutput    bool
+	outputMode        OutputMode
 	prettyPrintOutput bool
 
 	prog          *tea.Program
@@ -32,6 +46,7 @@ type TUI struct {
 
 func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {
 	ui := &TUI{
+		shutter:           shutter.New(),
 		req:               req,
 		pkg:               pkg,
 		outputStreamNames: outputStreamNames,
@@ -48,7 +63,7 @@ func (ui *TUI) Init(outputMode string) error {
 		return err
 	}
 
-	if ui.decorateOutput {
+	if ui.outputMode == OutputModeTUI {
 		ui.ensureTerminalLocked()
 	}
 
@@ -87,24 +102,31 @@ func (ui *TUI) Init(outputMode string) error {
 
 func (ui *TUI) configureOutputMode(outputMode string) error {
 	ui.isTerminal = isatty.IsTerminal(os.Stdout.Fd())
+
 	if outputMode == "" {
 		if ui.isTerminal {
-			outputMode = "ui"
+			ui.outputMode = OutputModeTUI
 		} else {
-			outputMode = "json"
+			ui.outputMode = OutputModeJSON
+		}
+	} else {
+		var err error
+		ui.outputMode, err = ParseOutputMode(outputMode)
+		if err != nil {
+			return fmt.Errorf("parse output mode: %w", err)
 		}
 	}
 
-	switch outputMode {
-	case "ui":
+	switch ui.outputMode {
+	case OutputModeTUI:
 		ui.prettyPrintOutput = true
-		ui.decorateOutput = true
-	case "jsonl":
-	case "json":
+	case OutputModeJSONL:
+	case OutputModeJSON:
 		ui.prettyPrintOutput = true
 	default:
-		return fmt.Errorf("output mode %q invalid, choose from: ui, json, jsonl", outputMode)
+		panic(fmt.Errorf("unhandled output mode %q", ui.outputMode))
 	}
+
 	return nil
 }
 
@@ -114,10 +136,10 @@ func (ui *TUI) Cancel() {
 	}
 	err := ui.prog.ReleaseTerminal()
 	if err != nil {
-		_ = fmt.Errorf("releasing terminal: %w", err)
+		err = fmt.Errorf("releasing terminal: %w", err)
 	}
-	// cancel a context or something we got from upstream, passing the command-line control here.
-	// a Shutter or something
+
+	ui.shutter.Shutdown(err)
 }
 
 func (ui *TUI) filterOutputModules(in []*pbsubstreams.ModuleOutput) (out []*pbsubstreams.ModuleOutput) {
@@ -133,7 +155,7 @@ func (ui *TUI) filterOutputModules(in []*pbsubstreams.ModuleOutput) (out []*pbsu
 func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreams.Response_Data:
-		if ui.decorateOutput {
+		if ui.outputMode == OutputModeTUI {
 			printClock(m.Data)
 		}
 		if m.Data == nil {
@@ -144,7 +166,7 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 			return nil
 		}
 		ui.seenFirstData = true
-		if ui.decorateOutput {
+		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()
 			return ui.decoratedBlockScopedData(outputs, m.Data.Clock)
 		} else {
@@ -154,7 +176,7 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 		if ui.seenFirstData {
 			ui.formatPostDataProgress(m)
 		} else {
-			if ui.decorateOutput {
+			if ui.outputMode == OutputModeTUI {
 				ui.ensureTerminalLocked()
 				for _, module := range m.Progress.Modules {
 					ui.prog.Send(module)
@@ -162,7 +184,7 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 			}
 		}
 	case *pbsubstreams.Response_DebugSnapshotData:
-		if ui.decorateOutput {
+		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()
 			return ui.decoratedSnapshotData(m.DebugSnapshotData)
 		} else {
@@ -170,12 +192,15 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 		}
 
 	case *pbsubstreams.Response_DebugSnapshotComplete:
-		if ui.decorateOutput {
+		if ui.outputMode == OutputModeTUI {
 			fmt.Println("Snapshot data dump complete")
 		}
 
 	case *pbsubstreams.Response_Session:
-		if ui.decorateOutput {
+		if ui.outputMode == OutputModeTUI {
+			ui.ensureTerminalLocked()
+			ui.prog.Send(m)
+		} else {
 			fmt.Printf("TraceID: %s\n", m.Session.TraceId)
 		}
 
@@ -199,6 +224,7 @@ func (ui *TUI) ensureTerminalLocked() {
 	if ui.prog != nil {
 		return
 	}
+
 	ui.prog = tea.NewProgram(newModel(ui))
 	go func() {
 		if err := ui.prog.Start(); err != nil {
@@ -213,4 +239,8 @@ func (ui *TUI) CleanUpTerminal() {
 			fmt.Println("failed releasing terminal:", err)
 		}
 	}
+}
+
+func (ui *TUI) OnTerminated(f func(error)) {
+	ui.shutter.OnTerminated(f)
 }

@@ -30,3 +30,7 @@ func (ui *TUI) send(msg tea.Msg) {
 }
 
 type BlockMessage string
+
+type SessionInitMessage struct {
+	TraceID string
+}

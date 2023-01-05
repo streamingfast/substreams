@@ -108,9 +108,11 @@ You can see that in `production` mode, parallel execution happens before the Sub
 
 ### CLI
 
+- Fixed `Ctrl-C` not working directly when in TUI mode.
+- Added `Trace ID` printing once available.
 - Added command `substreams tools analytics store-stats` to get statistic for a given store.
-- Added `--debug-modules-output` (comma-separated module names) (unavailable in `production` mode)
-* **Breaking** Renamed flag `--initial-snapshots` to `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in `production` mode)
+- Added `--debug-modules-output` (comma-separated module names) (unavailable in `production` mode).
+* **Breaking** Renamed flag `--initial-snapshots` to `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in `production` mode).
 
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
 

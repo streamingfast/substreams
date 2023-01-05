@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"embed"
+
 	"bytes"
 	"fmt"
 	"strings"
@@ -9,32 +11,10 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-var viewTpl = `
-{{- if not .Connected }}Connecting...{{ else -}}
-Connected - Progress messages received: {{ .Updates }} ({{ .UpdatesPerSecond }}/sec)
-{{ with .Request }}Backprocessing history up to requested target block {{ $.BackprocessingCompleteAtBlock }}:{{- end}}
-(hit 'm' to switch mode)
-{{ range $key, $value := .Modules }}
-{{ if $.BarMode }}
-  {{- pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ barmode $value $ }}
-{{- else }}
-  {{- pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
-{{ end }}
-{{- end -}}
-{{ end }}
-{{ if .Failures }}
-Failures: {{ .Failures }}.
-Last failure:
-  Reason: {{ .LastFailure.Reason }}
-  Logs:
-{{ range .LastFailure.Logs }}
-    {{ . }}
-{{ end }}
-{{- with .LastFailure.LogsTruncated }}  <logs truncated>{{ end }}
-{{ end -}}
-`
+//go:embed *.txt.gotmpl
+var viewTplFS embed.FS
 
-var tpl = template.Must(template.New("tpl").Funcs(template.FuncMap{
+var tpl = template.Must(template.New("main_view.txt.gotmpl").Funcs(template.FuncMap{
 	"pad": func(max int, in string) string {
 		l := len(in)
 		if l > max {
@@ -55,7 +35,7 @@ var tpl = template.Must(template.New("tpl").Funcs(template.FuncMap{
 	"barmode": func(in ranges, m model) string {
 		return barmode(in, m.BackprocessingCompleteAtBlock, m.BarSize)
 	},
-}).Parse(viewTpl))
+}).ParseFS(viewTplFS, "*.txt.gotmpl"))
 
 // ▓▒░
 

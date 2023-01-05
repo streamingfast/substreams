@@ -18,6 +18,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case Connected:
 		m.Connected = true
 	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		if msg.Width < 45 {
@@ -29,8 +30,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
-			fmt.Println("Interrupting UI, hit Ctrl+C to kill...")
 			m.ui.Cancel()
+			fmt.Println("Interrupted UI")
 			return m, tea.Quit
 		}
 		switch msg.String() {
@@ -47,6 +48,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// `barmode` which is effective only when no cursor has been passed yet.
 		m.BackprocessingCompleteAtBlock = uint64(m.Request.StartBlockNum)
 		return m, nil
+	case *pbsubstreams.Response_Session:
+		m.TraceID = msg.Session.TraceId
+
 	case *pbsubstreams.ModuleProgress:
 		m.Updates += 1
 		thisSec := time.Now().Unix()

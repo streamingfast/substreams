@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -119,11 +120,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 	defer ui.CleanUpTerminal()
 
+	streamCtx, cancel := context.WithCancel(ctx)
+	ui.OnTerminated(func(err error) {
+		if err != nil {
+			fmt.Printf("UI terminated with error %q\n", err)
+		}
+
+		cancel()
+	})
+	defer cancel()
+
 	ui.SetRequest(req)
 	ui.Connecting()
 	callOpts = append(callOpts, grpc.WaitForReady(false))
-	cli, err := ssClient.Blocks(ctx, req, callOpts...)
-	if err != nil {
+	cli, err := ssClient.Blocks(streamCtx, req, callOpts...)
+	if err != nil && streamCtx.Err() != context.Canceled {
 		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
 	}
 	ui.Connected()
@@ -141,6 +152,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 				fmt.Println("all done")
 				return nil
 			}
+
+			// Special handling if interrupted the context ourself, no error
+			if streamCtx.Err() == context.Canceled {
+				ui.Cancel()
+				return nil
+			}
+
 			return err
 		}
 	}

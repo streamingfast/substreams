@@ -30,4 +30,6 @@ type model struct {
 	Failures    int
 	LastFailure *pbsubstreams.ModuleProgress_Failed
 	Reason      string
+
+	TraceID string
 }

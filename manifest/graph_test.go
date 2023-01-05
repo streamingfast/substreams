@@ -78,7 +78,7 @@ func TestModuleGraph_ModulesDownTo(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	mods, err := g.ModulesDownTo([]string{"G"})
+	mods, err := g.ModulesDownTo("G")
 	assert.NoError(t, err)
 
 	var res []string
@@ -95,7 +95,7 @@ func TestModuleGraph_StoresDownTo(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	mods, err := g.StoresDownTo([]string{"G"})
+	mods, err := g.StoresDownTo("G")
 	assert.NoError(t, err)
 
 	var res []string

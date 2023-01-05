@@ -21,8 +21,6 @@ type Plan struct {
 	// ModulesStateMap
 	ModulesStateMap storage.ModuleStorageStateMap
 
-	outputGraph *outputmodules.Graph
-
 	upToBlock uint64
 
 	waitingJobs []*Job
@@ -40,10 +38,9 @@ func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStat
 		ModulesStateMap: modulesStateMap,
 		upToBlock:       upToBlock,
 		logger:          logger,
-		outputGraph:     outputGraph,
 	}
 
-	if err := plan.splitWorkIntoJobs(subrequestSplitSize); err != nil {
+	if err := plan.splitWorkIntoJobs(subrequestSplitSize, outputGraph.SchedulableModuleNames(), outputGraph.AncestorsFrom); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
 
@@ -54,16 +51,16 @@ func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStat
 	return plan, nil
 }
 
-func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64) error {
+func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, schedulableModules []string, ancestorsFrom func(string) []string) error {
 	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
-	for _, storeName := range p.outputGraph.SchedulableModuleNames() {
+	for _, storeName := range schedulableModules {
 		modState := p.ModulesStateMap[storeName]
 		if modState == nil {
 			continue
 		}
 		requests := modState.BatchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
-			requiredModules := p.outputGraph.AncestorsFrom(storeName)
+			requiredModules := ancestorsFrom(storeName)
 
 			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
 			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)

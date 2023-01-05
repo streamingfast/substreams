@@ -12,11 +12,11 @@ How to respect Sink's expected output's type with examples for JSON (maybe CSV))
 
 ## Clone and install `substreams-sink-files`
 
-1. Visit the official `substreams-sink-files` Github repository and clone the project to acquire the required tools and code.
+1. Visit the official `substreams-sink-files` GitHub repository and clone the project to acquire the required tools and code.
 
-2. Launch a shell session and naviate into the `devel` directory. Start the `substreams-sink-files` installation process by using the `./substreams-sink-files` command.
+2. Launch a shell session and navigate into the `devel` directory. Start the `substreams-sink-files` installation process by using the `./substreams-sink-files` command.
 
-3. Check the installation to make sure the isntallation is working properly by using the `substreams-sink-files -v` command. A message is printed to the shell session displaying the version of the application that was installed.
+3. Check the installation to make sure the installation is working properly by using the `substreams-sink-files -v` command. A message is printed to the shell session displaying the version of the application that was installed.
 
 ```bash
 substreams-sink-files version dev
@@ -73,6 +73,19 @@ The steps should be something like:
 - Download/acquire SF tool for sinking to files (how does this work exactly?)
 - Create protobuf for sink tool? (is this required for files sinks?)
 - Run and test sink tool (need commands, etc., they aren't provided anywhere)
+
+I found the map_json_transfers mapper in the substreams-eth-token-transfers project that uses the eth.filesink.v1.rs and eth.token.transfers.v1.rs protobufs. Do we want to convolute this documentation with Transfers? That feels like a lot of code that will obfuscate what we're attempting to explain, which is sinking to files. Wouldn't it be adequate to simply identify and extract information from the Block for whatever chain we use for the code example?
+
+I found the following embedded in the start.sh in the /devel/sink-local of the substreams-sink-files repo. It appears that this is the command we'll need to use to run the sink to files. Is that correct? (Obviously changing values, etc. for our code.)
+
+exec $sink run \
+    "--encoder=lines" \
+    "--state-store=$output_dir/working/state.yaml" \
+ "${SUBSTREAMS_ENDPOINT:-"mainnet.eth.streamingfast.io:443"}" \
+    "gs://staging.dfuseio-global.appspot.com/substreams/eth-token-transfers/spkg/substreams-v0.3.0.spkg" \
+    "${SUBSTREAMS_MODULE:-"map_json_transfers"}" \
+ "$output_dir/out" \
+    "$@"
 
 NOTES:
 

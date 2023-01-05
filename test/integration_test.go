@@ -63,72 +63,121 @@ func TestForkSituation(t *testing.T) { // todo: change test name
 	require.NoError(t, run.Run(t))
 }
 
-func TestProductionMode_simple(t *testing.T) {
-	run := newTestRun(1, 10, 15, "assert_test_store_add_i64")
-	run.ProductionMode = true
-	run.ParallelSubrequests = 1
+func TestOneStoreOneMap(t *testing.T) {
+	tests := []struct {
+		name        string
+		startBlock  int64
+		linearBlock uint64
+		stopBlock   uint64
+		production  bool
+		expectCount int
+		expectFiles []string
+	}{
+		{
+			name:        "dev_mode_backprocess",
+			startBlock:  25,
+			linearBlock: 25,
+			stopBlock:   29,
+			production:  false,
+			expectCount: 4,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+			},
+		},
+		{
+			name:        "dev_mode_backprocess_then_save_state",
+			startBlock:  25,
+			linearBlock: 25,
+			stopBlock:   32,
+			production:  false,
+			expectCount: 7,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"states/0000000030-0000000001.kv",
+			},
+		},
+		{
+			name:        "prod_mode_back_forward_to_lib",
+			startBlock:  25,
+			linearBlock: 27,
+			stopBlock:   29,
+			production:  true,
+			expectCount: 4,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"outputs/0000000020-0000000027.output",
+			},
+		},
+		{
+			name:        "prod_mode_back_forward_to_stop",
+			startBlock:  25,
+			linearBlock: 29,
+			stopBlock:   29,
+			production:  true,
+			expectCount: 4,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"outputs/0000000020-0000000029.output",
+			},
+		},
+		{
+			name:        "prod_mode_back_forward_to_stop_passed_boundary",
+			startBlock:  25,
+			linearBlock: 38,
+			stopBlock:   38,
+			production:  true,
+			expectCount: 13,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"states/0000000030-0000000001.kv",
+				"outputs/0000000020-0000000030.output",
+				"outputs/0000000030-0000000038.output",
+			},
+		},
+		{
+			name:        "prod_mode_start_before_linear_and_firstboundary",
+			startBlock:  7,
+			linearBlock: 8,
+			stopBlock:   9,
+			production:  true,
+			expectCount: 2,
+			expectFiles: []string{
+				"outputs/0000000001-0000000008.output",
+			},
+		},
+		{
+			name:        "prod_mode_start_before_linear_then_pass_firstboundary",
+			startBlock:  7,
+			linearBlock: 8,
+			stopBlock:   15,
+			production:  true,
+			expectCount: 8,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"outputs/0000000001-0000000008.output",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 
-	require.NoError(t, run.Run(t))
+			run := newTestRun(test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64")
+			run.ProductionMode = test.production
+			run.ParallelSubrequests = 5
+			require.NoError(t, run.Run(t))
 
-	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 14, strings.Count(mapOutput, "\n"))
-	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
-}
+			mapOutput := run.MapOutput("assert_test_store_add_i64")
+			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 
-func TestProductionMode_StartBlock_Before_LinearHandoffBlock(t *testing.T) {
-	run := newTestRun(20, 28, 33, "assert_test_store_add_i64")
-	run.ProductionMode = true
-	run.ParallelSubrequests = 5
-
-	require.NoError(t, run.Run(t))
-
-	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 13, strings.Count(mapOutput, "\n"))
-	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
-	assert.Regexp(t, "20:", mapOutput)
-	assert.Regexp(t, "32:", mapOutput)
-	assertFiles(t, run.TempDir,
-		"outputs/0000000020-0000000028.output",
-		"states/0000000010-0000000001.kv",
-		"states/0000000020-0000000001.kv",
-		"states/0000000030-0000000001.kv",
-	)
-}
-
-func TestProductionMode_StartBlock_Same_LinearHandoffBlock(t *testing.T) {
-	run := newTestRun(10, 10, 15, "assert_test_store_add_i64")
-	run.ProductionMode = true
-	run.ParallelSubrequests = 1
-
-	require.NoError(t, run.Run(t))
-
-	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 5, strings.Count(mapOutput, "\n"))
-	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
-}
-
-func TestProductionMode_StartBlock_Before_LinearBlock_And_FirstBoundary(t *testing.T) {
-	run := newTestRun(7, 8, 10, "assert_test_store_add_i64")
-	run.ProductionMode = true
-	run.ParallelSubrequests = 1
-
-	require.NoError(t, run.Run(t))
-
-	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 3, strings.Count(mapOutput, "\n"))
-	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
-}
-
-func TestProductionMode_close_after_boundary(t *testing.T) {
-	run := newTestRun(10, 11, 20, "assert_test_store_add_i64")
-	run.ProductionMode = true
-	run.ParallelSubrequests = 5
-
-	require.NoError(t, run.Run(t))
-
-	mapOutput := run.MapOutput("assert_test_store_add_i64")
-	assert.Equal(t, 10, strings.Count(mapOutput, "\n"))
-	assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
+			assert.Equal(t, test.expectCount, strings.Count(mapOutput, "\n"))
+			assertFiles(t, run.TempDir, test.expectFiles...)
+		})
+	}
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
@@ -154,9 +203,7 @@ func TestAllAssertions(t *testing.T) {
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	t.Skip("Skipping until we can figure out why this is failing")
-
-	run := newTestRun(10000, 10001, 10001, "test_store_proto")
+	run := newTestRun(10000, 10001, 10001, "test_map")
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,

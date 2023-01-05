@@ -56,7 +56,7 @@ func BuildParallelProcessor(
 	}
 
 	// In Dev mode
-	// * The linearHandoff will be set to the startblock (never equal to stopBlock)
+	// * The linearHandoff will be set to the startblock (never equal to stopBlock, which is exclusive)
 	// * We will generate stores up to the linearHandoff, even if we end with an incomplete store
 	//
 	// In Prod mode

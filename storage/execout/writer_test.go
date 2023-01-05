@@ -1,7 +1,6 @@
 package execout
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/test-go/testify/assert"
@@ -24,21 +23,13 @@ var testConfigs = &Configs{
 }
 
 func TestNewExecOutputWriterNotSubrequest(t *testing.T) {
-	res := NewWriter(11, 15, mkmap("A"), testConfigs, false)
+	res := NewWriter(11, 15, "A", testConfigs, false)
 	require.NotNil(t, res)
 	assert.Equal(t, 20, int(res.files["A"].ExclusiveEndBlock))
 }
 
 func TestNewExecOutputWriterIsSubRequest(t *testing.T) {
-	res := NewWriter(11, 15, mkmap("A"), testConfigs, true)
+	res := NewWriter(11, 15, "A", testConfigs, true)
 	require.NotNil(t, res)
 	assert.Equal(t, 15, int(res.files["A"].ExclusiveEndBlock))
-}
-
-func mkmap(in string) map[string]bool {
-	out := map[string]bool{}
-	for _, el := range strings.Split(in, ",") {
-		out[el] = true
-	}
-	return out
 }

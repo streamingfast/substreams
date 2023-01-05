@@ -257,7 +257,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		execOutWriter = execout.NewWriter(
 			requestDetails.LinearHandoffBlockNum,
 			requestDetails.StopBlockNum,
-			map[string]bool{outputModule.Name: true},
+			outputModule.Name,
 			execOutputConfigs,
 			isSubRequest,
 		)

@@ -4,6 +4,10 @@ description: StreamingFast Substreams sink files
 
 # `substreams-sink-files` overview
 
+Substreams sinks provide the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions including BigQuery, Clickhouse, custom scripts and other related data storea and processing tools accepting a file-format. For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
+
+After a sink has been created and starts running, an automated ingestion task can be setup to have BigQuery, or another files-based storage solution, ingest the data. As an example, a user could use substreams-sink-files to sink data in `jsonl` format to a Google Cloud Storage (GCS) bucket and configure a BigQuery Transfer job to run every 15 minutes. This job would then ingest any new files found in the GCS bucket where the data was written.
+
 Overview (bundling N blocks together, line by line to file, entities are extracted and formatted by the Substreams itself any line by line text format supported, work in progress for binary format like Avro, Parquet, etc.)
 
 ## Prepare your Substreams

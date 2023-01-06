@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package sf.substreams.v1;
+
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
 
 import "google/protobuf/any.proto";

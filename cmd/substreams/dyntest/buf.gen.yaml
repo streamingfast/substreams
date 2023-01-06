@@ -1,0 +1,4 @@
+version: v1
+plugins:
+  - name: prost
+    out: src/pb

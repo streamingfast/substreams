@@ -555,6 +555,10 @@ github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQD
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
+github.com/second-state/WasmEdge-go v0.11.2 h1:4RZhxKvay9uBM9uzE0jrB/26t1ncQG3LbNQOooKjrHA=
+github.com/second-state/WasmEdge-go v0.11.2/go.mod h1:HyBf9hVj1sRAjklsjc1Yvs9b5RcmthPG9z99dY78TKg=
+github.com/second-state/wasmedge-bindgen v0.4.1 h1:N1OPuonO4P0rfHym2iOT4l/kCopSSDmjyuxHkSr4WsU=
+github.com/second-state/wasmedge-bindgen v0.4.1/go.mod h1:2dJ3iNlgMK+EBanG7PbEMCPGBMO/i85VdfLfPXllF9g=
 github.com/sethvargo/go-retry v0.1.0/go.mod h1:JzIOdZqQDNpPkQDmcqgtteAcxFLtYpNF/zJCM1ysDg8=
 github.com/sethvargo/go-retry v0.2.3 h1:oYlgvIvsju3jNbottWABtbnoLC+GDtLdBHxKWxQm/iU=
 github.com/sethvargo/go-retry v0.2.3/go.mod h1:1afjQuvh7s4gflMObvjLPaWgluLLyhA1wmVZ6KLpICw=

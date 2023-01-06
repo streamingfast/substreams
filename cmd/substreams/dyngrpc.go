@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
+	"github.com/second-state/WasmEdge-go/wasmedge"
+	bindgen "github.com/second-state/wasmedge-bindgen/host/go"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dgrpc/server/standard"
@@ -38,7 +42,7 @@ func runDyn(cmd *cobra.Command, args []string) error {
 		Streams: []grpc.StreamDesc{
 			{
 				StreamName:    "Transfers",
-				Handler:       genericService.New("Transfers").handle,
+				Handler:       genericService.New("sf.mycustomer.v1.Eth.Transfers").handle,
 				ServerStreams: true,
 			},
 		},
@@ -54,11 +58,15 @@ func runDyn(cmd *cobra.Command, args []string) error {
 type GenericService struct{}
 
 type GenericHandler struct {
-	streamName string
+	exportName string
 }
 
 func (s *GenericService) New(streamName string) *GenericHandler {
-	return &GenericHandler{streamName: streamName}
+	exportName := strings.Replace(streamName, ".", "_", -1)
+	exportName = strings.Replace(exportName, "/", "_", -1)
+	exportName = strings.ToLower(exportName)
+	// TODO: do validation that there are only letters and digits left
+	return &GenericHandler{exportName: exportName}
 }
 func (h *GenericHandler) handle(server interface{}, stream grpc.ServerStream) error {
 	m := NewPassthroughBytes()
@@ -66,12 +74,42 @@ func (h *GenericHandler) handle(server interface{}, stream grpc.ServerStream) er
 		return err
 	}
 
+	// See: https://github.com/second-state/WasmEdge-go-examples/blob/master/wasmedge-bindgen/go_BindgenFuncs/bindgen_funcs.go
+	wasmedge.SetLogErrorLevel()
+	conf := wasmedge.NewConfigure(wasmedge.WASI)
+	vm := wasmedge.NewVMWithConfig(conf)
+	wasi := vm.GetImportModule(wasmedge.WASI)
+	wasi.InitWasi(
+		os.Args[1:],     // The args
+		os.Environ(),    // The envs
+		[]string{".:."}, // The mapping preopens
+	)
+	if err := vm.LoadWasmFile("./cmd/substreams/dyntest/eth_xfer.wasm"); err != nil {
+		return fmt.Errorf("load wasm: %w", err)
+	}
+	if err := vm.Validate(); err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
+
+	fmt.Println("PAPA")
+	bg := bindgen.New(vm)
+	bg.Instantiate()
+
+	fmt.Println("MAMA")
 	// TODO: invoke the WASM machine, using `h.streamName`,
 	// take the return value
 	// and pipe it back to the `stream.SendMsg()` as Bytes, as a PassthroughBytes
 	// object.
+	res, _, err := bg.Execute(h.exportName, m.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed executing bindgen func %q: %w", h.exportName, err)
+	}
+	out := NewPassthroughBytes()
+	out.Set(res[0].([]byte))
 
-	stream.SendMsg(m)
+	if err := stream.SendMsg(out); err != nil {
+		return fmt.Errorf("send msg: %w", err)
+	}
 	return nil
 }
 

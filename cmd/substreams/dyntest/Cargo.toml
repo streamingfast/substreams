@@ -1,0 +1,17 @@
+[package]
+name = "eth-transfers-grpc-service"
+version = "0.1.0"
+authors = ["StreamingFast"]
+edition = "2018"
+
+[lib]
+name = "eth_xfer"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+num-integer = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wasmedge-bindgen = "0.4.1"
+wasmedge-bindgen-macro = "0.4.1"

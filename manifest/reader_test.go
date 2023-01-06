@@ -45,7 +45,7 @@ func TestReader_Read(t *testing.T) {
 			args{},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(),
+				ProtoFiles: readSystemProtoDescriptors(t),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -61,7 +61,7 @@ func TestReader_Read(t *testing.T) {
 			args{},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(),
+				ProtoFiles: readSystemProtoDescriptors(t),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -81,7 +81,7 @@ func TestReader_Read(t *testing.T) {
 			args{validateBinary: true},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(),
+				ProtoFiles: readSystemProtoDescriptors(t),
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
 						Name:    "test",
@@ -109,7 +109,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(),
+				ProtoFiles: readSystemProtoDescriptors(t),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -134,7 +134,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			&pbsubstreams.Package{
 				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(),
+				ProtoFiles: readSystemProtoDescriptors(t),
 				Modules:    &pbsubstreams.Modules{},
 				PackageMeta: []*pbsubstreams.PackageMetadata{
 					{
@@ -158,7 +158,7 @@ func TestReader_Read(t *testing.T) {
 			args{},
 			&pbsubstreams.Package{
 				Version: 1,
-				ProtoFiles: withSystemProtoDefs(
+				ProtoFiles: withSystemProtoDefs(t,
 					readProtoDescriptor(t, "./testdata", "./proto1/sf/substreams/test1.proto"),
 				),
 				Modules: &pbsubstreams.Modules{},
@@ -176,7 +176,7 @@ func TestReader_Read(t *testing.T) {
 			args{},
 			&pbsubstreams.Package{
 				Version: 1,
-				ProtoFiles: withSystemProtoDefs(
+				ProtoFiles: withSystemProtoDefs(t,
 					readProtoDescriptor(t, "testdata/proto1", "sf/substreams/test1.proto"),
 				),
 				Modules: &pbsubstreams.Modules{},
@@ -199,7 +199,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			&pbsubstreams.Package{
 				Version: 1,
-				ProtoFiles: withSystemProtoDefs(
+				ProtoFiles: withSystemProtoDefs(t,
 					readProtoDescriptor(t, "testdata/proto1", "sf/substreams/test1.proto"),
 					readProtoDescriptor(t, "testdata/proto2", "sf/substreams/test2.proto"),
 				),
@@ -289,16 +289,19 @@ func readProtoDescriptor(t *testing.T, importPath string, file string) (out *des
 	return customFiles[0].AsFileDescriptorProto()
 }
 
-func withSystemProtoDefs(additionalProto ...*descriptorpb.FileDescriptorProto) (out []*descriptorpb.FileDescriptorProto) {
-	out = readSystemProtoDescriptors()
+func withSystemProtoDefs(t *testing.T, additionalProto ...*descriptorpb.FileDescriptorProto) (out []*descriptorpb.FileDescriptorProto) {
+	t.Helper()
+
+	out = readSystemProtoDescriptors(t)
 	out = append(out, additionalProto...)
 	return
 }
 
-func readSystemProtoDescriptors() (out []*descriptorpb.FileDescriptorProto) {
+func readSystemProtoDescriptors(t *testing.T) (out []*descriptorpb.FileDescriptorProto) {
+	t.Helper()
+
 	systemProtoFiles, err := readSystemProtobufs()
-	if err != nil {
-		panic("bob dylan is great")
-	}
+	require.NoError(t, err)
+
 	return systemProtoFiles.File
 }

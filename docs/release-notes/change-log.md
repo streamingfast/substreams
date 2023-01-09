@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.1.0](https://github.com/streamingfast/substreams/releases/tag/v0.1.0)
 
 This upcoming release is going to bring significant changes on how Substreams are developed, consumed and speed of execution. Note that there is **no** breaking changes related to your Substreams' Rust code, only breaking changes will be about how Substreams are run and available features/flags.
 
@@ -17,6 +17,9 @@ Here the highlights of elements that will change in next release:
 - [Enhanced Parallel Execution](#enhanced-parallel-execution)
 
 In this rest of this post, we are going to go through each of them in greater details and the implications they have for you. Full changelog is available after.
+
+> **Warning** Operators, refer to [Operators Notes](#operators-notes) section for specific instructions of deploying this new version.
+
 ### Production vs development mode
 
 We introduce an execution mode when running Substreams, either `production` mode or `development` mode. The execution mode impacts how the Substreams get executed, specifically:
@@ -100,6 +103,10 @@ Backward parallel execution still occurs in `development` and `production` mode.
 ![parallel processing](../assets/substreams_processing.png)
 
 You can see that in `production` mode, parallel execution happens before the Substreams request range as well as within the requested range. While in `development` mode, we can see that parallel execution happens only before the Substreams request range, so between module's start block and start block of requested range (backward parallel execution only).
+
+### Operators Notes
+
+The state output format for `map` and `store` modules has changed internally to be more compact in Protobuf format. When deploying this new version, previous existing state files should be deleted or deployment updated to point to a new store location. The state output store is defined by the flag `--substreams-state-store-url` flag parameter on chain specific binary (i.e. `fireeth`).
 
 ### Library
 

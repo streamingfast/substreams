@@ -6,9 +6,9 @@ description: StreamingFast Substreams sink files
 
 ### Overview
 
-Substreams sinks provide the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions. A few available options include BigQuery, Clickhouse, custom scripts and other related data storage and processing tools accepting a file format. For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
+Substreams sinks provide the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions. A few available options include [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-After a sink has been created and starts running, an automated ingestion task can be setup to have BigQuery, or another files-based storage solution, ingest the data. As an example, a user could use substreams-sink-files to sink data in `jsonl` format to a Google Cloud Storage (GCS) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job would then ingest any new files found in the GCS bucket where the data was written.
+After a sink has been created and starts running, an automated ingestion task can be setup to have BigQuery, or another files-based storage solution, ingest the data. As an example, a user could use `substreams-sink-files` to sink data in `jsonl` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data was written.
 
 ### Accompanying code example
 
@@ -194,6 +194,8 @@ The sink tool will produce output resembling the following for and properly conf
 
 ## Conclusion and review
 
+**NOTE**: Provide a breif recap of the purpose of the sink tool, what's required to use it, where to get the tool and example, how to run the tool and example and any gotchas or tips and tricks.
+
 ## Getting help
 
 To get help with `substreams-sink-files` at any time, use the `substreams-sink-files -h` command. This will print helpful information about the application to the shell session.
@@ -227,5 +229,14 @@ Use "substreams-sink-files [command] --help" for more information about a comman
 
 **NOTE**: There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.
 
-**NOTE**: Add discussion about s3, gcs, etc. vs. local files
 **NOTE**: Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file)
+
+**NOTE**: Add discussion about s3, gcs, etc. vs. local files
+
+**NOTE**: Also, quickly describe that the actual output directory can be:
+
+A local folder
+A Google Cloud Storage Bucket (gs://<bucket>/<path>)
+An S3 compatible Bucket (s3://<bucket>/<path>)
+An Azure bucket (az://<bucket>/<path>)
+Configuration details for those could be seen at https://github.com/streamingfast/dstore#features

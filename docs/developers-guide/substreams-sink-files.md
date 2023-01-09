@@ -68,7 +68,7 @@ git clone TODO_INSERT_REPO_LINK_WHEN_AVAILABLE
 
 It's a good idea to run the example code using your installation of the `substreams` CLI to make sure everything is set up and working properly.
 
-Verify the setup for the example project by using `make build`, `make codegen` and `substreams run` commands.
+Verify the setup for the example project by using the `make build`, `make codegen` and `substreams run` commands.
 
 ### Build the example project
 
@@ -78,7 +78,7 @@ First, build the Substreams module by using the included `make` command.
 make
 ```
 
-# Generate the required code for the example
+### Generate the required code for the example
 
 Next, run the included `make codegen` command to create the required protobuf files.
 

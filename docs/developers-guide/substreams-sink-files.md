@@ -8,7 +8,7 @@ description: StreamingFast Substreams sink files
 
 Substreams sinks provide the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions. A few available options include [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-After a sink has been created and starts running, an automated ingestion task can be setup to have BigQuery, or another files-based storage solution, ingest the data. As an example, a user could use `substreams-sink-files` to sink data in `jsonl` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data was written.
+After a sink has been created and starts running, an automated ingestion task can be setup to have BigQuery, or another files-based storage solution, ingest the data. As an example, you could use `substreams-sink-files` to sink data in `jsonl` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data was written.
 
 ### Accompanying code example
 
@@ -137,6 +137,8 @@ fn map_eth_block_for_sink(block: eth::Block) -> Result<Lines, substreams::errors
 ```
 
 The module handler uses `JSONL` for the output type. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
+
+**NOTE**: <i>We just need to emphasis in the tutorial that it's an example and that a lot of "rows" can be extracted per block. Giving the ERC20/ERC721/ERC1155 examples is a good idea as we coded it: https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24</i>
 
 ### Example manifest
 

@@ -68,11 +68,15 @@ It's a good idea to run the example code using your installation of the `substre
 
 Verify the setup for the example project by using `make build`, `make codegen` and `substreams run` commands.
 
+### Build the example project
+
 First, build the Substreams module by using the included `make` command.
 
 ```bash
 make
 ```
+
+# Generate the required code for the example
 
 Next, run the included `make codegen` command to create the required protobuf files.
 
@@ -80,11 +84,15 @@ Next, run the included `make codegen` command to create the required protobuf fi
 make codegen
 ```
 
+### Run the example
+
 Last, run the project by using the `substreams run` command.
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams-filesink-tutorial.yaml map_eth_block_for_sink --start-block 1000000 --stop-block +1
 ```
+
+### Results of example
 
 The `substreams run` command will result in output resembling the following:
 
@@ -106,6 +114,8 @@ The `substreams run` command will result in output resembling the following:
 
 Take a moment to review the various files in the accompanying Substreams project. Two important files to review include the Substreams manifest and the [`lib.rs`](#) Rust source code file that contains the module handlers for the file sink example.
 
+### Example module handler
+
 The example code in the [`lib.rs`](#) Rust source code file contains the `map_eth_block_for_sink` module handler responsible for extracting the blockchain data and passing it to the `substreams.sink.files.v1` protobuf for the sink tool and its process.
 
 ```rust
@@ -125,6 +135,10 @@ fn map_eth_block_for_sink(block: eth::Block) -> Result<Lines, substreams::errors
     })
 }
 ```
+
+The module handler uses `JSONL` for the output type. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
+
+### Example manifest
 
 The Substreams manifest for the accompanying project sets up the required `substreams-sink-files-v0.1.0.spkg`, `substreams.sink.files.v1.Lines` and `sf.ethereum.type.v2.Block` protobufs and reference to the `map_eth_block_for_sink` module handler.
 
@@ -162,9 +176,7 @@ modules:
 
 ### Run and configure `substreams-sink-files` tool
 
-**TODO:** <i>(launching, flags, output, inspect, results)</i>
-
-The command to start and run the sink tool for the accompanying Substreams project will resemble:
+The command to start and run the `substreams-sink-files` tool for the accompanying Substreams project will resemble:
 
 {% code overflow="wrap" %}
 
@@ -174,9 +186,17 @@ substreams-sink-files run --encoder=lines --state-store=./localdata/working/stat
 
 {% endcode %}
 
+**TODO:**
+<i>
+
+- flags (what are the available flags? dig them out of the source code?)
+- output (how to show the directories and files that get produced)
+- inspect (need input for this, not sure what it is)
+  </i>
+
 ## Verify output from tool
 
-The sink tool will produce output resembling the following for and properly configured and working environment and project.
+The sink tool will produce output resembling the following for a properly configured and working environment and project.
 
 ```bash
 2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) starting prometheus metrics server {"listen_addr": "localhost:9102"}

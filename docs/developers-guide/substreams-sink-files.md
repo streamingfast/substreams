@@ -114,7 +114,7 @@ The `substreams run` command will result in output resembling the following:
 
 ## Code walkthrough
 
-Take a moment to review the various files in the accompanying Substreams project. Two important files to review include the Substreams manifest and the [`lib.rs`](#) Rust source code file that contains the module handlers for the file sink example.
+Take a moment to review the various files in the accompanying Substreams project. Two important files to review include the [Substreams manifest](#) and the [`lib.rs`](#) Rust source code file that contains the module handlers for the file sink example.
 
 ### Example module handler
 

@@ -35,7 +35,7 @@ https://github.com/streamingfast/substreams-sink-files/releases
 
 ### Verify installation
 
-Checking the version of substreams-sink-files will produce a message similar to:
+Checking the version of `substreams-sink-files` will produce a message similar to:
 
 ```bash
 substreams-sink-files version dev
@@ -86,7 +86,7 @@ Last, run the project by using the `substreams run` command.
 substreams run -e mainnet.eth.streamingfast.io:443 substreams-filesink-tutorial.yaml map_eth_block_for_sink --start-block 1000000 --stop-block +1
 ```
 
-The `substreams run` command will output results resembling the following:
+The `substreams run` command will result in output resembling the following:
 
 ```bash
 ----------- NEW BLOCK #1,000,000 (1000000) ---------------

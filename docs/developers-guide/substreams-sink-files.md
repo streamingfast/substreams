@@ -118,7 +118,7 @@ Take a moment to review the various files in the accompanying Substreams project
 
 ### Example module handler
 
-The example code in the [`lib.rs`](#) Rust source code file contains the `map_eth_block_for_sink` module handler responsible for extracting the blockchain data and passing it to the `substreams.sink.files.v1` protobuf for the sink tool and its process.
+The example code in the [`lib.rs`](#) Rust source code file contains the `map_eth_block_for_sink` module handler responsible for extracting the blockchain data. The module handler is responsible for passing the data to the `substreams.sink.files.v1` protobuf for the sink tool and its processes.
 
 ```rust
 #[substreams::handlers::map]

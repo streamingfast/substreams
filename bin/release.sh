@@ -100,25 +100,6 @@ verify_keybase() {
   fi
 }
 
-maybe_wait_publish() {
-  if [[ "$force" == "true" ]]; then
-    # We must wait a bit in-between publish lettin enough time for the crates.io registry to
-    # correctly records the newly published crate.
-    #
-    # Without this wait time, the second publish can hit `no matching package named ...` errors
-    # because the dependent crate is not "seen" by the registry yet.
-    #
-    #   Verifying substreams v0.0.8-beta (/Users/maoueh/work/sf/substreams/rust/substreams)
-    #   error: failed to verify package tarball
-    #
-    #   Caused by:
-    #     no matching package named `substreams-macro` found
-    #     location searched: registry `crates-io`
-    #     required by package `substreams v0.0.8-beta (/Users/maoueh/work/sf/substreams/target/package/substreams-0.0.8-beta)`
-    sleep 10
-  fi
-}
-
 usage_error() {
   message="$1"
   exit_code="$2"

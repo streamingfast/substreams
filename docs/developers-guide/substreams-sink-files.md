@@ -6,9 +6,11 @@ description: StreamingFast Substreams sink files
 
 ### Overview
 
-Substreams sinks provide the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions. A few available options include [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
+The `substreams-sink-files` tool provides the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions. A few available options include [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-After a sink has been created and starts running, an automated ingestion task can be setup to have BigQuery, or another files-based storage solution, ingest the data. As an example, you could use `substreams-sink-files` to sink data in `jsonl` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data was written.
+Substreams modules are created and prepared for the sink tool. After the sink tool us rurnning, automated ingestion tasks can be setup to have BigQuery, or other files-based storage solution, ingest the data.
+
+As an example, you could use `substreams-sink-files` to sink data in `jsonl` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data was written.
 
 ### Accompanying code example
 

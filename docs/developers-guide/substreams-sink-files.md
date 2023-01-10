@@ -45,7 +45,7 @@ Clone the `substreams-sink-files` repository to obtain the files required to wor
 git clone https://github.com/streamingfast/substreams-sink-files.git substreams-sink-files-tutorial
 ```
 
-**<i>NOTE: I'm still not clear on how we want them to install substreams-sink-files. Please advise.</i>**
+**<i>TODO: I'm still not clear on how we want them to install substreams-sink-files. Please advise.</i>**
 
 Checking the version of `substreams-sink-files` will produce a message similar to:
 
@@ -63,7 +63,7 @@ export GOPATH=$HOME/go
 
 The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository that you previously cloned. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
 
-**<i>NOTE: Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.</i>**
+**<i>TODO: Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.</i>**
 
 Run the included `make codegen` command to create the required protobuf files.
 
@@ -129,7 +129,7 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 
 The module handler uses `JSONL` for the output type. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
-**NOTE**: <i>We just need to emphasis in the tutorial that it's an example and that a lot of "rows" can be extracted per block. Giving the ERC20/ERC721/ERC1155 examples is a good idea as we coded it: https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24</i>
+**TODO**: <i>We just need to emphasis in the tutorial that it's an example and that a lot of "rows" can be extracted per block. Giving the ERC20/ERC721/ERC1155 examples is a good idea as we coded it: https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24</i>
 
 **TODO:** <i>How to respect Sink's expected output's type with examples for JSON (maybe CSV))</i>
 
@@ -213,11 +213,11 @@ You have to ensure the sinking strategy has been defined, the appropriate file t
 
 **-- DEV NOTES --**
 
-**NOTE**: There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.
+**TODO**: There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.
 
-**NOTE**: Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file)
+**TODO**: Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file)
 
-**NOTE**: Add discussion about s3, gcs, etc. vs. local files
+**TODO**: Add discussion about s3, gcs, etc. vs. local files
 
 A local folder
 A Google Cloud Storage Bucket (gs://<bucket>/<path>)

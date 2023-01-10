@@ -147,10 +147,30 @@ substreams-sink-files run --encoder=lines --state-store=./localdata/working/stat
 
 {% endcode %}
 
+Flags
+
+- `file_output_path`
+  **TODO:** <i>Description here.</i>
+- `file_working_dir`
+  **TODO:** <i>Description here.</i>
+- `endpoint`, `encoder`
+  **TODO:** <i>Description here.</i>
+- `manifest_path`
+  **TODO:** <i>Description here.</i>
+- `output_module_name`
+  **TODO:** <i>Description here.</i>
+- `block_range`
+  **TODO:** <i>Description here.</i>
+- `state_store`
+  **TODO:** <i>Description here.</i>
+- `blocks_per_file`
+  **TODO:** <i>Description here.</i>
+- `buffer_max_size`
+  **TODO:** <i>Description here.</i>
+
 **TODO:**
 <i>
 
-- flags (what are the available flags? dig them out of the source code?)
 - output (how to show the directories and files that get produced)
 - inspect (need input for this, not sure what it is)
   </i>
@@ -163,8 +183,8 @@ The sink tool will produce output in the terminal resembling the following for a
 
 ```bash
 2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) starting prometheus metrics server {"listen_addr": "localhost:9102"}
-2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) sink to files {"file_output_path": "./localdata/out", "file_working_dir": "./localdata/working", "endpoint": "mainnet.eth.streamingfast.io:443", "encoder": "lines", "manifest_path": "substreams-filesink-tutorial.yaml", "output_module_name": "jsonl_out", "block_range": "", "state_store": "./localdata/working/state.yaml", "blocks_per_file": 10000, "buffer_max_size": 67108864}
-2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) reading substreams manifest {"manifest_path": "substreams-filesink-tutorial.yaml"}
+2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) sink to files {"file_output_path": "./localdata/out", "file_working_dir": "./localdata/working", "endpoint": "mainnet.eth.streamingfast.io:443", "encoder": "lines", "manifest_path": "substreams.yaml", "output_module_name": "jsonl_out", "block_range": "", "state_store": "./localdata/working/state.yaml", "blocks_per_file": 10000, "buffer_max_size": 67108864}
+2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) reading substreams manifest {"manifest_path": "substreams.yaml"}
 2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) starting pprof server {"listen_addr": "localhost:6060"}
 2023-01-09T07:45:04.041-0800 INFO (pipeline) computed start block {"module_name": "jsonl_out", "start_block": 0}
 2023-01-09T07:45:04.042-0800 INFO (substreams-sink-files) ready, waiting for signal to quit
@@ -179,26 +199,25 @@ The sink tool will produce output in the terminal resembling the following for a
 
 The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](https://substreams.streamingfast.io/developers-guide/substreams-sinks) and sinking strategies.
 
-**NOTE**: Provide a breif recap of the purpose of the sink tool.
+### Recap
 
-- what's required to use it
-- where to get the tool and example
-- how to run the tool and example
-- and any gotchas or tips and tricks
+To use `substreams-sink-files` you need to clone the official repository, install the tooling, generate the required files from the substreams CLI for the example Substreams module and run the sink tool.
+
+The `substreams-sink-files` is available in its official GitHub repository.
+
+Use the tool through the `run` command passing all of the required flags including `file_output_path`, `file_working_dir`, `endpoint`, `encoder`, `manifest_path`, `output_module_name`, `block_range`, `state_store`, `blocks_per_file`, and `buffer_max_size`.
+
+You have to ensure the sinking strategy has been defined, the appropriate file types have been targeted, and accounted for, and the module handlers code in your Substreams module has been properly updated
 
 ---
 
 **-- DEV NOTES --**
-
-**NOTE**: Quick tutorial like content, from your Substreams, do this, run that, etc. This is a more advanced tutorial, so we give quick overview of the commands with quick explanation.
 
 **NOTE**: There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.
 
 **NOTE**: Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file)
 
 **NOTE**: Add discussion about s3, gcs, etc. vs. local files
-
-**NOTE**: Also, quickly describe that the actual output directory can be:
 
 A local folder
 A Google Cloud Storage Bucket (gs://<bucket>/<path>)

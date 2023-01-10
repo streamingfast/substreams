@@ -10,7 +10,7 @@ The `substreams-sink-files` tool provides the ability to pipe data extracted fro
 
 For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-Substreams modules are created and prepared for the sink tool. After the sink tool begins running, automated ingestion tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), or other files-based storage solution, ingest the data.
+Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), or other files-based storage solution, ingest the data.
 
 By using the automated ingestion tasks you can also route the data to [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. This can only be accomplished indirectly, however it's important to note that it's possible to automate further ingestion from files to data stores.
 

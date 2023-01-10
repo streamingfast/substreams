@@ -34,7 +34,6 @@ Binary format such as [Avro](https://avro.apache.org/) or [Parquet](https://parq
 4. Understanding the sink tool
 5. Run tool and verify output
 6. Conclusion and review
-7. Getting help
 
 ## Download code and tools
 

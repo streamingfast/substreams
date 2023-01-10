@@ -81,8 +81,6 @@ Build the Substreams module by using the included `make` command.
 make
 ```
 
-### Run the example
-
 Run the project by using the `substreams run` command.
 
 ```bash

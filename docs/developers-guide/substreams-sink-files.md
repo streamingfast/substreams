@@ -148,21 +148,21 @@ substreams-sink-files run --encoder=lines --state-store=./localdata/working/stat
 Flags
 
 - `file_output_path`
-  **TODO:** <i>Description here.</i>
+  The path to a directory the sink will write its files to during processing.
 - `file_working_dir`
   **TODO:** <i>Description here.</i>
 - `endpoint`, `encoder`
-  **TODO:** <i>Description here.</i>
+  The URI of the firehose service Substreams is connecting to.
 - `manifest_path`
-  **TODO:** <i>Description here.</i>
+  The path to the Substreams manifest for the Substreams module prepared for the sink.
 - `output_module_name`
-  **TODO:** <i>Description here.</i>
+  The name of the Rust-based Substreams module the sink will run during its processing.
 - `block_range`
   **TODO:** <i>Description here.</i>
 - `state_store`
   **TODO:** <i>Description here.</i>
 - `blocks_per_file`
-  **TODO:** <i>Description here.</i>
+  The number of Block objects from the blockchain to process while the sink is processing.
 - `buffer_max_size`
   **TODO:** <i>Description here.</i>
 

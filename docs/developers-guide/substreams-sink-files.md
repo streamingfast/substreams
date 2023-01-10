@@ -207,7 +207,7 @@ The `substreams-sink-files` is available in its official GitHub repository.
 
 Use the tool through the `run` command passing all of the required flags including `file_output_path`, `file_working_dir`, `endpoint`, `encoder`, `manifest_path`, `output_module_name`, `block_range`, `state_store`, `blocks_per_file`, and `buffer_max_size`.
 
-You have to ensure the sinking strategy has been defined, the appropriate file types have been targeted, and accounted for, and the module handlers code in your Substreams module has been properly updated
+You have to ensure the sinking strategy has been defined, the appropriate file types have been targeted, and accounted for, and the module handler code in your Substreams module has been properly updated.
 
 ---
 

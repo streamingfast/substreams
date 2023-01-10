@@ -1,4 +1,5 @@
 *~
+.env.release
 .DS_Store
 .idea
 target

@@ -20,7 +20,10 @@ main() {
   shift $((OPTIND-1))
 
   verify_github_token
-  verify_keybase
+
+  # We do not sign releases anymore because they are done in a Docker env now
+  # so some adaptation is required
+  #verify_keybase
 
   if [[ "$dry_run" == "true" && "$force" == "true" ]]; then
     usage_error "Only one of -n (dry run) or -f (force) can be provided at a time"
@@ -69,7 +72,21 @@ main() {
     trap cleanup_tag EXIT
   fi
 
-  goreleaser release $args
+  package_name="github.com/streamingfast/substreams"
+  golang_cross_version="v1.19.4"
+
+  # We have no customized sysroot, so nothing to link now
+  #-v "`pwd`/sysroot:/sysroot" \
+
+	docker run \
+		--rm \
+		-e CGO_ENABLED=1 \
+    --env-file .env.release \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "`pwd`:/go/src/${package_name}" \
+		-w "/go/src/${package_name}" \
+		"goreleaser/goreleaser-cross:${golang_cross_version}" \
+		$args
 }
 
 cleanup_tag() {
@@ -79,12 +96,29 @@ cleanup_tag() {
 }
 
 verify_github_token() {
-  if [[ ! -f "$HOME/.config/goreleaser/github_token" && "$GITHUB_TOKEN" = "" ]]; then
-    echo "No GitHub token could be found in enviornment variable GITHUB_TOKEN"
-    echo "nor at ~/.config/goreleaser/github_token."
+  release_env_file="$ROOT/.env.release"
+
+  if [[ "$GITHUB_TOKEN" != "" && ! -f "$release_env_file" ]]; then
+    echo 'GITHUB_TOKEN=${GITHUB_TOKEN}' > "$release_env_file"
+  fi
+
+  if [ ! -f "$ROOT/.env.release" ] || ! grep -q "GITHUB_TOKEN=" "$release_env_file"; then
+    echo "A '.env.release' file must be found at the root of the project and it must contain"
+    echo "definition of 'GITHUB_TOKEN' variable. You need to create this file locally and the"
+    echo "content should be:"
     echo ""
-    echo "You will need to create one on GitHub website and make it available through"
-    echo "one of the accept way mentionned above."
+    echo "GITHUB_TOKEN=<your_github_token>"
+    echo ""
+    echo "You will need to create your own GitHub Token on GitHub website and make it available through"
+    echo "the file mentioned above."
+
+    if [[ -f "$ROOT/.env.release" ]]; then
+      echo ""
+      echo "Actual content of '$release_env_file' is:"
+      echo ""
+      cat "$release_env_file"
+    fi
+
     exit 1
   fi
 }

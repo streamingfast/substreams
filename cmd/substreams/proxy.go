@@ -39,7 +39,6 @@ func (cs *ConnectServer) Blocks(
 	req *connect.Request[pbsubstreams.Request],
 	stream *connect.ServerStream[pbsubstreams.Response],
 ) error {
-
 	newReq := &pbsubstreams.Request{
 		StartBlockNum:                       req.Msg.StartBlockNum,
 		StopBlockNum:                        req.Msg.StopBlockNum,

@@ -10,7 +10,7 @@ The `substreams-sink-files` tool provides the ability to pipe data extracted fro
 
 For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), or other files-based storage solution, ingest the data.
+Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), or other files-based storage solutions, ingest the data.
 
 By using the automated ingestion tasks you can also route the data to [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. This can only be accomplished indirectly, however it's important to note that it's possible to automate further ingestion from files to data stores.
 
@@ -18,11 +18,9 @@ You could use `substreams-sink-files` to sink data in `JSONL` format to a [Googl
 
 ### Accompanying code example
 
-[The accompanying Substreams module](#) associated with this documentation is responsible for extracting a handful of data fields from the Block object injected into the Rust-based map module. The sink tool processes the extracted blockchain data line-by-line and outputs the data to the files-based persistence mechanism you've chosen.
+The accompanying Substreams module associated with this documentation is responsible for extracting a handful of data fields from the Block object injected into the Rust-based map module. The sink tool processes the extracted blockchain data line-by-line and outputs the data to the files-based persistence mechanism you've chosen.
 
 The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text, a `CSV` entry, or a `JSONL` element.
-
-StreamingFast is working on support for binary formats such as [Avro](https://avro.apache.org/), [Parquet](https://parquet.apache.org/), and others.
 
 Binary format such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to discuss details.
 

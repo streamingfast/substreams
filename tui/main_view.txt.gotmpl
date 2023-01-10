@@ -1,0 +1,23 @@
+{{- if not .Connected }}Connecting...{{ else -}}
+Connected (trace ID {{ .TraceID }})
+Progress messages received: {{ .Updates }} ({{ .UpdatesPerSecond }}/sec)
+{{ with .Request }}Backprocessing history up to requested target block {{ $.BackprocessingCompleteAtBlock }}:{{- end}}
+(hit 'm' to switch mode)
+{{ range $key, $value := .Modules }}
+{{ if $.BarMode }}
+  {{- pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ barmode $value $ }}
+{{- else }}
+  {{- pad 25 $key }}{{ printf "%d" $value.Lo | rpad 10 }}  ::  {{ range $value }}{{.Start}}-{{.End}} {{ end -}}
+{{ end }}
+{{- end -}}
+{{ end }}
+{{ if .Failures }}
+Failures: {{ .Failures }}.
+Last failure:
+  Reason: {{ .LastFailure.Reason }}
+  Logs:
+{{ range .LastFailure.Logs }}
+    {{ . }}
+{{ end }}
+{{- with .LastFailure.LogsTruncated }}  <logs truncated>{{ end }}
+{{ end -}}

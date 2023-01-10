@@ -2,44 +2,60 @@
 description: StreamingFast Substreams command line interface (CLI)
 ---
 
-# Using the CLI
+# Substreams CLI reference
 
-The Substreams command line interface (CLI) is the user interface and central access point for working with Substreams.
+## `substreams` CLI reference overview
 
-The Substreams CLI exposes many commands to developers enabling a range of functionality. Each command is explained in further detail.
+The `substreams` command line interface (CLI) is the primary user interface and the main tool for sending requests and receiving data.
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-31 at 2.40.08 PM.png" alt=""><figcaption><p>Substreams command-line interface screenshot</p></figcaption></figure>
+The `substreams` CLI exposes many commands to developers enabling a range of features.&#x20;
 
 {% hint style="info" %}
-_Note: any time a package is specified any of the following can be used, local `substreams.yaml` file, local `.spkg` or a remote `.spkg` URL._
+**Note**: When a package is specified you can use:&#x20;
+
+* Local `substreams.yaml` configuration files
+* Local `.spkg` package files
+* Remote `.spkg` package URLs
 {% endhint %}
 
 ### **`run`**
 
 The `run` command connects to a Substreams endpoint and begins processing data.
 
-```
+{% code title="run command" overflow="wrap" %}
+```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \
    -t +1 \
    ./substreams.yaml \
    module_name
 ```
+{% endcode %}
 
-#### Run Command Breakdown
+The details of the run command are:
 
-* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running our Substreams
-* `-t +1` (or `--stop-block`) only requests a single block (stop block will be manifest's `initialBlock` + 1)
-* `substreams.yaml` is the path where we have defined our [Substreams Manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). This can be an `.spkg` or a `substreams.yaml` file.
-* `module_name` is the module we want to run, referring to the `name` [defined in the manifest](manifests.md#modules-.name).
+* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams.
+* `-t +1` or `--stop-block` only requests a single block; the stop block is the manifest's `initialBlock` + 1.
+* `substreams.yaml` is the path where you have defined your [Substreams manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
+* `module_name` is the module we want to `run`, referring to the module name [defined in the Substreams manifest](manifests.md#modules-.name).
 
-Passing a different `-s` (or `--start-block`) will run any prior modules at high speed, in order to provide you with output at the requested start block as fast as possible, while keeping snapshots along the way, in case you want to process it again.
+{% hint style="success" %}
+**Tip**: Passing a different `-s` or `--start-block` runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
+{% endhint %}
 
-Example output of `gravatar_updates` starting at block 6200807.
+#### Run example with output
 
-```
+{% code title="substreams run " overflow="wrap" %}
+```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 \
     https://github.com/Jannis/gravity-substream/releases/download/v0.0.1/gravity-v0.1.0.spkg \
     gravatar_updates -o json
+```
+{% endcode %}
+
+The output of the `gravatar_updates` module starting at block `6200807` will print a message resembling:
+
+{% code title="run output" %}
+```bash
 {
   "updates": [
     {
@@ -52,34 +68,56 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 \
 }
 ...
 ```
+{% endcode %}
 
-Notice the `-o` (or `--output`), that can alter the output format. The options are:
+{% hint style="info" %}
+**Note**: The `-o` or `--output` flag alters the output format.&#x20;
+{% endhint %}
 
-* `ui`, a nicely formatted, UI-driven interface, with progress information, and execution logs.
-* `json`, an indented stream of data, with no progress information nor logs, but just data output for blocks following the start block.
-* `jsonl`, same as `json` but with each output on a single line.
+The available output display options are:
+
+* `ui`, a nicely formatted, UI-driven interface, displaying progress information and execution logs.
+* `json`, an indented stream of data, **not** displaying progress information or logs, only data output for blocks proceeding the start block.
+* `jsonl`, same as `json` showing every individual output on a single line.
 
 ### `pack`
 
 The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file.
 
+{% code title="pack command" overflow="wrap" %}
 ```bash
 $ substreams pack ./substreams.yaml
+```
+{% endcode %}
+
+The output of the `pack` command will print a message resembling:
+
+{% code title="pack output" overflow="wrap" %}
+```bash
 ...
 Successfully wrote "your-package-v0.1.0.spkg".
 ```
+{% endcode %}
 
 ### `info`
 
-The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` files.
+The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` configuration files.
 
+{% code title="info command" overflow="wrap" %}
 ```bash
 $ substreams info ./substreams.yaml
+```
+{% endcode %}
+
+The output of the `info` command will print a message resembling:
+
+{% code title="info output" overflow="wrap" %}
+```bash
 Package name: solana_spl_transfers
 Version: v0.5.2
 Doc: Solana SPL Token Transfers stream
 
-  This streams out SPL token transfers to the nearest human being.
+  Stream SPL token transfers to the nearest human being.
 
 Modules:
 ----
@@ -96,17 +134,20 @@ Value Type: proto:solana.spl.v1.TokenTransfers
 Update Policy: UPDATE_POLICY_SET
 Hash: 11fd70768029bebce3741b051c15191d099d2436
 ```
+{% endcode %}
 
 ### `graph`
 
-The `graph` command prints out a visual graph of the package in the _mermaid-js_ format.
+The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html).
 
-{% hint style="info" %}
-_Note: see_ [_https://mermaid.live/_](https://mermaid.live/) _for a live mermaid-js editor._
+{% hint style="success" %}
+**Tip**: [Mermaid Live Editor](https://mermaid.live/) is the visual editor used by Substreams.
 {% endhint %}
 
+{% code title="graph command" overflow="wrap" %}
 ````bash
-$ substreams graph ./substreams.yaml                         [±master ●●]
+$ substreams graph ./substreams.yaml     
+                    [±master ●●]
 Mermaid graph:
 
 ```mermaid
@@ -117,34 +158,51 @@ graph TD;
   spl_transfers --> transfer_store
 ```
 ````
+{% endcode %}
 
-The code will  a graphic similar to&#x20;
+The `graph` command will result in a graphic resembling:
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
-Open the link and change ".ink/svg/" to ".live/edit#" in the URL, to go back to edit mode.
+Mermaid generated graph diagram
 {% endembed %}
 
 ### `inspect`
 
-This command goes deep into the file structure of a package (`yaml` or `spkg`). The `inspect` command is used mostly for debugging, _or for the curious ;)_
+The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious_._
 
-```
+{% code title="inspect command" overflow="wrap" %}
+```bash
 $ substreams inspect ./substreams.yaml | less
-proto_files {
+```
+{% endcode %}
+
+The output of the `inspect` command will print a message resembling:
+
+{% code title="inspect output" overflow="wrap" %}
+```bash
+proto_files 
 ...
 modules {
   modules {
     name: "my_module_name"
 ...
 ```
+{% endcode %}
 
 ### Help
 
-The commands and a brief explanation are also provided in the Substreams CLI application. To access the help at any time simply execute the `substreams` command, in a terminal, and pass a flag of `-h`.
+To view a list of available commands and brief explanations in the `substreams` CLI, run the `substreams` command in a terminal passing the `-h` flag. You can use this help reference at any time.
 
-Output similar to the following will appear in the terminal.
-
+{% code title="help option" overflow="wrap" %}
+```bash
+substreams -h
 ```
+{% endcode %}
+
+The output of the `help` command will print a message resembling:
+
+{% code title="help output" overflow="wrap" %}
+```bash
 Usage:
   substreams [command]
 
@@ -166,3 +224,4 @@ Flags:
 
 Use "substreams [command] --help" for more information about a command.
 ```
+{% endcode %}

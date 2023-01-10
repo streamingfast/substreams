@@ -1,51 +1,82 @@
 ---
-description: StreamingFast Substreams modules overview
+description: StreamingFast Substreams modules basics
 ---
 
-# Modules Overview
+# Modules basics
 
-## What are Modules?
+## Modules basics overview
 
-Modules are a crucial aspect of working with Substreams. Modules provide hooks into the execution of the Substreams compute engine. Developers will craft their own data manipulation and transformation strategies within modules.
+Modules are an important part of Substreams, offering hooks into the execution of the Substreams compute engine. You can create Substreams data manipulation and transformation strategies within modules.
 
-In further detail, modules are small pieces of Rust code running in a WebAssembly (WASM) virtual machine. Modules coexist within the stream of blocks sent by the Substreams compute engine arriving from a blockchain node.&#x20;
+Modules are small pieces of Rust code running in a [WebAssembly (WASM)](https://webassembly.org/) virtual machine. They coexist within the stream of blocks sent by the Substreams compute engine, which arrives from a blockchain node.
 
-Modules have one or more inputs. The inputs can be in the form of a `map` or `store,` or a `Block` or `Clock` received from the blockchain's data source.
+Modules have one or more inputs, which can be in the form of a `map` or `store`, or a `Block` or `Clock` object received from the blockchain's data source.
 
 {% embed url="https://mermaid.ink/svg/pako:eNp1kM0KwjAQhF8l7NkWvEbwIPUJ9NYUWZKtLTZJ2WwEEd_dCAr-4GFhd_h2GOYKNjoCDUfGeVD7ZmWCUqmvSQZiyr6Wy0z1eVlvpmhPbYqZLen_RKeqaq2EMaSe-OBxfhi-320Z_aF8_diYgxC3SSKT_tE7WIAn9ji6kvv6sDdQsngyoMvqqMc8iQETbgXNs0OhrRuLG-gep0QLwCxxdwkWtHCmF9SMWGrwT-p2B02rZZY" %}
 Substreams modules data interaction diagram
 {% endembed %}
 
-In the diagram shown above the `transfer_map` module extracts all transfers in each `Block,` and the  `transfer_counter` store module tracks the number of transfers that have occurred.
+The diagram shows how the `transfer_map` module extracts the transfers in a `Block` and tracks the total number of transfers.
 
 {% hint style="info" %}
-**Note:** Multiple inputs are made possible because blockchains are clocked.&#x20;
-
-Blockchains allow synchronization between multiple execution streams opening up great performance improvements over comparable traditional streaming engines.
+**Note:** You can use multiple inputs in blockchains because they are clocked, which allows for synchronization between multiple execution streams and improved performance compared to conventional streaming engines.
 {% endhint %}
 
-Modules can also take in multiple inputs as seen in the `counters` store example diagram below. Two modules feed into a `store`, effectively tracking multiple `counters`.
+As seen in the `counters` `store` example diagram, modules can also take in multiple inputs. In this case, two modules feed into a `store`, effectively tracking multiple `counters`.
 
 {% embed url="https://mermaid.ink/svg/pako:eNqdkE1qAzEMha9itE4GsnWgi5KcINmNh6LamozJeGxsuSGE3L1KW1PIptCdnnjv088NbHQEGk4Z06SOu61ZlHqfoz33JdZsSasydsQTZaqh42ui7mPTvT4cg1qvX1TA9HbxPLmMF5zLv_KOUiyev8JPvF60fm5-J22sC1MufeGYZVDTQ8M07C-jdf4AwAoC5YDeyWtuD5wBOSGQAS2loxHrzAbMchdrTQ6Z9s4LBfQo-9EKsHI8XBcLmnOlZtp5lE-HH9f9EylZic0" %}
-Modules with multiple inputs diagram
+Multiple module inputs diagram
 {% endembed %}
 
-All of the modules are executed as a directed acyclic graph (DAG) each time a new `Block` is processed.
+Every time a new `Block` is processed, all of the modules are executed as a directed acyclic graph (DAG).
 
 {% hint style="info" %}
-**Note:** The top-level data source is always a protocol's `Block` protobuf model, and is deterministic in its execution.
+**Note:** The protocol's Block protobuf model always serves as the top-level data source and executes deterministically.
 {% endhint %}
 
-## Single Output
+### Single output
 
-Modules have a _**single typed output.**_ Modules are typed to inform consumers of the types of data to expect and also how to interpret the bytes being sent.
+Modules have a single typed output, which is typed to inform consumers of the types of data to expect and how to interpret the bytes being sent.
 
 {% hint style="success" %}
-**Tip**: Data that is output from one module is used as the input for subsequent modules basically forming a daisy chain of data flow from module to module.
+**Tip**: In subsequent modules, input from one module's data output is used to form a chain of data flow from module to module.
 {% endhint %}
 
-## Next steps
+### `map` versus `store` modules
 
-Read more about [modules in the developer guide](../developer-guide/modules/).
+To develop most non-trivial Substreams, you will need to use multiple `map` and `store` modules. The specific number, responsibilities, and communication methods for these modules will depend on the developer's specific goals for the Substreams development effort.
 
-####
+The two module types are commonly used together to construct the directed acyclic graph (DAG) outlined in the Substreams manifest. The two module types are very different in their use and how they work. Understanding these differences is vital for harnessing the full power of Substreams.
+
+### `map` modules
+
+`map` modules are used for data extraction, filtering, and transformation. They should be used when direct extraction is needed avoiding the need to reuse them later in the DAG.
+
+To optimize performance, you should use a single `map` module instead of multiple `map` modules to extract single events or functions. It is more efficient to perform the maximum amount of extraction in a single top-level `map` module and then pass the data to other Substreams modules for consumption. This is the recommended, simplest approach for both backend and consumer development experiences.
+
+Functional `map` modules have several important use cases and facts to consider, including:
+
+* Extracting model data from an event or function's inputs.
+* Reading data from a block and transforming it into a custom protobuf structure.
+* Filtering out events or functions for any given number of contracts.
+
+### `store` modules
+
+`store` modules are used for the aggregation of values and to persist state that temporarily exists across a block.
+
+{% hint style="warning" %}
+**Important:** Stores should not be used for temporary, free-form data persistence.
+{% endhint %}
+
+Unbounded `store` modules are discouraged. `store` modules shouldn't be used as an infinite bucket to dump data into.
+
+Notable facts and use cases for working `store` modules include:
+
+* `store` modules should only be used when reading data from another downstream Substreams module.
+* `store` modules cannot be output as a stream, except in development mode.
+* `store` modules are used to implement the Dynamic Data Sources pattern from Subgraphs, keeping track of contracts created to filter the next block with that information.
+* Downstream of the Substreams output, do not use `store` modules to query anything from them. Instead, use a sink to shape the data for proper querying.
+
+### Additional information
+
+Learn more about [modules in the Developer's guide](../developers-guide/modules/).

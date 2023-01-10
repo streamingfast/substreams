@@ -2,32 +2,64 @@ env_files:
   github_token: ~/.config/goreleaser/github_token
 
 builds:
-  - id: substreams
-    goos:
-    - linux
-    - darwin
-    goarch:
-    - arm64
-    - amd64
-    targets:
-    #- linux_amd64
-    - darwin_amd64
-    - darwin_arm64
-    ldflags: -s -w -X main.version={{.Version}} -X
+  - id: darwin-amd64
     main: ./cmd/substreams
     binary: substreams
+    goos:
+      - darwin
+    goarch:
+      - amd64
     env:
-      - CGO_ENABLED=1
+      - CC=o64-clang
+      - CXX=o64-clang++
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: darwin-arm64
+    main: ./cmd/substreams
+    binary: substreams
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    env:
+      - CC=oa64-clang
+      - CXX=oa64-clang++
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: linux-amd64
+    main: ./cmd/substreams
+    binary: substreams
+    goos:
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CC=x86_64-linux-gnu-gcc
+      - CXX=x86_64-linux-gnu-g++
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
 
 archives:
   - id: substreams
-    name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     builds:
-    - substreams
-    replacements:
-      amd64: x86_64
-      darwin: macOS
-      linux: linux
+      - darwin-amd64
+      - darwin-arm64
+      - linux-amd64
+      - windows-amd64
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- tolower .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ tolower .Arch }}{{ end }}
     format: tar.gz
     files:
     - LICENSE
@@ -37,7 +69,7 @@ checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  name_template: "{{ .Tag }}"
 
 changelog:
   sort: asc
@@ -46,19 +78,6 @@ changelog:
       - '^docs:'
       - '^test:'
       - '^GitBook:'
-
-signs:
-- cmd: keybase
-  args:
-  - sign
-  - --infile
-  - $artifact
-  - --binary
-  - --outfile
-  - $signature
-  - --detached
-  signature: ${artifact}.sig
-  artifacts: checksum
 
 release:
   draft: true

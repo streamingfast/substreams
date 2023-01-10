@@ -4,20 +4,23 @@ description: Running the StreamingFast Substreams service locally
 
 # Running Substreams locally
 
-It's possible to run Substreams locally by running StreamingFast Firehose on the same machine.
+## Local Substreams overview
+
+Run Substreams locally by running StreamingFast Firehose on the same machine.
 
 ### Download Firehose
 
-Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).&#x20;
+Full information for the installation and operation of Firehose is available in the [Firehose documentation](https://firehose.streamingfast.io/).
 
-The full source code is available in the official [Firehose GitHub repository](https://github.com/streamingfast/firehose-ethereum).&#x20;
+The full source code is available in the official [Firehose GitHub repository](https://github.com/streamingfast/firehose-ethereum).
 
-Firehose can be built from source or installed using a [Firehose Docker release](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum).
+Install Firehose locally from source or by using a [Firehose Docker release](https://github.com/orgs/streamingfast/packages/container/package/sf-ethereum).
 
 ### Get some data
 
-The following code will instruct Firehose to generate merged blocks files to use with Substreams.
+Instruct Firehose to generate merged blocks files for Substreams by using:
 
+{% code overflow="wrap" %}
 ```bash
 # Downloads 2.6GB of data
 fireeth tools download-from-firehose \
@@ -27,12 +30,13 @@ fireeth tools download-from-firehose \
 # You can skip this one:
 fireeth tools generate-irreversible-index ./localblocks ./localirr 6810000 6819700
 ```
+{% endcode %}
 
-### Write a config file
+### Write a configuration file
 
-Use the following for the Firehose configuration file. Additional information is available in the [Firehose documentation](https://firehose.streamingfast.io/).&#x20;
+The code in the `config.yaml` file is used for the Firehose configuration file. Additional information for configuration is [available in the Firehose documentation](https://firehose.streamingfast.io/).
 
-{% code title="config.yaml" %}
+{% code title="config.yaml" overflow="wrap" lineNumbers="true" %}
 ```yaml
 start:
   args:
@@ -51,20 +55,20 @@ start:
 ```
 {% endcode %}
 
-### Run the `firehose`
+### Run `firehose`
 
-Start Firehose and pass it the config file.
+Start Firehose passing it the `config.yaml` configuration file by using:
 
 ```bash
 $ fireeth start -c config.yaml
 ```
 
-### Run Substreams with Firehose
+### Running Substreams and Firehose
 
-Run the `substreams` command against the Firehose deployment using the following command.
+Run the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Firehose deployment by using:
 
 ```bash
-substreams run -p -e localhost:9000  # ...
+substreams run -p -e localhost:9000
 ```
 
-The `-p` flag indicates plaintext, running insecurely against the unsecured Firehose local server.
+Use the `-p` flag to specify plaintext mode when running the command for the local Firehose server in an insecure manner.

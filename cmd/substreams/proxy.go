@@ -14,7 +14,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	ssconnect "github.com/streamingfast/substreams/proto/sf/substreams/v1/substreamsv1connect"
+	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/v1/substreamsv1connect"
 	"github.com/streamingfast/substreams/tools"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -39,7 +39,6 @@ func (cs *ConnectServer) Blocks(
 	req *connect.Request[pbsubstreams.Request],
 	stream *connect.ServerStream[pbsubstreams.Response],
 ) error {
-
 	newReq := &pbsubstreams.Request{
 		StartBlockNum:                       req.Msg.StartBlockNum,
 		StopBlockNum:                        req.Msg.StopBlockNum,

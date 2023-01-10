@@ -2,6 +2,7 @@ package outputmodules
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -9,26 +10,25 @@ import (
 type Graph struct {
 	request *pbsubstreams.Request
 
-	stores                  []*pbsubstreams.Module // stores that need to be processed, either requested directly of as ancestor to a required module.
-	requestedMapper         *pbsubstreams.Module
+	allModules   []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	moduleHashes *manifest.ModuleHashes
+	stores       []*pbsubstreams.Module // subset of allModules: only the stores
+
+	outputModule *pbsubstreams.Module
+
 	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
-	allModules              []*pbsubstreams.Module // subset of request.Modules, needed for any `OutputModules`.
-	requestedOutput         *pbsubstreams.Module   // modules requested in `OutputModules`
-	outputModule            string
-	schedulableAncestorsMap map[string][]string // modules that are ancestors (therefore dependencies) of a given module
-	moduleHashes            *manifest.ModuleHashes
+	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
 }
 
-func (g *Graph) RequestedMapperModule() *pbsubstreams.Module { return g.requestedMapper }
-func (g *Graph) Stores() []*pbsubstreams.Module              { return g.stores }
-func (g *Graph) AllModules() []*pbsubstreams.Module          { return g.allModules }
-func (g *Graph) IsOutputModule(name string) bool             { return g.outputModule == name }
-func (g *Graph) ModuleHashes() *manifest.ModuleHashes        { return g.moduleHashes }
+func (g *Graph) OutputModule() *pbsubstreams.Module   { return g.outputModule }
+func (g *Graph) Stores() []*pbsubstreams.Module       { return g.stores }
+func (g *Graph) AllModules() []*pbsubstreams.Module   { return g.allModules }
+func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
+func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 
 func NewOutputModuleGraph(request *pbsubstreams.Request) (out *Graph, err error) {
 	out = &Graph{
-		request:      request,
-		outputModule: request.GetOutputModuleName(),
+		request: request,
 	}
 	if err := out.computeGraph(); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
@@ -42,23 +42,24 @@ func (g *Graph) computeGraph() error {
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
 	}
+	outputModuleName := g.request.GetOutputModuleName()
 
-	processModules, err := graph.ModulesDownTo([]string{g.outputModule})
+	processModules, err := graph.ModulesDownTo(outputModuleName)
 	if err != nil {
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.allModules = processModules
 	g.hashModules(graph)
 
-	storeModules, err := graph.StoresDownTo([]string{g.outputModule})
+	g.outputModule = computeOutputModule(g.allModules, outputModuleName)
+
+	storeModules, err := graph.StoresDownTo(g.outputModule.Name)
 	if err != nil {
 		return fmt.Errorf("stores down: %w", err)
 	}
 	g.stores = storeModules
 
-	g.requestedOutput = computeOutputModule(g.allModules, g.outputModule)
-	g.requestedMapper = computeRequestedMapper(g.allModules, g.outputModule)
-	g.schedulableModules = computeSchedulableModules(storeModules, g.requestedMapper)
+	g.schedulableModules = computeSchedulableModules(storeModules, g.outputModule, g.request.ProductionMode)
 
 	ancestorsMap, err := computeSchedulableAncestors(graph, g.schedulableModules)
 	if err != nil {
@@ -79,20 +80,16 @@ func computeOutputModule(mods []*pbsubstreams.Module, outputModule string) *pbsu
 
 }
 
-func computeRequestedMapper(mods []*pbsubstreams.Module, outputModule string) *pbsubstreams.Module {
-	for _, module := range mods {
-		if module.Name == outputModule && module.GetKindMap() != nil {
-			return module
-		}
-	}
-	return nil
-}
-
-func computeSchedulableModules(stores []*pbsubstreams.Module, requestedMapper *pbsubstreams.Module) (out []*pbsubstreams.Module) {
-	if requestedMapper == nil {
+func computeSchedulableModules(stores []*pbsubstreams.Module, outputModule *pbsubstreams.Module, productionMode bool) []*pbsubstreams.Module {
+	if !productionMode { // dev never schedules maps, all stores are in there
 		return stores
 	}
-	return append(append(out, stores...), requestedMapper)
+
+	if outputModule.GetKindStore() != nil {
+		return stores
+	}
+
+	return append(stores, outputModule)
 }
 
 func computeSchedulableAncestors(graph *manifest.ModuleGraph, schedulableModules []*pbsubstreams.Module) (out map[string][]string, err error) {
@@ -130,8 +127,8 @@ func (g *Graph) hashModules(graph *manifest.ModuleGraph) {
 }
 
 func (g *Graph) ValidateRequestStartBlock(requestStartBlockNum uint64) error {
-	if requestStartBlockNum < g.requestedOutput.InitialBlock {
-		return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", requestStartBlockNum, g.requestedOutput.Name, g.requestedOutput.InitialBlock)
+	if requestStartBlockNum < g.outputModule.InitialBlock {
+		return fmt.Errorf("start block %d smaller than request outputs for module %q with start block %d", requestStartBlockNum, g.outputModule.Name, g.outputModule.InitialBlock)
 	}
 	return nil
 }

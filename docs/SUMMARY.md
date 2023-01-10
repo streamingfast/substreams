@@ -4,40 +4,40 @@
 
 ## Concepts & Fundamentals
 
-* [Benefits & Comparisons](concepts-and-fundamentals/benefits.md)
-* [Modules Overview](concepts-and-fundamentals/modules.md)
+* [Benefits and comparisons](concepts-and-fundamentals/benefits.md)
+* [Modules basics](concepts-and-fundamentals/modules.md)
 * [Fundamentals](concepts-and-fundamentals/fundamentals.md)
 
 ## Getting Started
 
-* [Installing the CLI](getting-started/installing-the-cli.md)
+* [Installing the Substreams CLI](getting-started/installing-the-cli.md)
 * [Quickstart](getting-started/quickstart.md)
 
-## Developer Guide
+## Developer's Guide
 
-* [Overview](developer-guide/overview.md)
-* [Dependency Installation](developer-guide/installation-requirements.md)
-* [Manifest](developer-guide/creating-your-manifest.md)
-* [Protobuf Schemas](developer-guide/creating-protobuf-schemas.md)
-* [Modules](developer-guide/modules/README.md)
-  * [Module Types](developer-guide/modules/types.md)
-  * [Inputs](developer-guide/modules/inputs.md)
-  * [Outputs](developer-guide/modules/outputs.md)
-  * [Module Handlers](developer-guide/modules/setting-up-handlers.md)
-  * [Module Handler Creation](developer-guide/modules/writing-module-handlers.md)
-* [Running Substreams](developer-guide/running-substreams.md)
-* [Substreams Sinks](developer-guide/substreams-sinks.md)
+* [Overview](developers-guide/overview.md)
+* [Dependency installation](developers-guide/installation-requirements.md)
+* [Manifest](developers-guide/creating-your-manifest.md)
+* [Protobuf schemas](developers-guide/creating-protobuf-schemas.md)
+* [Modules](developers-guide/modules/README.md)
+  * [Module types](developers-guide/modules/types.md)
+  * [Inputs](developers-guide/modules/inputs.md)
+  * [Output](developers-guide/modules/outputs.md)
+  * [Module handlers](developers-guide/modules/setting-up-handlers.md)
+  * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
+* [Running Substreams](developers-guide/running-substreams.md)
+* [Substreams sinks](developers-guide/substreams-sinks.md)
 
 ## Reference & Specs
 
-* [Chains & Endpoints](reference-and-specs/chains-and-endpoints.md)
-* [CLI Reference](reference-and-specs/command-line-interface.md)
+* [Chains and endpoints](reference-and-specs/chains-and-endpoints.md)
+* [Substreams CLI reference](reference-and-specs/command-line-interface.md)
 * [Authentication](reference-and-specs/authentication.md)
 * [Manifests](reference-and-specs/manifests.md)
 * [Packages](reference-and-specs/packages.md)
 * [Rust crates](reference-and-specs/rust-crates.md)
 * [Advanced](advanced/README.md)
-  * [Graph-Node Setup](reference-and-specs/advanced/graph-node-setup.md)
+  * [Graph-node setup](reference-and-specs/advanced/graph-node-setup.md)
   * [Running Substreams locally](advanced/running-locally.md)
 * [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)

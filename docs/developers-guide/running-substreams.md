@@ -4,9 +4,11 @@ description: Running StreamingFast Substreams for the first time
 
 # Running Substreams
 
-After a successful build Substreams can be started with the following command, explained in greater detail below.
+## Running Substreams overview
 
-```
+After a successful build, start Substreams by using the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command:
+
+```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
    map_transfers \
@@ -16,33 +18,33 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 
 ### Explanation
 
-#### Substreams Run
+#### Substreams `run`
 
-First, start the Substreams CLI tool passing it a `run` command.
+First, start the [`substreams` CLI](../reference-and-specs/command-line-interface.md) passing it a [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command.
 
 #### Firehose URI
 
-The server address is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address. This is a running Firehose instance.\
+The server address is required by Substreams to connect to for data retrieval. The data provider for Substreams is located at the address, which is a running Firehose instance.\
 `-e mainnet.eth.streamingfast.io:443`
 
-#### Substreams YAML Configuration File
+#### Substreams YAML configuration file
 
 Inform Substreams where to find the `substreams.yaml` configuration file.
 
 #### Module
 
-The `map_transfers` module is defined in the manifest and it is the module that will be run by Substreams.
+The `map_transfers` module is defined in the manifest and it is the module run by Substreams.
 
-#### Block Mapping
+#### Block mapping
 
-Start mapping at the specific block 12292922 by using passing the flag and block number. \
+Start mapping at the specific block `12292922` by using passing the flag and block number.\
 `--start-block 12292922`
 
-Cease block execution with `--stop-block +1.` The +1 option will request a single block. In the example, the next block would be 12292923.
+Cease block processing by using `--stop-block +1.` The `+1` option requests a single block. In the example, the next block is `12292923`.
 
-### Successful Substreams Results
+### Successful Substreams results
 
-The following messages will be printed to the terminal for a successfully installed and configured Substreams setup.
+Messages are printed to the terminal for successfully installed and configured Substreams setups.
 
 ```bash
  substreams run -e mainnet.eth.streamingfast.io:443 \
@@ -50,6 +52,11 @@ The following messages will be printed to the terminal for a successfully instal
    map_transfers \
    --start-block 12292922 \
    --stop-block +1
+```
+
+The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command outputs:
+
+```bash
 2022-05-30T10:52:27.256-0400 INFO (substreams) connecting...
 2022-05-30T10:52:27.389-0400 INFO (substreams) connected
 
@@ -76,9 +83,11 @@ map_transfers: message "eth.erc721.v1.Transfers": {
 }
 ```
 
-The example output shown above contains data for different transfers from data in the blockchain. These transfers can also be verified on [Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).
+{% hint style="info" %}
+**Note**: The example output contains data for different transfers from data in the blockchain. The transfers are verifiable [on Etherscan](https://etherscan.io/tx/0xcfb197f62ec5c7f0e71a11ec0c4a0e394a3aa41db5386e85526f86c84b3f2796).
+{% endhint %}
 
-## Development abd production mode
+## Development and production mode
 
 ### Development mode
 

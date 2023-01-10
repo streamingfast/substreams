@@ -13,9 +13,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval uint64, mapConfigs *execout.Configs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock uint64) (ModuleStorageStateMap, error) {
+func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval uint64, mapConfigs *execout.Configs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock, storeLinearHandoffBlock uint64) (ModuleStorageStateMap, error) {
 	out := make(ModuleStorageStateMap)
-	if err := buildStoresStorageState(ctx, storeConfigMap, storeSnapshotsSaveInterval, linearHandoffBlock, out); err != nil {
+	if err := buildStoresStorageState(ctx, storeConfigMap, storeSnapshotsSaveInterval, storeLinearHandoffBlock, out); err != nil {
 		return nil, err
 	}
 	if err := buildMappersStorageState(ctx, mapConfigs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock, out); err != nil {
@@ -24,7 +24,7 @@ func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.Config
 	return out, nil
 }
 
-func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, linearHandoffBlock uint64, out ModuleStorageStateMap) error {
+func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, storeLinearHandoff uint64, out ModuleStorageStateMap) error {
 	logger := reqctx.Logger(ctx)
 
 	state, err := storeState.FetchState(ctx, storeConfigMap)
@@ -39,7 +39,7 @@ func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap
 			return fmt.Errorf("fatal: storage state not reported for module name %q", name)
 		}
 
-		moduleStorageState, err := storeState.NewStoreStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), linearHandoffBlock, snapshot)
+		moduleStorageState, err := storeState.NewStoreStorageState(name, storeSnapshotsSaveInterval, config.ModuleInitialBlock(), storeLinearHandoff, snapshot)
 		if err != nil {
 			return fmt.Errorf("new file units %q: %w", name, err)
 		}

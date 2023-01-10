@@ -10,20 +10,20 @@ The `substreams-sink-files` tool provides the ability to pipe data extracted fro
 
 Substreams modules are created and prepared for the sink tool. After the sink tool begins running, automated ingestion tasks can be setup to have BigQuery, or other files-based storage solution, ingest the data.
 
-As an example, you could use `substreams-sink-files` to sink data in `jsonl` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data was written.
+As an example, you could use `substreams-sink-files` to sink data in `JSONL` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data, extracted by the Substreams, was written.
 
 ### Accompanying code example
 
 [The accompanying Substreams module](#) associated with this documentation is responsible for extracting a handful of data fields from the Block object injected into the Rust-based map module. The sink tool processes the extracted blockchain data line-by-line and outputs the data to the files-based persistence mechanism you've chosen.
 
-The accompanying code example extracts four data points from the Block object and packs them into the substreams.sink.files.v1 protobuf's data model. The data is passed to the protobuf as a single line of plain text, a `CSV` entry, or a `JSONL` element. StreamingFast is working on support for binary formats such as [Avro](https://avro.apache.org/), [Parquet](https://parquet.apache.org/), and others.
+The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text, a `CSV` entry, or a `JSONL` element. StreamingFast is working on support for binary formats such as [Avro](https://avro.apache.org/), [Parquet](https://parquet.apache.org/), and others.
 
 ## Outline
 
 1. Download code and tools
 2. Run code and verify output
-3. Code Walkthrough
-4. Show and explain command to run tool
+3. Code walkthrough
+4. Understanding the sink tool
 5. Run tool and verify output
 6. Conclusion and review
 7. Getting help
@@ -56,7 +56,7 @@ export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
 ### Download accompanying code example
 
-The accompanying code example is available in its [official GitHub repository](#). You'll need to download or clone the repository to your computer.
+The accompanying code example is available in its [official GitHub repository](#). You'll need to download or clone the repository to your computer to complete this tutorial.
 
 You can use the `git clone` command to acquire the example code.
 
@@ -144,7 +144,7 @@ The module handler uses `JSONL` for the output type. The [`json!`](https://docs.
 
 ### Example manifest
 
-The Substreams manifest for the accompanying project sets up the required `substreams-sink-files-v0.1.0.spkg`, `substreams.sink.files.v1.Lines` and `sf.ethereum.type.v2.Block` protobufs and reference to the `map_eth_block_for_sink` module handler.
+The Substreams manifest for the accompanying project sets up the required `substreams-sink-files-v0.1.0.spkg`, `substreams.sink.files.v1.Lines` and `sf.ethereum.type.v2.Block` protobufs and includes a reference to the `map_eth_block_for_sink` module handler.
 
 {% code overflow="wrap" %}
 
@@ -176,9 +176,9 @@ modules:
 
 **TODO:** <i>How to respect Sink's expected output's type with examples for JSON (maybe CSV))</i>
 
-## Show and explain command to run tool
+## Understanding the sink tool
 
-### Run and configure `substreams-sink-files` tool
+### Run and configure the `substreams-sink-files` tool
 
 The command to start and run the `substreams-sink-files` tool for the accompanying Substreams project will resemble:
 
@@ -200,7 +200,9 @@ substreams-sink-files run --encoder=lines --state-store=./localdata/working/stat
 
 ## Verify output from tool
 
-The sink tool will produce output resembling the following for a properly configured and working environment and project.
+Running the sink tool results in visual output printed to the terminal and directories and files being written to the local system or a cloud provider bucket if configured.
+
+The sink tool will produce output in the terminal resembling the following for a properly configured and working environment and project.
 
 ```bash
 2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) starting prometheus metrics server {"listen_addr": "localhost:9102"}
@@ -218,7 +220,14 @@ The sink tool will produce output resembling the following for a properly config
 
 ## Conclusion and review
 
-**NOTE**: Provide a breif recap of the purpose of the sink tool, what's required to use it, where to get the tool and example, how to run the tool and example and any gotchas or tips and tricks.
+The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](https://substreams.streamingfast.io/developers-guide/substreams-sinks) and sinking strategies.
+
+**NOTE**: Provide a breif recap of the purpose of the sink tool.
+
+- what's required to use it
+- where to get the tool and example
+- how to run the tool and example
+- and any gotchas or tips and tricks
 
 ## Getting help
 

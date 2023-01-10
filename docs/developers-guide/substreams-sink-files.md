@@ -22,7 +22,7 @@ The accompanying Substreams module associated with this documentation is respons
 
 The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text, a `CSV` entry, or a `JSONL` element.
 
-Binary format such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to discuss details.
+Binary formats such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to learn more and discuss specifics.
 
 ## Outline
 
@@ -59,7 +59,7 @@ export GOPATH=$HOME/go
 
 ### Accompanying code example
 
-The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository that you previously cloned. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
+The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
 
 **<i>TODO: Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.</i>**
 

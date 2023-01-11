@@ -13,7 +13,7 @@ description: StreamingFast Substreams sink files
 5. Run tool and verify output
 6. Conclusion and review
 
-**<i>TODO: We can delete this outline later if you want, it helps me with development and creation of this content.</i>**
+**<i>NOTE: We can delete this outline later if you want, it helps me with development and creation of this content. If you would like to add or remove or restructure the main sections/steps of the document, let's do it here and then work down into the content.</i>**
 
 ### Purpose
 
@@ -49,7 +49,7 @@ Clone the `substreams-sink-files` repository to obtain the files required to wor
 git clone https://github.com/streamingfast/substreams-sink-files.git substreams-sink-files-tutorial
 ```
 
-**<i>TODO: I'm still not clear on how we want them to install substreams-sink-files. Please advise.</i>**
+**1. QUESTION:** <i>I'm still not clear on how we want them to install substreams-sink-files. Please advise.</i>
 
 Checking the version of `substreams-sink-files` will produce a message similar to:
 
@@ -67,9 +67,10 @@ export GOPATH=$HOME/go
 
 The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
 
-<b><i>TODO: 'Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.'
+**2. QUESTION**:
+<i>'Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.'
 
-NOTE FROM WRITER: This is explained below in more detail. Do you want to move it here? That feels strange to me. Shouldn't we have them run the example first to make sure it's working properly on their machine. Then start explaining the code in more detail (as seen in the Substreams modifications section)?</i></b>
+This is explained below in more detail. Do you want to move it here? Shouldn't we have them run the example first to make sure it's working properly on their machine. Then start explaining the code in more detail (as seen in the Substreams modifications section below)?</i>
 
 Run the included `make codegen` command to create the required protobuf files.
 
@@ -137,6 +138,8 @@ The module handler uses `JSONL` for the output type, `CSV` is also supported.. T
 
 The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based protobuf you're responsible for designing for your sink.
 
+The output type for sink is a list of lines. The line content can be any type anything that is formatted as plain text, and line based. For example, a basic string like the transaction's hash, would result in files containing all the hashes for the transactions, one per line.
+
 ## Understanding the sink tool
 
 ### Run and configure the `substreams-sink-files` tool
@@ -150,36 +153,6 @@ substreams-sink-files run --encoder=lines --state-store=./localdata/working/stat
 ```
 
 {% endcode %}
-
-Flags
-
-- `file_output_path`
-  The path to a directory the sink will write its files to during processing.
-- `file_working_dir`
-  **TODO:** <i>Description here.</i>
-- `endpoint`
-  The URI of the firehose service Substreams is connecting to.
-- `encoder`
-  **TODO:** <i>Description here.</i>
-- `manifest_path`
-  The path to the Substreams manifest for the Substreams module prepared for the sink.
-- `output_module_name`
-  The name of the Rust-based Substreams module the sink will run during its processing.
-- `block_range`
-  **TODO:** <i>Description here.</i>
-- `state_store`
-  **TODO:** <i>Description here.</i>
-- `blocks_per_file`
-  The number of Block objects from the blockchain to process while the sink is processing.
-- `buffer_max_size`
-  **TODO:** <i>Description here.</i>
-
-**TODO:**
-<i>
-
-- output (how to show the directories and files that get produced)
-- inspect (need input for this, not sure what it is)
-  </i>
 
 ## Verify output from tool
 
@@ -209,24 +182,35 @@ The ability to route data extracted from the blockchain by using Substreams is p
 
 To use `substreams-sink-files` you need to clone the official repository, install the tooling, generate the required files from the substreams CLI for the example Substreams module and run the sink tool.
 
-The `substreams-sink-files` is available in its official GitHub repository.
-
-Use the tool through the `run` command passing all of the required flags including `file_output_path`, `file_working_dir`, `endpoint`, `encoder`, `manifest_path`, `output_module_name`, `block_range`, `state_store`, `blocks_per_file`, and `buffer_max_size`.
-
-You have to ensure the sinking strategy has been defined, the appropriate file types have been targeted, and accounted for, and the module handler code in your Substreams module has been properly updated.
+You have to ensure the sinking strategy has been defined, the appropriate file types have been targeted, and accounted for, and the module handler code in your Substreams module has been properly updated. You need to start the `substreams-sink-files` tool and use the `run` command being sure to provide all of the required values for the various flags.
 
 ---
 
-**-- DEV NOTES --**
+**-- QUESTIONS --**
 
-**TODO**: There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.
+**3. QUESTION**: 'There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.'
 
-**TODO**: Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file)
+<i>I need input on this or some type of reference or something to find information for what we want to tell the reader.</i>
 
-**TODO**: Add discussion about s3, gcs, etc. vs. local files
+**4. QUESTION**: 'Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file).'
 
-A local folder
+<i>I need input on this or some type of reference or something to find information for what we want to tell the reader.</i>
+
+**5. QUESTION**:
+'Add discussion about s3, gcs, etc. vs. local files'
+
+<i>Where do we want to put this in the document, what section?</i>
+
+'A local folder
 A Google Cloud Storage Bucket (gs://<bucket>/<path>)
 An S3 compatible Bucket (s3://<bucket>/<path>)
 An Azure bucket (az://<bucket>/<path>)
-Configuration details for those could be seen at https://github.com/streamingfast/dstore#features
+Configuration details for those could be seen at https://github.com/streamingfast/dstore#features'
+
+**6. QUESTION:**
+
+- 'output'
+  <i>how to show the directories and files that get produced, is the logging to the terminal sufficient? The Google style guide restricts using screeshots so that limits using a screen capture of the directories and files that get produced. Should we decribe the output somehow? Please advise.</i>
+- 'inspect'
+  <i>I need input for this, not sure what it is.
+  </i>

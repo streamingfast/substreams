@@ -12,7 +12,7 @@ For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers f
 
 Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), or other files-based storage solutions, ingest the data.
 
-By using the automated ingestion tasks you can also route the data to [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. This can only be accomplished indirectly, however it's important to note that it's possible to automate further ingestion from files to data stores.
+By using the automated ingestion tasks you can also route the data to [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. This can only be accomplished indirectly. It's possible to automate further ingestion from files to data stores.
 
 You could use `substreams-sink-files` to sink data in `JSONL` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data, extracted by the Substreams, was written.
 
@@ -151,8 +151,10 @@ Flags
   The path to a directory the sink will write its files to during processing.
 - `file_working_dir`
   **TODO:** <i>Description here.</i>
-- `endpoint`, `encoder`
+- `endpoint`
   The URI of the firehose service Substreams is connecting to.
+- `encoder`
+  **TODO:** <i>Description here.</i>
 - `manifest_path`
   The path to the Substreams manifest for the Substreams module prepared for the sink.
 - `output_module_name`

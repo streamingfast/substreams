@@ -6,7 +6,7 @@ description: StreamingFast Substreams data sinks
 
 ## **Substreams sinks overview**
 
-A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and Substreams data and you can route data anywhere you're able to imagine.
+A sink is a final destination for data acquired through Substreams. Examples include databases, a Slack channel, or flat file storage. Sinks have a wide range of types and you can route data anywhere you're able to imagine.
 
 StreamingFast provides a few examples, libraries, and tools to assist you when routing blockchain data to sinks.
 
@@ -22,7 +22,7 @@ Protobufs provide a data-centric, technology stack, non-language specific, and p
 **Tip**: The platform-independent, data-centric capabilities of protobufs give you the opportunity to package and route data captured by Substreams to other sources, including sinks.
 {% endhint %}
 
-At a low-level, Substreams consumes data through a gRPC streaming service. Consumers receive streams of data scoped to a single block as requests are sent.
+At a low level, Substreams consumes data through a gRPC streaming service. Consumers receive streams of data scoped to a single block as requests are sent.
 
 ## **General requirements**
 
@@ -36,7 +36,7 @@ For example, database-like Substreams sinks such as PostgreSQL or MongoDB accept
 
 The sink reads the specific protobuf-based data being sent out of Substreams and performs the processing for it. Every sink performs differently regarding the data received, most perform some kind of storage.
 
-The configuration of the storage layer and its requirements are your responsibility. StreamingFast  provides documentation for the infrastructure required by various Substreams sinks. Read through the documentation to understand the behavior and requirements for the other sink types.
+The configuration of the storage layer and its requirements are your responsibility. StreamingFast provides documentation for the infrastructure required by various Substreams sinks. Read through the documentation to understand the behavior and requirements for the other sink types.
 
 An understanding of basic [Substreams fundamentals](../concepts-and-fundamentals/fundamentals.md) is expected before continuing. [Learn more about modules](https://substreams.streamingfast.io/concept-and-fundamentals/modules) in the Substreams documentation.
 

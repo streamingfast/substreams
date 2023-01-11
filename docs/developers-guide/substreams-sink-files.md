@@ -20,7 +20,7 @@ You could use `substreams-sink-files` to sink data in `JSONL` format to a [Googl
 
 The accompanying Substreams module associated with this documentation is responsible for extracting a handful of data fields from the Block object injected into the Rust-based map module. The sink tool processes the extracted blockchain data line-by-line and outputs the data to the files-based persistence mechanism you've chosen.
 
-The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text, a `CSV` entry, or a `JSONL` element.
+The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text.
 
 Binary formats such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to learn more and discuss specifics.
 
@@ -125,7 +125,7 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 }
 ```
 
-The module handler uses `JSONL` for the output type. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
+The module handler uses `JSONL` for the output type, `CSV` is also supported.. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
 **TODO**: <i>We just need to emphasis in the tutorial that it's an example and that a lot of "rows" can be extracted per block. Giving the ERC20/ERC721/ERC1155 examples is a good idea as we coded it: https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24</i>
 

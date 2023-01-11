@@ -135,9 +135,7 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 
 The module handler uses `JSONL` for the output type, `CSV` is also supported.. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
-**TODO**: <i>We just need to emphasis in the tutorial that it's an example and that a lot of "rows" can be extracted per block. Giving the ERC20/ERC721/ERC1155 examples is a good idea as we coded it: https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24</i>
-
-**TODO:** <i>How to respect Sink's expected output's type with examples for JSON (maybe CSV))</i>
+The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based protobuf you're responsible for designing for your sink.
 
 ## Understanding the sink tool
 

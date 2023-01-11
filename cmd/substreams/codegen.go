@@ -6,22 +6,20 @@ import (
 	"path/filepath"
 
 	"github.com/jhump/protoreflect/desc"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/manifest"
 )
 
 var codegenCmd = &cobra.Command{
-	Use:          "codegen <package>",
-	Short:        "GenerateProto substreams code from your substreams yaml manifest file",
-	RunE:         runCodeGen,
-	Args:         cobra.ExactArgs(1),
-	SilenceUsage: true,
+	Use:   "codegen <package>",
+	Short: "Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development",
+	RunE:  runCodeGen,
+	Args:  cobra.ExactArgs(1),
 }
 
 func init() {
-	rootCmd.AddCommand(codegenCmd)
+	alphaCmd.AddCommand(codegenCmd)
 }
 
 func runCodeGen(cmd *cobra.Command, args []string) error {

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+
+active_pid=
+
+main() {
+  set -e
+
+  version="unknown"
+  if [[ -f .version ]]; then
+    version=`cat .version`
+  fi
+
+  binary_name="substreams"
+  binary_package="./cmd/${binary_name}"
+
+  pushd "$ROOT" &> /dev/null
+    go install -ldflags "-X main.Version=$version" "${binary_package}"
+  popd &> /dev/null
+
+  if [[ $KILL_AFTER != "" ]]; then
+    "${GOPATH:-$HOME/go}/bin/${binary_name}" "$@" &
+    active_pid=$!
+
+    sleep $KILL_AFTER
+    kill -s TERM $active_pid &> /dev/null || true
+  else
+    exec "${GOPATH:-$HOME/go}/bin/${binary_name}" "$@"
+  fi
+}
+
+main "$@"

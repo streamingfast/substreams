@@ -177,7 +177,7 @@ Flags
 
 ## Verify output from tool
 
-Running the sink tool results in visual output printed to the terminal and directories and files being written to the local system or a cloud provider bucket if configured.
+Running the sink tool results in logging information printed to the terminal and directories and files being written to the local system or a cloud provider bucket if configured.
 
 The sink tool will produce output in the terminal resembling the following for a properly configured and working environment and project.
 

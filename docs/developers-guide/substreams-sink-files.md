@@ -4,6 +4,17 @@ description: StreamingFast Substreams sink files
 
 # `substreams-sink-files` introduction
 
+## Outline
+
+1. Download code and tools
+2. Run code and verify output
+3. Substreams modifications
+4. Understanding the sink tool
+5. Run tool and verify output
+6. Conclusion and review
+
+**<i>TODO: We can delete this outline later if you want, it helps me with development and creation of this content.</i>**
+
 ### Purpose
 
 This documentation exists to assist you in understanding and beginning to use the StreamingFast `substreams-sink-files` tool. The accompanying Substreams module is provided as a basic example of the elements required for sinking blockchain data into files-based storage solutions.
@@ -27,15 +38,6 @@ The accompanying Substreams module associated with this documentation is respons
 The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text.
 
 Binary formats such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to learn more and discuss specifics.
-
-## Outline
-
-1. Download code and tools
-2. Run code and verify output
-3. Substreams modifications
-4. Understanding the sink tool
-5. Run tool and verify output
-6. Conclusion and review
 
 ## Download code and tools
 
@@ -65,7 +67,9 @@ export GOPATH=$HOME/go
 
 The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
 
-**<i>TODO: Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.</i>**
+<b><i>TODO: 'Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.'
+
+NOTE FROM WRITER: This is explained below in more detail. Do you want to move it here? That feels strange to me. Shouldn't we have them run the example first to make sure it's working properly on their machine. Then start explaining the code in more detail (as seen in the Substreams modifications section)?</i></b>
 
 Run the included `make codegen` command to create the required protobuf files.
 

@@ -4,6 +4,10 @@ description: StreamingFast Substreams sink files
 
 # `substreams-sink-files` introduction
 
+### Purpose
+
+This documentation exists to assist you in understanding and beginning to use the StreamingFast `substreams-sink-files` tool. The accompanying Substreams module is provided as a basic example of the elements required for sinking blockchain data into files-based storage solutions.
+
 ### Overview
 
 The `substreams-sink-files` tool provides the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions.

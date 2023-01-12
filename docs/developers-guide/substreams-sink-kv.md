@@ -10,43 +10,32 @@ This documentation will assist you in using `substreams-sink-kv` to write data f
 
 ## Overview
 
-* `substreams-sink-kv` works by reading the output of specially-designed substreams module (usually called `kv_out`) that produces data in a protobuf-encoded structure called `sf.substreams.sink.kv.v1.KVOperations`.
+`substreams-sink-kv` works by reading the output of specially-designed substreams module (usually called `kv_out`) that produces data in a protobuf-encoded structure called `sf.substreams.sink.kv.v1.KVOperations`.
 
-* The data is written to a key-value store (ex: badger, bigtable, TiKV)
+The data is written to a key-value store. Currently supported KV store are Badger, BigTable and TiKV.
 
-* A Connect-Web interface makes the data available directly from the `substreams-sink-kv` process. Alternatively, you can consume the data directly from your key-value store.
+A Connect-Web interface makes the data available directly from the `substreams-sink-kv` process. Alternatively, you can consume the data directly from your key-value store.
 
 ## Requirements
 
-* An existing substreams (including substreams.yaml and rust code) that you want to instrument for `substreams-sink-kv`.
-* (Optional) A key-value store where you want to send your data (a badger local file can be used for development or very-small-scale deployments)
-* Knowledge about substreams development (start [here](https://substreams.streamingfast.io/getting-started/quickstart))
+* An existing substreams (including `substreams.yaml` and Rust code) that you want to instrument for `substreams-sink-kv`.
+* A key-value store where you want to send your data (a badger local file can be used for development)
+* Knowledge about Substreams development (start [here](https://substreams.streamingfast.io/getting-started/quickstart))
 * Rust installation and compiler
 
 ## Installation
 
-* Install [substreams-sink-kv](https://github.com/streamingfast/substreams-sink-kv) latest release
-* Install [substreams](https://github.com/streamingfast/substreams) latest release
-* Install [grpcurl](https://github.com/fullstorydev/grpcurl) to easily read the data back from the KV store
+* Install [substreams-sink-kv CLI](https://github.com/streamingfast/substreams-sink-kv/releases)
+* Install [substreams CLI](https://substreams.streamingfast.io/getting-started/installing-the-cli)
+* Install [grpcurl](https://github.com/fullstorydev/grpcurl/releases) to easily read the data back from the KV store
 
-## Quick test of your setup
-
-
-* Before you start instrumenting your substreams for the `kv-sink`, it may be a good idea to make sure that you can run your substreams normally:
-
-```bash
-substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml some_mapper_module --start-block 1000000 --stop-block +1
-```
-
-> **Note** To connect to a public StreamingFast substreams endpoint, you will need an authentication token, follow this [guide](https://substreams.streamingfast.io/reference-and-specs/authentication) to obtain one.
-
-## Instrumenting your substreams
+## Instrumenting your Substreams
 
 ### Assumptions
 
 The following instructions will assume that you are instrumenting [substreams-eth-block-meta](https://github.com/streamingfast/substreams-eth-block-meta), which contains:
 
-* a store `store_block_meta_end` defined like [this](https://github.com/streamingfast/substreams-eth-block-meta/blob/v0.4.0/substreams.yaml#L29-L34):
+* A store `store_block_meta_end` defined like [this](https://github.com/streamingfast/substreams-eth-block-meta/blob/v0.4.0/substreams.yaml#L29-L34):
 
 ```yaml
 # substreams.yaml
@@ -71,7 +60,7 @@ message BlockMeta {
 
 > **Note** The [substreams-eth-block-meta](https://github.com/streamingfast/substreams-eth-block-meta) is already instrumented for sink-kv, the proposed changes here are a simplified version of what has been implemented. Please adjust the proposed code to your own substreams.
 
-### Import the cargo module
+### Import the Cargo module
 
 1. Add the `substreams-sink-kv` crate to your `Cargo.toml`:
 
@@ -84,7 +73,7 @@ substreams-sink-kv = "0.1.1"
 
 ```
 
-2. Add a `kv_out` module  to your `substreams.yaml`:
+1. Add `map` module implementation function named `kv_out` to your `src/lib.rs`:
 
 
 ```yaml
@@ -99,7 +88,7 @@ substreams-sink-kv = "0.1.1"
       type: proto:sf.substreams.kv.v1.KVOperations
 ```
 
-3. Add a `kv_out` public function to your `src/lib.rs`:
+1. Add a `kv_out` public function to your `src/lib.rs`:
 
 ```rs
 // src/lib.rs
@@ -126,7 +115,7 @@ pub fn kv_out(
 }
 ```
 
-4. Add the `kv::process_deltas` transformation function referenced in the last snippet:
+1. Add the `kv::process_deltas` transformation function referenced in the last snippet:
 ```rs
 // src/kv_out.rs
 
@@ -161,15 +150,15 @@ pub fn process_deltas(ops: &mut KvOperations, deltas: store::Deltas<DeltaProto<B
 cargo build --release --target=wasm32-unknown-unknown
 ```
 
-2. Run with `substreams` command directly:
+1. Run with `substreams` command directly:
 
 ```bash
-substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml some_mapper_module --start-block 1000000 --stop-block +1
+substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml kv_out --start-block 1000000 --stop-block +1
 ```
 
 > **Note** To connect to a public StreamingFast substreams endpoint, you will need an authentication token, follow this [guide](https://substreams.streamingfast.io/reference-and-specs/authentication) to obtain one.
 
-3. Run with `substreams-sink-kv`:
+1. Run with `substreams-sink-kv`:
 
 ```bash
 substreams-sink-kv \
@@ -203,7 +192,7 @@ You should see output similar to this one:
 
 > **Note** This writes the data to a local folder "./badger_data.db/" in Badger format. You can `rm -rf ./badger_data.db` between your tests to cleanup all existing data.
 
-4. Look at the stored data
+1. Look at the stored data
 
 You can scan the whole dataset using the 'Scan' command:
 
@@ -216,6 +205,76 @@ You can look at data by key prefix:
 ```bash
 grpcurl --plaintext   -d '{"prefix": "day:first:201511", "limit":31}' localhost:8000 sf.substreams.sink.kv.v1.Kv/GetByPrefix
 ```
+
+## Consume the key-value data from a web-page using Connect-Web
+
+The [Connect-Web](https://connect.build/docs/web/getting-started) library allows you to quickly bootstrap a web-based client for your key-value store.
+
+### Requirements
+
+* [NodeJS](https://nodejs.dev/download)
+* [npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+* [buf CLI](https://docs.buf.build/installation)
+
+### Start from our example for `substreams-eth-block-meta`
+
+You can checkout and run our connect-web-example like this:
+
+```bash
+git clone git@github.com:streamingfast/substreams-sink-kv
+cd substreams-sink-kv/connect-web-example
+npm install
+npm run dev
+```
+
+Then, enter a key in the text box. The app currently only decodes `eth.block_meta.v1.BlockMeta`, so you will likely receive the corresponding value encoded in hex string.
+
+To decode the value of your own data structures, add your `.proto` files under `proto/` and generate Rust bindings like this:
+
+```bash
+npm run buf:generate
+```
+
+You should see this output:
+
+```
+> connect-web-example@0.0.0 buf:generate
+> buf generate ../proto/substreams/sink/kv/v1 && buf generate ./proto
+```
+
+Then, modify the code from `src/App.tsx` to decode your custom type, from this:
+
+```rust
+    import { BlockMeta } from "../gen/block_meta_pb";
+
+    ...
+
+    const blkmeta = BlockMeta.fromBinary(response.value);
+    output = JSON.stringify(blkmeta, (key, value) => {
+        if (key === "hash") {
+            return "0x" + bufferToHex(blkmeta.hash);
+        }
+        if (key === "parentHash") {
+            return "0x" + bufferToHex(blkmeta.parentHash);
+        }
+        return value;
+    }, 2);
+```
+
+to this:
+
+```rust
+    import { MyData } from "../gen/my_data_pb";
+
+    ...
+
+    const decoded = MyData.fromBinary(response.value);
+    output = JSON.stringify(decoded, null, 2);
+```
+
+### Bootstrap your own application
+
+If you want to start with an empty application, you can follow [these instructions](https://github.com/streamingfast/substreams-sink-kv/tree/main/connect-web-example/README.md)
 
 ## Sending to a production key-value store
 

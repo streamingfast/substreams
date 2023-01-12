@@ -210,7 +210,7 @@ Configuration details for those could be seen at https://github.com/streamingfas
 **6. QUESTION:**
 
 - 'output'
-  <i>how to show the directories and files that get produced, is the logging to the terminal sufficient? The Google style guide restricts using screeshots so that limits using a screen capture of the directories and files that get produced. Should we decribe the output somehow? Please advise.</i>
+  <i>how to show the directories and files that get produced, is the logging to the terminal sufficient? The Google style guide restricts using screenshots so that limits using a screen capture of the directories and files that get produced. Should we describe the output somehow? Please advise.</i>
 - 'inspect'
   <i>I need input for this, not sure what it is.
   </i>

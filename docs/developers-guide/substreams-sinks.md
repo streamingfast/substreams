@@ -51,7 +51,7 @@ StreamingFast provides several tools to assist database persistence for Substrea
 * **PostgreSQL:** A command line tool to [sync a Substreams with a PosgreSQL database](https://github.com/streamingfast/substreams-sink-postgres)
 * **MongoDB:** A command line tool to [sync a Substream with a MongoDB database](https://github.com/streamingfast/substreams-sink-mongodb)
 * **File-based storage:** A command line tool to [sync a Substreams to file-based storage](https://github.com/streamingfast/substreams-sink-files)
-* **Key-value-based storage:** A command line tool to [sync a Substreams to a key-value store](https://github.com/streamingfast/substreams-sink-kv) -- see [tutorial](developers-guide/substreams-sink-kv.md)
+* **Key-value-based storage:** A command line tool to [sync a Substreams to a key-value store](https://github.com/streamingfast/substreams-sink-kv) -- see [tutorial](./substreams-sink-kv.md)
 
 ## **Build a sink**
 

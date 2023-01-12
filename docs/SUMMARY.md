@@ -27,6 +27,7 @@
   * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developers-guide/running-substreams.md)
 * [Substreams sinks](developers-guide/substreams-sinks.md)
+  * [Substreams sink-kv](developers-guide/substreams-sink-kv.md)
 
 ## Reference & Specs
 

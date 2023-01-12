@@ -49,7 +49,11 @@ Clone the `substreams-sink-files` repository to obtain the files required to wor
 git clone https://github.com/streamingfast/substreams-sink-files.git substreams-sink-files-tutorial
 ```
 
-**1. QUESTION:** <i>I'm still not clear on how we want them to install substreams-sink-files. Please advise.</i>
+To install the `substreams-sink-files` tool you need to run the command:
+
+```bash
+go install ./cmd/substreams-sink-files
+```
 
 Checking the version of `substreams-sink-files` will produce a message similar to:
 

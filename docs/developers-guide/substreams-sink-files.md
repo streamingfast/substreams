@@ -4,17 +4,6 @@ description: StreamingFast Substreams sink files
 
 # `substreams-sink-files` introduction
 
-## Outline
-
-1. Download code and tools
-2. Run code and verify output
-3. Substreams modifications
-4. Understanding the sink tool
-5. Run tool and verify output
-6. Conclusion and review
-
-**<i>NOTE: We can delete this outline later if you want, it helps me with development and creation of this content. If you would like to add or remove or restructure the main sections/steps of the document, let's do it here and then work down into the content.</i>**
-
 ### Purpose
 
 This documentation exists to assist you in understanding and beginning to use the StreamingFast `substreams-sink-files` tool. The accompanying Substreams module is provided as a basic example of the elements required for sinking blockchain data into files-based storage solutions.
@@ -25,9 +14,7 @@ The `substreams-sink-files` tool provides the ability to pipe data extracted fro
 
 For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), or other files-based storage solutions, ingest the data.
-
-By using the automated ingestion tasks you can also route the data to [Clickhouse](https://clickhouse.com), custom scripts and other related data storage and processing tools accepting a file format. This can only be accomplished indirectly. It's possible to automate further ingestion from files to data stores.
+Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts, or other files-based storage solutions, ingest the data. This can only be accomplished indirectly. It's possible to automate further ingestion from files to data stores.
 
 You could use `substreams-sink-files` to sink data in `JSONL` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data, extracted by the Substreams, was written.
 
@@ -39,42 +26,19 @@ The accompanying code example extracts four data points from the Block object an
 
 Binary formats such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to learn more and discuss specifics.
 
-## Download code and tools
+## Installation
 
 ### Install `substreams-sink-files`
 
-Clone the `substreams-sink-files` repository to obtain the files required to work with the sink.
+Install `substreams-sink-files` by using the pre-built binary release [available in the official GitHub repository](https://github.com/streamingfast/substreams-sink-files/releases).
 
-```bash
-git clone https://github.com/streamingfast/substreams-sink-files.git substreams-sink-files-tutorial
-```
+Extract `substreams-sink-files` into a folder available in your PATH.
 
-To install the `substreams-sink-files` tool you need to run the command:
-
-```bash
-go install ./cmd/substreams-sink-files
-```
-
-Checking the version of `substreams-sink-files` will produce a message similar to:
-
-```bash
-substreams-sink-files version v0.2.0
-```
-
-Add the following lines to the computer's `~/.bashrc` configuration file and then restart the shell session to use the `substreams-sink-tool` from anywhere on your system.
-
-```bash
-export GOPATH=$HOME/go
-```
+The binary file is installed in your GO_PATH, typically \$HOME/go/bin. Make sure this folder is included in your PATH environment variable.
 
 ### Accompanying code example
 
 The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
-
-**2. QUESTION**:
-<i>'Explanation of what is required from Substreams module perspective. We need to talk here about the Protobuf gen required to pull sf.substreams.sink.files.v1 model and modifications required, e.g. outputting a JSON model for each entity, one entity per line.'
-
-This is explained below in more detail. Do you want to move it here? Shouldn't we have them run the example first to make sure it's working properly on their machine. Then start explaining the code in more detail (as seen in the Substreams modifications section below)?</i>
 
 Run the included `make codegen` command to create the required protobuf files.
 
@@ -118,7 +82,7 @@ The `substreams run` command will result in output resembling the following:
 
 ### Module handler changes for sink
 
-The example code in the [`lib.rs`](#) Rust source code file contains the `jsonl_out` module handler responsible for extracting the blockchain data. The module handler is responsible for passing the data to the `sf.substreams.sink.files.v1` protobuf for the sink tool and its processes.
+The example code in the [`lib.rs`](https://github.com/streamingfast/substreams-sink-files/blob/master/docs/tutorial/src/lib.rs) Rust source code file contains the `jsonl_out` module handler responsible for extracting the blockchain data. The module handler is responsible for passing the data to the `sf.substreams.sink.files.v1` protobuf for the sink tool and its processes.
 
 ```rust
 #[substreams::handlers::map]
@@ -178,11 +142,23 @@ The sink tool will produce output in the terminal resembling the following for a
 2023-01-09T07:45:06.052-0800 INFO (substreams-sink-files) substreams sink stats {"progress_msg_rate": "0.000 msg/s (0 total)", "block_rate": "650.000 blocks/s (1300 total)", "last_block": "#1299 (a0f0f283e0d297dd4bcf4bbff916b1df139d08336ad970e77f26b45f9a521802)"}
 ```
 
+One bundle of data is created for every 10K blocks during the sink process.
+
+### Cursors
+
+When you use Substreams, it sends back a block to a consumer using an opaque cursor. This cursor points to the exact location within the blockchain where the block is. In case your connection terminates or the process restarts, upon re-connection, Substreams sends back the cursor of the last written bundle in the request so that the stream of data can be resumed exactly where it left off and data integrity is maintained.
+
+You will find that the cursor is saved in a file on disk. The location of this file is specified by the flag `--state-store` which points to a local folder. It is important that you ensure that this file is properly saved to a persistent location. If the file is lost, the `substreams-sink-files` tool will restart from the beginning of the chain, redoing all the previous processing.
+
+Therefore, It is crucial that this file is properly persisted and follows your deployment of `substreams-sink-files` to avoid any data loss.
+
+### Limitations
+
+When you use the `substreams-sink-files` tool, you will find that it syncs up to the most recent "final" block of the chain. This means it is not real-time. Additionally, the tool writes bundles to disk when it has seen 10,000 blocks. As a result, the latency of the last available bundle can be delayed by around 10,000 blocks.
+
 ## Conclusion and review
 
 The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](https://substreams.streamingfast.io/developers-guide/substreams-sinks) and sinking strategies.
-
-### Recap
 
 To use `substreams-sink-files` you need to clone the official repository, install the tooling, generate the required files from the substreams CLI for the example Substreams module and run the sink tool.
 
@@ -191,10 +167,6 @@ You have to ensure the sinking strategy has been defined, the appropriate file t
 ---
 
 **-- QUESTIONS --**
-
-**3. QUESTION**: 'There need to have some content about how the limitation of this sink which write bundles only when last block of a bundle is final.'
-
-<i>I need input on this or some type of reference or something to find information for what we want to tell the reader.</i>
 
 **4. QUESTION**: 'Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file).'
 

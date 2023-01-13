@@ -6,11 +6,9 @@ description: Get off the ground by using Substreams by StreamingFast
 
 ## Authentication
 
-Starting quick start redesign.
+Get a StreamingFast API **key** from: [https://app.streamingfast.io](https://app.streamingfast.io).
 
-Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io).
-
-Get an API **Token** by using:
+Get an API **token** by using:
 
 {% code overflow="wrap" %}
 
@@ -45,53 +43,54 @@ The [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line
 **Tip**: Try the [Python](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python) example if you prefer streaming by using third-party languages.
 {% endhint %}
 
-## Platform independent Substreams
+## Build a Substreams from scratch
 
-Substreams is platform independent, meaning you can use many different blockchains.&#x20;
+### 1. Create Substreams manifest
 
-Developers select a specific blockchain and build a Substreams module tailored to the selected chain.&#x20;
+To create a "Substreams module" you need to first create the manifest file. The example manifest provided is taken from the `substreams-ethereum-tutorial`, available in [its official GitHub repository](https://github.com/streamingfast/substreams-ethereum-tutorial). The minimal amount of fields are defined in the example demonstrating the core values you need to provide.
 
-Data is available for any blockchain exposing an operational Firehose endpoint, installed and set up in [an on-premises environment](https://firehose.streamingfast.io/firehose-setup/ethereum/installation-1), or [provided by StreamingFast](../reference-and-specs/chains-and-endpoints.md) or other vendors.
+Copy and paste the example manifest into a new file named substreams.yaml and save it to the root, or main, directory of your Substreams module.
 
-{% hint style="info" %}
-**Note**: The remaining documentation assumes the [`substreams` CLI](../reference-and-specs/command-line-interface.md) and all other required dependencies have been installed and a [StreamingFast authentication token](../reference-and-specs/authentication.md) has been obtained.&#x20;
-{% endhint %}
+```yaml
+specVersion: v0.1.0
+package:
+  name: 'substreams_ethereum_tutorial'
+  version: v0.1.0
 
-### **Basics**
+protobuf:
+  files:
+    - basicexample.proto
+  importPaths:
+    - ./proto
 
-The most basic approach to use Substreams is through the [`substreams` CLI](../reference-and-specs/command-line-interface.md), passing an endpoint and the name of the Rust function, or module handler, used by the compute engine for processing.&#x20;
+imports:
+  eth: https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg
 
-The manifest defines the name of the module handler and the protocol buffer to use as the data definition for the Substreams module.&#x20;
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: target/wasm32-unknown-unknown/release/substreams_ethereum_tutorial.wasm
 
-The commands demonstrate how Substreams modules work by using the selected blockchain and instructing the compute engine to execute the `map_basic_eth` or `map_basic_sol` Rust functions, also called "_module handlers_".
-
-Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Ethereum example by using:
-
-{% code title="etheruem substreams run" overflow="wrap" %}
-
-```bash
-substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 10000001 --stop-block +1
+modules:
+  - name: map_basic_eth
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:eth.basicexample.v1.BasicExampleProtoData
 ```
 
-{% endcode %}
+### 2. Create Rust configuration file
 
-Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Solana example by using:
+Your new Substreams module also needs a Rust configuration file. The example configuration file is taken from the `substreams-ethereum-tutorial`.
 
-{% code title="solana substreams run" overflow="wrap" %}
+Copy and paste the content for the example configuration file into a new file named `Cargo.toml` and save it to the root, or main, directory of your Substreams module.
 
-```bash
-substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.yaml map_basic_sol
-```
+It's important to provide a unique and useful value for the name field. Also, make sure the `crate-type = ["cdylib"]` is defined so WASM is generated.
 
-{% endcode %}
+Include any dependencies on Substreams crates for helpers and `prost` for protobuf encoding and decoding.
 
-Different blockchains have specific requirements for their data definitions. The code in the module handlers needs to be updated to match the expectations of the separate blockchains.
-
-## **Crates and packages**
-
-Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project.
-
-{% code title="Cargo.toml" overflow="wrap" lineNumbers="true" %}
+Lastly, use the values provided in the example for the `profile.release` section to build an optimized `.WASM` file for your module.
 
 ```toml
 [package]
@@ -104,7 +103,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 substreams = "0.5.0"
+substreams-ethereum = "0.8.0"
 prost = "0.11"
+num-bigint = "0.4"
 
 [profile.release]
 lto = true
@@ -112,47 +113,36 @@ opt-level = 's'
 strip = "debuginfo"
 ```
 
-{% endcode %}
+### 3. Create protobufs
 
-Install the Rust crate for the chain you want to use. The crates have the protobuf models for the specific chains and helper code. Run the `cargo` `add` command to obtain the Substreams crates and specify the name of the crate for the blockchain you want to use.
+Substreams modules are required to output protobuf encoded messages. The example protobuf definition from the `substreams-ethereum-tutorial` defines a field for the blockchain version. The value is set in the Substreams module handler.
 
-Acquire the Ethereum crate for Substreams by using:
+Copy and paste the content for the example protobuf definition into a new file named `BasicExampleProtoData.proto` and save it to a `proto` directory in the root, or main directory, of your Substreams module.
 
-```bash
-$ cargo add substreams-ethereum
+```
+syntax = "proto3";
+
+package eth.basicexample.v1;
+
+message BasicExampleProtoData {
+  int32 version = 1;
+}
 ```
 
-Acquire the Solana crate for Substreams by using:
+4. Create Rust library and module handlers
 
-```bash
-$ cargo add substreams-solana
-```
+Every Substreams module contains a Rust library housing the "module handlers" responsible for handling blockchain data injected into them at runtime. The module handler in the EXAMPLE extracts the version from the Block object in the `block.ver` property. The value is logged to the terminal and assigned to the `version` field of the `BasicExampleProtoData` protobuf.
 
-{% hint style="success" %}
-**Tip**: Crates are used when they are available for the chosen blockchain.\
-\
-Alternatively, generate the Rust structs from one of the chain-specific `spkg` packages, which contain the protobuf modules. [Read through the Rust crates documentation](../reference-and-specs/rust-crates.md) for details.
-{% endhint %}
-
-## Quickstart examples overview
-
-The relationships for the flow of data are defined in the Substreams manifest. Further information is available in the documentation for [defining complex data strategies](../reference-and-specs/manifests.md) through manifest files.
-
-### Ethereum example
-
-Clone or download the Ethereum example codebase to get started. The example is located in the official [Substreams Ethereum Tutorial GitHub repository](https://github.com/streamingfast/substreams-ethereum-tutorial).
-
-Take a moment to explore the codebase. Take note of the chain name used through the different files including the [manifest](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/substreams-ethereum-tutorial.yaml), and the [TOML build configuration file](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml).&#x20;
-
-Also take note of the module handler, defined in [`lib.rs`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs), and the custom protobuf definition in the proto directory named [`basicexample.proto`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto).
-
-{% hint style="info" %}
-**Note**: The module handler in the [`lib.rs`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs) file for the Ethereum example has code specific to the blockchain. The basic block structure for Ethereum blocks can be viewed in the code excerpt.
-{% endhint %}
-
-{% code title="src/lib.rs" overflow="wrap" %}
+Copy the example module handler into a new Rust source code file and use the filename `lib.rs`. Make sure the Rust library source code file is saved to the `src` directory in the root, or main directory, of the Substreams module.
 
 ```rust
+mod pb;
+
+use pb::basicexample;
+
+use substreams::{log};
+use substreams_ethereum::{pb as ethpb};
+
 #[substreams::handlers::map]
 fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
     log::info!("block.ver: {:#?}", block.ver);
@@ -161,113 +151,16 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 }
 ```
 
-{% endcode %}
+### 5. Execute
 
-Follow this sequence of steps to use the example:
-
-1. Run the command to generate the required protobufs.
-2. Compile the example using the Rust compiler.
-3. Send commands to the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
-
-Generate the structs from the protobuf specified in the [`substreams-ethereum-tutorial.yaml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/substreams-ethereum-tutorial.yaml) configuration file by using the `protogen` command:
-
-{% code title="substreams protogen" overflow="wrap" %}
+To execute, or run, the example use the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command:
 
 ```bash
-substreams protogen substreams-ethereum-tutorial.yaml
+substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 10000001 --stop-block +1
 ```
 
-{% endcode %}
+### 6. Next steps
 
-Compile the project by using:
+Discuss the fact that substreams-template should be cloned when starting a new project.
 
-```bash
-cargo build --release --target wasm32-unknown-unknown
-```
-
-Start the project by using the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command:
-
-{% code overflow="wrap" %}
-
-```bash
-substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 1000000 --stop-block +1
-```
-
-{% endcode %}
-
-### Solana example
-
-The procedure to use the Solana example is very similar to the Ethereum example.&#x20;
-
-Clone or download the Solana example codebase. The example is located in the official [Substreams Solana Tutorial GitHub repository](https://github.com/streamingfast/substreams-solana-tutorial).
-
-After cloning the Solana example, take a moment to look through the repository. Differences from the Ethereum example stand out immediately.
-
-A very important distinction between the two examples is the module handler code. Different blockchains have their own architectures, implementations, and data structures. Blocks for Ethereum, Solana, or even Bitcoin are constructed and designed differently. Some of the differences are small and subtle, others are not.
-
-Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the _`block`_ passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields of the _`block`_ it receives. The disparities in the field names are due to differences in the block model for the separate blockchains.
-
-{% code title="src/lib.rs" overflow="wrap" %}
-
-```rust
-#[substreams::handlers::map]
-fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
-    log::info!("block.previous_blockhash: {:#?}", block.previous_blockhash);
-    log::info!("block.blockhash: {:#?}", block.blockhash);
-    log::info!("block.slot: {:#?}", block.slot);
-    Ok(basicexample::BasicExampleProtoData {blockhash: block.blockhash})
-}
-```
-
-{% endcode %}
-
-Follow the same steps [used for the Ethereum example](quickstart.md#ethereum-example) to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) the Solana example.
-
-{% code overflow="wrap" %}
-
-```basic
-substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yaml sol_basic_mapper --start-block 10000000 --stop-block +1
-```
-
-{% endcode %}
-
-{% hint style="info" %}
-Note: The Solana example has a different endpoint, module name, and manifest filename that are passed to the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command.
-{% endhint %}
-
-## **Next steps**
-
-Some important things to remember when using Substreams include:
-
-- Substreams can be used across multiple blockchains, as it is platform independent.
-- Each blockchain has its own unique structure and model for block data.
-- Different blockchains have different Substreams endpoints and packages.
-- Custom protobufs are used to transfer data between modules.
-
-{% hint style="info" %}
-**Note**: Gaining a basic understanding of how Substreams works across multiple blockchains enables you to graduate to build even more complex solutions.
-
-Understanding `map` and `store` modules are important for learning how to design and craft a DAG in your Substreams manifest.
-{% endhint %}
-
-Additional information is available for [understanding modules](../concepts-and-fundamentals/modules.md) and sample code and projects are located in the [Developer's guide](../developers-guide/overview.md).&#x20;
-
-Visit the [Substreams Template](https://github.com/streamingfast/substreams-template) repository and [Substreams Playground](https://github.com/streamingfast/substreams-playground) to expedite the process of getting up and running.
-
-## **Troubleshooting and errors**
-
-### **Requesting block types from the wrong chain endpoint**
-
-{% code overflow="wrap" %}
-
-```shell
-Error: rpc error: code = InvalidArgument desc = validate request: input source "type:\"sf.solana.type.v1.Block\"" not supported, only "sf.ethereum.type.v2.Block" and 'sf.substreams.v1.Clock' are valid
-```
-
-{% endcode %}
-
-To avoid requesting data for the wrong blockchain, make sure to double-check the endpoint being sent to the [`substreams`CLI](../reference-and-specs/command-line-interface.md) against the code and settings within the Substreams codebase. It is important to note that data from one blockchain is not compatible with others, and the RPC error you are receiving is indicating a block data disparity issue.&#x20;
-
-{% hint style="warning" %}
-**Important**: To resolve this problem, review the codebase to ensure it meets the requirements of the blockchain configuration for your code. The error occurs when the codebase expects blocks from Ethereum, but the [`substreams`CLI](../reference-and-specs/command-line-interface.md) is receiving blocks from Solana instead.
-{% endhint %}
+Pointers to other materials.

@@ -11,7 +11,7 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20221209144659-0fb1074db0f3
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20221125175206-82e01d420d45
-	github.com/streamingfast/dgrpc v0.0.0-20221031174241-978a7951c117
+	github.com/streamingfast/dgrpc v0.0.0-20230113212008-1898f17e0ac7
 	github.com/streamingfast/dstore v0.1.1-0.20221206141230-6d7bdda8687f
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
@@ -36,10 +36,10 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-testing-interface v1.14.1
 	github.com/prometheus/client_golang v1.12.1
-	github.com/rs/cors v1.8.2
+	github.com/rs/cors v1.8.3
 	github.com/streamingfast/dauth v0.0.0-20221027185237-b209f25fa3ff
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
-	github.com/streamingfast/sf-tracing v0.0.0-20221028154401-fd8a9e72bfc5
+	github.com/streamingfast/sf-tracing v0.0.0-20221104190152-7f721cb9b60c
 	github.com/streamingfast/shutter v1.5.0
 	github.com/test-go/testify v1.1.4
 	github.com/tidwall/pretty v1.2.0
@@ -64,7 +64,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v0.32.3 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.8.6 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.32.6 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.0.0-20221018185641-36f91511cfd7 // indirect
 	github.com/aws/aws-sdk-go v1.37.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect

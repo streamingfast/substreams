@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui"
-	"google.golang.org/grpc"
 )
 
 func init() {
@@ -132,7 +131,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	ui.SetRequest(req)
 	ui.Connecting()
-	callOpts = append(callOpts, grpc.WaitForReady(false))
 	cli, err := ssClient.Blocks(streamCtx, req, callOpts...)
 	if err != nil && streamCtx.Err() != context.Canceled {
 		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)

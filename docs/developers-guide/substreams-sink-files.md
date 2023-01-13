@@ -144,6 +144,24 @@ The sink tool will produce output in the terminal resembling the following for a
 
 One bundle of data is created for every 10K blocks during the sink process.
 
+To view the files the `substreams-sink-files` tool generates navigate into the directory you used for the output path. The directory referenced in the example points to the `localdata/out` directory. List the files in the output directory using the standard `ls` command to reveal the files created by the `substreams-sink-files` tool.
+
+```bash
+...
+0000000000-0000010000.jsonl	0000090000-0000100000.jsonl	0000180000-0000190000.jsonl
+0000010000-0000020000.jsonl	0000100000-0000110000.jsonl	0000190000-0000200000.jsonl
+0000020000-0000030000.jsonl	0000110000-0000120000.jsonl	0000200000-0000210000.jsonl
+0000030000-0000040000.jsonl	0000120000-0000130000.jsonl	0000210000-0000220000.jsonl
+0000040000-0000050000.jsonl	0000130000-0000140000.jsonl	0000220000-0000230000.jsonl
+0000050000-0000060000.jsonl	0000140000-0000150000.jsonl	0000230000-0000240000.jsonl
+0000060000-0000070000.jsonl	0000150000-0000160000.jsonl	0000240000-0000250000.jsonl
+0000070000-0000080000.jsonl	0000160000-0000170000.jsonl	0000250000-0000260000.jsonl
+0000080000-0000090000.jsonl	0000170000-0000180000.jsonl
+...
+```
+
+The block range spanned by the example is from block 0000090000 to block 0000180000. The blocks contain all the lines received for the full 10K of processed blocks by default. The block range is controlled by using the `--file-block-count` flag.
+
 ### Cursors
 
 When you use Substreams, it sends back a block to a consumer using an opaque cursor. This cursor points to the exact location within the blockchain where the block is. In case your connection terminates or the process restarts, upon re-connection, Substreams sends back the cursor of the last written bundle in the request so that the stream of data can be resumed exactly where it left off and data integrity is maintained.
@@ -151,6 +169,10 @@ When you use Substreams, it sends back a block to a consumer using an opaque cur
 You will find that the cursor is saved in a file on disk. The location of this file is specified by the flag `--state-store` which points to a local folder. It is important that you ensure that this file is properly saved to a persistent location. If the file is lost, the `substreams-sink-files` tool will restart from the beginning of the chain, redoing all the previous processing.
 
 Therefore, It is crucial that this file is properly persisted and follows your deployment of `substreams-sink-files` to avoid any data loss.
+
+### Cloud-based storage
+
+You can use the `substreams-sink-files` tool to route data to files on your local file system and cloud-based storage solutions. To use a cloud-based solution such as Google Cloud Storage bucket, S3 compatible bucket, or Azure bucket, you need to make sure it is set up properly. Then, instead of referencing a local file in the `substreams-sink-files run` command, use the path to the bucket. The paths resemble `gs://<bucket>/<path>`, `s3://<bucket>/<path>`, and `az://<bucket>/<path>` respectively. Be sure to update the values according to your account and provider.
 
 ### Limitations
 

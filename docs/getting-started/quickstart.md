@@ -6,15 +6,19 @@ description: Get off the ground by using Substreams by StreamingFast
 
 ## Authentication
 
+Starting quick start redesign.
+
 Get a StreamingFast API **Key** from: [https://app.streamingfast.io](https://app.streamingfast.io).
 
 Get an API **Token** by using:
 
 {% code overflow="wrap" %}
+
 ```bash
 export STREAMINGFAST_KEY=server_123123 # Use your own key
 export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
 ```
+
 {% endcode %}
 
 See the[ authentication](../reference-and-specs/authentication.md) page for details.&#x20;
@@ -28,9 +32,11 @@ See the[ authentication](../reference-and-specs/authentication.md) page for deta
 After you have authenticated, you're ready to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) your first Substreams by using:
 
 {% code title="substreams run" overflow="wrap" %}
+
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-template/releases/download/v0.2.0/substreams-template-v0.2.0.spkg map_transfers --start-block 12292922 --stop-block +1
 ```
+
 {% endcode %}
 
 The [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_transfers` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
@@ -62,17 +68,21 @@ The commands demonstrate how Substreams modules work by using the selected block
 Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Ethereum example by using:
 
 {% code title="etheruem substreams run" overflow="wrap" %}
+
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 10000001 --stop-block +1
 ```
+
 {% endcode %}
 
 Use the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command for the Solana example by using:
 
 {% code title="solana substreams run" overflow="wrap" %}
+
 ```bash
 substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-tutorial.yaml map_basic_sol
 ```
+
 {% endcode %}
 
 Different blockchains have specific requirements for their data definitions. The code in the module handlers needs to be updated to match the expectations of the separate blockchains.
@@ -82,6 +92,7 @@ Different blockchains have specific requirements for their data definitions. The
 Create a [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml) at the root of your project.
 
 {% code title="Cargo.toml" overflow="wrap" lineNumbers="true" %}
+
 ```toml
 [package]
 name = "substreams-ethereum-tutorial"
@@ -100,6 +111,7 @@ lto = true
 opt-level = 's'
 strip = "debuginfo"
 ```
+
 {% endcode %}
 
 Install the Rust crate for the chain you want to use. The crates have the protobuf models for the specific chains and helper code. Run the `cargo` `add` command to obtain the Substreams crates and specify the name of the crate for the blockchain you want to use.
@@ -139,6 +151,7 @@ Also take note of the module handler, defined in [`lib.rs`](https://github.com/s
 {% endhint %}
 
 {% code title="src/lib.rs" overflow="wrap" %}
+
 ```rust
 #[substreams::handlers::map]
 fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
@@ -147,6 +160,7 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
     Ok(basicexample::BasicExampleProtoData {version: block.ver})
 }
 ```
+
 {% endcode %}
 
 Follow this sequence of steps to use the example:
@@ -158,9 +172,11 @@ Follow this sequence of steps to use the example:
 Generate the structs from the protobuf specified in the [`substreams-ethereum-tutorial.yaml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/substreams-ethereum-tutorial.yaml) configuration file by using the `protogen` command:
 
 {% code title="substreams protogen" overflow="wrap" %}
+
 ```bash
 substreams protogen substreams-ethereum-tutorial.yaml
 ```
+
 {% endcode %}
 
 Compile the project by using:
@@ -172,9 +188,11 @@ cargo build --release --target wasm32-unknown-unknown
 Start the project by using the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command:
 
 {% code overflow="wrap" %}
+
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 1000000 --stop-block +1
 ```
+
 {% endcode %}
 
 ### Solana example
@@ -190,6 +208,7 @@ A very important distinction between the two examples is the module handler code
 Notice the Solana module handler uses the `previous_blockhash`, `blockhash,` and `slot` fields of the _`block`_ passed into the handler by Substreams. The Ethereum example's module handler uses the `ver` and `number` fields of the _`block`_ it receives. The disparities in the field names are due to differences in the block model for the separate blockchains.
 
 {% code title="src/lib.rs" overflow="wrap" %}
+
 ```rust
 #[substreams::handlers::map]
 fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
@@ -199,14 +218,17 @@ fn map_basic_sol(block: solpb::sol::v1::Block) -> Result<basicexample::BasicExam
     Ok(basicexample::BasicExampleProtoData {blockhash: block.blockhash})
 }
 ```
+
 {% endcode %}
 
 Follow the same steps [used for the Ethereum example](quickstart.md#ethereum-example) to [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) the Solana example.
 
 {% code overflow="wrap" %}
+
 ```basic
 substreams run -e mainnet.sol.streamingfast.io:443 substreams-solana-example.yaml sol_basic_mapper --start-block 10000000 --stop-block +1
 ```
+
 {% endcode %}
 
 {% hint style="info" %}
@@ -217,10 +239,10 @@ Note: The Solana example has a different endpoint, module name, and manifest fil
 
 Some important things to remember when using Substreams include:
 
-* Substreams can be used across multiple blockchains, as it is platform independent.
-* Each blockchain has its own unique structure and model for block data.
-* Different blockchains have different Substreams endpoints and packages.
-* Custom protobufs are used to transfer data between modules.
+- Substreams can be used across multiple blockchains, as it is platform independent.
+- Each blockchain has its own unique structure and model for block data.
+- Different blockchains have different Substreams endpoints and packages.
+- Custom protobufs are used to transfer data between modules.
 
 {% hint style="info" %}
 **Note**: Gaining a basic understanding of how Substreams works across multiple blockchains enables you to graduate to build even more complex solutions.
@@ -237,9 +259,11 @@ Visit the [Substreams Template](https://github.com/streamingfast/substreams-temp
 ### **Requesting block types from the wrong chain endpoint**
 
 {% code overflow="wrap" %}
+
 ```shell
 Error: rpc error: code = InvalidArgument desc = validate request: input source "type:\"sf.solana.type.v1.Block\"" not supported, only "sf.ethereum.type.v2.Block" and 'sf.substreams.v1.Clock' are valid
 ```
+
 {% endcode %}
 
 To avoid requesting data for the wrong blockchain, make sure to double-check the endpoint being sent to the [`substreams`CLI](../reference-and-specs/command-line-interface.md) against the code and settings within the Substreams codebase. It is important to note that data from one blockchain is not compatible with others, and the RPC error you are receiving is indicating a block data disparity issue.&#x20;

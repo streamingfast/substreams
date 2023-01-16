@@ -118,56 +118,48 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 //	return c.LoadAtBlock(ctx, c.BoundedRange.ExclusiveEndBlock)
 //}
 
+//	func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
+//		c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
 //
-//func (c *File) LoadAtBlock(ctx context.Context, atBlock uint64) (found bool, err error) {
-//	c.logger.Info("loading cache at block", zap.Uint64("at_block_num", atBlock))
+//		c.outputData = &pboutput.Map{
+//			Kv: make(map[string]*pboutput.Item),
+//		}
 //
-//	c.outputData = &pboutput.Map{
-//		Kv: make(map[string]*pboutput.Item),
-//	}
+//		blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
+//		if err != nil {
+//			return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
+//		}
 //
-//	blockRange, found, err := findBlockRange(ctx, c.store, atBlock)
-//	if err != nil {
-//		return found, fmt.Errorf("computing block range for module %q: %w", c.ModuleName, err)
-//	}
+//		c.logger.Debug("block range found", zap.Object("block_range", blockRange))
 //
-//	c.logger.Debug("block range found", zap.Object("block_range", blockRange))
+//		if !found {
+//			// TODO(abourget): it's not this object's business to go over boundaries,
+//			//  use the BoundedRange object on it to switch, and change files.
+//			//  In any case, this will belong to the Writer or to a consuming object
+//			//  not within the "File" to switch bounds. The caller might call "NextBoundary()"
+//			//  and get a new File, and manage it itself.
+//			endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
+//			blockRange = block.NewRange(atBlock, endBlockRange)
+//			c.BoundedRange = blockRange
+//			return found, nil
+//		}
 //
-//	if !found {
-//		// TODO(abourget): it's not this object's business to go over boundaries,
-//		//  use the BoundedRange object on it to switch, and change files.
-//		//  In any case, this will belong to the Writer or to a consuming object
-//		//  not within the "File" to switch bounds. The caller might call "NextBoundary()"
-//		//  and get a new File, and manage it itself.
-//		endBlockRange := (atBlock - (atBlock % c.saveBlockInterval)) + c.saveBlockInterval
-//		blockRange = block.NewRange(atBlock, endBlockRange)
-//		c.BoundedRange = blockRange
+//		err = c.Load(ctx, blockRange)
+//		if err != nil {
+//			return false, fmt.Errorf("loading cache at %d: %w", atBlock, err)
+//		}
+//
+//		c.loadedFromStore = true
+//
 //		return found, nil
-//	}
 //
-//	err = c.Load(ctx, blockRange)
-//	if err != nil {
-//		return false, fmt.Errorf("loading cache at %d: %w", atBlock, err)
-//	}
-//
-//	c.loadedFromStore = true
-//
-//	return found, nil
-//
-//}
+// }
 func (c *File) Load(ctx context.Context) (loaded bool, err error) {
 	filename := computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
 	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.BoundedRange))
 
-	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		objectReader, err := c.store.OpenObject(ctx, filename)
-		if err == dstore.ErrNotFound {
-			// TODO(abourget,stepd): proper design would be that RetryContext could handle a `NotRetryableError`
-			//  that would terminate the Retry loop, and unwrap the NotRetryableError and return it
-			//  to the caller.
-			//  We're hacking our way here.
-			return nil
-		}
 		if err != nil {
 			return fmt.Errorf("loading block reader %s: %w", filename, err)
 		}
@@ -189,6 +181,7 @@ func (c *File) Load(ctx context.Context) (loaded bool, err error) {
 		loaded = true
 		return nil
 	})
+
 	return
 }
 
@@ -211,7 +204,7 @@ func (c *File) Save(ctx context.Context) (func(), error) {
 	return func() {
 		c.logger.Info("writing execution output file", zap.String("filename", filename))
 
-		err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 			reader := bytes.NewReader(cnt)
 			err := c.store.WriteObject(ctx, filename, reader)
 			return err

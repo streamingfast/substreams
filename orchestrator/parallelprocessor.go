@@ -138,6 +138,9 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 	if b.execOutputReader != nil {
 		select {
 		case <-b.execOutputReader.Terminated():
+			if err := b.execOutputReader.Err(); err != nil {
+				return nil, err
+			}
 		case <-ctx.Done():
 		}
 	}

@@ -3,7 +3,9 @@ package tools
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -33,31 +35,33 @@ var decodeCmd = &cobra.Command{
 }
 
 var decodeOutputsModuleCmd = &cobra.Command{
-	Use:   "outputs <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Use:   "outputs <module_name> <output_url> <block_number> <key> <manifest_file>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		When running this outputs command with a mapper or a store the key will be the block hash. The key is optional
-		as it will return all the keys on the given block.
+		as it will return all the keys on the given block. The manifest is also optional as it will try to find one in 
+		your pwd.
 	`),
 	Example: cli.Dedent(`
-		substreams tools decode outputs uniswap-v3.spkg map_pools_created [bucket-url-path] 12487090 <optional_key>
-		substreams tools decode outputs uniswap-v3.spkg store_pools [bucket-url-path] 12487090 <optional_key>
+		substreams tools decode outputs map_pools_created [bucket-url-path] 12487090 <optional_key>
+		substreams tools decode outputs store_pools [bucket-url-path] 12487090 <optional_key> <optional_manifest_file>
 	`),
 	RunE:         runDecodeOutputsModuleRunE,
-	Args:         cobra.MinimumNArgs(4),
+	Args:         cobra.MinimumNArgs(3),
 	SilenceUsage: true,
 }
 
 var decodeStatesModuleCmd = &cobra.Command{
-	Use:   "states <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Use:   "states <module_name> <output_url> <block_number> <key> <manifest_file>",
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
-		to the user. The user needs to specify a key as it is required.
+		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find 
+		one in your pwd.
 	`),
 	Example: cli.Dedent(`
-		substreams tools decode states uniswap-v3.spkg store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
-		substreams tools decode states uniswap-v3.spkg store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		substreams tools decode states store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+		substreams tools decode states store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e [optional-manifest-file]
 	`),
 	RunE:         runDecodeStatesModuleRunE,
 	Args:         cobra.MinimumNArgs(4),
@@ -147,27 +151,43 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 
 func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	manifestPath := args[0]
-	moduleName := args[1]
-	storeUrl := args[2]
+	moduleName := args[0]
+	storeUrl := args[1]
 	saveInterval := mustGetUint64(cmd, "save-interval")
-	blockNumber, err := strconv.ParseUint(args[3], 10, 64)
+	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
 	}
 
 	key := ""
+	if len(args) > 3 {
+		key = args[3]
+	}
+
+	manifestPath := ""
 	if len(args) > 4 {
-		key = args[4]
+		manifestPath = args[4]
+	} else {
+		manifestPathInfo, err := os.Stat("manifest.yaml")
+		if err == nil {
+			manifestPath = manifestPathInfo.Name()
+		} else if errors.Is(err, os.ErrNotExist) {
+			potentialPath := fmt.Sprintf("%s/manifest.yaml", args[4])
+			manifestPathInfo, err = os.Stat(potentialPath)
+			if errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("reading manifest inputed: %w", err)
+			}
+		}
+
 	}
 
 	zlog.Info("decoding module",
-		zap.String("manifest_path", manifestPath),
 		zap.String("module_name", moduleName),
 		zap.String("store_url", storeUrl),
 		zap.Uint64("block_number", blockNumber),
 		zap.Uint64("save_internal", saveInterval),
 		zap.String("key", key),
+		zap.String("manifest_path", manifestPath),
 	)
 
 	s, err := dstore.NewStore(storeUrl, "zst", "zstd", false)

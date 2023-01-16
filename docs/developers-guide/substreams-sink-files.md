@@ -6,7 +6,7 @@ description: StreamingFast Substreams sink files
 
 ### Purpose
 
-This documentation exists to assist you in understanding and beginning to use the StreamingFast `substreams-sink-files` tool. The accompanying Substreams module is provided as a basic example of the elements required for sinking blockchain data into files-based storage solutions.
+This documentation exists to assist you in understanding and beginning to use the StreamingFast `substreams-sink-files` tool. The Substreams module paired with this tutorial is a basic example of the elements required for sinking blockchain data into files-based storage solutions.
 
 ### Overview
 
@@ -14,7 +14,7 @@ The `substreams-sink-files` tool provides the ability to pipe data extracted fro
 
 For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be setup to have [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts, or other files-based storage solutions, ingest the data. This can only be accomplished indirectly. It's possible to automate further ingestion from files to data stores.
+Substreams modules are created and prepared specifically for the sink tool. After the sink tool begins running, automated tasks can be set up to have [BigQuery](https://cloud.google.com/bigquery), [Clickhouse](https://clickhouse.com), custom scripts, or other files-based storage solutions, ingest the data. This can only be accomplished indirectly. It's possible to automate further ingestion from files to data stores.
 
 You could use `substreams-sink-files` to sink data in `JSONL` format to a [Google Cloud Storage (GCS)](https://cloud.google.com/storage) bucket and configure a BigQuery Transfer job to run every 15 minutes. The scheduled job ingests the new files found in the GCS bucket where the data, extracted by the Substreams, was written.
 
@@ -32,13 +32,11 @@ Binary formats such as [Avro](https://avro.apache.org/) or [Parquet](https://par
 
 Install `substreams-sink-files` by using the pre-built binary release [available in the official GitHub repository](https://github.com/streamingfast/substreams-sink-files/releases).
 
-Extract `substreams-sink-files` into a folder available in your PATH.
-
-The binary file is installed in your GO_PATH, typically \$HOME/go/bin. Make sure this folder is included in your PATH environment variable.
+Extract `substreams-sink-files` into a folder and ensure this folder is referenced globally via your `PATH` environment variable.
 
 ### Accompanying code example
 
-The accompanying code example for this tutorial is available in the `substreams-sink-tool` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
+The accompanying code example for this tutorial is available in the `substreams-sink-files` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
 
 Run the included `make codegen` command to create the required protobuf files.
 
@@ -102,7 +100,7 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 }
 ```
 
-The module handler uses `JSONL` for the output type, `CSV` is also supported.. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
+This module handler uses `JSONL` for the output type, any other plain-text line-based format can be supported, `CSV` for example. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
 The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based protobuf you're responsible for designing for your sink.
 
@@ -160,7 +158,7 @@ To view the files the `substreams-sink-files` tool generates navigate into the d
 ...
 ```
 
-The block range spanned by the example is from block 0000090000 to block 0000180000. The blocks contain all the lines received for the full 10K of processed blocks by default. The block range is controlled by using the `--file-block-count` flag.
+The blocks contain all the lines received for the full 10K of processed blocks by default. The block range is controlled by using the `--file-block-count` flag.
 
 ### Cursors
 
@@ -185,30 +183,3 @@ The ability to route data extracted from the blockchain by using Substreams is p
 To use `substreams-sink-files` you need to clone the official repository, install the tooling, generate the required files from the substreams CLI for the example Substreams module and run the sink tool.
 
 You have to ensure the sinking strategy has been defined, the appropriate file types have been targeted, and accounted for, and the module handler code in your Substreams module has been properly updated. You need to start the `substreams-sink-files` tool and use the `run` command being sure to provide all of the required values for the various flags.
-
----
-
-**-- QUESTIONS --**
-
-**4. QUESTION**: 'Add discussion about where Substreams cursor is saved and importance of persisting this state (save as a .yaml file).'
-
-<i>I need input on this or some type of reference or something to find information for what we want to tell the reader.</i>
-
-**5. QUESTION**:
-'Add discussion about s3, gcs, etc. vs. local files'
-
-<i>Where do we want to put this in the document, what section?</i>
-
-'A local folder
-A Google Cloud Storage Bucket (gs://<bucket>/<path>)
-An S3 compatible Bucket (s3://<bucket>/<path>)
-An Azure bucket (az://<bucket>/<path>)
-Configuration details for those could be seen at https://github.com/streamingfast/dstore#features'
-
-**6. QUESTION:**
-
-- 'output'
-  <i>how to show the directories and files that get produced, is the logging to the terminal sufficient? The Google style guide restricts using screenshots so that limits using a screen capture of the directories and files that get produced. Should we describe the output somehow? Please advise.</i>
-- 'inspect'
-  <i>I need input for this, not sure what it is.
-  </i>

@@ -143,7 +143,7 @@ substreams protogen substreams-ethereum-tutorial.yaml
 
 ### 4. Create Substreams module handlers
 
-Your Substreams module must contain a Rust library that houses the "module handlers." These handlers are responsible for handling blockchain data injected into the module at runtime. The example module handler extracts the version from the <i>Block</i> object in the `block.ver` property, logs it to the terminal, and assigns it to the `version` field of the [`BasicExampleProtoData`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto) protobuf.
+Your Substreams module must contain a Rust library that houses the "module handlers." These handlers are responsible for handling blockchain data injected into the module at runtime.
 
 To include this example module handler in your module, copy it into a new Rust source code file. Use the filename [`lib.rs`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/src/lib.rs) for this file. Make sure to save the Rust library source code file in the `src` directory, located in the root directory of your Substreams module.
 
@@ -154,13 +154,20 @@ mod pb;
 
 use pb::basicexample;
 
-use substreams::{log};
+use substreams::{log, Hex};
 use substreams_ethereum::{pb as ethpb};
 
 #[substreams::handlers::map]
 fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
+
+    let header = block.header.as_ref().unwrap();
+
     log::info!("block.number: {:#?}", block.number);
-    Ok(basicexample::BasicExampleProtoData {version: block.ver})
+    log::info!("block.hash: {:#?}",  Hex(&block.hash).to_string());
+    log::info!("block.header.parent_hash: {:#?}", Hex(&header.parent_hash).to_string());
+    log::info!("block.header.timestamp: {:#?}", header.timestamp.as_ref().unwrap().to_string());
+
+    Ok(basicexample::BasicExampleProtoData {number: block.number, hash: Hex(&block.hash).to_string(), parent_hash: Hex(&header.parent_hash).to_string(), timestamp: header.timestamp.as_ref().unwrap().to_string()})
 }
 ```
 

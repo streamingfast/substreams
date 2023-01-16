@@ -158,7 +158,7 @@ To view the files the `substreams-sink-files` tool generates navigate into the d
 ...
 ```
 
-The blocks contain all the lines received for the full 10K of processed blocks by default. The block range is controlled by using the `--file-block-count` flag.
+The block range spanned by the example is from block 0000000000 to block 0000260000. The blocks contain all the lines received for the full 10K of processed blocks by default. The block range is controlled by using the `--file-block-count` flag.
 
 ### Cursors
 

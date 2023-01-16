@@ -54,18 +54,11 @@ Before continuing, ensure that your system [meets the basic requirements](https:
 - Create your first Substreams module
 - Use the [`substreams` CLI](https://substreams.streamingfast.io/reference-and-specs/command-line-interface) to run the module
 
-### Prerequisites
-
-- Go compiler
-- Rust compiler
-- [`substreams` CLI](https://substreams.streamingfast.io/reference-and-specs/command-line-interface)
-- StreamingFast authentication key
-
 ### 1. Create Substreams manifest
 
-To create a "Substreams module", you must first create the manifest file. Use the example manifest provided in the [`substreams-ethereum-tutorial`](https://github.com/streamingfast/substreams-ethereum-tutorial)repository on GitHub as a guide. This example manifest includes the minimal required fields to demonstrate the core values that you must provide.
+To create a "Substreams module", you must first create the manifest file. This example manifest includes the minimal required fields to demonstrate the core values that you must provide.
 
-To use the example manifest, copy and paste it into a new file named substreams.yaml. Save this file in the root directory of your "Substreams module." You can find the example manifest in the [official GitHub repository for `substreams-ethereum-tutorial`](https://github.com/streamingfast/substreams-ethereum-tutorial).
+To use the example manifest, copy and paste it into a new file named `substreams.yaml`. Save this file in the root directory of your Substreams module. You can find the example manifest in the [official GitHub repository for `substreams-ethereum-tutorial`](https://github.com/streamingfast/substreams-ethereum-tutorial).
 
 ```yaml
 specVersion: v0.1.0
@@ -96,11 +89,11 @@ modules:
       type: proto:eth.basicexample.v1.BasicExampleProtoData
 ```
 
-### 2. Create Rust configuration file
+### 2. Create Rust manifest file
 
-To complete your new Substreams module, you must also create a Rust configuration file. Use the example configuration file from the [`substreams-ethereum-tutorial`](https://github.com/streamingfast/substreams-ethereum-tutorial) as a guide.
+To complete your new Substreams module, you must also create a Rust manifest file.
 
-To use the example configuration file, copy and paste its content into a new file named [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml). Save this file in the root directory of your Substreams module. It's important to provide a unique and useful value for the "name" field and to make sure that `crate-type = ["cdylib"]` is defined so the WASM is generated.
+To use the example Rust manifest file, copy and paste its content into a new file named [`Cargo.toml`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/Cargo.toml). Save this file in the root directory of your Substreams module. It's important to provide a unique and useful value for the "name" field and to make sure that `crate-type = ["cdylib"]` is defined so the WASM is generated.
 
 Also, include any dependencies on Substreams crates for helpers and `prost` for protobuf encoding and decoding.
 
@@ -119,7 +112,6 @@ crate-type = ["cdylib"]
 substreams = "0.5.0"
 substreams-ethereum = "0.8.0"
 prost = "0.11"
-num-bigint = "0.4"
 
 [profile.release]
 lto = true
@@ -149,7 +141,7 @@ Use the `substreams protogen` command to generate the Rust code to communicate w
 substreams protogen substreams-ethereum-tutorial.yaml
 ```
 
-### 4. Create Rust library and module handlers
+### 4. Create Substreams module handlers
 
 Your Substreams module must contain a Rust library that houses the "module handlers." These handlers are responsible for handling blockchain data injected into the module at runtime. The example module handler extracts the version from the <i>Block</i> object in the `block.ver` property, logs it to the terminal, and assigns it to the `version` field of the [`BasicExampleProtoData`](https://github.com/streamingfast/substreams-ethereum-tutorial/blob/main/proto/basicexample.proto) protobuf.
 
@@ -167,7 +159,6 @@ use substreams_ethereum::{pb as ethpb};
 
 #[substreams::handlers::map]
 fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExampleProtoData, substreams::errors::Error> {
-    log::info!("block.ver: {:#?}", block.ver);
     log::info!("block.number: {:#?}", block.number);
     Ok(basicexample::BasicExampleProtoData {version: block.ver})
 }
@@ -175,7 +166,7 @@ fn map_basic_eth(block: ethpb::eth::v2::Block) -> Result<basicexample::BasicExam
 
 {% endcode %}
 
-To run the Substreams module, first compile it by using the `cargo build` command including the `--release` and `--target` flags. Pass `wasm32-unknown-unknown` to the `--target` flag.
+Compile your Substreams module.
 
 ```bash
 cargo build --release --target wasm32-unknown-unknown
@@ -188,7 +179,7 @@ To execute, or run, the example use the `substreams` [`run`](https://substreams.
 {% code overflow="wrap" %}
 
 ```bash
-substreams run -e mainnet.eth.streamingfast.io:443 substreams-ethereum-tutorial.yaml map_basic_eth --start-block 10000001 --stop-block +1
+substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_basic_eth --start-block 10000001 --stop-block +1
 ```
 
 {% endcode %}

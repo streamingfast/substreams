@@ -104,6 +104,7 @@ func (f *testRun) Run(t *testing.T) error {
 			newBlockGenerator:      newBlockGenerator,
 			blockProcessedCallBack: f.BlockProcessedCallback,
 			testTempDir:            testTempDir,
+			id:                     workerID.Inc(),
 		}
 		return w
 	}

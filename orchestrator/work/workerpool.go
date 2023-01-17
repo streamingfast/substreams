@@ -2,6 +2,7 @@ package work
 
 import (
 	"context"
+
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
@@ -17,13 +18,13 @@ type workerPool struct {
 	workers chan Worker
 }
 
-func NewWorkerPool(ctx context.Context, workerCount uint64, newWorkerFunc WorkerFactory) WorkerPool {
+func NewWorkerPool(ctx context.Context, workerCount uint64, workerFactory WorkerFactory) WorkerPool {
 	logger := reqctx.Logger(ctx)
 
 	logger.Info("initializing worker pool", zap.Uint64("worker_count", workerCount))
 	workers := make(chan Worker, workerCount)
 	for i := uint64(0); i < workerCount; i++ {
-		workers <- newWorkerFunc(logger)
+		workers <- workerFactory(logger)
 	}
 
 	return &workerPool{

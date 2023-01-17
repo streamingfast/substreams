@@ -23,9 +23,14 @@ type TestWorker struct {
 	newBlockGenerator      BlockGeneratorFactory
 	blockProcessedCallBack blockProcessedCallBack
 	testTempDir            string
+	id                     uint64
 }
 
 var workerID atomic.Uint64
+
+func (w *TestWorker) ID() string {
+	return fmt.Sprintf("%d", w.id)
+}
 
 func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) *work.Result {
 	w.t.Helper()
@@ -35,8 +40,7 @@ func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ 
 	defer span.EndWithErr(&err)
 
 	logger := reqctx.Logger(ctx)
-	wid := workerID.Inc()
-	logger = logger.With(zap.Uint64("workerId", wid))
+	logger = logger.With(zap.Uint64("workerId", w.id))
 	ctx = reqctx.WithLogger(ctx, logger)
 
 	logger.Info("worker running job",

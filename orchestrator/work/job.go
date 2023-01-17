@@ -33,6 +33,10 @@ func NewJob(storeName string, requestRange *block.Range, requiredModules []strin
 	return j
 }
 
+func (j *Job) Matches(moduleName string, blockNum uint64) bool {
+	return j.ModuleName == moduleName && j.RequestRange.Contains(blockNum)
+}
+
 func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
 	return &pbsubstreams.Request{
 		StartBlockNum: int64(j.RequestRange.StartBlock),

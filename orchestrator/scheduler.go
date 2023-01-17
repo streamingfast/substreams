@@ -23,6 +23,10 @@ type Scheduler struct {
 	graph                  *manifest.ModuleGraph
 	upstreamRequestModules *pbsubstreams.Modules
 
+	currentJobsLock  sync.Mutex
+	currentJobs      map[string]*work.Job
+	currentJobsHooks map[string][]chan struct{}
+
 	OnStoreJobTerminated func(moduleName string, partialsWritten block.Ranges) error
 }
 
@@ -31,6 +35,8 @@ func NewScheduler(workPlan *work.Plan, respFunc substreams.ResponseFunc, upstrea
 		workPlan:               workPlan,
 		respFunc:               respFunc,
 		upstreamRequestModules: upstreamRequestModules,
+		currentJobs:            make(map[string]*work.Job),
+		currentJobsHooks:       make(map[string][]chan struct{}),
 	}
 }
 
@@ -56,20 +62,17 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err err
 	logger.Debug("launching scheduler")
 
 	go func() {
-		finished := false
-		for !finished {
-			finished = s.run(ctx, wg, result, pool)
+		allJobsStarted := false
+		for !allJobsStarted {
+			allJobsStarted = s.run(ctx, wg, result, pool)
 		}
-		logger.Info("scheduler finished scheduling jobs. waiting for jobs to complete")
+		logger.Info("scheduler finished starting jobs. waiting for them to complete")
 
 		wg.Wait()
 		logger.Info("all jobs completed")
 
 		close(result)
 		logger.Debug("result channel closed")
-
-		return
-
 	}()
 
 	return s.gatherResults(ctx, result)
@@ -88,9 +91,19 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 
 	wg.Add(1)
 	s.submittedJobs = append(s.submittedJobs, nextJob)
+	s.currentJobsLock.Lock()
+	s.currentJobs[worker.ID()] = nextJob
+	s.currentJobsLock.Unlock()
 	go func() {
 		jr := s.runSingleJob(ctx, worker, nextJob, s.upstreamRequestModules)
 		result <- jr
+		s.currentJobsLock.Lock()
+		delete(s.currentJobs, worker.ID())
+		for _, hook := range s.currentJobsHooks[worker.ID()] {
+			close(hook)
+		}
+		delete(s.currentJobsHooks, worker.ID())
+		s.currentJobsLock.Unlock()
 
 		pool.Return(worker)
 		wg.Done()
@@ -157,6 +170,19 @@ func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64
 	s.workPlan.MarkDependencyComplete(storeName, blockNum)
 }
 
+func (s *Scheduler) WaitForJobHook(moduleName string, blockNum uint64) chan struct{} {
+	s.currentJobsLock.Lock()
+	defer s.currentJobsLock.Unlock()
+	for workerID, job := range s.currentJobs {
+		if job.Matches(moduleName, blockNum) {
+			hook := make(chan struct{})
+			s.currentJobsHooks[workerID] = append(s.currentJobsHooks[workerID], hook)
+			return hook
+		}
+	}
+	return nil
+}
+
 func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) jobResult {
 	logger := reqctx.Logger(ctx)
 	request := job.CreateRequest(requestModules)
@@ -187,6 +213,6 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 
 	jr := fromWorkResult(job, workResult)
 
-	logger.Info("job completed", zap.Object("job", job))
+	logger.Info("job completed", zap.Object("job", job), zap.Error(workResult.Error))
 	return jr
 }

@@ -23,9 +23,10 @@ type LinearReader struct {
 	module            *pbsubstreams.Module
 	firstFile         *File
 	cacheItems        chan *pboutput.Item
+	waitForJobHook    func(string, uint64) chan struct{}
 }
 
-func NewLinearReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, firstFile *File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64) *LinearReader {
+func NewLinearReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubstreams.Module, firstFile *File, responseFunc substreams.ResponseFunc, execOutputSaveInterval uint64, waitForJobHook func(string, uint64) chan struct{}) *LinearReader {
 	return &LinearReader{
 		Shutter:           shutter.New(),
 		requestStartBlock: startBlock,
@@ -34,6 +35,7 @@ func NewLinearReader(startBlock uint64, exclusiveEndBlock uint64, module *pbsubs
 		firstFile:         firstFile,
 		responseFunc:      responseFunc,
 		cacheItems:        make(chan *pboutput.Item, execOutputSaveInterval*2),
+		waitForJobHook:    waitForJobHook,
 	}
 }
 
@@ -115,6 +117,15 @@ func (r *LinearReader) download(ctx context.Context, file *File) error {
 func (r *LinearReader) downloadFile(ctx context.Context, file *File) (out []*pboutput.Item, err error) {
 	logger := reqctx.Logger(ctx)
 	for {
+		if hook := r.waitForJobHook(r.module.Name, file.BoundedRange.StartBlock); hook != nil {
+			logger.Debug("linear reader waiting for running job", zap.Uint64("start_block", file.BoundedRange.StartBlock), zap.String("module_name", r.module.Name))
+			select {
+			case <-hook:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
 		logger.Debug("loading next cache", zap.Object("file", file))
 		loaded, err := file.Load(ctx)
 		if err != nil {

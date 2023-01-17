@@ -3,6 +3,11 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -10,10 +15,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	"sort"
-	"sync"
-	"testing"
-	"time"
 )
 
 type in struct {
@@ -70,7 +71,7 @@ func testRunnerPool(parallelism int) (work.WorkerPool, chan in, chan out) {
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, 1,
 		func(logger *zap.Logger) work.Worker {
-			return work.WorkerFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
+			return work.NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
 				inchan <- in{request, respFunc}
 				out := <-outchan
 				return &work.Result{
@@ -103,7 +104,11 @@ func TestScheduler_runOne(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := &Scheduler{workPlan: test.plan}
+			s := &Scheduler{
+				workPlan:         test.plan,
+				currentJobs:      make(map[string]*work.Job),
+				currentJobsHooks: make(map[string][]chan struct{}),
+			}
 			wg := &sync.WaitGroup{}
 			result := make(chan jobResult, 100)
 			pool := testNoopRunnerPool(test.parallelism)
@@ -123,7 +128,7 @@ func testNoopRunnerPool(parallelism uint64) work.WorkerPool {
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, parallelism,
 		func(logger *zap.Logger) work.Worker {
-			return work.WorkerFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
+			return work.NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
 				return &work.Result{}
 			})
 		},

@@ -3,8 +3,10 @@ package work
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/tracking"
 	"io"
+	"sync/atomic"
+
+	"github.com/streamingfast/substreams/tracking"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
@@ -19,19 +21,36 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+var lastWorkerID uint64
+
 type Result struct {
 	PartialsWritten []*block.Range
 	Error           error
 }
 
 type Worker interface {
+	ID() string
 	Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
 }
 
-type WorkerFunc func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result) *SimpleWorkerFactory {
+	return &SimpleWorkerFactory{
+		f:  f,
+		id: atomic.AddUint64(&lastWorkerID, 1),
+	}
+}
 
-func (f WorkerFunc) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
-	return f(ctx, request, respFunc)
+type SimpleWorkerFactory struct {
+	f  func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
+	id uint64
+}
+
+func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
+	return f.f(ctx, request, respFunc)
+}
+
+func (f SimpleWorkerFactory) ID() string {
+	return fmt.Sprintf("%d", f.id)
 }
 
 // The tracer will be provided by the worker pool, on worker creation
@@ -41,6 +60,7 @@ type RemoteWorker struct {
 	clientFactory client.Factory
 	tracer        ttrace.Tracer
 	logger        *zap.Logger
+	id            uint64
 }
 
 func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWorker {
@@ -48,7 +68,12 @@ func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWo
 		clientFactory: clientFactory,
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
 		logger:        logger,
+		id:            atomic.AddUint64(&lastWorkerID, 1),
 	}
+}
+
+func (w *RemoteWorker) ID() string {
+	return fmt.Sprintf("%d", w.id)
 }
 
 func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {

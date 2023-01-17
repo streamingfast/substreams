@@ -6,15 +6,12 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/streamingfast/substreams/tracking"
-
-	"github.com/streamingfast/substreams/tracking"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/tracking"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"

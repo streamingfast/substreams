@@ -23,9 +23,8 @@ type Scheduler struct {
 	graph                  *manifest.ModuleGraph
 	upstreamRequestModules *pbsubstreams.Modules
 
-	currentJobsLock  sync.Mutex
-	currentJobs      map[string]*work.Job
-	currentJobsHooks map[string][]chan struct{}
+	currentJobsLock sync.Mutex
+	currentJobs     map[string]*work.Job
 
 	OnStoreJobTerminated func(moduleName string, partialsWritten block.Ranges) error
 }
@@ -36,7 +35,6 @@ func NewScheduler(workPlan *work.Plan, respFunc substreams.ResponseFunc, upstrea
 		respFunc:               respFunc,
 		upstreamRequestModules: upstreamRequestModules,
 		currentJobs:            make(map[string]*work.Job),
-		currentJobsHooks:       make(map[string][]chan struct{}),
 	}
 }
 
@@ -78,6 +76,13 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err err
 	return s.gatherResults(ctx, result)
 }
 
+func jobsSummary(jobs map[string]*work.Job) (out []string) {
+	for k, j := range jobs {
+		out = append(out, fmt.Sprintf("%s (on %s,%d:%d)", j.ModuleName, k, j.RequestRange.StartBlock, j.RequestRange.ExclusiveEndBlock))
+	}
+	return
+}
+
 func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.WorkerPool) (finished bool) {
 	worker := pool.Borrow(ctx)
 	if worker == nil {
@@ -92,6 +97,7 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 	wg.Add(1)
 	s.submittedJobs = append(s.submittedJobs, nextJob)
 	s.currentJobsLock.Lock()
+	reqctx.Logger(ctx).Debug("current running jobs", zap.Strings("jobs", jobsSummary(s.currentJobs)))
 	s.currentJobs[worker.ID()] = nextJob
 	s.currentJobsLock.Unlock()
 	go func() {
@@ -99,10 +105,6 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 		result <- jr
 		s.currentJobsLock.Lock()
 		delete(s.currentJobs, worker.ID())
-		for _, hook := range s.currentJobsHooks[worker.ID()] {
-			close(hook)
-		}
-		delete(s.currentJobsHooks, worker.ID())
 		s.currentJobsLock.Unlock()
 
 		pool.Return(worker)
@@ -168,19 +170,6 @@ func (s *Scheduler) processJobResult(result jobResult) error {
 // This should unlock all jobs that were dependent
 func (s *Scheduler) OnStoreCompletedUntilBlock(storeName string, blockNum uint64) {
 	s.workPlan.MarkDependencyComplete(storeName, blockNum)
-}
-
-func (s *Scheduler) WaitForJobHook(moduleName string, blockNum uint64) chan struct{} {
-	s.currentJobsLock.Lock()
-	defer s.currentJobsLock.Unlock()
-	for workerID, job := range s.currentJobs {
-		if job.Matches(moduleName, blockNum) {
-			hook := make(chan struct{})
-			s.currentJobsHooks[workerID] = append(s.currentJobsHooks[workerID], hook)
-			return hook
-		}
-	}
-	return nil
 }
 
 func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *work.Job, requestModules *pbsubstreams.Modules) jobResult {

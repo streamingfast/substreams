@@ -35,6 +35,25 @@ func BuildParallelProcessor(
 	respFunc func(resp *pbsubstreams.Response) error,
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
+	var execOutputReader *execout.LinearReader
+
+	if reqDetails.ShouldStreamCachedOutputs() {
+		// note: since we are *NOT* in a sub-request and are setting up output module is a map
+		requestedModule := outputGraph.OutputModule()
+		if requestedModule.GetKindStore() != nil {
+			panic("logic error: should not get a store as outputModule on tier 1")
+		}
+		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
+		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
+		execOutputReader = execout.NewLinearReader(
+			reqDetails.RequestStartBlockNum,
+			reqDetails.LinearHandoffBlockNum,
+			requestedModule,
+			requestedModuleCache,
+			respFunc,
+			runtimeConfig.ExecOutputSaveInterval,
+		)
+	}
 
 	// In Dev mode
 	// * The linearHandoff will be set to the startblock (never equal to stopBlock, which is exclusive)
@@ -91,26 +110,6 @@ func BuildParallelProcessor(
 	scheduler.OnStoreJobTerminated = squasher.Squash
 
 	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
-
-	var execOutputReader *execout.LinearReader
-	if reqDetails.ShouldStreamCachedOutputs() {
-		// note: since we are *NOT* in a sub-request and are setting up output module is a map
-		requestedModule := outputGraph.OutputModule()
-		if requestedModule.GetKindStore() != nil {
-			panic("logic error: should not get a store as outputModule on tier 1")
-		}
-		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
-		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
-		execOutputReader = execout.NewLinearReader(
-			reqDetails.RequestStartBlockNum,
-			reqDetails.LinearHandoffBlockNum,
-			requestedModule,
-			requestedModuleCache,
-			respFunc,
-			runtimeConfig.ExecOutputSaveInterval,
-			scheduler.WaitForJobHook,
-		)
-	}
 
 	return &ParallelProcessor{
 		plan:             plan,

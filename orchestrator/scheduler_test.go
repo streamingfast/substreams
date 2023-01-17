@@ -105,9 +105,8 @@ func TestScheduler_runOne(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			s := &Scheduler{
-				workPlan:         test.plan,
-				currentJobs:      make(map[string]*work.Job),
-				currentJobsHooks: make(map[string][]chan struct{}),
+				workPlan:    test.plan,
+				currentJobs: make(map[string]*work.Job),
 			}
 			wg := &sync.WaitGroup{}
 			result := make(chan jobResult, 100)

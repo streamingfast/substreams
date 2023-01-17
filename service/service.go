@@ -178,7 +178,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.Strings("modules", moduleNames),
-		zap.String("output_module", request.GetOutputModuleName()),
+		zap.String("output_module", request.MustGetOutputModuleName()),
 	}
 	if !isSubRequest {
 		fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
@@ -218,7 +218,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	logger.Debug("executing subrequest",
-		zap.String("output_module", request.GetOutputModuleName()),
+		zap.String("output_module", request.MustGetOutputModuleName()),
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 	)
@@ -290,7 +290,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("request_start_cursor", request.StartCursor),
 		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
-		zap.String("output_module", request.GetOutputModuleName()),
+		zap.String("output_module", request.MustGetOutputModuleName()),
 	)
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)

@@ -8,6 +8,8 @@ import (
 
 	"github.com/streamingfast/substreams/tracking"
 
+	"github.com/streamingfast/substreams/tracking"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
@@ -80,7 +82,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	var err error
 	ctx, span := reqctx.WithSpan(ctx, "running_job")
 	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.String("output_module", request.GetOutputModuleName()))
+	span.SetAttributes(attribute.String("output_module", request.MustGetOutputModuleName()))
 	span.SetAttributes(attribute.Int64("start_block", request.StartBlockNum))
 	span.SetAttributes(attribute.Int64("stop_block", int64(request.StopBlockNum)))
 	logger := w.logger
@@ -97,7 +99,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	w.logger.Info("launching remote worker",
 		zap.Int64("start_block_num", request.StartBlockNum),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
-		zap.String("output_module", request.GetOutputModuleName()),
+		zap.String("output_module", request.MustGetOutputModuleName()),
 	)
 
 	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)

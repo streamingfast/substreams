@@ -7,12 +7,28 @@ import (
 )
 
 // GetOutputModuleName is a helper to retrieve the output module name as we transition to a single output
-// the assumption is that the Request has been validated before hence we can assume to there is 1 element in outputModules
-func (x *Request) GetOutputModuleName() string {
+// from either `OutputModule` (priority if non-empty) or `OutputModules`. If an output module was found,
+// return `<name>, true` otherwise returns `"", false`.
+func (x *Request) GetOutputModuleName() (string, bool) {
 	if x.OutputModule != "" {
-		return x.OutputModule
+		return x.OutputModule, true
 	}
-	return x.OutputModules[0]
+
+	if len(x.OutputModules) > 0 {
+		return x.OutputModules[0], true
+	}
+
+	return "", false
+}
+
+// MustGetOutputModuleName is like #GetOutputModuleName but panics if no output module is found.
+func (x *Request) MustGetOutputModuleName() string {
+	outputModule, found := x.GetOutputModuleName()
+	if !found {
+		panic(fmt.Errorf("no output module provided in request"))
+	}
+
+	return outputModule
 }
 
 func StepToProto(step bstream.StepType, finalBlocksOnly bool) (out ForkStep, skip bool) {
@@ -56,7 +72,11 @@ func ValidateRequest(req *Request, isSubRequest bool) error {
 		return fmt.Errorf("cannot set 'debug-modules-initial-snapshot' in 'production-mode'")
 	}
 
-	outputModule := req.GetOutputModuleName()
+	outputModule, found := req.GetOutputModuleName()
+	if !found {
+		return fmt.Errorf("no valid output module defined")
+	}
+
 	outputModuleFound := false
 	for _, mod := range req.Modules.Modules {
 		if _, ok := mod.Kind.(*Module_KindStore_); ok {

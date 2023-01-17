@@ -42,7 +42,7 @@ func (g *Graph) computeGraph() error {
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
 	}
-	outputModuleName := g.request.GetOutputModuleName()
+	outputModuleName := g.request.MustGetOutputModuleName()
 
 	processModules, err := graph.ModulesDownTo(outputModuleName)
 	if err != nil {

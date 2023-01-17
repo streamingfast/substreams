@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+* Request validation for blockchain's input type is now made only against the requested module it's transitive dependencies.
+
 * `substreams codegen` has been moved under `substreams alpha codegen` as this is a feature included by mistake in latest release that should not have been displayed in the main list of commands.
 
 ## [0.1.0](https://github.com/streamingfast/substreams/releases/tag/v0.1.0)

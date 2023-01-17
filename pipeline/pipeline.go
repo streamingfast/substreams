@@ -144,7 +144,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 
-	outputModuleName := reqDetails.Request.GetOutputModuleName()
+	outputModuleName := reqDetails.Request.MustGetOutputModuleName()
 
 	ttrace.SpanContextFromContext(context.Background())
 	storeMap := store.NewMap()

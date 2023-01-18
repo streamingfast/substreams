@@ -6,7 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/storage/store"
 
-	"github.com/bytecodealliance/wasmtime-go"
+	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 

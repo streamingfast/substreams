@@ -58,30 +58,6 @@ func TestWorkPlanning(t *testing.T) {
 				TestJob("As", "50-60", 2),
 			},
 		},
-		//{
-		//	name:        "test relative priority",
-		//	upToBlock:   60,
-		//	subreqSplit: 10,
-		//	state: TestModStateMap(
-		//		TestStoreState("G", "0-10,50-60"),
-		//		TestMapState("B", "0-60"),
-		//		TestStoreState("As", "0-10,30-40,50-60"),
-		//		TestStoreState("D", "10-20,50-60"),
-		//	),
-		//	outMod: "As,D,G",
-		//	expectWaitingJobs: []*Job{
-		//		TestJobDeps("G", "0-10", 3, "As,B,E"),
-		//		TestJobDeps("G", "50-60", -2, "As,B,E"),
-		//		TestJobDeps("D", "10-20", 4, "B"),
-		//		TestJobDeps("D", "50-60", 0, "B"),
-		//	},
-		//	expectReadyJobs: []*Job{
-		//		TestJob("As", "0-10", 6),
-		//		TestJob("B", "0-60", 6),
-		//		TestJob("As", "30-40", 3),
-		//		TestJob("As", "50-60", 1),
-		//	},
-		//},
 	}
 
 	for _, test := range tests {
@@ -112,35 +88,6 @@ func jobList(jobs []*Job) string {
 	}
 	return strings.Join(out, "\n")
 }
-
-//
-//func TestBuildNewPlan(t *testing.T) {
-//	type args struct {
-//		ctx                        context.Context
-//		storeConfigMap             store.ConfigMap
-//		storeSnapshotsSaveInterval uint64
-//		subrequestSplitSize        uint64
-//		upToBlock                  uint64
-//		graph                      *manifest.ModuleGraph
-//	}
-//	tests := []struct {
-//		name    string
-//		args    args
-//		want    *Plan
-//		wantErr assert.ErrorAssertionFunc
-//	}{
-//		// TODO: Add test cases.
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			got, err := BuildNewPlan(tt.args.ctx, tt.args.storeConfigMap, tt.args.storeSnapshotsSaveInterval, tt.args.subrequestSplitSize, tt.args.upToBlock, tt.args.graph)
-//			if !tt.wantErr(t, err, fmt.Sprintf("BuildNewPlan(%v, %v, %v, %v, %v, %v)", tt.args.ctx, tt.args.storeConfigMap, tt.args.storeSnapshotsSaveInterval, tt.args.subrequestSplitSize, tt.args.upToBlock, tt.args.graph)) {
-//				return
-//			}
-//			assert.Equalf(t, tt.want, got, "BuildNewPlan(%v, %v, %v, %v, %v, %v)", tt.args.ctx, tt.args.storeConfigMap, tt.args.storeSnapshotsSaveInterval, tt.args.subrequestSplitSize, tt.args.upToBlock, tt.args.graph)
-//		})
-//	}
-//}
 
 func TestPlan_MarkDependencyComplete(t *testing.T) {
 	type fields struct {
@@ -607,7 +554,9 @@ func TestPlan_splitWorkIntoJobs(t *testing.T) {
 		args    args
 		wantErr assert.ErrorAssertionFunc
 	}{
-		// TODO: Add test cases.
+		{
+			name: "a to b to c",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -668,6 +617,100 @@ func TestPlan_initialProgressMessages(t *testing.T) {
 			out := p.initialProgressMessages()
 
 			assert.Equal(t, test.expectedProgress, reduceProgressMessages(out))
+		})
+	}
+}
+
+func TestAncestorsDepth(t *testing.T) {
+	tests := []struct {
+		name               string
+		ancestorsMap       map[string][]string
+		outputModule       string
+		expectDepth        int
+		expectHighestDepth int
+	}{
+		{
+			"simple",
+			map[string][]string{
+				"A": {},
+				"B": {"A"},
+			},
+			"B",
+			2,
+			2,
+		},
+		{
+			"simple_mod_A",
+			map[string][]string{
+				"A": {},
+				"B": {"A"},
+			},
+			"A",
+			1,
+			2,
+		},
+		{
+			"3-deep",
+			map[string][]string{
+				"A": {},
+				"B": {"A"},
+				"C": {"A", "B"},
+			},
+			"C",
+			3,
+			3,
+		},
+		{
+			"3-deep-very-wide",
+			map[string][]string{
+				"A": {},
+				"B": {"A"},
+				"C": {"A", "B"},
+				"D": {"A", "B"},
+				"E": {"A", "B"},
+				"F": {"A", "B", "C", "D", "E"},
+			},
+			"F",
+			4,
+			4,
+		},
+		{
+			"3-deep-very-wide-request-simple",
+			map[string][]string{
+				"A": {},
+				"B": {"A"},
+				"C": {"A", "B"},
+				"D": {"A", "B"},
+				"E": {"A", "B"},
+				"F": {"A", "B", "C", "D", "E"},
+			},
+			"B",
+			2,
+			4,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			f := func(in string) []string {
+				return test.ancestorsMap[in]
+			}
+
+			depth := ancestorsDepth(test.outputModule, f)
+			assert.Equal(t, test.expectDepth, depth)
+
+			var modulesList []string
+			stateMap := make(map[string]storage.ModuleStorageState)
+			for k := range test.ancestorsMap {
+				modulesList = append(modulesList, k)
+				stateMap[k] = &state.StoreStorageState{}
+			}
+			highestDepth := calculateHighestDependencyDepth(
+				modulesList,
+				stateMap,
+				f,
+			)
+			assert.Equal(t, test.expectHighestDepth, highestDepth)
 		})
 	}
 }

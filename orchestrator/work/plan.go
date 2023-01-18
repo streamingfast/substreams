@@ -18,7 +18,6 @@ import (
 )
 
 type Plan struct {
-	// ModulesStateMap
 	ModulesStateMap storage.ModuleStorageStateMap
 
 	upToBlock uint64
@@ -40,7 +39,7 @@ func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStat
 		logger:          logger,
 	}
 
-	if err := plan.splitWorkIntoJobs(subrequestSplitSize, outputGraph.SchedulableModuleNames(), outputGraph.AncestorsFrom); err != nil {
+	if err := plan.splitWorkIntoJobs(subrequestSplitSize, outputGraph.SchedulableModuleNames(), outputGraph.OutputModule().Name, outputGraph.AncestorsFrom); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
 
@@ -51,8 +50,11 @@ func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStat
 	return plan, nil
 }
 
-func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, schedulableModules []string, ancestorsFrom func(string) []string) error {
-	highestJobOrdinal := int(p.upToBlock / subrequestSplitSize)
+func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, schedulableModules []string, outputModuleName string, ancestorsFrom func(string) []string) error {
+
+	stepSize := calculateHighestDependencyDepth(schedulableModules, p.ModulesStateMap, ancestorsFrom)
+	highestJobOrdinal := int(p.upToBlock/subrequestSplitSize) * stepSize
+
 	for _, storeName := range schedulableModules {
 		modState := p.ModulesStateMap[storeName]
 		if modState == nil {
@@ -61,14 +63,19 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, schedulableModules 
 		requests := modState.BatchRequests(subrequestSplitSize)
 		for _, requestRange := range requests {
 			requiredModules := ancestorsFrom(storeName)
+			dependencyDepth := ancestorsDepth(storeName, ancestorsFrom)
 
-			jobOrdinal := int(requestRange.StartBlock / subrequestSplitSize)
-			priority := highestJobOrdinal - jobOrdinal - len(requiredModules)
+			jobOrdinal := int(requestRange.StartBlock/subrequestSplitSize) * stepSize
+			priority := highestJobOrdinal - jobOrdinal - (dependencyDepth - 1)
+			if storeName == outputModuleName {
+				priority += stepSize // always run our outputModule 1 step ahead of its dependencies, it only needs the previous stores to be completed and should start ahead
+			}
 
 			p.logger.Debug("adding job",
 				zap.String("module", storeName),
 				zap.Uint64("start_block", requestRange.StartBlock),
 				zap.Uint64("end_block", requestRange.ExclusiveEndBlock),
+				zap.Int("dependencyDepth", dependencyDepth),
 				zap.Int("priority", priority),
 			)
 
@@ -83,6 +90,36 @@ func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, schedulableModules 
 	// with the appropriate ranges in there, and not the
 	// store-specific `PartialsMissing`, `PartialsPresent`, etc..
 	return nil
+}
+
+func ancestorsDepth(moduleName string, ancestorsFrom func(string) []string) int {
+	deepest := 1
+	for _, ancestor := range ancestorsFrom(moduleName) {
+		depth := 1 + ancestorsDepth(ancestor, ancestorsFrom)
+		if depth > deepest {
+			deepest = depth
+		}
+	}
+	return deepest
+}
+
+func calculateHighestDependencyDepth(
+	schedulableModules []string,
+	modulesStateMap storage.ModuleStorageStateMap,
+	ancestorsFrom func(string) []string,
+) int {
+	highestDependencyDepth := 1
+	for _, storeName := range schedulableModules {
+		if modulesStateMap[storeName] == nil {
+			continue
+		}
+		dependencyDepth := ancestorsDepth(storeName, ancestorsFrom)
+		fmt.Println("got dep depth", dependencyDepth, storeName)
+		if dependencyDepth > highestDependencyDepth {
+			highestDependencyDepth = dependencyDepth
+		}
+	}
+	return highestDependencyDepth
 }
 
 func (p *Plan) initModulesReadyUpToBlock() {

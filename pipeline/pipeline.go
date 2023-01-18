@@ -87,7 +87,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) Init(ctx context.Context) (err error) {
+func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
@@ -114,15 +114,16 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 	}
 	p.stores.SetStoreMap(storeMap)
 
+	return nil
+}
+
+func (p *Pipeline) InitWASM(ctx context.Context) (err error) {
+
 	// TODO(abourget): Build the Module Executor list: this could be done lazily, but the outputmodules.Graph,
 	//  and cache the latest if all block boundaries
 	//  are still clear.
 
-	if err = p.buildWASM(ctx, p.outputGraph.AllModules()); err != nil {
-		return fmt.Errorf("initiating module output caches: %w", err)
-	}
-
-	return nil
+	return p.buildWASM(ctx, p.outputGraph.AllModules())
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {

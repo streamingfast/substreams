@@ -290,42 +290,43 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
 		zap.String("output_module", request.MustGetOutputModuleName()),
 	)
-	if err := pipe.Init(ctx); err != nil {
+	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
+	}
+	if !isSubRequest && requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
+		return pipe.OnStreamTerminated(ctx, trailerWriter, nil)
+	}
+
+	if err := pipe.InitWASM(ctx); err != nil {
+		return fmt.Errorf("error building pipeline WASM: %w", err)
 	}
 
 	var streamErr error
-	if requestDetails.LinearHandoffBlockNum != request.StopBlockNum {
-		cursor := request.StartCursor
-		var cursorIsTarget bool
-		if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
-			cursorIsTarget = true
-		}
-		logger.Info("creating firehose stream",
-			zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
-			zap.Uint64("stop_block", request.StopBlockNum),
-			zap.String("cursor", cursor),
-		)
-
-		blockStream, err := s.streamFactoryFunc(
-			ctx,
-			pipe,
-			int64(requestDetails.LinearHandoffBlockNum),
-			request.StopBlockNum,
-			cursor,
-			cursorIsTarget,
-		)
-		if err != nil {
-			return fmt.Errorf("error getting stream: %w", err)
-		}
-		streamErr = blockStream.Run(ctx)
+	cursor := request.StartCursor
+	var cursorIsTarget bool
+	if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
+		cursorIsTarget = true
 	}
+	logger.Info("creating firehose stream",
+		zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
+		zap.Uint64("stop_block", request.StopBlockNum),
+		zap.String("cursor", cursor),
+	)
 
-	if err := pipe.OnStreamTerminated(ctx, trailerWriter, streamErr); err != nil {
-		return err
+	blockStream, err := s.streamFactoryFunc(
+		ctx,
+		pipe,
+		int64(requestDetails.LinearHandoffBlockNum),
+		request.StopBlockNum,
+		cursor,
+		cursorIsTarget,
+	)
+	if err != nil {
+		return fmt.Errorf("error getting stream: %w", err)
 	}
+	streamErr = blockStream.Run(ctx)
 
-	return nil
+	return pipe.OnStreamTerminated(ctx, trailerWriter, streamErr)
 }
 
 func (s *Service) buildPipelineOptions(ctx context.Context, request *pbsubstreams.Request) (opts []pipeline.Option) {

@@ -43,7 +43,7 @@ func BuildParallelProcessor(
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
-		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.ExecOutputSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
+		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
 		execOutputReader = execout.NewLinearReader(
 			reqDetails.RequestStartBlockNum,
@@ -51,7 +51,7 @@ func BuildParallelProcessor(
 			requestedModule,
 			requestedModuleCache,
 			respFunc,
-			runtimeConfig.ExecOutputSaveInterval,
+			runtimeConfig.CacheSaveInterval,
 		)
 	}
 
@@ -71,15 +71,14 @@ func BuildParallelProcessor(
 	storeLinearHandoffBlockNum := reqDetails.LinearHandoffBlockNum
 	if stopAtHandoff {
 		// we don't need to bring the stores up to handoff block if we stop there
-		storeLinearHandoffBlockNum = lowBoundary(reqDetails.LinearHandoffBlockNum, runtimeConfig.StoreSnapshotsSaveInterval)
+		storeLinearHandoffBlockNum = lowBoundary(reqDetails.LinearHandoffBlockNum, runtimeConfig.CacheSaveInterval)
 	}
 
 	modulesStateMap, err := storage.BuildModuleStorageStateMap( // ok, I will cut stores up to 800 not 842
 		ctx,
 		storeConfigs,
-		runtimeConfig.StoreSnapshotsSaveInterval,
+		runtimeConfig.CacheSaveInterval,
 		execoutStorage,
-		runtimeConfig.ExecOutputSaveInterval,
 		reqDetails.RequestStartBlockNum,
 		reqDetails.LinearHandoffBlockNum,
 		storeLinearHandoffBlockNum,

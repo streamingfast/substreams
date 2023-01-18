@@ -56,7 +56,7 @@ func NewMultiSquasher(
 				return nil, fmt.Errorf("store %q not found", storeModuleName)
 			}
 
-			storeSquasher, err := buildStoreSquasher(ctx, runtimeConfig.StoreSnapshotsSaveInterval, storeConfig, logger, storageState, upToBlock, onStoreCompletedUntilBlock)
+			storeSquasher, err := buildStoreSquasher(ctx, runtimeConfig.CacheSaveInterval, storeConfig, logger, storageState, upToBlock, onStoreCompletedUntilBlock)
 			if err != nil {
 				return nil, err
 			}

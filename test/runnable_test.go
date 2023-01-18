@@ -212,7 +212,6 @@ func processRequest(
 	}
 	runtimeConfig := config.NewRuntimeConfig(
 		10,
-		10,
 		subrequestsSplitSize,
 		parallelSubrequests,
 		baseStoreStore,

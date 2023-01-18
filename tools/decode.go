@@ -33,20 +33,19 @@ var decodeCmd = &cobra.Command{
 }
 
 var decodeOutputsModuleCmd = &cobra.Command{
-	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> [<key>]",
+	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> <key>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
-		When running this outputs command with a mapper or a store the key will be the block hash. The key is optional
-		as it will return all the keys on the given block. The manifest is also optional as it will try to find one in 
-		your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is  optional 
+		as it will try to find one in your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
 	`),
-	Example: cli.Dedent(`
-		substreams tools decode outputs map_pools_created [bucket-url-path] 12487090 <optional_key>
-		substreams tools decode outputs uniswap-v3.spkg store_pools [bucket-url-path] 12487090 <optional_key>
-		substreams tools decode outputs dir-with-manifest store_pools [bucket-url-path] 12487090 <optional_key>
-	`),
+	Example: string(cli.ExamplePrefixed("substreams tools decode outputs", `
+		map_pools_created gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		uniswap-v3.spkg store_pools gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		dir-with-manifest store_pools gs://[bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+	`)),
 	RunE:         runDecodeOutputsModuleRunE,
-	Args:         cobra.RangeArgs(3, 5),
+	Args:         cobra.RangeArgs(4, 5),
 	SilenceUsage: true,
 }
 

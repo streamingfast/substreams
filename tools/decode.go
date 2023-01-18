@@ -38,7 +38,7 @@ var decodeOutputsModuleCmd = &cobra.Command{
 	Long: cli.Dedent(`
 		When running this outputs command with a mapper or a store the key will be the block hash. The key is optional
 		as it will return all the keys on the given block. The manifest is also optional as it will try to find one in 
-		your pwd. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
 	`),
 	Example: cli.Dedent(`
 		substreams tools decode outputs map_pools_created [bucket-url-path] 12487090 <optional_key>
@@ -56,7 +56,7 @@ var decodeStatesModuleCmd = &cobra.Command{
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
 		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find one in 
-		your pwd. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
 	`),
 	Example: cli.Dedent(`
 		substreams tools decode states store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth

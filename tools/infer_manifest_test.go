@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestInferManifestFile(t *testing.T) {
+func TestResolveManifestFile(t *testing.T) {
 	tests := []struct {
 		name         string
 		createsFile  bool
@@ -16,8 +16,8 @@ func TestInferManifestFile(t *testing.T) {
 		expectedPath string
 		expectErr    bool
 	}{
-		{"input, valid manifest in pwd", true, false, "manifest.yaml", "manifest.yaml", false},
-		{"input, invalid manifest in pwd", false, false, "substream.yaml", "", true},
+		{"input, valid manifest in pwd", true, false, "substreams.yaml", "substreams.yaml", false},
+		{"input, invalid manifest in pwd", false, false, "substreams.yaml", "", true},
 		{"input, valid dir with manifest", true, true, "manifests", "manifest/substreams.yaml", false},
 		{"input, invalid dir", false, false, "manifests", "", true},
 		{"input, valid dir w/o manifest", false, true, "manifests", "", true},

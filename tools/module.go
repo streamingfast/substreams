@@ -16,10 +16,14 @@ import (
 )
 
 var moduleCmd = &cobra.Command{
-	Use:   "module <module_name> <manifest|spkg_path> <substreams_state_store_url>",
+	Use:   "module <module_name> [<manifest|spkg_path>] <substreams_state_store_url>",
 	Short: "returns the state of the module on the state store",
-	Args:  cobra.ExactArgs(3),
-	RunE:  moduleRunE,
+	Long: cli.Dedent(`
+		Returns the state of the module on the state store. The manifest is optional as it will try to find one in 
+		your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+	`),
+	Args: cobra.RangeArgs(2, 3),
+	RunE: moduleRunE,
 }
 
 func init() {
@@ -28,10 +32,26 @@ func init() {
 
 func moduleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+	var err error
+	var moduleName string
+	var manifestPath string
+	var stateStoreURL string
 
-	moduleName := args[0]
-	manifestPath := args[1]
-	stateStoreURL := args[2]
+	if len(args) == 2 {
+		moduleName = args[0]
+		stateStoreURL = args[1]
+		manifestPath, err = ResolveManifestFile("")
+		if err != nil {
+			return fmt.Errorf("resolving manifest: %w", err)
+		}
+	} else {
+		moduleName = args[0]
+		manifestPath, err = ResolveManifestFile(args[1])
+		if err != nil {
+			return fmt.Errorf("resolving manifest: %w", err)
+		}
+		stateStoreURL = args[2]
+	}
 
 	zlog.Info("found state store",
 		zap.String("module_name", moduleName),

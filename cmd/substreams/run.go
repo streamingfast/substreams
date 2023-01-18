@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/cli"
+	"github.com/streamingfast/substreams/tools"
 	"io"
 	"os"
 	"strconv"
@@ -32,19 +34,39 @@ func init() {
 
 // runCmd represents the command to run substreams remotely
 var runCmd = &cobra.Command{
-	Use:          "run <manifest> <module_name>",
-	Short:        "Stream module outputs from a given package on a remote endpoint",
+	Use:   "run [<manifest>] <module_name>",
+	Short: "Stream module outputs from a given package on a remote endpoint",
+	Long: cli.Dedent(`
+		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find 
+		one in your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+	`),
 	RunE:         runRun,
-	Args:         cobra.ExactArgs(2),
+	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+	var err error
+	var manifestPath string
+	var outputModule string
 
 	outputMode := mustGetString(cmd, "output")
+	if len(args) == 1 {
+		manifestPath, err = tools.ResolveManifestFile("")
+		if err != nil {
+			return fmt.Errorf("resolving manifest: %w", err)
+		}
+		outputModule = args[0]
+	} else {
+		manifestPath, err = tools.ResolveManifestFile(args[0])
+		if err != nil {
+			return fmt.Errorf("resolving manifest: %w", err)
+		}
+		outputModule = args[1]
+	}
 
-	manifestPath := args[0]
+	// manifestPath
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
 	if err != nil {
@@ -64,8 +86,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating module graph: %w", err)
 	}
 
-	outputModule := args[1]
-
+	// outputModule
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
 		sb, err := graph.ModuleInitialBlock(outputModule)

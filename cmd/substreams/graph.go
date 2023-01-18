@@ -26,18 +26,13 @@ func init() {
 }
 
 func runManifestGraph(cmd *cobra.Command, args []string) error {
-	var manifestPath string
-	var err error
+	manifestPathRaw := ""
 	if len(args) == 1 {
-		manifestPath, err = tools.ResolveManifestFile(args[0])
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-	} else {
-		manifestPath, err = tools.ResolveManifestFile("")
-		if err != nil {
-			fmt.Errorf("resolving manifest: %w", err)
-		}
+		manifestPathRaw = args[0]
+	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
 	}
 
 	manifestReader := manifest.NewReader(manifestPath)

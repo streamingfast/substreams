@@ -16,7 +16,7 @@ import (
 )
 
 var packCmd = &cobra.Command{
-	Use:   "pack [<package>]",
+	Use:   "pack [<manifest>]",
 	Short: "Build an .spkg out of a .yaml manifest",
 	Long: cli.Dedent(`
 		Build an .spkg out of a .yaml manifest. The manifest is optional as it will try to find 
@@ -39,19 +39,14 @@ func init() {
 }
 
 func runPack(cmd *cobra.Command, args []string) error {
-	var manifestPath string
-	var err error
+	manifestPathRaw := ""
 
-	if len(args) == 0 {
-		manifestPath, err = tools.ResolveManifestFile("")
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-	} else {
-		manifestPath, err = tools.ResolveManifestFile(args[0])
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
+	if len(args) == 1 {
+		manifestPathRaw = args[0]
+	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
 	}
 	manifestReader := manifest.NewReader(manifestPath)
 

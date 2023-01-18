@@ -47,26 +47,18 @@ var runCmd = &cobra.Command{
 
 func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	var err error
-	var manifestPath string
-	var outputModule string
-
 	outputMode := mustGetString(cmd, "output")
-	if len(args) == 1 {
-		manifestPath, err = tools.ResolveManifestFile("")
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-		outputModule = args[0]
-	} else {
-		manifestPath, err = tools.ResolveManifestFile(args[0])
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-		outputModule = args[1]
-	}
 
-	// manifestPath
+	manifestPathRaw := ""
+
+	if len(args) == 2 {
+		manifestPathRaw = args[0]
+		args = args[1:]
+	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
 	if err != nil {
@@ -86,7 +78,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating module graph: %w", err)
 	}
 
-	// outputModule
+	outputModule := args[0]
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
 		sb, err := graph.ModuleInitialBlock(outputModule)

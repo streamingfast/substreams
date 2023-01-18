@@ -13,7 +13,7 @@ import (
 )
 
 var protogenCmd = &cobra.Command{
-	Use:   "protogen [<package>]",
+	Use:   "protogen [<manifest>]",
 	Short: "GenerateProto Rust bindings from a package",
 	Long: cli.Dedent(`
 		GenerateProto Rust bindings from a package. The manifest is optional as it will try to find 
@@ -35,22 +35,15 @@ func init() {
 
 func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := mustGetString(cmd, "output-path")
-
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
 
-	var manifestPath string
-	var err error
-
-	if len(args) == 0 {
-		manifestPath, err = tools.ResolveManifestFile("")
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-	} else {
-		manifestPath, err = tools.ResolveManifestFile(args[0])
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
+	manifestPathRaw := ""
+	if len(args) == 1 {
+		manifestPathRaw = args[0]
+	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
 	}
 	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
 

@@ -32,20 +32,16 @@ func init() {
 }
 
 func runInfo(cmd *cobra.Command, args []string) error {
-	var err error
-	var manifestPath string
+	manifestPathRaw := ""
 
-	if len(args) == 0 {
-		manifestPath, err = tools.ResolveManifestFile("")
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-	} else {
-		manifestPath, err = tools.ResolveManifestFile(args[1])
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
+	if len(args) == 1 {
+		manifestPathRaw = args[0]
 	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
+
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
 	if err != nil {

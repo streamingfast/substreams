@@ -48,31 +48,21 @@ func init() {
 }
 
 func runPrometheus(cmd *cobra.Command, args []string) error {
-	var err error
-	var endpoints []string
-	var manifestPath string
-	var moduleName string
-	var blockHeight string
-	var blockNum int64
 
-	if len(args) == 3 {
-		manifestPath, err = ResolveManifestFile("")
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-		moduleName = args[1]
-		blockHeight = args[2]
-
-	} else {
-		manifestPath, err = ResolveManifestFile(args[1])
-		if err != nil {
-			return fmt.Errorf("resolving manifest: %w", err)
-		}
-		moduleName = args[2]
-		blockHeight = args[3]
+	endpoints := strings.Split(args[0], ",")
+	manifestPathRaw := ""
+	if len(args) == 4 {
+		manifestPathRaw = args[1]
+		args = args[1:]
 	}
-	endpoints = strings.Split(args[0], ",")
-	blockNum, err = strconv.ParseInt(blockHeight, 10, 64)
+	manifestPath, err := ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
+	moduleName := args[1]
+	blockHeight := args[2]
+
+	blockNum, err := strconv.ParseInt(blockHeight, 10, 64)
 	addr := mustGetString(cmd, "listen-addr")
 
 	manifestReader := manifest.NewReader(manifestPath)

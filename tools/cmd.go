@@ -73,27 +73,30 @@ func mustGetDuration(cmd *cobra.Command, flagName string) time.Duration {
 
 func ResolveManifestFile(input string) (manifestName string, err error) {
 	if input == "" {
-		if _, err := os.Stat("substreams.yaml"); err == nil {
-			return "substreams.yaml", nil
-		} else if errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("finding manifest file: %w", err)
+		_, err := os.Stat("substreams.yaml")
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("no manifest entered in dir w/o a manifest")
+			}
+			return "", fmt.Errorf("finding manifest: %w", err)
 		}
-	} else {
 
-		// Check valid file first
-		if _, err := os.Stat(input); err == nil {
-			_, err := os.Open(input)
-			if err == nil {
-				return input, nil
-			}
-			// Check if dir w/ manifest
-		} else if errors.Is(err, os.ErrNotExist) {
-			potentialManifestPath := filepath.Join(input, "substreams.yaml")
-			if _, err := os.Stat(potentialManifestPath); err == nil {
-				return potentialManifestPath, nil
-			}
-			return "", fmt.Errorf("finding manifest file: %w", err)
-		}
+		return "substreams.yaml", nil
 	}
-	return "", nil
+
+	inputInfo, err := os.Stat(input)
+	if err != nil {
+		return "", fmt.Errorf("reading input: %w", err)
+	}
+
+	// If input is dir
+	if inputInfo.IsDir() {
+		potentialManifest := filepath.Join(inputInfo.Name(), "substreams.yaml")
+		_, err := os.Stat(potentialManifest)
+		if err != nil {
+			return "", fmt.Errorf("finding manifest in dir: %w", err)
+		}
+		return "substreams.yaml", nil
+	}
+	return inputInfo.Name(), nil
 }

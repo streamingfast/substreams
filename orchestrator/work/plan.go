@@ -114,7 +114,6 @@ func calculateHighestDependencyDepth(
 			continue
 		}
 		dependencyDepth := ancestorsDepth(storeName, ancestorsFrom)
-		fmt.Println("got dep depth", dependencyDepth, storeName)
 		if dependencyDepth > highestDependencyDepth {
 			highestDependencyDepth = dependencyDepth
 		}

@@ -69,7 +69,6 @@ func New(
 
 	runtimeConfig := config.NewRuntimeConfig(
 		1000, // overridden by Options
-		1000, // overridden by Options
 		subrequestSplitSize,
 		parallelSubRequests,
 		stateStore,
@@ -161,8 +160,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	s.runtimeConfig.BaseObjectStore.SetMeter(tracking.GetBytesMeter(ctx))
 
 	runtimeConfig := config.NewRuntimeConfig(
-		s.runtimeConfig.StoreSnapshotsSaveInterval,
-		s.runtimeConfig.ExecOutputSaveInterval,
+		s.runtimeConfig.CacheSaveInterval,
 		s.runtimeConfig.SubrequestsSplitSize,
 		s.runtimeConfig.ParallelSubrequests,
 		s.runtimeConfig.BaseObjectStore,
@@ -235,7 +233,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
 
-	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), runtimeConfig.ExecOutputSaveInterval, logger)
+	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -244,7 +242,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.StoreSnapshotsSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
 
 	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
 	//  * in direct mode, this would mean we start writing files after the handoff,

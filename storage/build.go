@@ -13,12 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
-func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval uint64, mapConfigs *execout.Configs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock, storeLinearHandoffBlock uint64) (ModuleStorageStateMap, error) {
+func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, cacheSaveInterval uint64, mapConfigs *execout.Configs, requestStartBlock, linearHandoffBlock, storeLinearHandoffBlock uint64) (ModuleStorageStateMap, error) {
 	out := make(ModuleStorageStateMap)
-	if err := buildStoresStorageState(ctx, storeConfigMap, storeSnapshotsSaveInterval, storeLinearHandoffBlock, out); err != nil {
+	if err := buildStoresStorageState(ctx, storeConfigMap, cacheSaveInterval, storeLinearHandoffBlock, out); err != nil {
 		return nil, err
 	}
-	if err := buildMappersStorageState(ctx, mapConfigs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock, out); err != nil {
+	if err := buildMappersStorageState(ctx, mapConfigs, cacheSaveInterval, requestStartBlock, linearHandoffBlock, out); err != nil {
 		return nil, err
 	}
 	return out, nil

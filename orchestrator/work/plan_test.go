@@ -39,7 +39,7 @@ func TestWorkPlanning(t *testing.T) {
 			),
 			outMod: "B",
 			expectReadyJobs: []*Job{
-				TestJob("B", "0-10", 4),
+				TestJob("B", "0-10", 5),
 			},
 		},
 		{
@@ -52,10 +52,9 @@ func TestWorkPlanning(t *testing.T) {
 			),
 			outMod: "As",
 			expectReadyJobs: []*Job{
-				TestJob("As", "0-20", 4),
-				//TestJob("B", "0-10", 4),
-				TestJob("As", "30-50", 3),
-				TestJob("As", "50-60", 2),
+				TestJob("As", "0-20", 5),
+				TestJob("As", "30-50", 4),
+				TestJob("As", "50-60", 3),
 			},
 		},
 	}

@@ -106,6 +106,32 @@ The example code is intentionally very basic. StreamingFast [provides a more rob
 
 The output type for sink is a list of lines. The line content can be any type anything that is formatted as plain text, and line based. For example, a basic string like the transaction's hash, would result in files containing all the hashes for the transactions, one per line.
 
+### Core steps for Substreams sink modules
+
+- Import sink `.spkg` files, re-generate protobufs and create and add a mod.rs file.
+
+- Create a map module outputing sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the serde_json crate to assist creating your structure, one per line.
+
+- Add the correct module definition to the Substreams manifest, `substreams.yaml`.
+
+```yaml
+imports:
+  sink_files: https://github.com/streamingfast/substreams-sink-files/releases/download/v0.2.0/substreams-sink-files-v0.2.0.spkg
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  - name: jsonl_out
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:sf.substreams.sink.files.v1.Lines
+```
+
 ## Understanding the sink tool
 
 ### Run and configure the `substreams-sink-files` tool

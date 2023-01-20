@@ -10,14 +10,14 @@ import (
 
 var initCmd = &cobra.Command{
 	Use:          "init <projectName> <path>",
-	Short:        "GenerateProto substreams code from your substreams yaml manifest file",
+	Short:        "Initialize a new Substreams project",
 	RunE:         runSubstreamsInitE,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 }
 
 func init() {
-	rootCmd.AddCommand(initCmd)
+	alphaCmd.AddCommand(initCmd)
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {

@@ -11,11 +11,13 @@ The `substreams` command line interface (CLI) is the primary user interface and 
 The `substreams` CLI exposes many commands to developers enabling a range of features.&#x20;
 
 {% hint style="info" %}
-**Note**: When a package is specified you can use:&#x20;
+**Note**: When a package is specified, it is optional. If you do use it, you can use:&#x20;
 
 * Local `substreams.yaml` configuration files
 * Local `.spkg` package files
 * Remote `.spkg` package URLs
+* Local directory containing a `substreams.yaml` file<br />
+  If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 {% endhint %}
 
 ### **`run`**

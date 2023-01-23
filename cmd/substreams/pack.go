@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/tools"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,10 +16,15 @@ import (
 )
 
 var packCmd = &cobra.Command{
-	Use:          "pack <package>",
-	Short:        "Build an .spkg out of a .yaml manifest",
+	Use:   "pack [<manifest>]",
+	Short: "Build an .spkg out of a .yaml manifest",
+	Long: cli.Dedent(`
+		Build an .spkg out of a .yaml manifest. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 
+		'substreams.yaml' file in place of '<manifest_file>'.
+	`),
 	RunE:         runPack,
-	Args:         cobra.ExactArgs(1),
+	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
@@ -34,7 +40,15 @@ func init() {
 }
 
 func runPack(cmd *cobra.Command, args []string) error {
-	manifestPath := args[0]
+	manifestPathRaw := ""
+
+	if len(args) == 1 {
+		manifestPathRaw = args[0]
+	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
 	manifestReader := manifest.NewReader(manifestPath)
 
 	if !manifestReader.IsLocalManifest() {

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/cli"
 	"io"
 	"net/http"
 	"os"
@@ -24,10 +25,15 @@ var status = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healt
 var requestDurationMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_duration_ms", Help: "Request full processing time in millisecond"}, []string{"endpoint"})
 
 var prometheusCmd = &cobra.Command{
-	Use:          "prometheus-exporter <endpoint[,endpoint[,...]]> <manifest> <module_name> <block_height>",
-	Short:        "run substreams client periodically on a single block, exporting the values in prometheus format",
+	Use:   "prometheus-exporter <endpoint[,endpoint[,...]]> [<manifest>] <module_name> <block_height>",
+	Short: "run substreams client periodically on a single block, exporting the values in prometheus format",
+	Long: cli.Dedent(`
+		Run substreams client periodically on a single block, exporting the values in prometheus format. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
+	`),
 	RunE:         runPrometheus,
-	Args:         cobra.ExactArgs(4),
+	Args:         cobra.RangeArgs(3, 4),
 	SilenceUsage: true,
 }
 
@@ -43,10 +49,20 @@ func init() {
 }
 
 func runPrometheus(cmd *cobra.Command, args []string) error {
+
 	endpoints := strings.Split(args[0], ",")
-	manifestPath := args[1]
-	moduleName := args[2]
-	blockHeight := args[3]
+	manifestPathRaw := ""
+	if len(args) == 4 {
+		manifestPathRaw = args[1]
+		args = args[1:]
+	}
+	manifestPath, err := ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
+	moduleName := args[1]
+	blockHeight := args[2]
+
 	blockNum, err := strconv.ParseInt(blockHeight, 10, 64)
 	addr := mustGetString(cmd, "listen-addr")
 

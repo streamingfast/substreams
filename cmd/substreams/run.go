@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/cli"
+	"github.com/streamingfast/substreams/tools"
 	"io"
 	"os"
 	"strconv"
@@ -32,19 +34,39 @@ func init() {
 
 // runCmd represents the command to run substreams remotely
 var runCmd = &cobra.Command{
-	Use:          "run <manifest> <module_name>",
-	Short:        "Stream module outputs from a given package on a remote endpoint",
+	Use:   "run [<manifest>] <module_name>",
+	Short: "Stream module outputs from a given package on a remote endpoint",
+	Long: cli.Dedent(`
+		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
+	`),
 	RunE:         runRun,
-	Args:         cobra.ExactArgs(2),
+	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-
 	outputMode := mustGetString(cmd, "output")
 
-	manifestPath := args[0]
+	manifestPath := ""
+	var err error
+	if len(args) == 2 {
+		manifestPath = args[0]
+		args = args[1:]
+	} else {
+		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) || strings.Contains(args[0], ".") {
+			return fmt.Errorf("parameter entered likely a manifest file, don't forget to include a '<module_name>' in your command")
+		}
+
+		// At this point, we assume the user invoked `substreams run <module_name>` so we `ResolveManifestFile` using the empty string since no argument has been passed.
+		manifestPath, err = tools.ResolveManifestFile("")
+		if err != nil {
+			return fmt.Errorf("resolving manifest: %w", err)
+		}
+	}
+
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
 	if err != nil {
@@ -64,8 +86,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating module graph: %w", err)
 	}
 
-	outputModule := args[1]
-
+	outputModule := args[0]
 	startBlock := mustGetInt64(cmd, "start-block")
 	if startBlock == -1 {
 		sb, err := graph.ModuleInitialBlock(outputModule)

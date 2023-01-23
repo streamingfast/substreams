@@ -15,7 +15,10 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,4 +69,33 @@ func mustGetDuration(cmd *cobra.Command, flagName string) time.Duration {
 		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
 	}
 	return val
+}
+
+func ResolveManifestFile(input string) (manifestName string, err error) {
+	if input == "" {
+		_, err := os.Stat("substreams.yaml")
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("no manifest entered in directory without a manifest")
+			}
+			return "", fmt.Errorf("finding manifest: %w", err)
+		}
+
+		return "substreams.yaml", nil
+	}
+
+	inputInfo, err := os.Stat(input)
+	if err != nil {
+		return "", fmt.Errorf("read input file info: %w", err)
+	}
+
+	if inputInfo.IsDir() {
+		potentialManifest := filepath.Join(inputInfo.Name(), "substreams.yaml")
+		_, err := os.Stat(potentialManifest)
+		if err != nil {
+			return "", fmt.Errorf("finding manifest in directory: %w", err)
+		}
+		return filepath.Join(input, "substreams.yaml"), nil
+	}
+	return input, nil
 }

@@ -33,34 +33,39 @@ var decodeCmd = &cobra.Command{
 }
 
 var decodeOutputsModuleCmd = &cobra.Command{
-	Use:   "outputs <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> <key>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
-		When running this outputs command with a mapper or a store the key will be the block hash. The key is optional
-		as it will return all the keys on the given block.
+		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
-	Example: cli.Dedent(`
-		substreams tools decode outputs uniswap-v3.spkg map_pools_created [bucket-url-path] 12487090 <optional_key>
-		substreams tools decode outputs uniswap-v3.spkg store_pools [bucket-url-path] 12487090 <optional_key>
-	`),
+	Example: string(cli.ExamplePrefixed("substreams tools decode outputs", `
+		map_pools_created gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		uniswap-v3.spkg store_pools gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		dir-with-manifest store_pools gs://[bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+	`)),
 	RunE:         runDecodeOutputsModuleRunE,
-	Args:         cobra.MinimumNArgs(4),
+	Args:         cobra.RangeArgs(4, 5),
 	SilenceUsage: true,
 }
 
 var decodeStatesModuleCmd = &cobra.Command{
-	Use:   "states <manifest_file> <module_name> <output_url> <block_number> <key>",
+	Use:   "states [<manifest_file>] <module_name> <output_url> <block_number> <key>",
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
-		to the user. The user needs to specify a key as it is required.
+		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
-	Example: cli.Dedent(`
-		substreams tools decode states uniswap-v3.spkg store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
-		substreams tools decode states uniswap-v3.spkg store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
-	`),
+	Example: string(cli.ExamplePrefixed("substreams tools decode states", `
+		store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+		dir-with-manifest store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		uniswap-v3.spkg store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+	`)),
 	RunE:         runDecodeStatesModuleRunE,
-	Args:         cobra.MinimumNArgs(4),
+	Args:         cobra.RangeArgs(4, 5),
 	SilenceUsage: true,
 }
 
@@ -76,32 +81,38 @@ func init() {
 
 func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	manifestPath := args[0]
-	moduleName := args[1]
-	storeUrl := args[2]
 	saveInterval := mustGetUint64(cmd, "save-interval")
-	blockNumber, err := strconv.ParseUint(args[3], 10, 64)
+
+	manifestPathRaw := ""
+	if len(args) == 5 {
+		manifestPathRaw = args[0]
+		args = args[1:]
+	}
+
+	moduleName := args[0]
+	storeURL := args[1]
+	manifestPath, err := ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
+	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
 	}
-
-	key := ""
-	if len(args) > 4 {
-		key = args[4]
-	}
+	key := args[3]
 
 	zlog.Info("decoding module",
 		zap.String("manifest_path", manifestPath),
 		zap.String("module_name", moduleName),
-		zap.String("store_url", storeUrl),
+		zap.String("store_url", storeURL),
 		zap.Uint64("block_number", blockNumber),
 		zap.Uint64("save_internal", saveInterval),
 		zap.String("key", key),
 	)
 
-	objStore, err := dstore.NewStore(storeUrl, "zst", "zstd", false)
+	objStore, err := dstore.NewStore(storeURL, "zst", "zstd", false)
 	if err != nil {
-		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
+		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
 	}
 
 	pkg, err := manifest.NewReader(manifestPath).Read()
@@ -147,32 +158,38 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 
 func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	manifestPath := args[0]
-	moduleName := args[1]
-	storeUrl := args[2]
 	saveInterval := mustGetUint64(cmd, "save-interval")
-	blockNumber, err := strconv.ParseUint(args[3], 10, 64)
+
+	manifestPathRaw := ""
+	if len(args) == 5 {
+		manifestPathRaw = args[0]
+		args = args[1:]
+	}
+
+	moduleName := args[0]
+	storeURL := args[1]
+	manifestPath, err := ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
+	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
 	}
-
-	key := ""
-	if len(args) > 4 {
-		key = args[4]
-	}
+	key := args[3]
 
 	zlog.Info("decoding module",
 		zap.String("manifest_path", manifestPath),
 		zap.String("module_name", moduleName),
-		zap.String("store_url", storeUrl),
+		zap.String("store_url", storeURL),
 		zap.Uint64("block_number", blockNumber),
 		zap.Uint64("save_internal", saveInterval),
 		zap.String("key", key),
 	)
 
-	s, err := dstore.NewStore(storeUrl, "zst", "zstd", false)
+	s, err := dstore.NewStore(storeURL, "zst", "zstd", false)
 	if err != nil {
-		return fmt.Errorf("initializing dstore for %q: %w", storeUrl, err)
+		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
 	}
 
 	pkg, err := manifest.NewReader(manifestPath).Read()
@@ -240,7 +257,7 @@ func searchOutputsModule(
 		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
 	}
 	if !found {
-		return fmt.Errorf("can't find cache at block %d storeUrl %q", blockNumber, moduleStore.BaseURL().String())
+		return fmt.Errorf("can't find cache at block %d storeURL %q", blockNumber, moduleStore.BaseURL().String())
 	}
 
 	fmt.Println()

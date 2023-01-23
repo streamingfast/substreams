@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/tools"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -12,10 +13,15 @@ import (
 )
 
 var protogenCmd = &cobra.Command{
-	Use:          "protogen <package>",
-	Short:        "Generate Rust bindings from a package",
+	Use:   "protogen [<manifest>]",
+	Short: "GenerateProto Rust bindings from a package",
+	Long: cli.Dedent(`
+		GenerateProto Rust bindings from a package. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
+	`),
 	RunE:         runProtogen,
-	Args:         cobra.ExactArgs(1),
+	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
@@ -30,9 +36,16 @@ func init() {
 
 func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := mustGetString(cmd, "output-path")
-
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
-	manifestPath := args[0]
+
+	manifestPathRaw := ""
+	if len(args) == 1 {
+		manifestPathRaw = args[0]
+	}
+	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
+	if err != nil {
+		return fmt.Errorf("resolving manifest: %w", err)
+	}
 	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
 
 	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {

@@ -8,15 +8,6 @@ import (
 	"testing"
 )
 
-//{
-//	{"input, valid manifest", true, false, "substreams.yaml", "substreams.yaml", false},
-//	{"input, invalid manifest", false, false, "substreams.yaml", "", true},
-//	{"input, valid dir", true, true, "manifests", "manifest/substreams.yaml", false},
-//	{"input, invalid dir", false, false, "manifests", "", true},
-//	{"no input, has manifest", true, false, "", "substreams.yaml", false},
-//	{"no input, no manifest", false, false, "", "", true},
-//}
-
 func TestResolveManifestFile(t *testing.T) {
 	type args struct {
 		input       string
@@ -39,7 +30,7 @@ func TestResolveManifestFile(t *testing.T) {
 			"no input provided and not substreams.yaml present",
 			args{"", "", []string{}},
 			"",
-			errorEqual("no manifest entered in dir w/o a manifest"),
+			errorEqual("no manifest entered in directory without a manifest"),
 		},
 		{
 			"input provided, valid manifest file",
@@ -51,19 +42,19 @@ func TestResolveManifestFile(t *testing.T) {
 			"input provided, invalid manifest file",
 			args{"substreams-custom.yaml", "", []string{}},
 			"",
-			errorEqual("reading input: stat substreams-custom.yaml: no such file or directory"),
+			errorEqual("read input file info: stat substreams-custom.yaml: no such file or directory"),
 		},
 		{
 			"input provided, valid dir",
 			args{"manifests-dir", "manifests-dir", []string{"substreams.yaml"}},
-			"substreams.yaml",
+			"manifests-dir/substreams.yaml",
 			require.NoError,
 		},
 		{
 			"input provided, invalid dir",
 			args{"manifests-dir", "manifests-dir", []string{}},
 			"",
-			errorEqual("reading input: stat manifests-dir: no such file or directory"),
+			errorEqual("read input file info: stat manifests-dir: no such file or directory"),
 		},
 	}
 	for _, tt := range tests {

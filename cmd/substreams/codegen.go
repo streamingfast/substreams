@@ -19,7 +19,7 @@ var codegenCmd = &cobra.Command{
 	Long: cli.Dedent(`
 		Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development. 
 		The manifest is optional as it will try to find one a file named 'substreams.yaml' in current working directory if nothing entered.
-		You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		You may enter a directory that contains a 'substreams.yaml' file in place of '<manifest_file>'.
 	`),
 	RunE: runCodeGen,
 	Args: cobra.RangeArgs(0, 1),

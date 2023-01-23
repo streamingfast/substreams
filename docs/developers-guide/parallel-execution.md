@@ -23,3 +23,15 @@ Assuming a chain has 16,000,000 blocks, which translates to 640 segments of 25K 
 The amount of parallel execution for the two modes is illustrated in the diagram. Production mode results in more parallel processing than development mode for the requested range. In contrast, development mode consists of more linear processing. Another important note is, foward parallel execution only occurs in production mode.
 
 <figure><img src="https://github.com/streamingfast/substreams/raw/develop/docs/assets/substreams_processing.png" alt=""><figcaption><p>Substreams production versus development mode for parallel execution digram</p></figcaption></figure>
+
+## Backward and forward parallel execution steps
+
+The two steps involved during parallel execution are **backward execution and forward execution**.
+
+Backward parallel execution consists of executing in parallel block ranges, from the module's initial block, up to the start block of the request. If the start block of the request matches the module's initial block no backwards execution is performed.
+
+Forward parallel execution consists of executing in parallel block ranges from the start block of the request up to last known final block, also called an irreversible block, or the stop block of the request depending on which is smaller. Forward parallel execution significantly improves the performance of Substreams.
+
+Backward parallel execution will occur in both development and production modes.
+
+Forward parallel execution only occurs in production mode.

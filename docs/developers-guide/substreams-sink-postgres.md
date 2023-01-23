@@ -6,15 +6,7 @@ description: StreamingFast Substreams PostgreSQL sink
 
 ### Purpose
 
-Learn how to use the StreamingFast [`substreams-sink-postgres`](https://github.com/streamingfast/substreams-sink-postgres) tool with this documentation. A basic Substreams module example is provided to help you get started.
-
-### Overview
-
-Use the StreamingFast [`substreams-sink-postgres`](https://github.com/streamingfast/substreams-sink-postgres) tool to pipe data extracted from a blockchain into a PostgreSQL database.
-
-### Accompanying code example
-
-Use the accompanying Substreams module to extract data from the Ethereum blockchain and route it into a protobuf for persistence in a PostgreSQL database. To customize the codebase to your needs, modify the `substreams.yaml`, `lib.rs`, `schema.sql`, `block_meta.proto`, and `Cargo.toml` files.
+Learn how to use the StreamingFast [`substreams-sink-postgres`](https://github.com/streamingfast/substreams-sink-postgres) tool with this documentation. A basic Substreams module example is provided to help you get started. We are going to showcase a Substreams module to extract data from the Ethereum blockchain and route it into a protobuf for persistence in a PostgreSQL database.
 
 ## Installation
 

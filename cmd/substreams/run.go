@@ -50,17 +50,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	outputMode := mustGetString(cmd, "output")
 
-	manifestPathRaw := ""
 	manifestPath := ""
 	var err error
 	if len(args) == 2 {
-		manifestPathRaw = args[0]
+		manifestPath = args[0]
 		args = args[1:]
 	} else {
 		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) || strings.Contains(args[0], ".") {
 			return fmt.Errorf("parameter entered likely a manifest file, don't forget to include a '<module_name>' in your command")
 		}
-		
+
 		// At this point, we assume the user invoked `substreams run <module_name>` so we `ResolveManifestFile` using the empty string since no argument has been passed.
 		manifestPath, err = tools.ResolveManifestFile("")
 		if err != nil {

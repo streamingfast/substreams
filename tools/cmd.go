@@ -95,7 +95,7 @@ func ResolveManifestFile(input string) (manifestName string, err error) {
 		if err != nil {
 			return "", fmt.Errorf("finding manifest in directory: %w", err)
 		}
-		return fmt.Sprintf("%s/substreams.yaml", input), nil
+		return filepath.Join(input, "substreams.yaml"), nil
 	}
-	return inputInfo.Name(), nil
+	return input, nil
 }

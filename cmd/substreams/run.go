@@ -37,8 +37,9 @@ var runCmd = &cobra.Command{
 	Use:   "run [<manifest>] <module_name>",
 	Short: "Stream module outputs from a given package on a remote endpoint",
 	Long: cli.Dedent(`
-		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find 
-		one in your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
 	RunE:         runRun,
 	Args:         cobra.RangeArgs(1, 2),
@@ -50,15 +51,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 	outputMode := mustGetString(cmd, "output")
 
 	manifestPathRaw := ""
-
+	manifestPath := ""
+	var err error
 	if len(args) == 2 {
 		manifestPathRaw = args[0]
 		args = args[1:]
+	} else {
+		manifestPath, err = tools.ResolveManifestFile(manifestPathRaw)
+		if err != nil {
+			return fmt.Errorf("resolving manifest: %w", err)
+		}
+		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) {
+			return fmt.Errorf("parameter entered likely a manifest. Don't forget to include a '<module_name>' in your command")
+		}
 	}
-	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
-	}
+
 	manifestReader := manifest.NewReader(manifestPath)
 	pkg, err := manifestReader.Read()
 	if err != nil {

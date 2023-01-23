@@ -19,8 +19,9 @@ var infoCmd = &cobra.Command{
 	Use:   "info [<manifest_file>]",
 	Short: "Display package modules and docs",
 	Long: cli.Dedent(`
-		Display package modules and docs. The manifest is optional as it will try to find 
-		one in your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		Display package modules and docs. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains 
+		a 'substreams.yaml' file in place of '<manifest_file>'.
 	`),
 	RunE:         runInfo,
 	Args:         cobra.RangeArgs(0, 1),

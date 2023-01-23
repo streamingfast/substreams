@@ -28,8 +28,9 @@ var prometheusCmd = &cobra.Command{
 	Use:   "prometheus-exporter <endpoint[,endpoint[,...]]> [<manifest>] <module_name> <block_height>",
 	Short: "run substreams client periodically on a single block, exporting the values in prometheus format",
 	Long: cli.Dedent(`
-		Run substreams client periodically on a single block, exporting the values in prometheus format. The manifest is optional 
-		as it will try to find one in your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		Run substreams client periodically on a single block, exporting the values in prometheus format. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
 	RunE:         runPrometheus,
 	Args:         cobra.RangeArgs(3, 4),

@@ -19,9 +19,9 @@ import (
 
 func TestResolveManifestFile(t *testing.T) {
 	type args struct {
-		input        string
-		subDirectory string
-		filesOnDisk  []string
+		input       string
+		dirToMake   string
+		filesOnDisk []string
 	}
 	tests := []struct {
 		name             string
@@ -68,7 +68,7 @@ func TestResolveManifestFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			root := filepath.Join(t.TempDir(), tt.args.subDirectory)
+			root := filepath.Join(t.TempDir(), tt.args.dirToMake)
 
 			for _, fileOnDisk := range tt.args.filesOnDisk {
 				directory := filepath.Join(root, filepath.Dir(fileOnDisk))
@@ -89,7 +89,7 @@ func TestResolveManifestFile(t *testing.T) {
 				require.NoError(t, err)
 			}()
 
-			if tt.args.subDirectory != "" {
+			if tt.args.dirToMake != "" {
 				root = filepath.Dir(root)
 			}
 			err = os.Chdir(root)

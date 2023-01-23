@@ -16,8 +16,10 @@ The `substreams` CLI exposes many commands to developers enabling a range of fea
 * Local `substreams.yaml` configuration files
 * Local `.spkg` package files
 * Remote `.spkg` package URLs
-* Local directory containing a `substreams.yaml` file<br />
-  If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
+* Local directory containing a `substreams.yaml` file
+  
+
+If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 {% endhint %}
 
 ### **`run`**

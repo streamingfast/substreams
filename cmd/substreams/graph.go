@@ -14,8 +14,9 @@ var graphCmd = &cobra.Command{
 	Short: "GenerateProto mermaid-js graph document",
 	RunE:  runManifestGraph,
 	Long: cli.Dedent(`
-		GenerateProto mermaid-js graph document. The manifest is optional as it will try to find one in your pwd if nothing entered.
-		You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		GenerateProto mermaid-js graph document. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 
+		'substreams.yaml' file in place of '<manifest_file>'.
 	`),
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,

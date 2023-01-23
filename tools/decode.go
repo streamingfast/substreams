@@ -36,8 +36,9 @@ var decodeOutputsModuleCmd = &cobra.Command{
 	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> <key>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
-		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is  optional 
-		as it will try to find one in your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode outputs", `
 		map_pools_created gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
@@ -54,8 +55,9 @@ var decodeStatesModuleCmd = &cobra.Command{
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
-		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find one in 
-		your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode states", `
 		store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth

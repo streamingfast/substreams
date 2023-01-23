@@ -19,8 +19,9 @@ var moduleCmd = &cobra.Command{
 	Use:   "module <module_name> [<manifest|spkg_path>] <substreams_state_store_url>",
 	Short: "returns the state of the module on the state store",
 	Long: cli.Dedent(`
-		Returns the state of the module on the state store. The manifest is optional as it will try to find one in 
-		your pwd if nothing entered. You may enter a dir that contains a 'substreams.yaml' file in place of <manifest_file>
+		Returns the state of the module on the state store. The manifest is optional as it will try to find one a file named 
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		file in place of '<manifest_file>'.
 	`),
 	Args: cobra.RangeArgs(2, 3),
 	RunE: moduleRunE,

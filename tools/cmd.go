@@ -76,7 +76,7 @@ func ResolveManifestFile(input string) (manifestName string, err error) {
 		_, err := os.Stat("substreams.yaml")
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				return "", fmt.Errorf("no manifest entered in dir w/o a manifest")
+				return "", fmt.Errorf("no manifest entered in directory without a manifest")
 			}
 			return "", fmt.Errorf("finding manifest: %w", err)
 		}
@@ -86,7 +86,7 @@ func ResolveManifestFile(input string) (manifestName string, err error) {
 
 	inputInfo, err := os.Stat(input)
 	if err != nil {
-		return "", fmt.Errorf("reading input: %w", err)
+		return "", fmt.Errorf("read input file info: %w", err)
 	}
 
 	// If input is dir
@@ -94,7 +94,7 @@ func ResolveManifestFile(input string) (manifestName string, err error) {
 		potentialManifest := filepath.Join(inputInfo.Name(), "substreams.yaml")
 		_, err := os.Stat(potentialManifest)
 		if err != nil {
-			return "", fmt.Errorf("finding manifest in dir: %w", err)
+			return "", fmt.Errorf("finding manifest in directory: %w", err)
 		}
 		return "substreams.yaml", nil
 	}

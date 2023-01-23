@@ -9,7 +9,7 @@ import (
 
 var graphCmd = &cobra.Command{
 	Use:          "graph <manifest_file>",
-	Short:        "GenerateProto mermaid-js graph document",
+	Short:        "Generate mermaid-js graph document",
 	RunE:         runManifestGraph,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

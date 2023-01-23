@@ -13,7 +13,7 @@ import (
 
 var protogenCmd = &cobra.Command{
 	Use:          "protogen <package>",
-	Short:        "GenerateProto Rust bindings from a package",
+	Short:        "Generate Rust bindings from a package",
 	RunE:         runProtogen,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

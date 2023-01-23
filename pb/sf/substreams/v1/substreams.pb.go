@@ -139,16 +139,25 @@ type Request struct {
 	StopBlockNum             uint64     `protobuf:"varint,3,opt,name=stop_block_num,json=stopBlockNum,proto3" json:"stop_block_num,omitempty"`
 	ForkSteps                []ForkStep `protobuf:"varint,4,rep,packed,name=fork_steps,json=forkSteps,proto3,enum=sf.substreams.v1.ForkStep" json:"fork_steps,omitempty"`
 	IrreversibilityCondition string     `protobuf:"bytes,5,opt,name=irreversibility_condition,json=irreversibilityCondition,proto3" json:"irreversibility_condition,omitempty"`
-	// By default, the engine runs in developer mode, with richer and deeper output,
-	// * support for multiple `output_modules`, of `store` and `map` kinds
-	// * support for `initial_store_snapshot_for_modules`
-	// * log outputs for output modules
+	// Substreams has two mode when executing your module(s) either development mode or production
+	// mode. Development and production modes impact the execution of Substreams, important aspects
+	// of execution include:
+	// * The time required to reach the first byte.
+	// * The speed that large ranges get executed.
+	// * The module logs and outputs sent back to the client.
 	//
-	// With `production_mode`, however, you trade off functionality for high speed, where it:
-	// * restricts the possible requested `output_modules` to a single mapper module,
-	// * turns off support for `initial_store_snapshot_for_modules`,
-	// * still streams output linearly, with a cursor, but at higher speeds
-	// * and purges log outputs from responses.
+	// By default, the engine runs in developer mode, with richer and deeper output. Differences
+	// between production and development modes include:
+	// * Forward parallel execution is enabled in production mode and disabled in development mode
+	// * The time required to reach the first byte in development mode is faster than in production mode.
+	//
+	// Specific attributes of development mode include:
+	// * The client will receive all of the executed module's logs.
+	// * It's possible to request specific store snapshots in the execution tree (via `debug_initial_store_snapshot_for_modules`).
+	// * Multiple module's output is possible.
+	//
+	// With production mode`, however, you trade off functionality for high speed enabling forward
+	// parallel execution of module ahead of time.
 	ProductionMode bool     `protobuf:"varint,9,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
 	Modules        *Modules `protobuf:"bytes,6,opt,name=modules,proto3" json:"modules,omitempty"`
 	OutputModules  []string `protobuf:"bytes,7,rep,name=output_modules,json=outputModules,proto3" json:"output_modules,omitempty"`

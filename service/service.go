@@ -175,6 +175,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	fields := []zap.Field{
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
+		zap.String("cursor", request.StartCursor),
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.MustGetOutputModuleName()),
 	}

@@ -212,9 +212,9 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 
 	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, isSubRequest)
 
-	bytesMeter := tracking.NewBytesMeter(ctx)
-	bytesMeter.Launch(ctx, respFunc)
-	ctx = tracking.WithBytesMeter(ctx, bytesMeter)
+	//bytesMeter := tracking.NewBytesMeter(ctx)
+	//bytesMeter.Launch(ctx, respFunc)
+	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	logger.Debug("executing subrequest",
 		zap.String("output_module", request.MustGetOutputModuleName()),

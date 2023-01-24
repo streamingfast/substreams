@@ -41,7 +41,7 @@ func TestSchedulerInOut(t *testing.T) {
 		&pbsubstreams.Modules{Modules: mods},
 	)
 	var accumulatedRanges block.Ranges
-	sched.OnStoreJobTerminated = func(mod string, partialsWritten block.Ranges) error {
+	sched.OnStoreJobTerminated = func(_ context.Context, mod string, partialsWritten block.Ranges) error {
 		assert.Equal(t, "B", mod)
 		accumulatedRanges = append(accumulatedRanges, partialsWritten...)
 		return nil

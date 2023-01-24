@@ -78,12 +78,16 @@ func (s *StoreSquasher) waitForCompletion(ctx context.Context) error {
 	}
 }
 
-func (s *StoreSquasher) squash(partialsChunks block.Ranges) error {
+func (s *StoreSquasher) squash(ctx context.Context, partialsChunks block.Ranges) error {
 	if len(partialsChunks) == 0 {
 		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
 	}
 
-	s.partialsChunks <- partialsChunks
+	select {
+	case s.partialsChunks <- partialsChunks:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	return nil
 }
 

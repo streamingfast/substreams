@@ -25,7 +25,7 @@ type MultiSquasher struct {
 type squashable interface {
 	launch(ctx context.Context)
 	waitForCompletion(ctx context.Context) error
-	squash(partialsChunks block.Ranges) error
+	squash(ctx context.Context, partialsChunks block.Ranges) error
 	moduleName() string
 }
 
@@ -107,7 +107,7 @@ func buildStoreSquasher(ctx context.Context, storeSnapshotsSaveInterval uint64, 
 		storeSquasher.targetExclusiveEndBlockReach = true
 	}
 	if len(storeStorageState.PartialsPresent) != 0 {
-		if err := storeSquasher.squash(storeStorageState.PartialsPresent); err != nil {
+		if err := storeSquasher.squash(ctx, storeStorageState.PartialsPresent); err != nil {
 			return nil, fmt.Errorf("first squash: %w", err)
 		}
 	}
@@ -120,13 +120,13 @@ func (s *MultiSquasher) Launch(ctx context.Context) {
 	}
 }
 
-func (s *MultiSquasher) Squash(moduleName string, partialsRanges block.Ranges) error {
+func (s *MultiSquasher) Squash(ctx context.Context, moduleName string, partialsRanges block.Ranges) error {
 	squashableStore, ok := s.storeSquashers[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in storeSquashers module registry", moduleName)
 	}
 
-	return squashableStore.squash(partialsRanges)
+	return squashableStore.squash(ctx, partialsRanges)
 }
 
 func (s *MultiSquasher) Wait(ctx context.Context) (out store.Map, err error) {

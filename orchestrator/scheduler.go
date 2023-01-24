@@ -26,7 +26,7 @@ type Scheduler struct {
 	currentJobsLock sync.Mutex
 	currentJobs     map[string]*work.Job
 
-	OnStoreJobTerminated func(moduleName string, partialsWritten block.Ranges) error
+	OnStoreJobTerminated func(ctx context.Context, moduleName string, partialsWritten block.Ranges) error
 }
 
 func NewScheduler(workPlan *work.Plan, respFunc substreams.ResponseFunc, upstreamRequestModules *pbsubstreams.Modules) *Scheduler {
@@ -102,7 +102,10 @@ func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan job
 	s.currentJobsLock.Unlock()
 	go func() {
 		jr := s.runSingleJob(ctx, worker, nextJob, s.upstreamRequestModules)
-		result <- jr
+		select {
+		case <-ctx.Done():
+		case result <- jr:
+		}
 		s.currentJobsLock.Lock()
 		delete(s.currentJobs, worker.ID())
 		s.currentJobsLock.Unlock()
@@ -142,21 +145,21 @@ func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (e
 			if !ok {
 				return nil
 			}
-			if err := s.processJobResult(jobResult); err != nil {
+			if err := s.processJobResult(ctx, jobResult); err != nil {
 				return fmt.Errorf("process job result for target %q: %w", jobResult.job.ModuleName, err)
 			}
 		}
 	}
 }
 
-func (s *Scheduler) processJobResult(result jobResult) error {
+func (s *Scheduler) processJobResult(ctx context.Context, result jobResult) error {
 	if result.err != nil {
 		return fmt.Errorf("worker ended in error: %w", result.err)
 	}
 
 	if result.partialsWritten != nil {
 		// This signals back to the Squasher that it can squash this segment
-		if err := s.OnStoreJobTerminated(result.job.ModuleName, result.partialsWritten); err != nil {
+		if err := s.OnStoreJobTerminated(ctx, result.job.ModuleName, result.partialsWritten); err != nil {
 			return fmt.Errorf("on job terminated: %w", err)
 		}
 	}

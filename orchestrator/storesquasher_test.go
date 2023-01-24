@@ -105,7 +105,7 @@ func TestStoreSquasher_squash(t *testing.T) {
 				name:           "mod",
 				partialsChunks: partialsChunks,
 			}
-			err := squasher.squash(test.ranges)
+			err := squasher.squash(context.Background(), test.ranges)
 			if test.expectErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, test.expectErr, err)

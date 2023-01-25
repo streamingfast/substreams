@@ -8,10 +8,22 @@ package:
     ##### ADD DOCUMENTATION STRING HERE #####
 
 protobuf:
-  files: []
+  files:
+    - erc721.proto
   importPaths:
     - ./proto
 
-binaries: {}
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
 
-modules: []
+modules:
+  - name: map_transfers
+    kind: map
+    initialBlock: 12287507
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:eth.erc721.v1.Transfers
+

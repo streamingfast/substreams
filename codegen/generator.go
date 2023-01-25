@@ -52,6 +52,27 @@ var tplPbMod string
 //go:embed templates/buildsh.gotmpl
 var tplBuildSh string
 
+//go:embed templates/librs.gotmpl
+var tplLibFile string
+
+//go:embed templates/makefile.gotmpl
+var tplMakefile string
+
+//go:embed templates/protofile.gotmpl
+var tplProtoFile string
+
+//go:embed templates/pbmodfile.gotmpl
+var tplPbModFile string
+
+//go:embed templates/abimodfile.gotmpl
+var tplAbiModFile string
+
+//go:embed templates/abiercfile.gotmpl
+var tplAbiErcFile string
+
+//go:embed templates/pbProtogenfile.gotmpl
+var tplProtogenFile string
+
 //go:embed templates/cargotoml.gotmpl
 var tplCargoToml string
 
@@ -60,6 +81,9 @@ var tplManifestYaml string
 
 //go:embed templates/rusttoolchain.gotmpl
 var tplRustToolchain string
+
+//go:embed templates/cargoconfig.gotmpl
+var tplCargoConfig string
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",

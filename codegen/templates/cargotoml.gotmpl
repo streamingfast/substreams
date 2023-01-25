@@ -1,26 +1,35 @@
 {{$engine := . -}}
 [package]
 name = "{{ $engine.ProjectName }}"
-version = "{{ $engine.ProjectVersion }}"
+version = "{{ $engine.ProjectVersionNum }}"
 description = ""
 edition = "2021"
+repository = "https://github.com/streamingfast/substreams-template"
+license = "Apache 2.0"
 
 [lib]
+name = "substreams"
 crate-type = ["cdylib"]
 
 [dependencies]
-ethabi = "17.0"
-hex = "0.4.3"
+num-bigint = "0.4.3"
+ethabi = "17"
 hex-literal = "0.3.4"
-prost = "0.10.1"
-
+prost = "0.11"
 # Use latest from https://crates.io/crates/substreams
-substreams = "{{ $engine.SubstreamsVersion }}"
-
+substreams = "0.5"
 # Use latest from https://crates.io/crates/substreams-ethereum
-#substreams-ethereum = "0.1.2"
+substreams-ethereum = "0.9.0"
+
+# Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
+[target.wasm32-unknown-unknown.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
 
 [build-dependencies]
 anyhow = "1"
-prost-build = "0.10.4"
-substreams-ethereum = "0.1.0"
+substreams-ethereum = "0.9.0"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

@@ -203,8 +203,12 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 		}
 	})
 
-	jr := fromWorkResult(job, workResult)
+	if err := ctx.Err(); err != nil {
+		logger.Info("job not completed", zap.Object("job", job), zap.Error(err))
+		return jobResult{err: err}
+	}
 
+	jr := fromWorkResult(job, workResult)
 	logger.Info("job completed", zap.Object("job", job), zap.Error(workResult.Error))
 	return jr
 }

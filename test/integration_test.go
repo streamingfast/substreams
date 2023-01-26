@@ -195,7 +195,7 @@ func TestStoreDeletePrefix(t *testing.T) {
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(20, 31, 31, "assert_all_test")
+	run := newTestRun(1, 31, 31, "assert_all_test")
 
 	require.NoError(t, run.Run(t))
 

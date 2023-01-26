@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"embed"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -52,25 +53,25 @@ var tplPbMod string
 //go:embed templates/buildsh.gotmpl
 var tplBuildSh string
 
-//go:embed templates/librs.gotmpl
+//go:embed templates/src/librs.gotmpl
 var tplLibFile string
 
 //go:embed templates/makefile.gotmpl
 var tplMakefile string
 
-//go:embed templates/protofile.gotmpl
+//go:embed templates/proto/protofile.gotmpl
 var tplProtoFile string
 
-//go:embed templates/pbmodfile.gotmpl
+//go:embed templates/src/pb/pbmodfile.gotmpl
 var tplPbModFile string
 
-//go:embed templates/abimodfile.gotmpl
+//go:embed templates/src/abi/abimodfile.gotmpl
 var tplAbiModFile string
 
-//go:embed templates/abiercfile.gotmpl
+//go:embed templates/src/abi/abiercfile.gotmpl
 var tplAbiErcFile string
 
-//go:embed templates/pbProtogenfile.gotmpl
+//go:embed templates/src/pb/pbProtogenfile.gotmpl
 var tplProtogenFile string
 
 //go:embed templates/cargotoml.gotmpl
@@ -82,8 +83,11 @@ var tplManifestYaml string
 //go:embed templates/rusttoolchain.gotmpl
 var tplRustToolchain string
 
-//go:embed templates/cargoconfig.gotmpl
+//go:embed templates/.cargo/cargoconfig.gotmpl
 var tplCargoConfig string
+
+//go:embed templates/**/*.gotmpl
+var templates embed.FS
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",

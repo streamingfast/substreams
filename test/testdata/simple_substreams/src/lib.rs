@@ -24,6 +24,8 @@ use substreams::{
         StoreSetProto,
     },
 };
+use substreams::pb::substreams::store_delta::Operation;
+use substreams::pb::substreams::store_delta::Operation::{Create, Update};
 
 use crate::pb::test;
 use crate::pb::test::Block;
@@ -275,10 +277,22 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
                 let delta_0 = deltas.deltas.get(0).unwrap();
                 assert(block.number, 0, delta_0.old_value);
                 assert(block.number, i64::MAX, delta_0.new_value);
+                match delta_0.operation {
+                    Create => {}
+                    _ => {
+                        panic!("expected Create, got {:?}", delta_0.operation);
+                    }
+                }
 
                 let delta_1 = deltas.deltas.get(1).unwrap();
                 assert(block.number, i64::MAX, delta_1.old_value);
                 assert(block.number, i64::MAX, delta_1.new_value);
+                match delta_1.operation {
+                    Update => {}
+                    _ => {
+                        panic!("expected Update, got {:?}", delta_1.operation);
+                    }
+                }
             }
             _ => {
                 if deltas.deltas.len() != 1 {
@@ -288,6 +302,12 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
                 let delta_0 = deltas.deltas.get(0).unwrap();
                 assert(block.number, i64::MAX, delta_0.old_value);
                 assert(block.number, i64::MAX, delta_0.new_value);
+                match delta_0.operation {
+                    Update => {}
+                    _ => {
+                        panic!("expected Update, got {:?}", delta_0.operation);
+                    }
+                }
             }
         }
 

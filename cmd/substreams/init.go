@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/streamingfast/cli"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/codegen"
@@ -15,7 +16,7 @@ var initCmd = &cobra.Command{
 	Use:   "init [<path>]",
 	Short: "Initialize a new, working Substreams project from scratch.",
 	Long: cli.Dedent(`
-		Initialize a new, working Substreams project from scratch. The path parameter is optional, 
+		Initialize a new, working Substreams project from scratch. The path parameter is optional,
 		with your current working directory being the default value.
 	`),
 	RunE:         runSubstreamsInitE,
@@ -143,41 +144,41 @@ func (m InputModel) View() string {
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
-	srcDir, err := filepath.Abs(".")
+	srcDir, err := filepath.Abs("/tmp/test")
 	if err != nil {
 		return fmt.Errorf("getting absolute path of working directory: %w", err)
 	}
-	if len(args) == 1 {
-		srcDir, err = filepath.Abs(args[0])
-		if err != nil {
-			return fmt.Errorf("getting absolute path of given directory: %w", err)
-		}
-	}
+	// if len(args) == 1 {
+	// 	srcDir, err = filepath.Abs(args[0])
+	// 	if err != nil {
+	// 		return fmt.Errorf("getting absolute path of given directory: %w", err)
+	// 	}
+	// }
 
-	// Bubble Tea model to select project name
-	projectNameModel, err := tea.NewProgram(projectNameSelection()).Run()
-	if err != nil {
-		return fmt.Errorf("creating name selector: %w", err)
-	}
-	projectNameExposed := projectNameModel.(InputModel)
-	nameSelected := projectNameExposed.textInput.Value()
+	// // Bubble Tea model to select project name
+	// projectNameModel, err := tea.NewProgram(projectNameSelection()).Run()
+	// if err != nil {
+	// 	return fmt.Errorf("creating name selector: %w", err)
+	// }
+	// projectNameExposed := projectNameModel.(InputModel)
+	// nameSelected := projectNameExposed.textInput.Value()
 
-	// Bubble Tea model to select chain for template
-	chainModel, err := tea.NewProgram(newChainSelection()).Run()
-	if err != nil {
-		return fmt.Errorf("creating chain selector: %w", err)
-	}
-	chainModelExposed := chainModel.(ChoiceModel)
-	chainSelected := chainModelExposed.selected
+	// // Bubble Tea model to select chain for template
+	// chainModel, err := tea.NewProgram(newChainSelection()).Run()
+	// if err != nil {
+	// 	return fmt.Errorf("creating chain selector: %w", err)
+	// }
+	// chainModelExposed := chainModel.(ChoiceModel)
+	// chainSelected := chainModelExposed.selected
 
-	if chainSelected != "Ethereum" {
-		fmt.Println("We haven't added any templates for your selected chain quite yet...")
-		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
-		return nil
-	}
+	// if chainSelected != "Ethereum" {
+	// 	fmt.Println("We haven't added any templates for your selected chain quite yet...")
+	// 	fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
+	// 	return nil
+	// }
 
-	gen := codegen.NewProjectGenerator(srcDir, nameSelected)
-	err = gen.GenerateProject()
+	gen := codegen.NewProjectGenerator(srcDir, "testting")
+	err = gen.GenerateProjectTest()
 	if err != nil {
 		return fmt.Errorf("generating code: %w", err)
 	}

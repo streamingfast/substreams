@@ -3,8 +3,12 @@ package codegen
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"text/template"
+
+	"github.com/streamingfast/substreams/manifest"
 )
 
 type ProjectGenerator struct {
@@ -55,6 +59,9 @@ func NewProjectGenerator(srcPath, projectName string, opts ...ProjectGeneratorOp
 	return pj
 }
 func (g *ProjectGenerator) GenerateProjectTest() error {
+	engine := &Engine{Manifest: &manifest.Manifest{}}
+	utils["getEngine"] = engine.GetEngine
+
 	if _, err := os.Stat(g.srcPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Creating missing %q folder\n", g.srcPath)
 		if err := os.MkdirAll(g.srcPath, os.ModePerm); err != nil {
@@ -70,14 +77,30 @@ func (g *ProjectGenerator) GenerateProjectTest() error {
 		}
 	}
 
-	fileEntries, err := templates.ReadDir("templates")
+	fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
+		fmt.Println("Reading", d.Name(), path)
+		return nil
+	})
+
+	tmpls, err := template.New("templates").Funcs(utils).ParseFS(templates, "**/*.gotmpl")
 	if err != nil {
-		return fmt.Errorf("reading all files from dir: %w", err)
+		return fmt.Errorf("instantiate template: %w", err)
 	}
 
-	for i, _ := range fileEntries {
-		fmt.Printf("reading file: %s", fileEntries[i].Name())
+	err = generate("externs", tmpls, "externs.gotmpl", engine, filepath.Join(g.srcPath, "externs.rs"))
+	if err != nil {
+		return fmt.Errorf("generating externs.rs: %w", err)
 	}
+	fmt.Println("Externs generated")
+
+	// fileEntries, err := templates.ReadDir("templates")
+	// if err != nil {
+	// 	return fmt.Errorf("reading all files from dir: %w", err)
+	// }
+
+	// for i, _ := range fileEntries {
+	// 	fmt.Printf("reading file: %s\n", fileEntries[i].Name())
+	// }
 	return nil
 }
 

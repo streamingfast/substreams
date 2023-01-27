@@ -4,11 +4,51 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.2.0](https://github.com/streamingfast/substreams/releases/tag/v0.2.0)
+
+### Highlights
+
+* Improved execution speed and module loading speed by bumping to WASM Time to version 4.0.
+
+* Improved developer experience on the CLI by making the `<manifest>` argument optional.
+
+  The CLI when `<manifest>` argument is not provided will now look in the current directory for a `substreams.yaml` file and is going to use it if present. So if you are in your Substreams project and your file is named `substreams.yaml`, you can simply do `substreams pack`, `substreams protogen`, etc.
+
+  Moreover, we added to possibility to pass a directory containing a `substreams.yaml` directly so `substreams pack path/to/project` would work as long as `path/to/project` contains a file named `substreams.yaml`.
+
+* Fixed a bug that was preventing production mode to complete properly when using a bounded block range.
+
+* Improved overall stability of the Substreams engine.
+
+#### Operators Notes
+
+* **Breaking** Config values `substreams-stores-save-interval` and `substreams-output-cache-save-interval` have been merged together into `substreams-cache-save-interval` in the `firehose-<chain>` repositories. Refer to chain specific `firehose-<chain>` repository for further details.
+
+### Added
+
+* The `<manifest>` can point to a directory that contains a `substreams.yaml` file instead of having to point to the file directly.
+
+* The `<manifest>` parameter is now optional in all commands requiring it.
 
 ### Fixed
 
+* Fixed production mode not completing when block range was specified
+
+* Fixed tier1 crashing due to missing context canceled check.
+
+* Fixed some code paths where locking could have happened due to incorrect checking of context cancellation.
+
 * Request validation for blockchain's input type is now made only against the requested module it's transitive dependencies.
+
+### Updated
+
+* Updated WASM Time library to 4.0.0 leading to improved execution speed.
+
+### Changed
+
+* Remove distinction between `output-save-interval` and `store-save-interval`.
+
+* `substreams init` has been moved under `substreams alpha init` as this is a feature included by mistake in latest release that should not have been displayed in the main list of commands.
 
 * `substreams codegen` has been moved under `substreams alpha codegen` as this is a feature included by mistake in latest release that should not have been displayed in the main list of commands.
 

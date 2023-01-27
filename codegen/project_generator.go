@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -58,10 +59,16 @@ func NewProjectGenerator(srcPath, projectName string, opts ...ProjectGeneratorOp
 
 	return pj
 }
-func (g *ProjectGenerator) GenerateProjectTest() error {
+func (g *ProjectGenerator) GenerateProject() error {
 	engine := &Engine{Manifest: &manifest.Manifest{}}
 	utils["getEngine"] = engine.GetEngine
-
+	directories := []string{
+		".cargo",
+		"proto",
+		"src",
+		filepath.Join("src", "abi"),
+		filepath.Join("src", "pb"),
+	}
 	if _, err := os.Stat(g.srcPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Creating missing %q folder\n", g.srcPath)
 		if err := os.MkdirAll(g.srcPath, os.ModePerm); err != nil {
@@ -69,217 +76,86 @@ func (g *ProjectGenerator) GenerateProjectTest() error {
 		}
 	}
 
-	fullPath := filepath.Join(g.srcPath, g.ProjectName)
-	if _, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
+	projectPath := filepath.Join(g.srcPath, g.ProjectName)
+	if _, err := os.Stat(projectPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Creating missing %q folder\n", g.srcPath)
-		if err := os.MkdirAll(fullPath, 0755); err != nil {
-			return fmt.Errorf("creating missing %q folder: %w", g.srcPath, err)
+		if err := os.MkdirAll(projectPath, 0755); err != nil {
+			return fmt.Errorf("creating missing %q folder: %w", projectPath, err)
 		}
 	}
 
-	fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
-		fmt.Println("Reading", d.Name(), path)
-		return nil
-	})
-
-	tmpls, err := template.New("templates").Funcs(utils).ParseFS(templates, "**/*.gotmpl")
+	// generate template from ./templates
+	tmpls, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*.gotmpl", "*/*/*.gotmpl", "*/*/*/*.gotmpl")
 	if err != nil {
 		return fmt.Errorf("instantiate template: %w", err)
 	}
 
-	err = generate("externs", tmpls, "externs.gotmpl", engine, filepath.Join(g.srcPath, "externs.rs"))
-	if err != nil {
-		return fmt.Errorf("generating externs.rs: %w", err)
+	// create directories
+	for _, dir := range directories {
+		dirPath := filepath.Join(projectPath, dir)
+		if _, err := os.Stat(dirPath); errors.Is(err, os.ErrNotExist) {
+			fmt.Printf("Creating missing %q folder\n", dirPath)
+			if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
+				return fmt.Errorf("creating directory %v: %w", dirPath, err)
+			}
+		} else {
+			fmt.Println("src directory already exists, skipping")
+		}
 	}
-	fmt.Println("Externs generated")
 
-	// fileEntries, err := templates.ReadDir("templates")
-	// if err != nil {
-	// 	return fmt.Errorf("reading all files from dir: %w", err)
-	// }
+	// create files
+	err = fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() ||
+			d.Name() == "externs.gotmpl" ||
+			d.Name() == "libGen.gotmpl" ||
+			d.Name() == "pb_mod.gotmpl" ||
+			d.Name() == "substreamsGen.gotmpl" ||
+			d.Name() == "mod.gotmpl" {
+			return nil
+		}
+		relativeEmbedPath := strings.TrimPrefix(path, "templates"+string(os.PathSeparator))
 
-	// for i, _ := range fileEntries {
-	// 	fmt.Printf("reading file: %s\n", fileEntries[i].Name())
-	// }
+		// Change duplicate template filenames
+		if d.Name() == "abimodfile.gotmpl" || d.Name() == "pb-modfile.gotmpl" {
+			relativeEmbedPath = relativeEmbedPath[:len(relativeEmbedPath)-17] + "mod.gotmpl"
+		}
+		if d.Name() == "abierc721.gotmpl" {
+			relativeEmbedPath = relativeEmbedPath[:len(relativeEmbedPath)-16] + "erc721.gotmpl"
+		}
+
+		// Change extensions from .gotmpl
+		if d.Name() == "cargo.gotmpl" ||
+			d.Name() == "config.gotmpl" ||
+			d.Name() == "rust-toolchain.gotmpl" {
+			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".toml")
+		}
+		if d.Name() == "substreams.gotmpl" {
+			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".yaml")
+		}
+		if d.Name() == "makefile.gotmpl" {
+			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", "")
+		}
+		if relativeEmbedPath == "proto/erc721.gotmpl" {
+			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".proto")
+		}
+		if d.Name() == "makefile.gotmpl" {
+			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", "")
+		}
+		if d.Name() == "lib.gotmpl" ||
+			strings.Contains(relativeEmbedPath, "src/pb") ||
+			strings.Contains(relativeEmbedPath, "src/abi") {
+			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".rs")
+		}
+
+		err = generate(path, tmpls, d.Name(), g, filepath.Join(projectPath, relativeEmbedPath))
+		if err != nil {
+			return fmt.Errorf("generating file %s: %w", path, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walking files: %w", err)
+	}
+
 	return nil
 }
-
-//func (g *ProjectGenerator) GenerateProject() error {
-//	if _, err := os.Stat(g.srcPath); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", g.srcPath)
-//		if err := os.MkdirAll(g.srcPath, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating src directory %v: %w", g.srcPath, err)
-//		}
-//	}
-//
-//	fullPath := filepath.Join(g.srcPath, g.ProjectName)
-//	if _, err := os.Stat(fullPath); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", g.srcPath)
-//		if err := os.MkdirAll(fullPath, 0755); err != nil {
-//			return fmt.Errorf("creating missing %q folder: %w", g.srcPath, err)
-//		}
-//	}
-//
-//	srcDir := filepath.Join(fullPath, "src")
-//	if _, err := os.Stat(srcDir); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", srcDir)
-//		if err := os.MkdirAll(srcDir, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating src directory %v: %w", srcDir, err)
-//		}
-//	} else {
-//		fmt.Println("src directory already exists, skipping")
-//	}
-//
-//	srcPbDir := filepath.Join(srcDir, "pb")
-//	if _, err := os.Stat(srcPbDir); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", srcPbDir)
-//		if err := os.MkdirAll(srcPbDir, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating src/pb directory %v: %w", srcPbDir, err)
-//		}
-//	} else {
-//		fmt.Println("src/pb directory already exists, skipping")
-//	}
-//
-//	srcAbiDir := filepath.Join(srcDir, "abi")
-//	if _, err := os.Stat(srcAbiDir); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", srcAbiDir)
-//		if err := os.MkdirAll(srcAbiDir, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating src/abi directory %v: %w", srcAbiDir, err)
-//		}
-//	} else {
-//		fmt.Println("src/abi directory already exists, skipping")
-//	}
-//
-//	protoDir := filepath.Join(fullPath, "proto")
-//	if _, err := os.Stat(protoDir); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", protoDir)
-//		if err := os.MkdirAll(protoDir, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating proto directory %v: %w", protoDir, err)
-//		}
-//	} else {
-//		fmt.Println("proto directory already exists, skipping")
-//	}
-//
-//	abiDir := filepath.Join(fullPath, "abi")
-//	if _, err := os.Stat(abiDir); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", abiDir)
-//		if err := os.MkdirAll(abiDir, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating abi directory %v: %w", abiDir, err)
-//		}
-//	} else {
-//		fmt.Println("abi directory already exists, skipping")
-//	}
-//
-//	cargoDir := filepath.Join(fullPath, ".cargo")
-//	if _, err := os.Stat(cargoDir); errors.Is(err, os.ErrNotExist) {
-//		fmt.Printf("Creating missing %q folder\n", cargoDir)
-//		if err := os.MkdirAll(cargoDir, os.ModePerm); err != nil {
-//			return fmt.Errorf("creating .cargo directory %v: %w", cargoDir, err)
-//		}
-//	} else {
-//		fmt.Println(".cargo directory already exists, skipping")
-//	}
-//
-//	abiModPath := filepath.Join(srcAbiDir, "mod.rs")
-//	if _, err := os.Stat(abiModPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("mod.rs", tplAbiModFile, g, abiModPath); err != nil {
-//			return fmt.Errorf("generating abi/mod.rs file: %w", err)
-//		}
-//	} else {
-//		fmt.Println("abi/mod.rs already exists, skipping")
-//	}
-//
-//	abiErcPath := filepath.Join(srcAbiDir, "erc721.rs")
-//	if _, err := os.Stat(abiErcPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("erc721.rs", tplAbiErcFile, g, abiErcPath); err != nil {
-//			return fmt.Errorf("generating abi/erc721.rs file: %w", err)
-//		}
-//	} else {
-//		fmt.Println("abi/erc721.rs already exists, skipping")
-//	}
-//
-//	pbModPath := filepath.Join(srcPbDir, "mod.rs")
-//	if _, err := os.Stat(pbModPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("mod.rs", tplPbModFile, g, pbModPath); err != nil {
-//			return fmt.Errorf("generating pb/mod.rs file: %w", err)
-//		}
-//	} else {
-//		fmt.Println("pb/mod.rs already exists, skipping")
-//	}
-//
-//	pbProtogenPath := filepath.Join(srcPbDir, "eth.erc721.v1.rs")
-//	if _, err := os.Stat(pbProtogenPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("eth.erc721.v1.rs", tplProtogenFile, g, pbProtogenPath); err != nil {
-//			return fmt.Errorf("generating eth.erc721.v1.rs file: %w", err)
-//		}
-//	} else {
-//		fmt.Println("protogen already exists, skipping")
-//	}
-//
-//	libFilePath := filepath.Join(srcDir, "lib.rs")
-//	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("erc721.proto", tplLibFile, g, libFilePath); err != nil {
-//			return fmt.Errorf("generating lib.rs file: %w", err)
-//		}
-//	} else {
-//		fmt.Println("proto definition already exists, skipping")
-//	}
-//
-//	protoFilePath := filepath.Join(protoDir, "erc721.proto")
-//	if _, err := os.Stat(protoFilePath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("erc721.proto", tplProtoFile, g, protoFilePath); err != nil {
-//			return fmt.Errorf("generating erc721.proto: %w", err)
-//		}
-//	} else {
-//		fmt.Println("proto definition already exists, skipping")
-//	}
-//
-//	cargoTomlPath := filepath.Join(fullPath, "Cargo.toml")
-//	if _, err := os.Stat(cargoTomlPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("Cargo.toml", tplCargoToml, g, cargoTomlPath); err != nil {
-//			return fmt.Errorf("generating Cargo.toml: %w", err)
-//		}
-//	} else {
-//		fmt.Println("Cargo.toml already exists, skipping")
-//	}
-//
-//	// generate makefile if it does not exist
-//	makeFilePath := filepath.Join(fullPath, "Makefile")
-//	if _, err := os.Stat(makeFilePath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("makefile", tplMakefile, g, makeFilePath); err != nil {
-//			return fmt.Errorf("generating makefile: %w", err)
-//		}
-//	} else {
-//		fmt.Println("makefile already exists, skipping")
-//	}
-//
-//	// generate manifest file if it does not exist
-//	manifestPath := filepath.Join(fullPath, "substreams.yaml")
-//	if _, err := os.Stat(manifestPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("substreams.yaml", tplManifestYaml, g, manifestPath); err != nil {
-//			return fmt.Errorf("generating substreams.yaml: %w", err)
-//		}
-//	} else {
-//		fmt.Println("substreams.yaml already exists, skipping")
-//	}
-//
-//	rustToolchainPath := filepath.Join(fullPath, "rust-toolchain.toml")
-//	if _, err := os.Stat(rustToolchainPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("substreams.yaml", tplRustToolchain, g, rustToolchainPath); err != nil {
-//			return fmt.Errorf("generating substreams.yaml: %w", err)
-//		}
-//	} else {
-//		fmt.Println("rust-toolchain.toml already exists, skipping")
-//	}
-//
-//	cargoConfigPath := filepath.Join(cargoDir, "config.toml")
-//	if _, err := os.Stat(cargoConfigPath); errors.Is(err, os.ErrNotExist) {
-//		if err := generate("config.toml", tplCargoConfig, g, cargoConfigPath); err != nil {
-//			return fmt.Errorf("generating .cargo/config.toml: %w", err)
-//		}
-//	} else {
-//		fmt.Println("rust-toolchain.toml already exists, skipping")
-//	}
-//
-//	return nil
-//}

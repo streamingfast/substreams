@@ -31,6 +31,7 @@ func init() {
 type (
 	errMsg error
 )
+
 type ChoiceModel struct {
 	questionContext string
 	choices         []string
@@ -131,15 +132,12 @@ func (m ChoiceModel) View() string {
 		output += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
 	}
 
-	output += "\nPress enter again to continue.\n"
-
 	return output
 }
 func (m InputModel) View() string {
 	return fmt.Sprintf(
 		"What would you like your project to be named?\n\n%s\n\n%s",
 		m.textInput.View(),
-		"(press 'enter' to continue)",
 	) + "\n"
 }
 
@@ -148,37 +146,37 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("getting absolute path of working directory: %w", err)
 	}
-	// if len(args) == 1 {
-	// 	srcDir, err = filepath.Abs(args[0])
-	// 	if err != nil {
-	// 		return fmt.Errorf("getting absolute path of given directory: %w", err)
-	// 	}
-	// }
+	if len(args) == 1 {
+		srcDir, err = filepath.Abs(args[0])
+		if err != nil {
+			return fmt.Errorf("getting absolute path of given directory: %w", err)
+		}
+	}
 
-	// // Bubble Tea model to select project name
-	// projectNameModel, err := tea.NewProgram(projectNameSelection()).Run()
-	// if err != nil {
-	// 	return fmt.Errorf("creating name selector: %w", err)
-	// }
-	// projectNameExposed := projectNameModel.(InputModel)
-	// nameSelected := projectNameExposed.textInput.Value()
+	// Bubble Tea model to select project name
+	projectNameModel, err := tea.NewProgram(projectNameSelection()).Run()
+	if err != nil {
+		return fmt.Errorf("creating name selector: %w", err)
+	}
+	projectNameExposed := projectNameModel.(InputModel)
+	nameSelected := projectNameExposed.textInput.Value()
 
-	// // Bubble Tea model to select chain for template
-	// chainModel, err := tea.NewProgram(newChainSelection()).Run()
-	// if err != nil {
-	// 	return fmt.Errorf("creating chain selector: %w", err)
-	// }
-	// chainModelExposed := chainModel.(ChoiceModel)
-	// chainSelected := chainModelExposed.selected
+	// Bubble Tea model to select chain for template
+	chainModel, err := tea.NewProgram(newChainSelection()).Run()
+	if err != nil {
+		return fmt.Errorf("creating chain selector: %w", err)
+	}
+	chainModelExposed := chainModel.(ChoiceModel)
+	chainSelected := chainModelExposed.selected
 
-	// if chainSelected != "Ethereum" {
-	// 	fmt.Println("We haven't added any templates for your selected chain quite yet...")
-	// 	fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
-	// 	return nil
-	// }
+	if chainSelected != "Ethereum" {
+		fmt.Println("We haven't added any templates for your selected chain quite yet...")
+		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
+		return nil
+	}
 
-	gen := codegen.NewProjectGenerator(srcDir, "testting")
-	err = gen.GenerateProjectTest()
+	gen := codegen.NewProjectGenerator(srcDir, nameSelected)
+	err = gen.GenerateProject()
 	if err != nil {
 		return fmt.Errorf("generating code: %w", err)
 	}

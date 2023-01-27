@@ -35,59 +35,9 @@ func init() {
 	}
 }
 
-// //go:embed templates/lib.gotmpl
-// var tplLibRs string
-
-// //go:embed templates/externs.gotmpl
-// var tplExterns string
-
-// //go:embed templates/substreams.gotmpl
-// var tplSubstreams string
-
-// //go:embed templates/mod.gotmpl
-// var tplMod string
-
-// //go:embed templates/pb_mod.gotmpl
-// var tplPbMod string
-
-// //go:embed templates/buildsh.gotmpl
-// var tplBuildSh string
-
-// //go:embed templates/src/librs.gotmpl
-// var tplLibFile string
-
-// //go:embed templates/makefile.gotmpl
-// var tplMakefile string
-
-// //go:embed templates/proto/protofile.gotmpl
-// var tplProtoFile string
-
-// //go:embed templates/src/pb/pbmodfile.gotmpl
-// var tplPbModFile string
-
-// //go:embed templates/src/abi/abimodfile.gotmpl
-// var tplAbiModFile string
-
-// //go:embed templates/src/abi/abiercfile.gotmpl
-// var tplAbiErcFile string
-
-// //go:embed templates/src/pb/pbProtogenfile.gotmpl
-// var tplProtogenFile string
-
-// //go:embed templates/cargotoml.gotmpl
-// var tplCargoToml string
-
-// //go:embed templates/manifestyaml.gotmpl
-// var tplManifestYaml string
-
-// //go:embed templates/rusttoolchain.gotmpl
-// var tplRustToolchain string
-
-// //go:embed templates/.cargo/cargoconfig.gotmpl
-// var tplCargoConfig string
-
 //go:embed templates/*.gotmpl
-//go:embed templates/**/*.gotmpl
+//go:embed templates/*/*.gotmpl
+//go:embed templates/*/*/*.gotmpl
 var templates embed.FS
 
 var StoreType = map[string]string{
@@ -178,7 +128,7 @@ func (g *Generator) Generate() (err error) {
 	}
 	fmt.Println("Externs generated")
 
-	err = generate("Substream", tmpls, "substreams.gotmpl", g.engine, filepath.Join(generatedFolder, "substreams.rs"))
+	err = generate("Substream", tmpls, "substreamsGen.gotmpl", g.engine, filepath.Join(generatedFolder, "substreams.rs"))
 	if err != nil {
 		return fmt.Errorf("generating substreams.rs: %w", err)
 	}
@@ -201,7 +151,7 @@ func (g *Generator) Generate() (err error) {
 	libFilePath := filepath.Join(g.srcPath, "lib.rs")
 	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Generating src/lib.rs\n")
-		err = generate("lib", tmpls, "lib.gotmpl", g.engine, filepath.Join(g.srcPath, "lib.rs"))
+		err = generate("lib", tmpls, "libGen.gotmpl", g.engine, filepath.Join(g.srcPath, "lib.rs"))
 		if err != nil {
 			return fmt.Errorf("generating lib.rs: %w", err)
 		}
@@ -274,6 +224,10 @@ type Engine struct {
 
 func (e *Engine) GetEngine() *Engine {
 	return e
+}
+
+func (e *Engine) ProjectName() string {
+	return "test"
 }
 
 func (e *Engine) MustModule(moduleName string) *manifest.Module {

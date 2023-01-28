@@ -85,7 +85,7 @@ substreams-sink-kv = "0.1.1"
       - store: store_block_meta_end
         mode: deltas
     output:
-      type: proto:sf.substreams.kv.v1.KVOperations
+      type: proto:sf.substreams.sink.kv.v1.KVOperations
 ```
 
 1. Add a `kv_out` public function to your `src/lib.rs`:

@@ -168,6 +168,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	)
 	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
 
+	if request.Modules == nil {
+		return status.Error(codes.InvalidArgument, "missing modules in request")
+	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
 		moduleNames[i] = request.Modules.Modules[i].Name

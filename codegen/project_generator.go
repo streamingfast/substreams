@@ -85,7 +85,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 	}
 
 	// generate template from ./templates
-	tmpls, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*.gotmpl", "*/*/*.gotmpl", "*/*/*/*.gotmpl")
+	templateFiles, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*.gotmpl", "*/*/*.gotmpl", "*/*/*/*.gotmpl")
 	if err != nil {
 		return fmt.Errorf("instantiate template: %w", err)
 	}
@@ -147,7 +147,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".rs")
 		}
 
-		err = generate(path, tmpls, d.Name(), g, filepath.Join(projectPath, relativeEmbedPath))
+		err = generate(path, templateFiles, d.Name(), g, filepath.Join(projectPath, relativeEmbedPath))
 		if err != nil {
 			return fmt.Errorf("generating file %s: %w", path, err)
 		}

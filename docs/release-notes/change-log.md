@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Improved execution speed and module loading speed by bumping to WASM Time to version 4.0.
 
+* Improved the `substreams alpha init` command to now create a ready-to-go substreams package. Its parameter is the desired project path, and the package created is similar to our `substreams-template` repo which tracks an ERC-721 project's transfers.
+
 * Improved developer experience on the CLI by making the `<manifest>` argument optional.
 
   The CLI when `<manifest>` argument is not provided will now look in the current directory for a `substreams.yaml` file and is going to use it if present. So if you are in your Substreams project and your file is named `substreams.yaml`, you can simply do `substreams pack`, `substreams protogen`, etc.

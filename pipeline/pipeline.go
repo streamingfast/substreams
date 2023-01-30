@@ -374,6 +374,8 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 	storeAccessor := p.stores.StoreMap
 	for _, input := range module.Inputs {
 		switch in := input.Input.(type) {
+		case *pbsubstreams.Module_Input_Params_:
+			out = append(out, wasm.NewParamsInput(input.GetParams().GetValue()))
 		case *pbsubstreams.Module_Input_Map_:
 			out = append(out, wasm.NewMapInput(in.Map.ModuleName))
 		case *pbsubstreams.Module_Input_Store_:

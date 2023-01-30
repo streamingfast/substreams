@@ -6,6 +6,8 @@ use crate::generated::substreams::{Substreams, SubstreamsTrait};
 
 #[no_mangle]
 pub extern "C" fn test_map(
+    params_ptr: *mut u8,
+    params_len: usize,
     block_ptr: *mut u8,
     block_len: usize,
 ) {
@@ -14,8 +16,14 @@ pub extern "C" fn test_map(
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
 
-        Substreams::test_map(block,
-            
+        let params=
+        unsafe {
+            String::from_raw_parts(params_ptr, params_len, params_len)
+        };
+
+        Substreams::test_map(params, block,
+
+
         )
     };
     let result = func();

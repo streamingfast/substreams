@@ -16,6 +16,7 @@ modules:
   - name: map_pairs
     kind: map
     inputs:
+      - params: string
       - source: sf.ethereum.type.v1.Block
     output:
       type: proto:pcs.types.v1.Pairs
@@ -41,3 +42,6 @@ modules:
       - source: sf.ethereum.type.v1.Block
     output:
       type: proto:sf.substreams.tokens.v1.Tokens
+
+params:
+  map_pairs: my default params

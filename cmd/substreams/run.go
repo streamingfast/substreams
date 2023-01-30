@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/cli"
-	"github.com/streamingfast/substreams/tools"
-
+	"github.com/schollz/closestmatch"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
+
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui"
 )
 
@@ -24,12 +25,13 @@ func init() {
 	runCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
-	runCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
-	runCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
+	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
+	runCmd.Flags().StringSliceP("params", "p", nil, "Set a parames for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -72,6 +74,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	if err := applyParams(cmd, pkg); err != nil {
+		return err
 	}
 
 	productionMode := mustGetBool(cmd, "production-mode")
@@ -173,7 +179,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			// Special handling if interrupted the context ourself, no error
+			// Special handling if interrupted the context ourselves, no error
 			if streamCtx.Err() == context.Canceled {
 				ui.Cancel()
 				return nil
@@ -182,6 +188,37 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
+}
+
+func applyParams(cmd *cobra.Command, pkg *pbsubstreams.Package) error {
+	params := mustGetStringSlice(cmd, "params")
+	for _, param := range params {
+		parts := strings.SplitN(param, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf(`param %q invalid, must be of the format: "module=value" or "imported:module=value"`, param)
+		}
+		var found bool
+		var closest []string
+		for _, mod := range pkg.Modules.Modules {
+			closest = append(closest, mod.Name)
+			if mod.Name == parts[0] {
+				if len(mod.Inputs) == 0 {
+					return fmt.Errorf("param for module %q: missing 'params' module input", mod.Name)
+				}
+				p := mod.Inputs[0].GetParams()
+				if p == nil {
+					return fmt.Errorf("param for module %q: first module input is not 'params'", mod.Name)
+				}
+				p.Value = parts[1]
+				found = true
+			}
+		}
+		if !found {
+			closeEnough := closestmatch.New(closest, []int{2}).Closest(parts[0])
+			return fmt.Errorf("param for module %q: module not found, did you mean %q ?", parts[0], closeEnough)
+		}
+	}
+	return nil
 }
 
 func readAPIToken(cmd *cobra.Command, envFlagName string) string {

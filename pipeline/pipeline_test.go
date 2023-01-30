@@ -92,6 +92,7 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 			name,
 			wasmModule,
 			[]wasm.Argument{
+				wasm.NewParamsInput("my test params"),
 				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
 			},
 			name,

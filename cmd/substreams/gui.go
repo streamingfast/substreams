@@ -10,6 +10,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -21,8 +22,8 @@ import (
 func init() {
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
-	guiCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
-	guiCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
+	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 
 	guiCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
 	guiCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
@@ -30,6 +31,7 @@ func init() {
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
+	guiCmd.Flags().StringSliceP("params", "p", nil, "Set a parames for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 	rootCmd.AddCommand(guiCmd)
@@ -50,6 +52,8 @@ var guiCmd = &cobra.Command{
 }
 
 func runGui(cmd *cobra.Command, args []string) error {
+	// TODO: DRY up this and `run` .. such duplication here.
+
 	manifestPath := ""
 	var err error
 	if len(args) == 2 {
@@ -71,6 +75,10 @@ func runGui(cmd *cobra.Command, args []string) error {
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	if err := applyParams(cmd, pkg); err != nil {
+		return err
 	}
 
 	productionMode := mustGetBool(cmd, "production-mode")

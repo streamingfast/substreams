@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -36,6 +36,7 @@ type Manifest struct {
 	Imports     mapSlice          `yaml:"imports"`
 	Binaries    map[string]Binary `yaml:"binaries"`
 	Modules     []*Module         `yaml:"modules"`
+	Params      map[string]string `yaml:"params"`
 
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
@@ -72,7 +73,7 @@ type Module struct {
 	UpdatePolicy string `yaml:"updatePolicy"`
 	ValueType    string `yaml:"valueType"`
 	Binary       string `yaml:"binary"`
-	//Code         Code         `yaml:"code"`
+
 	Inputs []*Input     `yaml:"inputs"`
 	Output StreamOutput `yaml:"output"`
 }
@@ -81,9 +82,9 @@ type Input struct {
 	Source string `yaml:"source"`
 	Store  string `yaml:"store"`
 	Map    string `yaml:"map"`
-	Mode   string `yaml:"mode"`
+	Params string `yaml:"params"`
 
-	Name string `yaml:"-"`
+	Mode string `yaml:"mode"`
 }
 
 type Binary struct {
@@ -101,7 +102,7 @@ type StreamOutput struct {
 }
 
 func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) {
-	cnt, err := ioutil.ReadFile(yamlFilePath)
+	cnt, err := os.ReadFile(yamlFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading substreams manifest %q: %w", yamlFilePath, err)
 	}
@@ -110,35 +111,47 @@ func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) 
 	}
 	return
 }
+
 func (i *Input) IsMap() bool {
-	return i.Map != "" && i.Store == "" && i.Source == ""
+	return i.Map != "" && i.Store == "" && i.Source == "" && i.Params == ""
 }
+
 func (i *Input) IsStore() bool {
-	return i.Store != "" && i.Map == "" && i.Source == ""
+	return i.Store != "" && i.Map == "" && i.Source == "" && i.Params == ""
 }
+
 func (i *Input) IsSource() bool {
-	return i.Source != "" && i.Map == "" && i.Store == ""
+	return i.Source != "" && i.Map == "" && i.Store == "" && i.Params == ""
 }
+
+func (i *Input) IsParams() bool {
+	return i.Params != "" && i.Source == "" && i.Map == "" && i.Store == ""
+}
+
 func (i *Input) parse() error {
 	if i.IsMap() {
-		i.Name = fmt.Sprintf("map:%s", i.Map)
+		//i.Name = fmt.Sprintf("map:%s", i.Map)
 		return nil
 	}
 	if i.IsStore() {
-		i.Name = fmt.Sprintf("store:%s", i.Store)
 		if i.Mode == "" {
 			i.Mode = "get"
 		}
 		if i.Mode != "get" && i.Mode != "deltas" {
-			return fmt.Errorf("input %q: 'mode' parameter must be one of: 'get', 'deltas'", i.Name)
+			return fmt.Errorf("input store %q: 'mode' parameter must be one of: 'get', 'deltas'", i.Store)
 		}
 		return nil
 	}
 	if i.IsSource() {
-		i.Name = fmt.Sprintf("source:%s", i.Source)
 		return nil
 	}
-	return fmt.Errorf("input has an unknown type. Expect one, and only one of 'map', 'store' or 'source'")
+	if i.IsParams() {
+		if i.Params != "string" {
+			return fmt.Errorf("input 'params': 'string' is the only acceptable value here; specify the parameter's value under the top-level 'params' mapping")
+		}
+		return nil
+	}
+	return fmt.Errorf("input has an unknown or mixed types; expect one, and only one of: 'params', 'map', 'store' or 'source'")
 }
 
 func validateStoreBuilder(module *Module) error {
@@ -232,7 +245,7 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 }
 
 func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
-	for _, input := range m.Inputs {
+	for i, input := range m.Inputs {
 		if input.Source != "" {
 			pbInput := &pbsubstreams.Module_Input{
 				Input: &pbsubstreams.Module_Input_Source_{
@@ -256,7 +269,6 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 			continue
 		}
 		if input.Store != "" {
-
 			var mode pbsubstreams.Module_Input_Store_Mode
 
 			switch input.Mode {
@@ -275,6 +287,21 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 					Store: &pbsubstreams.Module_Input_Store{
 						ModuleName: input.Store,
 						Mode:       mode,
+					},
+				},
+			}
+			pbModule.Inputs = append(pbModule.Inputs, pbInput)
+			continue
+		}
+		if input.Params != "" {
+			if i != 0 {
+				return fmt.Errorf("input.params must be the first input")
+			}
+
+			pbInput := &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_Params_{
+					Params: &pbsubstreams.Module_Input_Params{
+						Value: "",
 					},
 				},
 			}

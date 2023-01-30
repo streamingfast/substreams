@@ -4,17 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/substreams/tui2/replaylog"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-
-	"github.com/streamingfast/substreams/tui2/components/ranges"
-
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	tea "github.com/charmbracelet/bubbletea"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/components/ranges"
+	"github.com/streamingfast/substreams/tui2/replaylog"
 	"github.com/streamingfast/substreams/tui2/stream"
 )
 

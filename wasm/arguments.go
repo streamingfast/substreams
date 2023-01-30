@@ -106,3 +106,19 @@ func NewStoreWriterOutput(name string, store store.Store, updatePolicy pbsubstre
 		ValueType:    valueType,
 	}
 }
+
+type ParamsInput struct {
+	BaseArgument
+	BaseValueArgument
+}
+
+func NewParamsInput(value string) *ParamsInput {
+	return &ParamsInput{
+		BaseArgument: BaseArgument{
+			name: "params",
+		},
+		BaseValueArgument: BaseValueArgument{
+			value: []byte(value),
+		},
+	}
+}

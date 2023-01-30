@@ -39,6 +39,8 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 		case *wasm.StoreWriterOutput:
 		case *wasm.StoreReaderInput:
 			hasInput = true
+		case *wasm.ParamsInput:
+			hasInput = true
 		case wasm.ValueArgument:
 			hasInput = true
 			data, _, err := outputGetter.Get(v.Name())

@@ -4,6 +4,7 @@ use prost::encoding::float;
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
 use std::ops::Deref;
+use prost::Message;
 use substreams::errors::Error;
 use substreams::prelude::*;
 
@@ -14,16 +15,12 @@ use substreams::store::{
     StoreMinBigDecimal, StoreMinBigInt, StoreMinFloat64, StoreSetBigDecimal, StoreSetBigInt,
     StoreSetFloat64,
 };
-use substreams::{
-    errors,
-    scalar::BigInt,
-    store::{
-        DeltaBigInt, DeltaInt64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreDelete,
-        StoreGet, StoreGetBigInt, StoreGetInt64, StoreMinInt64, StoreNew, StoreSet,
-        StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto, StoreSetInt64,
-        StoreSetProto,
-    },
-};
+use substreams::{errors, log_info, scalar::BigInt, store::{
+    DeltaBigInt, DeltaInt64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreDelete,
+    StoreGet, StoreGetBigInt, StoreGetInt64, StoreMinInt64, StoreNew, StoreSet,
+    StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto, StoreSetInt64,
+    StoreSetProto,
+}};
 use substreams::pb::substreams::store_delta::Operation;
 use substreams::pb::substreams::store_delta::Operation::{Create, Update};
 
@@ -37,11 +34,16 @@ const TO_ADD: i64 = 1;
 const TO_SUBTRACT: i64 = -1;
 
 impl generated::substreams::SubstreamsTrait for generated::substreams::Substreams {
-    fn test_map(blk: test::Block) -> Result<test::MapResult, errors::Error> {
+    fn test_map(params: String, blk: test::Block) -> Result<test::MapResult, errors::Error> {
         let out = test::MapResult {
             block_number: blk.number,
             block_hash: blk.id,
         };
+
+        if params != "" {
+            assert_eq!(params, "my test params");
+        }
+
         Ok(out)
     }
 

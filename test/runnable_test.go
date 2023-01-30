@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
@@ -41,6 +42,8 @@ type testRun struct {
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	ProductionMode         bool
 	Context                context.Context // custom top-level context, defaults to context.Background()
+
+	Params map[string]string
 
 	Responses []*pbsubstreams.Response
 	TempDir   string
@@ -76,6 +79,22 @@ func (f *testRun) Run(t *testing.T) error {
 		Modules:        pkg.Modules,
 		OutputModule:   f.ModuleName,
 		ProductionMode: f.ProductionMode,
+	}
+
+	if f.Params != nil {
+		for k, v := range f.Params {
+			var found bool
+			for _, mod := range pkg.Modules.Modules {
+				if k == mod.Name {
+					assert.NotZero(t, len(mod.Inputs))
+					p := mod.Inputs[0].GetParams()
+					assert.NotNil(t, p)
+					p.Value = v
+					found = true
+				}
+			}
+			assert.True(t, found)
+		}
 	}
 
 	if f.SubrequestsSplitSize == 0 {

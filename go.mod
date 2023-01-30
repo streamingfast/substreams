@@ -129,6 +129,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
+	github.com/schollz/closestmatch v2.1.0+incompatible // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
 	github.com/spf13/cast v1.3.0 // indirect

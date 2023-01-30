@@ -42,8 +42,7 @@ func (sf *StreamFactory) New(
 		}
 	}
 
-	bytesMeter := tracking.GetBytesMeter(ctx)
-	if bytesMeter != nil {
+	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
 		sf.mergedBlocksStore.SetMeter(bytesMeter)
 		sf.forkedBlocksStore.SetMeter(bytesMeter)
 	}

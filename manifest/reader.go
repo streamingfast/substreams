@@ -107,7 +107,7 @@ func (r *Reader) IsLocalManifest() bool {
 }
 
 func (r *Reader) newPkgFromFile(inputFilePath string) (pkg *pbsubstreams.Package, err error) {
-	cnt, err := ioutil.ReadFile(inputFilePath)
+	cnt, err := os.ReadFile(inputFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %q: %w", inputFilePath, err)
 	}
@@ -282,6 +282,10 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 
 		for idx, in := range mod.Inputs {
 			switch i := in.Input.(type) {
+			case *pbsubstreams.Module_Input_Params_:
+				if idx != 0 {
+					return fmt.Errorf("module %q: input %d: params must be first input", mod.Name, idx)
+				}
 			case *pbsubstreams.Module_Input_Source_:
 				if i.Source.Type == "" {
 					return fmt.Errorf("module %q: source type empty", mod.Name)
@@ -408,15 +412,16 @@ const PrefixSeparator = ":"
 func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 	for _, mod := range mods {
 		mod.Name = prefix + PrefixSeparator + mod.Name
-		for _, inputIface := range mod.Inputs {
+		for idx, inputIface := range mod.Inputs {
 			switch input := inputIface.Input.(type) {
 			case *pbsubstreams.Module_Input_Source_:
 			case *pbsubstreams.Module_Input_Store_:
 				input.Store.ModuleName = prefix + PrefixSeparator + input.Store.ModuleName
 			case *pbsubstreams.Module_Input_Map_:
 				input.Map.ModuleName = prefix + PrefixSeparator + input.Map.ModuleName
+			case *pbsubstreams.Module_Input_Params_:
 			default:
-				panic(fmt.Sprintf("unsupported module type %s", inputIface.Input))
+				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))
 			}
 		}
 	}
@@ -526,7 +531,7 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 				codePath := m.resolvePath(binaryDef.File)
 				var byteCode []byte
 				if !r.skipSourceCodeImportValidation {
-					byteCode, err = ioutil.ReadFile(codePath)
+					byteCode, err = os.ReadFile(codePath)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
 					}
@@ -545,7 +550,26 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 
 		pkg.ModuleMeta = append(pkg.ModuleMeta, pbmeta)
 		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
+	}
 
+	for modName, paramValue := range m.Params {
+		var modFound bool
+		for _, mod := range pkg.Modules.Modules {
+			if mod.Name == modName {
+				if len(mod.Inputs) == 0 {
+					return nil, fmt.Errorf("params value defined for module %q but module has no inputs defined, add 'params: string' to 'inputs' for module", modName)
+				}
+				p := mod.Inputs[0].GetParams()
+				if p == nil {
+					return nil, fmt.Errorf("params value defined for module %q: module %q does not have 'params' as its first input type", modName, modName)
+				}
+				p.Value = paramValue
+				modFound = true
+			}
+		}
+		if !modFound {
+			return nil, fmt.Errorf("params value defined for module %q, but such module is not defined", modName)
+		}
 	}
 
 	return

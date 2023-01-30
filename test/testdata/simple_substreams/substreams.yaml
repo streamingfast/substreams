@@ -24,6 +24,7 @@ modules:
     kind: map
     initialBlock: 10
     inputs:
+      - params: string
       - source: sf.substreams.v1.test.Block
     output:
       type: proto:sf.substreams.v1.test.MapResult
@@ -834,3 +835,6 @@ modules:
       - store: assert_all_test_bigdecimal
     output:
       type: proto:sf.substreams.v1.test.Boolean
+
+params:
+  test_map: my default params value

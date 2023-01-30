@@ -35,6 +35,9 @@ func PrintMermaid(mods *pbsubstreams.Modules) {
 				} else {
 					fmt.Printf("  %s --> %s\n", name, s.Name)
 				}
+			case *pbsubstreams.Module_Input_Params_:
+				name := s.Name + ":params"
+				fmt.Printf("  %s[params] --> %s\n", name, s.Name)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+// ValidateRequest is run by the server code.
 func ValidateRequest(request *pbsubstreams.Request, blockType string, isSubRequest bool) error {
 	if request.ProductionMode {
 		if request.DebugInitialStoreSnapshotForModules != nil && len(request.DebugInitialStoreSnapshotForModules) > 0 {

@@ -108,6 +108,8 @@ func inputName(input *pbsubstreams.Module_Input) string {
 		return "source"
 	case *pbsubstreams.Module_Input_Map_:
 		return "map"
+	case *pbsubstreams.Module_Input_Params_:
+		return "params"
 	default:
 		panic(fmt.Sprintf("invalid input %T", input.Input))
 	}
@@ -121,6 +123,8 @@ func inputValue(input *pbsubstreams.Module_Input) string {
 		return input.GetSource().Type
 	case *pbsubstreams.Module_Input_Map_:
 		return input.GetMap().ModuleName
+	case *pbsubstreams.Module_Input_Params_:
+		return input.GetParams().Value
 	default:
 		panic(fmt.Sprintf("invalid input %T", input.Input))
 	}

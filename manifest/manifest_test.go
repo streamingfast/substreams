@@ -103,6 +103,9 @@ func TestManifest_ToProto(t *testing.T) {
 	require.Equal(t, "map_pairs", module.Name)
 	require.Equal(t, "map_pairs", module.BinaryEntrypoint)
 	require.Equal(t, uint32(0), module.BinaryIndex)
+	require.Equal(t, 2, len(module.Inputs))
+	require.Equal(t, "my default params", module.Inputs[0].GetParams().Value)
+	require.Equal(t, "sf.ethereum.type.v1.Block", module.Inputs[1].GetSource().Type)
 	require.Equal(t, "proto:pcs.types.v1.Pairs", module.Output.Type)
 
 	module = pbManifest.Modules[1]

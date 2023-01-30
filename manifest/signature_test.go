@@ -1,9 +1,10 @@
 package manifest
 
 import (
+	"testing"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_HashModule(t *testing.T) {
@@ -16,6 +17,13 @@ func Test_HashModule(t *testing.T) {
 			},
 		},
 		Inputs: []*pbsubstreams.Module_Input{
+			{
+				Input: &pbsubstreams.Module_Input_Params_{
+					Params: &pbsubstreams.Module_Input_Params{
+						Value: "foo",
+					},
+				},
+			},
 			{
 				Input: &pbsubstreams.Module_Input_Source_{
 					Source: &pbsubstreams.Module_Input_Source{

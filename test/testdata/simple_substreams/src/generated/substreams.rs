@@ -7,6 +7,7 @@ pub struct Substreams{}
 pub trait SubstreamsTrait {
 
     fn test_map(
+        params: String,
         block: pb::test::Block,
     ) -> Result<pb::test::MapResult, Error>;
 

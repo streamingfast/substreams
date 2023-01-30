@@ -204,6 +204,7 @@ func TestAllAssertions(t *testing.T) {
 
 func Test_SimpleMapModule(t *testing.T) {
 	run := newTestRun(10000, 10001, 10001, "test_map")
+	run.Params = map[string]string{"test_map": "my test params"}
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,

@@ -157,7 +157,9 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	hostname := updateStreamHeadersHostname(streamSrv, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
-	s.runtimeConfig.BaseObjectStore.SetMeter(tracking.GetBytesMeter(ctx))
+	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
+		s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
+	}
 
 	runtimeConfig := config.NewRuntimeConfig(
 		s.runtimeConfig.CacheSaveInterval,

@@ -6,12 +6,12 @@ import (
 )
 
 type Request struct {
-	common common.Common
+	common.Common
 	KeyMap KeyMap
 }
 
 func New(c common.Common) *Request {
-	return &Request{common: c}
+	return &Request{Common: c}
 }
 
 func (r *Request) Init() tea.Cmd { return nil }
@@ -21,8 +21,4 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (r *Request) View() string {
 	return "request view"
-}
-
-func (r *Request) SetSize(width, height int) {
-	r.common.SetSize(width, height)
 }

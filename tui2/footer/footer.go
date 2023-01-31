@@ -14,7 +14,7 @@ type UpdateKeyMapMsg help.KeyMap
 
 // Footer is a Bubble Tea model that displays help and other info.
 type Footer struct {
-	common common.Common
+	common.Common
 	help   help.Model
 	keymap help.KeyMap
 }
@@ -27,7 +27,7 @@ func New(c common.Common, keymap help.KeyMap) *Footer {
 	h.Styles.FullKey = c.Styles.HelpKey
 	h.Styles.FullDesc = c.Styles.HelpValue
 	f := &Footer{
-		common: c,
+		Common: c,
 		help:   h,
 		keymap: keymap,
 	}
@@ -37,9 +37,9 @@ func New(c common.Common, keymap help.KeyMap) *Footer {
 
 // SetSize implements common.Component.
 func (f *Footer) SetSize(width, height int) {
-	f.common.SetSize(width, height)
+	f.Common.SetSize(width, height)
 	f.help.Width = width -
-		f.common.Styles.Footer.GetHorizontalFrameSize()
+		f.Styles.Footer.GetHorizontalFrameSize()
 }
 
 // Init implements tea.Model.
@@ -65,8 +65,8 @@ func (f *Footer) View() string {
 	if f.keymap == nil {
 		return ""
 	}
-	s := f.common.Styles.Footer.Copy().
-		Width(f.common.Width)
+	s := f.Styles.Footer.Copy().
+		Width(f.Width)
 	helpView := f.help.View(f.keymap)
 	return s.Render(helpView)
 }

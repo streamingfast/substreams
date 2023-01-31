@@ -26,7 +26,7 @@ type UI struct {
 	msgDescs map[string]*desc.MessageDescriptor
 	stream   *stream.Stream
 
-	common     common.Common
+	common.Common
 	pages      []common.Component
 	activePage page
 	footer     *footer.Footer
@@ -42,12 +42,14 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor) *UI
 	ui := &UI{
 		msgDescs: msgDescs,
 		stream:   stream,
+		Common:   c,
 		pages: []common.Component{
 			request.New(c),
-			progress.New(c),
+			progress.New(c, stream.TargetEndBlock()),
 			output.New(c),
 		},
-		tabs: tabs.New(c, []string{"Request", "Progress", "Output"}),
+		activePage: progressPage,
+		tabs:       tabs.New(c, []string{"Request", "Progress", "Output"}),
 	}
 	ui.footer = footer.New(c, ui.pages[0])
 
@@ -66,12 +68,18 @@ func (ui *UI) Init() tea.Cmd {
 		ui.footer.Init(),
 	)
 
+	cmds = append(cmds, tabs.SelectTabCmd(1))
+	cmds = append(cmds, ui.stream.Init())
+
 	return tea.Batch(cmds...)
 }
 
 func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		ui.SetSize(msg.Width, msg.Height)
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -91,22 +99,40 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tabs.ActiveTabMsg:
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
+		ui.SetSize(ui.Width, ui.Height) // For when the footer changes size here
 	}
+
+	cmds = append(cmds, ui.stream.Update(msg))
 
 	_, cmd := ui.footer.Update(msg)
 	cmds = append(cmds, cmd)
 	_, cmd = ui.tabs.Update(msg)
 	cmds = append(cmds, cmd)
-	_, cmd = ui.pages[ui.activePage].Update(msg)
-	cmds = append(cmds, cmd)
+	for _, pg := range ui.pages {
+		_, cmd = pg.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	return ui, tea.Batch(cmds...)
 }
 
+func (ui *UI) SetSize(w, h int) {
+	ui.Common.SetSize(w, h)
+	footerHeight := ui.footer.Height()
+	ui.footer.SetSize(w, footerHeight)
+	tabsHeight := ui.tabs.Height
+	ui.tabs.SetSize(w, tabsHeight)
+	headerHeight := 1
+	for _, pg := range ui.pages {
+		pg.SetSize(w, h-footerHeight-tabsHeight-headerHeight)
+	}
+}
+
 func (ui *UI) View() string {
+	//ioutil.WriteFile("/tmp/mama.txt", []byte(fmt.Sprintf("MAMA %s\n", ui.common.Styles)), 0644)
 	return lipgloss.JoinVertical(0,
-		"Substreams GUI",
-		ui.tabs.View(),
+		ui.Styles.Header.Render("Substreams GUI"),
+		ui.Styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
 	)

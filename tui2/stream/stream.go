@@ -28,9 +28,10 @@ type ResponseInitialSnapshotCompleteMsg *pbsubstreams.InitialSnapshotComplete
 type ResponseUnknownMsg string
 
 type Stream struct {
-	req      *pbsubstreams.Request
-	client   pbsubstreams.StreamClient
-	callOpts []grpc.CallOption
+	req            *pbsubstreams.Request
+	client         pbsubstreams.StreamClient
+	callOpts       []grpc.CallOption
+	targetEndBlock uint64
 
 	ctx           context.Context
 	cancelContext func()
@@ -41,10 +42,15 @@ type Stream struct {
 
 func New(req *pbsubstreams.Request, client pbsubstreams.StreamClient, callOpts []grpc.CallOption) *Stream {
 	return &Stream{
-		req:      req,
-		client:   client,
-		callOpts: callOpts,
+		req:            req,
+		targetEndBlock: req.StopBlockNum,
+		client:         client,
+		callOpts:       callOpts,
 	}
+}
+
+func (s *Stream) TargetEndBlock() uint64 {
+	return s.targetEndBlock
 }
 
 func (s *Stream) Init() tea.Cmd {
@@ -103,6 +109,7 @@ func (s *Stream) readNextMessage() tea.Msg {
 	if s.err != nil {
 		return nil
 	}
+
 	resp, err := s.conn.Recv()
 	if err != nil {
 		if err == io.EOF {

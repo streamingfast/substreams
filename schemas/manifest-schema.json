@@ -107,11 +107,11 @@
               "description": "a protoPackageMapping",
               "type": "object",
               "propertyNames": {
-                "pattern" : {
-                  "type": "string"
-                }
+                "type": "string"
               },
-              "unevaluatedProperties": false,
+              "additionalProperties": {
+                "type": "string"
+              },
               "minProperties": 1
             }
           },

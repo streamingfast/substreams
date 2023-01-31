@@ -17,7 +17,7 @@ The `substreams` CLI exposes many commands to developers enabling a range of fea
 * Local `.spkg` package files
 * Remote `.spkg` package URLs
 * Local directory containing a `substreams.yaml` file
-  
+
 
 If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 {% endhint %}
@@ -150,7 +150,7 @@ The `graph` command prints out a visual graph of the package in the [mermaid-js 
 
 {% code title="graph command" overflow="wrap" %}
 ````bash
-$ substreams graph ./substreams.yaml     
+$ substreams graph ./substreams.yaml
                     [±master ●●]
 Mermaid graph:
 
@@ -184,7 +184,7 @@ The output of the `inspect` command will print a message resembling:
 
 {% code title="inspect output" overflow="wrap" %}
 ```bash
-proto_files 
+proto_files
 ...
 modules {
   modules {

@@ -38,10 +38,10 @@ The [`run`](../reference-and-specs/command-line-interface#run) command starts a 
 In this section we are going to:
 
 - Create your first Substreams module
-- Use the [`substreams` CLI](../reference-and-specs/command-line-interface) to run the module
+- Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to run the module
 
 {% hint style="note" %}
-**Note**: Before continuing, ensure that your system [meets the basic requirements](../developers-guide/installation-requirements) for Substreams development.
+**Note**: Before continuing, ensure that your system [meets the basic requirements](../developers-guide/installation-requirements.md) for Substreams development.
 {% endhint %}
 
 ### Create Substreams manifest
@@ -180,7 +180,7 @@ cargo build --release --target wasm32-unknown-unknown
 
 ### Execute
 
-To execute, or run, the example use the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command:
+To execute, or run, the example use the `substreams` [`run`](../reference-and-specs/command-line-interface.md#run) command:
 
 {% code overflow="wrap" %}
 ```bash
@@ -188,13 +188,13 @@ substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_block --s
 ```
 {% endcode %}
 
-To ensure that the [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command is executed correctly, you need to pass the proper endpoint, manifest name, and module handler name. The `--start-block` and `--stop-block` flags are optional, but they can help limit the results that are returned to the client.
+To ensure that the [`run`](../reference-and-specs/command-line-interface.md#run) command is executed correctly, you need to pass the proper endpoint, manifest name, and module handler name. The `--start-block` and `--stop-block` flags are optional, but they can help limit the results that are returned to the client.
 
 You have successfully created your first Substreams module that extracts data from the Ethereum blockchain.
 
 ## Next steps
 
-- [Modules basics](https://substreams.streamingfast.io/concepts-and-fundamentals/modules)
-- [Substreams fundamentals](https://substreams.streamingfast.io/concepts-and-fundamentals/fundamentals)
-- [Protobuf schemas](https://substreams.streamingfast.io/developers-guide/creating-protobuf-schemas)
+- [Modules basics](../concepts-and-fundamentals/modules.md)
+- [Substreams fundamentals](../concepts-and-fundamentals/fundamentals.md)
+- [Protobuf schemas](../developers-guide/creating-protobuf-schemas.md)
 - [Substreams Template](https://github.com/streamingfast/substreams-template)

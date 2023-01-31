@@ -12,25 +12,25 @@ const (
 	completed
 )
 
-type Questionaire struct {
+type Questionnaire struct {
 	state       sessionState
 	ProjectName InputModel
 	Network     ChoiceModel
 }
 
-func NewQuestionaire() Questionaire {
-	return Questionaire{
+func NewQuestionnaire() Questionnaire {
+	return Questionnaire{
 		state:       nameSelect,
 		ProjectName: ProjectNameSelection(),
 		Network:     NewChainSelection(),
 	}
 }
 
-func (m Questionaire) Init() tea.Cmd {
+func (m Questionnaire) Init() tea.Cmd {
 	return nil
 }
 
-func (m Questionaire) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Questionnaire) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.state {
@@ -58,7 +58,7 @@ func (m Questionaire) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Questionaire) View() string {
+func (m Questionnaire) View() string {
 	switch m.state {
 	case nameSelect:
 		return m.ProjectName.View()
@@ -67,5 +67,5 @@ func (m Questionaire) View() string {
 	case completed:
 		return ""
 	}
-	return "smth went wrong"
+	return "something went wrong :("
 }

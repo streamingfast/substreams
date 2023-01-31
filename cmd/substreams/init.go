@@ -40,11 +40,11 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	// Bubble Tea model for questionnaire
-	questionnaireModel, err := tea.NewProgram(init_models.NewQuestionaire()).Run()
+	questionnaireModel, err := tea.NewProgram(init_models.NewQuestionnaire()).Run()
 	if err != nil {
 		return fmt.Errorf("creating questionnaire: %w", err)
 	}
-	questionnaireExposed := questionnaireModel.(init_models.Questionaire)
+	questionnaireExposed := questionnaireModel.(init_models.Questionnaire)
 	networkSelected := questionnaireExposed.Network.Selected
 	nameSelected := questionnaireExposed.ProjectName.TextInput.Value()
 

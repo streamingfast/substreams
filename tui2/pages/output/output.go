@@ -3,6 +3,12 @@ package output
 import (
 	"fmt"
 
+	"github.com/streamingfast/substreams/tui2/components/blockselect"
+
+	"github.com/streamingfast/substreams/tui2/components/modselect"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -13,29 +19,104 @@ type Output struct {
 	common.Common
 	KeyMap KeyMap
 
-	updates int
+	moduleSelector *modselect.ModSelect
+	blockSelector  *blockselect.BlockSelect
+
+	lowBlock  uint64
+	highBlock uint64
+
+	blocksPerModule map[string][]uint64
+	payloads        map[string]map[uint64]*pbsubstreams.ModuleOutput
+	blockIDs        map[uint64]string
+
+	activeModule string
+	activeBlock  uint64
 }
 
 func New(c common.Common) *Output {
 	return &Output{
-		Common: c,
-		KeyMap: DefaultKeyMap(),
+		Common:          c,
+		KeyMap:          DefaultKeyMap(),
+		blocksPerModule: make(map[string][]uint64),
+		payloads:        make(map[string]map[uint64]*pbsubstreams.ModuleOutput),
+		blockIDs:        make(map[uint64]string),
+		moduleSelector:  modselect.New(c),
+		blockSelector:   blockselect.New(c),
 	}
 }
 
-func (o *Output) Init() tea.Cmd { return nil }
+func (o *Output) Init() tea.Cmd {
+	return tea.Batch(
+		o.moduleSelector.Init(),
+		o.blockSelector.Init(),
+	)
+}
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg.(type) {
+	// WARN: this will not be so pretty for the reversible segment, as we're
+	// flattening the block IDs into numbers..
+	// Probably fine for now, as we're debugging the history.
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
 	case stream.ResponseDataMsg:
-		o.updates += 1
+		blockNum := msg.Clock.Number
+
+		if o.lowBlock == 0 {
+			o.lowBlock = blockNum
+		}
+		if o.highBlock < blockNum {
+			o.highBlock = blockNum
+		}
+
+		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
+		for _, output := range msg.Outputs {
+			if isEmptyModuleOutput(output) {
+				continue
+			}
+
+			modName := output.Name
+
+			modulePayloads, found := o.payloads[modName]
+			if !found {
+				o.moduleSelector.AddModule(modName)
+				if o.activeModule == "" {
+					o.activeModule = modName
+				}
+				modulePayloads = make(map[uint64]*pbsubstreams.ModuleOutput)
+			}
+			if _, found := modulePayloads[blockNum]; !found {
+				if o.activeBlock == 0 {
+					o.activeBlock = blockNum
+				}
+				o.blocksPerModule[modName] = append(o.blocksPerModule[modName], blockNum)
+				if modName == o.activeModule {
+					o.blockSelector.SetAvailableBlocks(o.blocksPerModule[modName])
+				}
+			}
+			modulePayloads[blockNum] = output
+			o.payloads[modName] = modulePayloads
+		}
+	case modselect.ModuleSelectedMsg:
+		o.activeModule = string(msg)
+		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.activeModule])
+	case blockselect.BlockSelectedMsg:
+		o.activeBlock = uint64(msg)
+	case tea.KeyMsg:
+		_, cmd := o.moduleSelector.Update(msg)
+		cmds = append(cmds, cmd)
+		_, cmd = o.blockSelector.Update(msg)
+		cmds = append(cmds, cmd)
 	}
-	return o, nil
+	return o, tea.Batch(cmds...)
 }
 
 func (o *Output) View() string {
 	return lipgloss.JoinVertical(0,
-		"Output view",
-		fmt.Sprintf("Data updates: %d", o.updates),
+		"",
+		fmt.Sprintf("Active module: %s", o.activeModule),
+		fmt.Sprintf("Active block: %d", o.activeBlock),
+		fmt.Sprintf("Block range: %d - %d (total: %d)", o.lowBlock, o.highBlock, o.highBlock-o.lowBlock),
+		o.moduleSelector.View(),
+		o.blockSelector.View(),
 	)
 }

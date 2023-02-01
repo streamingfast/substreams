@@ -113,8 +113,9 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd = ui.tabs.Update(msg)
 	cmds = append(cmds, cmd)
 	for _, pg := range ui.pages {
-		_, cmd = pg.Update(msg)
-		cmds = append(cmds, cmd)
+		if _, cmd = pg.Update(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return ui, tea.Batch(cmds...)

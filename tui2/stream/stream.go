@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -126,6 +127,7 @@ func (s *Stream) routeNextMessage(resp *pbsubstreams.Response) tea.Msg {
 	case *pbsubstreams.Response_Data:
 		return ResponseDataMsg(m.Data)
 	case *pbsubstreams.Response_Progress:
+		log.Printf("Progress response: %T %v", resp, resp)
 		return ResponseProgressMsg(m.Progress)
 	case *pbsubstreams.Response_DebugSnapshotData:
 		return ResponseInitialSnapshotDataMsg(m.DebugSnapshotData)

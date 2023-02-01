@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
 )
@@ -20,7 +19,9 @@ type Bar struct {
 }
 
 func NewBar(c common.Common, name string, targetEndBlock uint64) *Bar {
-	return &Bar{Common: c, name: name, targetEndBlock: targetEndBlock}
+	out := &Bar{Common: c, name: name, targetEndBlock: targetEndBlock}
+
+	return out
 }
 
 func (b *Bar) Init() tea.Cmd { return nil }
@@ -39,21 +40,19 @@ func (b *Bar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b *Bar) View() string {
-	return lipgloss.JoinHorizontal(0,
-		lipgloss.NewStyle().Width(20).Margin(0, 2).Render(b.name),
-		"["+barmode(b.ranges, b.targetEndBlock, uint64(b.Width-26))+"]",
-	)
-	// Return the bar
-}
+	width := uint64(b.Width)
+	if width > 1000 {
+		return "[borked]"
+	}
 
-func barmode(in ranges, backprocessingCompleteAtBlock, width uint64) string {
+	in := b.ranges
 	lo := in.Lo()
-	hi := backprocessingCompleteAtBlock
-	binsize := (hi - lo) / width
+	hi := b.targetEndBlock
+	binSize := (hi - lo) / width
 	var out []string
 	for i := uint64(0); i < width; i++ {
-		loCheck := binsize*i + lo
-		hiCheck := binsize*(i+1) + lo
+		loCheck := binSize*i + lo
+		hiCheck := binSize*(i+1) + lo
 
 		if in.Covered(loCheck, hiCheck) {
 			out = append(out, "▓")
@@ -63,5 +62,5 @@ func barmode(in ranges, backprocessingCompleteAtBlock, width uint64) string {
 			out = append(out, "░")
 		}
 	}
-	return strings.Join(out, "")
+	return "[" + strings.Join(out, "") + "]"
 }

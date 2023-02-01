@@ -17,7 +17,8 @@ type Progress struct {
 	common.Common
 	KeyMap KeyMap
 
-	state string
+	state          string
+	targetEndBlock uint64
 
 	progressUpdates   int
 	dataPayloads      int
@@ -30,14 +31,17 @@ type Progress struct {
 
 func New(c common.Common, targetEndBlock uint64) *Progress {
 	return &Progress{
-		Common: c,
-		KeyMap: DefaultKeyMap(),
-		state:  "Initializing",
-		bars:   ranges.NewBars(c, targetEndBlock),
+		Common:         c,
+		KeyMap:         DefaultKeyMap(),
+		state:          "Initializing",
+		targetEndBlock: targetEndBlock,
+		bars:           ranges.NewBars(c, targetEndBlock),
 	}
 }
 
-func (p *Progress) Init() tea.Cmd { return nil }
+func (p *Progress) Init() tea.Cmd {
+	return p.bars.Init()
+}
 
 func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
@@ -52,7 +56,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.updatedSecond = thisSec
 		}
 		p.updatesThisSecond += 1
-		return p, nil
+		p.bars.Update(msg)
 	case stream.StreamErrorMsg:
 		p.state = fmt.Sprintf("Error: %s", msg)
 	}
@@ -64,16 +68,37 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stream.EndOfStreamMsg:
 		p.state = "Stream ended"
 	}
+
 	return p, nil
 }
 
 func (p *Progress) View() string {
-	return lipgloss.JoinVertical(50,
-		"Progress view",
-		fmt.Sprintf("Progress updates: %d", p.progressUpdates),
-		fmt.Sprintf("Data payloads: %d", p.dataPayloads),
-		fmt.Sprintf("Per second: %d", p.updatesPerSecond),
-		fmt.Sprintf("Status: %s", p.Styles.StatusBarValue.Render(p.state)),
+	labels := []string{
+		"Progress updates:",
+		"per second:",
+		"Data payloads:",
+		"Target end block:",
+		"Status:",
+	}
+	infos := []string{
+		fmt.Sprintf("%d", p.progressUpdates),
+		fmt.Sprintf("%d", p.dataPayloads),
+		fmt.Sprintf("%d", p.updatesPerSecond),
+		fmt.Sprintf("%d", p.targetEndBlock),
+		p.Styles.StatusBarValue.Render(p.state),
+	}
+
+	return lipgloss.JoinVertical(0,
+		lipgloss.JoinHorizontal(0,
+			lipgloss.NewStyle().Margin(1, 2).Render(lipgloss.JoinVertical(1, labels...)),
+			lipgloss.JoinVertical(0, infos...),
+		),
 		p.bars.View(),
 	)
+}
+
+func (p *Progress) SetSize(w, h int) {
+	headerHeight := 7
+	p.Common.SetSize(w, h)
+	p.bars.SetSize(w, h-headerHeight)
 }

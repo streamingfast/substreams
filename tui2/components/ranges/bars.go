@@ -11,14 +11,17 @@ type Bars struct {
 	common.Common
 	targetEndBlock uint64
 
-	bars    []*Bar
-	barsMap map[string]*Bar
+	labelWidth int
+	bars       []*Bar
+	barsMap    map[string]*Bar
 }
 
 func NewBars(c common.Common, targetEndBlock uint64) *Bars {
 	return &Bars{
 		Common:         c,
+		barsMap:        make(map[string]*Bar),
 		targetEndBlock: targetEndBlock,
+		labelWidth:     45,
 	}
 }
 
@@ -33,6 +36,7 @@ func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				bar = NewBar(b.Common, mod.Name, b.targetEndBlock)
 				b.barsMap[mod.Name] = bar
 				b.bars = append(b.bars, bar)
+				b.SetSize(b.Width, b.Height)
 			}
 			bar.Update(mod.Type)
 		}
@@ -43,10 +47,28 @@ func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return b, nil
 }
 
-func (b *Bars) View() string {
-	var bars []string
+func (b *Bars) SetSize(w, h int) {
+	b.Common.SetSize(w, h)
 	for _, bar := range b.bars {
+		bar.SetSize(w-b.labelWidth, 1)
+	}
+}
+
+func (b *Bars) View() string {
+	var labels []string
+	var bars []string
+	for idx, bar := range b.bars {
+		if idx > b.Height-2 {
+			labels = append(labels, "...")
+			continue
+		}
+		labels = append(labels, lipgloss.NewStyle().Margin(0, 2).Render(bar.name))
 		bars = append(bars, bar.View())
 	}
-	return lipgloss.JoinVertical(0, bars...)
+	return lipgloss.JoinVertical(0,
+		lipgloss.JoinHorizontal(0.5,
+			lipgloss.JoinVertical(1, labels...),
+			lipgloss.JoinVertical(0, bars...),
+		),
+	)
 }

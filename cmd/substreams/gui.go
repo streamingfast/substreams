@@ -133,6 +133,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	stream := streamui.New(req, ssClient, callOpts)
 
+	tea.LogToFile("debug.log", "gui")
 	_, err = tea.NewProgram(tui2.New(stream, msgDescs), tea.WithAltScreen()).Run()
 	if err != nil {
 		return fmt.Errorf("gui error: %w", err)

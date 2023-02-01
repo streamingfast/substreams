@@ -99,7 +99,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 				return fmt.Errorf("creating directory %v: %w", dirPath, err)
 			}
 		} else {
-			fmt.Println("src directory already exists, skipping")
+			fmt.Printf("%s directory already exists, skipping", dir)
 		}
 	}
 

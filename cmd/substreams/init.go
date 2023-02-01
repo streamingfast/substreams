@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/streamingfast/cli"
-	init_models "github.com/streamingfast/substreams/cmd/substreams/init-models"
+	models "github.com/streamingfast/substreams/cmd/substreams/init-models"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -40,17 +42,17 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	// Bubble Tea model for questionnaire
-	questionnaireModel, err := tea.NewProgram(init_models.NewQuestionnaire()).Run()
+	questionnaireModel, err := tea.NewProgram(models.NewQuestionnaire()).Run()
 	if err != nil {
 		return fmt.Errorf("creating questionnaire: %w", err)
 	}
-	questionnaireExposed := questionnaireModel.(init_models.Questionnaire)
+	questionnaireExposed := questionnaireModel.(models.Questionnaire)
 	networkSelected := questionnaireExposed.Network.Selected
 	nameSelected := questionnaireExposed.ProjectName.TextInput.Value()
 
 	if networkSelected == "other" {
-		fmt.Println("We haven't added any templates for your selected chain quite yet...")
-		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
+		fmt.Printf("We haven't added any templates for your selected chain quite yet...\n\n")
+		fmt.Printf("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!\n\n")
 		return nil
 	} else {
 		fmt.Printf("\033[32m ✔"+"\033[0m"+" Name: %s\n", nameSelected)
@@ -58,9 +60,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	gen := codegen.NewProjectGenerator(srcDir, nameSelected)
-	err = gen.GenerateProject()
-	if err != nil {
-		return fmt.Errorf("generating code: %w", err)
+	if _, err := os.Stat(filepath.Join(srcDir, nameSelected)); errors.Is(err, os.ErrNotExist) {
+		err = gen.GenerateProject()
+		if err != nil {
+			return fmt.Errorf("generating code: %w", err)
+		}
+	} else {
+		fmt.Printf("A Substreams project named %s already exists in the entered directory.\nTry changing the directory or project name and trying again.\n\n", nameSelected)
 	}
 
 	return nil

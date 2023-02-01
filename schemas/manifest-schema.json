@@ -1,0 +1,381 @@
+{
+  "name": "Substreams Manifest Schema",
+  "description": "A Schema to support in making Substreams manifest files",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties" : {
+    "specVersion" : {
+      "title": "manifest's specVersion",
+      "description": "A specVersion\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#specversion",
+      "enum" : ["v0.1.0"]
+    },
+    "package" : {
+      "title": "package",
+      "description": "A package",
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "package property",
+          "description": "A package name\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#package.name",
+          "type": "string",
+          "pattern": "^([a-zA-Z][a-zA-Z0-9_]{0,63})$"
+        },
+        "version": {
+          "title": "package version",
+          "description": "A package version\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#package.version",
+          "type": "string"
+        },
+        "url": {
+          "title": "package url",
+          "description": "A package url\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#package.url",
+          "type": "string"
+        },
+        "doc": {
+          "title": "package doc",
+          "description": "A package doc\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#package.docs",
+          "type": "string"
+        }
+      },
+      "required": ["name", "version"],
+      "additionalProperties": false
+    },
+    "imports": {
+      "title": "imports",
+      "description": "An import\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#imports",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1
+    },
+    "protobuf": {
+      "title": "protobuf",
+      "description": "A protobuf\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#protobuf",
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "title": "protobuf file",
+            "descriptions": "a file",
+            "type": "string",
+            "pattern": "\\.proto$"
+          },
+          "minItems": 1,
+          "unevaluatedItems": false
+        },
+        "importPaths": {
+          "type": "array",
+          "prefixFiles": [
+            {
+              "title": "protobuf prefixFile",
+              "descriptions": "a prefixFile",
+              "type":  "string"
+            }
+          ],
+          "minItems": 1
+        }
+      },
+      "required": ["files", "importPaths"],
+      "unevaluatedProperties": false
+    },
+    "binaries" : {
+      "title": "binaries",
+      "description": "A binary\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#binaries",
+      "type": "object",
+      "properties": {
+        "default" : {
+          "title": "default binary",
+          "description": "the default binary",
+          "type": "object",
+          "properties": {
+            "type": {
+              "title": "binary type",
+              "description": "A binary type\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#binaries-name-.type",
+              "enum": ["wasm/rust-v1"]
+            },
+            "file": {
+              "title": "binary file",
+              "description": "A binary file\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#binaries-name-.file",
+              "type": "string"
+            },
+            "protoPackageMapping" : {
+              "title": "binary protoPackageMapping",
+              "description": "a protoPackageMapping",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              },
+              "minProperties": 1
+            }
+          },
+          "required": ["type", "file"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["default"],
+      "unevaluatedProperties": false
+    },
+    "modules": {
+      "title": "modules",
+      "description": "A module \nhttps://substreams.streamingfast.io/reference-and-specs/manifests#modules",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "A module name\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-name",
+            "type": "string"
+          },
+          "initialBlock": {
+            "description": "A module initialBlock\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-initialBlock",
+            "type": "number"
+          },
+          "kind": {
+            "description": "A module kind\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-kind",
+            "enum": [
+              "map",
+              "store"
+            ]
+          },
+          "binary": {
+            "description": "A module binary\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-binary",
+            "type": "string"
+          },
+          "inputs": {
+            "description": "A module input\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-inputs",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "store": {
+                  "description": "an input store",
+                  "type": "string"
+                },
+                "source": {
+                  "description": "an input source",
+                  "type": "string"
+                },
+                "map": {
+                  "description": "an input map",
+                  "type": "string"
+                }
+              },
+              "if": {
+                "properties": {
+                  "store" : {
+                    "type": "string"
+                  }
+                },
+                "required": ["store"]
+              },
+              "then" : {
+                "maxProperties": 2,
+                "properties": {
+                  "mode": {
+                    "description": "an input mode",
+                    "type": "string"
+                  }
+                }
+              },
+              "else": {
+                "maxProperties": 1
+              },
+              "minProperties": 1,
+              "unevaluatedProperties": false
+            },
+            "unevaluatedItems": false
+          }
+        },
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "store"
+            }
+          },
+          "required": ["kind"]
+        },
+        "then": {
+          "properties": {
+            "updatePolicy": {
+              "description": "A module's updatePolicy\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-updatepolicy",
+              "enum": [
+                "set",
+                "set_if_not_exists",
+                "append",
+                "add",
+                "min",
+                "max"
+              ]
+            },
+            "valueType": {
+              "description": "A module's valueType\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-valuetype",
+              "type": ["string", "number"]
+            },
+            "name": {
+              "description": "A module name\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-name",
+              "type": "string"
+            },
+            "initialBlock": {
+              "description": "A module initialBlock\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-initialBlock",
+              "type": "number"
+            },
+            "kind": {
+              "description": "A module kind\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-kind",
+              "enum": [
+                "map",
+                "store"
+              ]
+            },
+            "binary": {
+              "description": "A module binary\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-binary",
+              "type": "string"
+            },
+            "inputs": {
+              "description": "A module input\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-inputs",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "store": {
+                    "description": "an input store",
+                    "type": "string"
+                  },
+                  "source": {
+                    "description": "an input source",
+                    "type": "string"
+                  },
+                  "map": {
+                    "description": "an input map",
+                    "type": "string"
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "store" : {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["store"]
+                },
+                "then" : {
+                  "maxProperties": 2,
+                  "properties": {
+                    "store": {
+                      "description": "an input store",
+                      "type": "string"
+                    },
+                    "mode": {
+                      "description": "an input mode",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "else": {
+                  "maxProperties": 1
+                },
+                "minProperties": 1,
+                "unevaluatedProperties": false
+              },
+              "unevaluatedItems": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "else" : {
+          "properties": {
+            "name": {
+              "description": "A module name\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-name",
+              "type": "string"
+            },
+            "initialBlock": {
+              "description": "A module initialBlock\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-initialBlock",
+              "type": "number"
+            },
+            "kind": {
+              "description": "A module kind\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-kind",
+              "enum": [
+                "map",
+                "store"
+              ]
+            },
+            "binary": {
+              "description": "A module binary\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-binary",
+              "type": "string"
+            },
+            "inputs": {
+              "description": "A module input\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-inputs",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "store": {
+                    "description": "an input store",
+                    "type": "string"
+                  },
+                  "source": {
+                    "description": "an input source",
+                    "type": "string"
+                  },
+                  "map": {
+                    "description": "an input map",
+                    "type": "string"
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "store" : {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["store"]
+                },
+                "then" : {
+                  "maxProperties": 2,
+                  "properties": {
+                    "mode": {
+                      "description": "an input mode",
+                      "type": "string"
+                    }
+                  }
+                },
+                "else": {
+                  "maxProperties": 1
+                },
+                "minProperties": 1,
+                "unevaluatedProperties": false
+              },
+              "unevaluatedItems": false
+            },
+            "output": {
+              "description": "A module's output\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-output",
+              "type": "object",
+              "properties": {
+                "type": {
+                  "description": "an output's type",
+                  "type": "string"
+                }
+              },
+              "required": ["type"],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "required": ["kind", "name", "inputs"],
+        "unevaluatedProperties": false
+      },
+      "additionalItems": false,
+      "minItems": 1
+    }
+  },
+  "required": ["specVersion", "package", "protobuf", "binaries", "modules"],
+  "additionalProperties": false
+}

@@ -27,6 +27,9 @@ func (b *BlockSelect) Init() tea.Cmd {
 }
 
 func (b *BlockSelect) SetAvailableBlocks(blocks []uint64) {
+	if len(b.blocksWithData) == 0 && len(blocks) != 0 {
+		b.activeBlock = blocks[0]
+	}
 	b.blocksWithData = blocks
 }
 

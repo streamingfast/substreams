@@ -55,15 +55,39 @@ func (m *ModSelect) View() string {
 	if len(m.Modules) == 0 {
 		return ""
 	}
-	var mods []string
+	var firstPart, lastPart, tmp []string
+	var activeModule string
 	for idx, mod := range m.Modules {
 		if idx == m.Selected {
-			mods = append(mods, Styles.SelectedModule.Render(mod))
+			activeModule = mod
+			firstPart = tmp[:]
+			tmp = nil
 		} else {
-			mods = append(mods, Styles.UnselectedModule.Render(mod))
+			tmp = append(tmp, mod)
 		}
 	}
-	return Styles.Box.MaxWidth(m.Width).Render(strings.Join(mods, ""))
+	lastPart = tmp
+
+	sidePartsWidth := (m.Width - len(activeModule) - 2) / 2
+	leftModules := strings.Join(firstPart, "  ")
+	leftWidth := len(leftModules)
+	if leftWidth > sidePartsWidth {
+		leftModules = "..." + leftModules[leftWidth-sidePartsWidth:]
+	}
+	rightModules := strings.Join(lastPart, "  ")
+	rightWidth := len(rightModules)
+	if rightWidth > sidePartsWidth {
+		rightModules = rightModules[:sidePartsWidth] + "..."
+	}
+
+	alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 3).Align(lipgloss.Right)
+	alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 3).Align(lipgloss.Left)
+	return Styles.Box.MaxWidth(m.Width).Render(
+		lipgloss.JoinHorizontal(0.5,
+			alignRight.Render(leftModules),
+			Styles.SelectedModule.Render(activeModule),
+			alignLeft.Render(rightModules),
+		))
 }
 
 var Styles = struct {
@@ -71,7 +95,6 @@ var Styles = struct {
 	SelectedModule   lipgloss.Style
 	UnselectedModule lipgloss.Style
 }{
-	Box:              lipgloss.NewStyle().Margin(1, 1),
-	SelectedModule:   lipgloss.NewStyle().Margin(0, 1).Foreground(lipgloss.Color("12")).Bold(true),
-	UnselectedModule: lipgloss.NewStyle().Margin(0, 1),
+	Box:            lipgloss.NewStyle().Margin(1, 1),
+	SelectedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
 }

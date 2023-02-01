@@ -120,3 +120,9 @@ func (o *Output) View() string {
 		o.blockSelector.View(),
 	)
 }
+
+func (o *Output) SetSize(w, h int) {
+	o.Common.SetSize(w, h)
+	o.moduleSelector.SetSize(w, 2)
+	o.blockSelector.SetSize(w, 2)
+}

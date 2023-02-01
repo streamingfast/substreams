@@ -68,7 +68,7 @@ func (m *ModSelect) View() string {
 	}
 	lastPart = tmp
 
-	sidePartsWidth := (m.Width - len(activeModule) - 2) / 2
+	sidePartsWidth := (m.Width-len(activeModule)-2)/2 - 3
 	leftModules := strings.Join(firstPart, "  ")
 	leftWidth := len(leftModules)
 	if leftWidth > sidePartsWidth {
@@ -80,8 +80,8 @@ func (m *ModSelect) View() string {
 		rightModules = rightModules[:sidePartsWidth] + "..."
 	}
 
-	alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 3).Align(lipgloss.Right)
-	alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 3).Align(lipgloss.Left)
+	alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Right)
+	alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Left)
 	return Styles.Box.MaxWidth(m.Width).Render(
 		lipgloss.JoinHorizontal(0.5,
 			alignRight.Render(leftModules),

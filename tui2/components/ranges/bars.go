@@ -9,19 +9,19 @@ import (
 
 type Bars struct {
 	common.Common
-	targetEndBlock uint64
+	linearHandoff uint64
 
 	labelWidth int
 	bars       []*Bar
 	barsMap    map[string]*Bar
 }
 
-func NewBars(c common.Common, targetEndBlock uint64) *Bars {
+func NewBars(c common.Common, linearHandoff uint64) *Bars {
 	return &Bars{
-		Common:         c,
-		barsMap:        make(map[string]*Bar),
-		targetEndBlock: targetEndBlock,
-		labelWidth:     45,
+		Common:        c,
+		barsMap:       make(map[string]*Bar),
+		linearHandoff: linearHandoff,
+		labelWidth:    45,
 	}
 }
 
@@ -33,7 +33,7 @@ func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, mod := range msg.Modules {
 			bar, found := b.barsMap[mod.Name]
 			if !found {
-				bar = NewBar(b.Common, mod.Name, b.targetEndBlock)
+				bar = NewBar(b.Common, mod.Name, b.linearHandoff)
 				b.barsMap[mod.Name] = bar
 				b.bars = append(b.bars, bar)
 				b.SetSize(b.Width, b.Height)
@@ -59,7 +59,8 @@ func (b *Bars) View() string {
 	var bars []string
 	for idx, bar := range b.bars {
 		if idx > b.Height-2 {
-			labels = append(labels, "...")
+			labels = append(labels, "  ...  ")
+			bars = append(bars, "")
 			continue
 		}
 		labels = append(labels, lipgloss.NewStyle().Margin(0, 2).Render(bar.name))
@@ -67,7 +68,7 @@ func (b *Bars) View() string {
 	}
 	return lipgloss.JoinVertical(0,
 		lipgloss.JoinHorizontal(0.5,
-			lipgloss.JoinVertical(1, labels...),
+			lipgloss.JoinVertical(0, labels...),
 			lipgloss.JoinVertical(0, bars...),
 		),
 	)

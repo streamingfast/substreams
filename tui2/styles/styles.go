@@ -59,7 +59,6 @@ func DefaultStyles() *Styles {
 
 	s.Header = lipgloss.NewStyle().
 		Margin(1, 2).
-		Foreground(lipgloss.Color("red")).
 		Bold(true)
 
 	s.Tabs = lipgloss.NewStyle().

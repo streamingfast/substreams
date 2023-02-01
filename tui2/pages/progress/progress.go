@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/tui2/components/ranges"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,8 +18,8 @@ type Progress struct {
 	common.Common
 	KeyMap KeyMap
 
-	state          string
-	targetEndBlock uint64
+	state         string
+	linearHandoff uint64
 
 	progressUpdates   int
 	dataPayloads      int
@@ -29,13 +30,13 @@ type Progress struct {
 	bars *ranges.Bars
 }
 
-func New(c common.Common, targetEndBlock uint64) *Progress {
+func New(c common.Common, linearHandoff uint64) *Progress {
 	return &Progress{
-		Common:         c,
-		KeyMap:         DefaultKeyMap(),
-		state:          "Initializing",
-		targetEndBlock: targetEndBlock,
-		bars:           ranges.NewBars(c, targetEndBlock),
+		Common:        c,
+		KeyMap:        DefaultKeyMap(),
+		state:         "Initializing",
+		linearHandoff: linearHandoff,
+		bars:          ranges.NewBars(c, linearHandoff),
 	}
 }
 
@@ -74,27 +75,28 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (p *Progress) View() string {
 	labels := []string{
-		"Progress updates:",
-		"per second:",
-		"Data payloads:",
-		"Target end block:",
-		"Status:",
+		"Parallel engine progress messages: ",
+		"target block: ",
+		"Data payloads received: ",
+		"Status: ",
 	}
 	infos := []string{
-		fmt.Sprintf("%d", p.progressUpdates),
+		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
+		fmt.Sprintf("%d", p.linearHandoff),
 		fmt.Sprintf("%d", p.dataPayloads),
-		fmt.Sprintf("%d", p.updatesPerSecond),
-		fmt.Sprintf("%d", p.targetEndBlock),
 		p.Styles.StatusBarValue.Render(p.state),
 	}
 
-	return lipgloss.JoinVertical(0,
-		lipgloss.JoinHorizontal(0,
-			lipgloss.NewStyle().Margin(1, 2).Render(lipgloss.JoinVertical(1, labels...)),
+	vp := viewport.New(p.Width, p.Height)
+	//vp.Style = lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true)
+	vp.SetContent(lipgloss.JoinVertical(0,
+		lipgloss.NewStyle().Margin(1, 2).Render(lipgloss.JoinHorizontal(0,
+			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
-		),
+		)),
 		p.bars.View(),
-	)
+	))
+	return vp.View()
 }
 
 func (p *Progress) SetSize(w, h int) {

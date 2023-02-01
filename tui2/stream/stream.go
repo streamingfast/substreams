@@ -50,8 +50,18 @@ func New(req *pbsubstreams.Request, client pbsubstreams.StreamClient, callOpts [
 	}
 }
 
-func (s *Stream) TargetEndBlock() uint64 {
-	return s.targetEndBlock
+func (s *Stream) StreamColor() string {
+	if s.err != nil && s.err != io.EOF {
+		return "9"
+	}
+	if s.cancelContext != nil || s.err == io.EOF {
+		return "2"
+	}
+	return "3"
+}
+
+func (s *Stream) LinearHandoffBlock() uint64 {
+	return uint64(s.req.StartBlockNum)
 }
 
 func (s *Stream) Init() tea.Cmd {
@@ -83,6 +93,7 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 		case InterruptStreamMsg:
 			if s.cancelContext != nil {
 				s.cancelContext()
+				s.cancelContext = nil
 			}
 		case EndOfStreamMsg:
 			s.err = io.EOF

@@ -45,7 +45,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor) *UI
 		Common:   c,
 		pages: []common.Component{
 			request.New(c),
-			progress.New(c, stream.TargetEndBlock()),
+			progress.New(c, stream.LinearHandoffBlock()),
 			output.New(c),
 		},
 		activePage: progressPage,
@@ -96,6 +96,10 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	//case stream.SetMessageDescriptors:
 	//	ui.msgDescs = msg
+	case tabs.SelectTabMsg:
+		ui.activePage = page(msg)
+		ui.footer.SetKeyMap(ui.pages[ui.activePage])
+		ui.SetSize(ui.Width, ui.Height)
 	case tabs.ActiveTabMsg:
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
@@ -122,7 +126,7 @@ func (ui *UI) SetSize(w, h int) {
 	ui.footer.SetSize(w, footerHeight)
 	tabsHeight := ui.tabs.Height
 	ui.tabs.SetSize(w, tabsHeight)
-	headerHeight := 1
+	headerHeight := 3
 	for _, pg := range ui.pages {
 		pg.SetSize(w, h-footerHeight-tabsHeight-headerHeight)
 	}
@@ -131,7 +135,7 @@ func (ui *UI) SetSize(w, h int) {
 func (ui *UI) View() string {
 	//ioutil.WriteFile("/tmp/mama.txt", []byte(fmt.Sprintf("MAMA %s\n", ui.common.Styles)), 0644)
 	return lipgloss.JoinVertical(0,
-		ui.Styles.Header.Render("Substreams GUI"),
+		ui.Styles.Header.Copy().Foreground(lipgloss.Color(ui.stream.StreamColor())).Render("Substreams GUI"),
 		ui.Styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),

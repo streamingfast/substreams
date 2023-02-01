@@ -68,7 +68,7 @@ func (f *Footer) View() string {
 	s := f.Styles.Footer.Copy().
 		Width(f.Width)
 	helpView := f.help.View(f.keymap)
-	return s.Render(helpView)
+	return lipgloss.NewStyle().Margin(0, 1).Render(s.Render(helpView))
 }
 
 // ShowAll returns whether the full help is shown.
@@ -83,7 +83,7 @@ func (f *Footer) SetShowAll(show bool) {
 
 // Height returns the height of the footer.
 func (f *Footer) Height() int {
-	return lipgloss.Height(f.View())
+	return lipgloss.Height(f.View()) + 1
 }
 
 func UpdateKeyMapCmd(keymap help.KeyMap) tea.Msg {

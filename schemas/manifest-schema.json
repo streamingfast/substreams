@@ -267,11 +267,16 @@
                 "then" : {
                   "maxProperties": 2,
                   "properties": {
+                    "store": {
+                      "description": "an input store",
+                      "type": "string"
+                    },
                     "mode": {
                       "description": "an input mode",
                       "type": "string"
                     }
-                  }
+                  },
+                  "additionalProperties": false
                 },
                 "else": {
                   "maxProperties": 1

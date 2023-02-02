@@ -3,6 +3,8 @@ package output
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/key"
+
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
 
 	"github.com/streamingfast/substreams/tui2/components/modselect"
@@ -17,7 +19,6 @@ import (
 
 type Output struct {
 	common.Common
-	KeyMap KeyMap
 
 	moduleSelector *modselect.ModSelect
 	blockSelector  *blockselect.BlockSelect
@@ -36,7 +37,6 @@ type Output struct {
 func New(c common.Common) *Output {
 	return &Output{
 		Common:          c,
-		KeyMap:          DefaultKeyMap(),
 		blocksPerModule: make(map[string][]uint64),
 		payloads:        make(map[string]map[uint64]*pbsubstreams.ModuleOutput),
 		blockIDs:        make(map[uint64]string),
@@ -52,9 +52,15 @@ func (o *Output) Init() tea.Cmd {
 	)
 }
 
+func (o *Output) SetSize(w, h int) {
+	o.Common.SetSize(w, h)
+	o.moduleSelector.SetSize(w, 2)
+	o.blockSelector.SetSize(w, 2)
+}
+
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// WARN: this will not be so pretty for the reversible segment, as we're
-	// flattening the block IDs into numbers..
+	// flattening the block IDs into numbers...
 	// Probably fine for now, as we're debugging the history.
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
@@ -67,6 +73,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if o.highBlock < blockNum {
 			o.highBlock = blockNum
 		}
+		o.blockSelector.StretchBounds(o.lowBlock, o.highBlock)
 
 		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
 		for _, output := range msg.Outputs {
@@ -121,8 +128,25 @@ func (o *Output) View() string {
 	)
 }
 
-func (o *Output) SetSize(w, h int) {
-	o.Common.SetSize(w, h)
-	o.moduleSelector.SetSize(w, 2)
-	o.blockSelector.SetSize(w, 2)
+func (o *Output) ShortHelp() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(
+			key.WithKeys("u", "i"),
+			key.WithHelp("u/i", "Nav. modules"),
+		),
+		key.NewBinding(
+			key.WithKeys("o", "p"),
+			key.WithHelp("o/p", "Nav. blocks"),
+		),
+		key.NewBinding(
+			key.WithKeys("up", "k", "down", "j"),
+			key.WithHelp("↑/k/↓/j", "up/down"),
+		),
+	}
+}
+
+func (o *Output) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		o.ShortHelp(),
+	}
 }

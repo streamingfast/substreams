@@ -2,6 +2,10 @@ package blockselect
 
 import (
 	"fmt"
+	"log"
+	"strings"
+
+	"github.com/dustin/go-humanize"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -16,6 +20,8 @@ type BlockSelect struct {
 
 	blocksWithData []uint64
 	activeBlock    uint64
+	lowBlock       uint64
+	highBlock      uint64
 }
 
 func New(c common.Common) *BlockSelect {
@@ -37,6 +43,11 @@ func (b *BlockSelect) SetActiveBlock(blockNum uint64) {
 	b.activeBlock = blockNum
 }
 
+func (b *BlockSelect) StretchBounds(low, high uint64) {
+	b.lowBlock = low
+	b.highBlock = high
+}
+
 func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
@@ -46,19 +57,26 @@ func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		key := msg.String()
 		switch key {
-		case "o", "p":
-			for idx, el := range b.blocksWithData {
-				if el == b.activeBlock || b.activeBlock == 0 {
-					var newIdx int
-					if key == "o" {
-						newIdx = (idx - 1 + len(b.blocksWithData)) % len(b.blocksWithData)
-					} else {
-						newIdx = (idx + 1) % len(b.blocksWithData)
-					}
-					b.activeBlock = b.blocksWithData[newIdx]
+		case "o":
+			var prevIdx int
+			for i, el := range b.blocksWithData {
+				if el >= b.activeBlock {
 					break
 				}
+				prevIdx = i
 			}
+			b.activeBlock = b.blocksWithData[prevIdx]
+			cmds = append(cmds, b.dispatchBlockSelected)
+		case "p":
+			var prevIdx = len(b.blocksWithData) - 1
+			for i := prevIdx; i >= 0; i-- {
+				el := b.blocksWithData[i]
+				if el <= b.activeBlock {
+					break
+				}
+				prevIdx = i
+			}
+			b.activeBlock = b.blocksWithData[prevIdx]
 			cmds = append(cmds, b.dispatchBlockSelected)
 		}
 	}
@@ -69,14 +87,58 @@ func (b *BlockSelect) dispatchBlockSelected() tea.Msg {
 	return BlockSelectedMsg(b.activeBlock)
 }
 
-func (b *BlockSelect) View() string {
+func (b *BlockSelect) OldView() string {
 	return Styles.Box.MaxWidth(b.Width).Render(
 		lipgloss.JoinVertical(0,
 			fmt.Sprintf("Active block: %d", b.activeBlock),
 			fmt.Sprintf("Blocks with data: %v", b.blocksWithData),
+			fmt.Sprintf("Range: %d - %d", b.lowBlock, b.highBlock),
 		),
 	)
+}
 
+func (b *BlockSelect) View() string {
+	if b.Width == 0 || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
+		return ""
+	}
+
+	bins := int(b.Width - 10)
+	binSize := int(b.highBlock-b.lowBlock) / bins
+	if binSize == 0 {
+		binSize = 1
+	}
+	log.Printf("BlockSelect: high %d low %d binSize %d width %d bins %d", b.highBlock, b.lowBlock, binSize, b.Width, bins)
+
+	ptrs := make([]int, bins)
+	for _, blk := range b.blocksWithData {
+		index := int(blk-b.lowBlock) / binSize
+		ptrs[index] += 1
+	}
+	var ptrsBar []string
+	for _, p := range ptrs {
+		chr := " "
+		if p == 1 {
+			chr = "|"
+		} else if p > 1 {
+			chr = "‖"
+		}
+		ptrsBar = append(ptrsBar, chr)
+	}
+
+	ptr := int(b.activeBlock-b.lowBlock) / binSize
+
+	activeBlock := humanize.Comma(int64(b.activeBlock))
+	if ptr < len(activeBlock)+3 {
+		activeBlock = fmt.Sprintf("%s^ %s", strings.Repeat(" ", ptr), activeBlock)
+	} else {
+		activeBlock = fmt.Sprintf("%s%s ^", strings.Repeat(" ", ptr-len(activeBlock)-1), activeBlock)
+	}
+
+	return lipgloss.JoinVertical(0,
+		fmt.Sprintf("%s --- %s", humanize.Comma(int64(b.lowBlock)), humanize.Comma(int64(b.highBlock))),
+		strings.Join(ptrsBar, ""),
+		activeBlock,
+	)
 }
 
 var Styles = struct {

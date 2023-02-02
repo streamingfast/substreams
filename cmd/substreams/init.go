@@ -3,14 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/manifoldco/promptui"
+	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
-	models "github.com/streamingfast/substreams/cmd/substreams/init-models"
+	"github.com/streamingfast/substreams/codegen"
 	"os"
 	"path/filepath"
-
-	"github.com/spf13/cobra"
-	"github.com/streamingfast/substreams/codegen"
 )
 
 var initCmd = &cobra.Command{
@@ -41,33 +39,56 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Bubble Tea model for questionnaire
-	questionnaireModel, err := tea.NewProgram(models.NewQuestionnaire()).Run()
-	if err != nil {
-		return fmt.Errorf("creating questionnaire: %w", err)
+	// Get desired project name
+	projectNamePrompt := promptui.Prompt{
+		Label:     "Project name: ",
+		Templates: inputTemplate(),
 	}
-	questionnaireExposed := questionnaireModel.(models.Questionnaire)
-	networkSelected := questionnaireExposed.Network.Selected
-	nameSelected := questionnaireExposed.ProjectName.TextInput.Value()
+	projectName, err := projectNamePrompt.Run()
+	if err != nil {
+		return fmt.Errorf("running project name prompt: %w", err)
+	}
 
-	if networkSelected == "other" {
+	// Get desired network
+	networkPrompt := promptui.Select{
+		Label:     "Select network",
+		Items:     []string{"Ethereum", "other"},
+		Templates: choiceTemplate(),
+		HideHelp:  true,
+	}
+	_, network, err := networkPrompt.Run()
+	if err != nil {
+		return fmt.Errorf("running network prompt: %w", err)
+	}
+
+	if network == "other" {
 		fmt.Printf("We haven't added any templates for your selected chain quite yet...\n\n")
 		fmt.Printf("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!\n\n")
 		return nil
-	} else {
-		fmt.Printf("\033[32m ✔"+"\033[0m"+" Name: %s\n", nameSelected)
-		fmt.Printf("\033[32m ✔"+"\033[0m"+" Network: %s\n\n", networkSelected)
 	}
 
-	gen := codegen.NewProjectGenerator(srcDir, nameSelected)
-	if _, err := os.Stat(filepath.Join(srcDir, nameSelected)); errors.Is(err, os.ErrNotExist) {
+	fmt.Println("")
 		err = gen.GenerateProject()
 		if err != nil {
 			return fmt.Errorf("generating code: %w", err)
 		}
 	} else {
-		fmt.Printf("A Substreams project named %s already exists in the entered directory.\nTry changing the directory or project name and trying again.\n\n", nameSelected)
+		fmt.Printf("A Substreams project named %s already exists in the entered directory.\nTry changing the directory or project name and trying again.\n\n", projectName)
 	}
 
 	return nil
+}
+
+func choiceTemplate() *promptui.SelectTemplates {
+	return &promptui.SelectTemplates{
+		Selected: fmt.Sprintf("%s {{ . | green }}", promptui.IconGood),
+	}
+}
+
+func inputTemplate() *promptui.PromptTemplates {
+	return &promptui.PromptTemplates{
+		Prompt:  "{{ . }} ",
+		Valid:   fmt.Sprintf("%s {{ . | bold }}", promptui.IconBad),
+		Success: fmt.Sprintf("%s {{ . | green }}", promptui.IconGood),
+	}
 }

@@ -3,6 +3,8 @@ package output
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/viewport"
+
 	"github.com/charmbracelet/bubbles/key"
 
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
@@ -20,8 +22,10 @@ import (
 type Output struct {
 	common.Common
 
-	moduleSelector *modselect.ModSelect
-	blockSelector  *blockselect.BlockSelect
+	moduleSelector    *modselect.ModSelect
+	blockSelector     *blockselect.BlockSelect
+	outputView        viewport.Model
+	lastOutputContent *pbsubstreams.ModuleOutput
 
 	lowBlock  uint64
 	highBlock uint64
@@ -42,6 +46,7 @@ func New(c common.Common) *Output {
 		blockIDs:        make(map[uint64]string),
 		moduleSelector:  modselect.New(c),
 		blockSelector:   blockselect.New(c),
+		outputView:      viewport.New(24, 80),
 	}
 }
 
@@ -56,6 +61,8 @@ func (o *Output) SetSize(w, h int) {
 	o.Common.SetSize(w, h)
 	o.moduleSelector.SetSize(w, 2)
 	o.blockSelector.SetSize(w, 2)
+	o.outputView.Width = w
+	o.outputView.Height = h - 8
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -102,12 +109,15 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			modulePayloads[blockNum] = output
 			o.payloads[modName] = modulePayloads
+			o.setViewportContent()
 		}
 	case modselect.ModuleSelectedMsg:
 		o.activeModule = string(msg)
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.activeModule])
+		o.setViewportContent()
 	case blockselect.BlockSelectedMsg:
 		o.activeBlock = uint64(msg)
+		o.setViewportContent()
 	case tea.KeyMsg:
 		_, cmd := o.moduleSelector.Update(msg)
 		cmds = append(cmds, cmd)
@@ -117,6 +127,23 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return o, tea.Batch(cmds...)
 }
 
+func (o *Output) setViewportContent() {
+	if mod, found := o.payloads[o.activeModule]; found {
+		if payload, found := mod[o.activeBlock]; found {
+			// Do the decoding once per view, and cache the decoded value if it hasn't changed
+			if payload != o.lastOutputContent {
+				o.outputView.SetContent(fmt.Sprintf("%v", payload))
+				o.lastOutputContent = payload
+			}
+		} else {
+			o.outputView.SetContent("")
+			o.lastOutputContent = nil
+		}
+	} else {
+		o.outputView.SetContent("")
+		o.lastOutputContent = nil
+	}
+}
 func (o *Output) View() string {
 	return lipgloss.JoinVertical(0,
 		"",
@@ -125,6 +152,7 @@ func (o *Output) View() string {
 		fmt.Sprintf("Block range: %d - %d (total: %d)", o.lowBlock, o.highBlock, o.highBlock-o.lowBlock),
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
+		o.outputView.View(),
 	)
 }
 

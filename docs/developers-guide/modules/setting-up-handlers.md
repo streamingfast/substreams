@@ -9,7 +9,7 @@ description: StreamingFast Substreams module handlers
 To begin creating the custom module handlers initialize a new Rust project by using the `cargo` `init` command.
 
 ```bash
-# Creates a barebones rust library
+# Creates a empty Rust project suitable for WASM compilation
 cargo init --lib
 ```
 
@@ -35,7 +35,7 @@ prost = "0.11"
 # Use latest from https://crates.io/crates/substreams
 substreams = "0.5"
 # Use latest from https://crates.io/crates/substreams-ethereum
-substreams-ethereum = "0.8"
+substreams-ethereum = "0.9"
 
 # Required so ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 [target.wasm32-unknown-unknown.dependencies]
@@ -131,9 +131,9 @@ The `config.toml` configuration file updates the default `cargo build` command t
 
 ### ABI generation
 
-The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core) offers an [`Abigen`](https://docs.rs/substreams-ethereum-abigen/latest/substreams\_ethereum\_abigen/) API to generate Rust types from a smart contract's ABI.
+The [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum) offers an [`Abigen`](https://docs.rs/substreams-ethereum-abigen/latest/substreams_ethereum_abigen/build/struct.Abigen.html) API to generate Rust types from a smart contract's ABI.
 
-Place the contract's [ABI JSON file](https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FerQrzMtqELZRGAdugCR2%2Fuploads%2FEPcZ7g7wnrxCKQxD8Vbc%2Ferc721.json?alt=media\&token=42863ee3-fabb-421f-964e-040eb389032f) in the Substreams project in the `abi` directory.
+Place the contract's [ABI JSON file](../../.gitbook/assets/erc721.json) in the Substreams project in the `abi` directory.
 
 ### **Rust build script**
 

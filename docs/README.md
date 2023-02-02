@@ -38,7 +38,7 @@ Find pre-built Substreams by using the following resources:
 
 ### Network model diagram
 
-<img src=".gitbook/assets/substreams.excalidraw (1).svg" alt="" class="gitbook-drawing">
+<img src=".gitbook/assets/substreams.excalidraw.svg" alt="" class="gitbook-drawing">
 
 **You can view Substreams from two perspectives** as illustrated in the high-level visual diagram. It can be viewed through the perspective of the **Substreams engine** itself and also the perspective of the **end-user developer and consumer**.
 

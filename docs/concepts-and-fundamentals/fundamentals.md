@@ -8,7 +8,7 @@ description: StreamingFast Substreams fundamental knowledge
 
 Substreams development involves using several different pieces of technology, including the [Substreams engine](fundamentals.md#the-substreams-engine), [`substreams` command line interface (CLI)](../reference-and-specs/command-line-interface.md), [modules](modules.md), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types. The documentation explains how these pieces fit together.
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 3.00.58 PM.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/substreams-breakdown-in-action.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
 ### The process to use Substreams includes:
 
@@ -55,7 +55,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 ### **Protobufs for Substreams**
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-25 at 1.44.19 PM.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
 [Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 

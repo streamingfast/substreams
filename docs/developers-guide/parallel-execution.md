@@ -22,7 +22,7 @@ Assuming a chain has 16,000,000 blocks, which translates to 640 segments of 25K 
 
 The amount of parallel execution for the two modes is illustrated in the diagram. Production mode results in more parallel processing than development mode for the requested range. In contrast, development mode consists of more linear processing. Another important note is, foward parallel execution only occurs in production mode.
 
-<figure><img src="https://github.com/streamingfast/substreams/raw/develop/docs/assets/substreams_processing.png" alt=""><figcaption><p>Substreams production versus development mode for parallel execution digram</p></figcaption></figure>
+<figure><img src="https://github.com/streamingfast/substreams/raw/develop/docs/assets/substreams_processing.png" alt=""><figcaption><p>Substreams production versus development mode for parallel execution diagram</p></figcaption></figure>
 
 ## Backward and forward parallel execution steps
 

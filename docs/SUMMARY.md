@@ -27,7 +27,9 @@
   * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developers-guide/running-substreams.md)
 * [Substreams sinks](developers-guide/substreams-sinks.md)
-  * [Substreams sink-kv](developers-guide/substreams-sink-kv.md)
+  * [Substreams sink Files](developers-guide/substreams-sink-files.md)
+  * [Substreams sink KV](developers-guide/substreams-sink-kv.md)
+  * [Substreams sink Postgres](developers-guide/substreams-sink-postgres.md)
 
 ## Reference & Specs
 
@@ -37,9 +39,6 @@
 * [Manifests](reference-and-specs/manifests.md)
 * [Packages](reference-and-specs/packages.md)
 * [Rust crates](reference-and-specs/rust-crates.md)
-* [Advanced](advanced/README.md)
-  * [Graph-node setup](reference-and-specs/advanced/graph-node-setup.md)
-  * [Running Substreams locally](advanced/running-locally.md)
 * [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)
 

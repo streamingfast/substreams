@@ -110,9 +110,9 @@ The output type for sink is a list of lines. The line content can be any type an
 
 - Import sink `.spkg` files, re-generate protobufs and create and add a mod.rs file.
 
-- Create a map module outputing sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the serde_json crate to assist creating your structure, one per line.
+- Create a map module outputting sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the [`serde_json`](https://docs.rs/serde_json/latest/serde_json) crate to assist creating your structure, one per line.
 
-- Add the correct module definition to the Substreams manifest, `substreams.yaml`.
+- Add the correct module definition to the Substreams manifest `substreams.yaml`.
 
 ```yaml
 imports:
@@ -139,11 +139,9 @@ modules:
 The command to start and run the `substreams-sink-files` tool for the accompanying Substreams project will resemble:
 
 {% code overflow="wrap" %}
-
 ```bash
-substreams-sink-files run --encoder=lines --state-store=./localdata/working/state.yaml mainnet.eth.streamingfast.io:443 substreams.yaml jsonl_out ./localdata/out
+substreams-sink-files run --encoder=lines --state-store=./output/state.yaml mainnet.eth.streamingfast.io:443 substreams.yaml jsonl_out ./output/files
 ```
-
 {% endcode %}
 
 ## Verify output from tool
@@ -204,7 +202,7 @@ When you use the `substreams-sink-files` tool, you will find that it syncs up to
 
 ## Conclusion and review
 
-The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](https://substreams.streamingfast.io/developers-guide/substreams-sinks) and sinking strategies.
+The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](./substreams-sinks.md) and sinking strategies.
 
 To use `substreams-sink-files` you need to clone the official repository, install the tooling, generate the required files from the substreams CLI for the example Substreams module and run the sink tool.
 

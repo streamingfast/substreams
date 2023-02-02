@@ -17,16 +17,19 @@ import (
 )
 
 func init() {
-	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
+	guiCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
+	guiCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+
 	guiCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
 	guiCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	guiCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
-	guiCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
-	guiCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
+
+	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 	rootCmd.AddCommand(guiCmd)
 }
 
@@ -133,9 +136,21 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	stream := streamui.New(req, ssClient, callOpts)
 
-	tea.LogToFile("debug.log", "gui")
-	_, err = tea.NewProgram(tui2.New(stream, msgDescs), tea.WithAltScreen()).Run()
+	replayLog, err := tui2.NewReplayLog()
 	if err != nil {
+		return err
+	}
+
+	tea.LogToFile("debug.log", "gui")
+	prog := tea.NewProgram(tui2.New(stream, msgDescs, replayLog), tea.WithAltScreen())
+	//if mustGetBool(cmd, "replay") {
+	//	initMessages, err := replayLog.Fetch()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	prog.Send(initMessages)
+	//}
+	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)
 	}
 

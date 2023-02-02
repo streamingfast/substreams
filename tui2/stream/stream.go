@@ -18,6 +18,7 @@ const (
 	ConnectedMsg
 	InterruptStreamMsg
 	EndOfStreamMsg
+	ReplayedMsg
 )
 
 type SetRequestMsg *pbsubstreams.Request
@@ -146,4 +147,10 @@ func (s *Stream) routeNextMessage(resp *pbsubstreams.Response) tea.Msg {
 		return ResponseInitialSnapshotCompleteMsg(m.DebugSnapshotComplete)
 	}
 	return ResponseUnknownMsg(fmt.Sprintf("%T", resp.Message))
+}
+
+func (s *Stream) BuildReplay() []any {
+	return []any{
+		SetRequestMsg(s.req),
+	}
 }

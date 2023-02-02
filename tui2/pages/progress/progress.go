@@ -68,6 +68,8 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.state = "Connected"
 	case stream.EndOfStreamMsg:
 		p.state = "Stream ended"
+	case stream.ReplayedMsg:
+		p.state = "Replayed from log"
 	}
 
 	return p, nil

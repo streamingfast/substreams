@@ -1,6 +1,8 @@
 package tui2
 
 import (
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/desc"
@@ -25,6 +27,7 @@ const (
 type UI struct {
 	msgDescs map[string]*desc.MessageDescriptor
 	stream   *stream.Stream
+	vcr      *ReplayLog
 
 	common.Common
 	pages      []common.Component
@@ -35,7 +38,7 @@ type UI struct {
 	tabs       *tabs.Tabs
 }
 
-func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor) *UI {
+func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *ReplayLog) *UI {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}
@@ -50,6 +53,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor) *UI
 		},
 		activePage: progressPage,
 		tabs:       tabs.New(c, []string{"Request", "Progress", "Output"}),
+		vcr:        vcr,
 	}
 	ui.footer = footer.New(c, ui.pages[0])
 
@@ -75,6 +79,18 @@ func (ui *UI) Init() tea.Cmd {
 }
 
 func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if bundle, ok := msg.(ReplayBundle); ok {
+		for _, el := range bundle {
+			_, _ = ui.update(el)
+		}
+	}
+	if err := ui.vcr.Push(msg); err != nil {
+		log.Printf("Failed to push to vcr: %w", err)
+		return ui, tea.Quit
+	}
+	return ui.update(msg)
+}
+func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:

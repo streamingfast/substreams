@@ -98,21 +98,18 @@ func (b *BlockSelect) OldView() string {
 }
 
 func (b *BlockSelect) View() string {
-	if b.Width == 0 || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
+	if b.Width < 11 || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
 		return ""
 	}
 
-	bins := int(b.Width - 10)
-	binSize := int(b.highBlock-b.lowBlock) / bins
-	if binSize == 0 {
-		binSize = 1
-	}
+	bins := float64(b.Width - 10)
+	binSize := float64(b.highBlock-b.lowBlock) / bins
 	log.Printf("BlockSelect: high %d low %d binSize %d width %d bins %d", b.highBlock, b.lowBlock, binSize, b.Width, bins)
 
-	ptrs := make([]int, bins)
+	ptrs := make([]int, int(bins)+1)
 	for _, blk := range b.blocksWithData {
-		index := int(blk-b.lowBlock) / binSize
-		ptrs[index] += 1
+		index := float64(blk-b.lowBlock) / binSize
+		ptrs[int(index)] += 1
 	}
 	var ptrsBar []string
 	for _, p := range ptrs {
@@ -125,7 +122,10 @@ func (b *BlockSelect) View() string {
 		ptrsBar = append(ptrsBar, chr)
 	}
 
-	ptr := int(b.activeBlock-b.lowBlock) / binSize
+	ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
+	if ptr < 0 {
+		return ""
+	}
 
 	activeBlock := humanize.Comma(int64(b.activeBlock))
 	if ptr < len(activeBlock)+3 {

@@ -61,7 +61,10 @@ func (s *Stream) StreamColor() string {
 	return "3"
 }
 
-func (s *Stream) LinearHandoffBlock() uint64 {
+func (s *Stream) TargetParallelProcessingBlock() uint64 {
+	if s.req.ProductionMode {
+		return s.req.StopBlockNum
+	}
 	return uint64(s.req.StartBlockNum)
 }
 

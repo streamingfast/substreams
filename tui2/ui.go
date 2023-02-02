@@ -48,7 +48,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr
 		Common:   c,
 		pages: []common.Component{
 			request.New(c),
-			progress.New(c, stream.LinearHandoffBlock()),
+			progress.New(c, stream.TargetParallelProcessingBlock()),
 			output.New(c, msgDescs),
 		},
 		activePage: progressPage,

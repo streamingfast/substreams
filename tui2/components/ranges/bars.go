@@ -9,19 +9,19 @@ import (
 
 type Bars struct {
 	common.Common
-	linearHandoff uint64
+	targetBlock uint64
 
 	labelWidth int
 	bars       []*Bar
 	barsMap    map[string]*Bar
 }
 
-func NewBars(c common.Common, linearHandoff uint64) *Bars {
+func NewBars(c common.Common, targetBlock uint64) *Bars {
 	return &Bars{
-		Common:        c,
-		barsMap:       make(map[string]*Bar),
-		linearHandoff: linearHandoff,
-		labelWidth:    45,
+		Common:      c,
+		barsMap:     make(map[string]*Bar),
+		targetBlock: targetBlock,
+		labelWidth:  45,
 	}
 }
 
@@ -33,7 +33,7 @@ func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, mod := range msg.Modules {
 			bar, found := b.barsMap[mod.Name]
 			if !found {
-				bar = NewBar(b.Common, mod.Name, b.linearHandoff)
+				bar = NewBar(b.Common, mod.Name, b.targetBlock)
 				b.barsMap[mod.Name] = bar
 				b.bars = append(b.bars, bar)
 				b.SetSize(b.Width, b.Height)

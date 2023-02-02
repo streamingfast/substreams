@@ -18,8 +18,8 @@ type Progress struct {
 	common.Common
 	KeyMap KeyMap
 
-	state         string
-	linearHandoff uint64
+	state       string
+	targetBlock uint64
 
 	progressUpdates   int
 	dataPayloads      int
@@ -30,13 +30,13 @@ type Progress struct {
 	bars *ranges.Bars
 }
 
-func New(c common.Common, linearHandoff uint64) *Progress {
+func New(c common.Common, targetBlock uint64) *Progress {
 	return &Progress{
-		Common:        c,
-		KeyMap:        DefaultKeyMap(),
-		state:         "Initializing",
-		linearHandoff: linearHandoff,
-		bars:          ranges.NewBars(c, linearHandoff),
+		Common:      c,
+		KeyMap:      DefaultKeyMap(),
+		state:       "Initializing",
+		targetBlock: targetBlock,
+		bars:        ranges.NewBars(c, targetBlock),
 	}
 }
 
@@ -84,7 +84,7 @@ func (p *Progress) View() string {
 	}
 	infos := []string{
 		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
-		fmt.Sprintf("%d", p.linearHandoff),
+		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
 		p.Styles.StatusBarValue.Render(p.state),
 	}

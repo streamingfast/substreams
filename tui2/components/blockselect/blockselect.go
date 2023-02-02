@@ -2,7 +2,6 @@ package blockselect
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -104,7 +103,10 @@ func (b *BlockSelect) View() string {
 
 	bins := float64(b.Width - 10)
 	binSize := float64(b.highBlock-b.lowBlock) / bins
-	log.Printf("BlockSelect: high %d low %d binSize %d width %d bins %d", b.highBlock, b.lowBlock, binSize, b.Width, bins)
+	if binSize < 1 {
+		binSize = 1
+	}
+	//log.Printf("BlockSelect: high %d low %d binSize %d width %d bins %d", b.highBlock, b.lowBlock, binSize, b.Width, bins)
 
 	ptrs := make([]int, int(bins)+1)
 	for _, blk := range b.blocksWithData {
@@ -116,22 +118,29 @@ func (b *BlockSelect) View() string {
 		chr := " "
 		if p == 1 {
 			chr = "|"
-		} else if p > 1 {
+		} else if p == 2 {
 			chr = "‖"
+		} else if p > 2 {
+			chr = "⫴" // or: ⁞⁝⁚‧
 		}
 		ptrsBar = append(ptrsBar, chr)
 	}
 
-	ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
-	if ptr < 0 {
-		return ""
-	}
+	var activeBlock string
+	if b.activeBlock != 0 {
+		activeBlock = humanize.Comma(int64(b.activeBlock))
+		ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
+		//log.Println("ptr", ptr, "binSize", binSize)
 
-	activeBlock := humanize.Comma(int64(b.activeBlock))
-	if ptr < len(activeBlock)+3 {
-		activeBlock = fmt.Sprintf("%s^ %s", strings.Repeat(" ", ptr), activeBlock)
-	} else {
-		activeBlock = fmt.Sprintf("%s%s ^", strings.Repeat(" ", ptr-len(activeBlock)-1), activeBlock)
+		if ptr < len(activeBlock)+1 {
+			activeBlock = fmt.Sprintf("%s^ %s", strings.Repeat(" ", ptr), activeBlock)
+		} else {
+			repeatLen := ptr - len(activeBlock) - 1
+			if repeatLen < 0 {
+				repeatLen = 0
+			}
+			activeBlock = fmt.Sprintf("%s%s ^", strings.Repeat(" ", repeatLen), activeBlock)
+		}
 	}
 
 	return lipgloss.JoinVertical(0,

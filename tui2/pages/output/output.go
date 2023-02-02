@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/jhump/protoreflect/desc"
 
 	"github.com/charmbracelet/bubbles/key"
 
@@ -22,6 +23,8 @@ import (
 type Output struct {
 	common.Common
 
+	msgDescs map[string]*desc.MessageDescriptor
+
 	moduleSelector    *modselect.ModSelect
 	blockSelector     *blockselect.BlockSelect
 	outputView        viewport.Model
@@ -38,9 +41,10 @@ type Output struct {
 	activeBlock  uint64
 }
 
-func New(c common.Common) *Output {
+func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
 	return &Output{
 		Common:          c,
+		msgDescs:        msgDescs,
 		blocksPerModule: make(map[string][]uint64),
 		payloads:        make(map[string]map[uint64]*pbsubstreams.ModuleOutput),
 		blockIDs:        make(map[uint64]string),
@@ -51,6 +55,7 @@ func New(c common.Common) *Output {
 }
 
 func (o *Output) Init() tea.Cmd {
+	o.outputView.Style = lipgloss.NewStyle().Margin(1, 0).BorderTop(true).BorderBottom(true)
 	return tea.Batch(
 		o.moduleSelector.Init(),
 		o.blockSelector.Init(),
@@ -62,7 +67,7 @@ func (o *Output) SetSize(w, h int) {
 	o.moduleSelector.SetSize(w, 2)
 	o.blockSelector.SetSize(w, 2)
 	o.outputView.Width = w
-	o.outputView.Height = h - 8
+	o.outputView.Height = h - 10
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -132,7 +137,7 @@ func (o *Output) setViewportContent() {
 		if payload, found := mod[o.activeBlock]; found {
 			// Do the decoding once per view, and cache the decoded value if it hasn't changed
 			if payload != o.lastOutputContent {
-				o.outputView.SetContent(fmt.Sprintf("%v", payload))
+				o.outputView.SetContent(o.renderPayload(payload))
 				o.lastOutputContent = payload
 			}
 		} else {
@@ -144,6 +149,7 @@ func (o *Output) setViewportContent() {
 		o.lastOutputContent = nil
 	}
 }
+
 func (o *Output) View() string {
 	return lipgloss.JoinVertical(0,
 		"",
@@ -154,6 +160,16 @@ func (o *Output) View() string {
 		o.blockSelector.View(),
 		o.outputView.View(),
 	)
+}
+
+var Styles = struct {
+	LogLabel  lipgloss.Style
+	LogLine   lipgloss.Style
+	ErrorLine lipgloss.Style
+}{
+	LogLabel:  lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
+	LogLine:   lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
+	ErrorLine: lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
 }
 
 func (o *Output) ShortHelp() []key.Binding {

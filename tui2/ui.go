@@ -49,7 +49,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr
 		pages: []common.Component{
 			request.New(c),
 			progress.New(c, stream.LinearHandoffBlock()),
-			output.New(c),
+			output.New(c, msgDescs),
 		},
 		activePage: progressPage,
 		tabs:       tabs.New(c, []string{"Request", "Progress", "Output"}),

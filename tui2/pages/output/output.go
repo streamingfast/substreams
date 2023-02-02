@@ -56,6 +56,7 @@ func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
 
 func (o *Output) Init() tea.Cmd {
 	o.outputView.Style = lipgloss.NewStyle().Margin(1, 0).BorderTop(true).BorderBottom(true)
+	//o.outputView.HighPerformanceRendering = true
 	return tea.Batch(
 		o.moduleSelector.Init(),
 		o.blockSelector.Init(),
@@ -65,9 +66,10 @@ func (o *Output) Init() tea.Cmd {
 func (o *Output) SetSize(w, h int) {
 	o.Common.SetSize(w, h)
 	o.moduleSelector.SetSize(w, 2)
-	o.blockSelector.SetSize(w, 2)
+	o.blockSelector.SetSize(w, 5)
 	o.outputView.Width = w
-	o.outputView.Height = h - 10
+	// header, block info in output
+	o.outputView.Height = h - 11
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -127,6 +129,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_, cmd := o.moduleSelector.Update(msg)
 		cmds = append(cmds, cmd)
 		_, cmd = o.blockSelector.Update(msg)
+		cmds = append(cmds, cmd)
+		o.outputView, cmd = o.outputView.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 	return o, tea.Batch(cmds...)

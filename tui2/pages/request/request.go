@@ -20,5 +20,5 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *Request) View() string {
-	return "request view"
+	return "\n[Construction: view the request, API endpoint, module information, etc]"
 }

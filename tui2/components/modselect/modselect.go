@@ -95,6 +95,6 @@ var Styles = struct {
 	SelectedModule   lipgloss.Style
 	UnselectedModule lipgloss.Style
 }{
-	Box:            lipgloss.NewStyle().Margin(1, 1),
+	Box:            lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
 	SelectedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
 }

@@ -143,11 +143,11 @@ func (b *BlockSelect) View() string {
 		}
 	}
 
-	return lipgloss.JoinVertical(0,
+	return Styles.Box.Render(lipgloss.JoinVertical(0,
 		fmt.Sprintf("%s --- %s", humanize.Comma(int64(b.lowBlock)), humanize.Comma(int64(b.highBlock))),
 		strings.Join(ptrsBar, ""),
 		activeBlock,
-	)
+	))
 }
 
 var Styles = struct {
@@ -155,7 +155,7 @@ var Styles = struct {
 	SelectedBlock   lipgloss.Style
 	UnselectedBlock lipgloss.Style
 }{
-	Box:             lipgloss.NewStyle().Margin(1, 1),
+	Box:             lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true).BorderBottom(true),
 	SelectedBlock:   lipgloss.NewStyle().Margin(0, 1).Foreground(lipgloss.Color("12")).Bold(true),
 	UnselectedBlock: lipgloss.NewStyle().Margin(0, 1),
 }

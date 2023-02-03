@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+* Added command `substreams gui`, providing a terminal-based GUI to inspect the streamed data. Also adds `--replay` support, to save a stream to `replay.log` and load it back in the UI later. You can use it as you would `substreams run`. Feedback welcome.
+
 * Added support for `{version}` template in `--output-file` flag value on `substreams pack`.
 
 ## [0.2.0](https://github.com/streamingfast/substreams/releases/tag/v0.2.0)

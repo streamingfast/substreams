@@ -3,6 +3,8 @@ package tui2
 import (
 	"log"
 
+	"github.com/streamingfast/substreams/tui2/replaylog"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/desc"
@@ -25,9 +27,9 @@ const (
 )
 
 type UI struct {
-	msgDescs map[string]*desc.MessageDescriptor
-	stream   *stream.Stream
-	vcr      *ReplayLog
+	msgDescs  map[string]*desc.MessageDescriptor
+	stream    *stream.Stream
+	replayLog *replaylog.File
 
 	common.Common
 	pages      []common.Component
@@ -38,7 +40,7 @@ type UI struct {
 	tabs       *tabs.Tabs
 }
 
-func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *ReplayLog) *UI {
+func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *replaylog.File) *UI {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}
@@ -53,7 +55,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr
 		},
 		activePage: progressPage,
 		tabs:       tabs.New(c, []string{"Request", "Progress", "Output"}),
-		vcr:        vcr,
+		replayLog:  vcr,
 	}
 	ui.footer = footer.New(c, ui.pages[0])
 
@@ -75,16 +77,22 @@ func (ui *UI) Init() tea.Cmd {
 	cmds = append(cmds, tabs.SelectTabCmd(1))
 	cmds = append(cmds, ui.stream.Init())
 
+	if ui.replayLog.IsWriting() {
+		cmds = append(cmds, func() tea.Msg {
+			return ui.replayLog
+		})
+	}
+
 	return tea.Batch(cmds...)
 }
 
 func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if bundle, ok := msg.(ReplayBundle); ok {
+	if bundle, ok := msg.(stream.ReplayBundle); ok {
 		for _, el := range bundle {
 			_, _ = ui.update(el)
 		}
 	}
-	if err := ui.vcr.Push(msg); err != nil {
+	if err := ui.replayLog.Push(msg); err != nil {
 		log.Printf("Failed to push to vcr: %w", err)
 		return ui, tea.Quit
 	}
@@ -108,10 +116,6 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case stream.InterruptStreamMsg:
 
 		}
-	case stream.SetRequestMsg:
-
-	//case stream.SetMessageDescriptors:
-	//	ui.msgDescs = msg
 	case tabs.SelectTabMsg:
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])

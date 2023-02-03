@@ -21,15 +21,14 @@ const (
 	ReplayedMsg
 )
 
-type SetRequestMsg *pbsubstreams.Request
+type ReplayBundle []any
+
 type StreamErrorMsg error
-type ResponseDataMsg *pbsubstreams.BlockScopedData
-type ResponseProgressMsg *pbsubstreams.ModulesProgress
-type ResponseInitialSnapshotDataMsg *pbsubstreams.InitialSnapshotData
-type ResponseInitialSnapshotCompleteMsg *pbsubstreams.InitialSnapshotComplete
 type ResponseUnknownMsg string
 
 type Stream struct {
+	ReplayBundle ReplayBundle
+
 	req            *pbsubstreams.Request
 	client         pbsubstreams.StreamClient
 	callOpts       []grpc.CallOption
@@ -69,9 +68,16 @@ func (s *Stream) TargetParallelProcessingBlock() uint64 {
 }
 
 func (s *Stream) Init() tea.Cmd {
+	if s.ReplayBundle != nil {
+		bundle := s.ReplayBundle
+		s.ReplayBundle = nil
+		return func() tea.Msg {
+			return bundle
+		}
+	}
 	return tea.Sequence(
 		func() tea.Msg {
-			return SetRequestMsg(s.req)
+			return s.req
 		},
 		func() tea.Msg {
 			return ConnectingMsg
@@ -84,10 +90,10 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case StreamErrorMsg:
 		s.err = msg
-	case ResponseDataMsg,
-		ResponseProgressMsg,
-		ResponseInitialSnapshotDataMsg,
-		ResponseInitialSnapshotCompleteMsg,
+	case *pbsubstreams.BlockScopedData,
+		*pbsubstreams.ModulesProgress,
+		*pbsubstreams.InitialSnapshotData,
+		*pbsubstreams.InitialSnapshotComplete,
 		ResponseUnknownMsg:
 		return s.readNextMessage
 	case Msg:
@@ -140,20 +146,14 @@ func (s *Stream) readNextMessage() tea.Msg {
 func (s *Stream) routeNextMessage(resp *pbsubstreams.Response) tea.Msg {
 	switch m := resp.Message.(type) {
 	case *pbsubstreams.Response_Data:
-		return ResponseDataMsg(m.Data)
+		return m.Data
 	case *pbsubstreams.Response_Progress:
 		log.Printf("Progress response: %T %v", resp, resp)
-		return ResponseProgressMsg(m.Progress)
+		return m.Progress
 	case *pbsubstreams.Response_DebugSnapshotData:
-		return ResponseInitialSnapshotDataMsg(m.DebugSnapshotData)
+		return m.DebugSnapshotData
 	case *pbsubstreams.Response_DebugSnapshotComplete:
-		return ResponseInitialSnapshotCompleteMsg(m.DebugSnapshotComplete)
+		return m.DebugSnapshotComplete
 	}
 	return ResponseUnknownMsg(fmt.Sprintf("%T", resp.Message))
-}
-
-func (s *Stream) BuildReplay() []any {
-	return []any{
-		SetRequestMsg(s.req),
-	}
 }

@@ -3,8 +3,8 @@ package ranges
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
-	"github.com/streamingfast/substreams/tui2/stream"
 )
 
 type Bars struct {
@@ -29,7 +29,7 @@ func (b *Bars) Init() tea.Cmd { return nil }
 
 func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case stream.ResponseProgressMsg:
+	case *pbsubstreams.ModulesProgress:
 		for _, mod := range msg.Modules {
 			bar, found := b.barsMap[mod.Name]
 			if !found {

@@ -17,7 +17,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/tui2/common"
-	"github.com/streamingfast/substreams/tui2/stream"
 )
 
 type Output struct {
@@ -78,7 +77,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Probably fine for now, as we're debugging the history.
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case stream.ResponseDataMsg:
+	case *pbsubstreams.BlockScopedData:
 		blockNum := msg.Clock.Number
 
 		if o.lowBlock == 0 {

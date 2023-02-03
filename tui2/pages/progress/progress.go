@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/substreams/tui2/replaylog"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/streamingfast/substreams/tui2/components/ranges"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -19,6 +23,7 @@ type Progress struct {
 	KeyMap KeyMap
 
 	state       string
+	replayState string
 	targetBlock uint64
 
 	progressUpdates   int
@@ -46,9 +51,9 @@ func (p *Progress) Init() tea.Cmd {
 
 func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
-	case stream.ResponseDataMsg:
+	case *pbsubstreams.BlockScopedData:
 		p.dataPayloads += 1
-	case stream.ResponseProgressMsg:
+	case *pbsubstreams.ModulesProgress:
 		p.progressUpdates += 1
 		thisSec := time.Now().Unix()
 		if p.updatedSecond != thisSec {
@@ -60,6 +65,8 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.bars.Update(msg)
 	case stream.StreamErrorMsg:
 		p.state = fmt.Sprintf("Error: %s", msg)
+	case *replaylog.File:
+		p.replayState = " [saving to replay log]"
 	}
 	switch msg {
 	case stream.ConnectingMsg:
@@ -86,7 +93,7 @@ func (p *Progress) View() string {
 		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
 		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
-		p.Styles.StatusBarValue.Render(p.state),
+		p.Styles.StatusBarValue.Render(p.state + p.replayState),
 	}
 
 	vp := viewport.New(p.Width, p.Height)

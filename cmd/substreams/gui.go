@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/streamingfast/substreams/tui2/replaylog"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
@@ -136,20 +138,23 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	stream := streamui.New(req, ssClient, callOpts)
 
-	replayLog, err := tui2.NewReplayLog()
-	if err != nil {
-		return err
+	replayLog := replaylog.New()
+	if mustGetBool(cmd, "replay") {
+		stream.ReplayBundle, err = replayLog.ReadReplay()
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := replayLog.OpenForWriting(); err != nil {
+			return err
+		}
+		defer replayLog.Close()
 	}
 
-	tea.LogToFile("debug.log", "gui")
+	fmt.Println("Launching Substreams GUI...")
+
+	tea.LogToFile("debug.log", "gui:")
 	prog := tea.NewProgram(tui2.New(stream, msgDescs, replayLog), tea.WithAltScreen())
-	//if mustGetBool(cmd, "replay") {
-	//	initMessages, err := replayLog.Fetch()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	prog.Send(initMessages)
-	//}
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)
 	}

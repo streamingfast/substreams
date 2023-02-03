@@ -86,29 +86,19 @@ func (b *BlockSelect) dispatchBlockSelected() tea.Msg {
 	return BlockSelectedMsg(b.activeBlock)
 }
 
-func (b *BlockSelect) OldView() string {
-	return Styles.Box.MaxWidth(b.Width).Render(
-		lipgloss.JoinVertical(0,
-			fmt.Sprintf("Active block: %d", b.activeBlock),
-			fmt.Sprintf("Blocks with data: %v", b.blocksWithData),
-			fmt.Sprintf("Range: %d - %d", b.lowBlock, b.highBlock),
-		),
-	)
-}
-
 func (b *BlockSelect) View() string {
-	if b.Width < 11 || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
+	if b.Width < 4 || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
 		return ""
 	}
 
-	bins := float64(b.Width - 10)
+	bins := float64(b.Width - Styles.Box.GetVerticalBorderSize())
 	binSize := float64(b.highBlock-b.lowBlock) / bins
 	if binSize < 1 {
 		binSize = 1
 	}
 	//log.Printf("BlockSelect: high %d low %d binSize %d width %d bins %d", b.highBlock, b.lowBlock, binSize, b.Width, bins)
 
-	ptrs := make([]int, int(bins)+1)
+	ptrs := make([]int, int(bins))
 	for _, blk := range b.blocksWithData {
 		index := float64(blk-b.lowBlock) / binSize
 		ptrs[int(index)] += 1
@@ -128,34 +118,45 @@ func (b *BlockSelect) View() string {
 
 	var activeBlock string
 	if b.activeBlock != 0 {
-		activeBlock = humanize.Comma(int64(b.activeBlock))
 		ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
-		//log.Println("ptr", ptr, "binSize", binSize)
+		activeBlock = fmt.Sprintf("%s: %s",
+			Styles.CurrentBlock.Render("Current block"),
+			Styles.SelectedBlock.Render(humanize.Comma(int64(b.activeBlock))),
+		)
 
-		if ptr < len(activeBlock)+1 {
-			activeBlock = fmt.Sprintf("%s^ %s", strings.Repeat(" ", ptr), activeBlock)
+		labelLen := lipgloss.Width(activeBlock) + 1
+		if ptr < labelLen {
+			activeBlock = fmt.Sprintf("%s^ %s",
+				strings.Repeat(" ", ptr),
+				activeBlock,
+			)
 		} else {
-			repeatLen := ptr - len(activeBlock) - 1
+			repeatLen := ptr - labelLen
 			if repeatLen < 0 {
 				repeatLen = 0
 			}
-			activeBlock = fmt.Sprintf("%s%s ^", strings.Repeat(" ", repeatLen), activeBlock)
+			activeBlock = fmt.Sprintf("%s%s ^",
+				strings.Repeat(" ", repeatLen),
+				activeBlock,
+			)
 		}
 	}
 
 	return Styles.Box.Render(lipgloss.JoinVertical(0,
 		fmt.Sprintf("%s --- %s", humanize.Comma(int64(b.lowBlock)), humanize.Comma(int64(b.highBlock))),
-		strings.Join(ptrsBar, ""),
+		Styles.Bar.Render(strings.Join(ptrsBar, "")),
 		activeBlock,
 	))
 }
 
 var Styles = struct {
-	Box             lipgloss.Style
-	SelectedBlock   lipgloss.Style
-	UnselectedBlock lipgloss.Style
+	Box           lipgloss.Style
+	SelectedBlock lipgloss.Style
+	CurrentBlock  lipgloss.Style
+	Bar           lipgloss.Style
 }{
-	Box:             lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true).BorderBottom(true),
-	SelectedBlock:   lipgloss.NewStyle().Margin(0, 1).Foreground(lipgloss.Color("12")).Bold(true),
-	UnselectedBlock: lipgloss.NewStyle().Margin(0, 1),
+	Box:           lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
+	SelectedBlock: lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	CurrentBlock:  lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	Bar:           lipgloss.NewStyle().Background(lipgloss.Color("235")),
 }

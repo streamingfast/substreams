@@ -1,8 +1,6 @@
 package output
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/jhump/protoreflect/desc"
 
@@ -156,9 +154,6 @@ func (o *Output) setViewportContent() {
 func (o *Output) View() string {
 	return lipgloss.JoinVertical(0,
 		"",
-		fmt.Sprintf("Active module: %s", o.activeModule),
-		fmt.Sprintf("Active block: %d", o.activeBlock),
-		fmt.Sprintf("Block range: %d - %d (total: %d)", o.lowBlock, o.highBlock, o.highBlock-o.lowBlock),
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
 		o.outputView.View(),

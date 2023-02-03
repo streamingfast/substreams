@@ -109,6 +109,12 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return ui, tea.Quit
 		}
+		_, cmd := ui.tabs.Update(msg)
+		cmds = append(cmds, cmd)
+		_, cmd = ui.pages[ui.activePage].Update(msg)
+		cmds = append(cmds, cmd)
+		return ui, tea.Batch(cmds...)
+
 	case stream.Msg:
 		switch msg {
 		case stream.ConnectingMsg:

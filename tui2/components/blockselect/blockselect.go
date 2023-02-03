@@ -100,8 +100,11 @@ func (b *BlockSelect) View() string {
 
 	ptrs := make([]int, int(bins))
 	for _, blk := range b.blocksWithData {
-		index := float64(blk-b.lowBlock) / binSize
-		ptrs[int(index)] += 1
+		index := int(float64(blk-b.lowBlock) / binSize)
+		if index >= len(ptrs) {
+			index = len(ptrs) - 1
+		}
+		ptrs[index] += 1
 	}
 	var ptrsBar []string
 	for _, p := range ptrs {

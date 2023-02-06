@@ -68,6 +68,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("")
+
+	gen := codegen.NewProjectGenerator(srcDir, projectName)
+	if _, err := os.Stat(filepath.Join(srcDir, projectName)); errors.Is(err, os.ErrNotExist) {
 		err = gen.GenerateProject()
 		if err != nil {
 			return fmt.Errorf("generating code: %w", err)

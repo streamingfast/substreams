@@ -26,10 +26,10 @@
   * [Module handlers](developers-guide/modules/setting-up-handlers.md)
   * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developers-guide/running-substreams.md)
-* [Substreams sinks](developers-guide/substreams-sinks.md)
-  * [Substreams sink Files](developers-guide/substreams-sink-files.md)
-  * [Substreams sink KV](developers-guide/substreams-sink-kv.md)
-  * [Substreams sink Postgres](developers-guide/substreams-sink-postgres.md)
+* [Sink targets](developers-guide/sink-targets/README.md)
+  * [Files](developers-guide/sink-targets/substreams-sink-files.md)
+  * [Key/value store](developers-guide/sink-targets/substreams-sink-kv.md)
+  * [PostgreSQL](developers-guide/sink-targets/substreams-sink-postgres.md)
 
 ## Reference & Specs
 

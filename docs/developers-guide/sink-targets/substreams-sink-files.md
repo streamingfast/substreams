@@ -2,11 +2,11 @@
 description: StreamingFast Substreams sink files
 ---
 
-# `substreams-sink-files` introduction
+# Files
 
 ### Purpose
 
-This documentation exists to assist you in understanding and beginning to use the StreamingFast `substreams-sink-files` tool. The Substreams module paired with this tutorial is a basic example of the elements required for sinking blockchain data into files-based storage solutions.
+This documentation exists to assist you in understanding and beginning to use the StreamingFast [`substreams-sink-file`](https://github.com/streamingfast/substreams-sink-files)`s` tool. The Substreams module paired with this tutorial is a basic example of the elements required for sinking blockchain data into files-based storage solutions.
 
 ### Overview
 
@@ -100,7 +100,7 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 }
 ```
 
-This module handler uses `JSONL` for the output type, any other plain-text line-based format can be supported, `CSV` for example. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
+This module handler uses `JSONL` for the output type, any other plain-text line-based format can be supported, `CSV` for example. The [`json!`](https://docs.rs/serde\_json/latest/serde\_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
 The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based protobuf you're responsible for designing for your sink.
 
@@ -108,11 +108,9 @@ The output type for sink is a list of lines. The line content can be any type an
 
 ### Core steps for Substreams sink modules
 
-- Import sink `.spkg` files, re-generate protobufs and create and add a mod.rs file.
-
-- Create a map module outputting sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the [`serde_json`](https://docs.rs/serde_json/latest/serde_json) crate to assist creating your structure, one per line.
-
-- Add the correct module definition to the Substreams manifest `substreams.yaml`.
+* Import sink `.spkg` files, re-generate protobufs and create and add a mod.rs file.
+* Create a map module outputting sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the [`serde_json`](https://docs.rs/serde\_json/latest/serde\_json) crate to assist creating your structure, one per line.
+* Add the correct module definition to the Substreams manifest `substreams.yaml`.
 
 ```yaml
 imports:
@@ -202,7 +200,7 @@ When you use the `substreams-sink-files` tool, you will find that it syncs up to
 
 ## Conclusion and review
 
-The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](./substreams-sinks.md) and sinking strategies.
+The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Files aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](./) and sinking strategies.
 
 To use `substreams-sink-files` you need to clone the official repository, install the tooling, generate the required files from the substreams CLI for the example Substreams module and run the sink tool.
 

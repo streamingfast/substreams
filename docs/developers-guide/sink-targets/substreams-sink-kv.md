@@ -2,11 +2,11 @@
 description: StreamingFast Substreams sink kv
 ---
 
-# `substreams-sink-kv` introduction
+# Key/value store
 
 ## Purpose
 
-This documentation will assist you in using `substreams-sink-kv` to write data from your existing substreams into a key-value store and serve it back through Connect-Web/GRPC.
+This documentation will assist you in using [`substreams-sink-kv`](https://github.com/streamingfast/substreams-sink-kv) to write data from your existing substreams into a key-value store and serve it back through Connect-Web/GRPC.
 
 ## Overview
 
@@ -48,8 +48,9 @@ The following instructions will assume that you are instrumenting [substreams-et
       - source: sf.ethereum.type.v2.Block
 ```
 
-* a `eth.block_meta.v1.BlockMeta` protobuf structure like [this](https://github.com/streamingfast/substreams-eth-block-meta/blob/v0.4.0/proto/block_meta.proto#L7-L12):
-```proto
+* a `eth.block_meta.v1.BlockMeta` protobuf structure like [this](https://github.com/streamingfast/substreams-eth-block-meta/blob/v0.4.0/proto/block\_meta.proto#L7-L12):
+
+```
 message BlockMeta {
   uint64 number = 1;
   bytes hash = 2;
@@ -75,7 +76,6 @@ substreams-sink-kv = "0.1.1"
 
 1. Add `map` module implementation function named `kv_out` to your `src/lib.rs`:
 
-
 ```yaml
 # substreams.yaml
 ...
@@ -90,7 +90,7 @@ substreams-sink-kv = "0.1.1"
 
 1. Add a `kv_out` public function to your `src/lib.rs`:
 
-```rs
+```
 // src/lib.rs
 
 #[path = "kv_out.rs"]
@@ -116,7 +116,8 @@ pub fn kv_out(
 ```
 
 1. Add the `kv::process_deltas` transformation function referenced in the last snippet:
-```rs
+
+```
 // src/kv_out.rs
 
 use substreams::proto;
@@ -190,7 +191,7 @@ You should see output similar to this one:
 2023-01-12T10:08:34.186-0500 INFO (sink-kv) substreams sink stats {"progress_msg_rate": "16551.500 msg/s (33103 total)", "block_rate": "10941.500 blocks/s (21883 total)", "last_block": "#291883 (66d03f819dde948b297c8d582889246d7ba11a5b947335497f8716a7b608f78e)"}
 ```
 
-> **Note** This writes the data to a local folder "./badger_data.db/" in Badger format. You can `rm -rf ./badger_data.db` between your tests to cleanup all existing data.
+> **Note** This writes the data to a local folder "./badger\_data.db/" in Badger format. You can `rm -rf ./badger_data.db` between your tests to cleanup all existing data.
 
 1. Look at the stored data
 

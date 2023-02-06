@@ -27,7 +27,7 @@ The Substreams engine serves as the CPU or brain of the Substreams system, handl
 **Note**: The Substreams engine is responsible for running developer-defined data transformations to process blockchain data.
 {% endhint %}
 
-Developers use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands, flags, and a reference to the manifest configuration file to the Substreams engine. They create data transformation strategies in Substreams "_module handlers_" using the Rust programming language, which acts on protobuf-based data models referenced from within the Substreams manifest.&#x20;
+Developers use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands, flags, and a reference to the manifest configuration file to the Substreams engine. They create data transformation strategies in Substreams "_module handlers_" using the Rust programming language, which acts on protobuf-based data models referenced from within the Substreams manifest.
 
 ### **Substreams module communication**
 
@@ -41,21 +41,21 @@ The data flow is [defined in the Substreams manifest](../reference-and-specs/man
 
 ### **Substreams DAG**
 
-Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).&#x20;
+Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).
 
 {% hint style="info" %}
 **Note**: In DAGs, data flows from one module to another in a one-directional manner, governed by the fundamental rules and principles of DAGs.
 {% endhint %}
 
-The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine.&#x20;
+The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine.
 
-Directed acyclic graphs contain nodes, which in this case are modules communicating in only one direction, passing from one node or module to another.&#x20;
+Directed acyclic graphs contain nodes, which in this case are modules communicating in only one direction, passing from one node or module to another.
 
 The Substreams engine creates the "_compute graph_" or "_dependency graph_" at run time through commands sent to the [`substreams` CLI](../reference-and-specs/command-line-interface.md) using the code in modules referenced by the manifest.
 
 ### **Protobufs for Substreams**
 
-<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler (1).png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
 [Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 
@@ -66,7 +66,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 **Note:** Protobufs include the names of the data objects and the fields contained and accessible within them.
 {% endhint %}
 
-Many protobuf definitions have already been created, such as [the erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), for use by developers creating Substreams data transformation strategies.&#x20;
+Many protobuf definitions have already been created, such as [the erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), for use by developers creating Substreams data transformation strategies.
 
 Custom smart contracts, [like UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), also have protobuf definitions that are referenced in the Substreams manifest and made available to module handler functions. Protobufs provide an API to the data for smart contract addresses.
 
@@ -78,7 +78,7 @@ In object-oriented programming terminology, protobufs are the objects or object 
 
 ### **Substreams Rust modules**
 
-<figure><img src="../.gitbook/assets/Screen Shot 2022-10-11 at 2.48.46 PM (1).png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/Screen%20Shot%202022-10-11%20at%202.48.46%20PM%20(1).png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
 
 The first step in Substreams development is to design an overall strategy for managing and transforming data. The Substreams engine processes modules by using the relationships defined in the manifest.
 

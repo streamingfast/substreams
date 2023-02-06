@@ -2,7 +2,7 @@
 description: StreamingFast Substreams data sinks
 ---
 
-# Substreams sinks
+# Sink targets
 
 ## **Substreams sinks overview**
 
@@ -14,7 +14,7 @@ StreamingFast provides a few examples, libraries, and tools to assist you when r
 
 Databases and flat files are standard storage types however you can pipe Substreams data into other locations required by a new or existing application or architecture.
 
-An important design aspect of Substreams is the decision to rely on protobufs for data packaging and transmission.&#x20;
+An important design aspect of Substreams is the decision to rely on protobufs for data packaging and transmission.
 
 Protobufs provide a data-centric, technology stack, non-language specific, and platform-independent approach to using data that is passed from one application to another.
 
@@ -38,7 +38,7 @@ The sink reads the specific protobuf-based data being sent out of Substreams and
 
 The configuration of the storage layer and its requirements are your responsibility. StreamingFast provides documentation for the infrastructure required by various Substreams sinks. Read through the documentation to understand the behavior and requirements for the other sink types.
 
-An understanding of basic [Substreams fundamentals](../concepts-and-fundamentals/fundamentals.md) is expected before continuing. [Learn more about modules](https://substreams.streamingfast.io/concept-and-fundamentals/modules) in the Substreams documentation.
+An understanding of basic [Substreams fundamentals](../../concepts-and-fundamentals/fundamentals.md) is expected before continuing. [Learn more about modules](https://substreams.streamingfast.io/concept-and-fundamentals/modules) in the Substreams documentation.
 
 ## **Existing and community sinks**
 
@@ -51,7 +51,7 @@ StreamingFast provides several tools to assist database persistence for Substrea
 * **PostgreSQL:** A command line tool to [sync a Substreams with a PosgreSQL database](https://github.com/streamingfast/substreams-sink-postgres)
 * **MongoDB:** A command line tool to [sync a Substream with a MongoDB database](https://github.com/streamingfast/substreams-sink-mongodb)
 * **File-based storage:** A command line tool to [sync a Substreams to file-based storage](https://github.com/streamingfast/substreams-sink-files)
-* **Key-value-based storage:** A command line tool to [sync a Substreams to a key-value store](https://github.com/streamingfast/substreams-sink-kv) -- see [tutorial](./substreams-sink-kv.md)
+* **Key-value-based storage:** A command line tool to [sync a Substreams to a key-value store](https://github.com/streamingfast/substreams-sink-kv) -- see [tutorial](substreams-sink-kv.md)
 
 ## **Build a sink**
 

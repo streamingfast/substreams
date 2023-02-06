@@ -30,6 +30,8 @@
   * [Files](developers-guide/sink-targets/substreams-sink-files.md)
   * [Key/value store](developers-guide/sink-targets/substreams-sink-kv.md)
   * [PostgreSQL](developers-guide/sink-targets/substreams-sink-postgres.md)
+  * [Prometheus](developers-guide/sink-targets/substreams-sink-prometheus.md)
+  * [MongoDB](developers-guide/sink-targets/substreams-sink-mongodb.md)
 
 ## Reference & Specs
 

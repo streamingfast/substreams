@@ -1,5 +1,5 @@
 ---
-description: StreamingFast Substreams sink kv
+description: StreamingFast Substreams Key/Value store sink
 ---
 
 # Key/value store

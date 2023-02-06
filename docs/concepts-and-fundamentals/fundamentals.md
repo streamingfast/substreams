@@ -55,7 +55,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 ### **Protobufs for Substreams**
 
-<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler (1).png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler (1) (1).png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
 [Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 

@@ -113,39 +113,17 @@ func (g *ProjectGenerator) GenerateProject() error {
 			d.Name() == "mod.gotmpl" {
 			return nil
 		}
+
 		relativeEmbedPath := strings.TrimPrefix(path, "templates"+string(os.PathSeparator))
 
 		// Change duplicate template filenames
-		if d.Name() == "abimodfile.gotmpl" || d.Name() == "pb-modfile.gotmpl" {
-			relativeEmbedPath = relativeEmbedPath[:len(relativeEmbedPath)-17] + "mod.gotmpl"
-		}
-		if d.Name() == "abierc721.gotmpl" {
-			relativeEmbedPath = relativeEmbedPath[:len(relativeEmbedPath)-16] + "erc721.gotmpl"
+		if d.Name() == "abimodfile.rs.gotmpl" || d.Name() == "pbmodfile.rs.gotmpl" || d.Name() == "abierc721.rs.gotmpl" {
+			relativeEmbedPath = strings.TrimSuffix(relativeEmbedPath, d.Name())
+			relativeEmbedPath = filepath.Join(relativeEmbedPath, "mod.rs")
 		}
 
 		// Change extensions from .gotmpl
-		if d.Name() == "cargo.gotmpl" ||
-			d.Name() == "config.gotmpl" ||
-			d.Name() == "rust-toolchain.gotmpl" {
-			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".toml")
-		}
-		if d.Name() == "substreams.gotmpl" {
-			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".yaml")
-		}
-		if d.Name() == "makefile.gotmpl" {
-			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", "")
-		}
-		if relativeEmbedPath == "proto/erc721.gotmpl" {
-			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".proto")
-		}
-		if d.Name() == "makefile.gotmpl" {
-			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", "")
-		}
-		if d.Name() == "lib.gotmpl" ||
-			strings.Contains(relativeEmbedPath, "src/pb") ||
-			strings.Contains(relativeEmbedPath, "src/abi") {
-			relativeEmbedPath = strings.ReplaceAll(relativeEmbedPath, ".gotmpl", ".rs")
-		}
+		relativeEmbedPath = strings.TrimSuffix(relativeEmbedPath, ".gotmpl")
 
 		err = generate(path, templateFiles, d.Name(), g, filepath.Join(projectPath, relativeEmbedPath))
 		if err != nil {

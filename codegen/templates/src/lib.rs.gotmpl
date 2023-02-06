@@ -1,3 +1,4 @@
+{{$engine := . -}}
 mod abi;
 mod pb;
 use hex_literal::hex;
@@ -7,7 +8,7 @@ use substreams::{log, store::StoreAddInt64, Hex};
 use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS};
 
 // Bored Ape Club Contract
-const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
+const TRACKED_CONTRACT: [u8; 20] = hex!(bc4ca0eda7647a8ab7c2061c2e118a18a936f13d);
 
 substreams_ethereum::init!();
 

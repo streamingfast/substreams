@@ -9,6 +9,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Highlights
 
 * Added command `substreams gui`, providing a terminal-based GUI to inspect the streamed data. Also adds `--replay` support, to save a stream to `replay.log` and load it back in the UI later. You can use it as you would `substreams run`. Feedback welcome.
+* Added support for module parameterization. Defined in the manifest as:
+
+```
+module:
+  name: my_module
+  inputs:
+    params: string
+  ...
+  
+params:
+  my_module: "0x123123"
+  "imported:module": override value from imported module
+```
+
+and on the command-line as:
+
+* `substreams run -p module=value -p "module2=other value" ...`
+
+Servers need to be updated for packages to be able to be consumed this way.
+
+This change keeps backwards compatibility. Old Substreams Packages will still work the same, with no changes to module hashes.
 
 ### Added
 

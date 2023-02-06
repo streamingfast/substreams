@@ -15,13 +15,7 @@ import (
 
 //go:generate go-enum -f=$GOFILE --nocase --marshal --names
 
-// ENUM(
-//
-//	TUI
-//	JSON
-//	JSONL
-//
-// )
+// ENUM(TUI, JSON, JSONL)
 type OutputMode uint
 
 type TUI struct {
@@ -41,7 +35,7 @@ type TUI struct {
 
 	msgDescs       map[string]*desc.MessageDescriptor
 	decodeMsgTypes map[string]func(in []byte) string
-	msgTypes       map[string]string
+	msgTypes       map[string]string // Replace by calls to GetFullyQualifiedName() on the `msgDescs`
 }
 
 func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {

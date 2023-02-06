@@ -8,16 +8,15 @@ description: StreamingFast Substreams command line interface (CLI)
 
 The `substreams` command line interface (CLI) is the primary user interface and the main tool for sending requests and receiving data.
 
-The `substreams` CLI exposes many commands to developers enabling a range of features.&#x20;
+The `substreams` CLI exposes many commands to developers enabling a range of features.
 
 {% hint style="info" %}
-**Note**: When a package is specified, it is optional. If you do use it, you can use:&#x20;
+**Note**: When a package is specified, it is optional. If you do use it, you can use:
 
 * Local `substreams.yaml` configuration files
 * Local `.spkg` package files
 * Remote `.spkg` package URLs
 * Local directory containing a `substreams.yaml` file
-
 
 If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 {% endhint %}
@@ -75,7 +74,7 @@ The output of the `gravatar_updates` module starting at block `6200807` will pri
 {% endcode %}
 
 {% hint style="info" %}
-**Note**: The `-o` or `--output` flag alters the output format.&#x20;
+**Note**: The `-o` or `--output` flag alters the output format.
 {% endhint %}
 
 The available output display options are:
@@ -83,6 +82,18 @@ The available output display options are:
 * `ui`, a nicely formatted, UI-driven interface, displaying progress information and execution logs.
 * `json`, an indented stream of data, **not** displaying progress information or logs, only data output for blocks proceeding the start block.
 * `jsonl`, same as `json` showing every individual output on a single line.
+
+### `gui`
+
+The `gui` command pops up a terminal-based graphical user interface.
+
+Its parameters are very similar to those of `run`, but provides a UI to navigate the results instead of a stream of data.
+
+#### Replay mode
+
+When you run a `gui` session, a file called `replay.log` gets written with the contents of the streamed data that persists after closing the GUI.
+
+You can reload the data without hitting the server again using `--replay`. The data is immediately reloaded in the GUI, ready for more inspection.
 
 ### `pack`
 
@@ -172,7 +183,7 @@ Mermaid generated graph diagram
 
 ### `inspect`
 
-The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious_._
+The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious\_.\_
 
 {% code title="inspect command" overflow="wrap" %}
 ```bash

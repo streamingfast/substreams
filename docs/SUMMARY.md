@@ -26,6 +26,7 @@
   * [Module handlers](developers-guide/modules/setting-up-handlers.md)
   * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developers-guide/running-substreams.md)
+* [Parallel Execution](developers-guide/parallel-execution.md)
 * [Sink targets](developers-guide/sink-targets/README.md)
   * [Files](developers-guide/sink-targets/substreams-sink-files.md)
   * [Key/value store](developers-guide/sink-targets/substreams-sink-kv.md)

@@ -40,24 +40,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Get desired project name
-	projectNamePrompt := promptui.Prompt{
-		Label:     "Project name: ",
-		Templates: inputTemplate(),
-	}
-	projectName, err := projectNamePrompt.Run()
+	projectName, err := generatePrompt("Project name: ")
 	if err != nil {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
 
-	// Get desired network
-	networkPrompt := promptui.Select{
-		Label:     "Select network",
-		Items:     []string{"Ethereum", "other"},
-		Templates: choiceTemplate(),
-		HideHelp:  true,
-	}
-	_, network, err := networkPrompt.Run()
+	network, err := generateSelect("Select network", []string{"Ethereum", "other"})
 	if err != nil {
 		return fmt.Errorf("running network prompt: %w", err)
 	}
@@ -68,14 +56,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Get decision on abi tracking
-	abiPrompt := promptui.Select{
-		Label:     "Would you like to track a particular contract",
-		Items:     []string{"yes", "no"},
-		Templates: choiceTemplate(),
-		HideHelp:  true,
-	}
-	_, wantsAbi, err := abiPrompt.Run()
+	wantsAbi, err := generateSelect("Would you like to track a particular contract", []string{"yes", "no"})
 	if err != nil {
 		return fmt.Errorf("running abi prompt: %w", err)
 	}
@@ -84,11 +65,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	// Used in 'github.com/streamingfast/substreams-template'
 	contract := "bc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
 	if wantsAbi == "yes" {
-		contractPrompt := promptui.Prompt{
-			Label:     "Contract to track: ",
-			Templates: inputTemplate(),
-		}
-		contract, err = contractPrompt.Run()
+		contract, err = generatePrompt("Contract to track: ")
 		if err != nil {
 			return fmt.Errorf("running contract prompt: %w", err)
 		}
@@ -101,15 +78,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	contractPretty := contractHex.Pretty()
 
+	// Get contract ABI & parse
 	abi, err := codegen.GetContractAbi(contractPretty)
 	if err != nil {
 		return fmt.Errorf("getting contract abi: %w", err)
 	}
+
 	ethAbi, err := eth.ParseABIFromBytes(abi)
 	if err != nil {
 		return fmt.Errorf("parsing abi bytes: %w", err)
 	}
-
 	fmt.Println("")
 
 	events, err := codegen.BuildEventModels(ethAbi)
@@ -142,4 +120,33 @@ func inputTemplate() *promptui.PromptTemplates {
 		Valid:   fmt.Sprintf("%s {{ . | bold }}", promptui.IconBad),
 		Success: fmt.Sprintf("%s {{ . | green }}", promptui.IconGood),
 	}
+}
+
+func generatePrompt(label string) (string, error) {
+	prompt := promptui.Prompt{
+		Label:     label,
+		Templates: inputTemplate(),
+	}
+	choice, err := prompt.Run()
+	if err != nil {
+		return "", fmt.Errorf("running prompt: %w", err)
+	}
+
+	return choice, nil
+}
+
+func generateSelect(label string, items []string) (string, error) {
+	choice := promptui.Select{
+		Label:     label,
+		Items:     items,
+		Templates: choiceTemplate(),
+		HideHelp:  true,
+	}
+
+	_, selection, err := choice.Run()
+	if err != nil {
+		return "", fmt.Errorf("running network prompt: %w", err)
+	}
+
+	return selection, nil
 }

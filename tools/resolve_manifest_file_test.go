@@ -56,6 +56,12 @@ func TestResolveManifestFile(t *testing.T) {
 			"",
 			errorEqual("read input file info: stat manifests-dir: no such file or directory"),
 		},
+		{
+			"input provided, valid spkg",
+			args{"https://github.com/org/repo/file.spkg", "", []string{}},
+			"https://github.com/org/repo/file.spkg",
+			require.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

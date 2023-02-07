@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -82,6 +83,8 @@ func ResolveManifestFile(input string) (manifestName string, err error) {
 		}
 
 		return "substreams.yaml", nil
+	} else if strings.HasSuffix(input, ".spkg") {
+		return input, nil
 	}
 
 	inputInfo, err := os.Stat(input)

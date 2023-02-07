@@ -27,9 +27,9 @@ and on the command-line as:
 
 * `substreams run -p module=value -p "module2=other value" ...`
 
-NOTE: **Servers** need to be updated for packages to be able to be consumed this way. The **CLI** needs to be updated to this version, and the `substreams` **crate** also requires a version above 0.5.2.
+Servers need to be updated for packages to be able to be consumed this way.
 
-This change is backwards compatible. Older Substreams Packages will still work the same, with no changes to module hashes.
+This change keeps backwards compatibility. Old Substreams Packages will still work the same, with no changes to module hashes.
 
 ### Added
 
@@ -40,12 +40,15 @@ This change is backwards compatible. Older Substreams Packages will still work t
 ### Highlights
 
 * Improved execution speed and module loading speed by bumping to WASM Time to version 4.0.
-*   Improved developer experience on the CLI by making the `<manifest>` argument optional.
 
-    The CLI when `<manifest>` argument is not provided will now look in the current directory for a `substreams.yaml` file and is going to use it if present. So if you are in your Substreams project and your file is named `substreams.yaml`, you can simply do `substreams pack`, `substreams protogen`, etc.
+* Improved developer experience on the CLI by making the `<manifest>` argument optional.
 
-    Moreover, we added to possibility to pass a directory containing a `substreams.yaml` directly so `substreams pack path/to/project` would work as long as `path/to/project` contains a file named `substreams.yaml`.
+  The CLI when `<manifest>` argument is not provided will now look in the current directory for a `substreams.yaml` file and is going to use it if present. So if you are in your Substreams project and your file is named `substreams.yaml`, you can simply do `substreams pack`, `substreams protogen`, etc.
+
+  Moreover, we added to possibility to pass a directory containing a `substreams.yaml` directly so `substreams pack path/to/project` would work as long as `path/to/project` contains a file named `substreams.yaml`.
+
 * Fixed a bug that was preventing production mode to complete properly when using a bounded block range.
+
 * Improved overall stability of the Substreams engine.
 
 #### Operators Notes
@@ -55,13 +58,17 @@ This change is backwards compatible. Older Substreams Packages will still work t
 ### Added
 
 * The `<manifest>` can point to a directory that contains a `substreams.yaml` file instead of having to point to the file directly.
+
 * The `<manifest>` parameter is now optional in all commands requiring it.
 
 ### Fixed
 
 * Fixed production mode not completing when block range was specified
+
 * Fixed tier1 crashing due to missing context canceled check.
+
 * Fixed some code paths where locking could have happened due to incorrect checking of context cancellation.
+
 * Request validation for blockchain's input type is now made only against the requested module it's transitive dependencies.
 
 ### Updated
@@ -71,7 +78,9 @@ This change is backwards compatible. Older Substreams Packages will still work t
 ### Changed
 
 * Remove distinction between `output-save-interval` and `store-save-interval`.
+
 * `substreams init` has been moved under `substreams alpha init` as this is a feature included by mistake in latest release that should not have been displayed in the main list of commands.
+
 * `substreams codegen` has been moved under `substreams alpha codegen` as this is a feature included by mistake in latest release that should not have been displayed in the main list of commands.
 
 ## [0.1.0](https://github.com/streamingfast/substreams/releases/tag/v0.1.0)
@@ -80,31 +89,31 @@ This upcoming release is going to bring significant changes on how Substreams ar
 
 Here the highlights of elements that will change in next release:
 
-* [Production vs Development Mode](change-log.md#production-vs-development-mode)
-* [Single Output Module](change-log.md#single-module-output)
-* [Output Module must be of type `map`](change-log.md#output-module-must-be-of-type-map)
-* [`InitialSnapshots` is now a `development` mode feature only](change-log.md#initialsnapshots-is-now-a-development-mode-feature-only)
-* [Enhanced Parallel Execution](change-log.md#enhanced-parallel-execution)
+- [Production vs Development Mode](#production-vs-development-mode)
+- [Single Output Module](#single-module-output)
+- [Output Module must be of type `map`](#output-module-must-be-of-type-map)
+- [`InitialSnapshots` is now a `development` mode feature only](#initialsnapshots-is-now-a-development-mode-feature-only)
+- [Enhanced Parallel Execution](#enhanced-parallel-execution)
 
 In this rest of this post, we are going to go through each of them in greater details and the implications they have for you. Full changelog is available after.
 
-> **Warning** Operators, refer to [Operators Notes](change-log.md#operators-notes) section for specific instructions of deploying this new version.
+> **Warning** Operators, refer to [Operators Notes](#operators-notes) section for specific instructions of deploying this new version.
 
 ### Production vs development mode
 
 We introduce an execution mode when running Substreams, either `production` mode or `development` mode. The execution mode impacts how the Substreams get executed, specifically:
 
-* The time to first byte
-* The module logs and outputs sent back to the client
-* How parallel execution is applied through the requested range
+ - The time to first byte
+ - The module logs and outputs sent back to the client
+ - How parallel execution is applied through the requested range
 
 The difference between the modes are:
 
-* In `development` mode, the client will receive all the logs of the executed `modules`. In `production` mode, logs are not available at all.
-* In `development` mode, module's are always re-executed from request's start block meaning now that logs will always be visible to the user. In `production` mode, if a module's output is found in cache, module execution is skipped completely and data is returned directly.
-* In `development` mode, only backward parallel execution can be effective. In `production` mode, both backward parallel execution and forward parallel execution can be effective. See [Enhanced parallel execution](change-log.md#enhanced-parallel-execution) section for further details about parallel execution.
-* In `development` mode, every module's output is returned back in the response but only root module is displayed by default in `substreams` CLI (configurable via a flag). In `production` mode, only root module's output is returned.
-* In `development` mode, you may request specific `store` snapshot that are in the execution tree via the `substreams` CLI `--debug-modules-initial-snapshots` flag. In `production` mode, this feature is not available.
+- In `development` mode, the client will receive all the logs of the executed `modules`. In `production` mode, logs are not available at all.
+- In `development` mode, module's are always re-executed from request's start block meaning now that logs will always be visible to the user. In `production` mode, if a module's output is found in cache, module execution is skipped completely and data is returned directly.
+- In `development` mode, only backward parallel execution can be effective. In `production` mode, both backward parallel execution and forward parallel execution can be effective. See [Enhanced parallel execution](#enhanced-parallel-execution) section for further details about parallel execution.
+- In `development` mode, every module's output is returned back in the response but only root module is displayed by default in `substreams` CLI (configurable via a flag). In `production` mode, only root module's output is returned.
+- In `development` mode, you may request specific `store` snapshot that are in the execution tree via the `substreams` CLI `--debug-modules-initial-snapshots` flag. In `production` mode, this feature is not available.
 
 The execution mode is specified at that gRPC request level and is the default mode is `development`. The `substreams` CLI tool being a development tool foremost, we do not expect people to activate production mode (`-p`) when using it outside for maybe testing purposes.
 
@@ -116,10 +125,10 @@ Final note, we recommend to run the production mode against a compiled `.spkg` f
 
 We now only support 1 output module when running a Substreams, while prior this release, it was possible to have multiple ones.
 
-* Only a single module can now be requested, previous version allowed to request N modules.
-* Only `map` module can now be requested, previous version allowed `map` and `store` to be requested.
-* `InitialSnapshots` is now forbidden in `production` mode and still allowed in `development` mode.
-* In `development` mode, the server sends back output for all executed modules (by default the CLI displays only requested module's output).
+- Only a single module can now be requested, previous version allowed to request N modules.
+- Only `map` module can now be requested, previous version allowed `map` and `store` to be requested.
+- `InitialSnapshots` is now forbidden in `production` mode and still allowed in `development` mode.
+- In `development` mode, the server sends back output for all executed modules (by default the CLI displays only requested module's output).
 
 > **Note** We added `output_module` to the Substreams request and kept `output_modules` to remain backwards compatible for a while. If an `output_module` is specified we will honor that module. If not we will check `output_modules` to ensure there is only 1 output module. In a future release, we are going to remove `output_modules` altogether.
 
@@ -131,9 +140,9 @@ With the introduction of `development` vs `production` mode, we added a change i
 
 It is now forbidden to request a `store` module as the output module of the Substreams request, the requested output module must now be of kind `map`. Different factors have motivated this change:
 
-* Recently we have seen incorrect usage of `store` module. A `store` module was not intended to be used as a persistent long term storage, `store` modules were conceived as a place to aggregate data for later steps in computation. Using it as a persistent storage make the store unmanageable.
-* We had always expected users to consume a `map` module which would return data formatted according to a final `sink` spec which will then permanently store the extracted data. We never envisioned `store` to act as long term storage.
-* Forward parallel execution does not support a `store` as its last step.
+- Recently we have seen incorrect usage of `store` module. A `store` module was not intended to be used as a persistent long term storage, `store` modules were conceived as a place to aggregate data for later steps in computation. Using it as a persistent storage make the store unmanageable.
+- We had always expected users to consume a `map` module which would return data formatted according to a final `sink` spec which will then permanently store the extracted data. We never envisioned `store` to act as long term storage.
+- Forward parallel execution does not support a `store` as its last step.
 
 > **Migration Path** If you are currently using a `store` module as your output store. You will need to create a `map` module that will have as input the `deltas` of said `store` module, and return the deltas.
 
@@ -156,7 +165,7 @@ However, the `InitialSnapshots` is a useful tool for debugging what a store cont
 
 Let's assume a Substreams with these dependencies: `[block] --> [map_pools] --> [store_pools] --> [map_transfers]`
 
-* Running `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` will print all the entries in store\_pools at block 999, then continue with outputs and logs from `map_transfers` in blocks 1000 to 1004.
+* Running `substreams run substreams.yaml map_transfers -s 1000 -t +5 --debug-modules-initial-snapshot=store_pools` will print all the entries in store_pools at block 999, then continue with outputs and logs from `map_transfers` in blocks 1000 to 1004.
 
 ### Enhanced parallel execution
 
@@ -170,7 +179,7 @@ Forward parallel execution happens only in `production` mode is always disabled 
 
 Backward parallel execution still occurs in `development` and `production` mode. The diagram below gives details about when parallel execution happen.
 
-![parallel processing](../assets/substreams\_processing.png)
+![parallel processing](../assets/substreams_processing.png)
 
 You can see that in `production` mode, parallel execution happens before the Substreams request range as well as within the requested range. While in `development` mode, we can see that parallel execution happens only before the Substreams request range, so between module's start block and start block of requested range (backward parallel execution only).
 
@@ -180,15 +189,15 @@ The state output format for `map` and `store` modules has changed internally to 
 
 ### Library
 
-* Added `production_mode` to Substreams Request
-* Added `output_module` to Substreams Request
+- Added `production_mode` to Substreams Request
+- Added `output_module` to Substreams Request
 
 ### CLI
 
-* Fixed `Ctrl-C` not working directly when in TUI mode.
-* Added `Trace ID` printing once available.
-* Added command `substreams tools analytics store-stats` to get statistic for a given store.
-* Added `--debug-modules-output` (comma-separated module names) (unavailable in `production` mode).
+- Fixed `Ctrl-C` not working directly when in TUI mode.
+- Added `Trace ID` printing once available.
+- Added command `substreams tools analytics store-stats` to get statistic for a given store.
+- Added `--debug-modules-output` (comma-separated module names) (unavailable in `production` mode).
 * **Breaking** Renamed flag `--initial-snapshots` to `--debug-modules-initial-snapshots` (comma-separated module names) (unavailable in `production` mode).
 
 ## [0.0.21](https://github.com/streamingfast/substreams/releases/tag/v0.0.21)
@@ -198,23 +207,37 @@ The state output format for `map` and `store` modules has changed internally to 
 ### Library
 
 * Gained significant execution time improvement when saving and loading stores, during the squashing process by leveraging [vtprotobuf](https://github.com/planetscale/vtprotobuf)
+
 * Added XDS support for tier 2s
+
 * Added intrinsic support for type `bigdecimal`, will deprecate `bigfloat`
+
 * Significant improvements in code-coverage and full integration tests.
 
 ### CLI
 
 * Added `substreams tools proxy <package>` subcommand to allow calling substreams with a pre-defined package easily from a web browser using bufbuild/connect-web
+
 * Lowered GRPC client keep alive frequency, to prevent "Too Many Pings" disconnection issue.
+
 * Added a fast failure when attempting to connect to an unreachable substreams endpoint.
+
 * CLI is now able to read `.spkg` from `gs://`, `s3://` and `az://` URLs, the URL format must be supported by our [dstore](https://github.com/streamingfast/dstore) library).
+
 * Command `substreams pack` is now restricted to local manifest file.
+
 * Added command `substreams tools module` to introspect a store state in storage.
+
 * Made changes to allow for `substreams` CLI to run on Windows OS (thanks @robinbernon).
-* Added flag `--output-file <template>` to `substreams pack` command to control where the `.skpg` is written, `{manifestDir}` and `{spkgDefaultName}` can be used in the `template` value where `{manifestDir}` resolves to manifest's directory and `{spkgDefaultName}` is the pre-computed default name in the form `<name>-<version>` where `<name>` is the manifest's "package.name" value (`_` values in the name are replaced by `-`) and `<version>` is `package.version` value.
+
+* Added flag `--output-file <template>` to `substreams pack` command to control where the `.skpg` is written, `{manifestDir}` and `{spkgDefaultName}` can be used in the `template` value where  `{manifestDir}` resolves to manifest's directory and `{spkgDefaultName}` is the pre-computed default name in the form `<name>-<version>` where `<name>` is the manifest's "package.name" value (`_` values in the name are replaced by `-`) and `<version>` is `package.version` value.
+
 * Fixed relative path not resolved correctly against manifest's location in `protobuf.files` list.
+
 * Fixed relative path not resolved correctly against manifest's location in `binaries` list.
+
 * `substreams protogen <package> --output-path <path>` flag is now relative to `<package>` if `<package>` is a local manifest file ending with `.yaml`.
+
 * Endpoint's port is now validated otherwise when unspecified, it creates an infinite 'Connecting...' message that will never resolves.
 
 ## [0.0.20](https://github.com/streamingfast/substreams/releases/tag/v0.0.20)
@@ -225,67 +248,81 @@ The state output format for `map` and `store` modules has changed internally to 
 
 ## [0.0.19](https://github.com/streamingfast/substreams/releases/tag/v0.0.19)
 
-**New updatePolicy `append`**, allows one to build a store that concatenates values and supports parallelism. This affects the server, the manifest format (additive only), the substreams crate and the generated code therein.
+**New updatePolicy `append`**, allows one to build a store that concatenates values and supports parallelism.  This affects the server, the manifest format (additive only), the substreams crate and the generated code therein.
 
 ### Rust API
 
-* Store APIs methods now accept `key` of type `AsRef<str>` which means for example that both `String` an `&str` are accepted as inputs in:
-  * `StoreSet::set`
-  * `StoreSet::set_many`
-  * `StoreSet::set_if_not_exists`
-  * `StoreSet::set_if_not_exists_many`
-  * `StoreAddInt64::add`
-  * `StoreAddInt64::add_many`
-  * `StoreAddFloat64::add`
-  * `StoreAddFloat64::add_many`
-  * `StoreAddBigFloat::add`
-  * `StoreAddBigFloat::add_many`
-  * `StoreAddBigInt::add`
-  * `StoreAddBigInt::add_many`
-  * `StoreMaxInt64::max`
-  * `StoreMaxFloat64::max`
-  * `StoreMaxBigInt::max`
-  * `StoreMaxBigFloat::max`
-  * `StoreMinInt64::min`
-  * `StoreMinFloat64::min`
-  * `StoreMinBigInt::min`
-  * `StoreMinBigFloat::min`
-  * `StoreAppend::append`
-  * `StoreAppend::append_bytes`
-  * `StoreGet::get_at`
-  * `StoreGet::get_last`
-  * `StoreGet::get_first`
-* Low-level state methods now accept `key` of type `AsRef<str>` which means for example that both `String` an `&str` are accepted as inputs in:
-  * `state::get_at`
-  * `state::get_last`
-  * `state::get_first`
-  * `state::set`
-  * `state::set_if_not_exists`
-  * `state::append`
-  * `state::delete_prefix`
-  * `state::add_bigint`
-  * `state::add_int64`
-  * `state::add_float64`
-  * `state::add_bigfloat`
-  * `state::set_min_int64`
-  * `state::set_min_bigint`
-  * `state::set_min_float64`
-  * `state::set_min_bigfloat`
-  * `state::set_max_int64`
-  * `state::set_max_bigint`
-  * `state::set_max_float64`
-  * `state::set_max_bigfloat`
-* Bumped `prost` (and related dependencies) to `^0.11.0`
+- Store APIs methods now accept `key` of type `AsRef<str>` which means for example that both `String` an `&str` are accepted as inputs in:
+
+  - `StoreSet::set`
+  - `StoreSet::set_many`
+  - `StoreSet::set_if_not_exists`
+  - `StoreSet::set_if_not_exists_many`
+  - `StoreAddInt64::add`
+  - `StoreAddInt64::add_many`
+  - `StoreAddFloat64::add`
+  - `StoreAddFloat64::add_many`
+  - `StoreAddBigFloat::add`
+  - `StoreAddBigFloat::add_many`
+  - `StoreAddBigInt::add`
+  - `StoreAddBigInt::add_many`
+  - `StoreMaxInt64::max`
+  - `StoreMaxFloat64::max`
+  - `StoreMaxBigInt::max`
+  - `StoreMaxBigFloat::max`
+  - `StoreMinInt64::min`
+  - `StoreMinFloat64::min`
+  - `StoreMinBigInt::min`
+  - `StoreMinBigFloat::min`
+  - `StoreAppend::append`
+  - `StoreAppend::append_bytes`
+  - `StoreGet::get_at`
+  - `StoreGet::get_last`
+  - `StoreGet::get_first`
+
+- Low-level state methods now accept `key` of type `AsRef<str>` which means for example that both `String` an `&str` are accepted as inputs in:
+
+  - `state::get_at`
+  - `state::get_last`
+  - `state::get_first`
+  - `state::set`
+  - `state::set_if_not_exists`
+  - `state::append`
+  - `state::delete_prefix`
+  - `state::add_bigint`
+  - `state::add_int64`
+  - `state::add_float64`
+  - `state::add_bigfloat`
+  - `state::set_min_int64`
+  - `state::set_min_bigint`
+  - `state::set_min_float64`
+  - `state::set_min_bigfloat`
+  - `state::set_max_int64`
+  - `state::set_max_bigint`
+  - `state::set_max_float64`
+  - `state::set_max_bigfloat`
+
+- Bumped `prost` (and related dependencies) to `^0.11.0`
 
 ### CLI
 
 * Environment variables are now accepted in manifest's `imports` list.
+
 * Environment variables are now accepted in manifest's `protobuf.importPaths` list.
+
 * Fixed relative path not resolved correctly against manifest's location in `imports` list.
-* Changed the output modes: `module-*` modes are gone and become the format for `jsonl` and `json`. This means all printed outputs are wrapped to provide the module name, and other metadata.
-* Added `--initial-snapshots` (or `-i`) to the `run` command, which will dump the stores specified as output modules.
+
+* Changed the output modes: `module-*` modes are gone and become the
+  format for `jsonl` and `json`. This means all printed outputs are
+  wrapped to provide the module name, and other metadata.
+
+* Added `--initial-snapshots` (or `-i`) to the `run` command, which
+  will dump the stores specified as output modules.
+
 * Added color for `ui` output mode under a tty.
-* Added some request validation on both client and server (validate that output modules are present in the modules graph)
+
+* Added some request validation on both client and server (validate
+  that output modules are present in the modules graph)
 
 ### Service
 
@@ -303,6 +340,7 @@ The state output format for `map` and `store` modules has changed internally to 
 
 * Multiple fixes to boundaries
 
+
 ## [v0.0.12](https://github.com/streamingfast/substreams/releases/tag/v0.0.12)
 
 ### `substreams` server
@@ -312,6 +350,7 @@ The state output format for `map` and `store` modules has changed internally to 
 ### `substreams` CLI
 
 * Fix null pointer exception at the end of CLI run in some cases.
+
 * Do log last error when the CLI exit with an error has the error is already printed to the user and it creates a weird behavior.
 
 ## [v0.0.11](https://github.com/streamingfast/substreams/releases/tag/v0.0.11)

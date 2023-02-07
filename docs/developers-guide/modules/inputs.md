@@ -6,13 +6,14 @@ description: StreamingFast Substreams module inputs
 
 ## `inputs` overview
 
-Modules receive `inputs` of three types:&#x20;
+Modules receive `inputs` of three types:
 
 * `source`
 * `map`
 * `store`
+* `params`
 
-## `inputs` type `source`
+## Input type `source`
 
 An `inputs` of type `source` represents a chain-specific, Firehose-provisioned protobuf object. Learn more about the supported protocols and their corresponding message types in the [Chains and inputs documentation](../../reference-and-specs/chains-and-endpoints.md).
 
@@ -20,14 +21,13 @@ An `inputs` of type `source` represents a chain-specific, Firehose-provisioned p
 **Note**: The different blockchains reference different `Block` objects. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`. Ethereum-based Substreams modules specify `sf.ethereum.type.v2.Block.`
 {% endhint %}
 
-The `source` `inputs` type __ is defined in the Substreams manifest. It is important to specify the correct `Block` object for the chain.
+The `source` `inputs` type \_\_ is defined in the Substreams manifest. It is important to specify the correct `Block` object for the chain.
 
-{% code title="manifest excerpt" %}
-```yaml
+<pre class="language-yaml" data-title="manifest excerpt"><code class="lang-yaml">modules:
+- name: my_mod
   inputs:
-    - source: sf.ethereum.type.v2.Block
-```
-{% endcode %}
+  - <a data-footnote-ref href="#user-content-fn-1">source: sf.ethereum.type.v2.Block</a>
+</code></pre>
 
 #### `Clock` object
 
@@ -39,17 +39,27 @@ The `sf.substreams.v1.Clock` represents:
 * `Block` `ID`
 * `Block` `timestamp`
 
-## `inputs` type `map`
+## Input type `params`
 
-An `inputs` of type `map` represents the output of another `map` module.&#x20;
+An `inputs` of type `params` represents a parameterizable module input. Those parameters can be specified either:
 
-The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.&#x20;
+* in the `params` section of the manifest,
+* on the command-line (using `substreams run -p` for instance),
+* by tweaking the protobuf objects directly when consuming from your favorite language
+
+See the [Manifest's `params` manifest section of the Reference & specs](../../reference-and-specs/manifests.md#params) for more details.
+
+## Input type `map`
+
+An input of type `map` represents the output of another `map` module. It defines a parent-child relationship between modules.
+
+The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.
 
 {% hint style="warning" %}
-**Important**_**:**_ `map` modules _**cannot depend on themselves**_. When modules depend on themselves they create an unwanted circular dependency.
+**Important**_**:**_ The graph built by input dependencies is a Directed Acyclic Graph, which means there can be no circular dependencies.
 {% endhint %}
 
-You define the `map` `inputs` type in the Substreams manifest and choose a name for the `map` reflecting the logic contained within it.
+Define the `map` input type in the manifest and choose a name for the `map` reflecting the logic contained within it.
 
 {% code title="manifest excerpt" %}
 ```yaml
@@ -60,7 +70,7 @@ You define the `map` `inputs` type in the Substreams manifest and choose a name 
 
 [Learn more about `maps`](../../concepts-and-fundamentals/modules.md#the-map-module-type) in the Substreams modules documentation.
 
-## `inputs` type `store`
+## Input type `store`
 
 A `store inputs` type represents the state of another `store` used by the Substreams module being created.
 
@@ -85,7 +95,7 @@ Alternatively, set `stores` to `deltas` mode by using:
 ```
 {% endcode %}
 
-### Module `mode`
+### Store access `mode`
 
 Substreams uses two types of `mode` for modules:
 
@@ -97,17 +107,17 @@ Substreams uses two types of `mode` for modules:
 * A `store` can only receive `inputs` as read-only.
 * A `store` cannot depend on itself.
 
-### `get` `mode`
+### `get` mode
 
-`get` mode provides a key-value store readily queryable and guaranteed to be in sync with the block being processed.&#x20;
+`get` mode provides a key-value store readily queryable and guaranteed to be in sync with the block being processed.
 
 {% hint style="success" %}
 **Tip**_**:**_ `get` `mode` is the default mode for modules.
 {% endhint %}
 
-### `delta` `mode`
+### `delta` mode
 
-`delta` `mode` modules are [protobuf objects](../../../pb/sf/substreams/v1/substreams.proto#L124) containing all the changes occurring in the `store` module available in the same block.&#x20;
+`delta` `mode` modules are [protobuf objects](../../../pb/sf/substreams/v1/substreams.proto#L124) containing all the changes occurring in the `store` module available in the same block.
 
 `delta` mode enables you to loop through keys and decode values mutated in the module.
 
@@ -136,3 +146,5 @@ message StoreDelta {
 }
 ```
 {% endcode %}
+
+[^1]: `source` input

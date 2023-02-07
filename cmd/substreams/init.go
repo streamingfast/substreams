@@ -95,13 +95,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	// Clean up given contract
-	contractBytes, err := eth.NewHex(contract)
+	contractHex, err := eth.NewHex(contract)
 	if err != nil {
 		return fmt.Errorf("getting contract bytes: %w", err)
 	}
-	contractPretty := contractBytes.Pretty()
+	contractPretty := contractHex.Pretty()
 
-	abi, err := codegen.GetContractAbi("0x8a90cab2b38dba80c64b7734e58ee1db38b8992e")
+	abi, err := codegen.GetContractAbi(contractPretty)
 	if err != nil {
 		return fmt.Errorf("getting contract abi: %w", err)
 	}
@@ -117,7 +117,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("build ABI event models: %w", err)
 	}
 
-	gen := codegen.NewProjectGenerator(srcDir, "new", "8a90cab2b38dba80c64b7734e58ee1db38b8992e", string(abi), events)
+	gen := codegen.NewProjectGenerator(srcDir, "new", contract, string(abi), events)
 	if _, err := os.Stat(filepath.Join(srcDir, "new")); errors.Is(err, os.ErrNotExist) {
 		err = gen.GenerateProject()
 		if err != nil {

@@ -13,7 +13,11 @@ import (
 )
 
 type ProjectGenerator struct {
-	srcPath string
+	srcPath             string
+	ProjectContract     string
+	ProjectAbi          string
+	ProjectContractType string
+	ProjectEvents       []CodegenEvent
 
 	ProjectName       string
 	ProjectVersion    string
@@ -43,9 +47,13 @@ func WithRustVersion(version string) ProjectGeneratorOption {
 	}
 }
 
-func NewProjectGenerator(srcPath, projectName string, opts ...ProjectGeneratorOption) *ProjectGenerator {
+func NewProjectGenerator(srcPath, projectName string, projectContract string, abi string, events []CodegenEvent, opts ...ProjectGeneratorOption) *ProjectGenerator {
 	pj := &ProjectGenerator{
-		srcPath:           srcPath,
+		ProjectAbi:      abi,
+		srcPath:         srcPath,
+		ProjectContract: projectContract,
+		ProjectEvents:   events,
+
 		ProjectName:       projectName,
 		ProjectVersion:    DefaultProjectVersion,
 		ProjectVersionNum: DefaultProjectVersionNum,
@@ -66,6 +74,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 		".cargo",
 		"proto",
 		"src",
+		"abi",
 		filepath.Join("src", "abi"),
 		filepath.Join("src", "pb"),
 	}
@@ -84,7 +93,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 		}
 	}
 
-	// generate template from ./templates
+	// generate template from ./templates/init_template
 	templateFiles, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*.gotmpl", "*/*/*.gotmpl", "*/*/*/*.gotmpl")
 	if err != nil {
 		return fmt.Errorf("instantiate template: %w", err)
@@ -136,4 +145,17 @@ func (g *ProjectGenerator) GenerateProject() error {
 	}
 
 	return nil
+}
+
+var ethereumProjectEntries = []string{
+	"proto/contrack.proto",
+	"src/abi/mod.rs",
+	"src/pb/contrack.v1.rs",
+	"src/pb/mod.rs",
+	"src/lib.rs.tmpl",
+	"build.rs",
+	"Cargo.lock",
+	"Cargo.toml",
+	"substreams.yaml",
+	"rust-toolchain.toml",
 }

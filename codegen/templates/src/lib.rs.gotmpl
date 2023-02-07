@@ -1,33 +1,54 @@
+// Generated file DO NOT EDIT directly. Running the Go tests will automatically erase that file,
+// take great care in development. Usual flow is to test something in the `lib.rs` and port it
+// where needed.
 {{$engine := . -}}
 mod abi;
 mod pb;
 use hex_literal::hex;
-use pb::erc721;
-use substreams::prelude::*;
-use substreams::{log, store::StoreAddInt64, Hex};
-use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS};
+#[allow(unused_imports)]
+use num_traits::ToPrimitive;
+use pb::contract;
+use serde_json::json;
+use substreams::Hex;
+use substreams_ethereum::pb::eth::v2 as eth;
+use substreams_ethereum::Event;
 
-// Bored Ape Club Contract
-const TRACKED_CONTRACT: [u8; 20] = hex!(bc4ca0eda7647a8ab7c2061c2e118a18a936f13d);
+const TRACKED_CONTRACT: [u8; 20] = hex!("{{$engine.ProjectContract}}");
 
 substreams_ethereum::init!();
 
-/// Extracts transfers events from the contract
 #[substreams::handlers::map]
-fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::errors::Error> {
-    Ok(erc721::Transfers {
-        transfers: blk
-            .events::<abi::erc721::events::Transfer>(&[&TRACKED_CONTRACT])
-            .map(|(transfer, log)| {
-                substreams::log::info!("NFT Transfer seen");
+fn map_all_events(blk: eth::Block) -> Result<contract::Event, substreams::errors::Error> {
+    Ok(contract::Event {
+        events: blk
+            .receipts()
+            .flat_map(|view| {
+                view.receipt.logs.iter().filter_map(|log| {
+                    if log.address != TRACKED_CONTRACT {
+                        return None;
+                    }
 
-                erc721::Transfer {
-                    trx_hash: log.receipt.transaction.hash.clone(),
-                    from: transfer.from,
-                    to: transfer.to,
-                    token_id: transfer.token_id.to_u64(),
-                    ordinal: log.block_index() as u64,
-                }
+                    {{- range $engine.ProjectEvents }}
+                    if let Some(event) = abi::contract::events::{{.RustName}}::match_and_decode(log) {
+                        return Some(
+                            json!({
+                                "block_number": blk.number,
+                                "block_hash": Hex(&blk.hash).to_string(),
+                                "trx_hash": Hex(&view.transaction.hash).to_string(),
+                                "log_index": log.block_index,
+                                "event_name": abi::contract::events::{{.RustName}}::NAME,
+                                {{- range $key, $access := .Fields }}
+                                "{{$key}}": {{$access}},
+                                {{- end}}
+                            })
+                            .to_string()
+                            .into_bytes(),
+                        );
+                    }
+                    {{- end}}
+
+                    None
+                })
             })
             .collect(),
     })

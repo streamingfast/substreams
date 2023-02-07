@@ -6,6 +6,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/codegen"
 	"os"
 	"path/filepath"
@@ -67,10 +68,57 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Get decision on abi tracking
+	abiPrompt := promptui.Select{
+		Label:     "Would you like to track a particular contract",
+		Items:     []string{"yes", "no"},
+		Templates: choiceTemplate(),
+		HideHelp:  true,
+	}
+	_, wantsAbi, err := abiPrompt.Run()
+	if err != nil {
+		return fmt.Errorf("running abi prompt: %w", err)
+	}
+
+	// Default 'Bored Ape Yacht Club' contract.
+	// Used in 'github.com/streamingfast/substreams-template'
+	contract := "bc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
+	if wantsAbi == "yes" {
+		contractPrompt := promptui.Prompt{
+			Label:     "Contract to track: ",
+			Templates: inputTemplate(),
+		}
+		contract, err = contractPrompt.Run()
+		if err != nil {
+			return fmt.Errorf("running contract prompt: %w", err)
+		}
+	}
+
+	// Clean up given contract
+	contractBytes, err := eth.NewHex(contract)
+	if err != nil {
+		return fmt.Errorf("getting contract bytes: %w", err)
+	}
+	contractPretty := contractBytes.Pretty()
+
+	abi, err := codegen.GetContractAbi("0x8a90cab2b38dba80c64b7734e58ee1db38b8992e")
+	if err != nil {
+		return fmt.Errorf("getting contract abi: %w", err)
+	}
+	ethAbi, err := eth.ParseABIFromBytes(abi)
+	if err != nil {
+		return fmt.Errorf("parsing abi bytes: %w", err)
+	}
+
 	fmt.Println("")
 
-	gen := codegen.NewProjectGenerator(srcDir, projectName)
-	if _, err := os.Stat(filepath.Join(srcDir, projectName)); errors.Is(err, os.ErrNotExist) {
+	events, err := codegen.BuildEventModels(ethAbi)
+	if err != nil {
+		return fmt.Errorf("build ABI event models: %w", err)
+	}
+
+	gen := codegen.NewProjectGenerator(srcDir, "new", "8a90cab2b38dba80c64b7734e58ee1db38b8992e", string(abi), events)
+	if _, err := os.Stat(filepath.Join(srcDir, "new")); errors.Is(err, os.ErrNotExist) {
 		err = gen.GenerateProject()
 		if err != nil {
 			return fmt.Errorf("generating code: %w", err)

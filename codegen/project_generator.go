@@ -146,16 +146,3 @@ func (g *ProjectGenerator) GenerateProject() error {
 
 	return nil
 }
-
-var ethereumProjectEntries = []string{
-	"proto/contrack.proto",
-	"src/abi/mod.rs",
-	"src/pb/contrack.v1.rs",
-	"src/pb/mod.rs",
-	"src/lib.rs.tmpl",
-	"build.rs",
-	"Cargo.lock",
-	"Cargo.toml",
-	"substreams.yaml",
-	"rust-toolchain.toml",
-}

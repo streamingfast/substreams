@@ -45,7 +45,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
 
-	network, err := generateSelect("Select network", []string{"Ethereum", "other"})
+	network, err := generateSelect("Select network", []string{"Ethereum", "Other"})
 	if err != nil {
 		return fmt.Errorf("running network prompt: %w", err)
 	}
@@ -56,47 +56,36 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	wantsAbi, err := generateSelect("Would you like to track a particular contract", []string{"yes", "no"})
+	wantsABI, err := generateSelect("Would you like to track a particular contract", []string{"yes", "no"})
 	if err != nil {
-		return fmt.Errorf("running abi prompt: %w", err)
+		return fmt.Errorf("running ABI prompt: %w", err)
 	}
 
 	// Default 'Bored Ape Yacht Club' contract.
 	// Used in 'github.com/streamingfast/substreams-template'
-	contract := "bc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
-	if wantsAbi == "yes" {
-		contract, err = generatePrompt("Contract to track: ")
+	contract, _ := eth.NewAddress("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
+	if wantsABI == "yes" {
+		contract, err = generateContractPrompt("Verified Ethereum mainnet contract to track")
 		if err != nil {
 			return fmt.Errorf("running contract prompt: %w", err)
 		}
 	}
-
-	// Clean up given contract
-	contractHex, err := eth.NewHex(contract)
-	if err != nil {
-		return fmt.Errorf("getting contract bytes: %w", err)
-	}
-	contractPretty := contractHex.Pretty()
-
 	// Get contract ABI & parse
-	abi, err := codegen.GetContractAbi(contractPretty)
+	contractPretty := contract.Pretty()
+	ABI, ethABI, err := codegen.GetContractABI(contractPretty)
 	if err != nil {
-		return fmt.Errorf("getting contract abi: %w", err)
+		return fmt.Errorf("getting contract ABI: %w", err)
 	}
 
-	ethAbi, err := eth.ParseABIFromBytes(abi)
-	if err != nil {
-		return fmt.Errorf("parsing abi bytes: %w", err)
-	}
 	fmt.Println("")
 
-	events, err := codegen.BuildEventModels(ethAbi)
+	events, err := codegen.BuildEventModels(ethABI)
 	if err != nil {
 		return fmt.Errorf("build ABI event models: %w", err)
 	}
 
-	gen := codegen.NewProjectGenerator(srcDir, "new", contract, string(abi), events)
-	if _, err := os.Stat(filepath.Join(srcDir, "new")); errors.Is(err, os.ErrNotExist) {
+	gen := codegen.NewProjectGenerator(srcDir, projectName, contract, string(ABI), events)
+	if _, err := os.Stat(filepath.Join(srcDir, projectName)); errors.Is(err, os.ErrNotExist) {
 		err = gen.GenerateProject()
 		if err != nil {
 			return fmt.Errorf("generating code: %w", err)
@@ -133,6 +122,34 @@ func generatePrompt(label string) (string, error) {
 	}
 
 	return choice, nil
+}
+
+func generateContractPrompt(label string) (eth.Address, error) {
+	contractValidation := func(input string) error {
+		_, err := eth.NewAddress(input)
+		if err != nil {
+			return errors.New("Invalid address")
+		}
+		return nil
+	}
+	prompt := promptui.Prompt{
+		Label:     label,
+		Templates: inputTemplate(),
+		Validate:  contractValidation,
+	}
+
+	choice, err := prompt.Run()
+	if err != nil {
+		return nil, fmt.Errorf("running prompt: %w", err)
+	}
+
+	// Clean up given contract
+	contractAddress, err := eth.NewAddress(choice)
+	if err != nil {
+		return nil, fmt.Errorf("getting contract bytes: %w", err)
+	}
+
+	return contractAddress, nil
 }
 
 func generateSelect(label string, items []string) (string, error) {

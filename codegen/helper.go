@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 type CodegenEvent struct {
@@ -83,15 +84,24 @@ func GetContractABI(contract string) ([]byte, *eth.ABI, error) {
 	}
 
 	var response Response
-	err = json.Unmarshal(abi, &response)
+	err = json.Unmarshal(ABI, &response)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshaling: %w", err)
+		return nil, nil, fmt.Errorf("unmarshaling: %w", err)
 	}
-	abi = []byte(response.Result.(string))
 
-	return abi, nil
+	_, ok := response.Result.(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("unable to interpret abi result")
+	}
+	ABI = []byte(response.Result.(string))
+
+	ethABI, err := eth.ParseABIFromBytes(ABI)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing abi bytes: %w", err)
+	}
+
+	return ABI, ethABI, nil
 }
-
 func BuildEventModels(abi *eth.ABI) (out []CodegenEvent, err error) {
 	names := keys(abi.LogEventsByNameMap)
 	sort.StringSlice(names).Sort()

@@ -3,6 +3,7 @@ package codegen
 import (
 	"errors"
 	"fmt"
+	"github.com/streamingfast/eth-go"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -14,10 +15,12 @@ import (
 
 type ProjectGenerator struct {
 	srcPath             string
-	ProjectContract     string
+	ProjectContract     eth.Address
 	ProjectAbi          string
 	ProjectContractType string
 	ProjectEvents       []CodegenEvent
+	ProtoEvents         []ProtoEvent
+	RustEvents          []RustEvent
 
 	ProjectName       string
 	ProjectVersion    string
@@ -47,7 +50,7 @@ func WithRustVersion(version string) ProjectGeneratorOption {
 	}
 }
 
-func NewProjectGenerator(srcPath, projectName string, projectContract string, abi string, events []CodegenEvent, opts ...ProjectGeneratorOption) *ProjectGenerator {
+func NewProjectGenerator(srcPath, projectName string, projectContract eth.Address, abi string, events []CodegenEvent, opts ...ProjectGeneratorOption) *ProjectGenerator {
 	pj := &ProjectGenerator{
 		ProjectAbi:      abi,
 		srcPath:         srcPath,
@@ -60,7 +63,10 @@ func NewProjectGenerator(srcPath, projectName string, projectContract string, ab
 		RustVersion:       DefaultRustVersion,
 		SubstreamsVersion: DefaultSubstreamsVersion,
 	}
-
+	for i, event := range events {
+		pj.ProtoEvents = append(pj.ProtoEvents, event.getProtoEvent(i+1, &event))
+		pj.RustEvents = append(pj.RustEvents, event.getRustEvent(&event))
+	}
 	for _, opt := range opts {
 		opt(pj)
 	}

@@ -65,7 +65,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	// Used in 'github.com/streamingfast/substreams-template'
 	contract, _ := eth.NewAddress("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
 	if wantsABI == "yes" {
-		contract, err = generateContractPrompt("Verified Ethereum mainnet contract to track")
+		contract, err = generateContractPrompt("Verified Ethereum mainnet contract to track: ")
 		if err != nil {
 			return fmt.Errorf("running contract prompt: %w", err)
 		}

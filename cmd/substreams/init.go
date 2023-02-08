@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/codegen"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 var initCmd = &cobra.Command{
@@ -112,9 +113,18 @@ func inputTemplate() *promptui.PromptTemplates {
 }
 
 func generatePrompt(label string) (string, error) {
+	moduleNameRegexp := regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_]{0,63})$`)
+	namingValidation := func(input string) error {
+		ok := moduleNameRegexp.MatchString(input)
+		if !ok {
+			return errors.New("invalid name: must match ^([a-zA-Z][a-zA-Z0-9_]{0,63})$")
+		}
+		return nil
+	}
 	prompt := promptui.Prompt{
 		Label:     label,
 		Templates: inputTemplate(),
+		Validate:  namingValidation,
 	}
 	choice, err := prompt.Run()
 	if err != nil {

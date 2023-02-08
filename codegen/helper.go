@@ -13,19 +13,67 @@ import (
 
 type CodegenEvent struct {
 	RustName string
-	Fields   map[string]string
+	Fields   map[int]string
+	Values   []string
 }
 
-func GetContractAbi(contract string) ([]byte, error) {
-	res, err := http.Get(fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=7E11P1IJ4ZRWQ36CZN78QZ7KTE7YP7MJ31", contract))
+type ProtoEvent struct {
+	EventIndex     int            // >=1
+	EventName      string         //Transfer
+	LowerAndPlural string         //transfers
+	Fields         map[int]string //{[1]"to", [2]"from"}
+	IndexesPlus    []int          //[6, 7]
+}
+
+type RustEvent struct {
+	RustName       string         // Approval
+	LowerAndPlural string         // "approvalsforalls"
+	Fields         map[int]string // {[1]"to", [2]"from"}
+	FieldValues    []string       // {"", "Hex(&blk.hash).to_string()
+}
+
+func (*CodegenEvent) getProtoEvent(eventIndex int, event *CodegenEvent) ProtoEvent {
+	protoEvent := &ProtoEvent{
+		EventIndex:     eventIndex,
+		EventName:      event.RustName,
+		LowerAndPlural: fmt.Sprintf("%ss", strings.ToLower(event.RustName)),
+		Fields:         event.Fields,
+		IndexesPlus:    []int{0},
+	}
+	for i, _ := range event.Fields {
+		protoEvent.IndexesPlus = append(protoEvent.IndexesPlus, i+5)
+	}
+	return *protoEvent
+}
+
+func (*CodegenEvent) getRustEvent(event *CodegenEvent) RustEvent {
+	rustEvent := &RustEvent{
+		RustName:       event.RustName,
+		LowerAndPlural: fmt.Sprintf("%ss", strings.ToLower(event.RustName)),
+		Fields:         event.Fields,
+		FieldValues:    []string{""},
+	}
+
+	for _, value := range event.Values {
+		if strings.HasSuffix(value, ".to_string()") {
+			rustEvent.FieldValues = append(rustEvent.FieldValues, value)
+		} else {
+			rustEvent.FieldValues = append(rustEvent.FieldValues, fmt.Sprintf("%s.to_string()", value))
+		}
+	}
+	return *rustEvent
+}
+
+func GetContractABI(contract string) ([]byte, *eth.ABI, error) {
+	res, err := http.Get(fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", contract))
 	if err != nil {
-		return nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
+		return nil, nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
 	}
 	defer res.Body.Close()
 
-	abi, err := ioutil.ReadAll(res.Body)
+	ABI, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading fetched abi: %w", err)
+		return nil, nil, fmt.Errorf("reading fetched abi: %w", err)
 	}
 
 	type Response struct {
@@ -67,6 +115,7 @@ func BuildEventModels(abi *eth.ABI) (out []CodegenEvent, err error) {
 			}
 
 			out = append(out, codegenEvent)
+			i++
 		}
 	}
 
@@ -93,8 +142,8 @@ func (e *CodegenEvent) populateFields(log *eth.LogEventDef) error {
 		return nil
 	}
 
-	e.Fields = map[string]string{}
-	for _, parameter := range log.Parameters {
+	e.Fields = map[int]string{}
+	for i, parameter := range log.Parameters {
 		name := strcase.ToSnake(parameter.Name)
 
 		var toJsonCode string
@@ -116,7 +165,8 @@ func (e *CodegenEvent) populateFields(log *eth.LogEventDef) error {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		e.Fields[name] = toJsonCode
+		e.Fields[i+1] = name
+		e.Values = append(e.Values, toJsonCode)
 	}
 
 	return nil

@@ -20,7 +20,8 @@ substreams_ethereum::init!();
 #[substreams::handlers::map]
 fn map_all_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
     Ok(contract::Events {
-        events: blk
+        {{- range $rustEvent := $engine.RustEvents }}
+        {{$rustEvent.LowerAndPlural}}: blk
             .receipts()
             .flat_map(|view| {
                 view.receipt.logs.iter().filter_map(|log| {
@@ -28,29 +29,27 @@ fn map_all_events(blk: eth::Block) -> Result<contract::Events, substreams::error
                         return None;
                     }
 
-                    {{- range $engine.ProjectEvents }}
-                    if let Some(event) = abi::contract::events::{{.RustName}}::match_and_decode(log) {
+                    if let Some(event) = abi::contract::events::{{$rustEvent.RustName}}::match_and_decode(log) {
                         return Some(
-                            contract::Event {
+                            contract::{{$rustEvent.RustName}} {
                                 block_number: blk.number,
                                 block_hash: Hex(&blk.hash).to_string(),
                                 trx_hash: Hex(&view.transaction.hash).to_string(),
                                 log_index: log.block_index,
                                 event_name: abi::contract::events::{{.RustName}}::NAME.to_string(),
-                                event_details: json!({
-                                    {{- range $key, $access := .Fields }}
-                                    "{{$key}}": {{$access}},
-                                    {{- end}}
-                                }).to_string(),
+                                {{- range $index, $name := .Fields }}
+                                {{$name}}: {{index $rustEvent.FieldValues $index}},
+                                {{- end}}
                             }
                         );
                     }
-                    {{- end}}
 
                     None
                 })
             })
             .collect(),
+        {{- end}}
     })
 }
+
 

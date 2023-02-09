@@ -270,6 +270,7 @@ func (m *Module) registerStateImports(linker *wasmtime.Linker) error {
 	functions["get_at"] = m.getAt
 	functions["get_first"] = m.getFirst
 	functions["get_last"] = m.getLast
+	functions["has_at"] = m.hasAt
 
 	for n, f := range functions {
 		if err := linker.FuncWrap("state", n, f); err != nil {

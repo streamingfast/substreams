@@ -21,6 +21,12 @@ func TestStore(t *testing.T) {
 	s.Set(1, "1", "val5")
 	s.Set(3, "1", "val6")
 	s.Set(5, "1", "val7")
+	s.Set(6, "3", "foo")
+	s.Set(7, "3", "bar")
+	s.DeletePrefix(8, "3")
+	s.Set(9, "4", "baz")
+
+	var found bool
 
 	val, found := s.GetFirst("1")
 	assert.Equal(t, "val3", string(val))
@@ -45,6 +51,20 @@ func TestStore(t *testing.T) {
 	val, found = s.GetLast("1")
 	assert.Equal(t, "val7", string(val))
 	assert.True(t, found)
+
+	for i := 0; i < 5; i++ {
+		found = s.HasAt(uint64(i), "1")
+		assert.True(t, found)
+	}
+
+	found = s.HasAt(5, "0")
+	assert.False(t, found)
+
+	found = s.HasAt(7, "3")
+	assert.True(t, found)
+
+	found = s.HasAt(9, "3")
+	assert.False(t, found)
 }
 
 func TestFileName(t *testing.T) {

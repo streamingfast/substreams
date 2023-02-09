@@ -282,6 +282,20 @@ func (m *Module) getAt(storeIndex int32, ord int64, keyPtr, keyLength, outputPtr
 	return 1
 }
 
+func (m *Module) hasAt(storeIndex int32, ord int64, keyPtr, keyLength, outputPtr int32) int32 {
+	if int(storeIndex+1) > len(m.CurrentInstance.inputStores) {
+		returnStateError(fmt.Errorf("'has_at' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
+	}
+	readStore := m.CurrentInstance.inputStores[storeIndex]
+	key := m.Heap.ReadString(keyPtr, keyLength)
+	found := readStore.HasAt(uint64(ord), key)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.hasAt %q: found:%t storeDetail:%s", readStore.Name(), key, found, readStore.String()))
+	if !found {
+		return 0
+	}
+	return 1
+}
+
 func (m *Module) getFirst(storeIndex int32, keyPtr, keyLength, outputPtr int32) int32 {
 	if int(storeIndex)+1 > len(m.CurrentInstance.inputStores) {
 		returnStateError(fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))

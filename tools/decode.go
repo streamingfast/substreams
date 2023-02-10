@@ -36,7 +36,7 @@ var decodeOutputsModuleCmd = &cobra.Command{
 	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> <key>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
-		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find one a file named 
+		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find a file named 
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
 		file in place of '<manifest_file>'.
 	`),
@@ -55,7 +55,7 @@ var decodeStatesModuleCmd = &cobra.Command{
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
-		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find one a file named 
+		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find a file named 
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
 		file in place of '<manifest_file>'.
 	`),

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/streamingfast/cli"
-	"github.com/streamingfast/substreams/tools"
 	"path"
 	"path/filepath"
+
+	"github.com/streamingfast/cli"
+	"github.com/streamingfast/substreams/tools"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
@@ -18,7 +19,7 @@ var codegenCmd = &cobra.Command{
 	Short: "Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development",
 	Long: cli.Dedent(`
 		Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development. 
-		The manifest is optional as it will try to find one a file named 'substreams.yaml' in current working directory if nothing entered.
+		The manifest is optional as it will try to find a file named 'substreams.yaml' in current working directory if nothing entered.
 		You may enter a directory that contains a 'substreams.yaml' file in place of '<manifest_file>'.
 	`),
 	RunE: runCodeGen,

@@ -17,7 +17,7 @@ var protogenCmd = &cobra.Command{
 	Use:   "protogen [<manifest>]",
 	Short: "Generate Rust bindings from a package",
 	Long: cli.Dedent(`
-		Generate Rust bindings from a package. The manifest is optional as it will try to find one a file named
+		Generate Rust bindings from a package. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>'.
 	`),

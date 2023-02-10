@@ -2,24 +2,25 @@ package main
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/tools"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// var manifestCmd = &cobra.Command{
-// 	Use:          "manifest",
-// 	SilenceUsage: true,
-// }
+//	var manifestCmd = &cobra.Command{
+//		Use:          "manifest",
+//		SilenceUsage: true,
+//	}
 var infoCmd = &cobra.Command{
 	Use:   "info [<manifest_file>]",
 	Short: "Display package modules and docs",
 	Long: cli.Dedent(`
-		Display package modules and docs. The manifest is optional as it will try to find one a file named 
+		Display package modules and docs. The manifest is optional as it will try to find a file named 
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains 
 		a 'substreams.yaml' file in place of '<manifest_file>'.
 	`),

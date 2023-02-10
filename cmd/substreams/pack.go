@@ -20,7 +20,7 @@ var packCmd = &cobra.Command{
 	Use:   "pack [<manifest>]",
 	Short: "Build an .spkg out of a .yaml manifest",
 	Long: cli.Dedent(`
-		Build an .spkg out of a .yaml manifest. The manifest is optional as it will try to find one a file named
+		Build an .spkg out of a .yaml manifest. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a
 		'substreams.yaml' file in place of '<manifest_file>'.
 	`),

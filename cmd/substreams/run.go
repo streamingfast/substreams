@@ -40,7 +40,7 @@ var runCmd = &cobra.Command{
 	Use:   "run [<manifest>] <module_name>",
 	Short: "Stream module outputs from a given package on a remote endpoint",
 	Long: cli.Dedent(`
-		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find one a file named 
+		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find a file named 
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
 		file in place of '<manifest_file>'.
 	`),

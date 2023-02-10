@@ -314,6 +314,20 @@ func (m *Module) getFirst(storeIndex int32, keyPtr, keyLength, outputPtr int32) 
 	return 1
 }
 
+func (m *Module) hasFirst(storeIndex int32, keyPtr, keyLength, outputPtr int32) int32 {
+	if int(storeIndex)+1 > len(m.CurrentInstance.inputStores) {
+		returnStateError(fmt.Errorf("'has_first' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
+	}
+	readStore := m.CurrentInstance.inputStores[storeIndex]
+	key := m.Heap.ReadString(keyPtr, keyLength)
+	found := readStore.HasFirst(key)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.hasFirst %q: found:%t storeDetail:%s", readStore.Name(), key, found, readStore.String()))
+	if !found {
+		return 0
+	}
+	return 1
+}
+
 func (m *Module) getLast(storeIndex int32, keyPtr, keyLength, outputPtr int32) int32 {
 	if int(storeIndex)+1 > len(m.CurrentInstance.inputStores) {
 		returnStateError(fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
@@ -332,6 +346,20 @@ func (m *Module) getLast(storeIndex int32, keyPtr, keyLength, outputPtr int32) i
 	if err != nil {
 		returnStateError(fmt.Errorf("writing value to output ptr %d: %w", outputPtr, err))
 
+	}
+	return 1
+}
+
+func (m *Module) hasLast(storeIndex int32, keyPtr, keyLength, outputPtr int32) int32 {
+	if int(storeIndex)+1 > len(m.CurrentInstance.inputStores) {
+		returnStateError(fmt.Errorf("'has_last' failed: invalid store index %d, %d stores declared", storeIndex, len(m.CurrentInstance.inputStores)))
+	}
+	readStore := m.CurrentInstance.inputStores[storeIndex]
+	key := m.Heap.ReadString(keyPtr, keyLength)
+	found := readStore.HasLast(key)
+	m.CurrentInstance.PushExecutionStack(fmt.Sprintf("%s.hasLast %q: found:%t storeDetail:%s", readStore.Name(), key, found, readStore.String()))
+	if !found {
+		return 0
 	}
 	return 1
 }

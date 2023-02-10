@@ -32,6 +32,9 @@ func TestStore(t *testing.T) {
 	assert.Equal(t, "val3", string(val))
 	assert.True(t, found)
 
+	found = s.HasFirst("1")
+	assert.True(t, found)
+
 	val, found = s.GetAt(0, "1")
 	assert.Equal(t, "val4", string(val))
 	assert.True(t, found)
@@ -50,6 +53,9 @@ func TestStore(t *testing.T) {
 
 	val, found = s.GetLast("1")
 	assert.Equal(t, "val7", string(val))
+	assert.True(t, found)
+
+	found = s.HasLast("1")
 	assert.True(t, found)
 
 	for i := 0; i < 5; i++ {

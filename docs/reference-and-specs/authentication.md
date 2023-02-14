@@ -12,61 +12,46 @@ An authentication token is a [JSON Web Token ](https://jwt.io/)(JWT) responsible
 
 ### Obtain your API key
 
-The API key is required for obtaining an authentication token. Register for an authentication key at [`app.streamingfast.io`](https://app.streamingfast.io).&#x20;
+The API key is required for requesting an authentication token. Obtain one by visiting our Portal:
 
-The StreamingFast team is available on [Discord](https://discord.gg/jZwqxJAvRs) to help you get an API key.
+* [https://app.streamingfast.io](https://app.streamingfast.io)
+
+The StreamingFast team is also available on [Discord](https://discord.gg/jZwqxJAvRs) to help you get an API key.
 
 ### Request your authentication token
 
-An authentication token must be requested after successfully obtaining the API key.
+Request the a token with `curl`:
 
-Request the authentication token by using your StreamingFast API key through `curl`:
-
-{% code title="request token" overflow="wrap" %}
-```bash
-curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key":"your-secret-key"}'
-```
-{% endcode %}
+<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{<a data-footnote-ref href="#user-content-fn-1">"api_key"</a>: "your-secret-key"}'
+</code></pre>
 
 ### Set your environment variable
 
 Set the token as an `ENV` variable through the terminal by using:&#x20;
 
-{% code title="set env variable" %}
 ```bash
 export SUBSTREAMS_API_TOKEN="your_token"
 ```
-{% endcode %}
 
-{% hint style="success" %}
-**Tip**: Surround the token in quotes.&#x20;
-{% endhint %}
+The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command checks the `SUBSTREAMS_API_TOKEN` environment variable for the token by default. You can change that with the `--substreams-api-token-envvar` flag.
 
-The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command checks the `SUBSTREAMS_API_TOKEN` environment variable for the StreamingFast authentication token by default.
+### All-in-one bash function
 
-**Authentication Token Env Flag**
+Place this function in your terminal profile (`.bashrc` or `.zshrc`), for a quick all-in-one token fetcher:&#x20;
 
-By default, the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command uses an environment variable for the authentication token. You can specify a custom environment variable name by using the `--substreams-api-token-envvar` flag.
-
-### Environment variable script
-
-Run the `bash` function from the command line to obtain a token. The function is placed in the `.bashrc` file, located in your computer's home directory.&#x20;
-
-```bash
-export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  
+<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  
 function sftoken {
-    export FIREHOSE_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
-    export SUBSTREAMS_API_TOKEN=$FIREHOSE_API_TOKEN
-    echo Token set on FIREHOSE_API_TOKEN and SUBSTREAMS_API_TOKEN
+    export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | <a data-footnote-ref href="#user-content-fn-2">jq</a> -r .token)
+    echo "Token set on in SUBSTREAMS_API_TOKEN"
 }
-```
+</code></pre>
 
-{% hint style="success" %}
-**Tip**: Contact the StreamingFast team on Discord to [request an authentication token](https://discord.gg/mYPcRAzeVN).
-{% endhint %}
-
-Load the key into the `SUBSTREAMS_API_TOKEN` environment variable by using:
+Then obtain a new key and set it in your environment by running:
 
 ```bash
-sftoken
+$ sftoken
 ```
+
+[^1]: The `api_key` specified here is one starting with `server_`, `web_` or `mobile_`, obtained through the StreamingFast Portal.
+
+[^2]: Install `jq` from [https://stedolan.github.io/jq/](https://stedolan.github.io/jq/)

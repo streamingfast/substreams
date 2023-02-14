@@ -16,10 +16,7 @@ pub extern "C" fn test_map(
         
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
 
-        let params=
-        unsafe {
-            String::from_raw_parts(params_ptr, params_len, params_len)
-        };
+        let params : String = std::mem::ManuallyDrop::new(unsafe { String::from_raw_parts(params_ptr, params_len, params_len) }).to_string();
 
         Substreams::test_map(params, block,
 

@@ -2,6 +2,7 @@ package blockselect
 
 import (
 	"fmt"
+	"golang.org/x/term"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -145,8 +146,12 @@ func (b *BlockSelect) View() string {
 		}
 	}
 
+	var terminalWidth, _, _ = term.GetSize(0)
+	highBlockMargin := len(string(humanize.Comma(int64(b.highBlock)))) + len(string(humanize.Comma(int64(b.highBlock)))) + 2
+	highBlockStyle := lipgloss.NewStyle().MarginLeft(terminalWidth - highBlockMargin)
+
 	return Styles.Box.Render(lipgloss.JoinVertical(0,
-		fmt.Sprintf("%s --- %s", humanize.Comma(int64(b.lowBlock)), humanize.Comma(int64(b.highBlock))),
+		fmt.Sprintf("%s%s", humanize.Comma(int64(b.lowBlock)), highBlockStyle.Render(humanize.Comma(int64(b.highBlock)))),
 		Styles.Bar.Render(strings.Join(ptrsBar, "")),
 		activeBlock,
 	))

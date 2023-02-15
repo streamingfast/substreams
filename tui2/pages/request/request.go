@@ -2,16 +2,23 @@ package request
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/components/requestsummary"
 )
 
 type Request struct {
 	common.Common
 	KeyMap KeyMap
+
+	requestSummary *requestsummary.RequestSummary
 }
 
-func New(c common.Common) *Request {
-	return &Request{Common: c}
+func New(c common.Common, summary *requestsummary.RequestSummary) *Request {
+	return &Request{
+		Common:         c,
+		requestSummary: requestsummary.New(c, summary),
+	}
 }
 
 func (r *Request) Init() tea.Cmd { return nil }
@@ -20,5 +27,7 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *Request) View() string {
-	return "\n[Construction: view the request, API endpoint, module information, etc]"
+	return lipgloss.JoinVertical(0,
+		r.requestSummary.View(),
+	)
 }

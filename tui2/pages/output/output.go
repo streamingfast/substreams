@@ -134,11 +134,12 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (o *Output) setViewportContent() {
+	paddingBottom := lipgloss.NewStyle().PaddingBottom(3)
 	if mod, found := o.payloads[o.activeModule]; found {
 		if payload, found := mod[o.activeBlock]; found {
 			// Do the decoding once per view, and cache the decoded value if it hasn't changed
 			if payload != o.lastOutputContent {
-				o.outputView.SetContent(o.renderPayload(payload))
+				o.outputView.SetContent(paddingBottom.Render(o.renderPayload(payload)))
 				o.lastOutputContent = payload
 			}
 		} else {

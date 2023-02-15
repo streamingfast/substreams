@@ -1,6 +1,7 @@
 package tui2
 
 import (
+	"github.com/streamingfast/substreams/tui2/components/requestsummary"
 	"log"
 
 	"github.com/streamingfast/substreams/tui2/replaylog"
@@ -40,7 +41,7 @@ type UI struct {
 	tabs       *tabs.Tabs
 }
 
-func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *replaylog.File) *UI {
+func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *replaylog.File, s *requestsummary.RequestSummary) *UI {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}
@@ -49,7 +50,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr
 		stream:   stream,
 		Common:   c,
 		pages: []common.Component{
-			request.New(c),
+			request.New(c, s),
 			progress.New(c, stream.TargetParallelProcessingBlock()),
 			output.New(c, msgDescs),
 		},

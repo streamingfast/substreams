@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"path/filepath"	
 	"strings"
 
 	"github.com/streamingfast/substreams/tui2/replaylog"
+	"github.com/streamingfast/substreams/tui2/components/requestsummary"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"

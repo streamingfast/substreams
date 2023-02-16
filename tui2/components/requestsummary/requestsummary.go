@@ -2,11 +2,10 @@ package requestsummary
 
 import (
 	"fmt"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/tui2/common"
-	"golang.org/x/term"
+	"strings"
 )
 
 type RequestSummary struct {
@@ -15,7 +14,7 @@ type RequestSummary struct {
 	Manifest        string
 	Endpoint        string
 	DevMode         bool
-	InitialSnapshot string
+	InitialSnapshot []string
 }
 
 func New(c common.Common, summary *RequestSummary) *RequestSummary {
@@ -43,17 +42,19 @@ func (r *RequestSummary) View() string {
 		fmt.Sprintf("%s", r.Manifest),
 		fmt.Sprintf("%s", r.Endpoint),
 		fmt.Sprintf("%v", r.DevMode),
-		fmt.Sprintf("%s", r.InitialSnapshot),
+	}
+	if len(r.InitialSnapshot) > 0 {
+		values = append(values, fmt.Sprintf("%s", strings.Join(r.InitialSnapshot, ", ")))
+	} else {
+		values = append(values, r.Styles.StatusBarValue.Render(fmt.Sprintf("None")))
 	}
 
-	var terminalWidth, _, _ = term.GetSize(0)
-	vp := viewport.New(terminalWidth, 10)
-	vp.Style = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true)
-	vp.SetContent(lipgloss.JoinVertical(0,
-		lipgloss.NewStyle().Padding(2, 4, 2, 4).Render(lipgloss.JoinHorizontal(0.5,
+	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
+
+	return style.Render(
+		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(lipgloss.JoinHorizontal(0.5,
 			lipgloss.JoinVertical(0, labels...),
 			lipgloss.JoinVertical(0, values...),
 		)),
-	))
-	return vp.View()
+	)
 }

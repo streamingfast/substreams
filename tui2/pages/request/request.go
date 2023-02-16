@@ -31,3 +31,8 @@ func (r *Request) View() string {
 		r.requestSummary.View(),
 	)
 }
+
+func (r *Request) SetSize(w, h int) {
+	r.Common.SetSize(w, h)
+	r.requestSummary.SetSize(w, 8)
+}

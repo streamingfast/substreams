@@ -156,7 +156,7 @@ func (ui *UI) SetSize(w, h int) {
 	ui.tabs.SetSize(w, tabsHeight)
 	headerHeight := 3
 	for _, pg := range ui.pages {
-		pg.SetSize(w, h-footerHeight-tabsHeight-headerHeight)
+		pg.SetSize(w, h-headerHeight-tabsHeight-footerHeight)
 	}
 }
 

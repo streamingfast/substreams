@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -93,16 +92,13 @@ func (p *Progress) View() string {
 		p.Styles.StatusBarValue.Render(p.state + p.replayState),
 	}
 
-	vp := viewport.New(p.Width, p.Height)
-	//vp.Style = lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true)
-	vp.SetContent(lipgloss.JoinVertical(0,
+	return lipgloss.JoinVertical(0,
 		lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
 			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
 		)),
 		p.bars.View(),
-	))
-	return vp.View()
+	)
 }
 
 func (p *Progress) SetSize(w, h int) {

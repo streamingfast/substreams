@@ -187,13 +187,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
 	}
 	prog := tea.NewProgram(tui2.New(stream, msgDescs, replayLog, &requestSummary), tea.WithAltScreen())
-	requestSummary := requestsummary.RequestSummary{
-		Manifest:        manifestPath,
-		Endpoint:        substreamsClientConfig.Endpoint(),
-		DevMode:         productionMode,
-		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-	}
-	prog := tea.NewProgram(tui2.New(stream, msgDescs, replayLog, &requestSummary), tea.WithAltScreen())
 
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)

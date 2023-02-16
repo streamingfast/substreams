@@ -36,6 +36,7 @@ func New(c common.Common, tabs []string) *Tabs {
 		TabInactive:  c.Styles.TabInactive,
 		TabActive:    c.Styles.TabActive,
 	}
+	r.Height = 2
 	return r
 }
 
@@ -88,6 +89,7 @@ func (t *Tabs) View() string {
 	}
 	return lipgloss.NewStyle().
 		MaxWidth(t.Width).
+		Border(lipgloss.HiddenBorder(), false, false, true, false).
 		Render(s.String())
 }
 

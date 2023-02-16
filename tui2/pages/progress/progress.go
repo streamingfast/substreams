@@ -96,7 +96,7 @@ func (p *Progress) View() string {
 	vp := viewport.New(p.Width, p.Height)
 	//vp.Style = lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true)
 	vp.SetContent(lipgloss.JoinVertical(0,
-		lipgloss.NewStyle().Margin(1, 2).Render(lipgloss.JoinHorizontal(0,
+		lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
 			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
 		)),

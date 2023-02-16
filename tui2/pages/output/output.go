@@ -52,7 +52,6 @@ func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
 }
 
 func (o *Output) Init() tea.Cmd {
-	o.outputView.Style = lipgloss.NewStyle().Margin(1, 0).BorderTop(true).BorderBottom(true)
 	//o.outputView.HighPerformanceRendering = true
 	return tea.Batch(
 		o.moduleSelector.Init(),
@@ -67,6 +66,8 @@ func (o *Output) SetSize(w, h int) {
 	o.outputView.Width = w
 	// header, block info in output
 	o.outputView.Height = h - 11
+	outputViewTopBorder := 1
+	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -134,12 +135,11 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (o *Output) setViewportContent() {
-	paddingBottom := lipgloss.NewStyle().PaddingBottom(3)
 	if mod, found := o.payloads[o.activeModule]; found {
 		if payload, found := mod[o.activeBlock]; found {
 			// Do the decoding once per view, and cache the decoded value if it hasn't changed
 			if payload != o.lastOutputContent {
-				o.outputView.SetContent(paddingBottom.Render(o.renderPayload(payload)))
+				o.outputView.SetContent(o.renderPayload(payload))
 				o.lastOutputContent = payload
 			}
 		} else {
@@ -154,9 +154,9 @@ func (o *Output) setViewportContent() {
 
 func (o *Output) View() string {
 	return lipgloss.JoinVertical(0,
-		"",
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
+		"",
 		o.outputView.View(),
 	)
 }

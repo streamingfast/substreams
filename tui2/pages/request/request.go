@@ -8,6 +8,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/requestsummary"
+	"strings"
 )
 
 type Request struct {
@@ -47,9 +48,11 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *Request) View() string {
+	lineCount := strings.Count(r.getViewportContent(), "\n")
 	return lipgloss.JoinVertical(0,
 		r.requestSummary.View(),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.requestView.View()),
+		lipgloss.NewStyle().MarginLeft(r.Width-len(string(lineCount))-15).Render(fmt.Sprintf("Total lines: %v", lineCount)),
 	)
 }
 
@@ -57,7 +60,7 @@ func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
 	r.requestSummary.SetSize(w, 8)
 	r.requestView.Width = w
-	r.requestView.Height = h - 10
+	r.requestView.Height = h - 9
 }
 
 func (r *Request) setViewportContent() {

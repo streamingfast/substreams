@@ -4,6 +4,7 @@ import (
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
 	"strings"
 )
@@ -15,6 +16,8 @@ type RequestSummary struct {
 	Endpoint        string
 	DevMode         bool
 	InitialSnapshot []string
+	Docs            []*pbsubstreams.PackageMetadata
+	Params          []string
 }
 
 func New(c common.Common, summary *RequestSummary) *RequestSummary {
@@ -24,6 +27,8 @@ func New(c common.Common, summary *RequestSummary) *RequestSummary {
 		summary.Endpoint,
 		summary.DevMode,
 		summary.InitialSnapshot,
+		summary.Docs,
+		summary.Params,
 	}
 }
 

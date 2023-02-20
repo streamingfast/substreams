@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/streamingfast/substreams/tui2/replaylog"
@@ -146,7 +148,20 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	stream := streamui.New(req, ssClient, callOpts)
 
-	replayLog := replaylog.New()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = "."
+	} else {
+		err = os.MkdirAll(filepath.Join(homeDir, ".config", "substreams"), 0755)
+		if err != nil {
+			return fmt.Errorf("creating config directory: %w", err)
+		}
+
+		homeDir = filepath.Join(homeDir, ".config", "substreams")
+	}
+
+	replayLogFilePath := filepath.Join(homeDir, "replay.log")
+	replayLog := replaylog.New(replaylog.WithPath(replayLogFilePath))
 	if mustGetBool(cmd, "replay") {
 		stream.ReplayBundle, err = replayLog.ReadReplay()
 		if err != nil {
@@ -161,7 +176,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Launching Substreams GUI...")
 
-	tea.LogToFile("debug.log", "gui:")
+	debugLogPath := filepath.Join(homeDir, "debug.log")
+	tea.LogToFile(debugLogPath, "gui:")
 	prog := tea.NewProgram(tui2.New(stream, msgDescs, replayLog), tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)

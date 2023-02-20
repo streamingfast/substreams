@@ -17,14 +17,31 @@ import (
 
 type File struct {
 	writer *dbin.Writer
+	path   string
 }
 
 const ReplayMagicString = "rpl"
 const ReplayFileVersion = 1
 const ReplayFilename = "replay.log"
 
-func New() *File {
-	return &File{}
+type Option func(*File)
+
+func WithPath(path string) Option {
+	return func(f *File) {
+		f.path = path
+	}
+}
+
+func New(opts ...Option) *File {
+	f := &File{
+		path: ReplayFilename,
+	}
+
+	for _, opt := range opts {
+		opt(f)
+	}
+
+	return f
 }
 
 func (f *File) IsWriting() bool {

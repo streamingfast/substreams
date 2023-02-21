@@ -67,7 +67,6 @@ func (r *Request) SetSize(w, h int) {
 
 func (r *Request) setViewportContent() {
 	content, _ := r.getViewportContent()
-	//content += fmt.Sprintf("\nParams: %s", strings.Join(r.requestSummary.Params, ","))
 	r.requestView.SetContent(content)
 }
 
@@ -86,14 +85,18 @@ func (r *Request) getViewportContent() (string, error) {
 
 		var moduleDoc string
 		var curParam string
-		if curParams == nil {
+		if len(curParams) == 0 {
 			curParam = ""
+		} else {
+			curParam = curParams[len(curParams)-1]
 		}
-		curParam = curParams[len(curParams)-1]
 
-		moduleDoc, err := r.getViewPortDropdown(r.requestSummary.Docs[i], curParam, module)
-		if err != nil {
-			return "", fmt.Errorf("getting module doc: %w", err)
+		var err error
+		if i <= len(r.requestSummary.Docs)-1 {
+			moduleDoc, err = r.getViewPortDropdown(r.requestSummary.Docs[i], curParam, module)
+			if err != nil {
+				return "", fmt.Errorf("getting module doc: %w", err)
+			}
 		}
 
 		output += fmt.Sprintf("%s\n\n", module.Name)
@@ -123,12 +126,14 @@ func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, pa
 }
 
 func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, param string, module *pbsubstreams.Module) (string, error) {
-	var markdown string
+	markdown := ""
 
 	markdown += "# " + fmt.Sprintf("%s - docs: ", module.Name)
 	markdown += "\n"
-	markdown += "	[doc]: " + "	" + metadata.GetDoc()
-	markdown += "\n"
+	if metadata.GetDoc() != "" {
+		markdown += "	[doc]: " + "	" + metadata.GetDoc()
+		markdown += "\n"
+	}
 	if metadata.Url != "" {
 		markdown += "	[url]: " + "	" + metadata.Url
 		markdown += "\n\n"

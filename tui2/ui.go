@@ -93,7 +93,7 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if err := ui.replayLog.Push(msg); err != nil {
-		log.Printf("Failed to push to vcr: %w", err)
+		log.Printf("Failed to push to vcr: %s", err.Error())
 		return ui, tea.Quit
 	}
 	return ui.update(msg)

@@ -149,20 +149,3 @@ func TestReduce2(t *testing.T) {
 		{Start: 6990000, End: 6999997},
 	}.String(), res.String())
 }
-
-func TestLineBar(t *testing.T) {
-	t.Skip()
-	res := barmode(
-		ranges{
-
-			{Start: 1, End: 23},
-			{Start: 50, End: 100},
-			{Start: 200, End: 600},
-			{Start: 700, End: 710},
-			{Start: 822, End: 832},
-		},
-		100,
-		1000,
-	)
-	assert.Equal(t, "▒░░░▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒░░░▒▒░░░░▒░░░░░░░", res)
-}

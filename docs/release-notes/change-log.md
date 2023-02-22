@@ -63,6 +63,8 @@ This change keeps backwards compatibility. Old Substreams Packages will still wo
 
 ### Fixed
 
+* Fixed valuetype mismatch for stores 
+
 * Fixed production mode not completing when block range was specified
 
 * Fixed tier1 crashing due to missing context canceled check.

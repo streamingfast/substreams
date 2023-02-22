@@ -33,8 +33,17 @@ pub extern "C" fn {{$functionSignature.Name}}(
             {{- if $argument.ModuleInput.IsStore -}}
         {{- $m := $engine.MustModule $argument.Name }}
         {{ $engine.ReadableStoreDeclaration $argument.Name $m $argument.ModuleInput }}
-            {{- else }}
+            {{- end -}}
+            {{- if $argument.ModuleInput.IsMap }}
         let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
+            {{- end -}}
+
+            {{- if $argument.ModuleInput.IsSource }}
+        let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
+            {{- end -}}
+
+            {{- if $argument.ModuleInput.IsParams }}
+        let {{$argument.Name}}: {{$argument.Type}} = std::mem::ManuallyDrop::new(unsafe { String::from_raw_parts({{$argument.Name}}_ptr, {{$argument.Name}}_len, {{$argument.Name}}_len) }).to_string();
             {{- end -}}
         {{ end }}
 

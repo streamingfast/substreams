@@ -14,13 +14,12 @@ pub extern "C" fn test_map(
     substreams::register_panic_hook();
     let func = ||-> Result<pb::test::MapResult, Error>{
         
+        let params: String = std::mem::ManuallyDrop::new(unsafe { String::from_raw_parts(params_ptr, params_len, params_len) }).to_string();
         let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
 
-        let params : String = std::mem::ManuallyDrop::new(unsafe { String::from_raw_parts(params_ptr, params_len, params_len) }).to_string();
-
-        Substreams::test_map(params, block,
-
-
+        Substreams::test_map(params,
+            block,
+            
         )
     };
     let result = func();

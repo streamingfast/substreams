@@ -276,14 +276,14 @@ func (e *Engine) FunctionSignature(module *manifest.Module) (*FunctionSignature,
 	case manifest.ModuleKindStore:
 		return e.storeFunctionSignature(module)
 	default:
-		return nil, fmt.Errorf("unknown MustModule kind: %T", module.Kind)
+		return nil, fmt.Errorf("unknown must module kind: %T", module.Kind)
 	}
 }
 
 func (e *Engine) mapFunctionSignature(module *manifest.Module) (*FunctionSignature, error) {
 	inputs, err := e.ModuleArgument(module.Inputs)
 	if err != nil {
-		return nil, fmt.Errorf("generating MustModule intputs: %w", err)
+		return nil, fmt.Errorf("generating must module intputs: %w", err)
 	}
 
 	outType := module.Output.Type
@@ -334,7 +334,9 @@ func (e *Engine) ModuleArgument(inputs []*manifest.Input) (Arguments, error) {
 			name = strings.ToLower(name)
 
 			out = append(out, NewArgument(name, inputType, input))
-
+		case input.IsParams():
+			inputType := strings.Trim(input.Params, " ")
+			out = append(out, NewArgument("params", inputType, input))
 		default:
 			return nil, fmt.Errorf("unknown MustModule kind: %T", input)
 		}

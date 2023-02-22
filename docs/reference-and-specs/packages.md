@@ -6,11 +6,11 @@ description: StreamingFast Substreams packages reference
 
 ## Substreams packages overview
 
-A Substreams package is a **single file** **containing all necessary dependencies** including:&#x20;
+A Substreams package is a **single file** **containing all necessary dependencies** including:
 
 * Protobuf definitions as FileDescriptors
 * Compiled WASM code
-* Module DAG definition&#x20;
+* Module DAG definition
 
 Substreams packages are protobuf-serialized files. The standard extension for Substreams packages is **`.spkg`**.
 
@@ -18,9 +18,9 @@ Substreams packages are protobuf-serialized files. The standard extension for Su
 **Tip**: Packages expedite the use of Substreams and allow developers to **begin streaming immediately**_._
 {% endhint %}
 
-**Buf images**
+### **Packages as self-describing messages**
 
-[Substreams packages](../../pb/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard protobuf FileDescriptorSet. Substreams packages can be used across multiple code generation tools as a source for schema definitions.
+[Substreams packages](../../pb/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard protobuf FileDescriptorSet message layout. They therefore can be used with multiple code generation tools as a replacement for raw `.proto` files. They implement a pattern called [Self-describing Messages](https://protobuf.dev/programming-guides/techniques/#self-description).&#x20;
 
 ### Creating packages
 
@@ -38,7 +38,7 @@ Developers can use modules and protobuf definitions from other Substreams packag
 **Important**: To avoid potential naming collisions select unique `.proto` filenames and namespaces specifying fully qualified paths.
 {% endhint %}
 
-Local protobuf filenames take precedence over the imported package's proto files.&#x20;
+Local protobuf filenames take precedence over the imported package's proto files.
 
 ### Additional information
 

@@ -132,7 +132,7 @@ func (g *Generator) Generate() (err error) {
 		return fmt.Errorf("creating pb directory %v: %w", g.srcPath, err)
 	}
 
-	protoGenerator := NewProtoGenerator(pbFolder, nil)
+	protoGenerator := NewProtoGenerator(pbFolder, nil, false)
 	err = protoGenerator.GenerateProto(g.pkg)
 	if err != nil {
 		return fmt.Errorf("generating protobuf code: %w", err)

@@ -46,12 +46,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
 
-	network, err := generateSelect("Select network", []string{"Ethereum", "Other"})
+	protocol, err := generateSelect("Select protocol", []string{"Ethereum", "Other"})
 	if err != nil {
-		return fmt.Errorf("running network prompt: %w", err)
+		return fmt.Errorf("running protocol prompt: %w", err)
 	}
 
-	if network == "other" {
+	if protocol == "other" {
 		fmt.Printf("We haven't added any templates for your selected chain quite yet...\n\n")
 		fmt.Printf("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!\n\n")
 		return nil
@@ -172,7 +172,7 @@ func generateSelect(label string, items []string) (string, error) {
 
 	_, selection, err := choice.Run()
 	if err != nil {
-		return "", fmt.Errorf("running network prompt: %w", err)
+		return "", fmt.Errorf("running protocol prompt: %w", err)
 	}
 
 	return selection, nil

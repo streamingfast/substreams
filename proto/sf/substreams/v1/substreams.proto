@@ -98,6 +98,8 @@ message BlockScopedData {
   Clock clock = 3;
   ForkStep step = 6;
   string cursor = 10;
+  // Potentially non-deterministic. Reserved for future use.
+  uint64 final_block_height = 11;
 }
 
 message ModuleOutput {

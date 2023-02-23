@@ -33,11 +33,16 @@ func init() {
 		(e.g. a local file ending with .yaml), the output path will be made relative to it
 	`))
 	protogenCmd.Flags().StringArrayP("exclude-paths", "x", []string{}, "Exclude specific files or directories, for example \"proto/a/a.proto\" or \"proto/a\"")
+	protogenCmd.Flags().Bool("generate-mod-rs", true, cli.FlagDescription(`
+		Generate the protobuf 'mod.rs' file alongside the rust bindings. Include '--generate-mod-rs=false' If you wish to disable this generation.
+		If there is a present 'buf.gen.yaml', consult https://github.com/neoeinstein/protoc-gen-prost/blob/main/protoc-gen-prost-crate/README.md to add 'mod.rs' generation functionality.
+	`))
 }
 
 func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := mustGetString(cmd, "output-path")
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
+	generateMod := mustGetBool(cmd, "generate-mod-rs")
 
 	manifestPathRaw := ""
 	if len(args) == 1 {
@@ -69,6 +74,6 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
-	generator := codegen.NewProtoGenerator(outputPath, excludePaths)
+	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)
 	return generator.GenerateProto(pkg)
 }

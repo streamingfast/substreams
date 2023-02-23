@@ -17,12 +17,14 @@ import (
 type ProtoGenerator struct {
 	excludedPaths []string
 	outputPath    string
+	generateMod   bool
 }
 
-func NewProtoGenerator(outputPath string, excludedPaths []string) *ProtoGenerator {
+func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bool) *ProtoGenerator {
 	return &ProtoGenerator{
 		outputPath:    outputPath,
 		excludedPaths: excludedPaths,
+		generateMod:   generateMod,
 	}
 }
 
@@ -50,6 +52,14 @@ plugins:
     out: ` + g.outputPath + `
     opt:
 `
+		if g.generateMod {
+			content += `
+  - remote: buf.build/prost/plugins/crate:v0.3.1-1
+    out: ` + g.outputPath + `
+    opt:
+    - no_features
+`
+		}
 		fmt.Println(`Writing to temporary 'buf.gen.yaml':
 ---
 ` + content + `

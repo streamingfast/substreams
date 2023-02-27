@@ -249,6 +249,18 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 
 	// TODO: Loop through inputs, outputs, and check that all internal proto references are satisfied by the FileDescriptors
 
+	if pkg.SinkModule != "" {
+		var found bool
+		for _, mod := range pkg.Modules.Modules {
+			if mod.Name == pkg.SinkModule {
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("sink: module: module %q not found in package", pkg.SinkModule)
+		}
+	}
+
 	return nil
 }
 

@@ -33,12 +33,8 @@ func loadSinkConfig(pkg *pbsubstreams.Package, m *Manifest, protoDescs []*desc.F
 files:
 	for _, file := range protoDescs {
 		for _, msgDesc := range file.GetMessageTypes() {
-			fmt.Println("Type found:", file.GetName(), msgDesc.GetFullyQualifiedName())
+			//fmt.Println("Type found:", file.GetName(), msgDesc.GetFullyQualifiedName())
 			if msgDesc.GetFullyQualifiedName() == m.Sink.Type {
-				// TODO: create a dynamic message of that type
-				// unpack the JSON into it
-				// serialize and create the `anypb.Any`
-				// assign it to pkg.SinkConfig
 				dynConf := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 				if err := dynConf.UnmarshalJSON(jsonConfigBytes); err != nil {
 					return fmt.Errorf("sink: config: encoding json into protobuf message: %w", err)

@@ -12,19 +12,18 @@ message Package {
   // Needs to be one so this file can be used _directly_ as a
   // buf `Image` andor a ProtoSet for grpcurl and other tools
   repeated google.protobuf.FileDescriptorProto proto_files = 1;
-  reserved 2; // In case protosets add a field some day.
-  reserved 3; // In case protosets add a field some day.
-  reserved 4; // In case protosets add a field some day.
+  reserved 2 to 4; // Reserved for future: in case protosets adds fields
 
   uint64 version = 5;
   sf.substreams.v1.Modules modules = 6;
   repeated ModuleMetadata module_meta = 7;
   repeated PackageMetadata package_meta = 8;
 
-  // Standardized network name.
-  string target_network = 9;
+  // Source network for Substreams to fetch its data from.
+  string network = 9;
 
   google.protobuf.Any sink_config = 10;
+  string sink_module = 11;
 }
 
 message PackageMetadata {

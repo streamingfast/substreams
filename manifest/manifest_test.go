@@ -4,10 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func TestManifest_YamlUnmarshal(t *testing.T) {
@@ -131,4 +132,24 @@ func TestManifest_ToProto(t *testing.T) {
 	require.Equal(t, "map_block_to_tokens", module.BinaryEntrypoint)
 	require.Equal(t, uint32(0), module.BinaryIndex)
 	require.Equal(t, "proto:sf.substreams.tokens.v1.Tokens", module.Output.Type)
+
+	require.Equal(t, "antelope", pkg.Network)
+	require.Equal(t, "pcs.services.v1.WASMQueryService", pkg.SinkConfig.TypeUrl)
+	require.Len(t, pkg.SinkConfig.Value, 2)
+	require.Equal(t, []byte{0x08, 0x01}, pkg.SinkConfig.Value)
+	require.Equal(t, "map_block_to_tokens", pkg.SinkModule)
 }
+
+//
+//type testSinkConfig struct {
+//	state         protoimpl.MessageState
+//	sizeCache     protoimpl.SizeCache
+//	unknownFields protoimpl.UnknownFields
+//
+//	AddSomePancakes bool `protobuf:"varint,1,opt,name=add_some_pancakes,json=addSomePancakes,proto3" json:"add_some_pancakes,omitempty"`
+//}
+//
+//func (x *testSinkConfig) Reset()                             { *x = testSinkConfig{} }
+//func (x *testSinkConfig) String() string                     { return "testSinkConfig" }
+//func (*testSinkConfig) ProtoMessage()                        {}
+//func (x *testSinkConfig) ProtoReflect() protoreflect.Message { panic("unimplemented") }

@@ -15,10 +15,11 @@ import (
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/streamingfast/dstore"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 var httpClient = &http.Client{
@@ -488,6 +489,10 @@ func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, []*desc.File
 		return nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
+	if err := loadSinkConfig(pkg, m, protoDefinitions); err != nil {
+		return nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
+	}
+
 	return pkg, protoDefinitions, nil
 }
 
@@ -502,6 +507,7 @@ func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error
 		Version:     1,
 		PackageMeta: []*pbsubstreams.PackageMetadata{pkgMeta},
 		Modules:     &pbsubstreams.Modules{},
+		Network:     m.Network,
 	}
 
 	moduleCodeIndexes := map[string]int{}

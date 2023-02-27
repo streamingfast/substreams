@@ -10,8 +10,9 @@ import (
 	"regexp"
 	"strings"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"gopkg.in/yaml.v3"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 const UNSET = math.MaxUint64
@@ -38,8 +39,17 @@ type Manifest struct {
 	Modules     []*Module         `yaml:"modules"`
 	Params      map[string]string `yaml:"params"`
 
+	Network string `yaml:"network"`
+	Sink    *Sink  `yaml:"sink"`
+
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
+}
+
+type Sink struct {
+	Type   string      `yaml:"type"`
+	Module string      `yaml:"module"`
+	Config interface{} `yaml:"config"`
 }
 
 var httpSchemePrefixRegex = regexp.MustCompile("^https?://")

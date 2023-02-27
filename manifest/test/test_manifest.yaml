@@ -45,3 +45,11 @@ modules:
 
 params:
   map_pairs: my default params
+
+network: antelope
+
+sink:
+  module: map_block_to_tokens
+  type: pcs.services.v1.WASMQueryService
+  config:
+    addSomePancakes: true

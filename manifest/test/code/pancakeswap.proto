@@ -1,0 +1,5 @@
+syntax = "proto3";
+package pcs.services.v1;
+message WASMQueryService {
+  bool add_some_pancakes = 1;
+}

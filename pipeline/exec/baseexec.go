@@ -54,7 +54,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 	}
 	// This allows us to skip the execution of the VM if there are no inputs.
 	// This assumption should either be configurable by the manifest, or clearly documented:
-	//  state builders will not be called if their input streams are 0 bytes length (and there'e no
+	//  state builders will not be called if their input streams are 0 bytes length (and there is no
 	//  state store in read mode)
 	if hasInput {
 		clock := outputGetter.Clock()

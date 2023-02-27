@@ -36,7 +36,7 @@ func init() {
 		specifying the value of the flag. You can use "{manifestDir}" which resolves to manifest's
 		directory. You can use "{spkgDefaultName}" which is the pre-computed default name in the form
 		"<name>-<version>" where "<name>" is the manifest's "package.name" value ("_" values in the name are
-		replaced by "-") and "<version>" is "package.version" value. Yu can use "{version}" which resolves
+		replaced by "-") and "<version>" is "package.version" value. You can use "{version}" which resolves
 		to "package.version".
 	`))
 }

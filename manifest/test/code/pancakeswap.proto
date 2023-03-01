@@ -2,4 +2,6 @@ syntax = "proto3";
 package pcs.services.v1;
 message WASMQueryService {
   bool add_some_pancakes = 1;
+  bytes some_bytes = 2;
+  string some_string = 3;
 }

@@ -7,24 +7,20 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/substreams/block"
-
-	"github.com/streamingfast/cli"
-
-	"google.golang.org/protobuf/proto"
-
-	"github.com/jhump/protoreflect/dynamic"
-
-	"github.com/streamingfast/substreams/storage/execout"
-	"github.com/streamingfast/substreams/storage/store"
-
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
+
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/descriptorpb"
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 var decodeCmd = &cobra.Command{

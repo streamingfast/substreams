@@ -3,7 +3,7 @@ package manifest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/jhump/protoreflect/desc"
-
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
@@ -53,6 +53,11 @@ type Reader struct {
 	input                       string
 	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
 
+	// cached values
+	protoDefinitions         []*desc.FileDescriptor
+	sinkConfigJSON           string
+	sinkConfigDynamicMessage *dynamic.Message
+
 	//options
 	skipSourceCodeImportValidation bool
 	skipModuleOutputTypeValidation bool
@@ -80,6 +85,7 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 		if r.collectProtoDefinitionsFunc != nil {
 			r.collectProtoDefinitionsFunc(protoDefinitions)
 		}
+		r.protoDefinitions = protoDefinitions
 		return pkg, nil
 	}
 
@@ -131,7 +137,7 @@ func (r *Reader) newPkgFromURL(fileURL string) (pkg *pbsubstreams.Package, err e
 		return nil, fmt.Errorf("error downloading %q: %w", fileURL, err)
 	}
 
-	cnt, err := ioutil.ReadAll(resp.Body)
+	cnt, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %q: %w", fileURL, err)
 	}
@@ -501,7 +507,7 @@ func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, []*desc.File
 		return nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
-	if err := loadSinkConfig(pkg, m, protoDefinitions); err != nil {
+	if err := r.loadSinkConfig(pkg, m, protoDefinitions); err != nil {
 		return nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
 	}
 

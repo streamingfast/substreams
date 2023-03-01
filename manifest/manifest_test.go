@@ -91,7 +91,8 @@ inputs:
 //}
 
 func TestManifest_ToProto(t *testing.T) {
-	pkg, err := NewReader("./test/test_manifest.yaml").Read()
+	reader := NewReader("./test/test_manifest.yaml")
+	pkg, err := reader.Read()
 	require.NoError(t, err)
 
 	pbManifest := pkg.Modules
@@ -135,9 +136,16 @@ func TestManifest_ToProto(t *testing.T) {
 
 	require.Equal(t, "antelope", pkg.Network)
 	require.Equal(t, "pcs.services.v1.WASMQueryService", pkg.SinkConfig.TypeUrl)
-	require.Len(t, pkg.SinkConfig.Value, 2)
-	require.Equal(t, []byte{0x08, 0x01}, pkg.SinkConfig.Value)
 	require.Equal(t, "map_block_to_tokens", pkg.SinkModule)
+	//require.Equal(t, "begin of json config for sink", reader.sinkConfigJSON)
+	require.Len(t, pkg.SinkConfig.Value, 2178)
+	addSomePancakes := reader.sinkConfigDynamicMessage.GetFieldByName("add_some_pancakes").(bool)
+	require.True(t, addSomePancakes)
+	someBytes := reader.sinkConfigDynamicMessage.GetFieldByName("some_bytes").([]byte)
+	require.Equal(t, "specVersion:", string(someBytes)[:12])
+	someString := reader.sinkConfigDynamicMessage.GetFieldByName("some_string").(string)
+	require.Equal(t, "specVersion:", someString[:12])
+
 }
 
 //

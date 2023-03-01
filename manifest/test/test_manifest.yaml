@@ -53,3 +53,5 @@ sink:
   type: pcs.services.v1.WASMQueryService
   config:
     addSomePancakes: true
+    someBytes: "@@./test_manifest.yaml"
+    someString: "@./test_manifest.yaml"

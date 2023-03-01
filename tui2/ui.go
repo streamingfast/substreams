@@ -1,15 +1,15 @@
 package tui2
 
 import (
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/tui2/components/requestsummary"
 	"log"
 
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/desc"
+
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/footer"
 	"github.com/streamingfast/substreams/tui2/pages/output"
@@ -42,7 +42,7 @@ type UI struct {
 	tabs       *tabs.Tabs
 }
 
-func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *replaylog.File, s *requestsummary.RequestSummary, modules *pbsubstreams.Modules) *UI {
+func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *replaylog.File, reqSummary *request.Summary, modules *pbsubstreams.Modules) *UI {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}
@@ -51,7 +51,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr
 		stream:   stream,
 		Common:   c,
 		pages: []common.Component{
-			request.New(c, s, modules),
+			request.New(c, reqSummary, modules),
 			progress.New(c, stream.TargetParallelProcessingBlock()),
 			output.New(c, msgDescs),
 		},

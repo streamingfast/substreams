@@ -2,28 +2,29 @@ package request
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
-	"github.com/streamingfast/substreams/tui2/components/requestsummary"
-	"strings"
 )
 
 type Request struct {
 	common.Common
 
-	requestSummary *requestsummary.RequestSummary
+	requestSummary *Summary
 	modules        *pbsubstreams.Modules
 	requestView    viewport.Model
 }
 
-func New(c common.Common, summary *requestsummary.RequestSummary, modules *pbsubstreams.Modules) *Request {
+func New(c common.Common, summary *Summary, modules *pbsubstreams.Modules) *Request {
 	return &Request{
 		Common:         c,
-		requestSummary: requestsummary.New(c, summary),
+		requestSummary: summary,
 		modules:        modules,
 		requestView:    viewport.New(24, 80),
 	}
@@ -52,15 +53,43 @@ func (r *Request) View() string {
 	viewportContent, _ := r.getViewportContent()
 	lineCount := strings.Count(viewportContent, "\n")
 	return lipgloss.JoinVertical(0,
-		r.requestSummary.View(),
+		r.renderRequestSummary(),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.requestView.View()),
 		lipgloss.NewStyle().MarginLeft(r.Width-len(string(lineCount))-15).Render(fmt.Sprintf("Total lines: %v", lineCount)),
 	)
 }
 
+func (r *Request) renderRequestSummary() string {
+	summary := r.requestSummary
+	labels := []string{
+		"Package: ",
+		"Endpoint: ",
+		"Dev Mode: ",
+		"Initial Snapshot: ",
+	}
+	values := []string{
+		fmt.Sprintf("%s", summary.Manifest),
+		fmt.Sprintf("%s", summary.Endpoint),
+		fmt.Sprintf("%v", summary.DevMode),
+	}
+	if len(summary.InitialSnapshot) > 0 {
+		values = append(values, fmt.Sprintf("%s", strings.Join(summary.InitialSnapshot, ", ")))
+	} else {
+		values = append(values, r.Styles.StatusBarValue.Render(fmt.Sprintf("None")))
+	}
+
+	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
+
+	return style.Render(
+		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(lipgloss.JoinHorizontal(0.5,
+			lipgloss.JoinVertical(0, labels...),
+			lipgloss.JoinVertical(0, values...),
+		)),
+	)
+}
+
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
-	r.requestSummary.SetSize(w, 8)
 	r.requestView.Width = w
 	r.requestView.Height = h - 11
 }
@@ -72,28 +101,14 @@ func (r *Request) setViewportContent() {
 
 func (r *Request) getViewportContent() (string, error) {
 	output := ""
-	paramsMapped := make(map[string][]string)
-
-	// build mapped params
-	for _, param := range r.requestSummary.Params {
-		paramSplit := strings.Split(param, "=")
-		paramsMapped[paramSplit[0]] = append(paramsMapped[paramSplit[0]], paramSplit[1])
-	}
 
 	for i, module := range r.modules.Modules {
-		curParams := paramsMapped[module.Name]
 
 		var moduleDoc string
-		var curParam string
-		if len(curParams) == 0 {
-			curParam = ""
-		} else {
-			curParam = curParams[len(curParams)-1]
-		}
 
 		var err error
 		if i <= len(r.requestSummary.Docs)-1 {
-			moduleDoc, err = r.getViewPortDropdown(r.requestSummary.Docs[i], curParam, module)
+			moduleDoc, err = r.getViewPortDropdown(r.requestSummary.Docs[i], module)
 			if err != nil {
 				return "", fmt.Errorf("getting module doc: %w", err)
 			}
@@ -116,8 +131,8 @@ func (r *Request) getViewportContent() (string, error) {
 	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(output), nil
 }
 
-func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, param string, module *pbsubstreams.Module) (string, error) {
-	content, err := glamouriseModuleDoc(metadata, param, module)
+func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
+	content, err := glamouriseModuleDoc(metadata, module)
 	if err != nil {
 		return "", fmt.Errorf("getting module docs: %w", err)
 	}
@@ -125,7 +140,7 @@ func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, pa
 	return content, nil
 }
 
-func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, param string, module *pbsubstreams.Module) (string, error) {
+func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
 	markdown := ""
 
 	markdown += "# " + fmt.Sprintf("%s - docs: ", module.Name)
@@ -140,10 +155,6 @@ func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, param string, m
 	}
 	markdown += "	[version]: " + "	" + metadata.Version
 	markdown += "\n\n"
-	if param != "" {
-		markdown += "	[param]: " + "	" + param
-		markdown += "\n\n"
-	}
 
 	out, err := glamour.Render(markdown, "dark")
 	if err != nil {

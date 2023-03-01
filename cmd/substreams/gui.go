@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"	
+	"path/filepath"
 	"strings"
 
+	"github.com/streamingfast/substreams/tui2/pages/request"
 	"github.com/streamingfast/substreams/tui2/replaylog"
-	"github.com/streamingfast/substreams/tui2/components/requestsummary"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
@@ -180,16 +180,15 @@ func runGui(cmd *cobra.Command, args []string) error {
 	debugLogPath := filepath.Join(homeDir, "debug.log")
 	tea.LogToFile(debugLogPath, "gui:")
 
-	requestSummary := requestsummary.RequestSummary{
+	requestSummary := &request.Summary{
 		Manifest:        manifestPath,
 		Endpoint:        substreamsClientConfig.Endpoint(),
 		DevMode:         productionMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
 		Docs:            pkg.PackageMeta,
-		Params:          mustGetStringSlice(cmd, "params"),
 	}
 
-	ui := tui2.New(stream, msgDescs, replayLog, &requestSummary, pkg.Modules)
+	ui := tui2.New(stream, msgDescs, replayLog, requestSummary, pkg.Modules)
 	prog := tea.NewProgram(ui, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)

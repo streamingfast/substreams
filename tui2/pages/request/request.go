@@ -52,10 +52,11 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (r *Request) View() string {
 	viewportContent, _ := r.getViewportContent()
 	lineCount := strings.Count(viewportContent, "\n")
+	progress := float64(r.requestView.YOffset+r.requestView.Height-1) / float64(lineCount) * 100.0
 	return lipgloss.JoinVertical(0,
 		r.renderRequestSummary(),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.requestView.View()),
-		lipgloss.NewStyle().MarginLeft(r.Width-len(string(lineCount))-15).Render(fmt.Sprintf("Total lines: %v", lineCount)),
+		lipgloss.NewStyle().MarginLeft(r.Width-len(string(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
 	)
 }
 
@@ -64,13 +65,13 @@ func (r *Request) renderRequestSummary() string {
 	labels := []string{
 		"Package: ",
 		"Endpoint: ",
-		"Dev Mode: ",
-		"Initial Snapshot: ",
+		"Production mode: ",
+		"Initial snapshots: ",
 	}
 	values := []string{
 		fmt.Sprintf("%s", summary.Manifest),
 		fmt.Sprintf("%s", summary.Endpoint),
-		fmt.Sprintf("%v", summary.DevMode),
+		fmt.Sprintf("%v", summary.ProductionMode),
 	}
 	if len(summary.InitialSnapshot) > 0 {
 		values = append(values, fmt.Sprintf("%s", strings.Join(summary.InitialSnapshot, ", ")))

@@ -183,7 +183,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 	requestSummary := &request.Summary{
 		Manifest:        manifestPath,
 		Endpoint:        substreamsClientConfig.Endpoint(),
-		DevMode:         productionMode,
+		ProductionMode:  productionMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
 		Docs:            pkg.PackageMeta,
 	}

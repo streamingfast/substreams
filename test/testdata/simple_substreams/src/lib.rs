@@ -91,6 +91,9 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         block: test::Block,
         s: StoreGetInt64,
     ) -> Result<test::Boolean, errors::Error> {
+        assert(block.number, true, s.has_last("a.key"));
+        assert(block.number, false, s.has_last("b.key"));;
+
         assert(block.number, 0, s.get_last("a.key").unwrap());
         Ok(test::Boolean { result: true })
     }

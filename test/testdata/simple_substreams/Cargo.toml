@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 prost = "^0.11.0"
 prost-types = "^0.11.0"
-substreams = { version = "0.5.3" }
+substreams = { version = "0.5.6" }
 
 [build-dependencies]
 anyhow = "1"

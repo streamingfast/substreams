@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"runtime/debug"
@@ -26,7 +27,12 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	logger := reqctx.Logger(ctx)
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("error")
+			if err, ok := r.(error); ok {
+				if errors.Is(err, context.Canceled) {
+					logger.Info("context canceled")
+					return
+				}
+			}
 			err = fmt.Errorf("panic at block %s: %s", block, r)
 			logger.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
 			logger.Error(string(debug.Stack()))

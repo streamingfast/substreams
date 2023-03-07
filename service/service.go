@@ -71,6 +71,7 @@ func New(
 		1000, // overridden by Options
 		subrequestSplitSize,
 		parallelSubRequests,
+		0,
 		stateStore,
 		func(logger *zap.Logger) work.Worker {
 			return work.NewRemoteWorker(clientFactory, logger)
@@ -165,6 +166,7 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		s.runtimeConfig.CacheSaveInterval,
 		s.runtimeConfig.SubrequestsSplitSize,
 		s.runtimeConfig.ParallelSubrequests,
+		s.runtimeConfig.MaxWasmFuel,
 		s.runtimeConfig.BaseObjectStore,
 		s.runtimeConfig.WorkerFactory,
 	)
@@ -237,7 +239,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	wasmRuntime := wasm.NewRuntime(s.wasmExtensions)
+	wasmRuntime := wasm.NewRuntime(s.wasmExtensions, runtimeConfig.MaxWasmFuel)
 
 	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {

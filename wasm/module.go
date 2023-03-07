@@ -37,7 +37,9 @@ func (m *Module) FreeMem() {
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
 	cfg := wasmtime.NewConfig()
-	cfg.SetConsumeFuel(true)
+	if r.maxFuel != 0 {
+		cfg.SetConsumeFuel(true)
+	}
 	engine := wasmtime.NewEngineWithConfig(cfg)
 	linker := wasmtime.NewLinker(engine)
 	store := wasmtime.NewStore(engine)
@@ -104,7 +106,12 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*
 		clock:      clock,
 		entrypoint: entrypoint,
 	}
-	m.wasmStore.AddFuel(100000000)
+	if m.runtime.maxFuel != 0 {
+		if remaining, _ := m.wasmStore.ConsumeFuel(m.runtime.maxFuel); remaining != 0 {
+			m.wasmStore.ConsumeFuel(remaining) // don't accumulate fuel from previous executions
+		}
+		m.wasmStore.AddFuel(m.runtime.maxFuel)
+	}
 
 	var args []interface{}
 	for _, input := range arguments {

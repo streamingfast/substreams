@@ -56,7 +56,7 @@ func (r *Request) View() string {
 	return lipgloss.JoinVertical(0,
 		r.renderRequestSummary(),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.requestView.View()),
-		lipgloss.NewStyle().MarginLeft(r.Width-len(string(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
+		lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
 	)
 }
 

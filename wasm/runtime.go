@@ -4,6 +4,7 @@ import "fmt"
 
 type Runtime struct {
 	extensions map[string]map[string]WASMExtension
+	maxFuel    uint64
 }
 
 func (r *Runtime) registerWASMExtension(namespace string, importName string, ext WASMExtension) {
@@ -29,8 +30,10 @@ func (r *Runtime) registerWASMExtension(namespace string, importName string, ext
 	r.extensions[namespace][importName] = ext
 }
 
-func NewRuntime(extensions []WASMExtensioner) *Runtime {
-	r := &Runtime{}
+func NewRuntime(extensions []WASMExtensioner, maxFuel uint64) *Runtime {
+	r := &Runtime{
+		maxFuel: maxFuel,
+	}
 	for _, ext := range extensions {
 		for ns, exts := range ext.WASMExtensions() {
 			for name, ext := range exts {

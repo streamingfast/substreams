@@ -36,3 +36,9 @@ func WithRequestStats() Option {
 		s.runtimeConfig.WithRequestStats = true
 	}
 }
+
+func WithMaxWasmFuelPerBlockModule(maxFuel uint64) Option {
+	return func(s *Service) {
+		s.runtimeConfig.MaxWasmFuel = maxFuel
+	}
+}

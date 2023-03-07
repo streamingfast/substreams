@@ -36,9 +36,14 @@ func (m *Module) FreeMem() {
 }
 
 func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
-	engine := wasmtime.NewEngine()
+	cfg := wasmtime.NewConfig()
+	if r.maxFuel != 0 {
+		cfg.SetConsumeFuel(true)
+	}
+	engine := wasmtime.NewEngineWithConfig(cfg)
 	linker := wasmtime.NewLinker(engine)
 	store := wasmtime.NewStore(engine)
+
 	module, err := wasmtime.NewModule(store.Engine, wasmCode)
 	if err != nil {
 		return nil, fmt.Errorf("creating new module: %w", err)
@@ -100,6 +105,12 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*
 		Module:     m,
 		clock:      clock,
 		entrypoint: entrypoint,
+	}
+	if m.runtime.maxFuel != 0 {
+		if remaining, _ := m.wasmStore.ConsumeFuel(m.runtime.maxFuel); remaining != 0 {
+			m.wasmStore.ConsumeFuel(remaining) // don't accumulate fuel from previous executions
+		}
+		m.wasmStore.AddFuel(m.runtime.maxFuel)
 	}
 
 	var args []interface{}

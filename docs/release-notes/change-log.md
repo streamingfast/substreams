@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [1.0.0](https://github.com/streamingfast/substreams/releases/tag/v1.0.0)
 
 ### Highlights
 
@@ -35,6 +35,8 @@ This change keeps backwards compatibility. Old Substreams Packages will still wo
 ### Added
 
 * Added support for `{version}` template in `--output-file` flag value on `substreams pack`.
+* Added fuel limit to wasm execution as a server-side option, preventing wasm process from running forever.
+* Added 'Network' and 'Sink{Type, Module, Config}' fields in the manifest and protobuf definition for future bundling of substreams sink definitions within a substreams package.
 
 ## [0.2.0](https://github.com/streamingfast/substreams/releases/tag/v0.2.0)
 

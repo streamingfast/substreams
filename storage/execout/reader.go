@@ -3,6 +3,7 @@ package execout
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -168,11 +169,9 @@ func toModuleOutput(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbs
 	var output pbsubstreams.ModuleOutputData
 	switch module.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
+		outputType := strings.TrimPrefix(module.Output.Type, "proto:")
 		output = &pbsubstreams.ModuleOutput_MapOutput{
-			MapOutput: &anypb.Any{
-				TypeUrl: "type.googleapis.com/" + module.Output.Type,
-				Value:   cacheItem.Payload,
-			},
+			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + outputType, Value: cacheItem.Payload},
 		}
 	default:
 		panic(fmt.Sprintf("invalid module file %T", module.Kind))

@@ -15,7 +15,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (r *Reader) loadSinkConfig(pkg *pbsubstreams.Package, m *Manifest, protoDescs []*desc.FileDescriptor) error {
+func (r *Reader) loadSinkConfig(pkg *pbsubstreams.Package, m *Manifest) error {
 	if m.Sink == nil {
 		return nil
 	}
@@ -37,11 +37,15 @@ func (r *Reader) loadSinkConfig(pkg *pbsubstreams.Package, m *Manifest, protoDes
 
 	r.sinkConfigJSON = string(jsonConfigBytes)
 
+	files, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
+	if err != nil {
+		return fmt.Errorf("failed to create file descriptor: %2", err)
+	}
+
 	var found bool
 files:
-	for _, file := range protoDescs {
+	for _, file := range files {
 		for _, msgDesc := range file.GetMessageTypes() {
-			//fmt.Println("Type found:", file.GetName(), msgDesc.GetFullyQualifiedName())
 			if msgDesc.GetFullyQualifiedName() == m.Sink.Type {
 				dynConf := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 				if err := dynConf.UnmarshalJSON(jsonConfigBytes); err != nil {

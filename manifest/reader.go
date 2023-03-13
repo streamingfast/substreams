@@ -474,7 +474,7 @@ func mergeProtoFiles(src, dest *pbsubstreams.Package) {
 	for _, file := range src.ProtoFiles {
 		key := *file.Name
 		if seenFiles[key] {
-			zlog.Debug("skipping protofile already seen", zap.String("proto_file", *file.Name))
+			zlog.Debug("skipping proto file already seen", zap.String("proto_file", *file.Name))
 			continue
 		}
 		seenFiles[key] = true
@@ -507,7 +507,7 @@ func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, []*desc.File
 		return nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
-	if err := r.loadSinkConfig(pkg, m, protoDefinitions); err != nil {
+	if err := r.loadSinkConfig(pkg, m); err != nil {
 		return nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
 	}
 

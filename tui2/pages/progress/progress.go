@@ -105,4 +105,5 @@ func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
 	p.Common.SetSize(w, h)
 	p.bars.SetSize(w, h-headerHeight)
+	p.Styles.StatusBarValue.Width(p.Common.Width - len("Parallel engine progress messages: ") - 2)	// adjust width to force word wrap
 }

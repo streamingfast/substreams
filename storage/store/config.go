@@ -38,7 +38,7 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 		objStore:           subStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
-		appendLimit:        8_388_608,     // 8kb = 8 * 1024 * 1024,
+		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     1_073_741_824, // 1GiB
 		itemSizeLimit:      10_485_760,    // 10MiB
 	}, nil

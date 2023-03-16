@@ -25,7 +25,7 @@ Use your API Key to obtain a shorter-lived authentication token using `curl`:
 
 ### Set your environment variable
 
-Set the token as an `ENV` variable through the terminal by using:&#x20;
+Set the token as an `ENV` variable through the terminal by using:
 
 ```bash
 export SUBSTREAMS_API_TOKEN="your_token"
@@ -35,9 +35,9 @@ The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs
 
 ### All-in-one bash function
 
-Place this function in your terminal profile (`.bashrc` or `.zshrc`), for a quick all-in-one token fetcher:&#x20;
+Place this function in your terminal profile (`.bashrc` or `.zshrc`), for a quick all-in-one token fetcher:
 
-<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">export STREAMINGFAST_KEY=server_YOUR_KEY_HERE  
+<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">export STREAMINGFAST_KEY=server_YOUR_KEY_HERE
 function sftoken {
     export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | <a data-footnote-ref href="#user-content-fn-3">jq</a> -r .token)
     echo "Token set on in SUBSTREAMS_API_TOKEN"

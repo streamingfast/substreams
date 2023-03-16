@@ -20,7 +20,7 @@ Substreams packages are protobuf-serialized files. The standard extension for Su
 
 ### **Packages as self-describing messages**
 
-[Substreams packages](../../pb/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard protobuf FileDescriptorSet message layout. They therefore can be used with multiple code generation tools as a replacement for raw `.proto` files. They implement a pattern called [Self-describing Messages](https://protobuf.dev/programming-guides/techniques/#self-description).&#x20;
+[Substreams packages](../../pb/sf/substreams/v1/package.proto) conform to [Buf images](https://docs.buf.build/reference/images) and the standard protobuf FileDescriptorSet message layout. They therefore can be used with multiple code generation tools as a replacement for raw `.proto` files. They implement a pattern called [Self-describing Messages](https://protobuf.dev/programming-guides/techniques/#self-description).
 
 ### Creating packages
 

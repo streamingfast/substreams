@@ -8,7 +8,7 @@ description: StreamingFast Substreams examples
 
 #### Substreams template for dev guide
 
-The accompanying template for the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).&#x20;
+The accompanying template for the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).
 
 #### Uniswap-v3
 
@@ -16,7 +16,7 @@ Substreams-based Uniswap-v3 Subgraph and Substreams. [The Uniswap Substreams exa
 
 #### PancakeSwap Substreams
 
-Substreams [example for tracking PancakeSwap on BSC Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap).&#x20;
+Substreams [example for tracking PancakeSwap on BSC Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap).
 
 {% hint style="warning" %}
 **Important**: **No support is provided** for the PancakeSwap example or endpoint.
@@ -28,7 +28,7 @@ Substreams [example tracking ERC-20 tokens on the Ethereum Mainnet](https://gith
 
 #### Solana SPL Tokens
 
-First draft for [extraction of the SPL token on the Solana blockchain](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens).&#x20;
+First draft for [extraction of the SPL token on the Solana blockchain](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens).
 
 #### Substreams Rust client example
 

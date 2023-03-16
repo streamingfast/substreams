@@ -309,7 +309,7 @@ params:
   "imported:module": "overridden value"
 ```
 
-You can override those values with the `-p` parameter of `substreams run`.&#x20;
+You can override those values with the `-p` parameter of `substreams run`.
 
 When rolling out your consuming code -- in this example, Python -- you can use something like:
 

@@ -112,7 +112,7 @@ Notice the: `name: map_transfers`, the module in the manifest name matches the h
 
 The [`inputs`](inputs.md) uses the standard Ethereum Block, `sf.ethereum.type.v2.Block,` provided by the [`substreams-ethereum` crate](https://crates.io/crates/substreams-ethereum-core).
 
-The output uses the `type` `proto:eth.erc721.v1.Transfers` which is a custom protobuf definition provided by the generated Rust code.&#x20;
+The output uses the `type` `proto:eth.erc721.v1.Transfers` which is a custom protobuf definition provided by the generated Rust code.
 
 The function signature produced resembles:
 
@@ -160,7 +160,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 ```
 {% endcode %}
 
-Define the `store` module.&#x20;
+Define the `store` module.
 
 {% code title="manifest excerpt" %}
 ```yaml

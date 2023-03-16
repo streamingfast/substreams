@@ -10,14 +10,14 @@ The different blockchains have separate endpoints that Substreams uses. You will
 
 ### Supported blockchains and protobuf models
 
-Protobuf definitions and public endpoints are provided for the supported protocols and chains.&#x20;
+Protobuf definitions and public endpoints are provided for the supported protocols and chains.
 
 {% hint style="success" %}
 **Tip**: All of the endpoints listed in the documentation require [authentication](authentication.md) before use.
 {% endhint %}
 
 {% hint style="warning" %}
-**Important**_:_ Endpoints serve protobuf models specific to the underlying blockchain protocol and must match the `source:` field for the module.&#x20;
+**Important**_:_ Endpoints serve protobuf models specific to the underlying blockchain protocol and must match the `source:` field for the module.
 
 **Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint does not work!**
 {% endhint %}

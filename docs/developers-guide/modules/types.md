@@ -6,14 +6,14 @@ description: StreamingFast Substreams module types
 
 ## Module types overview
 
-Substreams uses two types of modules, `map` and `store`.&#x20;
+Substreams uses two types of modules, `map` and `store`.
 
 * `map` modules are functions receiving bytes as input and output. These bytes are encoded protobuf messages.
 * `store` modules are stateful, saving and tracking data through the use of key-value stores.
 
 ### `store` modules
 
-`store` modules write to key-value stores.&#x20;
+`store` modules write to key-value stores.
 
 {% hint style="info" %}
 **Note**: To ensure successful and proper parallelization can occur, `store` modules are not permitted to read any of their own data or values.
@@ -25,6 +25,8 @@ Stores declaring their own data types expose methods capable of mutating keys wi
 
 * Do not save keys in stores **unless they are going to be read by a downstream module**. Substreams stores are a way to aggregate data, but they are **not meant to be a storage layer**.
 * Do not save all transfers of a chain in a `store` module, rather, output them in a `map` and have a downstream system store them for querying.
+
+There are limitations impose on store usage. Specifically, each key/value entry must be smaller than 10MiB while a store cannot exceed 1GiB total. Keys being string, each character in the key account for 1 byte of storage space.
 
 ### Important store properties
 
@@ -46,7 +48,7 @@ The `valueType` property instructs the Substreams runtime of the data to be save
 
 #### `updatePolicy` property
 
-The `updatePolicy` property determines what methods are available in the runtime.&#x20;
+The `updatePolicy` property determines what methods are available in the runtime.
 
 The `updatePolicy` also defines the merging strategy for identical keys found in two contiguous stores produced through parallel processing.
 
@@ -63,7 +65,7 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 **Tip**: All update policies provide the `delete_prefix` method.
 {% endhint %}
 
-The merge strategy is **applied during parallel processing**.&#x20;
+The merge strategy is **applied during parallel processing**.
 
 * A module has built two partial stores containing keys for segment A, blocks 0-1000, and segment B, blocks 1000-2000, and is prepared to merge them into a complete store.
 * The complete store is represented acting as if the processing was done in a linear fashion, starting at block 0 and proceeding up to block 2000.
@@ -78,7 +80,7 @@ A downstream module is created to read from a store by using one of its inputs t
 
 Ordinals allow a key-value store to have multiple versions of a key within a single block. The `store` APIs contain different methods of `ordinal` or `ord`.
 
-For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B **and between B and D**_._&#x20;
+For example, the price for a token can change after transaction B and transaction D, and a downstream module might want to know the value of a key before transaction B **and between B and D**_._
 
 {% hint style="warning" %}
 **Important**: Ordinals **must be set every time a key is set** and **you can only set keys in increasing ordinal order**, or by using an ordinal equal to the previous.
@@ -100,8 +102,8 @@ The `get mode` function provides the module with a key-value store that is guara
 
 The definition of `store` method behavior is:
 
-* The `get_last` method is the fastest because it queries the store directly.&#x20;
-* The `get_first` method first goes through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.&#x20;
+* The `get_last` method is the fastest because it queries the store directly.
+* The `get_first` method first goes through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.
 * The `get_at` method unwinds deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
 
 #### `deltas mode`

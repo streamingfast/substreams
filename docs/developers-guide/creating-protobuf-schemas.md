@@ -16,7 +16,7 @@ Learn more about the details of Google Protocol Buffers in the official document
 
 **Google Protocol Buffer Documentation**
 
-[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.&#x20;
+[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.
 
 **Google Protocol Buffer Tutorial**
 
@@ -59,9 +59,9 @@ The ERC721 smart contract used in the Substreams Template example contains a `Tr
 The protobuf file serves as the interface between the module handlers and the data being provided by Substreams.
 
 {% hint style="success" %}
-**Tip**: Protobufs are platform-independent and are defined and used for various blockchains.&#x20;
+**Tip**: Protobufs are platform-independent and are defined and used for various blockchains.
 
-* The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.&#x20;
+* The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.
 * The size and scope of the Substreams module dictates the number of and complexity of protobufs.
 {% endhint %}
 
@@ -103,11 +103,11 @@ View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/de
 
 Protocol buffers define fields' type by using standard primitive data types, such as integers, booleans, and floats or a complex data type such as `message`, `enum`, `oneof` or `map`. View the [full list](https://developers.google.com/protocol-buffers/docs/proto#scalar) of types in the [Google Protocol Buffers documentation](https://developers.google.com/protocol-buffers/docs/overview).
 
-Any primitive data types in a message generate the corresponding Rust type,[`String`](https://doc.rust-lang.org/std/string/struct.String.html) for `string`, `u64` for `uint64,` and assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for [`String`](https://doc.rust-lang.org/std/string/struct.String.html), 0 for integer types, `false` for `bool`. &#x20;
+Any primitive data types in a message generate the corresponding Rust type,[`String`](https://doc.rust-lang.org/std/string/struct.String.html) for `string`, `u64` for `uint64,` and assign the default value of the corresponding Rust type if the field is not present in a message, an empty string for [`String`](https://doc.rust-lang.org/std/string/struct.String.html), 0 for integer types, `false` for `bool`.
 
 Rust generates the corresponding `message` type wrapped by an [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) enum type for fields referencing other complex `messages`. The [`None`](https://doc.rust-lang.org/std/option/) variant is used if the field is not present in the message.
 
-The [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) [`enum`](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html) is used to represent the presence through [`Some(x)`](https://doc.rust-lang.org/std/option/) or absence through [`None`](https://doc.rust-lang.org/std/option/) of a value in Rust. [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) allows developers to distinguish between a field containing a value versus a field without an assigned a value.&#x20;
+The [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) [`enum`](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html) is used to represent the presence through [`Some(x)`](https://doc.rust-lang.org/std/option/) or absence through [`None`](https://doc.rust-lang.org/std/option/) of a value in Rust. [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) allows developers to distinguish between a field containing a value versus a field without an assigned a value.
 
 {% hint style="info" %}
 **Note**: The standard approach to represent nullable data in Rust is to wrap optional values in [`Option<T>`](https://doc.rust-lang.org/rust-by-example/std/option.html).

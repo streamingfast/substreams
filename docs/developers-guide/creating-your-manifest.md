@@ -21,7 +21,7 @@ The manifest from the [Substreams Template example](https://github.com/streaming
 {% hint style="info" %}
 **Note**: Learn more about Substreams manifests and different blockchains through the examples provided by StreamingFast.
 
-* The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain.&#x20;
+* The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain.
 * The [Solana SPL Token Transfers example](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens) contains a [manifest specific to the Solana blockchain](https://github.com/streamingfast/substreams-playground/blob/master/modules/sol-spl-tokens/substreams.yaml).
 {% endhint %}
 

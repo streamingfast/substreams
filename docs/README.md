@@ -20,21 +20,21 @@ Learn about Substreams in a short, dense 25-minute intro and understand its impa
 A walkthrough of Firehose features, Substreams modules, including a sample Rust module and StreamingFast's vision.
 {% endembed %}
 
-Learn essential facts about Substreams through [reading the Benefits and comparison](./concepts-and-fundamentals/benefits.md).
+Learn essential facts about Substreams through [reading the Benefits and comparison](concepts-and-fundamentals/benefits.md).
 
 The primary ways to use Substreams include:
 
-* [Installing the `substreams` CLI](./getting-started/installing-the-cli.md)
-* [Going through the Quickstart](./getting-started/quickstart.md)
+* [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
+* [Going through the Quickstart](getting-started/quickstart.md)
 
 After installing Substreams and reviewing the Quickstart:
 
-* You can [learn more about modules](./concepts-and-fundamentals/modules.md), and then [study the Developer's guide](./developers-guide/overview.md).
+* You can [learn more about modules](concepts-and-fundamentals/modules.md), and then [study the Developer's guide](developers-guide/overview.md).
 
 Find pre-built Substreams by using the following resources:
 
 * The [Substreams Template](https://github.com/streamingfast/substreams-template) helps expedite the process of getting you up and running.
-* The [Substreams Playground](https://github.com/streamingfast/substreams-playground) is a collection of Substreams modules and examples.
+* A [list of maintained Substreams examples](reference-and-specs/examples.md)
 
 ### Network model diagram
 

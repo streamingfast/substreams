@@ -78,13 +78,25 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return p, nil
 }
 
-func (p *Progress) View() string {
-	labels := []string{
-		"Parallel engine progress messages: ",
-		"target block: ",
-		"Data payloads received: ",
-		"Status: ",
+var labels = []string{
+	"Parallel engine progress messages: ",
+	"Target block: ",
+	"Data payloads received: ",
+	"Status: ",
+}
+
+func labelsMaxLen() int {
+	width := 0
+	for _, label := range labels {
+		if len(label) > width {
+			width = len(label)
+		}
 	}
+	return width
+}
+
+func (p *Progress) View() string {
+
 	infos := []string{
 		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
 		fmt.Sprintf("%d", p.targetBlock),
@@ -105,5 +117,5 @@ func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
 	p.Common.SetSize(w, h)
 	p.bars.SetSize(w, h-headerHeight)
-	p.Styles.StatusBarValue.Width(p.Common.Width - len("Parallel engine progress messages: ") - 2)	// adjust width to force word wrap
+	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen() - 2) // adjust width to force word wrap
 }

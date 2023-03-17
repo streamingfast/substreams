@@ -26,7 +26,7 @@ The accompanying template for the Developer's guide is[ ](https://github.com/str
 
 #### Substreams for Solana
 
-A basic [Substreams module for the Solana blockchain](https://github.com/streamingfast/substreams-solana-tutorial) demonstrates how to reference the chain-specific SPKG, endpoints, and data models.
+A basic [Substreams module for the Solana blockchain](https://github.com/streamingfast/substreams-solana-quickstart) demonstrates how to reference the chain-specific SPKG, endpoints, and data models.
 
 ### StreamingFast Discord for Substreams
 

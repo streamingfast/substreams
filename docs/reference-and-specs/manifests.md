@@ -35,7 +35,6 @@ Excerpt pulled from the example Substreams manifest.
 package:
   name: module_name_for_project
   version: v0.5.0
-  url: https://github.com/streamingfast/substreams-playground
   doc: |
     Documentation heading for the package.
 
@@ -320,4 +319,4 @@ my_mod.inputs[0].params.value = "myvalue"
 ```
 {% endcode %}
 
-which would be inserted j[ust before starting the stream](https://github.com/streamingfast/substreams-playground/blob/master/consumers/python/main.py#L34).
+which would be inserted just before starting the stream.

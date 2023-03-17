@@ -151,7 +151,8 @@ func DefaultStyles() *Styles {
 		Foreground(lipgloss.Color("228"))
 
 	s.StatusBarValue = lipgloss.NewStyle().
-		Padding(0, 1).
+		PaddingLeft(1).
+		PaddingRight(2).
 		Background(lipgloss.Color("235")).
 		Foreground(lipgloss.Color("243"))
 

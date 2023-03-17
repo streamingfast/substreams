@@ -117,5 +117,5 @@ func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
 	p.Common.SetSize(w, h)
 	p.bars.SetSize(w, h-headerHeight)
-	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen() - 2) // adjust width to force word wrap
+	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen()) // adjust status bar width to force word wrap: full width - labels width
 }

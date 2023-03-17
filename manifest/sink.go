@@ -39,7 +39,7 @@ func (r *Reader) loadSinkConfig(pkg *pbsubstreams.Package, m *Manifest) error {
 
 	files, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
 	if err != nil {
-		return fmt.Errorf("failed to create file descriptor: %2", err)
+		return fmt.Errorf("failed to create file descriptor: %w", err)
 	}
 
 	var found bool

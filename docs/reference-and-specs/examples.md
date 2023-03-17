@@ -14,30 +14,29 @@ The accompanying template for the Developer's Guide is[ ](https://github.com/str
 
 Substreams-based Uniswap-v3 Subgraph and Substreams. [The Uniswap Substreams example ](https://github.com/streamingfast/substreams-uniswap-v3)is in beta.
 
-#### PancakeSwap Substreams
-
-Substreams [example for tracking PancakeSwap on BSC Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/pancakeswap).
-
-{% hint style="warning" %}
-**Important**: **No support is provided** for the PancakeSwap example or endpoint.
-{% endhint %}
-
 #### ETH Token Substreams
 
-Substreams [example tracking ERC-20 tokens on the Ethereum Mainnet](https://github.com/streamingfast/substreams-playground/tree/master/modules/eth-token).
+Substreams [example tracking ERC-20/721/1155 tokens on the Ethereum Mainnet](https://github.com/streamingfast/substreams-eth-token-transfers).
 
-#### Solana SPL Tokens
+#### ETH BlockMeta Substreams
 
-First draft for [extraction of the SPL token on the Solana blockchain](https://github.com/streamingfast/substreams-playground/tree/master/modules/sol-spl-tokens).
+Substreams [example tracking first and last block for every month on Ethereum Mainnet](https://github.com/streamingfast/substreams-eth-block-meta).
 
-#### Substreams Rust client example
+**ETH Address Created Count**
 
-Substreams example to [consume data from the compute engine](https://github.com/streamingfast/substreams-playground/tree/master/consumers/rust), written in Rust.
+Simple Subtreams [example tracking Ethereum Mainnet address creation](https://github.com/streamingfast/substreams-ethereum-address-created-count).
 
-#### Substreams Python client example
+## Substreams Key/Value store sink examples
 
-Substreams example to [consume data from the compute engine](https://github.com/streamingfast/substreams-playground/tree/master/consumers/python), written in Python.
+#### ETH BlockMeta Substreams with Generic Service
 
-#### PancakeSwap direct to database example
+End-to-end example sinking the BlockMeta Substreams to a key-value store and serving a website that utilizes the Generic Service to query the store
 
-An[ E2E indexer for PancakeSwap](https://github.com/streamingfast/substreams-playground/tree/master/consumers/pancakeswap-to-graphnode) written in the Go programming language.
+[https://github.com/streamingfast/substreams-sink-kv/tree/develop/examples/generic-service](https://github.com/streamingfast/substreams-sink-kv/tree/develop/examples/generic-service)
+
+#### ETH BlockMeta Substreams with Wasm Query Service
+
+End-to-end example sinking the BlockMeta Substreams to a key-value store and serving a gRPC API backed by user defined WASM.
+
+[https://github.com/streamingfast/substreams-sink-kv/tree/develop/examples/wasm-query-service](https://github.com/streamingfast/substreams-sink-kv/tree/develop/examples/wasm-query-service)
+

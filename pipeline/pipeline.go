@@ -258,7 +258,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		return fmt.Errorf("set output cache: %w", err)
 	}
 	if moduleOutput != nil {
-		p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Number)
+		p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Id)
 	}
 	return nil
 }

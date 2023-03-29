@@ -114,7 +114,7 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 
 func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	p.execOutputCache.HandleStalled(clock)
-	p.forkHandler.removeReversibleOutput(clock.Number)
+	p.forkHandler.removeReversibleOutput(clock.Id)
 	return nil
 }
 
@@ -125,7 +125,15 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock
 		}
 	}
 	p.execOutputCache.HandleUndo(clock)
-	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc, p.gate.shouldSendOutputs()); err != nil {
+
+	var outputableModules []*pbsubstreams.Module
+	if reqctx.Details(ctx).Request.GetProductionMode() {
+		outputableModules = []*pbsubstreams.Module{p.outputGraph.OutputModule()}
+	} else {
+		outputableModules = p.outputGraph.AllModules()
+	}
+
+	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc, p.gate.shouldSendOutputs(), outputableModules); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 	return nil
@@ -136,7 +144,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	if err := p.execOutputCache.HandleFinal(clock); err != nil {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
-	p.forkHandler.removeReversibleOutput(clock.Number)
+	p.forkHandler.removeReversibleOutput(clock.Id)
 	return nil
 }
 

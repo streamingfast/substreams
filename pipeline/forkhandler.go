@@ -18,13 +18,13 @@ type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.M
 //	live on the Pipeline (where it makes sense)
 //	and have some nested structs handle
 type ForkHandler struct {
-	reversibleOutputs map[uint64][]*pbsubstreams.ModuleOutput
+	reversibleOutputs map[string][]*pbsubstreams.ModuleOutput
 	undoHandlers      []UndoHandler
 }
 
 func NewForkHandler() *ForkHandler {
 	return &ForkHandler{
-		reversibleOutputs: make(map[uint64][]*pbsubstreams.ModuleOutput),
+		reversibleOutputs: make(map[string][]*pbsubstreams.ModuleOutput),
 		undoHandlers:      []UndoHandler{},
 	}
 }
@@ -38,10 +38,20 @@ func (f *ForkHandler) handleUndo(
 	cursor *bstream.Cursor,
 	respFunc func(resp *pbsubstreams.Response) error,
 	sendOutputs bool,
+	outputableModules []*pbsubstreams.Module,
 ) error {
-	if moduleOutputs, found := f.reversibleOutputs[clock.Number]; found {
+	if moduleOutputs, found := f.reversibleOutputs[clock.Id]; found {
 		if sendOutputs {
-			if err := returnModuleDataOutputs(clock, bstream.StepUndo, cursor, moduleOutputs, respFunc); err != nil {
+			var toSend []*pbsubstreams.ModuleOutput
+			for _, out := range moduleOutputs {
+				for _, outputable := range outputableModules {
+					if outputable.Name == out.Name {
+						toSend = append(toSend, out)
+						break
+					}
+				}
+			}
+			if err := returnModuleDataOutputs(clock, bstream.StepUndo, cursor, toSend, respFunc); err != nil {
 				return fmt.Errorf("calling return func when reverting outputs: %w", err)
 			}
 		}
@@ -53,10 +63,10 @@ func (f *ForkHandler) handleUndo(
 	return nil
 }
 
-func (f *ForkHandler) removeReversibleOutput(blockNumber uint64) {
-	delete(f.reversibleOutputs, blockNumber)
+func (f *ForkHandler) removeReversibleOutput(blockID string) {
+	delete(f.reversibleOutputs, blockID)
 }
 
-func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockNum uint64) {
-	f.reversibleOutputs[blockNum] = append(f.reversibleOutputs[blockNum], moduleOutput)
+func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockID string) {
+	f.reversibleOutputs[blockID] = append(f.reversibleOutputs[blockID], moduleOutput)
 }

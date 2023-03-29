@@ -7,20 +7,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var reversibleOutputs = map[uint64][]*pbsubstreams.ModuleOutput{
-	10: {
+var reversibleOutputs = map[string][]*pbsubstreams.ModuleOutput{
+	"10a": {
 		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 	},
-	20: {
+	"20a": {
 		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 	},
-	30: {
+	"30a": {
 		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 	},
-	40: {
+	"40a": {
 		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 	},
-	50: {
+	"50a": {
 		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 	},
 }
@@ -48,24 +48,24 @@ func Test_HandleIrreversibility(t *testing.T) {
 	tests := []struct {
 		name              string
 		reversibleOutputs map[string][]*pbsubstreams.Module
-		blockNumbers      []uint64
-		expectedOutputs   map[uint64][]*pbsubstreams.ModuleOutput
+		blockIDs          []string
+		expectedOutputs   map[string][]*pbsubstreams.ModuleOutput
 	}{
 		{
 			name:              "handle irreversibility for block 20",
 			reversibleOutputs: reversibleModules,
-			blockNumbers:      []uint64{20},
-			expectedOutputs: map[uint64][]*pbsubstreams.ModuleOutput{
-				10: {
+			blockIDs:          []string{"20a"},
+			expectedOutputs: map[string][]*pbsubstreams.ModuleOutput{
+				"10a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
-				30: {
+				"30a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
-				40: {
+				"40a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
-				50: {
+				"50a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
 			},
@@ -73,15 +73,15 @@ func Test_HandleIrreversibility(t *testing.T) {
 		{
 			name:              "handle irreversibility for block 20 and 30",
 			reversibleOutputs: reversibleModules,
-			blockNumbers:      []uint64{20, 30},
-			expectedOutputs: map[uint64][]*pbsubstreams.ModuleOutput{
-				10: {
+			blockIDs:          []string{"20a", "30a"},
+			expectedOutputs: map[string][]*pbsubstreams.ModuleOutput{
+				"10a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
-				40: {
+				"40a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
-				50: {
+				"50a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
 			},
@@ -89,9 +89,9 @@ func Test_HandleIrreversibility(t *testing.T) {
 		{
 			name:              "handle irreversibility for block 20, 30, 40 and 50",
 			reversibleOutputs: reversibleModules,
-			blockNumbers:      []uint64{20, 30, 40, 50},
-			expectedOutputs: map[uint64][]*pbsubstreams.ModuleOutput{
-				10: {
+			blockIDs:          []string{"20a", "30a", "40a", "50a"},
+			expectedOutputs: map[string][]*pbsubstreams.ModuleOutput{
+				"10a": {
 					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
 				},
 			},
@@ -103,8 +103,8 @@ func Test_HandleIrreversibility(t *testing.T) {
 			forkHandler := &ForkHandler{
 				reversibleOutputs: reversibleOutputs,
 			}
-			for _, blockNum := range test.blockNumbers {
-				forkHandler.removeReversibleOutput(blockNum)
+			for _, id := range test.blockIDs {
+				forkHandler.removeReversibleOutput(id)
 			}
 			require.Equal(t, test.expectedOutputs, forkHandler.reversibleOutputs)
 		})

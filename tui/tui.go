@@ -221,8 +221,13 @@ func (ui *TUI) ensureTerminalLocked() {
 
 	ui.prog = tea.NewProgram(newModel(ui))
 	go func() {
-		if err := ui.prog.Start(); err != nil {
-			fmt.Printf("Failed bubble tea program: %s\n", err)
+		if _, err := ui.prog.Run(); err != nil {
+			if err != tea.ErrProgramKilled {
+				// tea library handles the error weirdly. It will return  an ErrProgramKilled when
+				// the context has been canceled. This occurs when the program shutdowns, which should not
+				// actually be an error
+				fmt.Printf("Failed bubble tea program: %s\n", err)
+			}
 		}
 	}()
 }

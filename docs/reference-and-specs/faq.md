@@ -40,7 +40,7 @@ The Substreams documentation also [provides general instructions surrounding aut
 
 ### **How do I create a Substreams module?**
 
-Developers create their own Substreams implementations in a variety of ways. StreamingFast [provides the Substreams Playground](https://github.com/streamingfast/substreams-playground) containing examples to use as a reference and starting point.
+Developers create their own Substreams implementations in a variety of ways. Use these [examples](reference-and-specs/examples.md) as a reference and starting point.
 
 The Substreams documentation [provides a Developer's guide](https://substreams.streamingfast.io/developer-guide/overview) to assist you to understand and use Substreams.
 

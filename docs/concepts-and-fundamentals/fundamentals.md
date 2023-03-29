@@ -68,7 +68,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 Many protobuf definitions have already been created, such as [the erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), for use by developers creating Substreams data transformation strategies.
 
-Custom smart contracts, [like UniSwap](https://github.com/streamingfast/substreams-playground/blob/master/modules/uniswap/proto/modules.proto), also have protobuf definitions that are referenced in the Substreams manifest and made available to module handler functions. Protobufs provide an API to the data for smart contract addresses.
+Custom smart contracts, [like UniSwap](https://github.com/streamingfast/substreams-uniswap-v3/blob/e4b0fb016210870a385484f29bb5116931ea9a50/proto/uniswap/v1/uniswap.proto), also have protobuf definitions that are referenced in the Substreams manifest and made available to module handler functions. Protobufs provide an API to the data for smart contract addresses.
 
 In object-oriented programming terminology, protobufs are the objects or object models. In front-end web development, they are similar to REST or other data APIs.
 

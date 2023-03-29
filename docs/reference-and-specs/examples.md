@@ -10,6 +10,14 @@ description: StreamingFast Substreams examples
 
 The accompanying template for the Developer's Guide is[ ](https://github.com/streamingfast/substreams-template)conveniently located in the [official Substreams Template Github repository](https://github.com/streamingfast/substreams-template).
 
+#### ETH Substreams Quickstart
+
+A basic [Ethereum Substreams](https://github.com/streamingfast/substreams-ethereum-quickstart)
+
+#### SOL Substreams Quickstart
+
+A basic [Solana Substreams](https://github.com/streamingfast/substreams-solana-quickstart).
+
 #### Uniswap-v3
 
 Substreams-based Uniswap-v3 Subgraph and Substreams. [The Uniswap Substreams example ](https://github.com/streamingfast/substreams-uniswap-v3)is in beta.

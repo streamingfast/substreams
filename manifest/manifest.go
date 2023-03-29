@@ -116,7 +116,10 @@ func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) 
 	if err != nil {
 		return nil, fmt.Errorf("reading substreams manifest %q: %w", yamlFilePath, err)
 	}
-	if err := yaml.NewDecoder(bytes.NewReader(cnt)).Decode(&out); err != nil {
+
+	decoder := yaml.NewDecoder(bytes.NewReader(cnt))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&out); err != nil {
 		return nil, fmt.Errorf("decoding manifest content: %w", err)
 	}
 	return

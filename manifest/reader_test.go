@@ -219,6 +219,12 @@ func TestReader_Read(t *testing.T) {
 			nil,
 			require.Error,
 		},
+		{
+			"invalid_unknown_field.yaml",
+			args{},
+			nil,
+			require.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

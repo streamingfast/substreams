@@ -1,0 +1,20 @@
+specVersion: v0.1.0
+package:
+  name: test
+  version: v0.0.0
+
+import:
+  bare: "./dep1.yaml"
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy.wasm
+
+modules:
+  - name: test_mapper
+    kind: map
+    inputs:
+      - source: sf.test.Block
+    output:
+      type: proto:sf.test.Output

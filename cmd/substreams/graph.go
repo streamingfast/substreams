@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/streamingfast/cli"
-	"github.com/streamingfast/substreams/tools"
-
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
+
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/tools"
 )
 
 var graphCmd = &cobra.Command{
@@ -44,6 +44,11 @@ func runManifestGraph(cmd *cobra.Command, args []string) error {
 	}
 
 	manifest.PrintMermaid(pkg.Modules)
+
+	fmt.Println("")
+	fmt.Println("Here is a quick link to see the graph:")
+	fmt.Println("")
+	fmt.Println(manifest.GenerateMermaidLiveURL(pkg.Modules))
 
 	return nil
 }

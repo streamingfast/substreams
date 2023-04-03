@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * "undo" messages incorrectly contained too many module outputs (all modules, with some duplicates)
 * Fixed status bar message cutoff bug
+* Fixed `substreams run` when `manifest` contains unknown attributes
+* Fixed bubble tea program error when existing the `run` command
 
 ## [1.0.0](https://github.com/streamingfast/substreams/releases/tag/v1.0.0)
 

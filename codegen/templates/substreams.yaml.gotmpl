@@ -9,7 +9,7 @@ package:
 
 protobuf:
   files:
-    - erc721.proto
+    - contractproto.proto
   importPaths:
     - ./proto
 
@@ -19,11 +19,11 @@ binaries:
     file: ./target/wasm32-unknown-unknown/release/substreams.wasm
 
 modules:
-  - name: map_transfers
+  - name: map_all_events
     kind: map
     initialBlock: 12287507
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:eth.erc721.v1.Transfers
+      type: proto:eth.contract.v1.Events
 

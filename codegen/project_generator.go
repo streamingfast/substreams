@@ -3,6 +3,7 @@ package codegen
 import (
 	"errors"
 	"fmt"
+	"github.com/streamingfast/eth-go"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -13,7 +14,13 @@ import (
 )
 
 type ProjectGenerator struct {
-	srcPath string
+	srcPath             string
+	ProjectContract     eth.Address
+	ProjectAbi          string
+	ProjectContractType string
+	ProjectEvents       []CodegenEvent
+	ProtoEvents         []ProtoEvent
+	RustEvents          []RustEvent
 
 	ProjectName       string
 	ProjectVersion    string
@@ -43,16 +50,23 @@ func WithRustVersion(version string) ProjectGeneratorOption {
 	}
 }
 
-func NewProjectGenerator(srcPath, projectName string, opts ...ProjectGeneratorOption) *ProjectGenerator {
+func NewProjectGenerator(srcPath, projectName string, projectContract eth.Address, abi string, events []CodegenEvent, opts ...ProjectGeneratorOption) *ProjectGenerator {
 	pj := &ProjectGenerator{
-		srcPath:           srcPath,
+		ProjectAbi:      abi,
+		srcPath:         srcPath,
+		ProjectContract: projectContract,
+		ProjectEvents:   events,
+
 		ProjectName:       projectName,
 		ProjectVersion:    DefaultProjectVersion,
 		ProjectVersionNum: DefaultProjectVersionNum,
 		RustVersion:       DefaultRustVersion,
 		SubstreamsVersion: DefaultSubstreamsVersion,
 	}
-
+	for i, event := range events {
+		pj.ProtoEvents = append(pj.ProtoEvents, event.getProtoEvent(i+1, &event))
+		pj.RustEvents = append(pj.RustEvents, event.getRustEvent(&event))
+	}
 	for _, opt := range opts {
 		opt(pj)
 	}
@@ -66,6 +80,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 		".cargo",
 		"proto",
 		"src",
+		"abi",
 		filepath.Join("src", "abi"),
 		filepath.Join("src", "pb"),
 	}
@@ -84,7 +99,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 		}
 	}
 
-	// generate template from ./templates
+	// generate template from ./templates/init_template
 	templateFiles, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*.gotmpl", "*/*/*.gotmpl", "*/*/*/*.gotmpl")
 	if err != nil {
 		return fmt.Errorf("instantiate template: %w", err)

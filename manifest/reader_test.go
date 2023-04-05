@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -99,31 +100,30 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 		},
-		// FIXME: this test fails
-		//{
-		//	"imports_http_url.yaml",
-		//	args{
-		//		env: map[string]string{
-		//			"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
-		//		},
-		//	},
-		//	&pbsubstreams.Package{
-		//		Version:    1,
-		//		ProtoFiles: readSystemProtoDescriptors(t),
-		//		Modules:    &pbsubstreams.Modules{},
-		//		PackageMeta: []*pbsubstreams.PackageMetadata{
-		//			{
-		//				Name:    "test",
-		//				Version: "v0.0.0",
-		//			},
-		//			{
-		//				Name:    "spkg1",
-		//				Version: "v0.0.0",
-		//			},
-		//		},
-		//	},
-		//	require.NoError,
-		//},
+		{
+			"imports_http_url.yaml",
+			args{
+				env: map[string]string{
+					"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
+				},
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				Modules:    &pbsubstreams.Modules{},
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "test",
+						Version: "v0.0.0",
+					},
+					{
+						Name:    "spkg1",
+						Version: "v0.0.0",
+					},
+				},
+			},
+			require.NoError,
+		},
 		{
 			"imports_expand_env_variables.yaml",
 			args{

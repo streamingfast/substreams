@@ -1,13 +1,15 @@
 mod generated;
 
 use prost::encoding::float;
+use prost::Message;
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display};
 use std::ops::Deref;
-use prost::Message;
 use substreams::errors::Error;
 use substreams::prelude::*;
 
+use substreams::pb::substreams::store_delta::Operation;
+use substreams::pb::substreams::store_delta::Operation::{Create, Update};
 use substreams::scalar::BigDecimal;
 use substreams::store::{
     DeltaBigDecimal, DeltaFloat64, StoreAddBigDecimal, StoreAddFloat64, StoreGetBigDecimal,
@@ -15,14 +17,16 @@ use substreams::store::{
     StoreMinBigDecimal, StoreMinBigInt, StoreMinFloat64, StoreSetBigDecimal, StoreSetBigInt,
     StoreSetFloat64,
 };
-use substreams::{errors, log_info, scalar::BigInt, store::{
-    DeltaBigInt, DeltaInt64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreDelete,
-    StoreGet, StoreGetBigInt, StoreGetInt64, StoreMinInt64, StoreNew, StoreSet,
-    StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto, StoreSetInt64,
-    StoreSetProto,
-}};
-use substreams::pb::substreams::store_delta::Operation;
-use substreams::pb::substreams::store_delta::Operation::{Create, Update};
+use substreams::{
+    errors, log_info,
+    scalar::BigInt,
+    store::{
+        DeltaBigInt, DeltaInt64, Deltas, StoreAdd, StoreAddBigInt, StoreAddInt64, StoreDelete,
+        StoreGet, StoreGetBigInt, StoreGetInt64, StoreMinInt64, StoreNew, StoreSet,
+        StoreSetIfNotExists, StoreSetIfNotExistsInt64, StoreSetIfNotExistsProto, StoreSetInt64,
+        StoreSetProto,
+    },
+};
 
 use crate::pb::test;
 use crate::pb::test::Block;
@@ -92,7 +96,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         s: StoreGetInt64,
     ) -> Result<test::Boolean, errors::Error> {
         assert(block.number, true, s.has_last("a.key"));
-        assert(block.number, false, s.has_last("b.key"));;
+        assert(block.number, false, s.has_last("b.key"));
 
         assert(block.number, 0, s.get_last("a.key").unwrap());
         Ok(test::Boolean { result: true })

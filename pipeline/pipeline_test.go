@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -54,7 +55,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 				forkHandler: NewForkHandler(),
 				outputGraph: outputmodules.TestNew(),
 			}
-			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
+			clock := &pbsubstreamsrpc.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)
 			err := pipe.execute(ctx, executor, execOutput)
@@ -80,7 +81,6 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 
 	wasmModule, err := wasm.NewRuntime(nil, 0).NewModule(
 		context.Background(),
-		nil,
 		binary.Content,
 		name,
 		name,
@@ -184,12 +184,12 @@ type testStoreConfig struct {
 
 func withTestRequest(t *testing.T, outputModule string, startBlock uint64) context.Context {
 	t.Helper()
-	req, err := BuildRequestDetails(&pbsubstreams.Request{
-		OutputModule:  outputModule,
-		StartBlockNum: int64(startBlock),
-	}, false, func(name string) bool {
-		return name == outputModule
-	}, func() (uint64, error) { return 0, nil })
+	req, err := BuildRequestDetails(
+		&pbsubstreamsrpc.Request{
+			OutputModule:  outputModule,
+			StartBlockNum: int64(startBlock),
+		},
+		func() (uint64, error) { return 0, nil })
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)
 }

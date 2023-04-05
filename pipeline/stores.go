@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 	"go.opentelemetry.io/otel/attribute"
@@ -64,10 +64,10 @@ func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	return nil
 }
 
-func (s *Stores) storesHandleUndo(moduleOutput *pbsubstreams.ModuleOutput) {
-	if s, found := s.StoreMap.Get(moduleOutput.Name); found {
+func (s *Stores) storesHandleUndo(moduleOutput *pbssinternal.ModuleOutput) {
+	if s, found := s.StoreMap.Get(moduleOutput.ModuleName); found {
 		if deltaStore, ok := s.(store.DeltaAccessor); ok {
-			deltaStore.ApplyDeltasReverse(moduleOutput.GetDebugStoreDeltas().GetDeltas())
+			deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().StoreDeltas)
 		}
 	}
 }
@@ -100,7 +100,7 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, b
 		return fmt.Errorf("failed to write store: %w", err)
 	}
 
-	if reqctx.Details(ctx).ShouldReturnWrittenPartialsInTrailer(saveStore.Name()) {
+	if reqctx.Details(ctx).ShouldReturnWrittenPartials(saveStore.Name()) {
 		s.partialsWritten = append(s.partialsWritten, blockRange)
 		reqctx.Logger(ctx).Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", s.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
 

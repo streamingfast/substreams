@@ -10,6 +10,8 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -40,8 +42,12 @@ type Pipeline struct {
 	wasmRuntime     *wasm.Runtime
 	outputGraph     *outputmodules.Graph
 	moduleExecutors []exec.ModuleExecutor
-	moduleOutputs   []*pbsubstreams.ModuleOutput
-	respFunc        func(resp *pbsubstreams.Response) error
+
+	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
+	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
+	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
+
+	respFunc func(substreams.ResponseFromAnyTier) error
 
 	stores         *Stores
 	execoutStorage *execout.Configs
@@ -51,11 +57,13 @@ type Pipeline struct {
 	gate *gate
 
 	forkHandler     *ForkHandler
+	insideReorgUpTo bstream.BlockRef
+
 	execOutputCache *cache.Engine
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
 	// (for chains with potential block skips)
-	lastFinalClock *pbsubstreams.Clock
+	lastFinalClock *pbsubstreamsrpc.Clock
 }
 
 func New(
@@ -66,7 +74,7 @@ func New(
 	wasmRuntime *wasm.Runtime,
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
-	respFunc func(resp *pbsubstreams.Response) error,
+	respFunc func(substreams.ResponseFromAnyTier) error,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -93,7 +101,7 @@ func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
 	defer span.EndWithErr(&err)
 
-	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.ModuleOutput) {
+	p.forkHandler.registerUndoHandler(func(clock *pbsubstreamsrpc.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
 		for _, modOut := range moduleOutputs {
 			p.stores.storesHandleUndo(modOut)
 		}
@@ -131,7 +139,7 @@ func (p *Pipeline) GetStoreMap() store.Map {
 }
 
 func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
-	for _, module := range reqDetails.Request.Modules.Modules {
+	for _, module := range reqDetails.Modules.Modules {
 		if reqDetails.IsOutputModule(module.Name) {
 			p.processingModule = &processingModule{
 				name:            module.GetName(),
@@ -145,7 +153,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 
-	outputModuleName := reqDetails.Request.MustGetOutputModuleName()
+	outputModuleName := reqDetails.OutputModule
 
 	ttrace.SpanContextFromContext(context.Background())
 	storeMap := store.NewMap()
@@ -210,7 +218,7 @@ func (p *Pipeline) isOutputModule(name string) bool {
 	return p.outputGraph.IsOutputModule(name)
 }
 
-func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
+func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreamsrpc.Clock) {
 	for _, hook := range p.postJobHooks {
 		if err := hook(ctx, clock); err != nil {
 			reqctx.Logger(ctx).Warn("post job hook failed", zap.Error(err))
@@ -218,7 +226,7 @@ func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Cloc
 	}
 }
 
-func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clock) (err error) {
+func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreamsrpc.Clock) (err error) {
 	_, span := reqctx.WithSpan(ctx, "pre_block_hooks")
 	defer span.EndWithErr(&err)
 
@@ -243,7 +251,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	moduleOutput, outputBytes, runError := exec.RunModule(ctx, executor, execOutput)
 	if runError != nil {
 		if hasValidOutput {
-			p.appendModuleOutputs(moduleOutput)
+			p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 		}
 		return fmt.Errorf("execute module: %w", runError)
 	}
@@ -251,9 +259,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	if !hasValidOutput {
 		return nil
 	}
-	if p.isOutputModule(executor.Name()) || !reqctx.Details(ctx).Request.GetProductionMode() {
-		p.appendModuleOutputs(moduleOutput)
-	}
+	p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 	if err := execOutput.Set(executorName, outputBytes); err != nil {
 		return fmt.Errorf("set output cache: %w", err)
 	}
@@ -263,19 +269,91 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	return nil
 }
 
-func (p *Pipeline) appendModuleOutputs(moduleOutput *pbsubstreams.ModuleOutput) {
-	if moduleOutput != nil {
-		p.moduleOutputs = append(p.moduleOutputs, moduleOutput)
+func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
+	if p.isOutputModule(moduleName) {
+		p.mapModuleOutput = toRPCMapModuleOutputs(output)
+		return
+	}
+	if isProduction {
+		return
+	}
+
+	if storeOutputs := toRPCStoreModuleOutputs(output); storeOutputs != nil {
+		p.extraStoreModuleOutputs = append(p.extraStoreModuleOutputs, storeOutputs)
+		return
+	}
+	if mapOutput := toRPCMapModuleOutputs(output); mapOutput != nil {
+		p.extraMapModuleOutputs = append(p.extraMapModuleOutputs, mapOutput)
+	}
+	return
+
+}
+
+func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.StoreModuleOutput) {
+	deltas := in.GetStoreDeltas()
+	if deltas == nil {
+		return nil
+	}
+	return &pbsubstreamsrpc.StoreModuleOutput{
+		Name:             in.ModuleName,
+		DebugStoreDeltas: toRPCDeltas(deltas),
+		DebugInfo: &pbsubstreamsrpc.OutputDebugInfo{
+			Logs:          in.Logs,
+			LogsTruncated: in.DebugLogsTruncated,
+			Cached:        in.Cached,
+		},
 	}
 }
-func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error {
-	var progress []*pbsubstreams.ModuleProgress
+
+func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
+	for _, d := range in.StoreDeltas {
+		out = append(out, &pbsubstreamsrpc.StoreDelta{
+			Operation: toRPCOperation(d.Operation),
+			Ordinal:   d.Ordinal,
+			Key:       d.Key,
+			OldValue:  d.OldValue,
+			NewValue:  d.NewValue,
+		})
+	}
+	return
+}
+
+func toRPCOperation(in pbssinternal.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
+	switch in {
+	case pbssinternal.StoreDelta_UPDATE:
+		return pbsubstreamsrpc.StoreDelta_UPDATE
+	case pbssinternal.StoreDelta_CREATE:
+		return pbsubstreamsrpc.StoreDelta_CREATE
+	case pbssinternal.StoreDelta_DELETE:
+		return pbsubstreamsrpc.StoreDelta_DELETE
+	}
+	return pbsubstreamsrpc.StoreDelta_UNSET
+}
+
+func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.MapModuleOutput) {
+	data := in.GetMapOutput()
+	if data == nil {
+		return nil
+	}
+	return &pbsubstreamsrpc.MapModuleOutput{
+		Name:      in.ModuleName,
+		MapOutput: data,
+		DebugInfo: &pbsubstreamsrpc.OutputDebugInfo{
+			Logs:          in.Logs,
+			LogsTruncated: in.DebugLogsTruncated,
+			Cached:        in.Cached,
+		},
+	}
+}
+
+func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreamsrpc.Clock) error {
+	var progress []*pbsubstreamsrpc.ModuleProgress
 	if p.processingModule != nil {
-		progress = append(progress, &pbsubstreams.ModuleProgress{
+		progress = append(progress, &pbsubstreamsrpc.ModuleProgress{
 			Name: p.processingModule.name,
-			Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-				ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
-					ProcessedRanges: []*pbsubstreams.BlockRange{
+			Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+				ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+					ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
 						{
 							StartBlock: p.processingModule.initialBlockNum,
 							EndBlock:   clock.Number,
@@ -285,8 +363,29 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 			},
 		})
 	}
-	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
-		return fmt.Errorf("calling return func: %w", err)
+	if p.respFunc != nil {
+		if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
+	}
+	return nil
+}
+
+func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreamsrpc.Clock) error {
+	if p.respFunc != nil {
+		out := &pbssinternal.ProcessRangeResponse{
+			ModuleName: p.processingModule.name,
+			Type: &pbssinternal.ProcessRangeResponse_ProcessedRange{
+				ProcessedRange: &pbssinternal.BlockRange{
+					StartBlock: p.processingModule.initialBlockNum,
+					EndBlock:   clock.Number,
+				},
+			},
+		}
+
+		if err := p.respFunc(out); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
 	}
 	return nil
 }
@@ -297,7 +396,7 @@ func (p *Pipeline) returnModuleProgressOutputs(clock *pbsubstreams.Clock) error 
 // moduleExecutorsInitialized bool
 // moduleExecutors            []exec.ModuleExecutor
 func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module) error {
-	request := reqctx.Details(ctx).Request
+	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	for _, module := range modules {
@@ -308,8 +407,8 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 
 		modName := module.Name // to ensure it's enclosed
 		entrypoint := module.BinaryEntrypoint
-		code := request.Modules.Binaries[module.BinaryIndex]
-		wasmModule, err := p.wasmRuntime.NewModule(ctx, request, code.Content, module.Name, entrypoint)
+		code := reqModules.Binaries[module.BinaryIndex]
+		wasmModule, err := p.wasmRuntime.NewModule(ctx, code.Content, module.Name, entrypoint)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}
@@ -354,16 +453,23 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 	return nil
 }
 
-func returnModuleDataOutputs(clock *pbsubstreams.Clock, step bstream.StepType, cursor *bstream.Cursor, moduleOutputs []*pbsubstreams.ModuleOutput, respFunc func(resp *pbsubstreams.Response) error) error {
-	protoStep, _ := pbsubstreams.StepToProto(step, false)
-	out := &pbsubstreams.BlockScopedData{
-		Outputs: moduleOutputs,
-		Clock:   clock,
-		Step:    protoStep,
-		Cursor:  cursor.ToOpaque(),
+func returnModuleDataOutputs(
+	clock *pbsubstreamsrpc.Clock,
+	cursor *bstream.Cursor,
+	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
+	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,
+	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
+	respFunc func(substreams.ResponseFromAnyTier) error,
+) error {
+	out := &pbsubstreamsrpc.BlockScopedData{
+		Clock:             clock,
+		Output:            mapModuleOutput,
+		DebugMapOutputs:   extraMapModuleOutputs,
+		DebugStoreOutputs: extraStoreModuleOutputs,
+		Cursor:            cursor.ToOpaque(),
 	}
 
-	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+	if err := respFunc(substreams.NewBlockDataResponse(out)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}
 

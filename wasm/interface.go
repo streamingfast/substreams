@@ -3,7 +3,7 @@ package wasm
 import (
 	"context"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type WASMExtensioner interface {
@@ -19,4 +19,4 @@ type WASMExtensioner interface {
 // serialized as protobuf messages.
 //
 // Such a function needs to be registered through RegisterRuntime.
-type WASMExtension func(ctx context.Context, request *pbsubstreams.Request, clock *pbsubstreams.Clock, in []byte) (out []byte, err error)
+type WASMExtension func(ctx context.Context, traceID string, clock *pbsubstreamsrpc.Clock, in []byte) (out []byte, err error)

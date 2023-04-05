@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/execout"
+	"google.golang.org/protobuf/types/known/anypb"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type MapperModuleExecutor struct {
@@ -23,8 +23,6 @@ func NewMapperModuleExecutor(baseExecutor *BaseExecutor, outputType string) *Map
 	return &MapperModuleExecutor{BaseExecutor: *baseExecutor, outputType: outputType}
 }
 
-var _ ModuleExecutor = (*StoreModuleExecutor)(nil)
-
 // Name implements ModuleExecutor
 func (e *MapperModuleExecutor) Name() string { return e.moduleName }
 
@@ -36,7 +34,7 @@ func (e *MapperModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstanc
 // and in this case, we don't do anything
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
-func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
+func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
@@ -49,19 +47,20 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 		out = instance.Output()
 	}
 
-	if out != nil {
-		moduleOutput = &pbsubstreams.ModuleOutput_MapOutput{
-			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: out},
-		}
+	modOut, err := e.toModuleOutput(out)
+	if err != nil {
+		return nil, nil, fmt.Errorf("converting back to module output: %w", err)
 	}
 
-	return out, moduleOutput, nil
+	return out, modOut, nil
 }
 
-func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
-	return toModuleOutput(e, &pbsubstreams.ModuleOutput_MapOutput{
-		MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: data},
-	}), nil
+func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
+	return &pbssinternal.ModuleOutput{
+		Data: &pbssinternal.ModuleOutput_MapOutput{
+			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + e.outputType, Value: data},
+		},
+	}, nil
 }
 
 func (e *MapperModuleExecutor) HasValidOutput() bool {

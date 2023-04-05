@@ -18,7 +18,7 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
 )
 
@@ -69,7 +69,7 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 	return
 }
 
-func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
+func (c *File) SetItem(clock *pbsubstreamsrpc.Clock, data []byte) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -88,7 +88,7 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 	c.kv[clock.Id] = ci
 }
 
-func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
+func (c *File) Get(clock *pbsubstreamsrpc.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 

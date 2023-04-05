@@ -12,7 +12,7 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
@@ -32,7 +32,7 @@ func (w *TestWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ substreams.ResponseFunc) *work.Result {
+func (w *TestWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ substreams.ResponseFunc) *work.Result {
 	w.t.Helper()
 	var err error
 
@@ -44,25 +44,25 @@ func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ 
 	ctx = reqctx.WithLogger(ctx, logger)
 
 	logger.Info("worker running job",
-		zap.String("output_module", request.MustGetOutputModuleName()),
-		zap.Int64("start_block_num", request.StartBlockNum),
+		zap.String("output_module", request.OutputModule),
+		zap.Uint64("start_block_num", request.StartBlockNum),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
 	)
 	subrequestsSplitSize := uint64(10)
-	if err := processRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize, 1, 0); err != nil {
+	if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize, 1, 0); err != nil {
 		return &work.Result{
 			Error: fmt.Errorf("processing sub request: %w", err),
 		}
 	}
 	logger.Info("worker done running job",
-		zap.String("output_module", request.MustGetOutputModuleName()),
-		zap.Int64("start_block_num", request.StartBlockNum),
+		zap.String("output_module", request.OutputModule),
+		zap.Uint64("start_block_num", request.StartBlockNum),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
 	)
 
 	var blockRanges []*block.Range
 	if request.StopBlockNum-uint64(request.StartBlockNum) > subrequestsSplitSize {
-		blockRanges = splitBlockRanges(request, subrequestsSplitSize)
+		blockRanges = splitBlockRanges(request.StopBlockNum, subrequestsSplitSize)
 	} else {
 		blockRanges = []*block.Range{
 			{
@@ -79,9 +79,9 @@ func (w *TestWorker) Work(ctx context.Context, request *pbsubstreams.Request, _ 
 
 // splitBlockRanges for example: called when subrequestsSplitSize is 10 and request
 // has a start block of 1 and stop block of 20 -> splits to [[1, 10), [10, 20)]
-func splitBlockRanges(request *pbsubstreams.Request, subrequestsSplitSize uint64) []*block.Range {
+func splitBlockRanges(stopBlockNum, subrequestsSplitSize uint64) []*block.Range {
 	var blockRanges block.Ranges
-	nbSplitRequests := int(math.Ceil(float64(request.StopBlockNum / subrequestsSplitSize)))
+	nbSplitRequests := int(math.Ceil(float64(stopBlockNum / subrequestsSplitSize)))
 
 	for i := 0; i < nbSplitRequests; i++ {
 		blockRange := &block.Range{
@@ -92,7 +92,7 @@ func splitBlockRanges(request *pbsubstreams.Request, subrequestsSplitSize uint64
 			blockRange.StartBlock = 1
 		}
 		if i == nbSplitRequests-1 {
-			blockRange.ExclusiveEndBlock = request.StopBlockNum
+			blockRange.ExclusiveEndBlock = stopBlockNum
 		}
 		blockRanges = append(blockRanges, blockRange)
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -28,8 +28,8 @@ func (b *Bar) Init() tea.Cmd { return nil }
 
 func (b *Bar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case *pbsubstreams.ModuleProgress_ProcessedRanges:
-		for _, v := range msg.ProcessedRanges.ProcessedRanges {
+	case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges:
+		for _, v := range msg.ProcessedRanges {
 			b.ranges = mergeRangeLists(b.ranges, &blockRange{
 				Start: v.StartBlock,
 				End:   v.EndBlock,

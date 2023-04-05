@@ -7,7 +7,7 @@ import (
 	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"google.golang.org/grpc"
 )
 
@@ -29,19 +29,19 @@ type ResponseUnknownMsg string
 type Stream struct {
 	ReplayBundle ReplayBundle
 
-	req            *pbsubstreams.Request
-	client         pbsubstreams.StreamClient
+	req            *pbsubstreamsrpc.Request
+	client         pbsubstreamsrpc.StreamClient
 	callOpts       []grpc.CallOption
 	targetEndBlock uint64
 
 	ctx           context.Context
 	cancelContext func()
-	conn          pbsubstreams.Stream_BlocksClient
+	conn          pbsubstreamsrpc.Stream_BlocksClient
 
 	err error
 }
 
-func New(req *pbsubstreams.Request, client pbsubstreams.StreamClient, callOpts []grpc.CallOption) *Stream {
+func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, callOpts []grpc.CallOption) *Stream {
 	return &Stream{
 		req:            req,
 		targetEndBlock: req.StopBlockNum,
@@ -90,10 +90,10 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case StreamErrorMsg:
 		s.err = msg
-	case *pbsubstreams.BlockScopedData,
-		*pbsubstreams.ModulesProgress,
-		*pbsubstreams.InitialSnapshotData,
-		*pbsubstreams.InitialSnapshotComplete,
+	case *pbsubstreamsrpc.BlockScopedData,
+		*pbsubstreamsrpc.ModulesProgress,
+		*pbsubstreamsrpc.InitialSnapshotData,
+		*pbsubstreamsrpc.InitialSnapshotComplete,
 		ResponseUnknownMsg:
 		return s.readNextMessage
 	case Msg:
@@ -143,16 +143,16 @@ func (s *Stream) readNextMessage() tea.Msg {
 	return s.routeNextMessage(resp)
 }
 
-func (s *Stream) routeNextMessage(resp *pbsubstreams.Response) tea.Msg {
+func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 	switch m := resp.Message.(type) {
-	case *pbsubstreams.Response_Data:
-		return m.Data
-	case *pbsubstreams.Response_Progress:
+	case *pbsubstreamsrpc.Response_BlockData:
+		return m.BlockData
+	case *pbsubstreamsrpc.Response_Progress:
 		log.Printf("Progress response: %T %v", resp, resp)
 		return m.Progress
-	case *pbsubstreams.Response_DebugSnapshotData:
+	case *pbsubstreamsrpc.Response_DebugSnapshotData:
 		return m.DebugSnapshotData
-	case *pbsubstreams.Response_DebugSnapshotComplete:
+	case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
 		return m.DebugSnapshotComplete
 	}
 	return ResponseUnknownMsg(fmt.Sprintf("%T", resp.Message))

@@ -10,41 +10,57 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
-	"github.com/streamingfast/bstream"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/tidwall/pretty"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (ui *TUI) decoratedBlockScopedData(outputs []*pbsubstreams.ModuleOutput, clock *pbsubstreams.Clock) error {
-
+func (ui *TUI) decoratedBlockScopedData(
+	output *pbsubstreamsrpc.MapModuleOutput,
+	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
+	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
+	clock *pbsubstreamsrpc.Clock,
+) error {
 	var s []string
-	for _, out := range outputs {
-		for _, log := range out.DebugLogs {
+
+	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
+		if _, ok := ui.msgTypes[out.Name]; !ok {
+			continue
+		}
+		if out.DebugInfo != nil {
+			for _, log := range out.DebugInfo.Logs {
+				s = append(s, fmt.Sprintf("%s: log: %s\n", out.Name, log))
+			}
+		}
+
+		if len(out.MapOutput.Value) != 0 {
+			msgDesc := ui.msgDescs[out.Name]
+			msgType := ui.msgTypes[out.Name]
+			cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
+			cnt = ui.prettyFormat(cnt, true)
+			if out.DebugInfo != nil && out.DebugInfo.Cached {
+				s = append(s, cachedValues(out.Name))
+			}
+			s = append(s, string(cnt))
+		}
+	}
+
+	for _, out := range debugStoreOutputs {
+		if _, ok := ui.msgTypes[out.Name]; !ok {
+			continue
+		}
+		for _, log := range out.DebugInfo.Logs {
 			s = append(s, fmt.Sprintf("%s: log: %s\n", out.Name, log))
 		}
 
-		switch data := out.Data.(type) {
-		case *pbsubstreams.ModuleOutput_MapOutput:
-			if len(data.MapOutput.Value) != 0 {
-				msgDesc := ui.msgDescs[out.Name]
-				msgType := ui.msgTypes[out.Name]
-				cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, data.MapOutput)
-				cnt = ui.prettyFormat(cnt, true)
-				if out.Cached {
-					s = append(s, cachedValues(out.Name))
-				}
-				s = append(s, string(cnt))
+		if len(out.DebugStoreDeltas) != 0 {
+			if out.DebugInfo != nil && out.DebugInfo.Cached {
+				s = append(s, cachedValues(out.Name))
 			}
-		case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
-			if len(data.DebugStoreDeltas.Deltas) != 0 {
-				if out.Cached {
-					s = append(s, cachedValues(out.Name))
-				}
-				s = append(s, ui.renderDecoratedDeltas(out.Name, clock.Number, data.DebugStoreDeltas.Deltas, false)...)
-			}
+			s = append(s, ui.renderDecoratedDeltas(out.Name, clock.Number, out.DebugStoreDeltas, false)...)
 		}
 	}
+
 	if len(s) != 0 {
 		fmt.Println(strings.Join(s, ""))
 	}
@@ -55,7 +71,7 @@ func cachedValues(name string) string {
 	return fmt.Sprintf("Cached value(s) for %s\n", name)
 }
 
-func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*pbsubstreams.StoreDelta, initialSnapshot bool) (s []string) {
+func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*pbsubstreamsrpc.StoreDelta, initialSnapshot bool) (s []string) {
 	msgDesc := ui.msgDescs[modName]
 	msgType := ui.msgTypes[modName]
 	if initialSnapshot {
@@ -67,14 +83,6 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 		keyStr, _ := json.Marshal(delta.Key)
 		s = append(s, fmt.Sprintf("  %s (%d) KEY: %s\n", delta.Operation.String(), delta.Ordinal, ui.prettyFormat(keyStr, false)))
 
-		if len(delta.OldValue) == 0 {
-			if !initialSnapshot {
-				s = append(s, "    OLD: (none)\n")
-			}
-		} else {
-			old := ui.decodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, delta.OldValue)
-			s = append(s, fmt.Sprintf("    OLD: %s\n", indent(ui.prettyFormat(old, false))))
-		}
 		if len(delta.NewValue) == 0 {
 			s = append(s, "    NEW: (none)\n")
 		} else {
@@ -85,7 +93,7 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 	return
 }
 
-func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*pbsubstreams.StoreDelta) error {
+func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*pbsubstreamsrpc.StoreDelta) error {
 	wrap := DeltasWrap{
 		Module:   modName,
 		BlockNum: blockNum,
@@ -97,10 +105,6 @@ func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*p
 			Operation: delta.Operation.String(),
 			Ordinal:   delta.Ordinal,
 			Key:       delta.Key,
-		}
-		if len(delta.OldValue) != 0 {
-			old := ui.decodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.OldValue)
-			subwrap.OldValue = json.RawMessage(old)
 		}
 		if len(delta.NewValue) != 0 {
 			new := ui.decodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
@@ -120,39 +124,50 @@ func indent(in []byte) []byte {
 	return bytes.Replace(in, []byte("\n"), []byte("\n    "), -1)
 }
 
-func (ui *TUI) jsonBlockScopedData(outputs []*pbsubstreams.ModuleOutput, clock *pbsubstreams.Clock) error {
-	for _, out := range outputs {
-		switch data := out.Data.(type) {
+func (ui *TUI) jsonBlockScopedData(
+	output *pbsubstreamsrpc.MapModuleOutput,
+	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
+	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
+	clock *pbsubstreamsrpc.Clock,
+) error {
 
-		case *pbsubstreams.ModuleOutput_MapOutput:
-			if len(data.MapOutput.Value) != 0 {
-				msgDesc := ui.msgDescs[out.Name]
-				msgType := ui.msgTypes[out.Name]
-				cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, data.MapOutput)
-				cnt = ui.prettyFormat(cnt, true)
-				if out.Cached {
-					fmt.Println(cachedValues(out.Name))
-				}
-				fmt.Println(string(cnt))
+	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
+		if _, ok := ui.msgTypes[out.Name]; !ok {
+			continue
+		}
+
+		if len(out.MapOutput.Value) != 0 {
+			msgDesc := ui.msgDescs[out.Name]
+			msgType := ui.msgTypes[out.Name]
+			cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
+			cnt = ui.prettyFormat(cnt, true)
+			if out.DebugInfo != nil && out.DebugInfo.Cached {
+				fmt.Println(cachedValues(out.Name))
 			}
-		case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
-			if len(data.DebugStoreDeltas.Deltas) != 0 {
-				if out.Cached {
-					fmt.Println(cachedValues(out.Name))
-				}
-				if err := ui.printJSONBlockDeltas(out.Name, clock.Number, data.DebugStoreDeltas.Deltas); err != nil {
-					return fmt.Errorf("print json deltas: %w", err)
-				}
+			fmt.Println(string(cnt))
+		}
+	}
+
+	for _, out := range debugStoreOutputs {
+		if _, ok := ui.msgTypes[out.Name]; !ok {
+			continue
+		}
+		if len(out.DebugStoreDeltas) != 0 {
+			if out.DebugInfo != nil && out.DebugInfo.Cached {
+				fmt.Println(cachedValues(out.Name))
+			}
+			if err := ui.printJSONBlockDeltas(out.Name, clock.Number, out.DebugStoreDeltas); err != nil {
+				return fmt.Errorf("print json deltas: %w", err)
 			}
 		}
 	}
 	return nil
 }
 
-func (ui *TUI) decoratedSnapshotData(output *pbsubstreams.InitialSnapshotData) error {
+func (ui *TUI) decoratedSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) error {
 	var s []string
-	if output.Deltas != nil && len(output.Deltas.Deltas) != 0 {
-		s = append(s, ui.renderDecoratedDeltas(output.ModuleName, 0, output.Deltas.Deltas, true)...)
+	if output != nil && len(output.Deltas) != 0 {
+		s = append(s, ui.renderDecoratedDeltas(output.ModuleName, 0, output.Deltas, true)...)
 	}
 	if len(s) != 0 {
 		fmt.Println(strings.Join(s, ""))
@@ -160,16 +175,16 @@ func (ui *TUI) decoratedSnapshotData(output *pbsubstreams.InitialSnapshotData) e
 	return nil
 }
 
-func (ui *TUI) jsonSnapshotData(output *pbsubstreams.InitialSnapshotData) error {
-	if output.Deltas == nil || len(output.Deltas.Deltas) == 0 {
+func (ui *TUI) jsonSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) error {
+	if len(output.Deltas) == 0 {
 		return nil
 	}
 
 	modName := output.ModuleName
 	msgDesc := ui.msgDescs[modName]
 	msgType := ui.msgTypes[modName]
-	length := len(output.Deltas.Deltas)
-	for idx, delta := range output.Deltas.Deltas {
+	length := len(output.Deltas)
+	for idx, delta := range output.Deltas {
 		wrap := SnapshotDeltaWrap{
 			Module:   modName,
 			Progress: fmt.Sprintf("%.2f %%", float64(int(output.SentKeys)-length+idx+1)/float64(output.TotalKeys)*100),
@@ -178,10 +193,6 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreams.InitialSnapshotData) error 
 			Operation: delta.Operation.String(),
 			Ordinal:   delta.Ordinal,
 			Key:       delta.Key,
-		}
-		if len(delta.OldValue) != 0 {
-			old := ui.decodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.OldValue)
-			subwrap.OldValue = json.RawMessage(old)
 		}
 		if len(delta.NewValue) != 0 {
 			new := ui.decodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
@@ -197,14 +208,14 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreams.InitialSnapshotData) error 
 	return nil
 }
 
-func (ui *TUI) formatPostDataProgress(msg *pbsubstreams.Response_Progress) {
+func (ui *TUI) formatPostDataProgress(msg *pbsubstreamsrpc.Response_Progress) {
 	var displayedFailure bool
 	for _, mod := range msg.Progress.Modules {
 		switch progMsg := mod.Type.(type) {
-		case *pbsubstreams.ModuleProgress_ProcessedRanges:
-		case *pbsubstreams.ModuleProgress_InitialState_:
-		case *pbsubstreams.ModuleProgress_ProcessedBytes_:
-		case *pbsubstreams.ModuleProgress_Failed_:
+		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
+		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
+		case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
+		case *pbsubstreamsrpc.ModuleProgress_Failed_:
 			failure := progMsg.Failed
 			if !displayedFailure {
 				fmt.Println("--------------------------------------------")
@@ -377,18 +388,6 @@ type ModuleWrap struct {
 func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
 func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
 
-func printClock(block *pbsubstreams.BlockScopedData) {
-	fmt.Printf("----------- %s BLOCK #%s (%d) ---------------\n", strings.ToUpper(stepFromProto(block.Step).String()), humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
-}
-
-func stepFromProto(step pbsubstreams.ForkStep) bstream.StepType {
-	switch step {
-	case pbsubstreams.ForkStep_STEP_NEW:
-		return bstream.StepNew
-	case pbsubstreams.ForkStep_STEP_UNDO:
-		return bstream.StepUndo
-	case pbsubstreams.ForkStep_STEP_IRREVERSIBLE:
-		return bstream.StepIrreversible
-	}
-	return bstream.StepType(0)
+func printClock(block *pbsubstreamsrpc.BlockScopedData) {
+	fmt.Printf("----------- BLOCK #%s (%d) ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Number)
 }

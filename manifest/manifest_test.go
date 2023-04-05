@@ -4,11 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/test-go/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestManifest_YamlUnmarshal(t *testing.T) {
@@ -148,7 +147,6 @@ func TestManifest_ToProto(t *testing.T) {
 
 }
 
-//
 //type testSinkConfig struct {
 //	state         protoimpl.MessageState
 //	sizeCache     protoimpl.SizeCache

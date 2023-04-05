@@ -12,13 +12,14 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
 type in struct {
-	request  *pbsubstreams.Request
+	request  *pbssinternal.ProcessRangeRequest
 	respFunc substreams.ResponseFunc
 }
 type out struct {
@@ -35,7 +36,7 @@ func TestSchedulerInOut(t *testing.T) {
 	)
 	sched := NewScheduler(
 		plan,
-		func(resp *pbsubstreams.Response) error {
+		func(_ substreams.ResponseFromAnyTier) error {
 			return nil
 		},
 		&pbsubstreams.Modules{Modules: mods},
@@ -71,7 +72,7 @@ func testRunnerPool(parallelism int) (work.WorkerPool, chan in, chan out) {
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, 1,
 		func(logger *zap.Logger) work.Worker {
-			return work.NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
+			return work.NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *work.Result {
 				inchan <- in{request, respFunc}
 				out := <-outchan
 				return &work.Result{
@@ -127,7 +128,7 @@ func testNoopRunnerPool(parallelism uint64) work.WorkerPool {
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, parallelism,
 		func(logger *zap.Logger) work.Worker {
-			return work.NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *work.Result {
+			return work.NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *work.Result {
 				return &work.Result{}
 			})
 		},

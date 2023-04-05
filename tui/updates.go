@@ -5,7 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 // Implement the tea.Model interface
@@ -41,17 +41,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		}
-	case *pbsubstreams.Request:
+	case *pbsubstreamsrpc.Request:
 		m.Request = msg
 		// It's ok to use `StartBlockNum` directly instead of effective start block (start block
 		// of cursor if present, `StartBlockNum` otherwise) because this is only used in backprocessing
 		// `barmode` which is effective only when no cursor has been passed yet.
 		m.BackprocessingCompleteAtBlock = uint64(m.Request.StartBlockNum)
 		return m, nil
-	case *pbsubstreams.Response_Session:
+	case *pbsubstreamsrpc.Response_Session:
 		m.TraceID = msg.Session.TraceId
 
-	case *pbsubstreams.ModuleProgress:
+	case *pbsubstreamsrpc.ModuleProgress:
 		m.Updates += 1
 		thisSec := time.Now().Unix()
 		if m.UpdatedSecond != thisSec {
@@ -62,7 +62,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.UpdatesThisSecond += 1
 
 		switch progMsg := msg.Type.(type) {
-		case *pbsubstreams.ModuleProgress_ProcessedRanges:
+		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
 			newModules := updatedRanges{}
 			for k, v := range m.Modules {
 				newModules[k] = v
@@ -76,9 +76,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.Modules = newModules
-		case *pbsubstreams.ModuleProgress_InitialState_:
-		case *pbsubstreams.ModuleProgress_ProcessedBytes_:
-		case *pbsubstreams.ModuleProgress_Failed_:
+		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
+		case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
+		case *pbsubstreamsrpc.ModuleProgress_Failed_:
 			m.Failures += 1
 			if progMsg.Failed.Reason != "" {
 				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %v", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)

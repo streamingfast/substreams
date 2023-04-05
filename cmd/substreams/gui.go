@@ -16,6 +16,7 @@ import (
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
@@ -125,19 +126,18 @@ func runGui(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("stop block: %w", err)
 	}
 
-	req := &pbsubstreams.Request{
+	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       startBlock,
 		StartCursor:                         mustGetString(cmd, "cursor"),
 		StopBlockNum:                        stopBlock,
-		ForkSteps:                           []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
+		FinalBlocksOnly:                     true,
 		Modules:                             pkg.Modules,
 		OutputModule:                        outputModule,
-		OutputModules:                       []string{outputModule}, //added for backwards compatibility, will be removed
 		ProductionMode:                      productionMode,
 		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
 	}
 
-	if err := pbsubstreams.ValidateRequest(req, false); err != nil {
+	if err := req.Validate(); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
 	toPrint := debugModulesOutput

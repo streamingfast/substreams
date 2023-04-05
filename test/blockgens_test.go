@@ -64,8 +64,9 @@ func (g *ForkBlockGenerator) Generate() []*GeneratedBlock {
 		generatedBlocks = append(generatedBlocks, &GeneratedBlock{
 			block: blk,
 			obj: &Obj{
-				cursor: forkableObject.Cursor(),
-				step:   forkableObject.Step(),
+				cursor:             forkableObject.Cursor(),
+				step:               forkableObject.Step(),
+				reorgJunctionBlock: forkableObject.ReorgJunctionBlock(),
 			},
 		})
 		return nil

@@ -13,6 +13,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage"
 	"github.com/stretchr/testify/assert"
@@ -62,13 +63,7 @@ func TestWorkPlanning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mods := manifest.NewTestModules()
-			outputGraph, err := outputmodules.NewOutputModuleGraph(&pbsubstreams.Request{
-				Modules: &pbsubstreams.Modules{
-					Modules:  mods,
-					Binaries: []*pbsubstreams.Binary{{}},
-				},
-				OutputModule: test.outMod,
-			})
+			outputGraph, err := outputmodules.NewOutputModuleGraph(test.outMod, false, &pbsubstreams.Modules{Modules: mods, Binaries: []*pbsubstreams.Binary{{}}})
 			require.NoError(t, err)
 
 			plan, err := BuildNewPlan(context.Background(), test.state, uint64(test.subreqSplit), test.upToBlock, outputGraph)
@@ -714,18 +709,18 @@ func TestAncestorsDepth(t *testing.T) {
 	}
 }
 
-func reduceProgressMessages(in []*pbsubstreams.ModuleProgress) string {
+func reduceProgressMessages(in []*pbsubstreamsrpc.ModuleProgress) string {
 	var out []string
 	for _, prog := range in {
 		entry := fmt.Sprintf("%s:", prog.Name)
 		switch t := prog.Type.(type) {
-		case *pbsubstreams.ModuleProgress_ProcessedRanges:
+		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
 			var rngs []string
 			for _, rng := range t.ProcessedRanges.ProcessedRanges {
 				rngs = append(rngs, fmt.Sprintf("%d-%d", rng.StartBlock, rng.EndBlock))
 			}
 			entry += "r" + strings.Join(rngs, ",")
-		case *pbsubstreams.ModuleProgress_InitialState_:
+		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
 			entry += "up" + fmt.Sprintf("%d", t.InitialState.AvailableUpToBlock)
 		default:
 			panic("unsupported here")

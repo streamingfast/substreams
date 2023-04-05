@@ -3,10 +3,12 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/storage/store"
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -17,7 +19,7 @@ type Instance struct {
 
 	valueType string
 
-	clock *pbsubstreams.Clock
+	clock *pbsubstreamsrpc.Clock
 
 	args        []interface{} // to the `entrypoint` function
 	returnValue []byte

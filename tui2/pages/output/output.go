@@ -10,7 +10,7 @@ import (
 
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,14 +25,16 @@ type Output struct {
 	moduleSelector    *modselect.ModSelect
 	blockSelector     *blockselect.BlockSelect
 	outputView        viewport.Model
-	lastOutputContent *pbsubstreams.ModuleOutput
+	lastOutputContent interface{}
 
 	lowBlock  uint64
 	highBlock uint64
 
 	blocksPerModule map[string][]uint64
-	payloads        map[string]map[uint64]*pbsubstreams.ModuleOutput
-	blockIDs        map[uint64]string
+	mapPayloads     map[string]map[uint64]*pbsubstreamsrpc.MapModuleOutput
+	storePayloads   map[string]map[uint64]*pbsubstreamsrpc.StoreModuleOutput
+
+	blockIDs map[uint64]string
 
 	activeModule string
 	activeBlock  uint64
@@ -43,7 +45,8 @@ func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
 		Common:          c,
 		msgDescs:        msgDescs,
 		blocksPerModule: make(map[string][]uint64),
-		payloads:        make(map[string]map[uint64]*pbsubstreams.ModuleOutput),
+		mapPayloads:     make(map[string]map[uint64]*pbsubstreamsrpc.MapModuleOutput),
+		storePayloads:   make(map[string]map[uint64]*pbsubstreamsrpc.StoreModuleOutput),
 		blockIDs:        make(map[uint64]string),
 		moduleSelector:  modselect.New(c),
 		blockSelector:   blockselect.New(c),
@@ -76,7 +79,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Probably fine for now, as we're debugging the history.
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case *pbsubstreams.BlockScopedData:
+	case *pbsubstreamsrpc.BlockScopedData:
 		blockNum := msg.Clock.Number
 
 		if o.lowBlock == 0 {
@@ -88,22 +91,22 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.blockSelector.StretchBounds(o.lowBlock, o.highBlock)
 
 		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
-		for _, output := range msg.Outputs {
-			if isEmptyModuleOutput(output) {
+		for _, output := range msg.AllMapModuleOutputs() {
+			if isEmptyMapModuleOutput(output) {
 				continue
 			}
-
 			modName := output.Name
 
-			modulePayloads, found := o.payloads[modName]
+			payloads, found := o.mapPayloads[modName]
 			if !found {
 				o.moduleSelector.AddModule(modName)
 				if o.activeModule == "" {
 					o.activeModule = modName
 				}
-				modulePayloads = make(map[uint64]*pbsubstreams.ModuleOutput)
+				payloads = make(map[uint64]*pbsubstreamsrpc.MapModuleOutput)
 			}
-			if _, found := modulePayloads[blockNum]; !found {
+
+			if _, found := payloads[blockNum]; !found {
 				if o.activeBlock == 0 {
 					o.activeBlock = blockNum
 				}
@@ -112,10 +115,42 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					o.blockSelector.SetAvailableBlocks(o.blocksPerModule[modName])
 				}
 			}
-			modulePayloads[blockNum] = output
-			o.payloads[modName] = modulePayloads
+			payloads[blockNum] = output
+			o.mapPayloads[modName] = payloads
 			o.setViewportContent()
+
 		}
+
+		for _, output := range msg.DebugStoreOutputs {
+			if isEmptyStoreModuleOutput(output) {
+				continue
+			}
+			modName := output.Name
+
+			payloads, found := o.storePayloads[modName]
+			if !found {
+				o.moduleSelector.AddModule(modName)
+				if o.activeModule == "" {
+					o.activeModule = modName
+				}
+				payloads = make(map[uint64]*pbsubstreamsrpc.StoreModuleOutput)
+			}
+
+			if _, found := payloads[blockNum]; !found {
+				if o.activeBlock == 0 {
+					o.activeBlock = blockNum
+				}
+				o.blocksPerModule[modName] = append(o.blocksPerModule[modName], blockNum)
+				if modName == o.activeModule {
+					o.blockSelector.SetAvailableBlocks(o.blocksPerModule[modName])
+				}
+			}
+			payloads[blockNum] = output
+			o.storePayloads[modName] = payloads
+			o.setViewportContent()
+
+		}
+
 	case modselect.ModuleSelectedMsg:
 		o.activeModule = string(msg)
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.activeModule])
@@ -135,21 +170,29 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (o *Output) setViewportContent() {
-	if mod, found := o.payloads[o.activeModule]; found {
+	if mod, found := o.mapPayloads[o.activeModule]; found {
 		if payload, found := mod[o.activeBlock]; found {
 			// Do the decoding once per view, and cache the decoded value if it hasn't changed
 			if payload != o.lastOutputContent {
-				o.outputView.SetContent(o.renderPayload(payload))
+				o.outputView.SetContent(o.renderMapPayload(payload))
 				o.lastOutputContent = payload
+				return
 			}
-		} else {
-			o.outputView.SetContent("")
-			o.lastOutputContent = nil
 		}
-	} else {
-		o.outputView.SetContent("")
-		o.lastOutputContent = nil
 	}
+	if mod, found := o.storePayloads[o.activeModule]; found {
+		if payload, found := mod[o.activeBlock]; found {
+			// Do the decoding once per view, and cache the decoded value if it hasn't changed
+			if payload != o.lastOutputContent {
+				o.outputView.SetContent(o.renderStorePayload(payload))
+				o.lastOutputContent = payload
+				return
+			}
+		}
+	}
+
+	o.outputView.SetContent("")
+	o.lastOutputContent = nil
 }
 
 func (o *Output) View() string {

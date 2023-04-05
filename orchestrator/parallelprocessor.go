@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage"
@@ -32,10 +35,12 @@ func BuildParallelProcessor(
 	runtimeConfig config.RuntimeConfig,
 	outputGraph *outputmodules.Graph,
 	execoutStorage *execout.Configs,
-	respFunc func(resp *pbsubstreams.Response) error,
+	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
+	_ = pbssinternal.ProcessRangeRequest{}
+	_ = pbsubstreamsrpc.Request{}
 
 	if reqDetails.ShouldStreamCachedOutputs() {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
@@ -96,7 +101,7 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("send initial progress: %w", err)
 	}
 
-	scheduler := NewScheduler(plan, respFunc, reqDetails.Request.Modules)
+	scheduler := NewScheduler(plan, respFunc, reqDetails.Modules)
 	if err != nil {
 		return nil, err
 	}

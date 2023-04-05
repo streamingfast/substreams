@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/ranges"
 	"github.com/streamingfast/substreams/tui2/replaylog"
@@ -47,9 +47,9 @@ func (p *Progress) Init() tea.Cmd {
 
 func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
-	case *pbsubstreams.BlockScopedData:
+	case *pbsubstreamsrpc.BlockScopedData:
 		p.dataPayloads += 1
-	case *pbsubstreams.ModulesProgress:
+	case *pbsubstreamsrpc.ModulesProgress:
 		p.progressUpdates += 1
 		thisSec := time.Now().Unix()
 		if p.updatedSecond != thisSec {

@@ -9,19 +9,19 @@ import (
 
 	"github.com/streamingfast/bstream"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 func Test_resolveStartBlockNum(t *testing.T) {
 	tests := []struct {
 		name             string
-		req              *pbsubstreams.Request
+		req              *pbsubstreamsrpc.Request
 		expectedBlockNum uint64
 		wantErr          bool
 	}{
 		{
 			name: "invalid cursor step",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepType(0),
@@ -35,7 +35,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		},
 		{
 			name: "step undo",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepUndo,
@@ -49,7 +49,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		},
 		{
 			name: "step new",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepNew,
@@ -63,7 +63,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		},
 		{
 			name: "step irreversible",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepIrreversible,
@@ -77,7 +77,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		},
 		{
 			name: "step new irreversible",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepNewIrreversible,
@@ -153,27 +153,29 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 }
 
 func TestBuildRequestDetails(t *testing.T) {
-	req, err := BuildRequestDetails(&pbsubstreams.Request{
-		StartBlockNum:  10,
-		ProductionMode: false,
-	}, true, func(name string) bool {
-		return false
-	}, func() (uint64, error) {
-		assert.True(t, true, "should pass here")
-		return 999, nil
-	})
+	req, err := BuildRequestDetails(
+		&pbsubstreamsrpc.Request{
+			StartBlockNum:  10,
+			ProductionMode: false,
+			OutputModule:   "nomatch",
+		},
+		func() (uint64, error) {
+			assert.True(t, true, "should pass here")
+			return 999, nil
+		})
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
 	assert.Equal(t, 10, int(req.LinearHandoffBlockNum))
 
-	req, err = BuildRequestDetails(&pbsubstreams.Request{
-		StartBlockNum:  10,
-		ProductionMode: true,
-	}, true, func(name string) bool {
-		return true
-	}, func() (uint64, error) {
-		return 999, nil
-	})
+	req, err = BuildRequestDetails(
+		&pbsubstreamsrpc.Request{
+			StartBlockNum:  10,
+			ProductionMode: true,
+			OutputModule:   "",
+		},
+		func() (uint64, error) {
+			return 999, nil
+		})
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
 	assert.Equal(t, 999, int(req.LinearHandoffBlockNum))

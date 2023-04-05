@@ -3,11 +3,12 @@ package tracking
 import (
 	"context"
 	"errors"
-	"go.uber.org/zap"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -125,7 +126,7 @@ func TestBytesMeter_Send(t *testing.T) {
 		err          error
 		requiredMsgs int
 		requiredErr  error
-		validate     func(t *testing.T, fields fields, resps []*pbsubstreams.Response, err error)
+		validate     func(t *testing.T, fields fields, resps []*pbsubstreamsrpc.Response, err error)
 	}{
 		{
 			name:         "simple",
@@ -151,11 +152,13 @@ func TestBytesMeter_Send(t *testing.T) {
 				logger: zap.NewNop(),
 			}
 
-			var resps []*pbsubstreams.Response
-			testRespFunc := substreams.ResponseFunc(func(resp *pbsubstreams.Response) error {
+			var resps []*pbsubstreamsrpc.Response
+			testRespFunc := substreams.ResponseFunc(func(respAny substreams.ResponseFromAnyTier) error {
 				if tt.err != nil {
 					return tt.err
 				}
+
+				resp := respAny.(*pbsubstreamsrpc.Response)
 				resps = append(resps, resp)
 				return nil
 			})

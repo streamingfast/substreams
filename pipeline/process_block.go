@@ -14,7 +14,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/metrics"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -42,13 +42,15 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 
-	clock := &pbsubstreams.Clock{
+	clock := &pbsubstreamsrpc.Clock{
 		Number:    block.Num(),
 		Id:        block.Id,
 		Timestamp: timestamppb.New(block.Time()),
 	}
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
+	finalBlockHeight := obj.(bstream.Stepable).FinalBlockHeight()
+	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
 
 	span.SetAttributes(
 		attribute.String("block.id", block.Id),
@@ -58,18 +60,26 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	reqStats.RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
-	if err = p.processBlock(ctx, block, clock, cursor, step); err != nil {
+	if err = p.processBlock(ctx, block, clock, cursor, step, finalBlockHeight, reorgJunctionBlock); err != nil {
 		p.runPostJobHooks(ctx, clock)
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 	return
 }
 
-func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor, step bstream.StepType) (err error) {
+func (p *Pipeline) processBlock(
+	ctx context.Context,
+	block *bstream.Block,
+	clock *pbsubstreamsrpc.Clock,
+	cursor *bstream.Cursor,
+	step bstream.StepType,
+	finalBlockHeight uint64,
+	reorgJunctionBlock bstream.BlockRef,
+) (err error) {
 	var eof bool
 	switch step {
 	case bstream.StepUndo:
-		if err = p.handleStepUndo(ctx, clock, cursor); err != nil {
+		if err = p.handleStepUndo(ctx, clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 
@@ -79,7 +89,7 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 		}
 
 	case bstream.StepNew:
-		err := p.handlerStepNew(ctx, block, clock, cursor)
+		err := p.handleStepNew(ctx, block, clock, cursor)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
@@ -87,7 +97,7 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 			eof = true
 		}
 	case bstream.StepNewIrreversible:
-		err := p.handlerStepNew(ctx, block, clock, cursor)
+		err := p.handleStepNew(ctx, block, clock, cursor)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
 		}
@@ -112,35 +122,57 @@ func (p *Pipeline) processBlock(ctx context.Context, block *bstream.Block, clock
 	return nil
 }
 
-func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
+func (p *Pipeline) handleStepStalled(clock *pbsubstreamsrpc.Clock) error {
 	p.execOutputCache.HandleStalled(clock)
 	p.forkHandler.removeReversibleOutput(clock.Id)
 	return nil
 }
 
-func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
-	if p.gate.shouldSendSnapshot() {
-		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
-			return fmt.Errorf("send initial snapshots: %w", err)
-		}
-	}
-	p.execOutputCache.HandleUndo(clock)
+func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreamsrpc.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+	// FIXME: doublecheck: never send snapshot in handleStepUndo now, but send it in following of stepNew...
+	//
+	//if p.gate.shouldSendSnapshot() {
+	//	if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
+	//		return fmt.Errorf("send initial snapshots: %w", err)
+	//	}
+	//}
 
-	var outputableModules []*pbsubstreams.Module
-	if reqctx.Details(ctx).Request.GetProductionMode() {
-		outputableModules = []*pbsubstreams.Module{p.outputGraph.OutputModule()}
-	} else {
-		outputableModules = p.outputGraph.AllModules()
-	}
-
-	if err := p.forkHandler.handleUndo(clock, cursor, p.respFunc, p.gate.shouldSendOutputs(), outputableModules); err != nil {
+	if err := p.forkHandler.handleUndo(clock, cursor); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
-	return nil
+
+	if bstream.EqualsBlockRefs(p.insideReorgUpTo, reorgJunctionBlock) {
+		return nil
+	}
+	p.insideReorgUpTo = reorgJunctionBlock
+
+	targetCursor := &bstream.Cursor{
+		Step:      bstream.StepNew,
+		Block:     reorgJunctionBlock,
+		LIB:       cursor.LIB,
+		HeadBlock: cursor.HeadBlock,
+	}
+
+	targetClock := &pbsubstreamsrpc.Clock{
+		Id:     reorgJunctionBlock.ID(),
+		Number: reorgJunctionBlock.Num(),
+		//FIXME: we don't have timestamp here...
+	}
+
+	return p.respFunc(
+		&pbsubstreamsrpc.Response{
+			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
+				&pbsubstreamsrpc.BlockUndoSignal{
+					LastValidClock:  targetClock,
+					LastValidCursor: targetCursor.ToOpaque(),
+				},
+			},
+		})
 }
 
-func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
+func (p *Pipeline) handleStepFinal(clock *pbsubstreamsrpc.Clock) error {
 	p.lastFinalClock = clock
+	p.insideReorgUpTo = nil
 	if err := p.execOutputCache.HandleFinal(clock); err != nil {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
@@ -148,13 +180,14 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
+func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreamsrpc.Clock, cursor *bstream.Cursor) error {
+	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
-	if isBlockOverStopBlock(clock.Number, reqDetails.Request.StopBlockNum) {
+	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return io.EOF
 	}
 
-	if err := p.stores.flushStores(ctx, block.Number); err != nil {
+	if err := p.stores.flushStores(ctx, clock.Number); err != nil {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
@@ -179,14 +212,20 @@ func (p *Pipeline) handlerStepNew(ctx context.Context, block *bstream.Block, clo
 	}
 
 	if reqDetails.ShouldReturnProgressMessages() {
-		if err = p.returnModuleProgressOutputs(clock); err != nil {
-			return fmt.Errorf("failed to return modules progress %w", err)
+		if reqDetails.IsSubRequest {
+			if err = p.returnInternalModuleProgressOutputs(clock); err != nil {
+				return fmt.Errorf("failed to return modules progress %w", err)
+			}
+		} else {
+			if err = p.returnRPCModuleProgressOutputs(clock); err != nil {
+				return fmt.Errorf("failed to return modules progress %w", err)
+			}
 		}
 	}
 
 	if p.gate.shouldSendOutputs() {
 		logger.Debug("will return module outputs")
-		if err = returnModuleDataOutputs(clock, bstream.StepNew, cursor, p.moduleOutputs, p.respFunc); err != nil {
+		if err = returnModuleDataOutputs(clock, cursor, p.mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc); err != nil {
 			return fmt.Errorf("failed to return module data output: %w", err)
 		}
 	}
@@ -204,7 +243,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	//  this way we skip the buildWASM() in `Init()`.
 	//  Would pave the way towards PATCH'd modules too.
 
-	p.moduleOutputs = nil
+	p.mapModuleOutput = nil
+	p.extraMapModuleOutputs = nil
+	p.extraStoreModuleOutputs = nil
 	for _, executor := range p.moduleExecutors {
 		if err := p.execute(ctx, executor, execOutput); err != nil {
 			return fmt.Errorf("running executor %q: %w", executor.Name(), err)

@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -73,7 +74,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
 
-	outputStreamNames := strings.Split(moduleName, ",")
+	outputStreamName := moduleName
 
 	apiToken := readAPIToken(cmd, "substreams-api-token-envvar")
 	insecure := mustGetBool(cmd, "insecure")
@@ -87,7 +88,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			insecure,
 			plaintext,
 		)
-		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkg.Modules, outputStreamNames, blockNum, interval, timeout)
+		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkg.Modules, outputStreamName, blockNum, interval, timeout)
 	}
 
 	promReg := prometheus.NewRegistry()
@@ -118,7 +119,7 @@ func markFailure(endpoint string, begin time.Time) {
 	requestDurationMs.With(prometheus.Labels{"endpoint": endpoint}).Set(float64(time.Since(begin).Milliseconds()))
 }
 
-func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamNames []string, blockNum int64, pollingInterval, pollingTimeout time.Duration) {
+func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration) {
 	sleep := time.Duration(0)
 	for {
 		time.Sleep(sleep)
@@ -134,15 +135,15 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 			continue
 		}
 
-		subReq := &pbsubstreams.Request{
-			StartBlockNum: blockNum,
-			StopBlockNum:  uint64(blockNum + 1),
-			ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
-			Modules:       modules,
-			OutputModules: outputStreamNames,
+		subReq := &pbsubstreamsrpc.Request{
+			StartBlockNum:   blockNum,
+			StopBlockNum:    uint64(blockNum + 1),
+			FinalBlocksOnly: true,
+			Modules:         modules,
+			OutputModule:    outputStreamName,
 		}
 
-		if err := pbsubstreams.ValidateRequest(subReq, false); err != nil {
+		if err := subReq.Validate(); err != nil {
 			zlog.Error("validate request", zap.Error(err))
 			markFailure(endpoint, begin)
 			connClose()
@@ -164,8 +165,8 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 			resp, err := cli.Recv()
 			if resp != nil {
 				switch resp.Message.(type) {
-				case *pbsubstreams.Response_Data:
-					fmt.Println(resp.Message.(*pbsubstreams.Response_Data).Data.Outputs)
+				case *pbsubstreamsrpc.Response_BlockData:
+					fmt.Println(resp.Message.(*pbsubstreamsrpc.Response_BlockData).BlockData.Output)
 					gotResp = true
 				}
 			}

@@ -8,11 +8,10 @@ import (
 )
 
 type Graph struct {
-	request *pbsubstreams.Request
-
-	allModules   []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
-	moduleHashes *manifest.ModuleHashes
-	stores       []*pbsubstreams.Module // subset of allModules: only the stores
+	requestModules *pbsubstreams.Modules
+	usedModules    []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	moduleHashes   *manifest.ModuleHashes
+	stores         []*pbsubstreams.Module // subset of allModules: only the stores
 
 	outputModule *pbsubstreams.Module
 
@@ -22,36 +21,36 @@ type Graph struct {
 
 func (g *Graph) OutputModule() *pbsubstreams.Module   { return g.outputModule }
 func (g *Graph) Stores() []*pbsubstreams.Module       { return g.stores }
-func (g *Graph) AllModules() []*pbsubstreams.Module   { return g.allModules }
+func (g *Graph) AllModules() []*pbsubstreams.Module   { return g.usedModules }
 func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 
-func NewOutputModuleGraph(request *pbsubstreams.Request) (out *Graph, err error) {
+func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{
-		request: request,
+		requestModules: modules,
 	}
-	if err := out.computeGraph(); err != nil {
+	if err := out.computeGraph(outputModule, productionMode, modules); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
 	}
 
 	return out, nil
 }
 
-func (g *Graph) computeGraph() error {
-	graph, err := manifest.NewModuleGraph(g.request.Modules.Modules)
+func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) error {
+	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
 	}
-	outputModuleName := g.request.MustGetOutputModuleName()
+	outputModuleName := outputModule
 
 	processModules, err := graph.ModulesDownTo(outputModuleName)
 	if err != nil {
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
-	g.allModules = processModules
+	g.usedModules = processModules
 	g.hashModules(graph)
 
-	g.outputModule = computeOutputModule(g.allModules, outputModuleName)
+	g.outputModule = computeOutputModule(g.usedModules, outputModuleName)
 
 	storeModules, err := graph.StoresDownTo(g.outputModule.Name)
 	if err != nil {
@@ -59,7 +58,7 @@ func (g *Graph) computeGraph() error {
 	}
 	g.stores = storeModules
 
-	g.schedulableModules = computeSchedulableModules(storeModules, g.outputModule, g.request.ProductionMode)
+	g.schedulableModules = computeSchedulableModules(storeModules, g.outputModule, productionMode)
 
 	ancestorsMap, err := computeSchedulableAncestors(graph, g.schedulableModules)
 	if err != nil {
@@ -121,8 +120,8 @@ func moduleNames(modules []*pbsubstreams.Module) (out []string) {
 
 func (g *Graph) hashModules(graph *manifest.ModuleGraph) {
 	g.moduleHashes = manifest.NewModuleHashes()
-	for _, module := range g.allModules {
-		g.moduleHashes.HashModule(g.request.Modules, module, graph)
+	for _, module := range g.usedModules {
+		g.moduleHashes.HashModule(g.requestModules, module, graph)
 	}
 }
 

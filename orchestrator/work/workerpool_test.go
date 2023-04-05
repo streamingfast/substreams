@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/substreams"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -13,7 +13,7 @@ import (
 func Test_workerPoolPool_Borrow_Return(t *testing.T) {
 	ctx := context.Background()
 	pi := NewWorkerPool(ctx, 2, func(logger *zap.Logger) Worker {
-		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
+		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
 			return &Result{}
 		})
 	})
@@ -30,7 +30,7 @@ func Test_workerPoolPool_Borrow_Return_Canceled_Ctx(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	pi := NewWorkerPool(ctx, 1, func(logger *zap.Logger) Worker {
-		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
+		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
 			return &Result{}
 		})
 	})

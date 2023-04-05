@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/streamingfast/dbin"
 
@@ -103,11 +103,11 @@ func (f *File) ReadReplay() (out stream.ReplayBundle, err error) {
 
 func mapTypeToUpdateMsg(in any) any {
 	switch m := in.(type) {
-	case *pbsubstreams.Request,
-		*pbsubstreams.BlockScopedData,
-		*pbsubstreams.ModulesProgress,
-		*pbsubstreams.InitialSnapshotData,
-		*pbsubstreams.InitialSnapshotComplete:
+	case *pbsubstreamsrpc.Request,
+		*pbsubstreamsrpc.BlockScopedData,
+		*pbsubstreamsrpc.ModulesProgress,
+		*pbsubstreamsrpc.InitialSnapshotData,
+		*pbsubstreamsrpc.InitialSnapshotComplete:
 		return m
 	}
 	panic("unsupported payload")
@@ -119,11 +119,11 @@ func (f *File) Push(msg tea.Msg) error {
 	}
 
 	switch msg.(type) {
-	case *pbsubstreams.Request,
-		*pbsubstreams.BlockScopedData,
-		*pbsubstreams.ModulesProgress,
-		*pbsubstreams.InitialSnapshotData,
-		*pbsubstreams.InitialSnapshotComplete:
+	case *pbsubstreamsrpc.Request,
+		*pbsubstreamsrpc.BlockScopedData,
+		*pbsubstreamsrpc.ModulesProgress,
+		*pbsubstreamsrpc.InitialSnapshotData,
+		*pbsubstreamsrpc.InitialSnapshotComplete:
 
 		anyMsg, err := anypb.New(msg.(proto.Message))
 		if err != nil {

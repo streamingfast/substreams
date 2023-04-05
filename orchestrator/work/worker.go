@@ -9,9 +9,9 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/tracking"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -29,10 +29,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
+	Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -40,11 +40,11 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbsubstreams.
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result
+	f  func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
+func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
 	return f.f(ctx, request, respFunc)
 }
 
@@ -56,13 +56,13 @@ func (f SimpleWorkerFactory) ID() string {
 type WorkerFactory = func(logger *zap.Logger) Worker
 
 type RemoteWorker struct {
-	clientFactory client.Factory
+	clientFactory client.InternalClientFactory
 	tracer        ttrace.Tracer
 	logger        *zap.Logger
 	id            uint64
 }
 
-func NewRemoteWorker(clientFactory client.Factory, logger *zap.Logger) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, logger *zap.Logger) *RemoteWorker {
 	return &RemoteWorker{
 		clientFactory: clientFactory,
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
@@ -75,12 +75,12 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, respFunc substreams.ResponseFunc) *Result {
+func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
 	var err error
 	ctx, span := reqctx.WithSpan(ctx, "running_job")
 	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.String("output_module", request.MustGetOutputModuleName()))
-	span.SetAttributes(attribute.Int64("start_block", request.StartBlockNum))
+	span.SetAttributes(attribute.String("output_module", request.OutputModule))
+	span.SetAttributes(attribute.Int64("start_block", int64(request.StartBlockNum)))
 	span.SetAttributes(attribute.Int64("stop_block", int64(request.StopBlockNum)))
 	logger := w.logger
 
@@ -94,12 +94,12 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
 	w.logger.Info("launching remote worker",
-		zap.Int64("start_block_num", request.StartBlockNum),
+		zap.Int64("start_block_num", int64(request.StartBlockNum)),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
-		zap.String("output_module", request.MustGetOutputModuleName()),
+		zap.String("output_module", request.OutputModule),
 	)
 
-	stream, err := grpcClient.Blocks(ctx, request, grpcCallOpts...)
+	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
 			return &Result{
@@ -148,9 +148,10 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 
 		resp, err := stream.Recv()
 		if resp != nil {
-			switch r := resp.Message.(type) {
-			case *pbsubstreams.Response_Progress:
-				err := respFunc(resp)
+			switch r := resp.Type.(type) {
+			case *pbssinternal.ProcessRangeResponse_ProcessedRange:
+				forwardResponse := toRPCRangeProgressResponse(resp.ModuleName, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
+				err := respFunc(forwardResponse)
 				if err != nil {
 					span.SetStatus(codes.Error, err.Error())
 					return &Result{
@@ -158,46 +159,90 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbsubstreams.Request, 
 					}
 				}
 
-				for _, progress := range resp.GetProgress().Modules {
-					if f := progress.GetProcessedBytes(); f != nil {
-						bm := tracking.GetBytesMeter(ctx)
-						bm.AddBytesWritten(int(f.TotalBytesWritten))
-						bm.AddBytesRead(int(f.TotalBytesRead))
-					}
+			case *pbssinternal.ProcessRangeResponse_ProcessedBytes:
+				//		bm := tracking.GetBytesMeter(ctx)
+				//		bm.AddBytesWritten(int(f.TotalBytesWritten))
+				//		bm.AddBytesRead(int(f.TotalBytesRead))
+				// respFunc(...)
 
-					if f := progress.GetFailed(); f != nil {
-						err := fmt.Errorf("module %s failed on host: %s", progress.Name, f.Reason)
-						span.SetStatus(codes.Error, err.Error())
-						return &Result{
-							Error: err,
-						}
-					}
+			case *pbssinternal.ProcessRangeResponse_Failed:
+				forwardResponse := toRPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
+				respFunc(forwardResponse)
+				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
+				span.SetStatus(codes.Error, err.Error())
+				return &Result{
+					Error: err,
 				}
-			case *pbsubstreams.Response_DebugSnapshotData:
-				_ = r.DebugSnapshotData
-			case *pbsubstreams.Response_DebugSnapshotComplete:
-				_ = r.DebugSnapshotComplete
-			case *pbsubstreams.Response_Data:
-				// These are not returned by virtue of `returnOutputs`
+
+			case *pbssinternal.ProcessRangeResponse_Completed:
+				logger.Info("worker done")
+				return &Result{
+					PartialsWritten: toRPCBlockRanges(r.Completed.AllProcessedRanges),
+				}
 			}
 		}
 
 		if err != nil {
 			if err == io.EOF {
-				logger.Info("worker done")
-				trailers := stream.Trailer().Get("substreams-partials-written")
-				var partialsWritten []*block.Range
-				if len(trailers) != 0 {
-					logger.Info("partial written", zap.String("trailer", trailers[0]))
-					partialsWritten = block.ParseRanges(trailers[0])
-				}
-				return &Result{
-					PartialsWritten: partialsWritten,
-				}
+				return &Result{}
 			}
 			return &Result{
 				Error: &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)},
 			}
 		}
 	}
+}
+func toRPCFailedProgressResponse(moduleName, reason string, logs []string, logsTruncated bool) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Progress{
+			Progress: &pbsubstreamsrpc.ModulesProgress{
+				Modules: []*pbsubstreamsrpc.ModuleProgress{
+					&pbsubstreamsrpc.ModuleProgress{
+						Name: moduleName,
+						Type: &pbsubstreamsrpc.ModuleProgress_Failed_{
+							Failed: &pbsubstreamsrpc.ModuleProgress_Failed{
+								Reason:        reason,
+								Logs:          logs,
+								LogsTruncated: logsTruncated,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func toRPCRangeProgressResponse(moduleName string, start, end uint64) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Progress{
+			Progress: &pbsubstreamsrpc.ModulesProgress{
+				Modules: []*pbsubstreamsrpc.ModuleProgress{
+					&pbsubstreamsrpc.ModuleProgress{
+						Name: moduleName,
+						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+							ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+								ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
+									{
+										StartBlock: start,
+										EndBlock:   end,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func toRPCBlockRanges(in []*pbssinternal.BlockRange) (out []*block.Range) {
+	for _, b := range in {
+		out = append(out, &block.Range{
+			StartBlock:        b.StartBlock,
+			ExclusiveEndBlock: b.EndBlock,
+		})
+	}
+	return
 }

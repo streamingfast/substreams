@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/substreams"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -104,12 +104,12 @@ func (b *bytesMeter) Send(ctx context.Context, respFunc substreams.ResponseFunc)
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	var in []*pbsubstreams.ModuleProgress
+	var in []*pbsubstreamsrpc.ModuleProgress
 
-	in = append(in, &pbsubstreams.ModuleProgress{
+	in = append(in, &pbsubstreamsrpc.ModuleProgress{
 		Name: "",
-		Type: &pbsubstreams.ModuleProgress_ProcessedBytes_{
-			ProcessedBytes: &pbsubstreams.ModuleProgress_ProcessedBytes{
+		Type: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes_{
+			ProcessedBytes: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes{
 				TotalBytesWritten: b.bytesWritten,
 				TotalBytesRead:    b.bytesRead,
 				BytesWrittenDelta: b.bytesWrittenDelta,

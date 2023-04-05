@@ -1,13 +1,11 @@
 package output
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
-func isEmptyModuleOutput(in *pbsubstreams.ModuleOutput) bool {
-	switch d := in.Data.(type) {
-	case *pbsubstreams.ModuleOutput_MapOutput:
-		return len(d.MapOutput.Value) == 0
-	case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
-		return len(d.DebugStoreDeltas.Deltas) == 0
-	}
-	return true
+func isEmptyMapModuleOutput(in *pbsubstreamsrpc.MapModuleOutput) bool {
+	return len(in.MapOutput.Value) == 0
+}
+
+func isEmptyStoreModuleOutput(in *pbsubstreamsrpc.StoreModuleOutput) bool {
+	return len(in.DebugStoreDeltas) == 0
 }

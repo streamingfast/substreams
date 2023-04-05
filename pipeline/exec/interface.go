@@ -3,9 +3,8 @@ package exec
 import (
 	"context"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/execout"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type ModuleExecutor interface {
@@ -14,9 +13,9 @@ type ModuleExecutor interface {
 	String() string
 	ResetWASMInstance()
 	FreeMem()
-	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
+	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	applyCachedOutput(value []byte) error
-	toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error)
+	toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error)
 	HasValidOutput() bool
 
 	moduleLogs() (logs []string, truncated bool)

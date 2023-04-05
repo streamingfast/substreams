@@ -6,40 +6,55 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (o *Output) renderPayload(in *pbsubstreams.ModuleOutput) string {
+func (o *Output) renderMapPayload(in *pbsubstreamsrpc.MapModuleOutput) string {
 	out := &strings.Builder{}
 
-	for _, log := range in.DebugLogs {
-		out.WriteString(Styles.LogLabel.Render("log: "))
-		out.WriteString(Styles.LogLine.Render(log))
-		out.WriteString("\n")
+	if in.DebugInfo != nil {
+		for _, log := range in.DebugInfo.Logs {
+			out.WriteString(Styles.LogLabel.Render("log: "))
+			out.WriteString(Styles.LogLine.Render(log))
+			out.WriteString("\n")
+		}
+
+		if len(in.DebugInfo.Logs) != 0 {
+			out.WriteString("\n")
+		}
 	}
 
-	if len(in.DebugLogs) != 0 {
-		out.WriteString("\n")
+	if len(in.MapOutput.Value) != 0 {
+		msgDesc := o.msgDescs[in.Name]
+		out.WriteString(o.decodeDynamicMessage(msgDesc, in.MapOutput))
+	}
+	return out.String()
+}
+
+func (o *Output) renderStorePayload(in *pbsubstreamsrpc.StoreModuleOutput) string {
+	out := &strings.Builder{}
+
+	if in.DebugInfo != nil {
+		for _, log := range in.DebugInfo.Logs {
+			out.WriteString(Styles.LogLabel.Render("log: "))
+			out.WriteString(Styles.LogLine.Render(log))
+			out.WriteString("\n")
+		}
+
+		if len(in.DebugInfo.Logs) != 0 {
+			out.WriteString("\n")
+		}
 	}
 
-	switch data := in.Data.(type) {
-	case *pbsubstreams.ModuleOutput_MapOutput:
-		if len(data.MapOutput.Value) != 0 {
-			msgDesc := o.msgDescs[in.Name]
-			out.WriteString(o.decodeDynamicMessage(msgDesc, data.MapOutput))
-		}
-	case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
-		if len(data.DebugStoreDeltas.Deltas) != 0 {
-			//out.WriteString(o.decodeDynamicStoreDeltas())
-			//s = append(s, ui.renderDecoratedDeltas(in.Name, data.DebugStoreDeltas.Deltas, false)...)
-		} else {
-			out.WriteString("No deltas")
-		}
+	if len(in.DebugStoreDeltas) != 0 {
+		//out.WriteString(o.decodeDynamicStoreDeltas())
+		//s = append(s, ui.renderDecoratedDeltas(in.Name, in.DebugStoreDeltas.Deltas, false)...)
+	} else {
+		out.WriteString("No deltas")
 	}
 	return out.String()
 }

@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -12,21 +13,14 @@ import (
 
 type getRecentFinalBlockFunc func() (uint64, error)
 
-func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, isOutputModule reqctx.IsOutputModuleFunc, getRecentFinalBlock getRecentFinalBlockFunc) (req *reqctx.RequestDetails, err error) {
+func BuildRequestDetails(request *pbsubstreamsrpc.Request, getRecentFinalBlock getRecentFinalBlockFunc) (req *reqctx.RequestDetails, err error) {
 	req = &reqctx.RequestDetails{
-		Request:        request,
-		IsSubRequest:   isSubRequest,
-		StopBlockNum:   request.StopBlockNum,
-		IsOutputModule: isOutputModule,
+		Modules:                             request.Modules,
+		OutputModule:                        request.OutputModule,
+		DebugInitialStoreSnapshotForModules: request.DebugInitialStoreSnapshotForModules,
+		ProductionMode:                      request.ProductionMode,
+		StopBlockNum:                        request.StopBlockNum,
 	}
-
-	// FIXME:
-	// CURSOR: if cursor is on a forked block, we NEED to kick off the LIVE
-	//         process directly, even if that's realllly in the past.
-	///        Eventually, we have a first process that corrects the live segment
-	///        joining on a final segment, and then kick off parallel processing
-	///        until a new, more recent, live block.
-	// See also `resolveStartBlockNum`'s TODO
 	req.RequestStartBlockNum, err = resolveStartBlockNum(request)
 	if err != nil {
 		return nil, err
@@ -40,6 +34,19 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, isOut
 	req.LinearHandoffBlockNum = linearHandoff
 
 	return req, nil
+}
+
+func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest) (req *reqctx.RequestDetails) {
+	req = &reqctx.RequestDetails{
+		Modules:               request.Modules,
+		OutputModule:          request.OutputModule,
+		ProductionMode:        true,
+		IsSubRequest:          true,
+		StopBlockNum:          request.StopBlockNum,
+		LinearHandoffBlockNum: request.StopBlockNum,
+		RequestStartBlockNum:  request.StartBlockNum,
+	}
+	return req
 }
 
 func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {
@@ -63,7 +70,7 @@ func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint6
 	return minOf(startBlock, maxHandoff), nil
 }
 
-func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
+func resolveStartBlockNum(req *pbsubstreamsrpc.Request) (uint64, error) {
 	// TODO(abourget): a caller will need to verify that, if there's a cursor.Step that is New or Undo,
 	// then we need to validate that we are returning not only a number, but an ID,
 	// We then need to sync from a known finalized Snapshot's block, down to the potentially

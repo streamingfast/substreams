@@ -2,30 +2,27 @@ package outputmodules
 
 import (
 	"fmt"
+	"testing"
+
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_ValidateRequest(t *testing.T) {
 	tests := []struct {
 		name       string
-		request    *pbsubstreams.Request
+		request    *pbsubstreamsrpc.Request
 		subrequest bool
 		blockType  string
 		expect     error
 	}{
 		{"negative start block num", req(-1), false, "sf.substreams.v1.test.Block", fmt.Errorf("negative start block -1 is not accepted")},
-		{"no modules found in request", &pbsubstreams.Request{StartBlockNum: 1}, false, "sf.substreams.v1.test.Block", fmt.Errorf("no modules found in request")},
-		{"multiple output modules is not accepted", req(1, withOutputModules([][]string{{"output_mod_1", "store"}, {"output_mod_1", "kind"}}, true)), false, "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
-		{"single legacy map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map", true)), false, "sf.substreams.v1.test.Block", nil},
-		{"single legacy store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store", true)), false, "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
-		{"single legacy map output module is accepted for sub-request", req(1, withOutputModule("output_mod", "map", true)), true, "sf.substreams.v1.test.Block", nil},
-		{"single legacy store output module is accepted for sub-request", req(1, withOutputModule("output_mod", "store", true)), true, "sf.substreams.v1.test.Block", nil},
-		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map", false)), false, "sf.substreams.v1.test.Block", nil},
-		{"single store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store", false)), false, "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
-		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map", false)), true, "sf.substreams.v1.test.Block", nil},
-		{"single store output module is  accepted for none sub-request", req(1, withOutputModule("output_mod", "map", false)), true, "sf.substreams.v1.test.Block", nil},
+		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, false, "sf.substreams.v1.test.Block", fmt.Errorf("no modules found in request")},
+		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), false, "sf.substreams.v1.test.Block", nil},
+		{"single store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store")), false, "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
+		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), true, "sf.substreams.v1.test.Block", nil},
+		{"single store output module is  accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), true, "sf.substreams.v1.test.Block", nil},
 		{name: "debug initial snapshots not accepted in production mode", request: req(1, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), expect: fmt.Errorf("debug initial snapshots not accepted in production mode")},
 	}
 
@@ -41,40 +38,31 @@ func Test_ValidateRequest(t *testing.T) {
 	}
 }
 
-func withOutputModules(modules [][]string, legacy bool) reqOption {
-	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
-		for _, module := range modules {
-			addOutputModule(req, module[0], module[1], legacy)
-		}
-		return req
-	}
-}
+type reqOption func(*pbsubstreamsrpc.Request) *pbsubstreamsrpc.Request
 
-type reqOption func(*pbsubstreams.Request) *pbsubstreams.Request
-
-func withOutputModule(outputModule, kind string, legacy bool) reqOption {
-	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
-		addOutputModule(req, outputModule, kind, legacy)
+func withOutputModule(outputModule, kind string) reqOption {
+	return func(req *pbsubstreamsrpc.Request) *pbsubstreamsrpc.Request {
+		addOutputModule(req, outputModule, kind)
 		return req
 	}
 }
 
 func withProductionMode() reqOption {
-	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
+	return func(req *pbsubstreamsrpc.Request) *pbsubstreamsrpc.Request {
 		req.ProductionMode = true
 		return req
 	}
 }
 
 func withDebugInitialSnapshotForModules(modules []string) reqOption {
-	return func(req *pbsubstreams.Request) *pbsubstreams.Request {
+	return func(req *pbsubstreamsrpc.Request) *pbsubstreamsrpc.Request {
 		req.DebugInitialStoreSnapshotForModules = modules
 		return req
 	}
 }
 
-func req(startBlockNum int64, opts ...reqOption) *pbsubstreams.Request {
-	r := &pbsubstreams.Request{
+func req(startBlockNum int64, opts ...reqOption) *pbsubstreamsrpc.Request {
+	r := &pbsubstreamsrpc.Request{
 		StartBlockNum: startBlockNum,
 		Modules:       &pbsubstreams.Modules{},
 	}
@@ -84,7 +72,7 @@ func req(startBlockNum int64, opts ...reqOption) *pbsubstreams.Request {
 	return r
 }
 
-func addOutputModule(req *pbsubstreams.Request, outputModule, kind string, legacy bool) {
+func addOutputModule(req *pbsubstreamsrpc.Request, outputModule, kind string) {
 	module := &pbsubstreams.Module{
 		Name: outputModule,
 		Kind: nil,
@@ -95,10 +83,6 @@ func addOutputModule(req *pbsubstreams.Request, outputModule, kind string, legac
 		module.Kind = &pbsubstreams.Module_KindMap_{}
 	}
 	req.Modules.Modules = append(req.Modules.Modules, module)
-	if legacy {
-		req.OutputModules = append(req.OutputModules, outputModule)
-	} else {
-		req.OutputModule = outputModule
-	}
+	req.OutputModule = outputModule
 
 }

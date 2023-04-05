@@ -18,7 +18,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
@@ -39,9 +39,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type Service struct {
+type Tier1Service struct {
 	blockType           string
-	partialModeEnabled  bool
 	wasmExtensions      []wasm.WASMExtensioner
 	pipelineOptions     []pipeline.PipelineOptioner
 	streamFactoryFunc   StreamFactoryFunc
@@ -55,17 +54,17 @@ type Service struct {
 
 var workerID atomic.Uint64
 
-func New(
+func NewTier1(
 	stateStore dstore.Store,
 	blockType string,
 	parallelSubRequests uint64,
 	subrequestSplitSize uint64,
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
-) (s *Service, err error) {
+) (s *Tier1Service, err error) {
 
 	zlog.Info("creating gprc client factory", zap.Reflect("config", substreamsClientConfig))
-	clientFactory := client.NewFactory(substreamsClientConfig)
+	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
 
 	runtimeConfig := config.NewRuntimeConfig(
 		1000, // overridden by Options
@@ -77,7 +76,7 @@ func New(
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
 	)
-	s = &Service{
+	s = &Tier1Service{
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,
 		tracer:        otel.GetTracerProvider().Tracer("service"),
@@ -93,15 +92,15 @@ func New(
 	return s, nil
 }
 
-func (s *Service) BaseStateStore() dstore.Store {
+func (s *Tier1Service) BaseStateStore() dstore.Store {
 	return s.runtimeConfig.BaseObjectStore
 }
 
-func (s *Service) BlockType() string {
+func (s *Tier1Service) BlockType() string {
 	return s.blockType
 }
 
-func (s *Service) Register(
+func (s *Tier1Service) Register(
 	server dgrpcserver.Server,
 	mergedBlocksStore dstore.Store,
 	forkedBlocksStore dstore.Store,
@@ -118,32 +117,22 @@ func (s *Service) Register(
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
 	s.logger = logger
 	server.RegisterService(func(gs grpc.ServiceRegistrar) {
-		pbsubstreams.RegisterStreamServer(gs, s)
+		pbsubstreamsrpc.RegisterStreamServer(gs, s)
 	})
 }
 
-func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.Stream_BlocksServer) (grpcError error) {
+func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubstreamsrpc.Stream_BlocksServer) (grpcError error) {
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 	ctx := streamSrv.Context()
 
-	isSubRequest, err := s.isSubRequest(ctx)
-	if err != nil {
-		return err
-	}
-
-	loggerName := "tier1"
-	if isSubRequest {
-		loggerName = "tier2"
-	}
-
-	logger := reqctx.Logger(ctx).Named(loggerName)
+	logger := reqctx.Logger(ctx).Named("tier1")
 	respFunc := responseHandler(logger, streamSrv)
 
-	respFunc(&pbsubstreams.Response{
-		Message: &pbsubstreams.Response_Session{
-			Session: &pbsubstreams.SessionInit{
+	respFunc(&pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Session{
+			Session: &pbsubstreamsrpc.SessionInit{
 				TraceId: tracing.GetTraceID(ctx).String(),
 			},
 		},
@@ -184,19 +173,17 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
 		zap.Strings("modules", moduleNames),
-		zap.String("output_module", request.MustGetOutputModuleName()),
+		zap.String("output_module", request.OutputModule),
 	}
-	if !isSubRequest {
-		fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
-		auth := authenticator.GetCredentials(ctx)
-		if id := auth.GetUserID(); id != "" {
-			fields = append(fields, zap.String("user_id", id))
-		}
+	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
+	auth := authenticator.GetCredentials(ctx)
+	if id := auth.GetUserID(); id != "" {
+		fields = append(fields, zap.String("user_id", id))
 	}
 	logger.Info("incoming substreams Blockd request", fields...)
 
-	err = s.blocks(ctx, runtimeConfig, isSubRequest, request, respFunc, streamSrv)
-	grpcError = s.toGRPCError(err)
+	err = s.blocks(ctx, runtimeConfig, request, respFunc)
+	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
 		logger.Info("unexpected termination of stream of blocks", zap.Error(err))
@@ -205,31 +192,31 @@ func (s *Service) Blocks(request *pbsubstreams.Request, streamSrv pbsubstreams.S
 	return grpcError
 }
 
-func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, isSubRequest bool, request *pbsubstreams.Request, respFunc substreams.ResponseFunc, trailerWriter pipeline.Trailable) error {
+func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	if err := outputmodules.ValidateRequest(request, s.blockType, isSubRequest); err != nil {
+	if err := outputmodules.ValidateRequest(request, s.blockType, true); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
-	outputGraph, err := outputmodules.NewOutputModuleGraph(request)
+	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, isSubRequest)
+	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, true)
 
 	//bytesMeter := tracking.NewBytesMeter(ctx)
 	//bytesMeter.Launch(ctx, respFunc)
 	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	logger.Debug("executing subrequest",
-		zap.String("output_module", request.MustGetOutputModuleName()),
+		zap.String("output_module", request.OutputModule),
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 	)
 
-	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, outputGraph.IsOutputModule, s.getRecentFinalBlock)
+	requestDetails, err := pipeline.BuildRequestDetails(request, s.getRecentFinalBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
@@ -250,31 +237,19 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, isSubRequest)
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, false)
 
 	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
 	//  * in direct mode, this would mean we start writing files after the handoff,
 	//    but it's not so useful to write those files, as they're partials
 	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
 	//  *
-	var execOutWriter *execout.Writer
-	outputModule := outputGraph.OutputModule()
-	if outputModule.GetKindMap() != nil && isSubRequest {
-		execOutWriter = execout.NewWriter(
-			requestDetails.LinearHandoffBlockNum,
-			requestDetails.StopBlockNum,
-			outputModule.Name,
-			execOutputConfigs,
-			isSubRequest,
-		)
-	}
-
-	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, execOutWriter, s.blockType)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, nil, s.blockType)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
-	opts := s.buildPipelineOptions(ctx, request)
+	opts := s.buildPipelineOptions(ctx)
 	pipe := pipeline.New(
 		ctx,
 		outputGraph,
@@ -296,13 +271,13 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("request_start_cursor", request.StartCursor),
 		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
-		zap.String("output_module", request.MustGetOutputModuleName()),
+		zap.String("output_module", request.OutputModule),
 	)
 	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
-	if !isSubRequest && requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
-		return pipe.OnStreamTerminated(ctx, trailerWriter, nil)
+	if requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
+		return pipe.OnStreamTerminated(ctx, nil)
 	}
 
 	if err := pipe.InitWASM(ctx); err != nil {
@@ -334,18 +309,20 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	}
 	streamErr = blockStream.Run(ctx)
 
-	return pipe.OnStreamTerminated(ctx, trailerWriter, streamErr)
+	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func (s *Service) buildPipelineOptions(ctx context.Context, request *pbsubstreams.Request) (opts []pipeline.Option) {
+func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipeline.Option) {
+	reqDetails := reqctx.Details(ctx)
 	for _, pipeOpts := range s.pipelineOptions {
-		opts = append(opts, pipeOpts.PipelineOptions(ctx, request)...)
+		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.RequestStartBlockNum, reqDetails.StopBlockNum, tracing.GetTraceID(ctx).String())...)
 	}
 	return
 }
 
-func responseHandler(logger *zap.Logger, streamSrv pbsubstreams.Stream_BlocksServer) func(resp *pbsubstreams.Response) error {
-	return func(resp *pbsubstreams.Response) error {
+func responseHandler(logger *zap.Logger, streamSrv pbsubstreamsrpc.Stream_BlocksServer) func(substreams.ResponseFromAnyTier) error {
+	return func(anyResp substreams.ResponseFromAnyTier) error {
+		resp := anyResp.(*pbsubstreamsrpc.Response)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
 			return status.Error(codes.Unavailable, err.Error())
@@ -369,20 +346,7 @@ func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats
 	return ctx, metrics.NewNoopStats()
 }
 
-func (s *Service) isSubRequest(ctx context.Context) (bool, error) {
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		partialMode := md.Get("substreams-partial-mode")
-		if len(partialMode) == 1 && partialMode[0] == "true" {
-			if !s.partialModeEnabled {
-				return false, status.Error(codes.InvalidArgument, "substreams-partial-mode not enabled on this instance")
-			}
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, logger *zap.Logger) string {
+func updateStreamHeadersHostname(streamSrv pbsubstreamsrpc.Stream_BlocksServer, logger *zap.Logger) string {
 	hostname, err := os.Hostname()
 	if err != nil {
 		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
@@ -410,7 +374,7 @@ func updateStreamHeadersHostname(streamSrv pbsubstreams.Stream_BlocksServer, log
 //
 // Otherwise, the error is assumed to be an internal error and turned backed into a proper
 // `status.Error(codes.Internal, err.Error())`.
-func (s *Service) toGRPCError(err error) error {
+func toGRPCError(err error) error {
 	if err == nil {
 		return nil
 	}

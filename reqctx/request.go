@@ -5,15 +5,21 @@ import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 type IsOutputModuleFunc func(name string) bool
 
 type RequestDetails struct {
-	Request *pbsubstreams.Request
+	Modules *pbsubstreams.Modules
 
+	DebugInitialStoreSnapshotForModules []string
+	OutputModule                        string
 	// What the user requested, derived from either the Request.StartBlockNum or Request.Cursor
 	RequestStartBlockNum  uint64
 	LinearHandoffBlockNum uint64
 	StopBlockNum          uint64
 
+	ProductionMode bool
 	IsSubRequest   bool
-	IsOutputModule IsOutputModuleFunc
+}
+
+func (d *RequestDetails) IsOutputModule(modName string) bool {
+	return modName == d.OutputModule
 }
 
 // Called to determine if we *really* need to save this store snapshot. We don't need
@@ -24,7 +30,7 @@ func (d *RequestDetails) SkipSnapshotSave(modName string) bool {
 	return d.IsSubRequest && !d.IsOutputModule(modName)
 }
 
-func (d *RequestDetails) ShouldReturnWrittenPartialsInTrailer(modName string) bool {
+func (d *RequestDetails) ShouldReturnWrittenPartials(modName string) bool {
 	return d.IsSubRequest && d.IsOutputModule(modName)
 }
 
@@ -33,6 +39,6 @@ func (d *RequestDetails) ShouldReturnProgressMessages() bool {
 }
 
 func (d *RequestDetails) ShouldStreamCachedOutputs() bool {
-	return d.Request.ProductionMode &&
+	return d.ProductionMode &&
 		d.RequestStartBlockNum < d.LinearHandoffBlockNum
 }

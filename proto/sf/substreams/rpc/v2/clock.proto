@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package sf.substreams.v1;
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
+package sf.substreams.rpc.v2;
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpc";
 
 import "google/protobuf/timestamp.proto";
 

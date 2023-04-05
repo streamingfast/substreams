@@ -8,7 +8,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -45,10 +45,10 @@ func assertProtoEqual(t *testing.T, expected proto.Message, actual proto.Message
 
 type ExecOutputTesting struct {
 	Values map[string][]byte
-	clock  *pbsubstreams.Clock
+	clock  *pbsubstreamsrpc.Clock
 }
 
-func NewExecOutputTesting(t *testing.T, block *bstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
+func NewExecOutputTesting(t *testing.T, block *bstream.Block, clock *pbsubstreamsrpc.Clock) *ExecOutputTesting {
 	blkBytes, err := block.Payload.Get()
 	require.NoError(t, err)
 
@@ -59,7 +59,7 @@ func NewExecOutputTesting(t *testing.T, block *bstream.Block, clock *pbsubstream
 		clock: clock,
 		Values: map[string][]byte{
 			"sf.substreams.v1.test.Block": blkBytes,
-			"sf.substreams.v1.Clock":      clockBytes,
+			"sf.substreams.rpc.v2.Clock":  clockBytes,
 		},
 	}
 }
@@ -77,6 +77,6 @@ func (i *ExecOutputTesting) Set(moduleName string, value []byte) (err error) {
 	return nil
 }
 
-func (i *ExecOutputTesting) Clock() *pbsubstreams.Clock {
+func (i *ExecOutputTesting) Clock() *pbsubstreamsrpc.Clock {
 	return i.clock
 }

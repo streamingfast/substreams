@@ -7,17 +7,18 @@ import (
 
 	"github.com/streamingfast/substreams/storage/execout"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockExecOutput struct {
-	clockFunc func() *pbsubstreams.Clock
+	clockFunc func() *pbsubstreamsrpc.Clock
 
 	cacheMap map[string][]byte
 }
 
-func (t *MockExecOutput) Clock() *pbsubstreams.Clock {
+func (t *MockExecOutput) Clock() *pbsubstreamsrpc.Clock {
 	return t.clockFunc()
 }
 
@@ -35,13 +36,14 @@ func (t *MockExecOutput) Set(name string, value []byte) (err error) {
 }
 
 type MockModuleExecutor struct {
-	name string
+	name       string
+	outputType string
 
-	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error)
+	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	ApplyFunc    func(value []byte) error
-	ToOutputFunc func(data []byte) (*pbsubstreams.ModuleOutput, error)
 	LogsFunc     func() (logs []string, truncated bool)
 	StackFunc    func() []string
+	ToOutputFunc func(data []byte) (*pbssinternal.ModuleOutput, error)
 	cacheable    bool
 }
 
@@ -59,7 +61,7 @@ func (t *MockModuleExecutor) FreeMem() {}
 
 func (t *MockModuleExecutor) ResetWASMInstance() {}
 
-func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error) {
+func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	if t.RunFunc != nil {
 		return t.RunFunc(ctx, reader)
 	}
@@ -77,7 +79,7 @@ func (t *MockModuleExecutor) applyCachedOutput(value []byte) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (t *MockModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
+func (t *MockModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
 	if t.ToOutputFunc != nil {
 		return t.ToOutputFunc(data)
 	}
@@ -102,8 +104,12 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	executor := &MockModuleExecutor{
 		name: "test",
-		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error) {
-			return []byte("test"), &pbsubstreams.ModuleOutput_MapOutput{}, nil
+		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+			return []byte("test"), &pbssinternal.ModuleOutput{
+				Data: &pbssinternal.ModuleOutput_MapOutput{
+					MapOutput: nil,
+				},
+			}, nil
 		},
 		LogsFunc: func() (logs []string, truncated bool) {
 			return []string{"test"}, false
@@ -129,12 +135,18 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 
 	executor := &MockModuleExecutor{
 		name: "test",
-		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData pbsubstreams.ModuleOutputData, err error) {
-			return []byte("test"), &pbsubstreams.ModuleOutput_MapOutput{}, nil
+		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+			return []byte("test"), &pbssinternal.ModuleOutput{
+				Data: &pbssinternal.ModuleOutput_MapOutput{
+					MapOutput: nil,
+				},
+			}, nil
 		},
-		ToOutputFunc: func(data []byte) (*pbsubstreams.ModuleOutput, error) {
-			return &pbsubstreams.ModuleOutput{
-				Data: &pbsubstreams.ModuleOutput_MapOutput{},
+		ToOutputFunc: func(data []byte) (*pbssinternal.ModuleOutput, error) {
+			return &pbssinternal.ModuleOutput{
+				Data: &pbssinternal.ModuleOutput_MapOutput{
+					MapOutput: nil,
+				},
 			}, nil
 		},
 		ApplyFunc: func(value []byte) error {

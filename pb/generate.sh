@@ -48,10 +48,10 @@ function generate_system() {
   fi
 
   protoc -I$PROTO \
-    "$PROTO/sf/substreams/v1/clock.proto" \
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
-    "$PROTO/sf/substreams/v1/substreams.proto" \
+    "$PROTO/sf/substreams/rpc/v2/clock.proto" \
+    "$PROTO/sf/substreams/rpc/v2/service.proto" \
     "$PROTO/google/protobuf/any.proto" \
     "$PROTO/google/protobuf/descriptor.proto" \
     "$PROTO/google/protobuf/timestamp.proto" \

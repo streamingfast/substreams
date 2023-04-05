@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/streamingfast/substreams/block"
+	pbssintern "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap/zapcore"
 )
@@ -37,14 +38,12 @@ func (j *Job) Matches(moduleName string, blockNum uint64) bool {
 	return j.ModuleName == moduleName && j.RequestRange.Contains(blockNum)
 }
 
-func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbsubstreams.Request {
-	return &pbsubstreams.Request{
-		StartBlockNum: int64(j.RequestRange.StartBlock),
+func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbssintern.ProcessRangeRequest {
+	return &pbssintern.ProcessRangeRequest{
+		StartBlockNum: j.RequestRange.StartBlock,
 		StopBlockNum:  j.RequestRange.ExclusiveEndBlock,
-		ForkSteps:     []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
-		//IrreversibilityCondition: irreversibilityCondition, // Unsupported for now
-		Modules:      originalModules,
-		OutputModule: j.ModuleName,
+		Modules:       originalModules,
+		OutputModule:  j.ModuleName,
 	}
 }
 

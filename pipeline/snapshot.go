@@ -7,7 +7,7 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 
 	"github.com/streamingfast/substreams"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
 )
 
@@ -15,7 +15,7 @@ func (p *Pipeline) sendSnapshots(ctx context.Context, storeMap store.Map) error 
 	if reqctx.Details(ctx).IsSubRequest {
 		return nil
 	}
-	snapshotModules := reqctx.Details(ctx).Request.DebugInitialStoreSnapshotForModules
+	snapshotModules := reqctx.Details(ctx).DebugInitialStoreSnapshotForModules
 	if len(snapshotModules) == 0 {
 		return nil
 	}
@@ -26,26 +26,24 @@ func (p *Pipeline) sendSnapshots(ctx context.Context, storeMap store.Map) error 
 			return fmt.Errorf("store %q not found", modName)
 		}
 
-		send := func(count uint64, total uint64, deltas []*pbsubstreams.StoreDelta) {
-			data := &pbsubstreams.InitialSnapshotData{
+		send := func(count uint64, total uint64, deltas []*pbsubstreamsrpc.StoreDelta) {
+			data := &pbsubstreamsrpc.InitialSnapshotData{
 				ModuleName: modName,
-				Deltas: &pbsubstreams.StoreDeltas{
-					Deltas: deltas,
-				},
-				SentKeys:  count,
-				TotalKeys: total,
+				Deltas:     deltas,
+				SentKeys:   count,
+				TotalKeys:  total,
 			}
 			p.respFunc(substreams.NewSnapshotData(data))
 		}
 
 		var count uint64
 		total := store.Length()
-		var accum []*pbsubstreams.StoreDelta
+		var accum []*pbsubstreamsrpc.StoreDelta
 
 		store.Iter(func(k string, v []byte) error {
 			count++
-			accum = append(accum, &pbsubstreams.StoreDelta{
-				Operation: pbsubstreams.StoreDelta_CREATE,
+			accum = append(accum, &pbsubstreamsrpc.StoreDelta{
+				Operation: pbsubstreamsrpc.StoreDelta_CREATE,
 				Key:       k,
 				NewValue:  v,
 			})

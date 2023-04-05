@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssintern "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
 func (b *baseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
@@ -43,18 +43,18 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
-	var delta *pbsubstreams.StoreDelta
+	var delta *pbssintern.StoreDelta
 	if found {
-		delta = &pbsubstreams.StoreDelta{
-			Operation: pbsubstreams.StoreDelta_UPDATE,
+		delta = &pbssintern.StoreDelta{
+			Operation: pbssintern.StoreDelta_UPDATE,
 			Ordinal:   ord,
 			Key:       key,
 			OldValue:  val,
 			NewValue:  cpValue,
 		}
 	} else {
-		delta = &pbsubstreams.StoreDelta{
-			Operation: pbsubstreams.StoreDelta_CREATE,
+		delta = &pbssintern.StoreDelta{
+			Operation: pbssintern.StoreDelta_CREATE,
 			Ordinal:   ord,
 			Key:       key,
 			OldValue:  nil,
@@ -77,8 +77,8 @@ func (b *baseStore) setIfNotExists(ord uint64, key string, value []byte) {
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
-	delta := &pbsubstreams.StoreDelta{
-		Operation: pbsubstreams.StoreDelta_CREATE,
+	delta := &pbssintern.StoreDelta{
+		Operation: pbssintern.StoreDelta_CREATE,
 		Ordinal:   ord,
 		Key:       key,
 		OldValue:  nil,

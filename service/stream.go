@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
@@ -44,7 +45,9 @@ func (sf *StreamFactory) New(
 
 	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
 		sf.mergedBlocksStore.SetMeter(bytesMeter)
-		sf.forkedBlocksStore.SetMeter(bytesMeter)
+		if sf.forkedBlocksStore != nil {
+			sf.forkedBlocksStore.SetMeter(bytesMeter)
+		}
 	}
 
 	return stream.New(

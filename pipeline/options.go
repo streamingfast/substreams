@@ -2,12 +2,12 @@ package pipeline
 
 import (
 	"context"
+
 	"github.com/streamingfast/substreams"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type PipelineOptioner interface {
-	PipelineOptions(ctx context.Context, request *pbsubstreams.Request) []Option
+	PipelineOptions(ctx context.Context, startBlock, stopBlock uint64, traceID string) []Option
 }
 
 type Option func(p *Pipeline)

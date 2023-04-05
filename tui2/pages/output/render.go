@@ -44,6 +44,18 @@ func (o *Output) renderPayload(in *pbsubstreams.ModuleOutput) string {
 	return out.String()
 }
 
+func applySearchColoring(text, keyword string) string {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return text
+	}
+
+	escapedKeyword := strings.ReplaceAll(keyword, " ", `\s+`)
+	highlightedText := strings.ReplaceAll(text, keyword, "\033[48;5;11m"+escapedKeyword+"\033[0m")
+
+	return highlightedText
+}
+
 func (o *Output) decodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *anypb.Any) string {
 	if msgDesc == nil {
 		return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))

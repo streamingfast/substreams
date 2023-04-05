@@ -1,10 +1,11 @@
 package output
 
 import (
+	"fmt"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/jhump/protoreflect/desc"
-
-	"github.com/charmbracelet/bubbles/key"
 
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
 
@@ -36,10 +37,13 @@ type Output struct {
 
 	activeModule string
 	activeBlock  uint64
+	
+	searchInput   textinput.Model
+	searchVisible bool
 }
 
 func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
-	return &Output{
+	output := &Output{
 		Common:          c,
 		msgDescs:        msgDescs,
 		blocksPerModule: make(map[string][]uint64),
@@ -49,6 +53,12 @@ func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
 		blockSelector:   blockselect.New(c),
 		outputView:      viewport.New(24, 80),
 	}
+	output.searchInput = textinput.New()
+	output.searchInput.Placeholder = "Search"
+	output.searchInput.Focus()
+	output.searchInput.CharLimit = 256
+	output.searchInput.Width = 80
+	return output
 }
 
 func (o *Output) Init() tea.Cmd {
@@ -124,12 +134,46 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.activeBlock = uint64(msg)
 		o.setViewportContent()
 	case tea.KeyMsg:
-		_, cmd := o.moduleSelector.Update(msg)
-		cmds = append(cmds, cmd)
-		_, cmd = o.blockSelector.Update(msg)
-		cmds = append(cmds, cmd)
-		o.outputView, cmd = o.outputView.Update(msg)
-		cmds = append(cmds, cmd)
+		if msg.String() == "/" {
+			o.searchVisible = !o.searchVisible
+			if o.searchVisible {
+				o.searchInput.Focus()
+			} else {
+				o.searchInput.Blur()
+			}
+			return o, nil
+		}
+
+		if o.searchVisible {
+			if o.searchInput.Focused() {
+				_, cmd := o.searchInput.Update(msg)
+				if msg.Type == tea.KeyEnter {
+					keyword := o.searchInput.Value()
+					lastOutputAsString := o.renderPayload(o.lastOutputContent)
+					o.outputView.SetContent(applySearchColoring(lastOutputAsString, keyword))
+
+				} else if msg.Type == tea.KeyLeft {
+					o.searchInput.SetCursor(o.searchInput.Position() - 1)
+				} else if msg.Type == tea.KeyRight {
+					o.searchInput.SetCursor(o.searchInput.Position() + 1)
+				} else if msg.Type == tea.KeyBackspace {
+					o.searchInput.SetCursor(o.searchInput.Position() - 1)
+					o.searchInput.SetValue(o.searchInput.Value()[:o.searchInput.Position()])
+				} else if msg.Type != tea.KeyTab {
+					o.searchInput.SetValue(fmt.Sprintf("%s%s", o.searchInput.Value(), msg))
+					o.searchInput.SetCursor(o.searchInput.Position() + 2)
+				}
+
+				cmds = append(cmds, cmd)
+			}
+		} else {
+			_, cmd := o.moduleSelector.Update(msg)
+			cmds = append(cmds, cmd)
+			_, cmd = o.blockSelector.Update(msg)
+			cmds = append(cmds, cmd)
+			o.outputView, cmd = o.outputView.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 	return o, tea.Batch(cmds...)
 }
@@ -153,11 +197,20 @@ func (o *Output) setViewportContent() {
 }
 
 func (o *Output) View() string {
+	if o.searchVisible {
+		return lipgloss.JoinVertical(0,
+			o.moduleSelector.View(),
+			o.blockSelector.View(),
+			o.outputView.View(),
+			o.searchInput.View(),
+		)
+	}
+
 	return lipgloss.JoinVertical(0,
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
-		"",
 		o.outputView.View(),
+		"",
 	)
 }
 
@@ -184,6 +237,10 @@ func (o *Output) ShortHelp() []key.Binding {
 		key.NewBinding(
 			key.WithKeys("up", "k", "down", "j"),
 			key.WithHelp("↑/k/↓/j", "up/down"),
+		),
+		key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
 		),
 	}
 }

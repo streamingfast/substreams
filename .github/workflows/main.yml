@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - develop
+      - "release/v*"
   pull_request:
     branches:
       - "**"

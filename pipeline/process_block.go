@@ -42,11 +42,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 
-	clock := &pbsubstreamsrpc.Clock{
-		Number:    block.Num(),
-		Id:        block.Id,
-		Timestamp: timestamppb.New(block.Time()),
-	}
+	clock := blockToClock(block)
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
 	finalBlockHeight := obj.(bstream.Stepable).FinalBlockHeight()
@@ -65,6 +61,22 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 	return
+}
+
+func blockToClock(block *bstream.Block) *pbsubstreamsrpc.Clock {
+	return &pbsubstreamsrpc.Clock{
+		Number:    block.Number,
+		Id:        block.Id,
+		Timestamp: timestamppb.New(block.Time()),
+	}
+}
+
+func blockRefToClock(block bstream.BlockRef) *pbsubstreamsrpc.Clock {
+	return &pbsubstreamsrpc.Clock{
+		Number: block.Num(),
+		Id:     block.ID(),
+		// Timestamp: timestamppb.New(block.Time()),
+	}
 }
 
 func (p *Pipeline) processBlock(
@@ -146,11 +158,7 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreamsrpc.Cl
 		HeadBlock: cursor.HeadBlock,
 	}
 
-	targetClock := &pbsubstreamsrpc.Clock{
-		Id:     reorgJunctionBlock.ID(),
-		Number: reorgJunctionBlock.Num(),
-		//FIXME: we don't have timestamp here...
-	}
+	targetClock := blockRefToClock(reorgJunctionBlock)
 
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
@@ -219,6 +227,12 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 
 	if p.gate.shouldSendOutputs() {
 		logger.Debug("will return module outputs")
+		for _, hook := range p.preFirstBlockDataHooks {
+			if err := hook(ctx, clock); err != nil {
+				return fmt.Errorf("failed to run pre-first-block-data-hook: %w", err)
+			}
+		}
+		p.preFirstBlockDataHooks = nil
 		if err = returnModuleDataOutputs(clock, cursor, p.mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc); err != nil {
 			return fmt.Errorf("failed to return module data output: %w", err)
 		}

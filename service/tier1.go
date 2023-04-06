@@ -45,6 +45,7 @@ type Tier1Service struct {
 	pipelineOptions     []pipeline.PipelineOptioner
 	streamFactoryFunc   StreamFactoryFunc
 	getRecentFinalBlock func() (uint64, error)
+	resolveCursor       pipeline.CursorResolver
 
 	runtimeConfig config.RuntimeConfig
 
@@ -115,6 +116,7 @@ func (s *Tier1Service) Register(
 
 	s.streamFactoryFunc = sf.New
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
+	s.resolveCursor = pipeline.NewCursorResolver(forkableHub, mergedBlocksStore, forkedBlocksStore)
 	s.logger = logger
 	server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreamsrpc.RegisterStreamServer(gs, s)
@@ -144,7 +146,7 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
 
-	hostname := updateStreamHeadersHostname(streamSrv, logger)
+	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
 	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
@@ -180,7 +182,7 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	if id := auth.GetUserID(); id != "" {
 		fields = append(fields, zap.String("user_id", id))
 	}
-	logger.Info("incoming substreams Blockd request", fields...)
+	logger.Info("incoming substreams Blocks request", fields...)
 
 	err = s.blocks(ctx, runtimeConfig, request, respFunc)
 	grpcError = toGRPCError(err)
@@ -210,16 +212,11 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	//bytesMeter.Launch(ctx, respFunc)
 	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
-	logger.Debug("executing subrequest",
-		zap.String("output_module", request.OutputModule),
-		zap.Int64("start_block", request.StartBlockNum),
-		zap.Uint64("stop_block", request.StopBlockNum),
-	)
-
-	requestDetails, err := pipeline.BuildRequestDetails(request, s.getRecentFinalBlock)
+	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
+
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 
 	if err := outputGraph.ValidateRequestStartBlock(requestDetails.RequestStartBlockNum); err != nil {
@@ -250,6 +247,16 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	}
 
 	opts := s.buildPipelineOptions(ctx)
+	if undoSignal != nil {
+		opts = append(opts, pipeline.WithPreFirstBlockDataHook(func(_ context.Context, _ *pbsubstreamsrpc.Clock) error {
+			return respFunc(&pbsubstreamsrpc.Response{
+				Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
+					BlockUndoSignal: undoSignal,
+				},
+			})
+		}))
+	}
+
 	pipe := pipeline.New(
 		ctx,
 		outputGraph,
@@ -270,7 +277,6 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		zap.Uint64("request_start_block", requestDetails.RequestStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("request_start_cursor", request.StartCursor),
-		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
 		zap.String("output_module", request.OutputModule),
 	)
 	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
@@ -346,7 +352,7 @@ func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats
 	return ctx, metrics.NewNoopStats()
 }
 
-func updateStreamHeadersHostname(streamSrv pbsubstreamsrpc.Stream_BlocksServer, logger *zap.Logger) string {
+func updateStreamHeadersHostname(setHeader func(metadata.MD) error, logger *zap.Logger) string {
 	hostname, err := os.Hostname()
 	if err != nil {
 		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
@@ -354,7 +360,7 @@ func updateStreamHeadersHostname(streamSrv pbsubstreamsrpc.Stream_BlocksServer, 
 	}
 	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
 		md := metadata.New(map[string]string{"host": hostname})
-		err = streamSrv.SetHeader(md)
+		err = setHeader(md)
 		if err != nil {
 			logger.Warn("cannot send header metadata", zap.Error(err))
 		}

@@ -35,9 +35,10 @@ type Pipeline struct {
 	ctx           context.Context
 	runtimeConfig config.RuntimeConfig
 
-	preBlockHooks  []substreams.BlockHook
-	postBlockHooks []substreams.BlockHook
-	postJobHooks   []substreams.PostJobHook
+	preFirstBlockDataHooks []substreams.BlockHook
+	preBlockHooks          []substreams.BlockHook
+	postBlockHooks         []substreams.BlockHook
+	postJobHooks           []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Runtime
 	outputGraph     *outputmodules.Graph

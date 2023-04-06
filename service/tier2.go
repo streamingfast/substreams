@@ -24,6 +24,7 @@ import (
 	"github.com/streamingfast/substreams/tracking"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -112,6 +113,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
 
+	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
+	span.SetAttributes(attribute.String("hostname", hostname))
+
 	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
 		s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
 	}
@@ -169,12 +173,6 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	//bytesMeter := tracking.NewBytesMeter(ctx)
 	//bytesMeter.Launch(ctx, respFunc)
 	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
-
-	logger.Debug("executing subrequest",
-		zap.String("output_module", request.OutputModule),
-		zap.Uint64("start_block", request.StartBlockNum),
-		zap.Uint64("stop_block", request.StopBlockNum),
-	)
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
@@ -235,7 +233,6 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	logger.Info("initializing pipeline",
 		zap.Uint64("request_start_block", requestDetails.RequestStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
-		zap.Bool("is_subrequest", requestDetails.IsSubRequest),
 		zap.String("output_module", request.OutputModule),
 	)
 	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
@@ -247,11 +244,6 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	}
 
 	var streamErr error
-	logger.Info("creating firehose stream",
-		zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
-		zap.Uint64("stop_block", request.StopBlockNum),
-	)
-
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
 		pipe,

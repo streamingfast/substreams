@@ -18,6 +18,14 @@ func WithPreBlockHook(f substreams.BlockHook) Option {
 	}
 }
 
+// WithPreFirstBlockDataHook functions will be called before we send the first 'BlockScopedData'
+// to the consumer
+func WithPreFirstBlockDataHook(f substreams.BlockHook) Option {
+	return func(p *Pipeline) {
+		p.preFirstBlockDataHooks = append(p.preBlockHooks, f)
+	}
+}
+
 func WithPostBlockHook(f substreams.BlockHook) Option {
 	return func(p *Pipeline) {
 		p.postBlockHooks = append(p.postBlockHooks, f)

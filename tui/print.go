@@ -392,9 +392,10 @@ func printClock(block *pbsubstreamsrpc.BlockScopedData) {
 	fmt.Printf("----------- BLOCK #%s (%s) ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Id)
 }
 
-func printUndo(lastGoodClock *pbsubstreamsrpc.Clock) {
+func printUndo(lastGoodClock *pbsubstreamsrpc.Clock, cursor string) {
 	fmt.Printf("----------- BLOCK UNDO UP TO #%s (0x%s) ---------------\n", humanize.Comma(int64(lastGoodClock.Number)), lastGoodClock.Id)
+	fmt.Printf("\nNext cursor: %s\n", cursor)
 }
-func printUndoJSON(lastGoodClock *pbsubstreamsrpc.Clock) {
-	fmt.Printf("{\"undo_until\":{\"num\":%d,\"id\":%s\"}\n", lastGoodClock.Number, lastGoodClock.Id)
+func printUndoJSON(lastGoodClock *pbsubstreamsrpc.Clock, cursor string) {
+	fmt.Printf("{\"undo_until\":{\"num\":%d,\"id\":%s\",\"next_cursor\":\"%s\"}\n", lastGoodClock.Number, lastGoodClock.Id, cursor)
 }

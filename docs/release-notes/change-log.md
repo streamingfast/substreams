@@ -11,9 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Services for tier1 (request, response...) now exposed as `sf.substreams.rpc.v2.Stream/Blocks` and removed from `sf.substreams.v1`
   * Single module output from mapper in response. 
   * In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs` 
-  * The concept of "step" under blockData has been removed: reorgs are now signalled with a `BlockUndoSignal` message. Original block data is no longer emitted when a block is forked out during a reorg.
+  * The concept of "step" under blockData has been removed: reorgs are now signalled with a `BlockUndoSignal` message (without the original data)
 * Services for tier2 (subrequests) now exposed as `sf.substreams.internal.v2.Substreams/ProcessRange` (not to be used externally)
 * The package and modules definitions stay under `sf.substreams.v1`
+* If a cursor cannot be resolved to the closest canonical parent, it will fall back to the closest final block.
 
 ### Unreleased 
 

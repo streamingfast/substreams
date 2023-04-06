@@ -129,13 +129,6 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreamsrpc.Clock) error {
 }
 
 func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreamsrpc.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
-	// FIXME: doublecheck: never send snapshot in handleStepUndo now, but send it in following of stepNew...
-	//
-	//if p.gate.shouldSendSnapshot() {
-	//	if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
-	//		return fmt.Errorf("send initial snapshots: %w", err)
-	//	}
-	//}
 
 	if err := p.forkHandler.handleUndo(clock, cursor); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
@@ -191,6 +184,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
+	// note: if we start on a forked cursor, the undo signal will appear BEFORE we send the snapshot
 	if p.gate.shouldSendSnapshot() {
 		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
 			return fmt.Errorf("send initial snapshots: %w", err)

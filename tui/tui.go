@@ -139,6 +139,14 @@ func (ui *TUI) Cancel() {
 
 func (ui *TUI) IncomingMessage(resp *pbsubstreamsrpc.Response) error {
 	switch m := resp.Message.(type) {
+	case *pbsubstreamsrpc.Response_BlockUndoSignal:
+		if ui.outputMode == OutputModeTUI {
+			printUndo(m.BlockUndoSignal.LastValidClock)
+			ui.ensureTerminalUnlocked()
+		} else {
+			printUndoJSON(m.BlockUndoSignal.LastValidClock)
+		}
+
 	case *pbsubstreamsrpc.Response_BlockData:
 		if ui.outputMode == OutputModeTUI {
 			printClock(m.BlockData)

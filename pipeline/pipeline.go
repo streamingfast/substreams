@@ -553,7 +553,7 @@ func blockTriggersGate(blockNum, requestStartBlockNum uint64, step bstream.StepT
 		return blockNum >= requestStartBlockNum
 	}
 	if step.Matches(bstream.StepUndo) {
-		return blockNum+1 == requestStartBlockNum //  FIXME undo case will require additional previousBlock in cursor
+		return true
 	}
 	return false
 }

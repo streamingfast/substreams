@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The package and modules definitions stay under `sf.substreams.v1`
 * If a cursor cannot be resolved to the closest canonical parent, it will fall back to the closest final block.
 
-### Unreleased 
+## [1.0.1](https://github.com/streamingfast/substreams/releases/tag/v1.0.1)
 
 ### Fixed
 
@@ -25,12 +25,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed `substreams run` when `manifest` contains unknown attributes
 * Fixed bubble tea program error when existing the `run` command
 
+### Added
+
+* Improved the `substreams alpha init` command to now create a ready-to-go Substreams package. Its parameter is the desired project path, and the package created is similar to our `substreams-template` repo which tracks an ERC-721 project's transfers.
+
 ## [1.0.0](https://github.com/streamingfast/substreams/releases/tag/v1.0.0)
 
 ### Highlights
 
 * Added command `substreams gui`, providing a terminal-based GUI to inspect the streamed data. Also adds `--replay` support, to save a stream to `replay.log` and load it back in the UI later. You can use it as you would `substreams run`. Feedback welcome.
+
 * Modified command `substreams protogen`, defaulting to generating the `mod.rs` file alongside the rust bindings. Also added `--generate-mod-rs` flag to toggle `mod.rs` generation.
+
 * Added support for module parameterization. Defined in the manifest as:
 
 ```
@@ -39,7 +45,7 @@ module:
   inputs:
     params: string
   ...
-  
+
 params:
   my_module: "0x123123"
   "imported:module": override value from imported module
@@ -87,7 +93,7 @@ This change keeps backwards compatibility. Old Substreams Packages will still wo
 
 ### Fixed
 
-* Fixed valuetype mismatch for stores 
+* Fixed valuetype mismatch for stores
 
 * Fixed production mode not completing when block range was specified
 

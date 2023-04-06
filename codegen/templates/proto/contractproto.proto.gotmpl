@@ -1,0 +1,24 @@
+{{$engine := . -}}
+syntax = "proto3";
+
+package eth.contract.v1;
+
+message Events {
+    {{- range $index, $event := $engine.ProtoEvents }}
+    repeated {{$event.EventName}} {{$event.LowerAndPlural}} = {{$event.EventIndex}};
+    {{- end}}
+}
+
+{{- range $event := $engine.ProtoEvents }}
+message {{.EventName}} {
+    uint64 block_number = 1;
+    string block_hash = 2;
+    string trx_hash = 3;
+    uint32 log_index = 4;
+    string event_name = 5;
+    {{- range $fieldIndex, $fieldName := .Fields }}
+    string {{$fieldName}} = {{index $event.IndexesPlus $fieldIndex}};
+    {{- end}}
+}
+{{- end}}
+

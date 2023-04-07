@@ -46,6 +46,7 @@ type Service struct {
 	pipelineOptions     []pipeline.PipelineOptioner
 	streamFactoryFunc   StreamFactoryFunc
 	getRecentFinalBlock func() (uint64, error)
+	getHeadBlock        func() (uint64, error)
 
 	runtimeConfig config.RuntimeConfig
 
@@ -116,6 +117,7 @@ func (s *Service) Register(
 
 	s.streamFactoryFunc = sf.New
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
+	s.getHeadBlock = sf.GetHeadBlock
 	s.logger = logger
 	server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreams.RegisterStreamServer(gs, s)
@@ -229,7 +231,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		zap.Uint64("stop_block", request.StopBlockNum),
 	)
 
-	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, outputGraph.IsOutputModule, s.getRecentFinalBlock)
+	requestDetails, err := pipeline.BuildRequestDetails(request, isSubRequest, outputGraph.IsOutputModule, s.getRecentFinalBlock, s.getHeadBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}

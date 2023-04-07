@@ -27,7 +27,6 @@ replace github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.
 replace github.com/bytecodealliance/wasmtime-go/v4 => github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3
 
 require (
-	github.com/76creates/stickers v0.0.0-20230121000757-d6bf5dc8ab6b
 	github.com/alecthomas/chroma v0.10.0
 	github.com/bufbuild/connect-go v1.1.0
 	github.com/bufbuild/connect-grpcreflect-go v1.0.0
@@ -53,7 +52,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20221104190152-7f721cb9b60c
 	github.com/streamingfast/shutter v1.5.0
 	github.com/test-go/testify v1.1.4
-	github.com/tidwall/pretty v1.2.1
+	github.com/tidwall/pretty v1.2.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4
 	go.opentelemetry.io/otel v1.11.1
 	go.opentelemetry.io/otel/trace v1.11.1

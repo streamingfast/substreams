@@ -3,16 +3,16 @@ package replaylog
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/streamingfast/dbin"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/streamingfast/substreams/tui2/stream"
 	"google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/tui2/stream"
 )
 
 type File struct {
@@ -81,11 +81,6 @@ func (f *File) ReadReplay() (out stream.ReplayBundle, err error) {
 			if err == io.EOF {
 				break
 			}
-			if err == io.ErrUnexpectedEOF {
-				log.Println("Unexpected EOF reading replay file, ignoring it.")
-				break
-			}
-
 			return nil, fmt.Errorf("reading replay file: %w", err)
 		}
 

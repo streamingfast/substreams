@@ -247,8 +247,14 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 			}
 		}
 
+		inputSeen := map[string]bool{}
 		for _, in := range mod.Inputs {
 			_ = in
+			s := duplicateStringInput(in)
+			if inputSeen[s] {
+				return fmt.Errorf("module %q: duplicate input %q", mod.Name, s)
+			}
+			inputSeen[s] = true
 			// TODO: do more proto ref checking for those inputs listed
 		}
 	}
@@ -268,6 +274,24 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 	}
 
 	return nil
+}
+
+func duplicateStringInput(in *pbsubstreams.Module_Input) string {
+	if in == nil {
+		return ""
+	}
+	switch put := in.Input.(type) {
+	case *pbsubstreams.Module_Input_Source_:
+		return fmt.Sprintf("source: %s", put.Source.Type)
+	case *pbsubstreams.Module_Input_Map_:
+		return fmt.Sprintf("map: %s", put.Map.ModuleName)
+	case *pbsubstreams.Module_Input_Store_:
+		return fmt.Sprintf("store: %s, mode: %s", put.Store.ModuleName, strings.ToLower(put.Store.Mode.String()))
+	case *pbsubstreams.Module_Input_Params_:
+		return "params"
+	default:
+		return ""
+	}
 }
 
 // ValidateModules is run both by the client _and_ the server.

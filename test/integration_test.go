@@ -171,6 +171,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
+				"states/0000000025-0000000020.partial",
 			},
 		},
 		{
@@ -183,6 +184,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
+				"states/0000000025-0000000020.partial",
 				"states/0000000030-0000000001.kv",
 			},
 		},

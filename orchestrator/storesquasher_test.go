@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 
 	"github.com/abourget/llerrgroup"
@@ -218,7 +219,12 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				nextExpectedStartBlock: test.nextExpectedStartBlock,
 				storeSaveInterval:      test.storeSaveInterval,
 			}
-			err := squasher.processRange(context.Background(), eg, test.squashableRange)
+			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
+				Request: &pbsubstreams.Request{
+					ProductionMode: false,
+				},
+			})
+			err := squasher.processRange(ctx, eg, test.squashableRange)
 			require.NoError(t, eg.Wait())
 
 			if test.expectError != nil {

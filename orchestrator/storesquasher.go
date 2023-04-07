@@ -251,10 +251,12 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	logger.Debug("store merge", zap.Object("store", s.store))
 	s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
 
-	logger.Info("deleting store", zap.Stringer("store", nextStore))
-	eg.Go(func() error {
-		return nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
-	})
+	if reqctx.Details(ctx).Request.ProductionMode {
+		logger.Info("deleting store", zap.Stringer("store", nextStore))
+		eg.Go(func() error {
+			return nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+		})
+	}
 
 	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {
 		_, writer, err := s.store.Save(squashableRange.ExclusiveEndBlock)

@@ -1,11 +1,11 @@
 package output
 
 import (
-	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/jhump/protoreflect/desc"
-
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/jhump/protoreflect/dynamic"
 
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
 
 	"github.com/streamingfast/substreams/tui2/components/modselect"
@@ -14,13 +14,16 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
 type Output struct {
 	common.Common
 
-	msgDescs map[string]*desc.MessageDescriptor
+	msgDescs       map[string]*manifest.ModuleDescriptor
+	modules        map[string]*pbsubstreams.Module
+	messageFactory *dynamic.MessageFactory
 
 	moduleSelector    *modselect.ModSelect
 	blockSelector     *blockselect.BlockSelect
@@ -38,16 +41,23 @@ type Output struct {
 	activeBlock  uint64
 }
 
-func New(c common.Common, msgDescs map[string]*desc.MessageDescriptor) *Output {
+func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, modules *pbsubstreams.Modules) *Output {
+	mods := map[string]*pbsubstreams.Module{}
+	for _, mod := range modules.Modules {
+		mods[mod.Name] = mod
+	}
+
 	return &Output{
 		Common:          c,
 		msgDescs:        msgDescs,
+		modules:         mods,
 		blocksPerModule: make(map[string][]uint64),
 		payloads:        make(map[string]map[uint64]*pbsubstreams.ModuleOutput),
 		blockIDs:        make(map[uint64]string),
 		moduleSelector:  modselect.New(c),
 		blockSelector:   blockselect.New(c),
 		outputView:      viewport.New(24, 80),
+		messageFactory:  dynamic.NewMessageFactoryWithDefaults(),
 	}
 }
 

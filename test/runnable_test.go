@@ -288,8 +288,9 @@ func (r *TestRunner) Run(context.Context) error {
 }
 
 type Obj struct {
-	cursor *bstream.Cursor
-	step   bstream.StepType
+	cursor             *bstream.Cursor
+	step               bstream.StepType
+	reorgJunctionBlock bstream.BlockRef
 }
 
 func (o *Obj) Cursor() *bstream.Cursor {
@@ -298,4 +299,12 @@ func (o *Obj) Cursor() *bstream.Cursor {
 
 func (o *Obj) Step() bstream.StepType {
 	return o.step
+}
+
+func (o *Obj) FinalBlockHeight() uint64 {
+	return o.cursor.LIB.Num()
+}
+
+func (o *Obj) ReorgJunctionBlock() bstream.BlockRef {
+	return o.reorgJunctionBlock
 }

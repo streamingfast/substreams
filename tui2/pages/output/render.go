@@ -135,3 +135,18 @@ func (o *Output) decodeDelta(in []byte, msgDesc *manifest.ModuleDescriptor, oldN
 	}
 	return out.String()
 }
+
+func applySearchColoring(block, payload, keyword string) (string, int) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return payload, 0
+	}
+
+	count := strings.Count(block, keyword)
+
+	escapedKeyword := strings.ReplaceAll(keyword, " ", `\s+`)
+
+	highlightedPayload := strings.ReplaceAll(payload, keyword, "\033[48;5;11m"+escapedKeyword+"\033[0m")
+
+	return highlightedPayload, count
+}

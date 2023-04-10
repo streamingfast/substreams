@@ -1,7 +1,9 @@
 package output
 
 import (
+	"fmt"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/jhump/protoreflect/dynamic"
 
@@ -17,6 +19,27 @@ import (
 
 	"github.com/streamingfast/substreams/tui2/common"
 )
+
+var badSearchChars = map[tea.KeyType]bool{
+	tea.KeyTab:  true,
+	tea.KeyDown: true,
+	tea.KeyUp:   true,
+}
+
+type searchCtx struct {
+	searchKeyword string
+	timesFound    int
+
+	resultViewEnabled bool
+	searchVisible     bool
+
+	searchFocused bool
+}
+
+type viewCtxStructure struct {
+	payload string
+}
+type viewContextMap map[string]map[uint64]*viewCtxStructure
 
 type Output struct {
 	common.Common
@@ -37,8 +60,11 @@ type Output struct {
 	payloads        map[string]map[uint64]*pbsubstreams.ModuleOutput
 	blockIDs        map[uint64]string
 
-	activeModule string
-	activeBlock  uint64
+	activeModule  string
+	activeBlock   uint64
+	searchInput   textinput.Model
+	searchCtx     searchCtx
+	outputViewCtx viewContextMap
 }
 
 func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, modules *pbsubstreams.Modules) *Output {
@@ -47,7 +73,7 @@ func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, module
 		mods[mod.Name] = mod
 	}
 
-	return &Output{
+	output := &Output{
 		Common:          c,
 		msgDescs:        msgDescs,
 		modules:         mods,
@@ -59,6 +85,13 @@ func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, module
 		outputView:      viewport.New(24, 80),
 		messageFactory:  dynamic.NewMessageFactoryWithDefaults(),
 	}
+	output.searchInput = textinput.New()
+	output.searchInput.Placeholder = "Search"
+	output.searchInput.Focus()
+	output.searchInput.Prompt = ""
+	output.searchInput.CharLimit = 256
+	output.searchInput.Width = 80
+	return output
 }
 
 func (o *Output) Init() tea.Cmd {
@@ -84,6 +117,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// WARN: this will not be so pretty for the reversible segment, as we're
 	// flattening the block IDs into numbers...
 	// Probably fine for now, as we're debugging the history.
+	searchCtx := &o.searchCtx
+
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case *pbsubstreams.BlockScopedData:
@@ -127,19 +162,76 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			o.setViewportContent()
 		}
 	case modselect.ModuleSelectedMsg:
+		//o.setViewContext()
 		o.activeModule = string(msg)
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.activeModule])
 		o.setViewportContent()
+
 	case blockselect.BlockSelectedMsg:
+		//o.setViewContext()
 		o.activeBlock = uint64(msg)
 		o.setViewportContent()
 	case tea.KeyMsg:
-		_, cmd := o.moduleSelector.Update(msg)
-		cmds = append(cmds, cmd)
-		_, cmd = o.blockSelector.Update(msg)
-		cmds = append(cmds, cmd)
-		o.outputView, cmd = o.outputView.Update(msg)
-		cmds = append(cmds, cmd)
+		if msg.String() == "/" {
+
+			// toggle search visibility
+			o.searchCtx.searchVisible = !o.searchCtx.searchVisible
+
+			if searchCtx.resultViewEnabled {
+				searchCtx.resultViewEnabled = false
+			}
+
+			// Set to focus or blur
+			if o.searchCtx.searchVisible {
+				o.searchCtx.searchFocused = true
+				o.searchInput.Focus()
+			} else {
+				searchCtx.searchFocused = false
+				o.searchInput.Blur()
+			}
+		} else if searchCtx.searchVisible {
+			if o.searchInput.Focused() {
+				_, cmd := o.searchInput.Update(msg)
+				if msg.Type == tea.KeyEnter {
+
+					// Update search context
+					keyword := o.searchInput.Value()
+					searchCtx.searchKeyword = keyword
+					searchCtx.resultViewEnabled = true
+					searchCtx.searchVisible = false
+
+					//set highlighted payload with count on the entire block
+					if o.lastOutputContent != nil {
+						payloadIn := o.renderPayload(o.lastOutputContent)
+						fullBlockIn := o.renderPayload(o.payloads[o.activeModule][o.activeBlock])
+						payloadOut, count := applySearchColoring(fullBlockIn, payloadIn, searchCtx.searchKeyword)
+						searchCtx.timesFound = count
+						o.outputView.SetContent(payloadOut)
+
+					}
+
+				} else if msg.Type == tea.KeyLeft {
+					o.searchInput.SetCursor(o.searchInput.Position() - 1)
+				} else if msg.Type == tea.KeyRight {
+					o.searchInput.SetCursor(o.searchInput.Position() + 1)
+				} else if msg.Type == tea.KeyBackspace {
+					o.searchInput.SetCursor(o.searchInput.Position() - 1)
+					o.searchInput.SetValue(o.searchInput.Value()[:o.searchInput.Position()])
+				} else if badSearchChars[msg.Type] != true {
+					o.searchInput.SetValue(fmt.Sprintf("%s%s", o.searchInput.Value(), msg))
+					o.searchInput.SetCursor(o.searchInput.Position() + 2)
+				}
+
+				cmds = append(cmds, cmd)
+			}
+		} else {
+			_, cmd := o.moduleSelector.Update(msg)
+			cmds = append(cmds, cmd)
+			_, cmd = o.blockSelector.Update(msg)
+			cmds = append(cmds, cmd)
+			o.outputView, cmd = o.outputView.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 	return o, tea.Batch(cmds...)
 }
@@ -149,6 +241,12 @@ func (o *Output) setViewportContent() {
 		if payload, found := mod[o.activeBlock]; found {
 			// Do the decoding once per view, and cache the decoded value if it hasn't changed
 			if payload != o.lastOutputContent {
+
+				//if o.outputViewCtx[o.activeModule][o.activeBlock] != nil {
+				//	ctx := o.outputViewCtx[o.activeModule][o.activeBlock]
+				//	o.outputView.SetContent(ctx.payload)
+				//}
+
 				o.outputView.SetContent(o.renderPayload(payload))
 				o.lastOutputContent = payload
 			}
@@ -162,13 +260,82 @@ func (o *Output) setViewportContent() {
 	}
 }
 
+func (o *Output) setViewContext() string {
+	viewCtx := &o.outputViewCtx
+
+	payloadIn := o.renderPayload(o.lastOutputContent)
+	fullBlockIn := o.renderPayload(o.payloads[o.activeModule][o.activeBlock])
+	payloadOut, _ := applySearchColoring(fullBlockIn, payloadIn, "")
+
+	// Update view context
+	if len(*viewCtx) == 0 {
+		*viewCtx = map[string]map[uint64]*viewCtxStructure{
+			o.activeModule: {
+				o.activeBlock: &viewCtxStructure{
+					payload: payloadOut,
+				},
+			},
+		}
+	} else {
+		o.outputViewCtx[o.activeModule][o.activeBlock] = &viewCtxStructure{
+			payload: payloadOut,
+		}
+	}
+
+	return payloadOut
+}
+func (o *Output) displaySearchOutput() string {
+	out := ""
+	ctx := o.searchCtx
+
+	if ctx.resultViewEnabled {
+		// display relevant search results
+		_, timesFound := applySearchColoring(o.renderPayload(o.payloads[o.activeModule][o.activeBlock]), o.renderPayload(o.lastOutputContent), ctx.searchKeyword)
+		return fmt.Sprintf("%s - (%v instances found)", ctx.searchKeyword, timesFound)
+	}
+	if ctx.searchVisible {
+		return o.searchInput.View()
+	}
+	return out
+}
+
+func (o *Output) displayOutputView() string {
+	out := o.outputView.View()
+	viewCtxMap := o.outputViewCtx
+	viewCtx := viewCtxMap[o.activeModule][o.activeBlock]
+
+	// If block has a search context
+	if viewCtx != nil {
+		o.outputView.SetContent(viewCtx.payload)
+		out = o.outputView.View()
+	} else {
+
+		// if results is active
+		if o.searchCtx.resultViewEnabled {
+
+			// gather block info and apply highlighting
+			payloadIn := o.renderPayload(o.lastOutputContent)
+			fullBlockIn := o.renderPayload(o.payloads[o.activeModule][o.activeBlock])
+			payloadHighlighted, _ := applySearchColoring(fullBlockIn, payloadIn, o.searchCtx.searchKeyword)
+
+			o.outputView.SetContent(payloadHighlighted)
+			out = o.outputView.View()
+		}
+	}
+
+	return out
+}
+
 func (o *Output) View() string {
-	return lipgloss.JoinVertical(0,
+
+	out := lipgloss.JoinVertical(0,
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
 		"",
-		o.outputView.View(),
+		o.displayOutputView(),
+		o.displaySearchOutput(),
 	)
+	return out
 }
 
 var Styles = struct {
@@ -194,6 +361,10 @@ func (o *Output) ShortHelp() []key.Binding {
 		key.NewBinding(
 			key.WithKeys("up", "k", "down", "j"),
 			key.WithHelp("↑/k/↓/j", "up/down"),
+		),
+		key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "Search"),
 		),
 	}
 }

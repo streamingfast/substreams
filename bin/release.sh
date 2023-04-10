@@ -95,10 +95,10 @@ verify_github_token() {
   release_env_file="$ROOT/.env.release"
 
   if [[ "$GITHUB_TOKEN" != "" && ! -f "$release_env_file" ]]; then
-    echo 'GITHUB_TOKEN=${GITHUB_TOKEN}' > "$release_env_file"
+    echo "GITHUB_TOKEN=${GITHUB_TOKEN}" > "$release_env_file"
   fi
 
-  if [ ! -f "$ROOT/.env.release" ] || ! grep -q "GITHUB_TOKEN=" "$release_env_file"; then
+  if [ ! -f "$ROOT/.env.release" ] || ! grep -q "GITHUB_TOKEN=gh" "$release_env_file"; then
     echo "A '.env.release' file must be found at the root of the project and it must contain"
     echo "definition of 'GITHUB_TOKEN' variable. You need to create this file locally and the"
     echo "content should be:"

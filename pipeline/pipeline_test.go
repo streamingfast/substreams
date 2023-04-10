@@ -189,7 +189,10 @@ func withTestRequest(t *testing.T, outputModule string, startBlock uint64) conte
 		StartBlockNum: int64(startBlock),
 	}, false, func(name string) bool {
 		return name == outputModule
-	}, func() (uint64, error) { return 0, nil })
+	},
+		func() (uint64, error) { return 0, nil },
+		func() (uint64, error) { return 0, nil },
+	)
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)
 }

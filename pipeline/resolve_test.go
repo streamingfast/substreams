@@ -17,6 +17,8 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		name             string
 		req              *pbsubstreams.Request
 		expectedBlockNum uint64
+		headBlock        uint64
+		headBlockErr     error
 		wantErr          bool
 	}{
 		{
@@ -89,10 +91,29 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			expectedBlockNum: 11,
 			wantErr:          false,
 		},
+		{
+			name: "negative startblock",
+			req: &pbsubstreams.Request{
+				StartBlockNum: -5,
+			},
+			headBlock:        16,
+			expectedBlockNum: 11,
+			wantErr:          false,
+		},
+		{
+			name: "negative startblock no head",
+			req: &pbsubstreams.Request{
+				StartBlockNum: -5,
+			},
+			headBlockErr: fmt.Errorf("cannot find head block"),
+			wantErr:      true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveStartBlockNum(tt.req)
+			got, err := resolveStartBlockNum(tt.req, func() (uint64, error) {
+				return tt.headBlock, tt.headBlockErr
+			})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveStartBlockNum() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -153,27 +174,45 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 }
 
 func TestBuildRequestDetails(t *testing.T) {
-	req, err := BuildRequestDetails(&pbsubstreams.Request{
-		StartBlockNum:  10,
-		ProductionMode: false,
-	}, true, func(name string) bool {
-		return false
-	}, func() (uint64, error) {
-		assert.True(t, true, "should pass here")
-		return 999, nil
-	})
+	req, err := BuildRequestDetails(
+		&pbsubstreams.Request{
+			StartBlockNum:  10,
+			ProductionMode: false,
+		},
+		true,
+		func(name string) bool {
+			return false
+		},
+		func() (uint64, error) {
+			assert.True(t, true, "should pass here")
+			return 999, nil
+		},
+		func() (uint64, error) {
+			t.Error("should not pass here")
+			return 0, nil
+		},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
 	assert.Equal(t, 10, int(req.LinearHandoffBlockNum))
 
-	req, err = BuildRequestDetails(&pbsubstreams.Request{
-		StartBlockNum:  10,
-		ProductionMode: true,
-	}, true, func(name string) bool {
-		return true
-	}, func() (uint64, error) {
-		return 999, nil
-	})
+	req, err = BuildRequestDetails(
+		&pbsubstreams.Request{
+			StartBlockNum:  10,
+			ProductionMode: true,
+		},
+		true,
+		func(name string) bool {
+			return true
+		},
+		func() (uint64, error) {
+			return 999, nil
+		},
+		func() (uint64, error) {
+			t.Error("should not pass here")
+			return 0, nil
+		},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
 	assert.Equal(t, 999, int(req.LinearHandoffBlockNum))

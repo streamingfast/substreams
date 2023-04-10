@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
@@ -66,4 +67,13 @@ func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 	}
 
 	return finalBlockNum, err
+}
+
+func (s *StreamFactory) GetHeadBlock() (uint64, error) {
+	headNum, _, _, _, err := s.hub.HeadInfo()
+	if err != nil {
+		return 0, err
+	}
+
+	return headNum, nil
 }

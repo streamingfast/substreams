@@ -3,14 +3,14 @@ package output
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
-
-	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -34,39 +34,28 @@ func (o *Output) renderPayload(in *pbsubstreams.ModuleOutput) string {
 			out.WriteString(o.decodeDynamicMessage(msgDesc, data.MapOutput))
 		}
 	case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
-		if len(data.DebugStoreDeltas.Deltas) != 0 {
-			//out.WriteString(o.decodeDynamicStoreDeltas())
-			//s = append(s, ui.renderDecoratedDeltas(in.Name, data.DebugStoreDeltas.Deltas, false)...)
-		} else {
+		if len(data.DebugStoreDeltas.Deltas) == 0 {
 			out.WriteString("No deltas")
+		} else {
+			msgDesc := o.msgDescs[in.Name]
+			out.WriteString(o.decodeDynamicStoreDeltas(data.DebugStoreDeltas.Deltas, msgDesc))
+			//s = append(s, ui.renderDecoratedDeltas(in.Name, data.DebugStoreDeltas.Deltas, false)...)
 		}
 	}
 	return out.String()
 }
 
-func applySearchColoring(text, keyword string) string {
-	keyword = strings.TrimSpace(keyword)
-	if keyword == "" {
-		return text
-	}
-
-	escapedKeyword := strings.ReplaceAll(keyword, " ", `\s+`)
-	highlightedText := strings.ReplaceAll(text, keyword, "\033[48;5;11m"+escapedKeyword+"\033[0m")
-
-	return highlightedText
-}
-
-func (o *Output) decodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *anypb.Any) string {
-	if msgDesc == nil {
+func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin *anypb.Any) string {
+	if msgDesc.MessageDescriptor == nil {
+		// TODO: also add the bytes message, and rotate the format with `f`
 		return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))
 	}
-	msgType := msgDesc.GetFullyQualifiedName()
 	in := anyin.GetValue()
-	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc.MessageDescriptor)
 	if err := dynMsg.Unmarshal(in); err != nil {
 		return Styles.ErrorLine.Render(
 			fmt.Sprintf("Failed unmarshalling message into %s: %s\n%s",
-				msgType,
+				msgDesc.ProtoMessageType,
 				err.Error(),
 				decodeAsString(in),
 			),
@@ -83,48 +72,81 @@ func (o *Output) decodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *an
 		)
 	}
 
+	return highlightJSON(string(cnt))
+}
+
+func highlightJSON(in string) string {
 	out := &strings.Builder{}
-	if err := quick.Highlight(out, string(cnt), "json", "terminal256", "dracula"); err != nil {
-		return string(cnt)
+	if err := quick.Highlight(out, in, "json", "terminal256", "dracula"); err != nil {
+		return in
 	}
 	return out.String()
 }
 
-//
-//func (o *Output) decodeDynamicStoreDeltas(msgDesc *desc.MessageDescriptor, in []byte) string {
-//	if msgDesc == nil {
-//		return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))
-//	}
-//	msgType := msgDesc.GetFullyQualifiedName()
-//	if msgType == "bytes" {
-//		return []byte(decodeAsHex(in))
-//	}
-//
-//	if msgDesc != nil {
-//		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-//		if err := dynMsg.Unmarshal(in); err != nil {
-//			cnt, _ := json.Marshal(&ErrorWrap{
-//				Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgDesc.GetFullyQualifiedName(), err.Error()),
-//				String: string(decodeAsString(in)),
-//				Bytes:  in,
-//			})
-//			return cnt
-//		}
-//		cnt, err := msgDescToJSON(msgType, blockNum, modName, dynMsg, false)
-//		if err != nil {
-//			cnt, _ := json.Marshal(&ErrorWrap{
-//				Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
-//				String: string(decodeAsString(in)),
-//				Bytes:  in,
-//			})
-//			return decodeAsString(cnt)
-//		}
-//		return cnt
-//	}
-//
-//	// default, other msgType: "bigint", "bigfloat", "int64", "float64", "string":
-//	return decodeAsString(in)
-//}
+func (o *Output) decodeDynamicStoreDeltas(deltas []*pbsubstreams.StoreDelta, msgDesc *manifest.ModuleDescriptor) string {
+	out := &strings.Builder{}
+	for _, delta := range deltas {
+		out.WriteString(fmt.Sprintf("%s (%d) KEY: %q\n", delta.Operation, delta.Ordinal, delta.Key))
+		out.WriteString(o.decodeDelta(delta.OldValue, msgDesc, "OLD"))
+		out.WriteString(o.decodeDelta(delta.NewValue, msgDesc, "NEW"))
+
+		out.WriteString("\n")
+	}
+	return out.String()
+}
 
 func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
 func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
+
+func decodeAsType(in []byte, typ string) string {
+	switch typ {
+	case "bytes":
+		return decodeAsHex(in)
+	default:
+		return string(in)
+	}
+}
+
+func (o *Output) decodeDelta(in []byte, msgDesc *manifest.ModuleDescriptor, oldNew string) string {
+	out := &strings.Builder{}
+	out.WriteString(fmt.Sprintf("  %s: ", oldNew))
+
+	if len(in) == 0 {
+		out.WriteString("(none)\n")
+	} else if msgDesc.MessageDescriptor == nil {
+		out.WriteString(fmt.Sprintf("%q\n", decodeAsType(in, msgDesc.StoreValueType)))
+	} else {
+
+		msg := o.messageFactory.NewDynamicMessage(msgDesc.MessageDescriptor)
+		if err := msg.Unmarshal(in); err != nil {
+			log.Println("error unmarshalling message:", err)
+		} else {
+			jsonBytes, err := msg.MarshalJSONIndent()
+			if err != nil {
+				out.WriteString("failed to marshal json: " + err.Error() + ", hex:")
+				out.WriteString(decodeAsHex(in))
+			} else {
+				jsonStr := strings.Replace(string(jsonBytes), "\n", "\n  ", -1)
+				jsonStr = highlightJSON(jsonStr)
+				out.WriteString(jsonStr)
+			}
+			out.WriteString("\n")
+		}
+	}
+	return out.String()
+}
+
+func applySearchColoring(block, payload, keyword string) (string, int) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return payload, 0
+	}
+
+	count := strings.Count(block, keyword)
+
+	escapedKeyword := strings.ReplaceAll(keyword, " ", `\s+`)
+
+	highlightedPayload := strings.ReplaceAll(payload, keyword, "\033[48;5;11m"+escapedKeyword+"\033[0m")
+
+	return highlightedPayload, count
+}

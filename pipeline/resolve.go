@@ -10,9 +10,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type getRecentFinalBlockFunc func() (uint64, error)
+type getBlockFunc func() (uint64, error)
 
-func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, isOutputModule reqctx.IsOutputModuleFunc, getRecentFinalBlock getRecentFinalBlockFunc) (req *reqctx.RequestDetails, err error) {
+func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, isOutputModule reqctx.IsOutputModuleFunc, getRecentFinalBlock getBlockFunc, getHeadBlock getBlockFunc) (req *reqctx.RequestDetails, err error) {
 	req = &reqctx.RequestDetails{
 		Request:        request,
 		IsSubRequest:   isSubRequest,
@@ -27,7 +27,7 @@ func BuildRequestDetails(request *pbsubstreams.Request, isSubRequest bool, isOut
 	///        joining on a final segment, and then kick off parallel processing
 	///        until a new, more recent, live block.
 	// See also `resolveStartBlockNum`'s TODO
-	req.RequestStartBlockNum, err = resolveStartBlockNum(request)
+	req.RequestStartBlockNum, err = resolveStartBlockNum(request, getHeadBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint6
 	return minOf(startBlock, maxHandoff), nil
 }
 
-func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
+func resolveStartBlockNum(req *pbsubstreams.Request, getHeadBlock getBlockFunc) (uint64, error) {
 	// TODO(abourget): a caller will need to verify that, if there's a cursor.Step that is New or Undo,
 	// then we need to validate that we are returning not only a number, but an ID,
 	// We then need to sync from a known finalized Snapshot's block, down to the potentially
@@ -72,7 +72,14 @@ func resolveStartBlockNum(req *pbsubstreams.Request) (uint64, error) {
 	// and everything is irreversible.
 
 	if req.StartBlockNum < 0 {
-		return 0, status.Error(grpccodes.InvalidArgument, "start block num must be positive")
+		headBlock, err := getHeadBlock()
+		if err != nil {
+			return 0, fmt.Errorf("resolving negative start block: %w", err)
+		}
+		req.StartBlockNum = int64(headBlock) + req.StartBlockNum
+		if req.StartBlockNum < 0 {
+			req.StartBlockNum = 0
+		}
 	}
 
 	if req.StartCursor == "" {

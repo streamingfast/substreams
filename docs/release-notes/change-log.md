@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Added
+
+* Added support for resolving a negative start-block on server (also added to run command)
+
+## [1.0.1](https://github.com/streamingfast/substreams/releases/tag/v1.0.1)
+
 ### Fixed
 
 * "undo" messages incorrectly contained too many module outputs (all modules, with some duplicates)

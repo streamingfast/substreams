@@ -3,12 +3,12 @@ package tui2
 import (
 	"log"
 
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jhump/protoreflect/desc"
 
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/footer"
@@ -29,7 +29,7 @@ const (
 )
 
 type UI struct {
-	msgDescs  map[string]*desc.MessageDescriptor
+	msgDescs  map[string]*manifest.ModuleDescriptor
 	stream    *stream.Stream
 	replayLog *replaylog.File
 
@@ -42,7 +42,7 @@ type UI struct {
 	tabs       *tabs.Tabs
 }
 
-func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr *replaylog.File, reqSummary *request.Summary, modules *pbsubstreams.Modules) *UI {
+func New(stream *stream.Stream, msgDescs map[string]*manifest.ModuleDescriptor, vcr *replaylog.File, reqSummary *request.Summary, modules *pbsubstreams.Modules) *UI {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}
@@ -53,7 +53,7 @@ func New(stream *stream.Stream, msgDescs map[string]*desc.MessageDescriptor, vcr
 		pages: []common.Component{
 			request.New(c, reqSummary, modules),
 			progress.New(c, stream.TargetParallelProcessingBlock()),
-			output.New(c, msgDescs),
+			output.New(c, msgDescs, modules),
 		},
 		activePage: progressPage,
 		tabs:       tabs.New(c, []string{"Request", "Progress", "Output"}),
@@ -95,7 +95,7 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if err := ui.replayLog.Push(msg); err != nil {
-		log.Printf("Failed to push to vcr: %s", err.Error())
+		log.Printf("Failed to push to replay log: %s", err.Error())
 		return ui, tea.Quit
 	}
 	return ui.update(msg)

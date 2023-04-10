@@ -18,32 +18,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 )
 
-var badSearchChars = map[tea.KeyType]bool{
-	tea.KeyTab:  true,
-	tea.KeyDown: true,
-	tea.KeyUp:   true,
-}
-
-type searchCtx struct {
-	searchVisible     bool
-	searchFocused     bool
-	resultViewEnabled bool
-
-	searchKeyword string
-
-	timesFound     int
-	matchPositions []int
-}
-
-type position struct {
-	yOffset int
-}
-
-type blockContext struct {
-	module   string
-	blockNum uint64
-}
-
 type Output struct {
 	common.Common
 
@@ -71,6 +45,20 @@ type Output struct {
 	searchCtx         searchCtx
 }
 
+type searchCtx struct {
+	enabled bool
+
+	searchKeyword string
+
+	timesFound     int
+	matchPositions []int
+}
+
+type blockContext struct {
+	module   string
+	blockNum uint64
+}
+
 func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, modules *pbsubstreams.Modules) *Output {
 	mods := map[string]*pbsubstreams.Module{}
 	for _, mod := range modules.Modules {
@@ -92,7 +80,6 @@ func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, module
 	}
 	output.searchInput = textinput.New()
 	output.searchInput.Placeholder = ""
-	output.searchInput.Focus()
 	output.searchInput.Prompt = "/"
 	output.searchInput.CharLimit = 256
 	output.searchInput.Width = 80
@@ -176,63 +163,53 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
 		o.setViewportContent()
 	case tea.KeyMsg:
-		if msg.String() == "/" {
-
-			// toggle search visibility
-			o.searchCtx.searchVisible = !o.searchCtx.searchVisible
-
-			if searchCtx.resultViewEnabled {
-				searchCtx.resultViewEnabled = false
-			}
-
-			// Set to focus or blur
-			if o.searchCtx.searchVisible {
-				o.searchCtx.searchFocused = true
-				o.searchInput.Focus()
-			} else {
-				searchCtx.searchFocused = false
+		if searchCtx.enabled && o.searchInput.Focused() {
+			switch msg.String() {
+			case "enter":
+				keyword := o.searchInput.Value()
+				searchCtx.searchKeyword = keyword
 				o.searchInput.Blur()
-			}
-			o.setViewportContent()
-		} else if searchCtx.searchVisible {
-			if o.searchInput.Focused() {
-				var cmd tea.Cmd
-				o.searchInput, cmd = o.searchInput.Update(msg)
-				switch msg.String() {
-				case "Enter":
-					log.Println("enter pressed")
 
-					keyword := o.searchInput.Value()
-					searchCtx.searchKeyword = keyword
-					searchCtx.resultViewEnabled = true
-					searchCtx.searchVisible = false
-				case "n":
-					log.Println("n pressed")
-				case "N":
-					log.Println("n pressed")
-					//case badSearchChars[msg.Type] != true:
-					//	log.Println("good character character")
-					//	o.searchInput.SetValue(fmt.Sprintf("%s%s", o.searchInput.Value(), msg))
-					//	o.searchInput.SetCursor(o.searchInput.Position() + 2)
-				}
-
-				//if msg.Type == tea.KeyEnter {
-				//
-				//	//} else if msg.Type == tea.KeyLeft {
-				//	//	o.searchInput.SetCursor(o.searchInput.Position() - 1)
-				//	//} else if msg.Type == tea.KeyRight {
-				//	//	o.searchInput.SetCursor(o.searchInput.Position() + 1)
-				//	//} else if msg.Type == tea.KeyBackspace {
-				//	//	o.searchInput.SetCursor(o.searchInput.Position() - 1)
-				//	//	o.searchInput.SetValue(o.searchInput.Value()[:o.searchInput.Position()])
-				//} else if badSearchChars[msg.Type] != true {
-				//
+				//if keyword == "" {
+				//	// alternative: match the ESC key when
+				//	searchCtx.searchVisible = false
 				//}
-
-				cmds = append(cmds, cmd)
-				o.setViewportContent()
+			case "backspace":
+				if o.searchInput.Value() == "" {
+					searchCtx.enabled = false
+				}
 			}
+
+			var cmd tea.Cmd
+			o.searchInput, cmd = o.searchInput.Update(msg)
+			cmds = append(cmds, cmd)
+
 		} else {
+			switch msg.String() {
+			case "/":
+				o.searchCtx.enabled = true
+				o.searchInput.Focus()
+				o.searchInput.SetValue("")
+			case "n":
+				log.Println("n pressed")
+				// update the offset based on the `positions`
+				for _, pos := range o.searchCtx.matchPositions {
+					if pos > o.outputView.YOffset {
+						o.outputView.YOffset = pos
+						break
+					}
+				}
+			case "N":
+				log.Println("N pressed")
+				for i := len(o.searchCtx.matchPositions) - 1; i >= 0; i-- {
+					pos := o.searchCtx.matchPositions[i]
+					if pos < o.outputView.YOffset {
+						o.outputView.YOffset = pos
+						break
+					}
+				}
+			}
+
 			_, cmd := o.moduleSelector.Update(msg)
 			cmds = append(cmds, cmd)
 
@@ -243,6 +220,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			o.outputViewYoffset[o.active] = o.outputView.YOffset
 		}
+		o.setViewportContent()
 	}
 	return o, tea.Batch(cmds...)
 }
@@ -257,7 +235,7 @@ type displayContext struct {
 func (o *Output) setViewportContent() {
 	dpContext := &displayContext{
 		blockCtx:          o.active,
-		searchViewEnabled: o.searchCtx.resultViewEnabled,
+		searchViewEnabled: o.searchCtx.enabled,
 		searchKeyword:     o.searchCtx.searchKeyword,
 		payload:           o.payloads[o.active],
 	}
@@ -266,7 +244,7 @@ func (o *Output) setViewportContent() {
 		if dpContext.searchViewEnabled {
 			var lines int
 			var positions []int
-			content, lines, positions = applySearchColoring(content, dpContext.searchKeyword)
+			content, lines, positions = applySearchColoring(content, o.searchCtx.searchKeyword)
 			o.searchCtx.timesFound = lines
 			o.searchCtx.matchPositions = positions
 		}
@@ -288,11 +266,12 @@ func (o *Output) View() string {
 
 func (o *Output) displaySearchOutput() string {
 	ctx := o.searchCtx
-	if ctx.resultViewEnabled {
-		// display relevant search results
-		return fmt.Sprintf("%s - (%v instances found)", ctx.searchKeyword, ctx.timesFound)
-	} else if ctx.searchVisible {
-		return o.searchInput.View()
+	if ctx.enabled {
+		if !o.searchInput.Focused() {
+			return fmt.Sprintf("/%s - (%v instances found)", ctx.searchKeyword, ctx.timesFound)
+		} else {
+			return o.searchInput.View()
+		}
 	}
 	return ""
 }

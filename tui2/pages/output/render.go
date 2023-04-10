@@ -8,6 +8,7 @@ import (
 
 	"github.com/alecthomas/chroma/quick"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -153,10 +154,10 @@ func applySearchColoring(content, highlight string) (string, int, []int) {
 		count := strings.Count(line, highlight)
 		totalCount += count
 		if count != 0 {
-			newLines = append(newLines, strings.ReplaceAll(line, highlight, "\033[48;5;11m"+highlight+"\033[0m"))
+			newLines[lineNo] = strings.ReplaceAll(line, highlight, termenv.String(highlight).Reverse().String())
 			positions = append(positions, lineNo)
 		} else {
-			newLines = append(newLines, line)
+			newLines[lineNo] = line
 		}
 	}
 	return strings.Join(newLines, "\n"), totalCount, positions

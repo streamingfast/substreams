@@ -15,6 +15,9 @@ import (
 )
 
 func (o *Output) renderPayload(in *pbsubstreams.ModuleOutput) string {
+	if in == nil {
+		return ""
+	}
 	out := &strings.Builder{}
 
 	for _, log := range in.DebugLogs {
@@ -136,17 +139,25 @@ func (o *Output) decodeDelta(in []byte, msgDesc *manifest.ModuleDescriptor, oldN
 	return out.String()
 }
 
-func applySearchColoring(block, payload, keyword string) (string, int) {
-	keyword = strings.TrimSpace(keyword)
-	if keyword == "" {
-		return payload, 0
+func applySearchColoring(content, highlight string) (string, int, []int) {
+	highlight = strings.TrimSpace(highlight)
+	if highlight == "" {
+		return content, 0, nil
 	}
 
-	count := strings.Count(block, keyword)
-
-	escapedKeyword := strings.ReplaceAll(keyword, " ", `\s+`)
-
-	highlightedPayload := strings.ReplaceAll(payload, keyword, "\033[48;5;11m"+escapedKeyword+"\033[0m")
-
-	return highlightedPayload, count
+	var positions []int
+	lines := strings.Split(content, "\n")
+	newLines := make([]string, len(lines))
+	var totalCount int
+	for lineNo, line := range lines {
+		count := strings.Count(line, highlight)
+		totalCount += count
+		if count != 0 {
+			newLines = append(newLines, strings.ReplaceAll(line, highlight, "\033[48;5;11m"+highlight+"\033[0m"))
+			positions = append(positions, lineNo)
+		} else {
+			newLines = append(newLines, line)
+		}
+	}
+	return strings.Join(newLines, "\n"), totalCount, positions
 }

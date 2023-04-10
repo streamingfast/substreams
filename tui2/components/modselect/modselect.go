@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -13,12 +14,14 @@ type ModuleSelectedMsg string
 // A vertical bar that allows you to select a module that has been seen
 type ModSelect struct {
 	common.Common
+	seen     map[string]bool
 	Modules  []string
 	Selected int
 }
 
 func New(c common.Common) *ModSelect {
 	return &ModSelect{
+		seen:   map[string]bool{},
 		Common: c,
 	}
 }
@@ -45,7 +48,10 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *ModSelect) AddModule(modName string) {
-	m.Modules = append(m.Modules, modName)
+	if !m.seen[modName] {
+		m.Modules = append(m.Modules, modName)
+		m.seen[modName] = true
+	}
 }
 
 func (m *ModSelect) dispatchModuleSelected() tea.Msg {

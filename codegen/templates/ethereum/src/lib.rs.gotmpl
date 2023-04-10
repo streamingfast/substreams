@@ -1,0 +1,51 @@
+mod abi;
+mod pb;
+use hex_literal::hex;
+#[allow(unused_imports)]
+use num_traits::ToPrimitive;
+use pb::contrack;
+use serde_json::json;
+use substreams::Hex;
+use substreams_ethereum::pb::eth::v2 as eth;
+use substreams_ethereum::Event;
+
+const CONTRACT: [u8; 20] = hex!("{{ .address }}");
+
+substreams_ethereum::init!();
+
+#[substreams::handlers::map]
+fn map_events(blk: eth::Block) -> Result<contrack::Contrack, substreams::errors::Error> {
+    Ok(contrack::Contrack {
+        events: blk
+            .receipts()
+            .flat_map(|view| {
+                view.receipt.logs.iter().filter_map(|log| {
+                    if log.address != CONTRACT {
+                        return None;
+                    }
+
+                    {{- range .events }}
+                    if let Some(event) = abi::contrack::events::{{.RustName}}::match_and_decode(log) {
+                        return Some(
+                            json!({
+                                "block_number": blk.number,
+                                "block_hash": Hex(&blk.hash).to_string(),
+                                "trx_hash": Hex(&view.transaction.hash).to_string(),
+                                "log_index": log.block_index,
+                                "event_name": abi::contrack::events::{{.RustName}}::NAME,
+                                {{- range $key, $access := .Fields }}
+                                "{{$key}}": {{$access}},
+                                {{- end}}
+                            })
+                            .to_string()
+                            .into_bytes(),
+                        );
+                    }
+                    {{- end}}
+
+                    None
+                })
+            })
+            .collect(),
+    })
+}

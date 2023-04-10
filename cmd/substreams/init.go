@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,10 +14,12 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/codegen"
+	"github.com/streamingfast/substreams/codegen/templates"
 )
 
 // Some developers centric environment overidde to make it faster to iterate on `substreams init` command
 var (
+	devInitSourceDirectory         = os.Getenv("SUBSTREAMS_DEV_INIT_SOURCE_DIRECTORY")
 	devInitProjectName             = os.Getenv("SUBSTREAMS_DEV_INIT_PROJECT_NAME")
 	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
 	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
@@ -46,6 +49,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		relativeSrcDir = args[0]
 	}
 
+	if devInitSourceDirectory != "" {
+		relativeSrcDir = devInitSourceDirectory
+	}
+
 	srcDir, err := filepath.Abs(relativeSrcDir)
 	if err != nil {
 		return fmt.Errorf("getting absolute path of %q: %w", relativeSrcDir, err)
@@ -62,7 +69,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	switch protocol {
-	case ProtocolEthereum:
+	case codegen.ProtocolEthereum:
 		wantsABI, err := promptTrackContract()
 		if err != nil {
 			return fmt.Errorf("running ABI prompt: %w", err)
@@ -79,23 +86,46 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		// Get contract ABI & parse
-		ABI, ethABI, err := codegen.GetContractABI(cmd.Context(), contract)
+		// Get contract abiContent & parse
+		abiContent, abi, err := codegen.GetContractABI(cmd.Context(), contract)
 		if err != nil {
 			return fmt.Errorf("getting contract ABI: %w", err)
 		}
 
-		events, err := codegen.BuildEventModels(ethABI)
+		// events, err := codegen.BuildEventModels(abi)
+		// if err != nil {
+		// 	return fmt.Errorf("build ABI event models: %w", err)
+		// }
+
+		project, err := templates.NewEthereumProject(projectName, templates.EthereumChainsByID["ethereum_mainnet"], contract, abi, abiContent)
 		if err != nil {
-			return fmt.Errorf("build ABI event models: %w", err)
+			return fmt.Errorf("new ethereum project: %w", err)
 		}
 
-		err = codegen.NewProjectGenerator(srcDir, projectName, contract, string(ABI), events).GenerateProject()
+		files, err := project.Render()
 		if err != nil {
-			return fmt.Errorf("generating code: %w", err)
+			return fmt.Errorf("render project: %w", err)
 		}
 
-	case ProtocolOther:
+		for relativeFile, content := range files {
+			file := path.Join(srcDir, strings.ReplaceAll(relativeFile, "/", string(os.PathSeparator)))
+
+			directory := path.Dir(file)
+			if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+				return fmt.Errorf("create directory %q: %w", directory, err)
+			}
+
+			if err := os.WriteFile(file, content, os.ModePerm); err != nil {
+				return fmt.Errorf("write file: %w", err)
+			}
+		}
+
+		// err = codegen.NewProjectGenerator(srcDir, projectName, contract, string(abiContent), events).GenerateProject()
+		// if err != nil {
+		// 	return fmt.Errorf("generating code: %w", err)
+		// }
+
+	case codegen.ProtocolOther:
 		fmt.Println()
 		fmt.Println("We haven't added any templates for your selected chain quite yet...")
 		fmt.Println()
@@ -104,6 +134,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		return errInitUnsupportedChain
 	}
+
+	fmt.Printf("Project %q initialized at %q\n", projectName, srcDir)
 
 	return nil
 }
@@ -163,10 +195,10 @@ func promptTrackContract() (bool, error) {
 	})
 }
 
-func promptProtocol() (SupportedProtocol, error) {
+func promptProtocol() (codegen.Protocol, error) {
 	if devInitProtocol != "" {
 		// It's ok to panic, we expect the dev to put in a valid Ethereum address
-		protocol, err := ParseSupportedProtocol(devInitProtocol)
+		protocol, err := codegen.ParseProtocol(devInitProtocol)
 		if err != nil {
 			panic(fmt.Errorf("invalid protocol: %w", err))
 		}
@@ -176,7 +208,7 @@ func promptProtocol() (SupportedProtocol, error) {
 
 	choice := promptui.Select{
 		Label: "Select protocol",
-		Items: SupportedProtocolNames(),
+		Items: codegen.ProtocolNames(),
 		Templates: &promptui.SelectTemplates{
 			Selected: `{{ "Protocol:" | faint }} {{ . }}`,
 		},
@@ -190,10 +222,10 @@ func promptProtocol() (SupportedProtocol, error) {
 			os.Exit(1)
 		}
 
-		return ProtocolOther, fmt.Errorf("running protocol prompt: %w", err)
+		return codegen.ProtocolOther, fmt.Errorf("running protocol prompt: %w", err)
 	}
 
-	var protocol SupportedProtocol
+	var protocol codegen.Protocol
 	if err := protocol.UnmarshalText([]byte(selection)); err != nil {
 		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
 	}
@@ -289,13 +321,3 @@ func promptConfirm(label string, opts *promptOptions) (bool, error) {
 
 	return promptT(label, transform, opts)
 }
-
-//go:generate go-enum -f=$GOFILE --noprefix --prefix Protocol --marshal --names --nocase
-
-// ENUM(
-//
-//	Ethereum
-//	Other
-//
-// )
-type SupportedProtocol uint

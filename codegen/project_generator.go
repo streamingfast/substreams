@@ -3,24 +3,24 @@ package codegen
 import (
 	"errors"
 	"fmt"
-	"github.com/streamingfast/eth-go"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
 
+	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/manifest"
 )
 
 type ProjectGenerator struct {
-	srcPath             string
-	ProjectContract     eth.Address
-	ProjectAbi          string
-	ProjectContractType string
-	ProjectEvents       []CodegenEvent
-	ProtoEvents         []ProtoEvent
-	RustEvents          []RustEvent
+	srcPath         string
+	ProjectContract eth.Address
+	ProjectAbi      string
+	ProjectEvents   []CodegenEvent
+	ProtoEvents     []ProtoEvent
+	RustEvents      []RustEvent
 
 	ProjectName       string
 	ProjectVersion    string
@@ -29,48 +29,19 @@ type ProjectGenerator struct {
 	SubstreamsVersion string
 }
 
-var DefaultProjectVersion = "v0.0.1"
-
-// DefaultProjectVersionNum for the manifest to produce 'v0.0.0' -> '0.0.0'
-var DefaultProjectVersionNum = DefaultProjectVersion[1:]
-var DefaultRustVersion = "1.60.0"
-var DefaultSubstreamsVersion = "0.4.0"
-
-type ProjectGeneratorOption func(*ProjectGenerator)
-
-func WithProjectVersion(version string) ProjectGeneratorOption {
-	return func(g *ProjectGenerator) {
-		g.ProjectVersion = version
-	}
-}
-
-func WithRustVersion(version string) ProjectGeneratorOption {
-	return func(g *ProjectGenerator) {
-		g.RustVersion = version
-	}
-}
-
-func NewProjectGenerator(srcPath, projectName string, projectContract eth.Address, abi string, events []CodegenEvent, opts ...ProjectGeneratorOption) *ProjectGenerator {
+func NewProjectGenerator(srcPath, projectName string, projectContract eth.Address, abi string, events []CodegenEvent) *ProjectGenerator {
 	pj := &ProjectGenerator{
 		ProjectAbi:      abi,
 		srcPath:         srcPath,
 		ProjectContract: projectContract,
 		ProjectEvents:   events,
 
-		ProjectName:       projectName,
-		ProjectVersion:    DefaultProjectVersion,
-		ProjectVersionNum: DefaultProjectVersionNum,
-		RustVersion:       DefaultRustVersion,
-		SubstreamsVersion: DefaultSubstreamsVersion,
+		ProjectName: projectName,
 	}
 	for i, event := range events {
 		pj.ProtoEvents = append(pj.ProtoEvents, event.getProtoEvent(i+1, &event))
 		pj.RustEvents = append(pj.RustEvents, event.getRustEvent(&event))
 	}
-	for _, opt := range opts {
-		opt(pj)
-	}
-
 	return pj
 }
 func (g *ProjectGenerator) GenerateProject() error {
@@ -100,7 +71,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 	}
 
 	// generate template from ./templates/init_template
-	templateFiles, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*.gotmpl", "*/*/*.gotmpl", "*/*/*/*.gotmpl")
+	templateFiles, err := template.New("templates").Funcs(utils).ParseFS(templates, "*/*/*.gotmpl", "*/*/*/*.gotmpl", "*/*/*/*/*.gotmpl")
 	if err != nil {
 		return fmt.Errorf("instantiate template: %w", err)
 	}
@@ -113,13 +84,11 @@ func (g *ProjectGenerator) GenerateProject() error {
 			if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
 				return fmt.Errorf("creating directory %v: %w", dirPath, err)
 			}
-		} else {
-			fmt.Printf("%s directory already exists, skipping", dir)
 		}
 	}
 
 	// create files
-	err = fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(templates, "templates", func(directory string, d fs.DirEntry, err error) error {
 		if d.IsDir() ||
 			d.Name() == "externs.gotmpl" ||
 			d.Name() == "libGen.gotmpl" ||
@@ -129,7 +98,7 @@ func (g *ProjectGenerator) GenerateProject() error {
 			return nil
 		}
 
-		relativeEmbedPath := strings.TrimPrefix(path, "templates"+string(os.PathSeparator))
+		relativeEmbedPath := strings.TrimPrefix(directory, path.Join("templates", "generator")+string(os.PathSeparator))
 
 		// Change duplicate template filenames
 		if d.Name() == "abimodfile.rs.gotmpl" || d.Name() == "pbmodfile.rs.gotmpl" || d.Name() == "abierc721.rs.gotmpl" {
@@ -140,9 +109,9 @@ func (g *ProjectGenerator) GenerateProject() error {
 		// Change extensions from .gotmpl
 		relativeEmbedPath = strings.TrimSuffix(relativeEmbedPath, ".gotmpl")
 
-		err = generate(path, templateFiles, d.Name(), g, filepath.Join(projectPath, relativeEmbedPath))
+		err = generate(directory, templateFiles, d.Name(), g, filepath.Join(projectPath, relativeEmbedPath))
 		if err != nil {
-			return fmt.Errorf("generating file %s: %w", path, err)
+			return fmt.Errorf("generating file %s: %w", directory, err)
 		}
 		return nil
 	})

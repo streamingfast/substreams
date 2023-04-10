@@ -35,9 +35,9 @@ func init() {
 	}
 }
 
-//go:embed templates/*.gotmpl
-//go:embed templates/*/*.gotmpl
-//go:embed templates/*/*/*.gotmpl
+//go:embed templates/generator/*.gotmpl
+//go:embed templates/generator/*/*.gotmpl
+//go:embed templates/generator/*/*/*.gotmpl
 var templates embed.FS
 
 var StoreType = map[string]string{
@@ -348,7 +348,7 @@ func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input
 	}
 
 	if p == manifest.UpdatePolicyAppend {
-		return fmt.Sprintf("substreams::store::StoreGetRaw")
+		return "substreams::store::StoreGetRaw"
 	}
 
 	t = maybeTranslateType(t)

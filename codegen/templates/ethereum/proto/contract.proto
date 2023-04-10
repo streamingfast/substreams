@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package contrack.v1;
+
+message Contrack {
+    // Events represents the list of events extracted from this block in JSON form. Each event
+    // will be one element of the array and each event will contain's the fully decoded events
+    // as well as: block's number, block's hash, transaction's hash, log index.
+    repeated bytes events = 1;
+}

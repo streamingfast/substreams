@@ -1,0 +1,102 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "address"
+      }
+    ],
+    "name": "Address",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "int8"
+      }
+    ],
+    "name": "Integer",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "uint256"
+      }
+    ],
+    "name": "UnsignedInteger",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "bytes"
+      }
+    ],
+    "name": "Bytes",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "bytes32"
+      }
+    ],
+    "name": "FixedBytes",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "fixed32x8"
+      }
+    ],
+    "name": "SignedFixedPoint",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "name": "first",
+        "type": "address[]"
+      }
+    ],
+    "name": "ArrayOfAddress",
+    "type": "event"
+  },
+
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "Transfer",
+    "type": "event"
+  }
+]

@@ -28,6 +28,7 @@ replace github.com/bytecodealliance/wasmtime-go/v4 => github.com/streamingfast/w
 
 require (
 	github.com/alecthomas/chroma v0.10.0
+	github.com/bobg/go-generics/v2 v2.1.1
 	github.com/bufbuild/connect-go v1.1.0
 	github.com/bufbuild/connect-grpcreflect-go v1.0.0
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
@@ -167,6 +168,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
+	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb // indirect
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/term v0.1.0 // indirect

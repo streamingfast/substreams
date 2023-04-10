@@ -3,14 +3,27 @@ package codegen
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/iancoleman/strcase"
-	"github.com/streamingfast/eth-go"
-	"io/ioutil"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/iancoleman/strcase"
+	"github.com/streamingfast/dhttp"
+	"github.com/streamingfast/eth-go"
+	"golang.org/x/net/context"
 )
+
+var httpClient = http.Client{
+	Transport: dhttp.NewLoggingRoundTripper(zlog, tracer, http.DefaultTransport),
+	Timeout:   30 * time.Second,
+}
+
+func init() {
+	// At least we define a sane defa
+	http.DefaultClient.Timeout = 30 * time.Second
+}
 
 type CodegenEvent struct {
 	RustName string
@@ -41,7 +54,7 @@ func (*CodegenEvent) getProtoEvent(eventIndex int, event *CodegenEvent) ProtoEve
 		Fields:         event.Fields,
 		IndexesPlus:    []int{0},
 	}
-	for i, _ := range event.Fields {
+	for i := range event.Fields {
 		protoEvent.IndexesPlus = append(protoEvent.IndexesPlus, i+5)
 	}
 	return *protoEvent
@@ -65,43 +78,40 @@ func (*CodegenEvent) getRustEvent(event *CodegenEvent) RustEvent {
 	return *rustEvent
 }
 
-func GetContractABI(contract string) ([]byte, *eth.ABI, error) {
-	res, err := http.Get(fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", contract))
+func GetContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", contract.Pretty()), nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
+		return "", nil, fmt.Errorf("new request: %w", err)
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
 	}
 	defer res.Body.Close()
 
-	ABI, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, nil, fmt.Errorf("reading fetched abi: %w", err)
-	}
-
 	type Response struct {
-		status  string
-		message string
-		Result  interface{} `json:"result"`
+		Result interface{} `json:"result"`
 	}
 
 	var response Response
-	err = json.Unmarshal(ABI, &response)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unmarshaling: %w", err)
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return "", nil, fmt.Errorf("unmarshaling: %w", err)
 	}
 
-	_, ok := response.Result.(string)
+	abiContent, ok := response.Result.(string)
 	if !ok {
-		return nil, nil, fmt.Errorf("unable to interpret abi result")
+		return "", nil, fmt.Errorf(`invalid response "Result" field type, expected "string" got "%T"`, response.Result)
 	}
-	ABI = []byte(response.Result.(string))
 
-	ethABI, err := eth.ParseABIFromBytes(ABI)
+	ethABI, err := eth.ParseABIFromBytes([]byte(abiContent))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parsing abi bytes: %w", err)
+		return "", nil, fmt.Errorf("parsing abi: %w", err)
 	}
 
-	return ABI, ethABI, nil
+	return abiContent, ethABI, nil
 }
+
 func BuildEventModels(abi *eth.ABI) (out []CodegenEvent, err error) {
 	names := keys(abi.LogEventsByNameMap)
 	sort.StringSlice(names).Sort()

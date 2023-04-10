@@ -3,15 +3,26 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/codegen"
-	"os"
-	"path/filepath"
-	"regexp"
 )
+
+// Some developers centric environment overidde to make it faster to iterate on `substreams init` command
+var (
+	devInitProjectName             = os.Getenv("SUBSTREAMS_DEV_INIT_PROJECT_NAME")
+	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
+	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
+)
+
+var errInitUnsupportedChain = errors.New("unsupported chain")
 
 var initCmd = &cobra.Command{
 	Use:   "init [<path>]",
@@ -30,150 +41,261 @@ func init() {
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
-	srcDir, err := filepath.Abs("/tmp/test")
-	if err != nil {
-		return fmt.Errorf("getting absolute path of working directory: %w", err)
-	}
+	relativeSrcDir := "."
 	if len(args) == 1 {
-		srcDir, err = filepath.Abs(args[0])
-		if err != nil {
-			return fmt.Errorf("getting absolute path of given directory: %w", err)
-		}
+		relativeSrcDir = args[0]
 	}
 
-	projectName, err := generatePrompt("Project name: ")
+	srcDir, err := filepath.Abs(relativeSrcDir)
+	if err != nil {
+		return fmt.Errorf("getting absolute path of %q: %w", relativeSrcDir, err)
+	}
+
+	projectName, err := promptProjectName(srcDir)
 	if err != nil {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
 
-	protocol, err := generateSelect("Select protocol", []string{"Ethereum", "Other"})
+	protocol, err := promptProtocol()
 	if err != nil {
 		return fmt.Errorf("running protocol prompt: %w", err)
 	}
 
-	if protocol == "other" {
-		fmt.Printf("We haven't added any templates for your selected chain quite yet...\n\n")
-		fmt.Printf("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!\n\n")
-		return nil
-	}
-
-	wantsABI, err := generateSelect("Would you like to track a particular contract", []string{"yes", "no"})
-	if err != nil {
-		return fmt.Errorf("running ABI prompt: %w", err)
-	}
-
-	// Default 'Bored Ape Yacht Club' contract.
-	// Used in 'github.com/streamingfast/substreams-template'
-	contract, _ := eth.NewAddress("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
-	if wantsABI == "yes" {
-		contract, err = generateContractPrompt("Verified Ethereum mainnet contract to track: ")
+	switch protocol {
+	case ProtocolEthereum:
+		wantsABI, err := promptTrackContract()
 		if err != nil {
-			return fmt.Errorf("running contract prompt: %w", err)
+			return fmt.Errorf("running ABI prompt: %w", err)
 		}
-	}
-	// Get contract ABI & parse
-	contractPretty := contract.Pretty()
-	ABI, ethABI, err := codegen.GetContractABI(contractPretty)
-	if err != nil {
-		return fmt.Errorf("getting contract ABI: %w", err)
-	}
 
-	fmt.Println("")
+		// Default 'Bored Ape Yacht Club' contract.
+		// Used in 'github.com/streamingfast/substreams-template'
+		contract := eth.MustNewAddress("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
 
-	events, err := codegen.BuildEventModels(ethABI)
-	if err != nil {
-		return fmt.Errorf("build ABI event models: %w", err)
-	}
+		if wantsABI {
+			contract, err = promptEthereumVerifiedContract()
+			if err != nil {
+				return fmt.Errorf("running contract prompt: %w", err)
+			}
+		}
 
-	gen := codegen.NewProjectGenerator(srcDir, projectName, contract, string(ABI), events)
-	if _, err := os.Stat(filepath.Join(srcDir, projectName)); errors.Is(err, os.ErrNotExist) {
-		err = gen.GenerateProject()
+		// Get contract ABI & parse
+		ABI, ethABI, err := codegen.GetContractABI(cmd.Context(), contract)
+		if err != nil {
+			return fmt.Errorf("getting contract ABI: %w", err)
+		}
+
+		events, err := codegen.BuildEventModels(ethABI)
+		if err != nil {
+			return fmt.Errorf("build ABI event models: %w", err)
+		}
+
+		err = codegen.NewProjectGenerator(srcDir, projectName, contract, string(ABI), events).GenerateProject()
 		if err != nil {
 			return fmt.Errorf("generating code: %w", err)
 		}
-	} else {
-		fmt.Printf("A Substreams project named %s already exists in the entered directory.\nTry changing the directory or project name and trying again.\n\n", projectName)
+
+	case ProtocolOther:
+		fmt.Println()
+		fmt.Println("We haven't added any templates for your selected chain quite yet...")
+		fmt.Println()
+		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
+		fmt.Println()
+
+		return errInitUnsupportedChain
 	}
 
 	return nil
 }
 
-func choiceTemplate() *promptui.SelectTemplates {
-	return &promptui.SelectTemplates{
-		Selected: fmt.Sprintf("%s {{ . | green }}", promptui.IconGood),
+// We accept _ here because they are used across developers. we sanitize it later when
+// used within Substreams module.
+var moduleNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_-]{0,63})$`)
+
+func promptProjectName(absoluteSrcDir string) (string, error) {
+	if devInitProjectName != "" {
+		return devInitProjectName, nil
 	}
+
+	return prompt("Project name", &promptOptions{
+		Validate: func(input string) error {
+			ok := moduleNameRegexp.MatchString(input)
+			if !ok {
+				return fmt.Errorf("invalid name: must match %s", moduleNameRegexp)
+			}
+
+			if cli.DirectoryExists(input) {
+				return fmt.Errorf("project %q already exist in %q", input, absoluteSrcDir)
+			}
+
+			return nil
+		},
+	})
 }
 
-func inputTemplate() *promptui.PromptTemplates {
-	return &promptui.PromptTemplates{
-		Prompt:  "{{ . }} ",
-		Valid:   fmt.Sprintf("%s {{ . | bold }}", promptui.IconBad),
-		Success: fmt.Sprintf("%s {{ . | green }}", promptui.IconGood),
+func promptEthereumVerifiedContract() (eth.Address, error) {
+	if devInitEthereumTrackedContract != "" {
+		// It's ok to panic, we expect the dev to put in a valid Ethereum address
+		return eth.MustNewAddress(devInitEthereumTrackedContract), nil
 	}
+
+	return promptT("Verified Ethereum mainnet contract to track", eth.NewAddress, &promptOptions{
+		Validate: func(input string) error {
+			_, err := eth.NewAddress(input)
+			if err != nil {
+				return fmt.Errorf("invalid address: %w", err)
+			}
+
+			return nil
+		},
+	})
 }
 
-func generatePrompt(label string) (string, error) {
-	moduleNameRegexp := regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_]{0,63})$`)
-	namingValidation := func(input string) error {
-		ok := moduleNameRegexp.MatchString(input)
-		if !ok {
-			return errors.New("invalid name: must match ^([a-zA-Z][a-zA-Z0-9_]{0,63})$")
+func promptTrackContract() (bool, error) {
+	if devInitEthereumTrackedContract != "" {
+		return true, nil
+	}
+
+	return promptConfirm("Would you like to track a particular contract", &promptOptions{
+		PromptTemplates: &promptui.PromptTemplates{
+			Success: `{{ "Track contract:" | faint }} `,
+		},
+	})
+}
+
+func promptProtocol() (SupportedProtocol, error) {
+	if devInitProtocol != "" {
+		// It's ok to panic, we expect the dev to put in a valid Ethereum address
+		protocol, err := ParseSupportedProtocol(devInitProtocol)
+		if err != nil {
+			panic(fmt.Errorf("invalid protocol: %w", err))
 		}
-		return nil
+
+		return protocol, nil
 	}
+
+	choice := promptui.Select{
+		Label: "Select protocol",
+		Items: SupportedProtocolNames(),
+		Templates: &promptui.SelectTemplates{
+			Selected: `{{ "Protocol:" | faint }} {{ . }}`,
+		},
+		HideHelp: true,
+	}
+
+	_, selection, err := choice.Run()
+	if err != nil {
+		if errors.Is(err, promptui.ErrInterrupt) {
+			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
+			os.Exit(1)
+		}
+
+		return ProtocolOther, fmt.Errorf("running protocol prompt: %w", err)
+	}
+
+	var protocol SupportedProtocol
+	if err := protocol.UnmarshalText([]byte(selection)); err != nil {
+		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
+	}
+
+	return protocol, nil
+}
+
+type promptOptions struct {
+	Validate        promptui.ValidateFunc
+	IsConfirm       bool
+	PromptTemplates *promptui.PromptTemplates
+}
+
+var confirmPromptRegex = regexp.MustCompile("(y|Y|n|N|No|Yes|YES|NO)")
+
+func prompt(label string, opts *promptOptions) (string, error) {
+	var templates *promptui.PromptTemplates
+
+	if opts != nil {
+		templates = opts.PromptTemplates
+	}
+
+	if templates == nil {
+		templates = &promptui.PromptTemplates{
+			Success: `{{ . | faint }}{{ ":" | faint}} `,
+		}
+	}
+
+	if opts != nil && opts.IsConfirm {
+		// We don't have no differences
+		templates.Valid = `{{ "?" | blue}} {{ . | bold }} {{ "[y/N]" | faint}} `
+		templates.Invalid = templates.Valid
+	}
+
 	prompt := promptui.Prompt{
 		Label:     label,
-		Templates: inputTemplate(),
-		Validate:  namingValidation,
+		Templates: templates,
 	}
+	if opts != nil && opts.Validate != nil {
+		prompt.Validate = opts.Validate
+	}
+
+	if opts != nil && opts.IsConfirm {
+		prompt.Validate = func(in string) error {
+			if !confirmPromptRegex.MatchString(in) {
+				return errors.New("answer with y/yes/Yes or n/no/No")
+			}
+
+			return nil
+		}
+	}
+
 	choice, err := prompt.Run()
 	if err != nil {
+		if errors.Is(err, promptui.ErrInterrupt) {
+			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
+			os.Exit(1)
+		}
+
+		if prompt.IsConfirm && errors.Is(err, promptui.ErrAbort) {
+			return "false", nil
+		}
+
 		return "", fmt.Errorf("running prompt: %w", err)
 	}
 
 	return choice, nil
 }
 
-func generateContractPrompt(label string) (eth.Address, error) {
-	contractValidation := func(input string) error {
-		_, err := eth.NewAddress(input)
-		if err != nil {
-			return errors.New("Invalid address")
-		}
-		return nil
-	}
-	prompt := promptui.Prompt{
-		Label:     label,
-		Templates: inputTemplate(),
-		Validate:  contractValidation,
+// promptT is just like [prompt] but accepts a transformer that transform the `string` into the generic type T.
+func promptT[T any](label string, transformer func(string) (T, error), opts *promptOptions) (T, error) {
+	choice, err := prompt(label, opts)
+	if err == nil {
+		return transformer(choice)
 	}
 
-	choice, err := prompt.Run()
-	if err != nil {
-		return nil, fmt.Errorf("running prompt: %w", err)
-	}
-
-	// Clean up given contract
-	contractAddress, err := eth.NewAddress(choice)
-	if err != nil {
-		return nil, fmt.Errorf("getting contract bytes: %w", err)
-	}
-
-	return contractAddress, nil
+	var empty T
+	return empty, err
 }
 
-func generateSelect(label string, items []string) (string, error) {
-	choice := promptui.Select{
-		Label:     label,
-		Items:     items,
-		Templates: choiceTemplate(),
-		HideHelp:  true,
+// promptConfirm is just like [prompt] but enforce `IsConfirm` and returns a boolean which is either
+// `true` for yes answer or `false` for a no answer.
+func promptConfirm(label string, opts *promptOptions) (bool, error) {
+	if opts == nil {
+		opts = &promptOptions{}
 	}
 
-	_, selection, err := choice.Run()
-	if err != nil {
-		return "", fmt.Errorf("running protocol prompt: %w", err)
+	opts.IsConfirm = true
+	transform := func(in string) (bool, error) {
+		in = strings.ToLower(in)
+		return in == "y" || in == "yes", nil
 	}
 
-	return selection, nil
+	return promptT(label, transform, opts)
 }
+
+//go:generate go-enum -f=$GOFILE --noprefix --prefix Protocol --marshal --names --nocase
+
+// ENUM(
+//
+//	Ethereum
+//	Other
+//
+// )
+type SupportedProtocol uint

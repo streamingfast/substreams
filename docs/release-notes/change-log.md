@@ -8,14 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* "undo" messages incorrectly contained too many module outputs (all modules, with some duplicates)
+* Fixed "undo" messages incorrectly contained too many module outputs (all modules, with some duplicates).
 * Fixed status bar message cutoff bug
 * Fixed `substreams run` when `manifest` contains unknown attributes
 * Fixed bubble tea program error when existing the `run` command
-
-### Added
-
-* Improved the `substreams alpha init` command to now create a ready-to-go Substreams package. Its parameter is the desired project path, and the package created is similar to our `substreams-template` repo which tracks an ERC-721 project's transfers.
 
 ## [1.0.0](https://github.com/streamingfast/substreams/releases/tag/v1.0.0)
 

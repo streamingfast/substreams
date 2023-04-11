@@ -1,6 +1,6 @@
 ENDPOINT ?= mainnet.eth.streamingfast.io:443
-START_BLOCK ?= 12292922
-STOP_BLOCK ?= +10
+START_BLOCK ?= 16000000
+STOP_BLOCK ?= +100
 
 .PHONY: build
 build:
@@ -8,12 +8,12 @@ build:
 
 .PHONY: stream
 stream: build
-	substreams run -e $(ENDPOINT) substreams.yaml map_transfers -s $(START_BLOCK) -t $(STOP_BLOCK)
+	substreams run -e $(ENDPOINT) substreams.yaml map_events -s $(START_BLOCK) -t $(STOP_BLOCK)
 
-.PHONY: codegen
-codegen:
+.PHONY: protogen
+protogen:
 	substreams protogen ./substreams.yaml --exclude-paths="sf/substreams,google"
 
-.PHONY: stream
+.PHONY: package
 package: build
 	substreams package substreams.yaml

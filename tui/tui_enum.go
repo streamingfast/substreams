@@ -20,6 +20,8 @@ const (
 	OutputModeJSONL
 )
 
+var ErrInvalidOutputMode = fmt.Errorf("not a valid OutputMode, try [%s]", strings.Join(_OutputModeNames, ", "))
+
 const _OutputModeName = "TUIJSONJSONL"
 
 var _OutputModeNames = []string{
@@ -49,6 +51,13 @@ func (x OutputMode) String() string {
 	return fmt.Sprintf("OutputMode(%d)", x)
 }
 
+// IsValid provides a quick way to determine if the typed value is
+// part of the allowed enumerated values
+func (x OutputMode) IsValid() bool {
+	_, ok := _OutputModeMap[x]
+	return ok
+}
+
 var _OutputModeValue = map[string]OutputMode{
 	_OutputModeName[0:3]:                   OutputModeTUI,
 	strings.ToLower(_OutputModeName[0:3]):  OutputModeTUI,
@@ -58,7 +67,7 @@ var _OutputModeValue = map[string]OutputMode{
 	strings.ToLower(_OutputModeName[7:12]): OutputModeJSONL,
 }
 
-// ParseOutputMode attempts to convert a string to a OutputMode
+// ParseOutputMode attempts to convert a string to a OutputMode.
 func ParseOutputMode(name string) (OutputMode, error) {
 	if x, ok := _OutputModeValue[name]; ok {
 		return x, nil
@@ -67,15 +76,15 @@ func ParseOutputMode(name string) (OutputMode, error) {
 	if x, ok := _OutputModeValue[strings.ToLower(name)]; ok {
 		return x, nil
 	}
-	return OutputMode(0), fmt.Errorf("%s is not a valid OutputMode, try [%s]", name, strings.Join(_OutputModeNames, ", "))
+	return OutputMode(0), fmt.Errorf("%s is %w", name, ErrInvalidOutputMode)
 }
 
-// MarshalText implements the text marshaller method
+// MarshalText implements the text marshaller method.
 func (x OutputMode) MarshalText() ([]byte, error) {
 	return []byte(x.String()), nil
 }
 
-// UnmarshalText implements the text unmarshaller method
+// UnmarshalText implements the text unmarshaller method.
 func (x *OutputMode) UnmarshalText(text []byte) error {
 	name := string(text)
 	tmp, err := ParseOutputMode(name)

@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/dhttp"
 	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/codegen/templates"
@@ -58,7 +63,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("getting absolute path of %q: %w", relativeSrcDir, err)
 	}
 
-	projectName, err := promptProjectName(srcDir)
+	projectName, moduleName, err := promptProjectName(srcDir)
 	if err != nil {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
@@ -87,17 +92,19 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		// Get contract abiContent & parse
-		abiContent, abi, err := codegen.GetContractABI(cmd.Context(), contract)
+		abiContent, abi, err := GetContractABI(cmd.Context(), contract)
 		if err != nil {
 			return fmt.Errorf("getting contract ABI: %w", err)
 		}
 
-		// events, err := codegen.BuildEventModels(abi)
-		// if err != nil {
-		// 	return fmt.Errorf("build ABI event models: %w", err)
-		// }
-
-		project, err := templates.NewEthereumProject(projectName, templates.EthereumChainsByID["ethereum_mainnet"], contract, abi, abiContent)
+		project, err := templates.NewEthereumProject(
+			projectName,
+			moduleName,
+			templates.EthereumChainsByID["ethereum_mainnet"],
+			contract,
+			abi,
+			abiContent,
+		)
 		if err != nil {
 			return fmt.Errorf("new ethereum project: %w", err)
 		}
@@ -144,12 +151,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 // used within Substreams module.
 var moduleNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_-]{0,63})$`)
 
-func promptProjectName(absoluteSrcDir string) (string, error) {
-	if devInitProjectName != "" {
-		return devInitProjectName, nil
+func promptProjectName(absoluteSrcDir string) (string, string, error) {
+	if name := devInitProjectName; name != "" {
+		return name, projectNameToModuleName(name), nil
 	}
 
-	return prompt("Project name", &promptOptions{
+	projectName, err := prompt("Project name", &promptOptions{
 		Validate: func(input string) error {
 			ok := moduleNameRegexp.MatchString(input)
 			if !ok {
@@ -163,6 +170,15 @@ func promptProjectName(absoluteSrcDir string) (string, error) {
 			return nil
 		},
 	})
+	if err != nil {
+		return "", "", err
+	}
+
+	return projectName, projectNameToModuleName(projectName), nil
+}
+
+func projectNameToModuleName(in string) string {
+	return strings.ReplaceAll(in, "-", "_")
 }
 
 func promptEthereumVerifiedContract() (eth.Address, error) {
@@ -320,4 +336,43 @@ func promptConfirm(label string, opts *promptOptions) (bool, error) {
 	}
 
 	return promptT(label, transform, opts)
+}
+
+var httpClient = http.Client{
+	Transport: dhttp.NewLoggingRoundTripper(zlog, tracer, http.DefaultTransport),
+	Timeout:   30 * time.Second,
+}
+
+func GetContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", contract.Pretty()), nil)
+	if err != nil {
+		return "", nil, fmt.Errorf("new request: %w", err)
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
+	}
+	defer res.Body.Close()
+
+	type Response struct {
+		Result interface{} `json:"result"`
+	}
+
+	var response Response
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return "", nil, fmt.Errorf("unmarshaling: %w", err)
+	}
+
+	abiContent, ok := response.Result.(string)
+	if !ok {
+		return "", nil, fmt.Errorf(`invalid response "Result" field type, expected "string" got "%T"`, response.Result)
+	}
+
+	ethABI, err := eth.ParseABIFromBytes([]byte(abiContent))
+	if err != nil {
+		return "", nil, fmt.Errorf("parsing abi: %w", err)
+	}
+
+	return abiContent, ethABI, nil
 }

@@ -99,6 +99,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v0.1.0 // indirect
 	github.com/eoscanada/eos-go v0.9.1-0.20200415144303-2adb25bcdeca // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/gertd/go-pluralize v0.2.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

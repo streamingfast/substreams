@@ -736,28 +736,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "substreams-contrack-ethereum"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ethabi",
- "getrandom",
- "hex-literal",
- "num-bigint",
- "num-traits",
- "prost",
- "serde_json",
- "substreams",
- "substreams-ethereum",
-]
-
-[[package]]
 name = "substreams-ethereum"
-version = "0.8.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03a426822f6032fa28145cb2cb7661e70554da839a40ee08b6348f1479a44e1b"
+checksum = "753cfedd3e523154cfce1b251f4569efec233d6f4fd8e2af349659afc391fdb0"
 dependencies = [
  "getrandom",
+ "num-bigint",
  "substreams",
  "substreams-ethereum-abigen",
  "substreams-ethereum-core",
@@ -766,9 +751,9 @@ dependencies = [
 
 [[package]]
 name = "substreams-ethereum-abigen"
-version = "0.8.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd2ba34bc4d19288e7487aa2b13ee75955222809d2dab48c9dad33230a6f4732"
+checksum = "d9bd370f59887e8e9af48832337e9a4740c4a457ac8b003da93e2cba3e8bed53"
 dependencies = [
  "anyhow",
  "ethabi",
@@ -783,9 +768,9 @@ dependencies = [
 
 [[package]]
 name = "substreams-ethereum-core"
-version = "0.8.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f680a56fc8df55dfd0b3465af2ed6f0eb471b4a0b5a9e0e56c13377911104b01"
+checksum = "3f2f60115bf182ac833c1aad81f4e40543463348df77a3780ee8246bbefa4735"
 dependencies = [
  "bigdecimal",
  "ethabi",
@@ -799,17 +784,33 @@ dependencies = [
 
 [[package]]
 name = "substreams-ethereum-derive"
-version = "0.8.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b40d3bcb83759b62c2ed372b582be8ba46fc844362a7f7a35fa0269590066118"
+checksum = "4bae0e58f526ef00b5ae970b73b89d3168a9d64b1aa0c285b0f25ca129a9103c"
 dependencies = [
  "ethabi",
  "heck",
  "hex",
+ "num-bigint",
  "proc-macro2",
  "quote",
  "substreams-ethereum-abigen",
  "syn",
+]
+
+[[package]]
+name = "substreams-init-test"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "ethabi",
+ "getrandom",
+ "hex-literal",
+ "num-bigint",
+ "num-traits",
+ "prost",
+ "substreams",
+ "substreams-ethereum",
 ]
 
 [[package]]

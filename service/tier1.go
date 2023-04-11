@@ -46,6 +46,7 @@ type Tier1Service struct {
 	streamFactoryFunc   StreamFactoryFunc
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
+	getHeadBlock        func() (uint64, error)
 
 	runtimeConfig config.RuntimeConfig
 
@@ -117,6 +118,7 @@ func (s *Tier1Service) Register(
 	s.streamFactoryFunc = sf.New
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
 	s.resolveCursor = pipeline.NewCursorResolver(forkableHub, mergedBlocksStore, forkedBlocksStore)
+	s.getHeadBlock = sf.GetHeadBlock
 	s.logger = logger
 	server.RegisterService(func(gs grpc.ServiceRegistrar) {
 		pbsubstreamsrpc.RegisterStreamServer(gs, s)
@@ -212,7 +214,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	//bytesMeter.Launch(ctx, respFunc)
 	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
-	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor)
+	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}

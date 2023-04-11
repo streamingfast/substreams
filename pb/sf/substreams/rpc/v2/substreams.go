@@ -6,8 +6,61 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (bd *BlockScopedData) AllMapModuleOutputs() []*MapModuleOutput {
-	return append([]*MapModuleOutput{bd.Output}, bd.DebugMapOutputs...)
+type AnyModuleOutput struct {
+	MapOutput   *MapModuleOutput
+	StoreOutput *StoreModuleOutput
+}
+
+func (a *AnyModuleOutput) IsMap() bool {
+	return a.MapOutput != nil
+}
+
+func (a *AnyModuleOutput) IsStore() bool {
+	return a.StoreOutput != nil
+}
+
+func (a *AnyModuleOutput) Name() string {
+	if a.MapOutput != nil {
+		return a.MapOutput.Name
+	}
+	return a.StoreOutput.Name
+}
+
+func (a *AnyModuleOutput) DebugInfo() *OutputDebugInfo {
+	if a.MapOutput != nil {
+		return a.MapOutput.DebugInfo
+	}
+	return a.StoreOutput.DebugInfo
+}
+
+func (a *AnyModuleOutput) IsEmpty() bool {
+	if a.MapOutput != nil {
+		return len(a.MapOutput.MapOutput.Value) == 0
+	}
+	return len(a.StoreOutput.DebugStoreDeltas) == 0
+}
+
+func (m *MapModuleOutput) ToAny() *AnyModuleOutput {
+	return &AnyModuleOutput{
+		MapOutput: m,
+	}
+}
+
+func (s *StoreModuleOutput) ToAny() *AnyModuleOutput {
+	return &AnyModuleOutput{
+		StoreOutput: s,
+	}
+}
+
+func (bd *BlockScopedData) AllModuleOutputs() (out []*AnyModuleOutput) {
+	out = append(out, bd.Output.ToAny())
+	for _, mapOut := range bd.DebugMapOutputs {
+		out = append(out, mapOut.ToAny())
+	}
+	for _, storeOut := range bd.DebugStoreOutputs {
+		out = append(out, storeOut.ToAny())
+	}
+	return
 }
 
 func (req *Request) Validate() error {

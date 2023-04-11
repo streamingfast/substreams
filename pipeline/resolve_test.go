@@ -18,6 +18,8 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		name               string
 		req                *pbsubstreamsrpc.Request
 		expectedBlockNum   uint64
+		headBlock          uint64
+		headBlockErr       error
 		wantErr            bool
 		cursorResolverArgs []interface{}
 		wantUndoLastBlock  bstream.BlockRef
@@ -114,10 +116,32 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			expectedBlockNum: 11,
 			wantErr:          false,
 		},
+		{
+			name: "negative startblock",
+			req: &pbsubstreamsrpc.Request{
+				StartBlockNum: -5,
+			},
+			headBlock:        16,
+			expectedBlockNum: 11,
+			wantErr:          false,
+		},
+		{
+			name: "negative startblock no head",
+			req: &pbsubstreamsrpc.Request{
+				StartBlockNum: -5,
+			},
+			headBlockErr: fmt.Errorf("cannot find head block"),
+			wantErr:      true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, undoSignal, err := resolveStartBlockNum(context.Background(), tt.req, newTestCursorResolver(tt.cursorResolverArgs...).resolveCursor)
+			got, undoSignal, err := resolveStartBlockNum(
+				context.Background(),
+				tt.req,
+				newTestCursorResolver(tt.cursorResolverArgs...).resolveCursor,
+				func() (uint64, error) { return tt.headBlock, tt.headBlockErr },
+			)
 			if tt.wantUndoLastBlock != nil {
 				require.NotNil(t, undoSignal)
 				assert.Equal(t, tt.wantUndoLastBlock.ID(), undoSignal.LastValidClock.Id)
@@ -198,6 +222,10 @@ func TestBuildRequestDetails(t *testing.T) {
 			return 999, nil
 		},
 		newTestCursorResolver().resolveCursor,
+		func() (uint64, error) {
+			t.Error("should not pass here")
+			return 0, nil
+		},
 	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))
@@ -214,6 +242,10 @@ func TestBuildRequestDetails(t *testing.T) {
 			return 999, nil
 		},
 		newTestCursorResolver().resolveCursor,
+		func() (uint64, error) {
+			t.Error("should not pass here")
+			return 0, nil
+		},
 	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.RequestStartBlockNum))

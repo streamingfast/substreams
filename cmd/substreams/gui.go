@@ -10,14 +10,12 @@ import (
 	"github.com/streamingfast/substreams/tui2/replaylog"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
@@ -145,8 +143,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 		toPrint = []string{outputModule}
 	}
 
-	msgDescs, err := buildMessageDescriptors(pkg)
-
 	stream := streamui.New(req, ssClient, callOpts)
 
 	homeDir, err := os.UserHomeDir()
@@ -175,10 +171,14 @@ func runGui(cmd *cobra.Command, args []string) error {
 		defer replayLog.Close()
 	}
 
-	fmt.Println("Launching Substreams GUI...")
-
 	debugLogPath := filepath.Join(homeDir, "debug.log")
 	tea.LogToFile(debugLogPath, "gui:")
+	fmt.Println("Logging to", debugLogPath)
+
+	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	if err != nil {
+		return fmt.Errorf("building message descriptors: %w", err)
+	}
 
 	requestSummary := &request.Summary{
 		Manifest:        manifestPath,
@@ -188,6 +188,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 		Docs:            pkg.PackageMeta,
 	}
 
+	fmt.Println("Launching Substreams GUI...")
+
 	ui := tui2.New(stream, msgDescs, replayLog, requestSummary, pkg.Modules)
 	prog := tea.NewProgram(ui, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
@@ -195,37 +197,4 @@ func runGui(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func buildMessageDescriptors(pkg *pbsubstreams.Package) (out map[string]*desc.MessageDescriptor, err error) {
-	fileDescs, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
-	}
-
-	out = make(map[string]*desc.MessageDescriptor)
-	for _, mod := range pkg.Modules.Modules {
-		var msgType string
-		switch modKind := mod.Kind.(type) {
-		case *pbsubstreams.Module_KindStore_:
-			msgType = modKind.KindStore.ValueType
-		case *pbsubstreams.Module_KindMap_:
-			msgType = modKind.KindMap.OutputType
-		}
-		msgType = strings.TrimPrefix(msgType, "proto:")
-
-		//ui.msgTypes[mod.Name] = msgType
-		// replace references to msgTypes by calls to
-		// GetFullyQualifiedName() on the msgDesc
-
-		var msgDesc *desc.MessageDescriptor
-		for _, file := range fileDescs {
-			msgDesc = file.FindMessage(msgType)
-			if msgDesc != nil {
-				break
-			}
-		}
-		out[mod.Name] = msgDesc
-	}
-	return
 }

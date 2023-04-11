@@ -16,9 +16,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type getRecentFinalBlockFunc func() (uint64, error)
+type getBlockFunc func() (uint64, error)
 
-func BuildRequestDetails(ctx context.Context, request *pbsubstreamsrpc.Request, getRecentFinalBlock getRecentFinalBlockFunc, resolveCursor CursorResolver) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
+func BuildRequestDetails(
+	ctx context.Context,
+	request *pbsubstreamsrpc.Request,
+	getRecentFinalBlock getBlockFunc,
+	resolveCursor CursorResolver,
+	getHeadBlock getBlockFunc) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
 	req = &reqctx.RequestDetails{
 		Modules:                             request.Modules,
 		OutputModule:                        request.OutputModule,
@@ -27,7 +32,8 @@ func BuildRequestDetails(ctx context.Context, request *pbsubstreamsrpc.Request, 
 		StopBlockNum:                        request.StopBlockNum,
 	}
 
-	req.RequestStartBlockNum, undoSignal, err = resolveStartBlockNum(ctx, request, resolveCursor)
+	req.RequestStartBlockNum, undoSignal, err = resolveStartBlockNum(ctx, request, resolveCursor, getHeadBlock)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,7 +83,7 @@ func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint6
 }
 
 // resolveStartBlockNum will occasionally modify or remove the cursor inside the request
-func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, resolveCursor CursorResolver) (uint64, *pbsubstreamsrpc.BlockUndoSignal, error) {
+func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, resolveCursor CursorResolver, getHeadBlock getBlockFunc) (uint64, *pbsubstreamsrpc.BlockUndoSignal, error) {
 	// TODO(abourget): a caller will need to verify that, if there's a cursor.Step that is New or Undo,
 	// then we need to validate that we are returning not only a number, but an ID,
 	// We then need to sync from a known finalized Snapshot's block, down to the potentially
@@ -86,7 +92,14 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 	// and everything is irreversible.
 
 	if req.StartBlockNum < 0 {
-		return 0, nil, status.Error(grpccodes.InvalidArgument, "start block num must be positive")
+		headBlock, err := getHeadBlock()
+		if err != nil {
+			return 0, nil, fmt.Errorf("resolving negative start block: %w", err)
+		}
+		req.StartBlockNum = int64(headBlock) + req.StartBlockNum
+		if req.StartBlockNum < 0 {
+			req.StartBlockNum = 0
+		}
 	}
 
 	if req.StartCursor == "" {

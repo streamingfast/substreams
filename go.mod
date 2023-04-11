@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20230406203654-ce7225ef14ef
+	github.com/streamingfast/bstream v0.0.2-0.20230407143220-06c919ae8476
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20221125175206-82e01d420d45
 	github.com/streamingfast/dgrpc v0.0.0-20230113212008-1898f17e0ac7
@@ -42,6 +42,7 @@ require (
 	github.com/mattn/go-isatty v0.0.16
 	github.com/mitchellh/go-testing-interface v1.14.1
 	github.com/muesli/reflow v0.3.0
+	github.com/muesli/termenv v0.13.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/cors v1.8.3
 	github.com/schollz/closestmatch v2.1.0+incompatible
@@ -52,7 +53,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20221104190152-7f721cb9b60c
 	github.com/streamingfast/shutter v1.5.0
 	github.com/test-go/testify v1.1.4
-	github.com/tidwall/pretty v1.2.0
+	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4
 	go.opentelemetry.io/otel v1.11.1
 	go.opentelemetry.io/otel/trace v1.11.1
@@ -74,6 +75,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v0.32.3 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.8.6 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.32.6 // indirect
+	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go v1.44.187 // indirect
 	github.com/aymanbagabas/go-osc52 v1.2.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
@@ -123,7 +125,6 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/muesli/ansi v0.0.0-20211031195517-c9f0611b6c70 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/openzipkin/zipkin-go v0.4.0 // indirect
 	github.com/paulbellamy/ratecounter v0.2.0 // indirect

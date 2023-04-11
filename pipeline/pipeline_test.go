@@ -192,6 +192,7 @@ func withTestRequest(t *testing.T, outputModule string, startBlock uint64) conte
 		},
 		func() (uint64, error) { return 0, nil },
 		newTestCursorResolver().resolveCursor,
+		func() (uint64, error) { return 0, nil },
 	)
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)

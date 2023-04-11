@@ -16,9 +16,10 @@ import (
 type Request struct {
 	common.Common
 
-	requestSummary *Summary
-	modules        *pbsubstreams.Modules
-	requestView    viewport.Model
+	requestSummary     *Summary
+	modules            *pbsubstreams.Modules
+	modulesView        viewport.Model
+	modulesViewContent string
 }
 
 func New(c common.Common, summary *Summary, modules *pbsubstreams.Modules) *Request {
@@ -26,23 +27,23 @@ func New(c common.Common, summary *Summary, modules *pbsubstreams.Modules) *Requ
 		Common:         c,
 		requestSummary: summary,
 		modules:        modules,
-		requestView:    viewport.New(24, 80),
+		modulesView:    viewport.New(24, 80),
 	}
 }
 
 func (r *Request) Init() tea.Cmd {
+	r.setModulesViewContent()
 	return tea.Batch(
-		r.requestView.Init(),
+		r.modulesView.Init(),
 	)
 }
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	r.setViewportContent()
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		var cmd tea.Cmd
-		r.requestView, cmd = r.requestView.Update(msg)
+		r.modulesView, cmd = r.modulesView.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -50,12 +51,11 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *Request) View() string {
-	viewportContent, _ := r.getViewportContent()
-	lineCount := strings.Count(viewportContent, "\n")
-	progress := float64(r.requestView.YOffset+r.requestView.Height-1) / float64(lineCount) * 100.0
+	lineCount := r.modulesView.TotalLineCount()
+	progress := float64(r.modulesView.YOffset+r.modulesView.Height-1) / float64(lineCount) * 100.0
 	return lipgloss.JoinVertical(0,
 		r.renderRequestSummary(),
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.requestView.View()),
+		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.modulesView.View()),
 		lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
 	)
 }
@@ -91,13 +91,14 @@ func (r *Request) renderRequestSummary() string {
 
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
-	r.requestView.Width = w
-	r.requestView.Height = h - 11
+	r.modulesView.Width = w
+	r.modulesView.Height = h - 11
 }
 
-func (r *Request) setViewportContent() {
+func (r *Request) setModulesViewContent() {
 	content, _ := r.getViewportContent()
-	r.requestView.SetContent(content)
+	r.modulesViewContent = content
+	r.modulesView.SetContent(content)
 }
 
 func (r *Request) getViewportContent() (string, error) {

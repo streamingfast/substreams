@@ -23,9 +23,9 @@ import (
 func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
-	runCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
+	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
-	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
+	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
 	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
@@ -95,8 +95,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	outputModule := args[0]
-	startBlock := mustGetInt64(cmd, "start-block")
-	if startBlock == -1 {
+
+	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
+	if err != nil {
+		return fmt.Errorf("stop block: %w", err)
+	}
+
+	if readFromModule {
 		sb, err := graph.ModuleInitialBlock(outputModule)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
@@ -231,6 +236,23 @@ func readAPIToken(cmd *cobra.Command, envFlagName string) string {
 	return os.Getenv("SF_API_TOKEN")
 }
 
+func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error) {
+	val, err := cmd.Flags().GetString(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	if val == "" {
+		return 0, true, nil
+	}
+
+	startBlock, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, false, fmt.Errorf("start block is invalid: %w", err)
+	}
+
+	return startBlock, false, nil
+}
+
 func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (uint64, error) {
 	val, err := cmd.Flags().GetString(flagName)
 	if err != nil {
@@ -239,7 +261,7 @@ func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (u
 
 	isRelative := strings.HasPrefix(val, "+")
 	if isRelative {
-		if startBlock == -1 {
+		if startBlock < 0 {
 			return 0, fmt.Errorf("relative end block is supported only with an absolute start block")
 		}
 

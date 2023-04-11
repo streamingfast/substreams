@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## 1.1.0 (Unreleased)
 
-### BREAKING CHANGES
+### Highlights -- BREAKING CHANGES
 
 * Services for tier1 (request, response...) now exposed as `sf.substreams.rpc.v2.Stream/Blocks` and removed from `sf.substreams.v1`
   * Single module output from mapper in response. 
@@ -15,6 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Services for tier2 (subrequests) now exposed as `sf.substreams.internal.v2.Substreams/ProcessRange` (not to be used externally)
 * The package and modules definitions stay under `sf.substreams.v1`
 * If a cursor cannot be resolved to the closest canonical parent, it will fall back to the closest final block.
+
+## Unreleased
+
+### Highlights
+
+* Added support for resolving a negative start-block on server (also added to run command)
+* The `run` and `gui` command no longer resolve a `start-block=-1` to the 'initialBlock' of the requested module. To get this behavior, simply assign an empty string value to the flag `start-block` instead.
 
 ## [1.0.1](https://github.com/streamingfast/substreams/releases/tag/v1.0.1)
 

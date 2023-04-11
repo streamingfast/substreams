@@ -17,9 +17,10 @@ type ModuleGraph struct {
 
 	currentHashesCache map[string][]byte // moduleName => hash
 
-	modules     []*pbsubstreams.Module
-	moduleIndex map[string]int
-	indexIndex  map[int]*pbsubstreams.Module
+	modules         []*pbsubstreams.Module
+	moduleIndex     map[string]int
+	indexIndex      map[int]*pbsubstreams.Module
+	inputOrderIndex map[string]map[string]int
 }
 
 func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
@@ -29,15 +30,17 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 		moduleIndex:        make(map[string]int),
 		indexIndex:         make(map[int]*pbsubstreams.Module),
 		currentHashesCache: make(map[string][]byte),
+		inputOrderIndex:    map[string]map[string]int{},
 	}
 
 	for i, module := range modules {
 		g.moduleIndex[module.Name] = i
 		g.indexIndex[i] = module
+		g.inputOrderIndex[module.Name] = map[string]int{}
 	}
 
 	for i, module := range modules {
-		for _, input := range module.Inputs {
+		for j, input := range module.Inputs {
 			var moduleName string
 			if v := input.GetMap(); v != nil {
 				moduleName = v.ModuleName
@@ -51,6 +54,8 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 			if j, found := g.moduleIndex[moduleName]; found {
 				g.AddCost(i, j, 1)
 			}
+
+			g.inputOrderIndex[module.Name][moduleName] = j
 		}
 	}
 
@@ -199,6 +204,10 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, erro
 			res = append(res, g.indexIndex[i])
 		}
 	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return g.inputOrderIndex[moduleName][res[i].Name] < g.inputOrderIndex[moduleName][res[j].Name]
+	})
 
 	return res, nil
 }

@@ -6,9 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Added
+### Highlights
 
 * Added support for resolving a negative start-block on server (also added to run command)
+* The `run` and `gui` command no longer resolve a `start-block=-1` to the 'initialBlock' of the requested module. To get this behavior, simply assign an empty string value to the flag `start-block` instead.
 
 ## [1.0.1](https://github.com/streamingfast/substreams/releases/tag/v1.0.1)
 

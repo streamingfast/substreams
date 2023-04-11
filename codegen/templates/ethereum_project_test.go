@@ -20,7 +20,7 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 	abi, err := eth.ParseABIFromBytes(abiContent)
 	require.NoError(t, err)
 
-	project, err := NewEthereumProject("substreams-tests", "substreams_tests", EthereumChainsByID["ethereum_mainnet"], eth.MustNewAddress("0x388C818CA8B9251b393131C08a736A67ccB19297"), abi, string(abiContent))
+	project, err := NewEthereumProject("substreams-tests", "substreams_tests", EthereumChainsByID["ethereum_mainnet"], eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(abiContent))
 	require.NoError(t, err)
 
 	files, err := project.Render()
@@ -45,7 +45,7 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 }
 
 func TestNewEthereumTemplateProject(t *testing.T) {
-	erc721ABI := fileContent(t, "ethereum/abi/contract.abi.json")
+	abi := fileContent(t, "ethereum/abi/contract.abi.json")
 
 	type args struct {
 		address string
@@ -59,17 +59,18 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 	}{
 		{
 			"standard case",
-			args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", erc721ABI},
+			args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abi},
 			map[string][]byte{
+				"abi/contract.abi.json": abi,
 				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
 				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
 				"src/pb/contract.v1.rs": fileContent(t, "./ethereum/src/pb/contract.v1.rs"),
 				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
 				"src/lib.rs":            fileContent(t, "./ethereum/src/lib.rs"),
 				"build.rs":              fileContent(t, "./ethereum/build.rs"),
-				"contrack.abi.json":     erc721ABI,
 				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
 				"Cargo.toml":            fileContent(t, "./ethereum/Cargo.toml"),
+				"Makefile":              fileContent(t, "./ethereum/Makefile"),
 				"substreams.yaml":       fileContent(t, "./ethereum/substreams.yaml"),
 				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
 			},
@@ -81,7 +82,9 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			abi, err := eth.ParseABIFromBytes(tt.args.abi)
 			require.NoError(t, err)
 
-			project, err := NewEthereumProject("substreams-tests", "substreams_tests", EthereumChainsByID["ethereum_mainnet"], eth.MustNewAddress("0x388C818CA8B9251b393131C08a736A67ccB19297 "), abi, string(tt.args.abi))
+			chain := EthereumChainsByID["ethereum_mainnet"]
+
+			project, err := NewEthereumProject("substreams-init-test", "substreams_init_test", chain, eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(tt.args.abi))
 			require.NoError(t, err)
 
 			got, err := project.Render()

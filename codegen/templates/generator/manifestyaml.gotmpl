@@ -1,0 +1,17 @@
+{{$engine := . -}}
+specVersion: v0.1.0
+package:
+  name: {{ $engine.ProjectName }}
+  version: {{ $engine.ProjectVersion }}
+  url: # ADD REPOSITORY URL HERE #
+  doc: |
+    ##### ADD DOCUMENTATION STRING HERE #####
+
+protobuf:
+  files: []
+  importPaths:
+    - ./proto
+
+binaries: {}
+
+modules: []

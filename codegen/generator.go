@@ -1,7 +1,6 @@
 package codegen
 
 import (
-	"embed"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -35,10 +34,32 @@ func init() {
 	}
 }
 
-//go:embed templates/generator/*.gotmpl
-//go:embed templates/generator/*/*.gotmpl
-//go:embed templates/generator/*/*/*.gotmpl
-var templates embed.FS
+//go:embed templates/generator/lib.gotmpl
+var tplLibRs string
+
+//go:embed templates/generator/externs.gotmpl
+var tplExterns string
+
+//go:embed templates/generator/substreams.gotmpl
+var tplSubstreams string
+
+//go:embed templates/generator/mod.gotmpl
+var tplMod string
+
+//go:embed templates/generator/pb_mod.gotmpl
+var tplPbMod string
+
+//go:embed templates/generator/buildsh.gotmpl
+var tplBuildSh string
+
+//go:embed templates/generator/cargotoml.gotmpl
+var tplCargoToml string
+
+//go:embed templates/generator/manifestyaml.gotmpl
+var tplManifestYaml string
+
+//go:embed templates/generator/rusttoolchain.gotmpl
+var tplRustToolchain string
 
 var StoreType = map[string]string{
 	"bytes":      "Raw",
@@ -117,23 +138,18 @@ func (g *Generator) Generate() (err error) {
 		return fmt.Errorf("generating protobuf code: %w", err)
 	}
 
-	tmpls, err := template.New("templates").Funcs(utils).ParseFS(templates, "*.gotmpl")
-	if err != nil {
-		return fmt.Errorf("instantiate template: %w", err)
-	}
-
-	err = generate("externs", tmpls, "externs.gotmpl", g.engine, filepath.Join(generatedFolder, "externs.rs"))
+	err = generate("externs", tplExterns, g.engine, filepath.Join(generatedFolder, "externs.rs"))
 	if err != nil {
 		return fmt.Errorf("generating externs.rs: %w", err)
 	}
 	fmt.Println("Externs generated")
 
-	err = generate("Substream", tmpls, "substreamsGen.gotmpl", g.engine, filepath.Join(generatedFolder, "substreams.rs"))
+	err = generate("Substream", tplSubstreams, g.engine, filepath.Join(generatedFolder, "substreams.rs"))
 	if err != nil {
 		return fmt.Errorf("generating substreams.rs: %w", err)
 	}
 
-	err = generate("mod", tmpls, "go.mod.gotmpl", g.engine, filepath.Join(generatedFolder, "mod.rs"))
+	err = generate("mod", tplMod, g.engine, filepath.Join(generatedFolder, "mod.rs"))
 	if err != nil {
 		return fmt.Errorf("generating mod.rs: %w", err)
 	}
@@ -141,7 +157,7 @@ func (g *Generator) Generate() (err error) {
 
 	pbModFilePath := filepath.Join(filepath.Join(pbFolder, "mod.rs"))
 	if _, err := os.Stat(pbModFilePath); errors.Is(err, os.ErrNotExist) {
-		err = generate("pb/mod", tmpls, "mod.gotmpl", protoPackages(g.protoDefinitions), pbModFilePath)
+		err = generate("pb/mod", tplPbMod, protoPackages(g.protoDefinitions), pbModFilePath)
 		if err != nil {
 			return fmt.Errorf("generating pb/mod.rs: %w", err)
 		}
@@ -151,7 +167,7 @@ func (g *Generator) Generate() (err error) {
 	libFilePath := filepath.Join(g.srcPath, "lib.rs")
 	if _, err := os.Stat(libFilePath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("Generating src/lib.rs\n")
-		err = generate("lib", tmpls, "libGen.gotmpl", g.engine, filepath.Join(g.srcPath, "lib.rs"))
+		err = generate("lib", tplLibRs, g.engine, filepath.Join(g.srcPath, "lib.rs"))
 		if err != nil {
 			return fmt.Errorf("generating lib.rs: %w", err)
 		}
@@ -187,7 +203,7 @@ func WithTestWriter(w io.Writer) GenerationOptions {
 	}
 }
 
-func generate(name string, tmpl *template.Template, filename string, data any, outputFile string, options ...GenerationOptions) (err error) {
+func generate(name, tpl string, data any, outputFile string, options ...GenerationOptions) (err error) {
 	var w io.Writer
 
 	opts := &generateOptions{}
@@ -204,7 +220,15 @@ func generate(name string, tmpl *template.Template, filename string, data any, o
 		}
 	}
 
-	err = tmpl.ExecuteTemplate(w, filename, data)
+	tmpl, err := template.New(name).Funcs(utils).Parse(tpl)
+	if err != nil {
+		return fmt.Errorf("parsing %q template: %w", name, err)
+	}
+
+	err = tmpl.Execute(
+		w,
+		data,
+	)
 	if err != nil {
 		return fmt.Errorf("executing %q template: %w", name, err)
 	}
@@ -224,10 +248,6 @@ type Engine struct {
 
 func (e *Engine) GetEngine() *Engine {
 	return e
-}
-
-func (e *Engine) ProjectName() string {
-	return "test"
 }
 
 func (e *Engine) MustModule(moduleName string) *manifest.Module {
@@ -348,7 +368,7 @@ func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input
 	}
 
 	if p == manifest.UpdatePolicyAppend {
-		return "substreams::store::StoreGetRaw"
+		return fmt.Sprintf("substreams::store::StoreGetRaw")
 	}
 
 	t = maybeTranslateType(t)

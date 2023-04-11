@@ -3,50 +3,33 @@ syntax = "proto3";
 package contract.v1;
 
 message Events {
-    repeated Address addresses = 1;
-    repeated ArrayOfAddress array_of_addresses = 2;
-    repeated Bytes bytes = 3;
-    repeated FixedBytes fixed_bytes = 4;
-    repeated Integer integers = 5;
-    repeated SignedFixedPoint signed_fixed_points = 6;
-    repeated Transfer transfers = 7;
-    repeated UnsignedInteger unsigned_integers = 8;
+    repeated Approval approvals = 1;
+    repeated ApprovalForAll approval_for_alls = 2;
+    repeated OwnershipTransferred ownership_transferreds = 3;
+    repeated Transfer transfers = 4;
 }
 
-message Address {
+message Approval {
     string trx_hash = 1;
     uint32 log_index = 2;
-    bytes first = 3;
+    bytes owner = 3;
+    bytes approved = 4;
+    string token_id = 5;
 }
 
-message ArrayOfAddress {
+message ApprovalForAll {
     string trx_hash = 1;
     uint32 log_index = 2;
-    repeated bytes first = 3;
+    bytes owner = 3;
+    bytes operator = 4;
+    bool approved = 5;
 }
 
-message Bytes {
+message OwnershipTransferred {
     string trx_hash = 1;
     uint32 log_index = 2;
-    bytes first = 3;
-}
-
-message FixedBytes {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    bytes first = 3;
-}
-
-message Integer {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    int64 first = 3;
-}
-
-message SignedFixedPoint {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    string first = 3;
+    bytes previous_owner = 3;
+    bytes new_owner = 4;
 }
 
 message Transfer {
@@ -55,10 +38,4 @@ message Transfer {
     bytes from = 3;
     bytes to = 4;
     string token_id = 5;
-}
-
-message UnsignedInteger {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    string first = 3;
 }

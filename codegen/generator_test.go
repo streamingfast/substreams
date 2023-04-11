@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"text/template"
 
 	"github.com/stretchr/testify/require"
 )
@@ -64,8 +63,8 @@ func TestGenerate_GenerateMod(t *testing.T) {
 		protoPackages[p] = strings.ReplaceAll(p, ".", "_")
 	}
 
-	tplMod, err := template.New("template").Funcs(utils).ParseFS(templates, "mod.gotmpl")
-	err = generate("", tplMod, "", protoPackages, "", WithTestWriter(w))
+	err = generate("", tplMod, protoPackages, "", WithTestWriter(w))
+
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
@@ -94,10 +93,7 @@ func TestGenerate_GeneratePbMod(t *testing.T) {
 		require.NoError(t, err)
 		close(done)
 	}()
-
-	tplPbMod, err := template.New("template").Funcs(utils).ParseFS(templates, "pb_mod.gotmpl")
-	err = generate("", tplPbMod, "", protoPackages(g.protoDefinitions), "use std.out", WithTestWriter(w))
-
+	err = generate("", tplPbMod, protoPackages(g.protoDefinitions), "use std.out", WithTestWriter(w))
 	require.NoError(t, err)
 	err = w.Close()
 	require.NoError(t, err)
@@ -127,8 +123,7 @@ func TestGenerate_GenerateExterns(t *testing.T) {
 		close(done)
 	}()
 
-	tplExterns, err := template.New("template").Funcs(utils).ParseFS(templates, "externs.gotmpl")
-	err = generate("GenerateExterns", tplExterns, "", g.engine, "use std.out", WithTestWriter(w))
+	err = generate("GenerateExterns", tplExterns, g.engine, "use std.out", WithTestWriter(w))
 
 	require.NoError(t, err)
 	err = w.Close()
@@ -159,8 +154,7 @@ func TestGenerate_GenerateLib(t *testing.T) {
 		close(done)
 	}()
 
-	tplLibRs, err := template.New("template").Funcs(utils).ParseFS(templates, "libGen.gotmpl")
-	err = generate("Lib", tplLibRs, "", g.engine, "use std.out", WithTestWriter(w))
+	err = generate("Lib", tplLibRs, g.engine, "use std.out", WithTestWriter(w))
 
 	require.NoError(t, err)
 	err = w.Close()
@@ -191,8 +185,7 @@ func TestGenerate_GenerateSubstreams(t *testing.T) {
 		close(done)
 	}()
 
-	tplSubstreams, err := template.New("template").Funcs(utils).ParseFS(templates, "substreamsGen.gotmpl")
-	err = generate("Substreams", tplSubstreams, "", g.engine, "use std.out", WithTestWriter(w))
+	err = generate("Substreams", tplSubstreams, g.engine, "use std.out", WithTestWriter(w))
 
 	require.NoError(t, err)
 	err = w.Close()

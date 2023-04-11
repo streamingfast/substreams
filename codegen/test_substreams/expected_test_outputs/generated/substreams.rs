@@ -12,7 +12,7 @@ pub trait SubstreamsTrait {
 
     fn map_block_i64(
         block: substreams_ethereum::pb::eth::v2::Block,
-    ) -> Result<i64, Error>;
+    ) -> Result<pb::my_types_v1::Number, Error>;
 
     fn store_test(
         block: substreams_ethereum::pb::eth::v2::Block,
@@ -35,7 +35,7 @@ pub trait SubstreamsTrait {
         map_block: pb::my_types_v1::Tests,
         store_test: substreams::store::StoreGetProto<pb::my_types_v1::Test>,
         store_test_deltas: substreams::store::Deltas<substreams::store::DeltaProto<pb::my_types_v1::Test>>,
-        map_block_i64: i64,
+        map_block_i64: pb::my_types_v1::Number,
         store_bigint: substreams::store::StoreGetBigInt,
         store_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt>,
         store_append_string: substreams::store::StoreGetRaw,

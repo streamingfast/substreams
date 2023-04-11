@@ -19,9 +19,9 @@ import (
 //go:embed ethereum/proto
 //go:embed ethereum/src
 //go:embed ethereum/build.rs
-//go:embed ethereum/proto/contract.proto.gotmpl
 //go:embed ethereum/Cargo.lock
 //go:embed ethereum/Cargo.toml.gotmpl
+//go:embed ethereum/Makefile
 //go:embed ethereum/substreams.yaml.gotmpl
 //go:embed ethereum/rust-toolchain.toml
 var ethereumProject embed.FS
@@ -64,6 +64,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"build.rs",
 		"Cargo.lock",
 		"Cargo.toml.gotmpl",
+		"Makefile",
 		"substreams.yaml.gotmpl",
 		"rust-toolchain.toml",
 	} {

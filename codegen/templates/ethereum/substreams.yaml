@@ -21,4 +21,4 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:contract.v1.Contract
+      type: proto:contract.v1.Events

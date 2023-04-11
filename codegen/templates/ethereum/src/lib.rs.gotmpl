@@ -14,7 +14,7 @@ const TRACKED_CONTRACT: [u8; 20] = hex!("{{ .address }}");
 substreams_ethereum::init!();
 
 #[substreams::handlers::map]
-fn map_all_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
+fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
     Ok(contract::Events {
         {{- range $event := .events }}
         {{- $rust := $event.Rust }}

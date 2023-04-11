@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -49,24 +50,26 @@ func init() {
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
-	relativeSrcDir := "."
+	relativeWorkingDir := "."
 	if len(args) == 1 {
-		relativeSrcDir = args[0]
+		relativeWorkingDir = args[0]
 	}
 
 	if devInitSourceDirectory != "" {
-		relativeSrcDir = devInitSourceDirectory
+		relativeWorkingDir = devInitSourceDirectory
 	}
 
-	srcDir, err := filepath.Abs(relativeSrcDir)
+	absoluteWorkingDir, err := filepath.Abs(relativeWorkingDir)
 	if err != nil {
-		return fmt.Errorf("getting absolute path of %q: %w", relativeSrcDir, err)
+		return fmt.Errorf("getting absolute path of %q: %w", relativeWorkingDir, err)
 	}
 
-	projectName, moduleName, err := promptProjectName(srcDir)
+	projectName, moduleName, err := promptProjectName(absoluteWorkingDir)
 	if err != nil {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
+
+	absoluteProjectDir := path.Join(absoluteWorkingDir, projectName)
 
 	protocol, err := promptProtocol()
 	if err != nil {
@@ -109,28 +112,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("new ethereum project: %w", err)
 		}
 
-		files, err := project.Render()
-		if err != nil {
-			return fmt.Errorf("render project: %w", err)
+		fmt.Println("Writing project files")
+		if err := renderProjectFilesIn(project, absoluteProjectDir); err != nil {
+			return fmt.Errorf("render ethereum project: %w", err)
 		}
-
-		for relativeFile, content := range files {
-			file := path.Join(srcDir, strings.ReplaceAll(relativeFile, "/", string(os.PathSeparator)))
-
-			directory := path.Dir(file)
-			if err := os.MkdirAll(directory, os.ModePerm); err != nil {
-				return fmt.Errorf("create directory %q: %w", directory, err)
-			}
-
-			if err := os.WriteFile(file, content, os.ModePerm); err != nil {
-				return fmt.Errorf("write file: %w", err)
-			}
-		}
-
-		// err = codegen.NewProjectGenerator(srcDir, projectName, contract, string(abiContent), events).GenerateProject()
-		// if err != nil {
-		// 	return fmt.Errorf("generating code: %w", err)
-		// }
 
 	case codegen.ProtocolOther:
 		fmt.Println()
@@ -142,7 +127,47 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return errInitUnsupportedChain
 	}
 
-	fmt.Printf("Project %q initialized at %q\n", projectName, srcDir)
+	fmt.Println("Generating Protobug Rust code")
+	if err := protogenSubstreams(absoluteProjectDir); err != nil {
+		return fmt.Errorf("protobug generation: %w", err)
+	}
+
+	fmt.Printf("Project %q initialized at %q\n", projectName, absoluteWorkingDir)
+
+	return nil
+}
+
+func protogenSubstreams(absoluteProjectDir string) error {
+	cmd := exec.Command("substreams", "protogen", `--exclude-paths="sf/substreams,google`)
+	cmd.Dir = absoluteProjectDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(string(output))
+		return fmt.Errorf("running %q failed: %w", cmd, err)
+	}
+
+	return nil
+}
+
+func renderProjectFilesIn(project templates.Project, absoluteProjectDir string) error {
+	files, err := project.Render()
+	if err != nil {
+		return fmt.Errorf("render project: %w", err)
+	}
+
+	for relativeFile, content := range files {
+		file := path.Join(absoluteProjectDir, strings.ReplaceAll(relativeFile, "/", string(os.PathSeparator)))
+
+		directory := path.Dir(file)
+		if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+			return fmt.Errorf("create directory %q: %w", directory, err)
+		}
+
+		if err := os.WriteFile(file, content, os.ModePerm); err != nil {
+			return fmt.Errorf("write file: %w", err)
+		}
+	}
 
 	return nil
 }

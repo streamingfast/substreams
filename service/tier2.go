@@ -183,7 +183,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions, runtimeConfig.MaxWasmFuel)
 
-	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
+	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}

@@ -10,8 +10,6 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/service/config"
@@ -39,8 +37,6 @@ func BuildParallelProcessor(
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
-	_ = pbssinternal.ProcessRangeRequest{}
-	_ = pbsubstreamsrpc.Request{}
 
 	if reqDetails.ShouldStreamCachedOutputs() {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map

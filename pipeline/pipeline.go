@@ -132,7 +132,7 @@ func (p *Pipeline) InitWASM(ctx context.Context) (err error) {
 	//  and cache the latest if all block boundaries
 	//  are still clear.
 
-	return p.buildWASM(ctx, p.outputGraph.AllModules())
+	return p.buildWASM(ctx, p.outputGraph.UsedModules())
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {

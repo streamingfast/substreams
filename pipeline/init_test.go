@@ -59,7 +59,7 @@ func NewExecOutputTesting(t *testing.T, block *bstream.Block, clock *pbsubstream
 		clock: clock,
 		Values: map[string][]byte{
 			"sf.substreams.v1.test.Block": blkBytes,
-			"sf.substreams.rpc.v2.Clock":  clockBytes,
+			"sf.substreams.v1.Clock":      clockBytes,
 		},
 	}
 }

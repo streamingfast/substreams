@@ -200,7 +200,7 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	if err := outputmodules.ValidateRequest(request, s.blockType, true); err != nil {
+	if err := outputmodules.ValidateRequest(request, s.blockType); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
@@ -228,7 +228,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 
 	wasmRuntime := wasm.NewRuntime(s.wasmExtensions, runtimeConfig.MaxWasmFuel)
 
-	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.AllModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
+	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -239,11 +239,6 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	}
 	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, false)
 
-	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
-	//  * in direct mode, this would mean we start writing files after the handoff,
-	//    but it's not so useful to write those files, as they're partials
-	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
-	//  *
 	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, nil, s.blockType)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)

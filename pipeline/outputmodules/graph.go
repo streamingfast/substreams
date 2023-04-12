@@ -21,7 +21,7 @@ type Graph struct {
 
 func (g *Graph) OutputModule() *pbsubstreams.Module   { return g.outputModule }
 func (g *Graph) Stores() []*pbsubstreams.Module       { return g.stores }
-func (g *Graph) AllModules() []*pbsubstreams.Module   { return g.usedModules }
+func (g *Graph) UsedModules() []*pbsubstreams.Module  { return g.usedModules }
 func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 

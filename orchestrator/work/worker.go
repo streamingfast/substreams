@@ -160,10 +160,11 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				}
 
 			case *pbssinternal.ProcessRangeResponse_ProcessedBytes:
-				//		bm := tracking.GetBytesMeter(ctx)
-				//		bm.AddBytesWritten(int(f.TotalBytesWritten))
-				//		bm.AddBytesRead(int(f.TotalBytesRead))
-				// respFunc(...)
+				// commented out while these message are causing issues
+				//bm := tracking.GetBytesMeter(ctx)
+				//bm.AddBytesWritten(int(r.ProcessedBytes.BytesWrittenDelta))
+				//bm.AddBytesRead(int(r.ProcessedBytes.BytesReadDelta))
+				//respFunc(toRPCProcessedBytes(resp.ModuleName, bm.BytesReadDelta(), bm.BytesWrittenDelta(), bm.BytesRead(), bm.BytesWritten(), 0))
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				forwardResponse := toRPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
@@ -197,7 +198,7 @@ func toRPCFailedProgressResponse(moduleName, reason string, logs []string, logsT
 		Message: &pbsubstreamsrpc.Response_Progress{
 			Progress: &pbsubstreamsrpc.ModulesProgress{
 				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					&pbsubstreamsrpc.ModuleProgress{
+					{
 						Name: moduleName,
 						Type: &pbsubstreamsrpc.ModuleProgress_Failed_{
 							Failed: &pbsubstreamsrpc.ModuleProgress_Failed{
@@ -213,12 +214,42 @@ func toRPCFailedProgressResponse(moduleName, reason string, logs []string, logsT
 	}
 }
 
+func toRPCProcessedBytes(
+	moduleName string,
+	bytesReadDelta uint64,
+	bytesWrittenDelta uint64,
+	totalBytesRead uint64,
+	totalBytesWritten uint64,
+	nanoSeconds uint64,
+) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Progress{
+			Progress: &pbsubstreamsrpc.ModulesProgress{
+				Modules: []*pbsubstreamsrpc.ModuleProgress{
+					{
+						Name: moduleName,
+						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes_{
+							ProcessedBytes: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes{
+								BytesReadDelta:    bytesReadDelta,
+								BytesWrittenDelta: bytesWrittenDelta,
+								TotalBytesRead:    totalBytesRead,
+								TotalBytesWritten: totalBytesWritten,
+								NanoSecondsDelta:  nanoSeconds,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func toRPCRangeProgressResponse(moduleName string, start, end uint64) *pbsubstreamsrpc.Response {
 	return &pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_Progress{
 			Progress: &pbsubstreamsrpc.ModulesProgress{
 				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					&pbsubstreamsrpc.ModuleProgress{
+					{
 						Name: moduleName,
 						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
 							ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{

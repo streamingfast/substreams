@@ -11,24 +11,23 @@ import (
 
 func Test_ValidateRequest(t *testing.T) {
 	tests := []struct {
-		name       string
-		request    *pbsubstreamsrpc.Request
-		subrequest bool
-		blockType  string
-		expect     error
+		name      string
+		request   *pbsubstreamsrpc.Request
+		blockType string
+		expect    error
 	}{
-		{"negative start block num", req(-1), false, "sf.substreams.v1.test.Block", fmt.Errorf("negative start block -1 is not accepted")},
-		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, false, "sf.substreams.v1.test.Block", fmt.Errorf("no modules found in request")},
-		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), false, "sf.substreams.v1.test.Block", nil},
-		{"single store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store")), false, "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
-		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), true, "sf.substreams.v1.test.Block", nil},
-		{"single store output module is  accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), true, "sf.substreams.v1.test.Block", nil},
+		{"negative start block num", req(-1), "sf.substreams.v1.test.Block", fmt.Errorf("negative start block -1 is not accepted")},
+		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, "sf.substreams.v1.test.Block", fmt.Errorf("no modules found in request")},
+		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), "sf.substreams.v1.test.Block", nil},
+		{"single store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store")), "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
+		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), "sf.substreams.v1.test.Block", nil},
+		{"single store output module is  accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), "sf.substreams.v1.test.Block", nil},
 		{name: "debug initial snapshots not accepted in production mode", request: req(1, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), expect: fmt.Errorf("debug initial snapshots not accepted in production mode")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateRequest(test.request, test.blockType, test.subrequest)
+			err := ValidateRequest(test.request, test.blockType)
 			if test.expect != nil {
 				require.Error(t, err)
 			} else {

@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package sf.substreams.v2.test;
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v2/test/;pbsubstreamstest";
+package sf.substreams.v1.test;
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1/test/;pbsubstreamstest";
 
 message Block {
   string id = 1;

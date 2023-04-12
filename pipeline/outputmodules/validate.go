@@ -10,7 +10,7 @@ import (
 )
 
 // ValidateRequest is run by the server code.
-func ValidateRequest(request *pbsubstreamsrpc.Request, blockType string, isSubRequest bool) error {
+func ValidateRequest(request *pbsubstreamsrpc.Request, blockType string) error {
 	if request.ProductionMode {
 		if request.DebugInitialStoreSnapshotForModules != nil && len(request.DebugInitialStoreSnapshotForModules) > 0 {
 			return fmt.Errorf("debug initial store snapshot feature is not supported in production mode")

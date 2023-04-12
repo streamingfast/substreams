@@ -3,7 +3,7 @@ package progress
 import "github.com/charmbracelet/bubbles/key"
 
 // KeyMap defines keybindings. It satisfies to the help.KeyMap interface, which
-// is used to render the menu menu.
+// is used to render the menu.
 type KeyMap struct {
 	// Keybindings used when browsing the list.
 	CursorUp   key.Binding
@@ -17,6 +17,8 @@ type KeyMap struct {
 
 	// The quit keybinding. This won't be caught when filtering.
 	Quit key.Binding
+
+	Refresh key.Binding
 
 	// The quit-no-matter-what keybinding. This will be caught when filtering.
 	ForceQuit key.Binding
@@ -58,6 +60,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("q", "esc"),
 			key.WithHelp("q", "quit"),
 		),
+
+		Refresh: key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "refresh"),
+		),
+
 		ForceQuit: key.NewBinding(key.WithKeys("ctrl+c")),
 	}
 }
@@ -66,6 +74,7 @@ func (p *Progress) ShortHelp() []key.Binding {
 	return []key.Binding{
 		p.KeyMap.CursorUp,
 		p.KeyMap.CursorDown,
+		p.KeyMap.Refresh,
 	}
 }
 
@@ -81,6 +90,7 @@ func (p *Progress) FullHelp() [][]key.Binding {
 		{
 			k.Quit,
 			k.ForceQuit,
+			k.Refresh,
 		},
 	}
 }

@@ -6,19 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/streamingfast/substreams/tui2/pages/request"
-	"github.com/streamingfast/substreams/tui2/replaylog"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/substreams/tui2/pages/request"
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
-	streamui "github.com/streamingfast/substreams/tui2/stream"
 )
 
 func init() {
@@ -65,7 +62,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) || strings.Contains(args[0], ".") {
 			return fmt.Errorf("parameter entered likely a manifest file, don't forget to include a '<module_name>' in your command")
 		}
-
 		// At this point, we assume the user invoked `substreams run <module_name>` so we `ResolveManifestFile` using the empty string since no argument has been passed.
 		manifestPath, err = tools.ResolveManifestFile("")
 		if err != nil {
@@ -73,38 +69,14 @@ func runGui(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	manifestReader := manifest.NewReader(manifestPath)
-	pkg, err := manifestReader.Read()
-	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	if err := applyParams(cmd, pkg); err != nil {
-		return err
-	}
-
 	productionMode := mustGetBool(cmd, "production-mode")
 	debugModulesOutput := mustGetStringSlice(cmd, "debug-modules-output")
 	if debugModulesOutput != nil && productionMode {
 		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
 	}
-
 	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("creating module graph: %w", err)
-	}
-
 	outputModule := args[0]
-	startBlock := mustGetInt64(cmd, "start-block")
-	if startBlock == -1 {
-		sb, err := graph.ModuleInitialBlock(outputModule)
-		if err != nil {
-			return fmt.Errorf("getting module start block: %w", err)
-		}
-		startBlock = int64(sb)
-	}
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
@@ -112,38 +84,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
-
-	ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
-	if err != nil {
-		return fmt.Errorf("substreams client setup: %w", err)
-	}
-	defer connClose()
-
-	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block")
-	if err != nil {
-		return fmt.Errorf("stop block: %w", err)
-	}
-
-	req := &pbsubstreamsrpc.Request{
-		StartBlockNum:                       startBlock,
-		StartCursor:                         mustGetString(cmd, "cursor"),
-		StopBlockNum:                        stopBlock,
-		FinalBlocksOnly:                     true,
-		Modules:                             pkg.Modules,
-		OutputModule:                        outputModule,
-		ProductionMode:                      productionMode,
-		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
-	}
-
-	if err := req.Validate(); err != nil {
-		return fmt.Errorf("validate request: %w", err)
-	}
-	toPrint := debugModulesOutput
-	if toPrint == nil {
-		toPrint = []string{outputModule}
-	}
-
-	stream := streamui.New(req, ssClient, callOpts)
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -157,40 +97,51 @@ func runGui(cmd *cobra.Command, args []string) error {
 		homeDir = filepath.Join(homeDir, ".config", "substreams")
 	}
 
-	replayLogFilePath := filepath.Join(homeDir, "replay.log")
-	replayLog := replaylog.New(replaylog.WithPath(replayLogFilePath))
-	if mustGetBool(cmd, "replay") {
-		stream.ReplayBundle, err = replayLog.ReadReplay()
-		if err != nil {
-			return err
-		}
-	} else {
-		if err := replayLog.OpenForWriting(); err != nil {
-			return err
-		}
-		defer replayLog.Close()
-	}
-
-	debugLogPath := filepath.Join(homeDir, "debug.log")
-	tea.LogToFile(debugLogPath, "gui:")
-	fmt.Println("Logging to", debugLogPath)
-
-	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
-	if err != nil {
-		return fmt.Errorf("building message descriptors: %w", err)
-	}
-
-	requestSummary := &request.Summary{
-		Manifest:        manifestPath,
-		Endpoint:        substreamsClientConfig.Endpoint(),
-		ProductionMode:  productionMode,
-		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-		Docs:            pkg.PackageMeta,
-	}
+	cursor := mustGetString(cmd, "cursor")
 
 	fmt.Println("Launching Substreams GUI...")
 
-	ui := tui2.New(stream, msgDescs, replayLog, requestSummary, pkg.Modules)
+	refreshContext := &request.OriginalSubstreamContext{
+		ManifestPath:                manifestPath,
+		ProdMode:                    productionMode,
+		DebugModulesOutput:          debugModulesOutput,
+		DebugModulesInitialSnapshot: debugModulesInitialSnapshot,
+		OutputModule:                outputModule,
+		SubstreamsClientConfig:      substreamsClientConfig,
+		HomeDir:                     homeDir,
+		Vcr:                         mustGetBool(cmd, "replay"),
+		Cursor:                      cursor,
+	}
+
+	startBlock := mustGetInt64(cmd, "start-block")
+	refreshContext.StartBlock = startBlock
+
+	graph, _, err := tui2.GetGraph(manifestPath)
+	if err != nil {
+		return fmt.Errorf("graph setup: %w", err)
+	}
+	
+	if startBlock == -1 {
+		sb, err := graph.ModuleInitialBlock(refreshContext.OutputModule)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return fmt.Errorf("getting module start block: %w", err)
+		}
+		refreshContext.StartBlock = int64(sb)
+	}
+
+	stopBlock, err := readStopBlockFlag(cmd, refreshContext.StartBlock, "stop-block")
+	if err != nil {
+		return fmt.Errorf("stop block: %w", err)
+	}
+	refreshContext.StopBlock = stopBlock
+
+	stream, msgDescs, replayLog, requestSummary, modules, refreshCtx, graph, err := tui2.StartSubstream(refreshContext)
+	if err != nil {
+		return fmt.Errorf("starting substream from inputs: %w", err)
+	}
+
+	ui := tui2.New(stream, msgDescs, replayLog, requestSummary, modules, *refreshCtx)
 	prog := tea.NewProgram(ui, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)

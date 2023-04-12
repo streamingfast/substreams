@@ -16,6 +16,10 @@ func (r *Request) ShortHelp() []key.Binding {
 			key.WithKeys("q", "esc"),
 			key.WithHelp("q", "quit"),
 		),
+		key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "refresh"),
+		),
 	}
 }
 func (r *Request) FullHelp() [][]key.Binding {

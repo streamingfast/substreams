@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/client"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -13,11 +14,27 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
+type RefreshSubstream *OriginalSubstreamContext
+
+type OriginalSubstreamContext struct {
+	ManifestPath                string
+	ProdMode                    bool
+	DebugModulesOutput          []string
+	DebugModulesInitialSnapshot []string
+	StartBlock                  int64
+	StopBlock                   uint64
+	OutputModule                string
+	SubstreamsClientConfig      *client.SubstreamsClientConfig
+	HomeDir                     string
+	Vcr                         bool
+	Cursor                      string
+}
+
 type Request struct {
 	common.Common
 
-	requestSummary     *Summary
-	modules            *pbsubstreams.Modules
+	RequestSummary     *Summary
+	Modules            *pbsubstreams.Modules
 	modulesView        viewport.Model
 	modulesViewContent string
 }
@@ -25,8 +42,8 @@ type Request struct {
 func New(c common.Common, summary *Summary, modules *pbsubstreams.Modules) *Request {
 	return &Request{
 		Common:         c,
-		requestSummary: summary,
-		modules:        modules,
+		RequestSummary: summary,
+		Modules:        modules,
 		modulesView:    viewport.New(24, 80),
 	}
 }
@@ -45,6 +62,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		r.modulesView, cmd = r.modulesView.Update(msg)
 		cmds = append(cmds, cmd)
+	case RefreshSubstream:
+		cmds = append(cmds, tea.Quit)
 	}
 
 	return r, tea.Batch(cmds...)
@@ -61,7 +80,7 @@ func (r *Request) View() string {
 }
 
 func (r *Request) renderRequestSummary() string {
-	summary := r.requestSummary
+	summary := r.RequestSummary
 	labels := []string{
 		"Package: ",
 		"Endpoint: ",
@@ -104,13 +123,13 @@ func (r *Request) setModulesViewContent() {
 func (r *Request) getViewportContent() (string, error) {
 	output := ""
 
-	for i, module := range r.modules.Modules {
+	for i, module := range r.Modules.Modules {
 
 		var moduleDoc string
 
 		var err error
-		if i <= len(r.requestSummary.Docs)-1 {
-			moduleDoc, err = r.getViewPortDropdown(r.requestSummary.Docs[i], module)
+		if i <= len(r.RequestSummary.Docs)-1 {
+			moduleDoc, err = r.getViewPortDropdown(r.RequestSummary.Docs[i], module)
 			if err != nil {
 				return "", fmt.Errorf("getting module doc: %w", err)
 			}
@@ -125,7 +144,7 @@ func (r *Request) getViewportContent() (string, error) {
 		output += fmt.Sprintln("	Outputs: ")
 		output += fmt.Sprintf("		%s\n", module.Output)
 		output += moduleDoc
-		if i <= len(r.modules.Modules)-1 {
+		if i <= len(r.Modules.Modules)-1 {
 			output += "\n\n"
 		}
 	}

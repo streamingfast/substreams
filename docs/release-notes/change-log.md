@@ -6,15 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## 1.1.0 (Unreleased)
 
-### Highlights -- BREAKING CHANGES
+This release changes how chain reorgs are signaled to the user to support more cases.
 
-* Services for tier1 (request, response...) now exposed as `sf.substreams.rpc.v2.Stream/Blocks` and removed from `sf.substreams.v1`
-  * Single module output from mapper in response. 
-  * In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs` 
-  * The concept of "step" under blockData has been removed: reorgs are now signalled with a `BlockUndoSignal` message (without the original data)
-* Services for tier2 (subrequests) now exposed as `sf.substreams.internal.v2.Substreams/ProcessRange` (not to be used externally)
-* The package and modules definitions stay under `sf.substreams.v1`
-* If a cursor cannot be resolved to the closest canonical parent, it will fall back to the closest final block.
+### Highlights - Getting rid of "UNDO payload" during reorg
+
+Previously, the GRPC endpoint `sf.substreams.v1.Stream/Blocks` would
+send a payload with the corresponding "step", NEW or UNDO.
+
+Unfortunately, this led to some cases where the payload could not be
+deterministically generated for old blocks that had been forked out, resulting
+in a stalling request, a failure, or in some worst cases, incomplete data.
+
+The new design, under `sf.substreams.rpc.v2.Stream/Blocks`, takes care of these
+situations by removing the 'step' component and using these two messages types:
+* `sf.substreams.rpc.v2.BlockScopedData` when chain progresses, with the payload
+* `sf.substreams.rpc.v2.BlockUndoSignal` during a reorg, with the last valid blocknum+hash
+
+The client now has the burden of keeping the necessary means of performing the
+undo actions (ex: a map of previous values for each block). The BlockScopedData
+message now includes the `final_block_height` to let you know when this "undo
+data" can be discarded.
+
+With these changes, a substreams server can even handle a cursor for a block
+that it has never seen, provided that it is a valid cursor, by signaling the
+client to revert up to the last known final block, trading efficiency for
+resilience in these extreme cases.
+
+### Highlights - Separating Tier1 vs Tier2 GRPC protocol (for substreams server operators)
+
+Now that the `Blocks` request has been moved from `sf.substreams.v1` to
+`sf.substreams.rpc.v2`, the communication between a substreams instance acting
+as tier1 and a tier2 instance that performs the background processing has also
+been reworked, and put under `sf.substreams.internal.v2.Stream/ProcessRange`.
+It has also been stripped of parameters that were not used for that level of
+communication (ex: `cursor`, `logs`...)
+
+### Other changes in protobuf messages
+
+* Deprecating the "Request" and "Response" messages, with some others, from `sf.substreams.v1`, now that they moved to `sf.substreams.rpc.v2`
+* The new request excludes fields and usages that were already deprecated, like using multiple `module_outputs`
+* The response now contains a single module output 
+* In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs` 
 
 ## Unreleased
 

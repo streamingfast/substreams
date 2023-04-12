@@ -212,6 +212,31 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, erro
 	return res, nil
 }
 
+func (g *ModuleGraph) ChildrenOf(moduleName string) ([]*pbsubstreams.Module, error) {
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
+
+	var res []*pbsubstreams.Module
+	resSet := map[string]*pbsubstreams.Module{}
+	for _, module := range g.modules {
+		_, distances := graph.ShortestPaths(g, g.moduleIndex[module.Name])
+		for i, d := range distances {
+			if d == 1 {
+				if g.indexIndex[i].Name == moduleName {
+					resSet[module.Name] = module
+				}
+			}
+		}
+	}
+
+	for _, module := range resSet {
+		res = append(res, module)
+	}
+
+	return res, nil
+}
+
 func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*pbsubstreams.Module, error) {
 	alreadyAdded := map[string]bool{}
 	topologicalIndex := map[string]int{}

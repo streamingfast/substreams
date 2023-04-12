@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -28,6 +29,25 @@ func TestModuleGraph_ParentsOf(t *testing.T) {
 	sort.Strings(res)
 
 	assert.Equal(t, []string{"D", "E"}, res)
+}
+
+func TestModuleGraph_ChildrenOf(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	fmt.Println(g.String())
+
+	children, err := g.ChildrenOf("C")
+	assert.NoError(t, err)
+
+	var res []string
+	for _, c := range children {
+		res = append(res, c.Name)
+	}
+
+	sort.Strings(res)
+
+	assert.Equal(t, []string{"E", "F"}, res)
 }
 
 func TestModuleGraph_AncestorsOf(t *testing.T) {

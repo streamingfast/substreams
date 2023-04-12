@@ -191,6 +191,24 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbsubstreams.Modul
 	return result, nil
 }
 
+func (g *ModuleGraph) Context(moduleName string) (parents []string, children []string) {
+	for _, m := range g.MustParentsOf(moduleName) {
+		parents = append(parents, m.Name)
+	}
+	for _, m := range g.MustChildrenOf(moduleName) {
+		children = append(children, m.Name)
+	}
+	return
+}
+
+func (g *ModuleGraph) MustParentsOf(moduleName string) []*pbsubstreams.Module {
+	res, err := g.ParentsOf(moduleName)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
 func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
@@ -210,6 +228,14 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, erro
 	})
 
 	return res, nil
+}
+
+func (g *ModuleGraph) MustChildrenOf(moduleName string) []*pbsubstreams.Module {
+	res, err := g.ChildrenOf(moduleName)
+	if err != nil {
+		panic(err)
+	}
+	return res
 }
 
 func (g *ModuleGraph) ChildrenOf(moduleName string) ([]*pbsubstreams.Module, error) {

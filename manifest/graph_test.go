@@ -50,6 +50,19 @@ func TestModuleGraph_ChildrenOf(t *testing.T) {
 	assert.Equal(t, []string{"E", "F"}, res)
 }
 
+func TestModuleGraph_Context(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	parents, children := g.Context("G")
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, len(parents))
+	assert.Equal(t, parents, []string{"D", "E"})
+	assert.Equal(t, 1, len(children))
+	assert.Equal(t, children, []string{"K"})
+}
+
 func TestModuleGraph_AncestorsOf(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)

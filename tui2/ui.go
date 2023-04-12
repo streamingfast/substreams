@@ -194,21 +194,19 @@ func StartSubstream(ctx *request.OriginalSubstreamContext) (*streamui.Stream, ma
 	}
 	//defer connClose()
 
-	req := &pbsubstreams.Request{
+	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       ctx.StartBlock,
 		StartCursor:                         ctx.Cursor,
 		StopBlockNum:                        ctx.StopBlock,
-		ForkSteps:                           []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		Modules:                             pkg.Modules,
 		OutputModule:                        ctx.OutputModule,
-		OutputModules:                       []string{ctx.OutputModule}, //added for backwards compatibility, will be removed
 		ProductionMode:                      ctx.ProdMode,
 		DebugInitialStoreSnapshotForModules: ctx.DebugModulesInitialSnapshot,
 	}
 
 	stream := streamui.New(req, ssClient, callOpts)
 
-	if err := pbsubstreams.ValidateRequest(req, false); err != nil {
+	if err := req.Validate(); err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("validate request: %w", err)
 	}
 

@@ -44,10 +44,10 @@ func BuildParallelProcessor(
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
-		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
+		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.ResolvedStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
 		execOutputReader = execout.NewLinearReader(
-			reqDetails.RequestStartBlockNum,
+			reqDetails.ResolvedStartBlockNum,
 			reqDetails.LinearHandoffBlockNum,
 			requestedModule,
 			requestedModuleCache,
@@ -80,7 +80,7 @@ func BuildParallelProcessor(
 		storeConfigs,
 		runtimeConfig.CacheSaveInterval,
 		execoutStorage,
-		reqDetails.RequestStartBlockNum,
+		reqDetails.ResolvedStartBlockNum,
 		reqDetails.LinearHandoffBlockNum,
 		storeLinearHandoffBlockNum,
 	)

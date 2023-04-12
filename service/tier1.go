@@ -222,7 +222,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 
-	if err := outputGraph.ValidateRequestStartBlock(requestDetails.RequestStartBlockNum); err != nil {
+	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
@@ -237,7 +237,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, false)
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, nil, s.blockType)
 	if err != nil {
@@ -272,9 +272,11 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		defer requestStats.Shutdown()
 	}
 	logger.Info("initializing pipeline",
-		zap.Uint64("request_start_block", requestDetails.RequestStartBlockNum),
+		zap.Int64("request_start_block", request.StartBlockNum),
+		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("request_start_cursor", request.StartCursor),
+		zap.String("resolved_cursor", requestDetails.ResolvedCursor),
 		zap.String("output_module", request.OutputModule),
 	)
 	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
@@ -289,9 +291,9 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	}
 
 	var streamErr error
-	cursor := request.StartCursor
+	cursor := requestDetails.ResolvedCursor
 	var cursorIsTarget bool
-	if requestDetails.RequestStartBlockNum != requestDetails.LinearHandoffBlockNum {
+	if requestDetails.ResolvedStartBlockNum != requestDetails.LinearHandoffBlockNum {
 		cursorIsTarget = true
 	}
 	logger.Info("creating firehose stream",
@@ -319,7 +321,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipeline.Option) {
 	reqDetails := reqctx.Details(ctx)
 	for _, pipeOpts := range s.pipelineOptions {
-		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.RequestStartBlockNum, reqDetails.StopBlockNum, tracing.GetTraceID(ctx).String())...)
+		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum, tracing.GetTraceID(ctx).String())...)
 	}
 	return
 }

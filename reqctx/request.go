@@ -1,6 +1,8 @@
 package reqctx
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import (
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+)
 
 type IsOutputModuleFunc func(name string) bool
 
@@ -10,7 +12,9 @@ type RequestDetails struct {
 	DebugInitialStoreSnapshotForModules []string
 	OutputModule                        string
 	// What the user requested, derived from either the Request.StartBlockNum or Request.Cursor
-	RequestStartBlockNum  uint64
+	ResolvedStartBlockNum uint64
+	ResolvedCursor        string
+
 	LinearHandoffBlockNum uint64
 	StopBlockNum          uint64
 
@@ -40,5 +44,5 @@ func (d *RequestDetails) ShouldReturnProgressMessages() bool {
 
 func (d *RequestDetails) ShouldStreamCachedOutputs() bool {
 	return d.ProductionMode &&
-		d.RequestStartBlockNum < d.LinearHandoffBlockNum
+		d.ResolvedStartBlockNum < d.LinearHandoffBlockNum
 }

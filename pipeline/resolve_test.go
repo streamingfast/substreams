@@ -23,6 +23,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		wantErr            bool
 		cursorResolverArgs []interface{}
 		wantUndoLastBlock  bstream.BlockRef
+		wantCursor         string
 	}{
 		{
 			name: "invalid cursor step",
@@ -54,6 +55,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			cursorResolverArgs: []interface{}{
 				"c1:2:10:10a:9:9a", bstream.NewBlockRef("9a", 9), bstream.NewBlockRef("9a", 9), nil,
 			},
+			wantCursor:        "c1:1:9:9a:9:9a",
 			wantUndoLastBlock: bstream.NewBlockRef("9a", 9),
 		},
 		{
@@ -69,6 +71,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			},
 			expectedBlockNum: 11,
 			wantErr:          false,
+			wantCursor:       "c1:1:10:10a:9:9a",
 		},
 		{
 			name: "step new on forked cursor",
@@ -87,6 +90,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 				"c1:1:10:10a:6:6a", bstream.NewBlockRef("8a", 8), bstream.NewBlockRef("11a", 11), nil,
 			},
 			wantUndoLastBlock: bstream.NewBlockRef("8a", 8),
+			wantCursor:        "c3:1:8:8a:11:11a:6:6a",
 		},
 		{
 			name: "step irreversible", // substreams should not receive these cursors now, kept for backwards compatibility
@@ -115,6 +119,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			},
 			expectedBlockNum: 11,
 			wantErr:          false,
+			wantCursor:       "c1:17:10:10a:9:9a",
 		},
 		{
 			name: "negative startblock",
@@ -136,7 +141,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, undoSignal, err := resolveStartBlockNum(
+			got, outCursor, undoSignal, err := resolveStartBlockNum(
 				context.Background(),
 				tt.req,
 				newTestCursorResolver(tt.cursorResolverArgs...).resolveCursor,
@@ -154,6 +159,12 @@ func Test_resolveStartBlockNum(t *testing.T) {
 				t.Errorf("resolveStartBlockNum() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if outCur, err := bstream.CursorFromOpaque(outCursor); err != nil {
+				assert.Empty(t, tt.wantCursor)
+			} else {
+				assert.Equal(t, tt.wantCursor, outCur.String())
+			}
+
 			if got != tt.expectedBlockNum {
 				t.Errorf("resolveStartBlockNum() got = %v, want %v", got, tt.expectedBlockNum)
 			}
@@ -228,7 +239,7 @@ func TestBuildRequestDetails(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, 10, int(req.RequestStartBlockNum))
+	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
 	assert.Equal(t, 10, int(req.LinearHandoffBlockNum))
 
 	req, _, err = BuildRequestDetails(
@@ -248,6 +259,6 @@ func TestBuildRequestDetails(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, 10, int(req.RequestStartBlockNum))
+	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
 	assert.Equal(t, 999, int(req.LinearHandoffBlockNum))
 }

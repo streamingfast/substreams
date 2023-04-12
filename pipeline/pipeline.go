@@ -144,7 +144,7 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 		if reqDetails.IsOutputModule(module.Name) {
 			p.processingModule = &processingModule{
 				name:            module.GetName(),
-				initialBlockNum: reqDetails.RequestStartBlockNum,
+				initialBlockNum: reqDetails.ResolvedStartBlockNum,
 			}
 		}
 	}
@@ -161,14 +161,14 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 
 	for name, storeConfig := range p.stores.configs {
 		if name == outputModuleName {
-			partialStore := storeConfig.NewPartialKV(reqDetails.RequestStartBlockNum, logger)
+			partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
 			storeMap.Set(partialStore)
 		} else {
 			fullStore := storeConfig.NewFullKV(logger)
 
 			//fixme: should we check if we don't have a boundary finished to not load ?
-			if fullStore.InitialBlock() != reqDetails.RequestStartBlockNum {
-				if err := fullStore.Load(ctx, reqDetails.RequestStartBlockNum); err != nil {
+			if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
+				if err := fullStore.Load(ctx, reqDetails.ResolvedStartBlockNum); err != nil {
 					return nil, fmt.Errorf("load full store: %w", err)
 				}
 			}
@@ -511,7 +511,7 @@ func newGate(ctx context.Context) *gate {
 	reqDetails := reqctx.Details(ctx)
 	return &gate{
 		disabled:             reqDetails.IsSubRequest,
-		requestStartBlockNum: reqDetails.RequestStartBlockNum,
+		requestStartBlockNum: reqDetails.ResolvedStartBlockNum,
 	}
 }
 

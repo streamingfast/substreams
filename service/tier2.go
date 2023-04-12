@@ -177,7 +177,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 
-	if err := outputGraph.ValidateRequestStartBlock(requestDetails.RequestStartBlockNum); err != nil {
+	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
@@ -192,7 +192,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.RequestStartBlockNum, request.StopBlockNum, true)
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 
 	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
 	//  * in direct mode, this would mean we start writing files after the handoff,
@@ -201,7 +201,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	//  *
 	outputModule := outputGraph.OutputModule()
 	execOutWriter := execout.NewWriter(
-		requestDetails.RequestStartBlockNum,
+		requestDetails.ResolvedStartBlockNum,
 		requestDetails.StopBlockNum,
 		outputModule.Name,
 		execOutputConfigs,
@@ -231,7 +231,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		defer requestStats.Shutdown()
 	}
 	logger.Info("initializing pipeline",
-		zap.Uint64("request_start_block", requestDetails.RequestStartBlockNum),
+		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("output_module", request.OutputModule),
 	)
@@ -247,7 +247,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
 		pipe,
-		int64(requestDetails.RequestStartBlockNum),
+		int64(requestDetails.ResolvedStartBlockNum),
 		request.StopBlockNum,
 		"",
 		false,

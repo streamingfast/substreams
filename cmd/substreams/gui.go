@@ -12,8 +12,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/pages/request"
 
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/manifest"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 )

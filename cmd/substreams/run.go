@@ -77,7 +77,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	if err := applyParams(cmd, pkg); err != nil {
+	if err := ApplyParams(cmd, pkg); err != nil {
 		return err
 	}
 
@@ -195,7 +195,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func applyParams(cmd *cobra.Command, pkg *pbsubstreams.Package) error {
+func ApplyParams(cmd *cobra.Command, pkg *pbsubstreams.Package) error {
 	params := mustGetStringSlice(cmd, "params")
 	for _, param := range params {
 		parts := strings.SplitN(param, "=", 2)

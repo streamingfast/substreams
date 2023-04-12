@@ -309,6 +309,10 @@ func (o *Output) ShortHelp() []key.Binding {
 			key.WithKeys("/"),
 			key.WithHelp("/", "Search"),
 		),
+		key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "refresh"),
+		),
 	}
 }
 

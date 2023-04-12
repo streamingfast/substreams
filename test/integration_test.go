@@ -141,7 +141,7 @@ func TestForkHandling(t *testing.T) {
 				}
 				if undo := resp.GetBlockUndoSignal(); undo != nil {
 					assert.Truef(t, test.expectedResponseNames[i].undo, "received undo, expecting block %s", test.expectedResponseNames[i].id)
-					assert.Equal(t, test.expectedResponseNames[i].id, undo.LastValidClock.Id, "inside undo message, wrong ID")
+					assert.Equal(t, test.expectedResponseNames[i].id, undo.LastValidBlock.Id, "inside undo message, wrong ID")
 					i++
 					continue
 				}

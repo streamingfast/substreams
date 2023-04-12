@@ -8,7 +8,6 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -19,7 +18,7 @@ type Instance struct {
 
 	valueType string
 
-	clock *pbsubstreamsrpc.Clock
+	clock *pbsubstreams.Clock
 
 	args        []interface{} // to the `entrypoint` function
 	returnValue []byte

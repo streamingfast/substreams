@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package sf.substreams.v1;
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
+
+import "google/protobuf/timestamp.proto";
+
+// Clock is a pointer to a block with added timestamp
+message Clock {
+  string id = 1;
+  uint64 number = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// BlockRef is a pointer to a block to which we don't know the timestamp
+message BlockRef {
+  string id = 1;
+  uint64 number = 2;
+}

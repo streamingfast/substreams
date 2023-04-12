@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type ResponseFromAnyTier interface {
@@ -35,5 +36,5 @@ func NewSnapshotComplete() *pbsubstreamsrpc.Response {
 	}
 }
 
-type BlockHook func(ctx context.Context, clock *pbsubstreamsrpc.Clock) error
-type PostJobHook func(ctx context.Context, clock *pbsubstreamsrpc.Clock) error
+type BlockHook func(ctx context.Context, clock *pbsubstreams.Clock) error
+type PostJobHook func(ctx context.Context, clock *pbsubstreams.Clock) error

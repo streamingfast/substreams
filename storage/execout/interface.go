@@ -3,11 +3,11 @@ package execout
 import (
 	"errors"
 
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type ExecutionOutputGetter interface {
-	Clock() *pbsubstreamsrpc.Clock
+	Clock() *pbsubstreams.Clock
 	Get(name string) (value []byte, cached bool, err error)
 }
 

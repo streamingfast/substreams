@@ -19,6 +19,7 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
@@ -250,7 +251,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 
 	opts := s.buildPipelineOptions(ctx)
 	if undoSignal != nil {
-		opts = append(opts, pipeline.WithPreFirstBlockDataHook(func(_ context.Context, _ *pbsubstreamsrpc.Clock) error {
+		opts = append(opts, pipeline.WithPreFirstBlockDataHook(func(_ context.Context, _ *pbsubstreams.Clock) error {
 			return respFunc(&pbsubstreamsrpc.Response{
 				Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
 					BlockUndoSignal: undoSignal,

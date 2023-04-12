@@ -141,10 +141,10 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreamsrpc.Response) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreamsrpc.Response_BlockUndoSignal:
 		if ui.outputMode == OutputModeTUI {
-			printUndo(m.BlockUndoSignal.LastValidClock, m.BlockUndoSignal.LastValidCursor)
+			printUndo(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
 			ui.ensureTerminalUnlocked()
 		} else {
-			printUndoJSON(m.BlockUndoSignal.LastValidClock, m.BlockUndoSignal.LastValidCursor)
+			printUndoJSON(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
 		}
 
 	case *pbsubstreamsrpc.Response_BlockData:

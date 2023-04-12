@@ -132,7 +132,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		req.StartCursor = validCursor.ToOpaque()
 
 		undoSignal = &pbsubstreamsrpc.BlockUndoSignal{
-			LastValidClock:  blockRefToClock(lastValidBlock),
+			LastValidBlock:  blockRefToPB(lastValidBlock),
 			LastValidCursor: req.StartCursor,
 		}
 	}

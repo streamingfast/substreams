@@ -11,6 +11,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/tidwall/pretty"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -19,7 +20,7 @@ func (ui *TUI) decoratedBlockScopedData(
 	output *pbsubstreamsrpc.MapModuleOutput,
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
-	clock *pbsubstreamsrpc.Clock,
+	clock *pbsubstreams.Clock,
 ) error {
 	var s []string
 
@@ -128,7 +129,7 @@ func (ui *TUI) jsonBlockScopedData(
 	output *pbsubstreamsrpc.MapModuleOutput,
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
-	clock *pbsubstreamsrpc.Clock,
+	clock *pbsubstreams.Clock,
 ) error {
 
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
@@ -392,10 +393,10 @@ func printClock(block *pbsubstreamsrpc.BlockScopedData) {
 	fmt.Printf("----------- BLOCK #%s (%s) ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Id)
 }
 
-func printUndo(lastGoodClock *pbsubstreamsrpc.Clock, cursor string) {
+func printUndo(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
 	fmt.Printf("----------- BLOCK UNDO UP TO #%s (0x%s) ---------------\n", humanize.Comma(int64(lastGoodClock.Number)), lastGoodClock.Id)
 	fmt.Printf("\nNext cursor: %s\n", cursor)
 }
-func printUndoJSON(lastGoodClock *pbsubstreamsrpc.Clock, cursor string) {
+func printUndoJSON(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
 	fmt.Printf("{\"undo_until\":{\"num\":%d,\"id\":%s\",\"next_cursor\":\"%s\"}\n", lastGoodClock.Number, lastGoodClock.Id, cursor)
 }

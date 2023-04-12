@@ -55,7 +55,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 				forkHandler: NewForkHandler(),
 				outputGraph: outputmodules.TestNew(),
 			}
-			clock := &pbsubstreamsrpc.Clock{Id: test.block.Id, Number: test.block.Number}
+			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)
 			err := pipe.execute(ctx, executor, execOutput)

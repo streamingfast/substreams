@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -63,26 +64,25 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return
 }
 
-func blockToClock(block *bstream.Block) *pbsubstreamsrpc.Clock {
-	return &pbsubstreamsrpc.Clock{
+func blockToClock(block *bstream.Block) *pbsubstreams.Clock {
+	return &pbsubstreams.Clock{
 		Number:    block.Number,
 		Id:        block.Id,
 		Timestamp: timestamppb.New(block.Time()),
 	}
 }
 
-func blockRefToClock(block bstream.BlockRef) *pbsubstreamsrpc.Clock {
-	return &pbsubstreamsrpc.Clock{
+func blockRefToPB(block bstream.BlockRef) *pbsubstreams.BlockRef {
+	return &pbsubstreams.BlockRef{
 		Number: block.Num(),
 		Id:     block.ID(),
-		// Timestamp: timestamppb.New(block.Time()),
 	}
 }
 
 func (p *Pipeline) processBlock(
 	ctx context.Context,
 	block *bstream.Block,
-	clock *pbsubstreamsrpc.Clock,
+	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 	step bstream.StepType,
 	finalBlockHeight uint64,
@@ -134,13 +134,13 @@ func (p *Pipeline) processBlock(
 	return nil
 }
 
-func (p *Pipeline) handleStepStalled(clock *pbsubstreamsrpc.Clock) error {
+func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	p.execOutputCache.HandleStalled(clock)
 	p.forkHandler.removeReversibleOutput(clock.Id)
 	return nil
 }
 
-func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreamsrpc.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 
 	if err := p.forkHandler.handleUndo(clock, cursor); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
@@ -158,20 +158,20 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreamsrpc.Cl
 		HeadBlock: cursor.HeadBlock,
 	}
 
-	targetClock := blockRefToClock(reorgJunctionBlock)
+	targetClock := blockRefToPB(reorgJunctionBlock)
 
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
 				&pbsubstreamsrpc.BlockUndoSignal{
-					LastValidClock:  targetClock,
+					LastValidBlock:  targetClock,
 					LastValidCursor: targetCursor.ToOpaque(),
 				},
 			},
 		})
 }
 
-func (p *Pipeline) handleStepFinal(clock *pbsubstreamsrpc.Clock) error {
+func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	p.lastFinalClock = clock
 	p.insideReorgUpTo = nil
 	if err := p.execOutputCache.HandleFinal(clock); err != nil {
@@ -181,7 +181,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreamsrpc.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreamsrpc.Clock, cursor *bstream.Cursor) error {
+func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {

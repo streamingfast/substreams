@@ -64,7 +64,7 @@ type Pipeline struct {
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
 	// (for chains with potential block skips)
-	lastFinalClock *pbsubstreamsrpc.Clock
+	lastFinalClock *pbsubstreams.Clock
 }
 
 func New(
@@ -102,7 +102,7 @@ func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
 	defer span.EndWithErr(&err)
 
-	p.forkHandler.registerUndoHandler(func(clock *pbsubstreamsrpc.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
+	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
 		for _, modOut := range moduleOutputs {
 			p.stores.storesHandleUndo(modOut)
 		}
@@ -219,7 +219,7 @@ func (p *Pipeline) isOutputModule(name string) bool {
 	return p.outputGraph.IsOutputModule(name)
 }
 
-func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreamsrpc.Clock) {
+func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
 	for _, hook := range p.postJobHooks {
 		if err := hook(ctx, clock); err != nil {
 			reqctx.Logger(ctx).Warn("post job hook failed", zap.Error(err))
@@ -227,7 +227,7 @@ func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreamsrpc.C
 	}
 }
 
-func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreamsrpc.Clock) (err error) {
+func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clock) (err error) {
 	_, span := reqctx.WithSpan(ctx, "pre_block_hooks")
 	defer span.EndWithErr(&err)
 
@@ -347,7 +347,7 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	}
 }
 
-func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreamsrpc.Clock) error {
+func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock) error {
 	var progress []*pbsubstreamsrpc.ModuleProgress
 	if p.processingModule != nil {
 		progress = append(progress, &pbsubstreamsrpc.ModuleProgress{
@@ -372,7 +372,7 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreamsrpc.Clock) 
 	return nil
 }
 
-func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreamsrpc.Clock) error {
+func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock) error {
 	if p.respFunc != nil {
 		out := &pbssinternal.ProcessRangeResponse{
 			ModuleName: p.processingModule.name,
@@ -455,7 +455,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 }
 
 func returnModuleDataOutputs(
-	clock *pbsubstreamsrpc.Clock,
+	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
 	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,

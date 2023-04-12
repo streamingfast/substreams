@@ -174,8 +174,8 @@ func toModuleOutput(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbs
 	}, nil
 }
 
-func toClock(item *pboutput.Item) *pbsubstreamsrpc.Clock {
-	return &pbsubstreamsrpc.Clock{
+func toClock(item *pboutput.Item) *pbsubstreams.Clock {
+	return &pbsubstreams.Clock{
 		Id:        item.BlockId,
 		Number:    item.BlockNum,
 		Timestamp: item.Timestamp,

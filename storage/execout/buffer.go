@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/proto"
 )
@@ -13,10 +13,10 @@ import (
 // as a sort of buffer.
 type Buffer struct {
 	values map[string][]byte
-	clock  *pbsubstreamsrpc.Clock
+	clock  *pbsubstreams.Clock
 } // TODO(abourget): rename to `Buffer`
 
-func NewBuffer(blockType string, block *bstream.Block, clock *pbsubstreamsrpc.Clock) (*Buffer, error) {
+func NewBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
 	blkBytes, err := block.Payload.Get()
 	if err != nil {
 		return nil, fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
@@ -35,7 +35,7 @@ func NewBuffer(blockType string, block *bstream.Block, clock *pbsubstreamsrpc.Cl
 	}, nil
 }
 
-func (i *Buffer) Clock() *pbsubstreamsrpc.Clock {
+func (i *Buffer) Clock() *pbsubstreams.Clock {
 	return i.clock
 }
 

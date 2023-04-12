@@ -8,17 +8,17 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockExecOutput struct {
-	clockFunc func() *pbsubstreamsrpc.Clock
+	clockFunc func() *pbsubstreams.Clock
 
 	cacheMap map[string][]byte
 }
 
-func (t *MockExecOutput) Clock() *pbsubstreamsrpc.Clock {
+func (t *MockExecOutput) Clock() *pbsubstreams.Clock {
 	return t.clockFunc()
 }
 

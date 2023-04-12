@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/streamingfast/substreams/block"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 // MultiplexedWriter?
@@ -47,7 +47,7 @@ func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule stri
 	return w
 }
 
-func (w *Writer) Write(clock *pbsubstreamsrpc.Clock, buffer *Buffer) {
+func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 	if val, found := buffer.values[w.outputModule]; found {
 		// TODO(abourget): triple check that we don't want to write
 		// if not found?

@@ -5,7 +5,7 @@ option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2
 
 import "google/protobuf/any.proto";
 import "sf/substreams/v1/modules.proto";
-import "sf/substreams/rpc/v2/clock.proto";
+import "sf/substreams/v1/clock.proto";
 
 service Stream {
   rpc Blocks(Request) returns (stream Response);
@@ -67,16 +67,16 @@ message Response {
 
 
 // BlockUndoSignal informs you that every bit of data
-// with a clock number above 'last_valid_clock' has been reverted
+// with a block number above 'last_valid_block' has been reverted
 // on-chain. Delete that data and restart from 'last_valid_cursor'
 message BlockUndoSignal {
-  Clock  last_valid_clock = 1; 
+  sf.substreams.v1.BlockRef last_valid_block = 1; 
   string last_valid_cursor = 2;
 }
 
 message BlockScopedData {
   MapModuleOutput output = 1;
-  Clock clock = 2;
+  sf.substreams.v1.Clock clock = 2;
   string cursor = 3;
 
   // Non-deterministic, allows substreams-sink to let go of their undo data.

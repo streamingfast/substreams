@@ -144,8 +144,8 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			)
 			if tt.wantUndoLastBlock != nil {
 				require.NotNil(t, undoSignal)
-				assert.Equal(t, tt.wantUndoLastBlock.ID(), undoSignal.LastValidClock.Id)
-				assert.Equal(t, tt.wantUndoLastBlock.Num(), undoSignal.LastValidClock.Number)
+				assert.Equal(t, tt.wantUndoLastBlock.ID(), undoSignal.LastValidBlock.Id)
+				assert.Equal(t, tt.wantUndoLastBlock.Num(), undoSignal.LastValidBlock.Number)
 			} else {
 				assert.Nil(t, undoSignal)
 			}

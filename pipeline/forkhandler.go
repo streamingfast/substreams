@@ -3,10 +3,10 @@ package pipeline
 import (
 	"github.com/streamingfast/bstream"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type UndoHandler func(clock *pbsubstreamsrpc.Clock, moduleOutputs []*pbssinternal.ModuleOutput)
+type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput)
 
 // TODO(abourget): The scope of this object and the Engine
 //
@@ -33,7 +33,7 @@ func (f *ForkHandler) registerUndoHandler(handler UndoHandler) {
 }
 
 func (f *ForkHandler) handleUndo(
-	clock *pbsubstreamsrpc.Clock,
+	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 ) error {
 	if moduleOutputs, found := f.reversibleOutputs[clock.Id]; found {

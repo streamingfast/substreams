@@ -8,7 +8,7 @@ import (
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
 	"github.com/dustin/go-humanize"
 	tracing "github.com/streamingfast/sf-tracing"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
@@ -89,7 +89,7 @@ func (r *Runtime) NewModule(ctx context.Context, wasmCode []byte, name string, e
 	return m, nil
 }
 
-func (m *Module) NewInstance(clock *pbsubstreamsrpc.Clock, arguments []Argument) (*Instance, error) {
+func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*Instance, error) {
 	if m.isClosed {
 		panic("module is closed")
 	}

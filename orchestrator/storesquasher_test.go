@@ -220,9 +220,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				storeSaveInterval:      test.storeSaveInterval,
 			}
 			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
-				Request: &pbsubstreams.Request{
-					ProductionMode: false,
-				},
+				ProductionMode: false,
 			})
 			err := squasher.processRange(ctx, eg, test.squashableRange)
 			require.NoError(t, eg.Wait())

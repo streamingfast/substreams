@@ -1,11 +1,9 @@
 syntax = "proto3";
 
-package sf.substreams.v1;
-
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
+package sf.substreams.rpc.v2;
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpc";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/timestamp.proto";
 import "sf/substreams/v1/modules.proto";
 import "sf/substreams/v1/clock.proto";
 
@@ -17,8 +15,10 @@ message Request {
   int64 start_block_num = 1;
   string start_cursor = 2;
   uint64 stop_block_num = 3;
-  repeated ForkStep fork_steps = 4;
-  string irreversibility_condition = 5;
+
+  // With final_block_only, you only receive blocks that are irreversible:
+  // 'final_block_height' will be equal to current block and no 'undo_signal' will ever be sent
+  bool final_blocks_only = 4;
 
   // Substreams has two mode when executing your module(s) either development mode or production
   // mode. Development and production modes impact the execution of Substreams, important aspects
@@ -39,43 +39,51 @@ message Request {
   //
   // With production mode`, however, you trade off functionality for high speed enabling forward
   // parallel execution of module ahead of time.
-  bool production_mode = 9;
+  bool production_mode = 5;
 
-  Modules modules = 6;
-  repeated string output_modules = 7;
+  string output_module = 6;
+
+  sf.substreams.v1.Modules modules = 7;
 
   // Available only in developer mode
-  repeated string debug_initial_store_snapshot_for_modules = 8;
-
-  string output_module = 10;
+  repeated string debug_initial_store_snapshot_for_modules = 10;
 }
+
 
 message Response {
   oneof message {
-    SessionInit session = 5; // Always sent first
-    ModulesProgress progress = 1; // Progress of data preparation, before sending in the stream of `data` events.
+    SessionInit session = 1; // Always sent first
+    ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
+    BlockScopedData block_scoped_data = 3; 
+    BlockUndoSignal block_undo_signal = 4;
 
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
-    InitialSnapshotData debug_snapshot_data = 2;
+    InitialSnapshotData debug_snapshot_data = 10;
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
-    InitialSnapshotComplete debug_snapshot_complete = 3;
+    InitialSnapshotComplete debug_snapshot_complete = 11;
 
-    BlockScopedData data = 4;
   }
 }
 
-enum ForkStep {
-  STEP_UNKNOWN = 0;
-  // Block is new head block of the chain, that is linear with the previous block
-  STEP_NEW = 1;
-  // Block is now forked and should be undone, it's not the head block of the chain anymore
-  STEP_UNDO = 2;
-  // Removed, was STEP_REDO
-  reserved 3;
-  // Block is now irreversible and can be committed to (finality is chain specific, see chain documentation for more details)
-  STEP_IRREVERSIBLE = 4;
-  // Removed, was STEP_STALLED
-  reserved 5;
+
+// BlockUndoSignal informs you that every bit of data
+// with a block number above 'last_valid_block' has been reverted
+// on-chain. Delete that data and restart from 'last_valid_cursor'
+message BlockUndoSignal {
+  sf.substreams.v1.BlockRef last_valid_block = 1; 
+  string last_valid_cursor = 2;
+}
+
+message BlockScopedData {
+  MapModuleOutput output = 1;
+  sf.substreams.v1.Clock clock = 2;
+  string cursor = 3;
+
+  // Non-deterministic, allows substreams-sink to let go of their undo data.
+  uint64 final_block_height = 4;
+
+  repeated MapModuleOutput debug_map_outputs = 10;
+  repeated StoreModuleOutput debug_store_outputs = 11;
 }
 
 message SessionInit  {
@@ -88,51 +96,35 @@ message InitialSnapshotComplete {
 
 message InitialSnapshotData {
   string module_name = 1;
-  StoreDeltas deltas = 2;
+  repeated StoreDelta deltas = 2;
   uint64 sent_keys = 4;
   uint64 total_keys = 3;
 }
 
-message BlockScopedData {
-  repeated ModuleOutput outputs = 1;
-  Clock clock = 3;
-  ForkStep step = 6;
-  string cursor = 10;
-  // Potentially non-deterministic. Reserved for future use.
-  uint64 final_block_height = 11;
+message MapModuleOutput {
+  string name = 1;
+  google.protobuf.Any map_output = 2;
+  // DebugOutputInfo is available in non-production mode only
+  OutputDebugInfo debug_info = 10;
 }
 
-message ModuleOutput {
+// StoreModuleOutput are produced for store modules in development mode.
+// It is not possible to retrieve store models in production, with parallelization
+// enabled. If you need the deltas directly, write a pass through mapper module
+// that will get them down to you.
+message StoreModuleOutput {
   string name = 1;
+  repeated StoreDelta debug_store_deltas = 2;
+  OutputDebugInfo debug_info = 10;
+}
 
-  oneof data {
-    google.protobuf.Any map_output = 2;
-
-    // StoreDeltas are produced for store modules in development mode.
-    // It is not possible to retrieve store models in production, with parallelization
-    // enabled. If you need the deltas directly, write a pass through mapper module
-    // that will get them down to you.
-    StoreDeltas debug_store_deltas = 3;
-  }
-  repeated string debug_logs = 4;
+message OutputDebugInfo {
+  repeated string logs = 1;
   // LogsTruncated is a flag that tells you if you received all the logs or if they
   // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
-  bool debug_logs_truncated = 5;
-
-  bool cached = 6;
+  bool logs_truncated = 2;
+  bool cached = 3;
 }
-
-// think about:
-// message ModuleOutput { ...
-//   ModuleOutputDebug debug_info = 6;
-// ...}
-//message ModuleOutputDebug {
-//  StoreDeltas store_deltas = 3;
-//  repeated string logs = 4;
-//  // LogsTruncated is a flag that tells you if you received all the logs or if they
-//  // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
-//  bool logs_truncated = 5;
-//}
 
 message ModulesProgress {
   repeated ModuleProgress modules = 1;
@@ -142,13 +134,13 @@ message ModuleProgress {
   string name = 1;
 
   oneof type {
-    ProcessedRange processed_ranges = 2;
+    ProcessedRanges processed_ranges = 2;
     InitialState initial_state = 3;
     ProcessedBytes processed_bytes = 4;
     Failed failed = 5;
   }
 
-  message ProcessedRange {
+  message ProcessedRanges {
     repeated BlockRange processed_ranges = 1;
   }
   message InitialState {
@@ -175,10 +167,6 @@ message BlockRange {
   uint64 end_block = 3;
 }
 
-message StoreDeltas {
-  repeated StoreDelta deltas = 1;
-}
-
 message StoreDelta {
   enum Operation {
     UNSET = 0;
@@ -191,11 +179,4 @@ message StoreDelta {
   string key = 3;
   bytes old_value = 4;
   bytes new_value = 5;
-}
-
-message Output {
-  uint64 block_num = 1;
-  string block_id = 2;
-  google.protobuf.Timestamp timestamp = 4;
-  google.protobuf.Any value = 10;
 }

@@ -34,7 +34,7 @@ func (sf *StreamFactory) New(
 	if cursor != "" {
 		cur, err := bstream.CursorFromOpaque(cursor)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid start cursor %q: %s", cursor, err)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err)
 		}
 		if cursorIsTarget {
 			options = append(options, stream.WithTargetCursor(cur))
@@ -45,7 +45,9 @@ func (sf *StreamFactory) New(
 
 	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
 		sf.mergedBlocksStore.SetMeter(bytesMeter)
-		sf.forkedBlocksStore.SetMeter(bytesMeter)
+		if sf.forkedBlocksStore != nil {
+			sf.forkedBlocksStore.SetMeter(bytesMeter)
+		}
 	}
 
 	return stream.New(

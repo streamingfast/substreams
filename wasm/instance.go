@@ -3,6 +3,7 @@ package wasm
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/storage/store"
 

@@ -7,46 +7,47 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (o *Output) renderPayload(in *pbsubstreams.ModuleOutput) string {
+func (o *Output) renderPayload(in *pbsubstreamsrpc.AnyModuleOutput) string {
 	if in == nil {
 		return ""
 	}
 	out := &strings.Builder{}
 
-	for _, log := range in.DebugLogs {
-		out.WriteString(Styles.LogLabel.Render("log: "))
-		out.WriteString(Styles.LogLine.Render(log))
-		out.WriteString("\n")
-	}
-
-	if len(in.DebugLogs) != 0 {
-		out.WriteString("\n")
-	}
-
-	switch data := in.Data.(type) {
-	case *pbsubstreams.ModuleOutput_MapOutput:
-		if len(data.MapOutput.Value) != 0 {
-			msgDesc := o.msgDescs[in.Name]
-			out.WriteString(o.decodeDynamicMessage(msgDesc, data.MapOutput))
+	if debugInfo := in.DebugInfo(); debugInfo != nil {
+		for _, log := range debugInfo.Logs {
+			out.WriteString(Styles.LogLabel.Render("log: "))
+			out.WriteString(Styles.LogLine.Render(log))
+			out.WriteString("\n")
 		}
-	case *pbsubstreams.ModuleOutput_DebugStoreDeltas:
-		if len(data.DebugStoreDeltas.Deltas) == 0 {
-			out.WriteString("No deltas")
+
+		if len(debugInfo.Logs) != 0 {
+			out.WriteString("\n")
+		}
+	}
+
+	if in.IsMap() && !in.IsEmpty() {
+		msgDesc := o.msgDescs[in.Name()]
+		out.WriteString(o.decodeDynamicMessage(msgDesc, in.MapOutput.MapOutput))
+	}
+	if in.IsStore() {
+		if !in.IsEmpty() {
+			msgDesc := o.msgDescs[in.Name()]
+			out.WriteString(o.decodeDynamicStoreDeltas(in.StoreOutput.DebugStoreDeltas, msgDesc))
 		} else {
-			msgDesc := o.msgDescs[in.Name]
-			out.WriteString(o.decodeDynamicStoreDeltas(data.DebugStoreDeltas.Deltas, msgDesc))
-			//s = append(s, ui.renderDecoratedDeltas(in.Name, data.DebugStoreDeltas.Deltas, false)...)
+			out.WriteString("No deltas")
 		}
 	}
 	return out.String()
+
 }
 
 func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin *anypb.Any) string {
@@ -87,7 +88,7 @@ func highlightJSON(in string) string {
 	return out.String()
 }
 
-func (o *Output) decodeDynamicStoreDeltas(deltas []*pbsubstreams.StoreDelta, msgDesc *manifest.ModuleDescriptor) string {
+func (o *Output) decodeDynamicStoreDeltas(deltas []*pbsubstreamsrpc.StoreDelta, msgDesc *manifest.ModuleDescriptor) string {
 	out := &strings.Builder{}
 	for _, delta := range deltas {
 		out.WriteString(fmt.Sprintf("%s (%d) KEY: %q\n", delta.Operation, delta.Ordinal, delta.Key))

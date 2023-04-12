@@ -4,38 +4,59 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/manifest"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 // ValidateRequest is run by the server code.
-func ValidateRequest(request *pbsubstreams.Request, blockType string, isSubRequest bool) error {
-	if request.ProductionMode {
-		if request.DebugInitialStoreSnapshotForModules != nil && len(request.DebugInitialStoreSnapshotForModules) > 0 {
-			return fmt.Errorf("debug initial store snapshot feature is not supported in production mode")
-		}
+func ValidateRequest(request *pbsubstreamsrpc.Request, blockType string) error {
+	if err := request.Validate(); err != nil {
+		return fmt.Errorf("validate request: %s", err)
+	}
+
+	if err := validateBinaryTypes(request.Modules.Binaries); err != nil {
+		return err
 	}
 
 	if err := manifest.ValidateModules(request.Modules); err != nil {
 		return fmt.Errorf("modules validation failed: %w", err)
 	}
 
-	if err := pbsubstreams.ValidateRequest(request, isSubRequest); err != nil {
+	if err := validateModuleGraph(request.Modules.Modules, request.OutputModule, blockType); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ValidateInternalRequest(request *pbssinternal.ProcessRangeRequest, blockType string) error {
+	if err := request.Validate(); err != nil {
 		return fmt.Errorf("validate request: %s", err)
 	}
 
-	for _, binary := range request.Modules.Binaries {
-		if binary.Type != "wasm/rust-v1" {
-			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1"`, binary.Type)
-		}
+	if err := validateBinaryTypes(request.Modules.Binaries); err != nil {
+		return err
 	}
 
-	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
+	if err := manifest.ValidateModules(request.Modules); err != nil {
+		return fmt.Errorf("modules validation failed: %w", err)
+	}
+
+	if err := validateModuleGraph(request.Modules.Modules, request.OutputModule, blockType); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateModuleGraph(mods []*pbsubstreams.Module, outputModule string, blockType string) error {
+	graph, err := manifest.NewModuleGraph(mods)
 	if err != nil {
 		return fmt.Errorf("should have been able to derive modules graph: %w", err)
 	}
 
 	// Already validated by `ValidateRequest` above, so we can use the `Must...` version
-	outputModule := request.MustGetOutputModuleName()
 	ancestors, err := graph.AncestorsOf(outputModule)
 	if err != nil {
 		return fmt.Errorf("computing ancestors of %q: %w", outputModule, err)
@@ -51,6 +72,16 @@ func ValidateRequest(request *pbsubstreams.Request, blockType string, isSubReque
 					return fmt.Errorf("input source %q not supported, only %q and 'sf.substreams.v1.Clock' are valid", src, blockType)
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+func validateBinaryTypes(bins []*pbsubstreams.Binary) error {
+	for _, binary := range bins {
+		if binary.Type != "wasm/rust-v1" {
+			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1"`, binary.Type)
 		}
 	}
 	return nil

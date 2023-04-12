@@ -10,10 +10,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
-func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbsubstreams.ModuleOutput, []byte, error) {
+func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, error) {
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
 
@@ -46,15 +46,18 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 			return moduleOutput, outputBytes, fmt.Errorf("converting output to module output: %w", err)
 		}
 
+		fillModuleOutputMetadata(executor, moduleOutput)
 		moduleOutput.Cached = true
 		return moduleOutput, outputBytes, nil
 	}
 	reqStats.RecordOutputCacheMiss()
 
-	outputBytes, moduleOutput, err := executeModule(ctx, executor, execOutput)
+	outputBytes, moduleOutput, err := executor.run(ctx, execOutput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("execute: %w", err)
 	}
+
+	fillModuleOutputMetadata(executor, moduleOutput)
 
 	return moduleOutput, outputBytes, nil
 }
@@ -67,27 +70,11 @@ func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleEx
 	return cached, output, nil
 }
 
-func executeModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) ([]byte, *pbsubstreams.ModuleOutput, error) {
-	out, moduleOutputData, err := executor.run(ctx, execOutput)
-	moduleOutput := toModuleOutput(executor, moduleOutputData)
-
-	if err != nil {
-		return out, moduleOutput, fmt.Errorf("execute: %w", err)
-	}
-	return out, moduleOutput, nil
-}
-
-func toModuleOutput(executor ModuleExecutor, data pbsubstreams.ModuleOutputData) *pbsubstreams.ModuleOutput {
+func fillModuleOutputMetadata(executor ModuleExecutor, in *pbssinternal.ModuleOutput) {
 	logs, truncated := executor.moduleLogs()
-	if len(logs) == 0 && data == nil {
-		return nil
-	}
 
-	output := &pbsubstreams.ModuleOutput{
-		Name:               executor.Name(),
-		DebugLogs:          logs,
-		DebugLogsTruncated: truncated,
-		Data:               data,
-	}
-	return output
+	in.ModuleName = executor.Name()
+	in.Logs = logs
+	in.DebugLogsTruncated = truncated
+	return
 }

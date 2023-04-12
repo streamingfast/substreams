@@ -18,7 +18,8 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
@@ -27,7 +28,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/metadata"
 )
 
 type testRun struct {
@@ -45,7 +45,7 @@ type testRun struct {
 
 	Params map[string]string
 
-	Responses []*pbsubstreams.Response
+	Responses []*pbsubstreamsrpc.Response
 	TempDir   string
 }
 
@@ -72,7 +72,7 @@ func (f *testRun) Run(t *testing.T) error {
 	if f.Cursor != nil {
 		opaqueCursor = f.Cursor.ToOpaque()
 	}
-	request := &pbsubstreams.Request{
+	request := &pbsubstreamsrpc.Request{
 		StartBlockNum:  f.StartBlock,
 		StopBlockNum:   f.ExclusiveEndBlock,
 		StartCursor:    opaqueCursor,
@@ -140,10 +140,12 @@ func (f *testRun) Run(t *testing.T) error {
 func (f *testRun) Logs() (out []string) {
 	for _, response := range f.Responses {
 		switch r := response.Message.(type) {
-		case *pbsubstreams.Response_Data:
-			for _, output := range r.Data.Outputs {
-				for _, log := range output.DebugLogs {
-					out = append(out, log)
+		case *pbsubstreamsrpc.Response_BlockScopedData:
+			for _, output := range r.BlockScopedData.AllModuleOutputs() {
+				if debugInfo := output.DebugInfo(); debugInfo != nil {
+					for _, log := range debugInfo.GetLogs() {
+						out = append(out, log)
+					}
 				}
 			}
 		}
@@ -155,12 +157,15 @@ func (f *testRun) MapOutput(modName string) string {
 	var moduleOutputs []string
 	for _, response := range f.Responses {
 		switch r := response.Message.(type) {
-		case *pbsubstreams.Response_Data:
-			for _, output := range r.Data.Outputs {
-				if output.Name != modName {
+		case *pbsubstreamsrpc.Response_BlockScopedData:
+			for _, output := range r.BlockScopedData.AllModuleOutputs() {
+				if output.Name() != modName {
 					continue
 				}
-				mapout := output.GetMapOutput()
+				if !output.IsMap() {
+					continue
+				}
+				mapout := output.MapOutput.GetMapOutput()
 				if mapout == nil {
 					continue
 				}
@@ -179,7 +184,7 @@ func (f *testRun) MapOutput(modName string) string {
 				//if err != nil {
 				//	panic("marshaling json: " + err.Error())
 				//}
-				moduleOutputs = append(moduleOutputs, fmt.Sprintf("%d: %s: %s", r.Data.Clock.Number, output.Name, res))
+				moduleOutputs = append(moduleOutputs, fmt.Sprintf("%d: %s: %s", r.BlockScopedData.Clock.Number, output.Name(), res))
 			}
 		}
 	}
@@ -204,10 +209,48 @@ func withTestTracing(t *testing.T, ctx context.Context) context.Context {
 	return ctx
 }
 
+func processInternalRequest(
+	t *testing.T,
+	ctx context.Context,
+	request *pbssinternal.ProcessRangeRequest,
+	workerFactory work.WorkerFactory,
+	newGenerator BlockGeneratorFactory,
+	responseCollector *responseCollector,
+	isSubRequest bool,
+	blockProcessedCallBack blockProcessedCallBack,
+	testTempDir string,
+	subrequestsSplitSize uint64,
+	parallelSubrequests uint64,
+	linearHandoffBlockNum uint64,
+) error {
+	t.Helper()
+
+	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
+	require.NoError(t, err)
+
+	tr := &TestRunner{
+		t:                      t,
+		baseStoreStore:         baseStoreStore,
+		blockProcessedCallBack: blockProcessedCallBack,
+		blockGeneratorFactory:  newGenerator,
+	}
+	runtimeConfig := config.NewRuntimeConfig(
+		10,
+		subrequestsSplitSize,
+		parallelSubrequests,
+		0,
+		baseStoreStore,
+		workerFactory,
+	)
+	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
+
+	return svc.TestBlocks(ctx, request, responseCollector.Collect)
+}
+
 func processRequest(
 	t *testing.T,
 	ctx context.Context,
-	request *pbsubstreams.Request,
+	request *pbsubstreamsrpc.Request,
 	workerFactory work.WorkerFactory,
 	newGenerator BlockGeneratorFactory,
 	responseCollector *responseCollector,
@@ -238,10 +281,6 @@ func processRequest(
 		workerFactory,
 	)
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)
-
-	if isSubRequest {
-		ctx = metadata.NewIncomingContext(ctx, metadata.MD{"substreams-partial-mode": []string{"true"}})
-	}
 	return svc.TestBlocks(ctx, isSubRequest, request, responseCollector.Collect)
 }
 

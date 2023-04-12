@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             (unknown)
-// source: sf/substreams/v1/substreams.proto
+// source: sf/substreams/rpc/v2/service.proto
 
-package pbsubstreams
+package pbsubstreamsrpc
 
 import (
 	context "context"
@@ -34,7 +34,7 @@ func NewStreamClient(cc grpc.ClientConnInterface) StreamClient {
 }
 
 func (c *streamClient) Blocks(ctx context.Context, in *Request, opts ...grpc.CallOption) (Stream_BlocksClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Stream_ServiceDesc.Streams[0], "/sf.substreams.v1.Stream/Blocks", opts...)
+	stream, err := c.cc.NewStream(ctx, &Stream_ServiceDesc.Streams[0], "/sf.substreams.rpc.v2.Stream/Blocks", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (x *streamBlocksServer) Send(m *Response) error {
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Stream_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "sf.substreams.v1.Stream",
+	ServiceName: "sf.substreams.rpc.v2.Stream",
 	HandlerType: (*StreamServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -126,5 +126,5 @@ var Stream_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "sf/substreams/v1/substreams.proto",
+	Metadata: "sf/substreams/rpc/v2/service.proto",
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -80,7 +81,6 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 
 	wasmModule, err := wasm.NewRuntime(nil, 0).NewModule(
 		context.Background(),
-		nil,
 		binary.Content,
 		name,
 		name,
@@ -184,15 +184,56 @@ type testStoreConfig struct {
 
 func withTestRequest(t *testing.T, outputModule string, startBlock uint64) context.Context {
 	t.Helper()
-	req, err := BuildRequestDetails(&pbsubstreams.Request{
-		OutputModule:  outputModule,
-		StartBlockNum: int64(startBlock),
-	}, false, func(name string) bool {
-		return name == outputModule
-	},
+	req, _, err := BuildRequestDetails(
+		context.Background(),
+		&pbsubstreamsrpc.Request{
+			OutputModule:  outputModule,
+			StartBlockNum: int64(startBlock),
+		},
 		func() (uint64, error) { return 0, nil },
+		newTestCursorResolver().resolveCursor,
 		func() (uint64, error) { return 0, nil },
 	)
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)
+}
+
+func newTestCursorResolver(args ...interface{}) *testCursorResolver {
+	if len(args)%4 != 0 {
+		panic("invalid invocation of newTestCursorResolver")
+	}
+
+	tcr := &testCursorResolver{
+		preparedResponses: make(map[string]cursorResolverResponse),
+	}
+	for i := 0; i < len(args); i += 4 {
+		var err error
+		if args[i+3] != nil {
+			err = args[i+3].(error)
+		}
+		tcr.preparedResponses[args[i].(string)] = cursorResolverResponse{
+			lastValid:   args[i+1].(bstream.BlockRef),
+			currentHead: args[i+2].(bstream.BlockRef),
+			err:         err,
+		}
+	}
+	return tcr
+}
+
+type cursorResolverResponse struct {
+	lastValid   bstream.BlockRef
+	currentHead bstream.BlockRef
+	err         error
+}
+
+type testCursorResolver struct {
+	preparedResponses map[string]cursorResolverResponse
+}
+
+func (cr *testCursorResolver) resolveCursor(_ context.Context, cursor *bstream.Cursor) (lastValidBlock, currentHead bstream.BlockRef, err error) {
+	resp, ok := cr.preparedResponses[cursor.String()]
+	if !ok {
+		return cursor.Block, cursor.HeadBlock, nil
+	}
+	return resp.lastValid, resp.currentHead, resp.err
 }

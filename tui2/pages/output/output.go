@@ -5,6 +5,10 @@ import (
 	"log"
 
 	"github.com/charmbracelet/bubbles/key"
+
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,7 +16,6 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
 	"github.com/streamingfast/substreams/tui2/components/modselect"
@@ -22,22 +25,22 @@ type Output struct {
 	common.Common
 
 	msgDescs       map[string]*manifest.ModuleDescriptor
-	modules        map[string]*pbsubstreams.Module
 	messageFactory *dynamic.MessageFactory
 
 	moduleSelector     *modselect.ModSelect
 	blockSelector      *blockselect.BlockSelect
 	outputView         viewport.Model
 	lastDisplayContext *displayContext
-	lastModuleOutput   *pbsubstreams.ModuleOutput
+	lastOutputContent  interface{}
 	//lastRenderedContent string
 
 	lowBlock  uint64
 	highBlock uint64
 
 	blocksPerModule map[string][]uint64
-	payloads        map[blockContext]*pbsubstreams.ModuleOutput
-	blockIDs        map[uint64]string
+	payloads        map[blockContext]*pbsubstreamsrpc.AnyModuleOutput
+
+	blockIDs map[uint64]string
 
 	active            blockContext // module + block
 	outputViewYoffset map[blockContext]int
@@ -68,9 +71,8 @@ func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, module
 	output := &Output{
 		Common:            c,
 		msgDescs:          msgDescs,
-		modules:           mods,
 		blocksPerModule:   make(map[string][]uint64),
-		payloads:          make(map[blockContext]*pbsubstreams.ModuleOutput),
+		payloads:          make(map[blockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:          make(map[uint64]string),
 		moduleSelector:    modselect.New(c),
 		blockSelector:     blockselect.New(c),
@@ -113,7 +115,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case *pbsubstreams.BlockScopedData:
+	case *pbsubstreamsrpc.BlockScopedData:
 		blockNum := msg.Clock.Number
 
 		if o.lowBlock == 0 {
@@ -125,12 +127,12 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.blockSelector.StretchBounds(o.lowBlock, o.highBlock)
 
 		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
-		for _, output := range msg.Outputs {
-			if isEmptyModuleOutput(output) {
+		for _, output := range msg.AllModuleOutputs() {
+			if output.IsEmpty() {
 				continue
 			}
 
-			modName := output.Name
+			modName := output.Name()
 			blockCtx := blockContext{
 				module:   modName,
 				blockNum: blockNum,
@@ -150,6 +152,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			o.payloads[blockCtx] = output
 			o.setViewportContent()
 		}
+
 	case modselect.ModuleSelectedMsg:
 		//o.setViewContext()
 		o.active.module = string(msg)
@@ -229,7 +232,7 @@ type displayContext struct {
 	blockCtx          blockContext
 	searchViewEnabled bool
 	searchKeyword     string
-	payload           *pbsubstreams.ModuleOutput
+	payload           *pbsubstreamsrpc.AnyModuleOutput
 }
 
 func (o *Output) setViewportContent() {
@@ -239,6 +242,7 @@ func (o *Output) setViewportContent() {
 		searchKeyword:     o.searchCtx.searchKeyword,
 		payload:           o.payloads[o.active],
 	}
+
 	if dpContext != o.lastDisplayContext {
 		content := o.renderPayload(dpContext.payload)
 		if dpContext.searchViewEnabled {
@@ -251,6 +255,7 @@ func (o *Output) setViewportContent() {
 		o.lastDisplayContext = dpContext
 		o.outputView.SetContent(content)
 	}
+
 }
 
 func (o *Output) View() string {

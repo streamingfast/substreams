@@ -7,6 +7,7 @@ import (
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
 	"github.com/dustin/go-humanize"
+	tracing "github.com/streamingfast/sf-tracing"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -35,7 +36,7 @@ func (m *Module) FreeMem() {
 	m.isClosed = true
 }
 
-func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, wasmCode []byte, name string, entrypoint string) (*Module, error) {
+func (r *Runtime) NewModule(ctx context.Context, wasmCode []byte, name string, entrypoint string) (*Module, error) {
 	cfg := wasmtime.NewConfig()
 	if r.maxFuel != 0 {
 		cfg.SetConsumeFuel(true)
@@ -64,7 +65,7 @@ func (r *Runtime) NewModule(ctx context.Context, request *pbsubstreams.Request, 
 	}
 	for namespace, imports := range r.extensions {
 		for importName, f := range imports {
-			f := m.newExtensionFunction(ctx, request, namespace, importName, f)
+			f := m.newExtensionFunction(ctx, namespace, importName, f)
 			if err := linker.FuncWrap(namespace, importName, f); err != nil {
 				return nil, fmt.Errorf("instantiating extension import, [%s@%s]: %w", namespace, name, err)
 			}
@@ -140,13 +141,15 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*
 	return m.CurrentInstance, nil
 }
 
-func (m *Module) newExtensionFunction(ctx context.Context, request *pbsubstreams.Request, namespace, name string, f WASMExtension) interface{} {
+func (m *Module) newExtensionFunction(ctx context.Context, namespace, name string, f WASMExtension) interface{} {
 	return func(ptr, length, outputPtr int32) {
 		heap := m.Heap
 
 		data := heap.ReadBytes(ptr, length)
 
-		out, err := f(ctx, request, m.CurrentInstance.clock, data)
+		traceID := tracing.GetTraceID(ctx).String()
+
+		out, err := f(ctx, traceID, m.CurrentInstance.clock, data)
 		if err != nil {
 			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
 		}

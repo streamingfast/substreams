@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
@@ -141,7 +142,7 @@ func (r *LinearReader) downloadFile(ctx context.Context, file *File) (out []*pbo
 	}
 }
 
-func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreams.BlockScopedData, error) {
+func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreamsrpc.BlockScopedData, error) {
 	clock := toClock(cacheItem)
 	blockRef := bstream.NewBlockRef(clock.Id, clock.Number)
 	cursor := bstream.Cursor{
@@ -150,8 +151,7 @@ func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*
 		LIB:       blockRef,
 		HeadBlock: blockRef,
 	}
-	out := &pbsubstreams.BlockScopedData{
-		Step:   pbsubstreams.ForkStep_STEP_IRREVERSIBLE,
+	out := &pbsubstreamsrpc.BlockScopedData{
 		Cursor: cursor.ToOpaque(),
 		Clock:  clock,
 	}
@@ -160,26 +160,17 @@ func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*
 	if err != nil {
 		return nil, fmt.Errorf("module output: %w", err)
 	}
-	out.Outputs = append(out.Outputs, m)
+	out.Output = m
 
 	return out, nil
 }
 
-func toModuleOutput(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreams.ModuleOutput, error) {
-	var output pbsubstreams.ModuleOutputData
-	switch module.Kind.(type) {
-	case *pbsubstreams.Module_KindMap_:
-		outputType := strings.TrimPrefix(module.Output.Type, "proto:")
-		output = &pbsubstreams.ModuleOutput_MapOutput{
-			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + outputType, Value: cacheItem.Payload},
-		}
-	default:
-		panic(fmt.Sprintf("invalid module file %T", module.Kind))
-	}
+func toModuleOutput(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*pbsubstreamsrpc.MapModuleOutput, error) {
+	outputType := strings.TrimPrefix(module.Output.Type, "proto:")
 
-	return &pbsubstreams.ModuleOutput{
-		Name: module.Name,
-		Data: output,
+	return &pbsubstreamsrpc.MapModuleOutput{
+		Name:      module.Name,
+		MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/" + outputType, Value: cacheItem.Payload},
 	}, nil
 }
 

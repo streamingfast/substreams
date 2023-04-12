@@ -1,13 +1,12 @@
 package pipeline
 
 import (
-	"fmt"
-
 	"github.com/streamingfast/bstream"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.ModuleOutput)
+type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput)
 
 // TODO(abourget): The scope of this object and the Engine
 //
@@ -18,13 +17,13 @@ type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbsubstreams.M
 //	live on the Pipeline (where it makes sense)
 //	and have some nested structs handle
 type ForkHandler struct {
-	reversibleOutputs map[string][]*pbsubstreams.ModuleOutput
+	reversibleOutputs map[string][]*pbssinternal.ModuleOutput
 	undoHandlers      []UndoHandler
 }
 
 func NewForkHandler() *ForkHandler {
 	return &ForkHandler{
-		reversibleOutputs: make(map[string][]*pbsubstreams.ModuleOutput),
+		reversibleOutputs: make(map[string][]*pbssinternal.ModuleOutput),
 		undoHandlers:      []UndoHandler{},
 	}
 }
@@ -36,26 +35,8 @@ func (f *ForkHandler) registerUndoHandler(handler UndoHandler) {
 func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
-	respFunc func(resp *pbsubstreams.Response) error,
-	sendOutputs bool,
-	outputableModules []*pbsubstreams.Module,
 ) error {
 	if moduleOutputs, found := f.reversibleOutputs[clock.Id]; found {
-		if sendOutputs {
-			var toSend []*pbsubstreams.ModuleOutput
-			for _, out := range moduleOutputs {
-				for _, outputable := range outputableModules {
-					if outputable.Name == out.Name {
-						toSend = append(toSend, out)
-						break
-					}
-				}
-			}
-			if err := returnModuleDataOutputs(clock, bstream.StepUndo, cursor, toSend, respFunc); err != nil {
-				return fmt.Errorf("calling return func when reverting outputs: %w", err)
-			}
-		}
-
 		for _, h := range f.undoHandlers {
 			h(clock, moduleOutputs)
 		}
@@ -67,6 +48,6 @@ func (f *ForkHandler) removeReversibleOutput(blockID string) {
 	delete(f.reversibleOutputs, blockID)
 }
 
-func (f *ForkHandler) addReversibleOutput(moduleOutput *pbsubstreams.ModuleOutput, blockID string) {
+func (f *ForkHandler) addReversibleOutput(moduleOutput *pbssinternal.ModuleOutput, blockID string) {
 	f.reversibleOutputs[blockID] = append(f.reversibleOutputs[blockID], moduleOutput)
 }

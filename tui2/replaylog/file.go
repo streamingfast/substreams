@@ -6,12 +6,14 @@ import (
 	"log"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+
 	"github.com/streamingfast/dbin"
+
+	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/stream"
 )
 
@@ -108,11 +110,11 @@ func (f *File) ReadReplay() (out stream.ReplayBundle, err error) {
 
 func mapTypeToUpdateMsg(in any) any {
 	switch m := in.(type) {
-	case *pbsubstreams.Request,
-		*pbsubstreams.BlockScopedData,
-		*pbsubstreams.ModulesProgress,
-		*pbsubstreams.InitialSnapshotData,
-		*pbsubstreams.InitialSnapshotComplete:
+	case *pbsubstreamsrpc.Request,
+		*pbsubstreamsrpc.BlockScopedData,
+		*pbsubstreamsrpc.ModulesProgress,
+		*pbsubstreamsrpc.InitialSnapshotData,
+		*pbsubstreamsrpc.InitialSnapshotComplete:
 		return m
 	}
 	panic("unsupported payload")
@@ -124,11 +126,11 @@ func (f *File) Push(msg tea.Msg) error {
 	}
 
 	switch msg.(type) {
-	case *pbsubstreams.Request,
-		*pbsubstreams.BlockScopedData,
-		*pbsubstreams.ModulesProgress,
-		*pbsubstreams.InitialSnapshotData,
-		*pbsubstreams.InitialSnapshotComplete:
+	case *pbsubstreamsrpc.Request,
+		*pbsubstreamsrpc.BlockScopedData,
+		*pbsubstreamsrpc.ModulesProgress,
+		*pbsubstreamsrpc.InitialSnapshotData,
+		*pbsubstreamsrpc.InitialSnapshotComplete:
 
 		anyMsg, err := anypb.New(msg.(proto.Message))
 		if err != nil {

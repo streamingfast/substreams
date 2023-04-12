@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage"
@@ -32,7 +33,7 @@ func BuildParallelProcessor(
 	runtimeConfig config.RuntimeConfig,
 	outputGraph *outputmodules.Graph,
 	execoutStorage *execout.Configs,
-	respFunc func(resp *pbsubstreams.Response) error,
+	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
@@ -43,10 +44,10 @@ func BuildParallelProcessor(
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
-		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.RequestStartBlockNum, reqDetails.LinearHandoffBlockNum)
+		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.ResolvedStartBlockNum, reqDetails.LinearHandoffBlockNum)
 		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
 		execOutputReader = execout.NewLinearReader(
-			reqDetails.RequestStartBlockNum,
+			reqDetails.ResolvedStartBlockNum,
 			reqDetails.LinearHandoffBlockNum,
 			requestedModule,
 			requestedModuleCache,
@@ -79,7 +80,7 @@ func BuildParallelProcessor(
 		storeConfigs,
 		runtimeConfig.CacheSaveInterval,
 		execoutStorage,
-		reqDetails.RequestStartBlockNum,
+		reqDetails.ResolvedStartBlockNum,
 		reqDetails.LinearHandoffBlockNum,
 		storeLinearHandoffBlockNum,
 	)
@@ -96,7 +97,7 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("send initial progress: %w", err)
 	}
 
-	scheduler := NewScheduler(plan, respFunc, reqDetails.Request.Modules)
+	scheduler := NewScheduler(plan, respFunc, reqDetails.Modules)
 	if err != nil {
 		return nil, err
 	}

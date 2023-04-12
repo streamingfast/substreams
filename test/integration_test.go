@@ -16,9 +16,17 @@ import (
 
 func TestForkHandling(t *testing.T) {
 	type response struct {
-		id      string
-		outputs []string
-		undo    bool
+		id                string
+		extraStoreOutputs []string
+		output            string
+		undo              bool
+	}
+
+	undoUpTo := func(id string) response {
+		return response{
+			id:   id,
+			undo: true,
+		}
 	}
 
 	tests := []struct {
@@ -51,26 +59,21 @@ func TestForkHandling(t *testing.T) {
 				{blockRef: bstream.NewBlockRef("7a", 6), previousID: "6a", libBlockRef: bstream.NewBlockRef("4a", 4)},
 			},
 			expectedResponseNames: []response{
-				{id: "1a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "2a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "3a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "4a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "4a", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "3a", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "2a", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "2b", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "3b", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "4b", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "5b", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "5b", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "4b", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "3b", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "2b", undo: true, outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "2a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "3a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "4a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "5a", outputs: []string{"assert_test_store_add_bigint"}},
-				{id: "6a", outputs: []string{"assert_test_store_add_bigint"}},
+				{id: "1a", output: "assert_test_store_add_bigint"},
+				{id: "2a", output: "assert_test_store_add_bigint"},
+				{id: "3a", output: "assert_test_store_add_bigint"},
+				{id: "4a", output: "assert_test_store_add_bigint"},
+				undoUpTo("1a"),
+				{id: "2b", output: "assert_test_store_add_bigint"},
+				{id: "3b", output: "assert_test_store_add_bigint"},
+				{id: "4b", output: "assert_test_store_add_bigint"},
+				{id: "5b", output: "assert_test_store_add_bigint"},
+				undoUpTo("1a"),
+				{id: "2a", output: "assert_test_store_add_bigint"},
+				{id: "3a", output: "assert_test_store_add_bigint"},
+				{id: "4a", output: "assert_test_store_add_bigint"},
+				{id: "5a", output: "assert_test_store_add_bigint"},
+				{id: "6a", output: "assert_test_store_add_bigint"},
 			},
 			inProcessValidation: func(ctx *execContext) {
 				if ctx.block.Number == 6 {
@@ -104,12 +107,12 @@ func TestForkHandling(t *testing.T) {
 				{blockRef: bstream.NewBlockRef("4a", 4), previousID: "3a", libBlockRef: bstream.NewBlockRef("0a", 0)},
 			},
 			expectedResponseNames: []response{
-				{id: "1a", outputs: []string{"setup_test_store_add_bigint", "assert_test_store_add_bigint"}},
-				{id: "2b", outputs: []string{"setup_test_store_add_bigint", "assert_test_store_add_bigint"}},
-				{id: "2b", undo: true, outputs: []string{"setup_test_store_add_bigint", "assert_test_store_add_bigint"}},
-				{id: "2a", outputs: []string{"setup_test_store_add_bigint", "assert_test_store_add_bigint"}},
-				{id: "3a", outputs: []string{"setup_test_store_add_bigint", "assert_test_store_add_bigint"}},
-				{id: "4a", outputs: []string{"setup_test_store_add_bigint", "assert_test_store_add_bigint"}},
+				{id: "1a", output: "assert_test_store_add_bigint", extraStoreOutputs: []string{"setup_test_store_add_bigint"}},
+				{id: "2b", output: "assert_test_store_add_bigint", extraStoreOutputs: []string{"setup_test_store_add_bigint"}},
+				undoUpTo("1a"),
+				{id: "2a", output: "assert_test_store_add_bigint", extraStoreOutputs: []string{"setup_test_store_add_bigint"}},
+				{id: "3a", output: "assert_test_store_add_bigint", extraStoreOutputs: []string{"setup_test_store_add_bigint"}},
+				{id: "4a", output: "assert_test_store_add_bigint", extraStoreOutputs: []string{"setup_test_store_add_bigint"}},
 			},
 		},
 	}
@@ -136,15 +139,28 @@ func TestForkHandling(t *testing.T) {
 				if resp.GetProgress() != nil {
 					continue
 				}
-				data := resp.GetData()
+				if undo := resp.GetBlockUndoSignal(); undo != nil {
+					assert.Truef(t, test.expectedResponseNames[i].undo, "received undo, expecting block %s", test.expectedResponseNames[i].id)
+					assert.Equal(t, test.expectedResponseNames[i].id, undo.LastValidBlock.Id, "inside undo message, wrong ID")
+					i++
+					continue
+				}
 				require.Greater(t, len(test.expectedResponseNames), i, "too many responses")
+
+				require.NotNil(t, test.expectedResponseNames[i])
+				require.False(t, test.expectedResponseNames[i].undo, "received undo where we shouldn't")
+
+				data := resp.GetBlockScopedData()
+				require.NotNil(t, data.Output)
 				assert.Equal(t, test.expectedResponseNames[i].id, data.Clock.Id)
 
-				var seenOutputModules []string
-				for _, out := range data.Outputs {
-					seenOutputModules = append(seenOutputModules, out.Name)
+				var outputStoreNames []string
+				for _, out := range data.DebugStoreOutputs {
+					outputStoreNames = append(outputStoreNames, out.Name)
 				}
-				assert.Equal(t, test.expectedResponseNames[i].outputs, seenOutputModules)
+
+				assert.Equal(t, test.expectedResponseNames[i].extraStoreOutputs, outputStoreNames)
+				assert.Equal(t, test.expectedResponseNames[i].output, data.Output.Name)
 				i++
 			}
 		})
@@ -328,7 +344,6 @@ func listFiles(t *testing.T, tempDir string) []string {
 		storedFiles = append(storedFiles, strings.TrimPrefix(path, tempDir))
 		return nil
 	}))
-	//fmt.Println("STORED FILES", storedFiles)
 	return storedFiles
 }
 

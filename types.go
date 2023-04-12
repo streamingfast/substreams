@@ -3,32 +3,36 @@ package substreams
 import (
 	"context"
 
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type ResponseFunc func(resp *pbsubstreams.Response) error
+type ResponseFromAnyTier interface {
+	ProtoMessage()
+}
+type ResponseFunc func(ResponseFromAnyTier) error
 
-func NewBlockScopedDataResponse(in *pbsubstreams.BlockScopedData) *pbsubstreams.Response {
-	return &pbsubstreams.Response{
-		Message: &pbsubstreams.Response_Data{Data: in},
+func NewBlockScopedDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_BlockScopedData{BlockScopedData: in},
 	}
 }
 
-func NewModulesProgressResponse(in []*pbsubstreams.ModuleProgress) *pbsubstreams.Response {
-	return &pbsubstreams.Response{
-		Message: &pbsubstreams.Response_Progress{Progress: &pbsubstreams.ModulesProgress{Modules: in}},
+func NewModulesProgressResponse(in []*pbsubstreamsrpc.ModuleProgress) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Progress{Progress: &pbsubstreamsrpc.ModulesProgress{Modules: in}},
 	}
 }
 
-func NewSnapshotData(in *pbsubstreams.InitialSnapshotData) *pbsubstreams.Response {
-	return &pbsubstreams.Response{
-		Message: &pbsubstreams.Response_DebugSnapshotData{DebugSnapshotData: in},
+func NewSnapshotData(in *pbsubstreamsrpc.InitialSnapshotData) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_DebugSnapshotData{DebugSnapshotData: in},
 	}
 }
 
-func NewSnapshotComplete() *pbsubstreams.Response {
-	return &pbsubstreams.Response{
-		Message: &pbsubstreams.Response_DebugSnapshotComplete{DebugSnapshotComplete: &pbsubstreams.InitialSnapshotComplete{}},
+func NewSnapshotComplete() *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_DebugSnapshotComplete{DebugSnapshotComplete: &pbsubstreamsrpc.InitialSnapshotComplete{}},
 	}
 }
 

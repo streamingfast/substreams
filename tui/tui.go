@@ -10,6 +10,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/mattn/go-isatty"
 	"github.com/streamingfast/shutter"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -21,7 +22,7 @@ type OutputMode uint
 type TUI struct {
 	shutter *shutter.Shutter
 
-	req               *pbsubstreams.Request
+	req               *pbsubstreamsrpc.Request
 	pkg               *pbsubstreams.Package
 	outputStreamNames []string
 
@@ -38,7 +39,7 @@ type TUI struct {
 	msgTypes       map[string]string // Replace by calls to GetFullyQualifiedName() on the `msgDescs`
 }
 
-func New(req *pbsubstreams.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {
+func New(req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {
 	ui := &TUI{
 		shutter:           shutter.New(),
 		req:               req,
@@ -136,37 +137,31 @@ func (ui *TUI) Cancel() {
 	ui.shutter.Shutdown(err)
 }
 
-func (ui *TUI) filterOutputModules(in []*pbsubstreams.ModuleOutput) (out []*pbsubstreams.ModuleOutput) {
-	for _, mo := range in {
-		if _, ok := ui.msgTypes[mo.Name]; ok {
-			out = append(out, mo)
-		}
-	}
-
-	return
-}
-
-func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
+func (ui *TUI) IncomingMessage(resp *pbsubstreamsrpc.Response) error {
 	switch m := resp.Message.(type) {
-	case *pbsubstreams.Response_Data:
+	case *pbsubstreamsrpc.Response_BlockUndoSignal:
 		if ui.outputMode == OutputModeTUI {
-			printClock(m.Data)
+			printUndo(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
+			ui.ensureTerminalUnlocked()
+		} else {
+			printUndoJSON(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
 		}
-		if m.Data == nil {
-			return nil
+
+	case *pbsubstreamsrpc.Response_BlockScopedData:
+		if ui.outputMode == OutputModeTUI {
+			printClock(m.BlockScopedData)
 		}
-		outputs := ui.filterOutputModules(m.Data.Outputs)
-		if len(outputs) == 0 {
+		if m.BlockScopedData == nil {
 			return nil
 		}
 		ui.seenFirstData = true
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()
-			return ui.decoratedBlockScopedData(outputs, m.Data.Clock)
+			return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		} else {
-			return ui.jsonBlockScopedData(outputs, m.Data.Clock)
+			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		}
-	case *pbsubstreams.Response_Progress:
+	case *pbsubstreamsrpc.Response_Progress:
 		if ui.seenFirstData {
 			ui.formatPostDataProgress(m)
 		} else {
@@ -177,7 +172,7 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 				}
 			}
 		}
-	case *pbsubstreams.Response_DebugSnapshotData:
+	case *pbsubstreamsrpc.Response_DebugSnapshotData:
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()
 			return ui.decoratedSnapshotData(m.DebugSnapshotData)
@@ -185,12 +180,12 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreams.Response) error {
 			return ui.jsonSnapshotData(m.DebugSnapshotData)
 		}
 
-	case *pbsubstreams.Response_DebugSnapshotComplete:
+	case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
 		if ui.outputMode == OutputModeTUI {
 			fmt.Println("Snapshot data dump complete")
 		}
 
-	case *pbsubstreams.Response_Session:
+	case *pbsubstreamsrpc.Response_Session:
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
 			ui.prog.Send(m)

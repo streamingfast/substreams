@@ -1,7 +1,7 @@
 package tui
 
 import (
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 func newModel(ui *TUI) model {
@@ -23,12 +23,12 @@ type model struct {
 	UpdatesPerSecond  int
 	UpdatesThisSecond int
 
-	Request                       *pbsubstreams.Request
+	Request                       *pbsubstreamsrpc.Request
 	BackprocessingCompleteAtBlock uint64
 	Connected                     bool
 
 	Failures    int
-	LastFailure *pbsubstreams.ModuleProgress_Failed
+	LastFailure *pbsubstreamsrpc.ModuleProgress_Failed
 	Reason      string
 
 	TraceID string

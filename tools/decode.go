@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/streamingfast/substreams/block"
@@ -325,32 +324,6 @@ func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDes
 					return fmt.Errorf("unmarshalling data: %w", err)
 				}
 				fmt.Println(val)
-				valuePrinted = true
-			case *pbsubstreams.Module_KindStore_:
-				deltas := &pbsubstreams.StoreDeltas{}
-				_ = proto.Unmarshal(data, deltas)
-
-				dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-
-				value := ""
-				for _, delta := range deltas.Deltas {
-					value += fmt.Sprintf("> Key %s\n", delta.Key)
-					value += fmt.Sprintln("----- New Value -----")
-					val, err := unmarshalData(delta.NewValue, dynMsg)
-					if err != nil {
-						return fmt.Errorf("unmarshalling data: %w", err)
-					}
-					value += fmt.Sprintln(val)
-
-					value += fmt.Sprintln("----- Old Value -----")
-					val, err = unmarshalData(delta.OldValue, dynMsg)
-					if err != nil {
-						return fmt.Errorf("unmarshalling data: %w", err)
-					}
-					value += fmt.Sprintln(val)
-				}
-
-				fmt.Println(value)
 				valuePrinted = true
 			default:
 				return fmt.Errorf("invalid module kind: %q", module.Kind)

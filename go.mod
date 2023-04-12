@@ -54,7 +54,6 @@ require (
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20221104190152-7f721cb9b60c
 	github.com/streamingfast/shutter v1.5.0
-	github.com/test-go/testify v1.1.4
 	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4
 	go.opentelemetry.io/otel v1.11.1

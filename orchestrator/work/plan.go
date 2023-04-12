@@ -14,7 +14,7 @@ import (
 	"github.com/streamingfast/substreams/storage"
 
 	"github.com/streamingfast/substreams"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type Plan struct {
@@ -209,20 +209,20 @@ func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) err
 	return nil
 }
 
-func (p *Plan) initialProgressMessages() (out []*pbsubstreams.ModuleProgress) {
+func (p *Plan) initialProgressMessages() (out []*pbsubstreamsrpc.ModuleProgress) {
 	for storeName, modState := range p.ModulesStateMap {
-		var more []*pbsubstreams.BlockRange
+		var more []*pbsubstreamsrpc.BlockRange
 		for _, rng := range modState.InitialProgressRanges() {
-			more = append(more, &pbsubstreams.BlockRange{
+			more = append(more, &pbsubstreamsrpc.BlockRange{
 				StartBlock: rng.StartBlock,
 				EndBlock:   rng.ExclusiveEndBlock,
 			})
 		}
 		if len(more) != 0 {
-			out = append(out, &pbsubstreams.ModuleProgress{
+			out = append(out, &pbsubstreamsrpc.ModuleProgress{
 				Name: storeName,
-				Type: &pbsubstreams.ModuleProgress_ProcessedRanges{
-					ProcessedRanges: &pbsubstreams.ModuleProgress_ProcessedRange{
+				Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+					ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
 						ProcessedRanges: more,
 					},
 				},

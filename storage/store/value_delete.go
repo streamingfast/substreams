@@ -3,7 +3,7 @@ package store
 import (
 	"strings"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
 //func (s *baseStore) Del(ord uint64, key string) {
@@ -30,8 +30,8 @@ func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
 		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
-		delta := &pbsubstreams.StoreDelta{
-			Operation: pbsubstreams.StoreDelta_DELETE,
+		delta := &pbssinternal.StoreDelta{
+			Operation: pbssinternal.StoreDelta_DELETE,
 			Ordinal:   ord,
 			Key:       key,
 			OldValue:  val,

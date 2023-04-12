@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -27,16 +27,16 @@ func (e *StoreModuleExecutor) String() string     { return e.Name() }
 func (e *StoreModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
-	deltas := &pbsubstreams.StoreDeltas{}
+	deltas := &pbssinternal.StoreDeltas{}
 	err := proto.Unmarshal(value, deltas)
 	if err != nil {
 		return fmt.Errorf("unmarshalling output deltas: %w", err)
 	}
-	e.outputStore.SetDeltas(deltas.Deltas)
+	e.outputStore.SetDeltas(deltas.StoreDeltas)
 	return nil
 }
 
-func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutput pbsubstreams.ModuleOutputData, err error) {
+func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "exec_store")
 	defer span.EndWithErr(&err)
 
@@ -52,9 +52,9 @@ func (e *StoreModuleExecutor) HasValidOutput() bool {
 	return ok
 }
 
-func (e *StoreModuleExecutor) wrapDeltas() ([]byte, pbsubstreams.ModuleOutputData, error) {
-	deltas := &pbsubstreams.StoreDeltas{
-		Deltas: e.outputStore.GetDeltas(),
+func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, error) {
+	deltas := &pbssinternal.StoreDeltas{
+		StoreDeltas: e.outputStore.GetDeltas(),
 	}
 
 	data, err := proto.Marshal(deltas)
@@ -62,19 +62,24 @@ func (e *StoreModuleExecutor) wrapDeltas() ([]byte, pbsubstreams.ModuleOutputDat
 		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
 	}
 
-	moduleOutput := &pbsubstreams.ModuleOutput_DebugStoreDeltas{
-		DebugStoreDeltas: deltas,
+	moduleOutput := &pbssinternal.ModuleOutput{
+		Data: &pbssinternal.ModuleOutput_StoreDeltas{
+			StoreDeltas: deltas,
+		},
 	}
 	return data, moduleOutput, nil
 }
 
-func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbsubstreams.ModuleOutput, error) {
-	deltas := &pbsubstreams.StoreDeltas{}
+func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
+	deltas := &pbssinternal.StoreDeltas{}
 	err := proto.Unmarshal(data, deltas)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling output deltas: %w", err)
 	}
-	return toModuleOutput(e, &pbsubstreams.ModuleOutput_DebugStoreDeltas{
-		DebugStoreDeltas: deltas,
-	}), nil
+
+	return &pbssinternal.ModuleOutput{
+		Data: &pbssinternal.ModuleOutput_StoreDeltas{
+			StoreDeltas: deltas,
+		},
+	}, nil
 }

@@ -3,25 +3,26 @@ package pipeline
 import (
 	"testing"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
 )
 
-var reversibleOutputs = map[string][]*pbsubstreams.ModuleOutput{
+var reversibleOutputs = map[string][]*pbssinternal.ModuleOutput{
 	"10a": {
-		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 	},
 	"20a": {
-		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 	},
 	"30a": {
-		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 	},
 	"40a": {
-		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 	},
 	"50a": {
-		{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+		{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 	},
 }
 
@@ -49,24 +50,24 @@ func Test_HandleIrreversibility(t *testing.T) {
 		name              string
 		reversibleOutputs map[string][]*pbsubstreams.Module
 		blockIDs          []string
-		expectedOutputs   map[string][]*pbsubstreams.ModuleOutput
+		expectedOutputs   map[string][]*pbssinternal.ModuleOutput
 	}{
 		{
 			name:              "handle irreversibility for block 20",
 			reversibleOutputs: reversibleModules,
 			blockIDs:          []string{"20a"},
-			expectedOutputs: map[string][]*pbsubstreams.ModuleOutput{
+			expectedOutputs: map[string][]*pbssinternal.ModuleOutput{
 				"10a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 				"30a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 				"40a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 				"50a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 			},
 		},
@@ -74,15 +75,15 @@ func Test_HandleIrreversibility(t *testing.T) {
 			name:              "handle irreversibility for block 20 and 30",
 			reversibleOutputs: reversibleModules,
 			blockIDs:          []string{"20a", "30a"},
-			expectedOutputs: map[string][]*pbsubstreams.ModuleOutput{
+			expectedOutputs: map[string][]*pbssinternal.ModuleOutput{
 				"10a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 				"40a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 				"50a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 			},
 		},
@@ -90,9 +91,9 @@ func Test_HandleIrreversibility(t *testing.T) {
 			name:              "handle irreversibility for block 20, 30, 40 and 50",
 			reversibleOutputs: reversibleModules,
 			blockIDs:          []string{"20a", "30a", "40a", "50a"},
-			expectedOutputs: map[string][]*pbsubstreams.ModuleOutput{
+			expectedOutputs: map[string][]*pbssinternal.ModuleOutput{
 				"10a": {
-					{Name: "module_1"}, {Name: "module_2"}, {Name: "module_3"},
+					{ModuleName: "module_1"}, {ModuleName: "module_2"}, {ModuleName: "module_3"},
 				},
 			},
 		},

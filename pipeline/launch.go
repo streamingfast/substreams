@@ -5,18 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/streamingfast/bstream/stream"
+	"github.com/streamingfast/substreams/block"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/tracking"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/metadata"
 )
 
 // OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.
-func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, err error) error {
+func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
 	bytesMeter := tracking.GetBytesMeter(ctx)
@@ -30,7 +30,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 	}
 
 	logger.Info("stream of blocks ended",
-		zap.Uint64("stop_block_num", reqDetails.Request.StopBlockNum),
+		zap.Uint64("stop_block_num", reqDetails.StopBlockNum),
 		zap.Bool("eof", errors.Is(err, io.EOF)),
 		zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
 		//zap.Uint64("total_bytes_written", bytesMeter.BytesWritten()),
@@ -43,7 +43,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 		return fmt.Errorf("end of stream: %w", err)
 	}
 
-	if err := p.stores.flushStores(ctx, reqDetails.Request.StopBlockNum); err != nil {
+	if err := p.stores.flushStores(ctx, reqDetails.StopBlockNum); err != nil {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
@@ -54,17 +54,25 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, streamSrv Trailable, 
 	}
 
 	if p.stores.partialsWritten != nil {
-		partialRanges := make([]string, len(p.stores.partialsWritten))
-		for i, rng := range p.stores.partialsWritten {
-			partialRanges[i] = fmt.Sprintf("%d-%d", rng.StartBlock, rng.ExclusiveEndBlock)
-		}
-		logger.Info("setting trailer", zap.Strings("ranges", partialRanges))
-		streamSrv.SetTrailer(metadata.MD{"substreams-partials-written": []string{strings.Join(partialRanges, ",")}})
+		p.respFunc(&pbssinternal.ProcessRangeResponse{
+			ModuleName: reqDetails.OutputModule,
+			Type: &pbssinternal.ProcessRangeResponse_Completed{
+				Completed: &pbssinternal.Completed{
+					AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
+				},
+			},
+		})
 	}
 
 	return nil
 }
 
-type Trailable interface {
-	SetTrailer(metadata.MD)
+func toPBInternalBlockRanges(in block.Ranges) (out []*pbssinternal.BlockRange) {
+	for _, r := range in {
+		out = append(out, &pbssinternal.BlockRange{
+			StartBlock: r.StartBlock,
+			EndBlock:   r.ExclusiveEndBlock,
+		})
+	}
+	return
 }

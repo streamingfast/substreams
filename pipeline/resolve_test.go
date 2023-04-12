@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -9,21 +10,24 @@ import (
 
 	"github.com/streamingfast/bstream"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 func Test_resolveStartBlockNum(t *testing.T) {
 	tests := []struct {
-		name             string
-		req              *pbsubstreams.Request
-		expectedBlockNum uint64
-		headBlock        uint64
-		headBlockErr     error
-		wantErr          bool
+		name               string
+		req                *pbsubstreamsrpc.Request
+		expectedBlockNum   uint64
+		headBlock          uint64
+		headBlockErr       error
+		wantErr            bool
+		cursorResolverArgs []interface{}
+		wantUndoLastBlock  bstream.BlockRef
+		wantCursor         string
 	}{
 		{
 			name: "invalid cursor step",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepType(0),
@@ -36,8 +40,8 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			wantErr:          true,
 		},
 		{
-			name: "step undo",
-			req: &pbsubstreams.Request{
+			name: "step undo", // support for 'undo cursor' is kept for backwards compatibility, these cursors are not sent to client anymore
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepUndo,
@@ -48,10 +52,15 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			},
 			expectedBlockNum: 10,
 			wantErr:          false,
+			cursorResolverArgs: []interface{}{
+				"c1:2:10:10a:9:9a", bstream.NewBlockRef("9a", 9), bstream.NewBlockRef("9a", 9), nil,
+			},
+			wantCursor:        "c1:1:9:9a:9:9a",
+			wantUndoLastBlock: bstream.NewBlockRef("9a", 9),
 		},
 		{
 			name: "step new",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepNew,
@@ -62,15 +71,35 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			},
 			expectedBlockNum: 11,
 			wantErr:          false,
+			wantCursor:       "c1:1:10:10a:9:9a",
 		},
 		{
-			name: "step irreversible",
-			req: &pbsubstreams.Request{
+			name: "step new on forked cursor",
+			req: &pbsubstreamsrpc.Request{
+				StartBlockNum: 10,
+				StartCursor: (&bstream.Cursor{
+					Step:      bstream.StepNew,
+					Block:     bstream.NewBlockRef("10a", 10),
+					LIB:       bstream.NewBlockRef("6a", 6),
+					HeadBlock: bstream.NewBlockRef("10a", 10),
+				}).ToOpaque(),
+			},
+			expectedBlockNum: 9,
+			wantErr:          false,
+			cursorResolverArgs: []interface{}{
+				"c1:1:10:10a:6:6a", bstream.NewBlockRef("8a", 8), bstream.NewBlockRef("11a", 11), nil,
+			},
+			wantUndoLastBlock: bstream.NewBlockRef("8a", 8),
+			wantCursor:        "c3:1:8:8a:11:11a:6:6a",
+		},
+		{
+			name: "step irreversible", // substreams should not receive these cursors now, kept for backwards compatibility
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepIrreversible,
 					Block:     bstream.NewBlockRef("10a", 10),
-					LIB:       bstream.NewBlockRef("9a", 9),
+					LIB:       bstream.NewBlockRef("10a", 10),
 					HeadBlock: bstream.NewBlockRef("10a", 10),
 				}).ToOpaque(),
 			},
@@ -79,7 +108,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		},
 		{
 			name: "step new irreversible",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{
 					Step:      bstream.StepNewIrreversible,
@@ -90,10 +119,11 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			},
 			expectedBlockNum: 11,
 			wantErr:          false,
+			wantCursor:       "c1:17:10:10a:9:9a",
 		},
 		{
 			name: "negative startblock",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: -5,
 			},
 			headBlock:        16,
@@ -102,7 +132,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 		},
 		{
 			name: "negative startblock no head",
-			req: &pbsubstreams.Request{
+			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: -5,
 			},
 			headBlockErr: fmt.Errorf("cannot find head block"),
@@ -111,13 +141,30 @@ func Test_resolveStartBlockNum(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveStartBlockNum(tt.req, func() (uint64, error) {
-				return tt.headBlock, tt.headBlockErr
-			})
+			got, outCursor, undoSignal, err := resolveStartBlockNum(
+				context.Background(),
+				tt.req,
+				newTestCursorResolver(tt.cursorResolverArgs...).resolveCursor,
+				func() (uint64, error) { return tt.headBlock, tt.headBlockErr },
+			)
+			if tt.wantUndoLastBlock != nil {
+				require.NotNil(t, undoSignal)
+				assert.Equal(t, tt.wantUndoLastBlock.ID(), undoSignal.LastValidBlock.Id)
+				assert.Equal(t, tt.wantUndoLastBlock.Num(), undoSignal.LastValidBlock.Number)
+			} else {
+				assert.Nil(t, undoSignal)
+			}
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveStartBlockNum() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if outCur, err := bstream.CursorFromOpaque(outCursor); err != nil {
+				assert.Empty(t, tt.wantCursor)
+			} else {
+				assert.Equal(t, tt.wantCursor, outCur.String())
+			}
+
 			if got != tt.expectedBlockNum {
 				t.Errorf("resolveStartBlockNum() got = %v, want %v", got, tt.expectedBlockNum)
 			}
@@ -174,46 +221,44 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 }
 
 func TestBuildRequestDetails(t *testing.T) {
-	req, err := BuildRequestDetails(
-		&pbsubstreams.Request{
+	req, _, err := BuildRequestDetails(
+		context.Background(),
+		&pbsubstreamsrpc.Request{
 			StartBlockNum:  10,
 			ProductionMode: false,
-		},
-		true,
-		func(name string) bool {
-			return false
+			OutputModule:   "nomatch",
 		},
 		func() (uint64, error) {
 			assert.True(t, true, "should pass here")
 			return 999, nil
 		},
+		newTestCursorResolver().resolveCursor,
 		func() (uint64, error) {
 			t.Error("should not pass here")
 			return 0, nil
 		},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, 10, int(req.RequestStartBlockNum))
+	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
 	assert.Equal(t, 10, int(req.LinearHandoffBlockNum))
 
-	req, err = BuildRequestDetails(
-		&pbsubstreams.Request{
+	req, _, err = BuildRequestDetails(
+		context.Background(),
+		&pbsubstreamsrpc.Request{
 			StartBlockNum:  10,
 			ProductionMode: true,
-		},
-		true,
-		func(name string) bool {
-			return true
+			OutputModule:   "",
 		},
 		func() (uint64, error) {
 			return 999, nil
 		},
+		newTestCursorResolver().resolveCursor,
 		func() (uint64, error) {
 			t.Error("should not pass here")
 			return 0, nil
 		},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, 10, int(req.RequestStartBlockNum))
+	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
 	assert.Equal(t, 999, int(req.LinearHandoffBlockNum))
 }

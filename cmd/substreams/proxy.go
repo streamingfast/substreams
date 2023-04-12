@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/v1/substreamsv1connect"
+	pbrpcsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/tools"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -36,16 +36,15 @@ type ConnectServer struct {
 
 func (cs *ConnectServer) Blocks(
 	ctx context.Context,
-	req *connect.Request[pbsubstreams.Request],
-	stream *connect.ServerStream[pbsubstreams.Response],
+	req *connect.Request[pbrpcsubstreams.Request],
+	stream *connect.ServerStream[pbrpcsubstreams.Response],
 ) error {
-	newReq := &pbsubstreams.Request{
+	newReq := &pbrpcsubstreams.Request{
 		StartBlockNum:                       req.Msg.StartBlockNum,
 		StopBlockNum:                        req.Msg.StopBlockNum,
 		StartCursor:                         req.Msg.StartCursor,
-		ForkSteps:                           req.Msg.ForkSteps,
-		IrreversibilityCondition:            req.Msg.IrreversibilityCondition,
-		OutputModules:                       req.Msg.OutputModules,
+		FinalBlocksOnly:                     req.Msg.FinalBlocksOnly,
+		OutputModule:                        req.Msg.OutputModule,
 		Modules:                             req.Msg.Modules,
 		DebugInitialStoreSnapshotForModules: req.Msg.DebugInitialStoreSnapshotForModules,
 	}
@@ -69,7 +68,7 @@ func (cs *ConnectServer) Blocks(
 	}
 	defer connClose()
 
-	if err := pbsubstreams.ValidateRequest(newReq, false); err != nil {
+	if err := newReq.Validate(); err != nil {
 		return fmt.Errorf("validate request: %w", err)
 	}
 

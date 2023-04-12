@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/streamingfast/substreams/block"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -72,10 +73,10 @@ type Iterable interface {
 }
 
 type DeltaAccessor interface {
-	SetDeltas([]*pbsubstreams.StoreDelta)
-	GetDeltas() []*pbsubstreams.StoreDelta
-	ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta)
-	ApplyDelta(delta *pbsubstreams.StoreDelta)
+	SetDeltas([]*pbssinternal.StoreDelta)
+	GetDeltas() []*pbssinternal.StoreDelta
+	ApplyDeltasReverse(deltas []*pbssinternal.StoreDelta)
+	ApplyDelta(delta *pbssinternal.StoreDelta)
 }
 
 type Reader interface {

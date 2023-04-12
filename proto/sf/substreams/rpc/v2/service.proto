@@ -54,7 +54,7 @@ message Response {
   oneof message {
     SessionInit session = 1; // Always sent first
     ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
-    BlockScopedData block_data = 3; 
+    BlockScopedData block_scoped_data = 3; 
     BlockUndoSignal block_undo_signal = 4;
 
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.

@@ -145,8 +145,8 @@ func (s *Stream) readNextMessage() tea.Msg {
 
 func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 	switch m := resp.Message.(type) {
-	case *pbsubstreamsrpc.Response_BlockData:
-		return m.BlockData
+	case *pbsubstreamsrpc.Response_BlockScopedData:
+		return m.BlockScopedData
 	case *pbsubstreamsrpc.Response_Progress:
 		log.Printf("Progress response: %T %v", resp, resp)
 		return m.Progress

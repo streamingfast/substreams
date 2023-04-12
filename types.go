@@ -12,9 +12,9 @@ type ResponseFromAnyTier interface {
 }
 type ResponseFunc func(ResponseFromAnyTier) error
 
-func NewBlockDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstreamsrpc.Response {
+func NewBlockScopedDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstreamsrpc.Response {
 	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_BlockData{BlockData: in},
+		Message: &pbsubstreamsrpc.Response_BlockScopedData{BlockScopedData: in},
 	}
 }
 

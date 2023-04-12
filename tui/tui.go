@@ -147,19 +147,19 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreamsrpc.Response) error {
 			printUndoJSON(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
 		}
 
-	case *pbsubstreamsrpc.Response_BlockData:
+	case *pbsubstreamsrpc.Response_BlockScopedData:
 		if ui.outputMode == OutputModeTUI {
-			printClock(m.BlockData)
+			printClock(m.BlockScopedData)
 		}
-		if m.BlockData == nil {
+		if m.BlockScopedData == nil {
 			return nil
 		}
 		ui.seenFirstData = true
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()
-			return ui.decoratedBlockScopedData(m.BlockData.Output, m.BlockData.DebugMapOutputs, m.BlockData.DebugStoreOutputs, m.BlockData.Clock)
+			return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		} else {
-			return ui.jsonBlockScopedData(m.BlockData.Output, m.BlockData.DebugMapOutputs, m.BlockData.DebugStoreOutputs, m.BlockData.Clock)
+			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		}
 	case *pbsubstreamsrpc.Response_Progress:
 		if ui.seenFirstData {

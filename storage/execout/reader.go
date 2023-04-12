@@ -74,7 +74,7 @@ func (r *LinearReader) run(ctx context.Context) error {
 			}
 
 			blockScopedData, err := toBlockScopedData(r.module, item)
-			err = r.responseFunc(substreams.NewBlockDataResponse(blockScopedData))
+			err = r.responseFunc(substreams.NewBlockScopedDataResponse(blockScopedData))
 			if err != nil {
 				return fmt.Errorf("calling response func: %w", err)
 			}

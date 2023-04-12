@@ -165,8 +165,8 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 			resp, err := cli.Recv()
 			if resp != nil {
 				switch resp.Message.(type) {
-				case *pbsubstreamsrpc.Response_BlockData:
-					fmt.Println(resp.Message.(*pbsubstreamsrpc.Response_BlockData).BlockData.Output)
+				case *pbsubstreamsrpc.Response_BlockScopedData:
+					fmt.Println(resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData).BlockScopedData.Output)
 					gotResp = true
 				}
 			}

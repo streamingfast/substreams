@@ -470,7 +470,7 @@ func returnModuleDataOutputs(
 		Cursor:            cursor.ToOpaque(),
 	}
 
-	if err := respFunc(substreams.NewBlockDataResponse(out)); err != nil {
+	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}
 

@@ -150,7 +150,7 @@ func TestForkHandling(t *testing.T) {
 				require.NotNil(t, test.expectedResponseNames[i])
 				require.False(t, test.expectedResponseNames[i].undo, "received undo where we shouldn't")
 
-				data := resp.GetBlockData()
+				data := resp.GetBlockScopedData()
 				require.NotNil(t, data.Output)
 				assert.Equal(t, test.expectedResponseNames[i].id, data.Clock.Id)
 

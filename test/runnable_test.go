@@ -140,8 +140,8 @@ func (f *testRun) Run(t *testing.T) error {
 func (f *testRun) Logs() (out []string) {
 	for _, response := range f.Responses {
 		switch r := response.Message.(type) {
-		case *pbsubstreamsrpc.Response_BlockData:
-			for _, output := range r.BlockData.AllModuleOutputs() {
+		case *pbsubstreamsrpc.Response_BlockScopedData:
+			for _, output := range r.BlockScopedData.AllModuleOutputs() {
 				if debugInfo := output.DebugInfo(); debugInfo != nil {
 					for _, log := range debugInfo.GetLogs() {
 						out = append(out, log)
@@ -157,8 +157,8 @@ func (f *testRun) MapOutput(modName string) string {
 	var moduleOutputs []string
 	for _, response := range f.Responses {
 		switch r := response.Message.(type) {
-		case *pbsubstreamsrpc.Response_BlockData:
-			for _, output := range r.BlockData.AllModuleOutputs() {
+		case *pbsubstreamsrpc.Response_BlockScopedData:
+			for _, output := range r.BlockScopedData.AllModuleOutputs() {
 				if output.Name() != modName {
 					continue
 				}
@@ -184,7 +184,7 @@ func (f *testRun) MapOutput(modName string) string {
 				//if err != nil {
 				//	panic("marshaling json: " + err.Error())
 				//}
-				moduleOutputs = append(moduleOutputs, fmt.Sprintf("%d: %s: %s", r.BlockData.Clock.Number, output.Name(), res))
+				moduleOutputs = append(moduleOutputs, fmt.Sprintf("%d: %s: %s", r.BlockScopedData.Clock.Number, output.Name(), res))
 			}
 		}
 	}

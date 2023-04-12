@@ -108,7 +108,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	cursor, err := bstream.CursorFromOpaque(req.StartCursor)
 	if err != nil {
-		return 0, nil, status.Errorf(grpccodes.InvalidArgument, "invalid start cursor %q: %s", cursor, err.Error())
+		return 0, nil, status.Errorf(grpccodes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err.Error())
 	}
 
 	if cursor.IsOnFinalBlock() {
@@ -119,7 +119,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	lastValidBlock, head, err := resolveCursor(ctx, cursor)
 	if err != nil {
-		return 0, nil, status.Errorf(grpccodes.InvalidArgument, "cannot resolve startCursor %q: %s", cursor, err.Error())
+		return 0, nil, status.Errorf(grpccodes.InvalidArgument, "cannot resolve StartCursor %q: %s", cursor, err.Error())
 	}
 	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
 	if lastValidBlock.Num() != cursor.Block.Num() {
@@ -162,9 +162,6 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
 		if src == nil { // block is out of reversible segment
 			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop())
-		}
-		if src == nil {
-			return nil, nil, fmt.Errorf("cannot get source to resolve cursor")
 		}
 
 		src.Run()

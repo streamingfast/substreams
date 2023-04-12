@@ -34,7 +34,7 @@ func (sf *StreamFactory) New(
 	if cursor != "" {
 		cur, err := bstream.CursorFromOpaque(cursor)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid start cursor %q: %s", cursor, err)
+			return nil, status.Errorf(codes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err)
 		}
 		if cursorIsTarget {
 			options = append(options, stream.WithTargetCursor(cur))

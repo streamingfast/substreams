@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	pbssintern "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,19 +14,19 @@ var baseStoreConfig = &Config{
 func TestApplyDelta(t *testing.T) {
 	tests := []struct {
 		name       string
-		deltas     []*pbssintern.StoreDelta
+		deltas     []*pbssinternal.StoreDelta
 		expectedKV map[string][]byte
 	}{
 		{
 			name: "creates",
-			deltas: []*pbssintern.StoreDelta{
+			deltas: []*pbssinternal.StoreDelta{
 				{
-					Operation: pbssintern.StoreDelta_CREATE,
+					Operation: pbssinternal.StoreDelta_CREATE,
 					Key:       "k1",
 					NewValue:  []byte("v1"),
 				},
 				{
-					Operation: pbssintern.StoreDelta_CREATE,
+					Operation: pbssinternal.StoreDelta_CREATE,
 					Key:       "k2",
 					NewValue:  []byte("v2"),
 				},
@@ -38,14 +38,14 @@ func TestApplyDelta(t *testing.T) {
 		},
 		{
 			name: "update",
-			deltas: []*pbssintern.StoreDelta{
+			deltas: []*pbssinternal.StoreDelta{
 				{
-					Operation: pbssintern.StoreDelta_CREATE,
+					Operation: pbssinternal.StoreDelta_CREATE,
 					Key:       "k1",
 					NewValue:  []byte("v1"),
 				},
 				{
-					Operation: pbssintern.StoreDelta_UPDATE,
+					Operation: pbssinternal.StoreDelta_UPDATE,
 					Key:       "k1",
 					OldValue:  []byte("v1"),
 					NewValue:  []byte("v2"),
@@ -57,19 +57,19 @@ func TestApplyDelta(t *testing.T) {
 		},
 		{
 			name: "delete",
-			deltas: []*pbssintern.StoreDelta{
+			deltas: []*pbssinternal.StoreDelta{
 				{
-					Operation: pbssintern.StoreDelta_CREATE,
+					Operation: pbssinternal.StoreDelta_CREATE,
 					Key:       "k1",
 					NewValue:  []byte("v1"),
 				},
 				{
-					Operation: pbssintern.StoreDelta_CREATE,
+					Operation: pbssinternal.StoreDelta_CREATE,
 					Key:       "k2",
 					NewValue:  []byte("v2"),
 				},
 				{
-					Operation: pbssintern.StoreDelta_DELETE,
+					Operation: pbssinternal.StoreDelta_DELETE,
 					Key:       "k1",
 					OldValue:  []byte("v1"),
 				},
@@ -100,25 +100,25 @@ func Test_baseStore_SetDeltas(t *testing.T) {
 		kv:             map[string][]byte{"A": []byte("a")},
 		totalSizeBytes: 2,
 	}
-	s.SetDeltas([]*pbssintern.StoreDelta{
+	s.SetDeltas([]*pbssinternal.StoreDelta{
 		{
 			Key:       "A",
-			Operation: pbssintern.StoreDelta_DELETE,
+			Operation: pbssinternal.StoreDelta_DELETE,
 			OldValue:  []byte("a"),
 		},
 		{
 			Key:       "B",
-			Operation: pbssintern.StoreDelta_CREATE,
+			Operation: pbssinternal.StoreDelta_CREATE,
 			NewValue:  []byte("b"),
 		},
 		{
 			Key:       "C",
-			Operation: pbssintern.StoreDelta_CREATE,
+			Operation: pbssinternal.StoreDelta_CREATE,
 			NewValue:  []byte("c"),
 		},
 		{
 			Key:       "C",
-			Operation: pbssintern.StoreDelta_UPDATE,
+			Operation: pbssinternal.StoreDelta_UPDATE,
 			OldValue:  []byte("c"),
 			NewValue:  []byte("d"),
 		},

@@ -39,7 +39,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			wantErr:          true,
 		},
 		{
-			name: "step undo", // substreams customers should not receive these cursors now, kept for backwards compatibility
+			name: "step undo", // support for 'undo cursor' is kept for backwards compatibility, these cursors are not sent to client anymore
 			req: &pbsubstreamsrpc.Request{
 				StartBlockNum: 10,
 				StartCursor: (&bstream.Cursor{

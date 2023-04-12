@@ -170,9 +170,9 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 
 	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, true)
 
-	//bytesMeter := tracking.NewBytesMeter(ctx)
-	//bytesMeter.Launch(ctx, respFunc)
-	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
+	// bytesMeter := tracking.NewBytesMeter(ctx)
+	// bytesMeter.Launch(ctx, respFunc)
+	// ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)

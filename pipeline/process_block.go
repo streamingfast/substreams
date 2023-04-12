@@ -163,7 +163,7 @@ func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
-				&pbsubstreamsrpc.BlockUndoSignal{
+				BlockUndoSignal: &pbsubstreamsrpc.BlockUndoSignal{
 					LastValidBlock:  targetClock,
 					LastValidCursor: targetCursor.ToOpaque(),
 				},
@@ -229,7 +229,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		logger.Debug("will return module outputs")
 		for _, hook := range p.preFirstBlockDataHooks {
 			if err := hook(ctx, clock); err != nil {
-				return fmt.Errorf("failed to run pre-first-block-data-hook: %w", err)
+				return fmt.Errorf("failed to run pre first block data hook: %w", err)
 			}
 		}
 		p.preFirstBlockDataHooks = nil

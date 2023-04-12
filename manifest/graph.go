@@ -17,9 +17,10 @@ type ModuleGraph struct {
 
 	currentHashesCache map[string][]byte // moduleName => hash
 
-	modules     []*pbsubstreams.Module
-	moduleIndex map[string]int
-	indexIndex  map[int]*pbsubstreams.Module
+	modules         []*pbsubstreams.Module
+	moduleIndex     map[string]int
+	indexIndex      map[int]*pbsubstreams.Module
+	inputOrderIndex map[string]map[string]int
 }
 
 func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
@@ -29,15 +30,17 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 		moduleIndex:        make(map[string]int),
 		indexIndex:         make(map[int]*pbsubstreams.Module),
 		currentHashesCache: make(map[string][]byte),
+		inputOrderIndex:    map[string]map[string]int{},
 	}
 
 	for i, module := range modules {
 		g.moduleIndex[module.Name] = i
 		g.indexIndex[i] = module
+		g.inputOrderIndex[module.Name] = map[string]int{}
 	}
 
 	for i, module := range modules {
-		for _, input := range module.Inputs {
+		for j, input := range module.Inputs {
 			var moduleName string
 			if v := input.GetMap(); v != nil {
 				moduleName = v.ModuleName
@@ -51,6 +54,8 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 			if j, found := g.moduleIndex[moduleName]; found {
 				g.AddCost(i, j, 1)
 			}
+
+			g.inputOrderIndex[module.Name][moduleName] = j
 		}
 	}
 
@@ -186,6 +191,24 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbsubstreams.Modul
 	return result, nil
 }
 
+func (g *ModuleGraph) Context(moduleName string) (parents []string, children []string) {
+	for _, m := range g.MustParentsOf(moduleName) {
+		parents = append(parents, m.Name)
+	}
+	for _, m := range g.MustChildrenOf(moduleName) {
+		children = append(children, m.Name)
+	}
+	return
+}
+
+func (g *ModuleGraph) MustParentsOf(moduleName string) []*pbsubstreams.Module {
+	res, err := g.ParentsOf(moduleName)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
 func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
@@ -198,6 +221,43 @@ func (g *ModuleGraph) ParentsOf(moduleName string) ([]*pbsubstreams.Module, erro
 		if d == 1 {
 			res = append(res, g.indexIndex[i])
 		}
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return g.inputOrderIndex[moduleName][res[i].Name] < g.inputOrderIndex[moduleName][res[j].Name]
+	})
+
+	return res, nil
+}
+
+func (g *ModuleGraph) MustChildrenOf(moduleName string) []*pbsubstreams.Module {
+	res, err := g.ChildrenOf(moduleName)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+func (g *ModuleGraph) ChildrenOf(moduleName string) ([]*pbsubstreams.Module, error) {
+	if _, found := g.moduleIndex[moduleName]; !found {
+		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	}
+
+	var res []*pbsubstreams.Module
+	resSet := map[string]*pbsubstreams.Module{}
+	for _, module := range g.modules {
+		_, distances := graph.ShortestPaths(g, g.moduleIndex[module.Name])
+		for i, d := range distances {
+			if d == 1 {
+				if g.indexIndex[i].Name == moduleName {
+					resSet[module.Name] = module
+				}
+			}
+		}
+	}
+
+	for _, module := range resSet {
+		res = append(res, module)
 	}
 
 	return res, nil

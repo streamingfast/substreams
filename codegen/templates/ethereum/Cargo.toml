@@ -1,25 +1,23 @@
-{{$engine := . -}}
 [package]
-name = "{{ $engine.ProjectName }}"
-version = "{{ $engine.ProjectVersionNum }}"
-description = ""
+name = "substreams-init-test"
+version = "0.0.1"
+description = "Extraction of all Ethereum events for address bc4ca0eda7647a8ab7c2061c2e118a18a936f13d, see https://etherscan.io/address/bc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
 edition = "2021"
-repository = "https://github.com/streamingfast/substreams-template"
-license = "Apache 2.0"
+# repository = ADD REPOSITORY URL HERE
+# license = "Apache 2.0"
 
 [lib]
 name = "substreams"
 crate-type = ["cdylib"]
 
 [dependencies]
-num-bigint = "0.4.3"
 ethabi = "17"
 hex-literal = "0.3.4"
+num-bigint = "0.4"
+num-traits = "0.2.15"
 prost = "0.11"
-# Use latest from https://crates.io/crates/substreams
 substreams = "0.5"
-# Use latest from https://crates.io/crates/substreams-ethereum
-substreams-ethereum = "0.9.0"
+substreams-ethereum = "0.9"
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 [target.wasm32-unknown-unknown.dependencies]
@@ -27,7 +25,7 @@ getrandom = { version = "0.2", features = ["custom"] }
 
 [build-dependencies]
 anyhow = "1"
-substreams-ethereum = "0.9.0"
+substreams-ethereum = "0.9"
 
 [profile.release]
 lto = true

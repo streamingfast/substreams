@@ -11,3 +11,7 @@ message Tests {
 message Test {
   string field1 = 1;
 }
+
+message Number {
+  int64 field1 = 1;
+}

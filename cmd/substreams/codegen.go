@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -14,11 +15,15 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 )
 
+var (
+	devSubstreamsCodegenGenerateTo = os.Getenv("SUBSTREAMS_DEV_CODEGEN_GENERATE_TO")
+)
+
 var codegenCmd = &cobra.Command{
 	Use:   "codegen [<manifest>]",
 	Short: "Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development",
 	Long: cli.Dedent(`
-		Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development. 
+		Generate a Rust trait and boilerplate code from your 'substreams.yaml' for nicer development.
 		The manifest is optional as it will try to find a file named 'substreams.yaml' in current working directory if nothing entered.
 		You may enter a directory that contains a 'substreams.yaml' file in place of '<manifest_file>'.
 	`),
@@ -60,6 +65,12 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 	}
 
 	srcDir := path.Join(workingDir, "src")
+	if devSubstreamsCodegenGenerateTo != "" {
+		srcDir, err = filepath.Abs(devSubstreamsCodegenGenerateTo)
+		if err != nil {
+			panic(fmt.Errorf("generate to folder %q should be able to be made absolute: %w", devSubstreamsCodegenGenerateTo, err))
+		}
+	}
 
 	gen := codegen.NewGenerator(pkg, manif, protoDefinitions, srcDir)
 	err = gen.Generate()

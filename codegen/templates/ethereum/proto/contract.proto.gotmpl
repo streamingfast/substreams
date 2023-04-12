@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package contract.v1;
+
+message Events {
+    {{- range $index, $event := $.events }}
+    {{- $proto := $event.Proto }}
+    repeated {{$proto.MessageName}} {{$proto.OutputModuleFieldName}} = {{ add $index 1 }};
+    {{- end}}
+}
+
+{{- range $event := $.events }}
+{{ $proto := $event.Proto }}
+message {{$proto.MessageName}} {
+    string trx_hash = 1;
+    uint32 log_index = 2;
+    {{- range $index, $protoField := $proto.Fields }}
+    {{$protoField.Type}} {{$protoField.Name}} = {{ add $index 3 }};
+    {{- end}}
+}
+{{- end}}

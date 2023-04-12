@@ -36,7 +36,7 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: i64
+      type: proto:my.types.v1.Number
 
   - name: store_test
     kind: store

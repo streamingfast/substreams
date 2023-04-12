@@ -31,7 +31,7 @@ pub extern "C" fn map_block_i64(
     block_len: usize,
 ) {
     substreams::register_panic_hook();
-    let func = ||-> Result<i64, Error>{
+    let func = ||-> Result<pb::my_types_v1::Number, Error>{
         
         let block: substreams_ethereum::pb::eth::v2::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
 
@@ -135,7 +135,7 @@ pub extern "C" fn store_test2(
         let store_test: substreams::store::StoreGetProto<pb::my_types_v1::Test>  = substreams::store::StoreGetProto::new(store_test_ptr);
         let raw_store_test_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(store_test_deltas_ptr, store_test_deltas_len).unwrap().deltas;
 		let store_test_deltas: substreams::store::Deltas<substreams::store::DeltaProto<pb::my_types_v1::Test>> = substreams::store::Deltas::new(raw_store_test_deltas);
-        let map_block_i64: i64 = substreams::proto::decode_ptr(map_block_i64_ptr, map_block_i64_len).unwrap();
+        let map_block_i64: pb::my_types_v1::Number = substreams::proto::decode_ptr(map_block_i64_ptr, map_block_i64_len).unwrap();
         let store_bigint: substreams::store::StoreGetBigInt = substreams::store::StoreGetBigInt::new(store_bigint_ptr);
         let raw_store_bigint_deltas = substreams::proto::decode_ptr::<substreams::pb::substreams::StoreDeltas>(store_bigint_deltas_ptr, store_bigint_deltas_len).unwrap().deltas;
 		let store_bigint_deltas: substreams::store::Deltas<substreams::store::DeltaBigInt> = substreams::store::Deltas::new(raw_store_bigint_deltas);

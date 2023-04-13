@@ -48,7 +48,7 @@ communication (ex: `cursor`, `logs`...)
 * The response now contains a single module output
 * In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs`
 
-## [1.0.2](https://github.com/streamingfast/substreams/releases/tag/v1.0.2)
+## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
 
 This should be the last release before a breaking change in the API and handling of the reorgs and UNDO messages.
 
@@ -59,6 +59,13 @@ This should be the last release before a breaking change in the API and handling
 * GUI: Added support for search, similar to `less`, with `/`.
 * GUI: Search and output offset is conserved when switching module/block number in the "Output" tab.
 * Library: protobuf message descriptors now exposed in the `manifest/` package. This is something useful to any sink that would need to interpret the protobuf messages inside a Package.
+* Added support for resolving a negative start-block on server (also added to run command)
+* The `run` and `gui` command no longer resolve a `start-block=-1` to the 'initialBlock' of the requested module. To get this behavior, simply assign an empty string value to the flag `start-block` instead.
+* Added support for search within the Substreams gui `output` view. Usage of search within `output` behaves similar to the `less` command, and can be toggled with "/".
+
+## [1.0.2](https://github.com/streamingfast/substreams/releases/tag/v1.0.2)
+
+* Release was retracted because it contained the refactoring expected for 1.1.0 by mistake, check https://github.com/streamingfast/substreams/releases/tag/v1.0.3 instead.
 
 ## [1.0.1](https://github.com/streamingfast/substreams/releases/tag/v1.0.1)
 

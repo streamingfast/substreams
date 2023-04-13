@@ -50,11 +50,16 @@ communication (ex: `cursor`, `logs`...)
 
 ## Unreleased
 
+## [1.0.2](https://github.com/streamingfast/substreams/releases/tag/v1.0.2)
+
 ### Highlights
 
-* Added support for resolving a negative start-block on server (also added to run command)
-* The `run` and `gui` command no longer resolve a `start-block=-1` to the 'initialBlock' of the requested module. To get this behavior, simply assign an empty string value to the flag `start-block` instead.
-* Added support for search within the substreams gui `output` view. Usage of search within `output` behaves similar to the `less` command, and can be toggled with "/".
+* Added support for resolving a negative start-block on server
+* CHANGED: The `run` command now resolves a start-block=-1 from the head of the chain (as supported by the servers now). Prior to this change, the `-1` value meant the 'initialBlock' of the requested module. The empty string is now used for this purpose,
+* GUI: Added support for search, similar to `less`, with `/`.
+* GUI: Search and output offset is conserved when switching module/block number in the "Output" tab.
+* Library: protobuf message descriptors now exposed in the `manifest/` package. This is something useful to any sink that would need to interpret the protobuf messages inside a Package.
+
 ## [1.0.1](https://github.com/streamingfast/substreams/releases/tag/v1.0.1)
 
 ### Fixed

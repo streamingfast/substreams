@@ -110,6 +110,10 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case request.NewRequestInstance:
 		o.msgDescs = msg.MsgDescs
+		o.blocksPerModule = make(map[string][]uint64)
+		o.payloads = make(map[blockContext]*pbsubstreamsrpc.AnyModuleOutput)
+		o.blockIDs = make(map[uint64]string)
+		o.outputView.SetContent("")
 	case *pbsubstreamsrpc.BlockScopedData:
 		blockNum := msg.Clock.Number
 

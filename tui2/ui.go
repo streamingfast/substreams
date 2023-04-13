@@ -102,6 +102,8 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return ui, tea.Quit
+		case "R":
+			return ui, ui.refreshSubstream()
 		}
 		_, cmd := ui.tabs.Update(msg)
 		cmds = append(cmds, cmd)
@@ -160,16 +162,18 @@ func (ui *UI) SetSize(w, h int) {
 }
 
 func (ui *UI) View() string {
+	headline := ui.Styles.Header.Copy().Render("Substreams GUI")
+
 	if ui.stream != nil {
-		return lipgloss.JoinVertical(0,
-			ui.Styles.Header.Copy().Foreground(lipgloss.Color(ui.stream.StreamColor())).Render("Substreams GUI"),
-			ui.Styles.Tabs.Render(ui.tabs.View()),
-			ui.pages[ui.activePage].View(),
-			ui.footer.View(),
-		)
-	} else {
-		return ""
+		headline = ui.Styles.Header.Copy().Foreground(lipgloss.Color(ui.stream.StreamColor())).Render("Substreams GUI")
 	}
+
+	return lipgloss.JoinVertical(0,
+		headline,
+		ui.Styles.Tabs.Render(ui.tabs.View()),
+		ui.pages[ui.activePage].View(),
+		ui.footer.View(),
+	)
 }
 
 func (ui *UI) refreshSubstream() tea.Cmd {
@@ -183,9 +187,13 @@ func (ui *UI) refreshSubstream() tea.Cmd {
 
 	return tea.Sequence(
 		func() tea.Msg {
+			return streamui.InterruptStreamMsg
+		},
+		func() tea.Msg {
 			return request.NewRequestInstance(requestInstance)
 		},
 		requestInstance.Stream.Init(),
+
 		func() tea.Msg {
 			if ui.replayLog.IsWriting() {
 				return ui.replayLog

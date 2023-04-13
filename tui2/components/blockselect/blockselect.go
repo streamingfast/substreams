@@ -2,6 +2,7 @@ package blockselect
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/tui2/pages/request"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -50,6 +51,8 @@ func (b *BlockSelect) StretchBounds(low, high uint64) {
 func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case request.NewRequestInstance:
+		b.blocksWithData = nil
 	case tea.KeyMsg:
 		if len(b.blocksWithData) == 0 {
 			break

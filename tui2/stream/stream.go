@@ -132,15 +132,18 @@ func (s *Stream) readNextMessage() tea.Msg {
 		return nil
 	}
 
-	resp, err := s.conn.Recv()
-	if err != nil {
-		if err == io.EOF {
-			s.err = io.EOF
-			return EndOfStreamMsg
+	if s.conn != nil {
+		resp, err := s.conn.Recv()
+		if err != nil {
+			if err == io.EOF {
+				s.err = io.EOF
+				return EndOfStreamMsg
+			}
+			return StreamErrorMsg(fmt.Errorf("read next message: %w", err))
 		}
-		return StreamErrorMsg(fmt.Errorf("read next message: %w", err))
+		return s.routeNextMessage(resp)
 	}
-	return s.routeNextMessage(resp)
+	return nil
 }
 
 func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {

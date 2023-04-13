@@ -51,6 +51,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case request.NewRequestInstance:
 		targetBlock := msg.(request.NewRequestInstance).Stream.TargetParallelProcessingBlock()
+		p.dataPayloads = 0
 		p.targetBlock = targetBlock
 		p.bars = ranges.NewBars(p.Common, targetBlock)
 		p.bars.Init()

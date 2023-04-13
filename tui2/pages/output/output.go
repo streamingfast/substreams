@@ -2,18 +2,17 @@ package output
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/tui2/pages/request"
 	"log"
 
 	"github.com/charmbracelet/bubbles/key"
-
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/dynamic"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -62,15 +61,9 @@ type blockContext struct {
 	blockNum uint64
 }
 
-func New(c common.Common, msgDescs map[string]*manifest.ModuleDescriptor, modules *pbsubstreams.Modules) *Output {
-	mods := map[string]*pbsubstreams.Module{}
-	for _, mod := range modules.Modules {
-		mods[mod.Name] = mod
-	}
-
+func New(c common.Common) *Output {
 	output := &Output{
 		Common:            c,
-		msgDescs:          msgDescs,
 		blocksPerModule:   make(map[string][]uint64),
 		payloads:          make(map[blockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:          make(map[uint64]string),
@@ -115,6 +108,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case request.NewRequestInstance:
+		o.msgDescs = msg.MsgDescs
 	case *pbsubstreamsrpc.BlockScopedData:
 		blockNum := msg.Clock.Number
 

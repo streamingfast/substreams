@@ -22,7 +22,7 @@ func init() {
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 
-	guiCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
+	guiCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	guiCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	guiCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
@@ -99,8 +99,16 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Launching Substreams GUI...")
 
-	refreshContext := &request.OriginalSubstreamContext{
+	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
+	if err != nil {
+		return fmt.Errorf("stop block: %w", err)
+	}
+
+	stopBlock := mustGetString(cmd, "stop-block")
+
+	requestConfig := &request.RequestConfig{
 		ManifestPath:                manifestPath,
+		ReadFromModule:              readFromModule,
 		ProdMode:                    productionMode,
 		DebugModulesOutput:          debugModulesOutput,
 		DebugModulesInitialSnapshot: debugModulesInitialSnapshot,
@@ -109,37 +117,11 @@ func runGui(cmd *cobra.Command, args []string) error {
 		HomeDir:                     homeDir,
 		Vcr:                         mustGetBool(cmd, "replay"),
 		Cursor:                      cursor,
+		StartBlock:                  startBlock,
+		StopBlock:                   stopBlock,
 	}
 
-	startBlock := mustGetInt64(cmd, "start-block")
-	refreshContext.StartBlock = startBlock
-
-	graph, _, err := tui2.GetGraph(manifestPath)
-	if err != nil {
-		return fmt.Errorf("graph setup: %w", err)
-	}
-	
-	if startBlock == -1 {
-		sb, err := graph.ModuleInitialBlock(refreshContext.OutputModule)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return fmt.Errorf("getting module start block: %w", err)
-		}
-		refreshContext.StartBlock = int64(sb)
-	}
-
-	stopBlock, err := readStopBlockFlag(cmd, refreshContext.StartBlock, "stop-block")
-	if err != nil {
-		return fmt.Errorf("stop block: %w", err)
-	}
-	refreshContext.StopBlock = stopBlock
-
-	stream, msgDescs, replayLog, requestSummary, modules, refreshCtx, graph, err := tui2.StartSubstream(refreshContext)
-	if err != nil {
-		return fmt.Errorf("starting substream from inputs: %w", err)
-	}
-
-	ui := tui2.New(stream, msgDescs, replayLog, requestSummary, modules, *refreshCtx)
+	ui := tui2.New(requestConfig)
 	prog := tea.NewProgram(ui, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)

@@ -3,6 +3,12 @@ package request
 import (
 	"fmt"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/tui2/replaylog"
+	streamui "github.com/streamingfast/substreams/tui2/stream"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -14,20 +20,31 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
-type RefreshSubstream *OriginalSubstreamContext
+type NewRequestInstance *RequestInstance
 
-type OriginalSubstreamContext struct {
+type RequestConfig struct {
 	ManifestPath                string
+	ReadFromModule              bool
 	ProdMode                    bool
 	DebugModulesOutput          []string
 	DebugModulesInitialSnapshot []string
 	StartBlock                  int64
-	StopBlock                   uint64
+	StopBlock                   string
 	OutputModule                string
 	SubstreamsClientConfig      *client.SubstreamsClientConfig
 	HomeDir                     string
 	Vcr                         bool
 	Cursor                      string
+}
+
+type RequestInstance struct {
+	Stream         *streamui.Stream
+	MsgDescs       map[string]*manifest.ModuleDescriptor
+	ReplayLog      *replaylog.File
+	RequestSummary *Summary
+	Modules        *pbsubstreams.Modules
+	RefreshCtx     *RequestConfig
+	Graph          *manifest.ModuleGraph
 }
 
 type Request struct {
@@ -39,33 +56,32 @@ type Request struct {
 	modulesViewContent string
 }
 
-func New(c common.Common, summary *Summary, modules *pbsubstreams.Modules) *Request {
+func New(c common.Common) *Request {
 	return &Request{
-		Common:         c,
-		RequestSummary: summary,
-		Modules:        modules,
-		modulesView:    viewport.New(24, 80),
+		Common:      c,
+		modulesView: viewport.New(24, 80),
 	}
 }
 
 func (r *Request) Init() tea.Cmd {
-	r.setModulesViewContent()
 	return tea.Batch(
 		r.modulesView.Init(),
 	)
 }
+
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case NewRequestInstance:
+		r.RequestSummary = msg.RequestSummary
+		r.Modules = msg.Modules
+		r.setModulesViewContent()
 	case tea.KeyMsg:
 		var cmd tea.Cmd
 		r.modulesView, cmd = r.modulesView.Update(msg)
 		cmds = append(cmds, cmd)
-	case RefreshSubstream:
-		cmds = append(cmds, tea.Quit)
 	}
-
 	return r, tea.Batch(cmds...)
 }
 
@@ -122,7 +138,6 @@ func (r *Request) setModulesViewContent() {
 
 func (r *Request) getViewportContent() (string, error) {
 	output := ""
-
 	for i, module := range r.Modules.Modules {
 
 		var moduleDoc string
@@ -183,4 +198,127 @@ func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubst
 	}
 
 	return out, nil
+}
+
+func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
+	graph, pkg, err := readManifest(c.ManifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("graph and package setup: %w", err)
+	}
+	if c.ReadFromModule {
+		sb, err := graph.ModuleInitialBlock(c.OutputModule)
+		if err != nil {
+			return nil, fmt.Errorf("getting module start block: %w", err)
+		}
+		c.StartBlock = int64(sb)
+	}
+
+	stopBlock, err := resolveStopBlock(c.StopBlock, c.StartBlock)
+	if err != nil {
+		return nil, fmt.Errorf("stop block: %w", err)
+	}
+
+	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("substreams client setup: %w", err)
+	}
+	//defer connClose()
+
+	req := &pbsubstreamsrpc.Request{
+		StartBlockNum:                       c.StartBlock,
+		StartCursor:                         c.Cursor,
+		StopBlockNum:                        stopBlock,
+		Modules:                             pkg.Modules,
+		OutputModule:                        c.OutputModule,
+		ProductionMode:                      c.ProdMode,
+		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
+	}
+
+	stream := streamui.New(req, ssClient, callOpts)
+
+	if err := req.Validate(); err != nil {
+		return nil, fmt.Errorf("validate request: %w", err)
+	}
+
+	toPrint := c.DebugModulesOutput
+	if toPrint == nil {
+		toPrint = []string{c.OutputModule}
+	}
+
+	replayLogFilePath := filepath.Join(c.HomeDir, "replay.log")
+	replayLog := replaylog.New(replaylog.WithPath(replayLogFilePath))
+	if c.Vcr {
+		stream.ReplayBundle, err = replayLog.ReadReplay()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err := replayLog.OpenForWriting(); err != nil {
+			return nil, err
+		}
+		//defer replayLog.Close()
+	}
+
+	debugLogPath := filepath.Join(c.HomeDir, "debug.log")
+	tea.LogToFile(debugLogPath, "gui:")
+
+	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	if err != nil {
+		return nil, fmt.Errorf("building message descriptors: %w", err)
+	}
+
+	requestSummary := &Summary{
+		Manifest:        c.ManifestPath,
+		Endpoint:        c.SubstreamsClientConfig.Endpoint(),
+		ProductionMode:  c.ProdMode,
+		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
+		Docs:            pkg.PackageMeta,
+	}
+
+	substreamRequirements := &RequestInstance{
+		stream,
+		msgDescs,
+		replayLog,
+		requestSummary,
+		pkg.Modules,
+		c,
+		graph,
+	}
+
+	return substreamRequirements, nil
+}
+
+func readManifest(manifestPath string) (*manifest.ModuleGraph, *pbsubstreams.Package, error) {
+	manifestReader := manifest.NewReader(manifestPath)
+	pkg, err := manifestReader.Read()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating module graph: %w", err)
+	}
+	return graph, pkg, nil
+}
+
+func resolveStopBlock(stopBlock string, startBlock int64) (uint64, error) {
+	isRelative := strings.HasPrefix(stopBlock, "+")
+	if isRelative {
+		stopBlock = strings.TrimPrefix(stopBlock, "+")
+		if startBlock < 0 {
+			return 0, fmt.Errorf("cannot have start block negative with relative stop block")
+		}
+	}
+
+	endBlock, err := strconv.ParseUint(stopBlock, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("end block is invalid: %w", err)
+	}
+
+	if isRelative {
+		return uint64(startBlock) + endBlock, nil
+	}
+
+	return endBlock, nil
 }

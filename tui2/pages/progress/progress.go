@@ -2,6 +2,7 @@ package progress
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/tui2/pages/request"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +14,8 @@ import (
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	"github.com/streamingfast/substreams/tui2/stream"
 )
+
+type refreshProgress tea.Msg
 
 type Progress struct {
 	common.Common
@@ -31,22 +34,27 @@ type Progress struct {
 	bars *ranges.Bars
 }
 
-func New(c common.Common, targetBlock uint64) *Progress {
+func New(c common.Common) *Progress {
 	return &Progress{
 		Common:      c,
 		KeyMap:      DefaultKeyMap(),
 		state:       "Initializing",
-		targetBlock: targetBlock,
-		bars:        ranges.NewBars(c, targetBlock),
+		targetBlock: 0,
+		bars:        ranges.NewBars(c, 0),
 	}
 }
-
 func (p *Progress) Init() tea.Cmd {
 	return p.bars.Init()
 }
 
 func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
+	case request.NewRequestInstance:
+		targetBlock := msg.(request.NewRequestInstance).Stream.TargetParallelProcessingBlock()
+		p.dataPayloads = 0
+		p.targetBlock = targetBlock
+		p.bars = ranges.NewBars(p.Common, targetBlock)
+		p.bars.Init()
 	case *pbsubstreamsrpc.BlockScopedData:
 		p.dataPayloads += 1
 	case *pbsubstreamsrpc.ModulesProgress:
@@ -116,6 +124,8 @@ func (p *Progress) View() string {
 func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
 	p.Common.SetSize(w, h)
-	p.bars.SetSize(w, h-headerHeight)
+	if p.bars != nil {
+		p.bars.SetSize(w, h-headerHeight)
+	}
 	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen()) // adjust status bar width to force word wrap: full width - labels width
 }

@@ -150,8 +150,17 @@ type junctionBlockGetter struct {
 var ErrJunctionFound = errors.New("junction block found")
 
 func (j *junctionBlockGetter) ProcessBlock(block *bstream.Block, obj interface{}) error {
-	j.foundBlock = obj.(bstream.Stepable).ReorgJunctionBlock()
 	j.currentHead = obj.(bstream.Cursorable).Cursor().HeadBlock
+	stepable := obj.(bstream.Stepable)
+	switch {
+	case stepable.Step().Matches(bstream.StepNew):
+		j.foundBlock = block.AsRef()
+	case stepable.Step().Matches(bstream.StepUndo):
+		j.foundBlock = stepable.ReorgJunctionBlock()
+	default:
+		return fmt.Errorf("internal error in junctionBlockGetter: received step %v", stepable.Step())
+	}
+
 	return ErrJunctionFound
 }
 

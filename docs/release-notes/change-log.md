@@ -45,12 +45,12 @@ communication (ex: `cursor`, `logs`...)
 
 * Deprecating the "Request" and "Response" messages, with some others, from `sf.substreams.v1`, now that they moved to `sf.substreams.rpc.v2`
 * The new request excludes fields and usages that were already deprecated, like using multiple `module_outputs`
-* The response now contains a single module output 
-* In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs` 
-
-## Unreleased
+* The response now contains a single module output
+* In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs`
 
 ## [1.0.2](https://github.com/streamingfast/substreams/releases/tag/v1.0.2)
+
+This should be the last release before a breaking change in the API and handling of the reorgs and UNDO messages.
 
 ### Highlights
 

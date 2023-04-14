@@ -6,8 +6,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/components/search"
 	"github.com/streamingfast/substreams/tui2/footer"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
@@ -33,13 +35,13 @@ type UI struct {
 	requestConfig *request.RequestConfig // all boilerplate to pass down to refresh
 
 	common.Common
-	pages           []common.Component
-	activePage      page
-	footer          *footer.Footer
-	showFooter      bool
-	error           error
-	tabs            *tabs.Tabs
-	isSearchFocused bool
+	currentModalFunc common.ModalUpdateFunc
+	pages            []common.Component
+	activePage       page
+	footer           *footer.Footer
+	showFooter       bool
+	error            error
+	tabs             *tabs.Tabs
 }
 
 func New(reqConfig *request.RequestConfig) *UI {
@@ -100,14 +102,22 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		ui.SetSize(msg.Width, msg.Height)
-	case output.ToggleSearchFocus:
-		ui.isSearchFocused = !ui.isSearchFocused
+	case common.SetModalUpdateFuncMsg:
+		ui.currentModalFunc = common.ModalUpdateFunc(msg)
+	case search.ApplySearchQueryMsg:
+		ui.currentModalFunc = nil
 	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return ui, tea.Quit
+		}
+		if ui.currentModalFunc != nil {
+			_, cmd := ui.currentModalFunc(msg)
+			cmds = append(cmds, cmd)
+			return ui, tea.Batch(cmds...)
+		}
 		switch msg.String() {
-		case "q", "ctrl+c":
-			if !ui.isSearchFocused {
-				return ui, tea.Quit
-			}
+		case "q":
+			return ui, tea.Quit
 		case "R":
 			return ui, ui.refreshSubstream()
 		}

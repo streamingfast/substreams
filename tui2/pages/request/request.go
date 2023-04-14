@@ -2,14 +2,15 @@ package request
 
 import (
 	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
-	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,6 +22,11 @@ import (
 )
 
 type NewRequestInstance *RequestInstance
+
+type BlockContext struct {
+	Module   string
+	BlockNum uint64
+}
 
 type RequestConfig struct {
 	ManifestPath                string

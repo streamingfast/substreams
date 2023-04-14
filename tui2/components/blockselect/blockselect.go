@@ -2,14 +2,17 @@ package blockselect
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/tui2/pages/request"
 	"strings"
+
+	"github.com/streamingfast/substreams/tui2/components/search"
+	"github.com/streamingfast/substreams/tui2/pages/request"
 
 	"github.com/dustin/go-humanize"
 
 	"github.com/charmbracelet/lipgloss"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -18,10 +21,11 @@ type BlockSelectedMsg uint64
 type BlockSelect struct {
 	common.Common
 
-	blocksWithData []uint64
+	BlocksWithData []uint64
 	activeBlock    uint64
 	lowBlock       uint64
 	highBlock      uint64
+	blocksColored  map[uint64]bool
 }
 
 func New(c common.Common) *BlockSelect {
@@ -33,10 +37,10 @@ func (b *BlockSelect) Init() tea.Cmd {
 }
 
 func (b *BlockSelect) SetAvailableBlocks(blocks []uint64) {
-	if len(b.blocksWithData) == 0 && len(blocks) != 0 {
+	if len(b.BlocksWithData) == 0 && len(blocks) != 0 {
 		b.activeBlock = blocks[0]
 	}
-	b.blocksWithData = blocks
+	b.BlocksWithData = blocks
 }
 
 func (b *BlockSelect) SetActiveBlock(blockNum uint64) {
@@ -51,34 +55,36 @@ func (b *BlockSelect) StretchBounds(low, high uint64) {
 func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case search.UpdateMatchingBlocks:
+		b.blocksColored = msg
 	case request.NewRequestInstance:
-		b.blocksWithData = nil
+		b.BlocksWithData = nil
 	case tea.KeyMsg:
-		if len(b.blocksWithData) == 0 {
+		if len(b.BlocksWithData) == 0 {
 			break
 		}
 		key := msg.String()
 		switch key {
 		case "o":
 			var prevIdx int
-			for i, el := range b.blocksWithData {
+			for i, el := range b.BlocksWithData {
 				if el >= b.activeBlock {
 					break
 				}
 				prevIdx = i
 			}
-			b.activeBlock = b.blocksWithData[prevIdx]
+			b.activeBlock = b.BlocksWithData[prevIdx]
 			cmds = append(cmds, b.dispatchBlockSelected)
 		case "p":
-			var prevIdx = len(b.blocksWithData) - 1
+			var prevIdx = len(b.BlocksWithData) - 1
 			for i := prevIdx; i >= 0; i-- {
-				el := b.blocksWithData[i]
+				el := b.BlocksWithData[i]
 				if el <= b.activeBlock {
 					break
 				}
 				prevIdx = i
 			}
-			b.activeBlock = b.blocksWithData[prevIdx]
+			b.activeBlock = b.BlocksWithData[prevIdx]
 			cmds = append(cmds, b.dispatchBlockSelected)
 		}
 	}
@@ -102,23 +108,36 @@ func (b *BlockSelect) View() string {
 	//log.Printf("BlockSelect: high %d low %d binSize %d width %d bins %d", b.highBlock, b.lowBlock, binSize, b.Width, bins)
 
 	ptrs := make([]int, int(bins))
-	for _, blk := range b.blocksWithData {
+	colored := make(map[int]bool)
+
+	for _, blk := range b.BlocksWithData {
 		index := int(float64(blk-b.lowBlock) / binSize)
 		if index >= len(ptrs) {
 			index = len(ptrs) - 1
 		}
 		ptrs[index] += 1
+
+		if b.blocksColored != nil && b.blocksColored[blk] {
+			colored[index] = true
+		} else {
+			colored[index] = false
+		}
 	}
 	var ptrsBar []string
-	for _, p := range ptrs {
+	for i, p := range ptrs {
 		chr := " "
 		if p == 1 {
-			chr = "|"
+			chr = "‧"
 		} else if p == 2 {
-			chr = "‖"
+			chr = "⁚"
 		} else if p > 2 {
-			chr = "⫴" // or: ⁞⁝⁚‧
+			chr = "⁝" // or: ⁞⁝⁚‧
 		}
+
+		if colored[i] {
+			chr = Styles.searchMatchedBlock.Render(chr)
+		}
+
 		ptrsBar = append(ptrsBar, chr)
 	}
 
@@ -159,13 +178,15 @@ func (b *BlockSelect) View() string {
 }
 
 var Styles = struct {
-	Box           lipgloss.Style
-	SelectedBlock lipgloss.Style
-	CurrentBlock  lipgloss.Style
-	Bar           lipgloss.Style
+	Box                lipgloss.Style
+	SelectedBlock      lipgloss.Style
+	CurrentBlock       lipgloss.Style
+	Bar                lipgloss.Style
+	searchMatchedBlock lipgloss.Style
 }{
-	Box:           lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
-	SelectedBlock: lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
-	CurrentBlock:  lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
-	Bar:           lipgloss.NewStyle().Background(lipgloss.Color("235")),
+	Box:                lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
+	SelectedBlock:      lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	CurrentBlock:       lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	Bar:                lipgloss.NewStyle().Background(lipgloss.Color("235")),
+	searchMatchedBlock: lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
 }

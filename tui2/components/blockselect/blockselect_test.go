@@ -20,7 +20,7 @@ func Strip(str string) string {
 func TestBlockSelect_Bar(t *testing.T) {
 	b := &BlockSelect{
 		Common:         common.Common{Width: 45},
-		blocksWithData: []uint64{2, 4, 6, 18},
+		BlocksWithData: []uint64{2, 4, 6, 18},
 		activeBlock:    18,
 		lowBlock:       1,
 		highBlock:      20,
@@ -35,7 +35,7 @@ func TestBlockSelect_Bar(t *testing.T) {
 
 func TestBlockSelect_Update(t *testing.T) {
 	b := &BlockSelect{
-		blocksWithData: []uint64{2, 4, 6},
+		BlocksWithData: []uint64{2, 4, 6},
 		activeBlock:    5,
 	}
 	b.Update(tea.KeyMsg(tea.Key{Type: tea.KeyRunes, Runes: []rune{'o'}}))

@@ -56,6 +56,7 @@ func New(reqConfig *request.RequestConfig) *UI {
 		activePage:    progressPage,
 		tabs:          tabs.New(c, []string{"Request", "Progress", "Output"}),
 		requestConfig: reqConfig,
+		replayLog:     replaylog.New(),
 	}
 	ui.footer = footer.New(c, ui.pages[0])
 

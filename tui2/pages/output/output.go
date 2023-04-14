@@ -20,6 +20,8 @@ import (
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 )
 
+type ToggleSearchFocus bool
+
 type Output struct {
 	common.Common
 
@@ -171,7 +173,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				keyword := o.searchInput.Value()
 				searchCtx.searchKeyword = keyword
 				o.searchInput.Blur()
-
+				cmds = append(cmds, o.toggleSearchFocus())
 				//if keyword == "" {
 				//	// alternative: match the ESC key when
 				//	searchCtx.searchVisible = false
@@ -192,6 +194,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				o.searchCtx.enabled = true
 				o.searchInput.Focus()
 				o.searchInput.SetValue("")
+				cmds = append(cmds, o.toggleSearchFocus())
 			case "n":
 				log.Println("n pressed")
 				// update the offset based on the `positions`
@@ -318,5 +321,11 @@ func (o *Output) ShortHelp() []key.Binding {
 func (o *Output) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		o.ShortHelp(),
+	}
+}
+
+func (o *Output) toggleSearchFocus() tea.Cmd {
+	return func() tea.Msg {
+		return ToggleSearchFocus(true)
 	}
 }

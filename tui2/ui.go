@@ -33,12 +33,13 @@ type UI struct {
 	requestConfig *request.RequestConfig // all boilerplate to pass down to refresh
 
 	common.Common
-	pages      []common.Component
-	activePage page
-	footer     *footer.Footer
-	showFooter bool
-	error      error
-	tabs       *tabs.Tabs
+	pages           []common.Component
+	activePage      page
+	footer          *footer.Footer
+	showFooter      bool
+	error           error
+	tabs            *tabs.Tabs
+	isSearchFocused bool
 }
 
 func New(reqConfig *request.RequestConfig) *UI {
@@ -98,11 +99,14 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		ui.SetSize(msg.Width, msg.Height)
-
+	case output.ToggleSearchFocus:
+		ui.isSearchFocused = !ui.isSearchFocused
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
-			return ui, tea.Quit
+			if !ui.isSearchFocused {
+				return ui, tea.Quit
+			}
 		case "R":
 			return ui, ui.refreshSubstream()
 		}
@@ -179,6 +183,8 @@ func (ui *UI) View() string {
 
 func (ui *UI) refreshSubstream() tea.Cmd {
 	requestInstance, err := ui.requestConfig.NewInstance()
+	ui.replayLog = requestInstance.ReplayLog
+
 	if err != nil {
 		return func() tea.Msg {
 			fmt.Printf("error: %+v\n", request.NewRequestInstance(requestInstance))

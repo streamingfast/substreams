@@ -2,6 +2,8 @@ package tui2
 
 import (
 	"fmt"
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/manifest"
@@ -14,7 +16,6 @@ import (
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 	"github.com/streamingfast/substreams/tui2/tabs"
-	"log"
 )
 
 type page int
@@ -180,7 +181,7 @@ func (ui *UI) refreshSubstream() tea.Cmd {
 	requestInstance, err := ui.requestConfig.NewInstance()
 	if err != nil {
 		return func() tea.Msg {
-			fmt.Println("error: %v", request.NewRequestInstance(requestInstance))
+			fmt.Printf("error: %+v\n", request.NewRequestInstance(requestInstance))
 			return streamui.StreamErrorMsg(err)
 		}
 	}

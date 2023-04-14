@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/streamingfast/substreams"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type PipelineOptioner interface {
@@ -18,11 +19,10 @@ func WithPreBlockHook(f substreams.BlockHook) Option {
 	}
 }
 
-// WithPreFirstBlockDataHook functions will be called before we send the first 'BlockScopedData'
-// to the consumer
-func WithPreFirstBlockDataHook(f substreams.BlockHook) Option {
+// WithPendingUndoMessage allows sending a message right before we send the first 'BlockScopedData'
+func WithPendingUndoMessage(msg *pbsubstreamsrpc.Response) Option {
 	return func(p *Pipeline) {
-		p.preFirstBlockDataHooks = append(p.preBlockHooks, f)
+		p.pendingUndoMessage = msg
 	}
 }
 

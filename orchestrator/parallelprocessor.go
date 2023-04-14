@@ -6,12 +6,10 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
-
-	"github.com/streamingfast/substreams/reqctx"
-
 	"github.com/streamingfast/substreams/orchestrator/work"
-
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -35,6 +33,7 @@ func BuildParallelProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
+	pendingUndoMessage *pbsubstreamsrpc.Response,
 ) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
 
@@ -53,6 +52,7 @@ func BuildParallelProcessor(
 			requestedModuleCache,
 			respFunc,
 			runtimeConfig.CacheSaveInterval,
+			pendingUndoMessage,
 		)
 	}
 

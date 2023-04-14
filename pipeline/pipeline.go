@@ -35,10 +35,10 @@ type Pipeline struct {
 	ctx           context.Context
 	runtimeConfig config.RuntimeConfig
 
-	preFirstBlockDataHooks []substreams.BlockHook
-	preBlockHooks          []substreams.BlockHook
-	postBlockHooks         []substreams.BlockHook
-	postJobHooks           []substreams.PostJobHook
+	pendingUndoMessage *pbsubstreamsrpc.Response
+	preBlockHooks      []substreams.BlockHook
+	postBlockHooks     []substreams.BlockHook
+	postJobHooks       []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Runtime
 	outputGraph     *outputmodules.Graph
@@ -196,6 +196,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
+		p.pendingUndoMessage,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

@@ -227,12 +227,12 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 
 	if p.gate.shouldSendOutputs() {
 		logger.Debug("will return module outputs")
-		for _, hook := range p.preFirstBlockDataHooks {
-			if err := hook(ctx, clock); err != nil {
-				return fmt.Errorf("failed to run pre first block data hook: %w", err)
+		if p.pendingUndoMessage != nil {
+			if err := p.respFunc(p.pendingUndoMessage); err != nil {
+				return fmt.Errorf("failed to run send pending undo message: %w", err)
 			}
 		}
-		p.preFirstBlockDataHooks = nil
+		p.pendingUndoMessage = nil
 		if err = returnModuleDataOutputs(clock, cursor, p.mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc); err != nil {
 			return fmt.Errorf("failed to return module data output: %w", err)
 		}

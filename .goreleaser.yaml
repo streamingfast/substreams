@@ -80,6 +80,8 @@ changelog:
 
 release:
   draft: true
+  name_template: '{{.Tag}}'
+  target_commitish: '{{ .Commit }}'
 
 brews:
   - name: substreams

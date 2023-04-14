@@ -116,48 +116,66 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		return nextBlock, "", nil, nil
 	}
 
-	lastValidBlock, head, err := resolveCursor(ctx, cursor)
+	reorgJunctionBlock, head, err := resolveCursor(ctx, cursor)
 	if err != nil {
 		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "cannot resolve StartCursor %q: %s", cursor, err.Error())
 	}
 	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
-	reqCursor := req.StartCursor
-	if lastValidBlock.Num() != cursor.Block.Num() {
+	resolvedCursor := cursor
+	if reorgJunctionBlock != nil && reorgJunctionBlock.Num() != cursor.Block.Num() {
 		validCursor := &bstream.Cursor{
 			Step:      bstream.StepNew,
-			Block:     lastValidBlock,
+			Block:     reorgJunctionBlock,
 			LIB:       cursor.LIB,
 			HeadBlock: head,
 		}
-		reqCursor = validCursor.ToOpaque()
+		resolvedCursor = validCursor
 
 		undoSignal = &pbsubstreamsrpc.BlockUndoSignal{
-			LastValidBlock:  blockRefToPB(lastValidBlock),
-			LastValidCursor: reqCursor,
+			LastValidBlock:  blockRefToPB(reorgJunctionBlock),
+			LastValidCursor: resolvedCursor.ToOpaque(),
 		}
 	}
 
-	return lastValidBlock.Num() + 1, reqCursor, undoSignal, nil
+	var resolvedStartBlockNum uint64
+	switch {
+	case resolvedCursor.Step.Matches(bstream.StepNew):
+		resolvedStartBlockNum = resolvedCursor.Block.Num() + 1
+	case resolvedCursor.Step.Matches(bstream.StepUndo):
+		resolvedStartBlockNum = resolvedCursor.Block.Num()
+	}
+
+	return resolvedStartBlockNum, resolvedCursor.ToOpaque(), undoSignal, nil
 }
 
-type CursorResolver func(context.Context, *bstream.Cursor) (lastValidBlock, currentHead bstream.BlockRef, err error)
+type CursorResolver func(context.Context, *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error)
 
 type junctionBlockGetter struct {
-	foundBlock  bstream.BlockRef
-	currentHead bstream.BlockRef
+	reorgJunctionBlock bstream.BlockRef
+	currentHead        bstream.BlockRef
 }
 
-var ErrJunctionFound = errors.New("junction block found")
+var Done = errors.New("done")
 
 func (j *junctionBlockGetter) ProcessBlock(block *bstream.Block, obj interface{}) error {
-	j.foundBlock = obj.(bstream.Stepable).ReorgJunctionBlock()
 	j.currentHead = obj.(bstream.Cursorable).Cursor().HeadBlock
-	return ErrJunctionFound
+
+	stepable := obj.(bstream.Stepable)
+	switch {
+	case stepable.Step().Matches(bstream.StepNew):
+		return Done
+	case stepable.Step().Matches(bstream.StepUndo):
+		j.reorgJunctionBlock = stepable.ReorgJunctionBlock()
+		return Done
+	}
+	// ignoring other steps
+	return nil
+
 }
 
 func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store) CursorResolver {
 
-	return func(ctx context.Context, cursor *bstream.Cursor) (lastValidBlock, currentHead bstream.BlockRef, err error) {
+	return func(ctx context.Context, cursor *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error) {
 		jctBlkGetter := &junctionBlockGetter{}
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
 		if src == nil { // block is out of reversible segment
@@ -171,7 +189,7 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		case <-src.Terminated():
 		}
 
-		if !errors.Is(src.Err(), ErrJunctionFound) {
+		if !errors.Is(src.Err(), Done) {
 			headBlock := cursor.HeadBlock
 			if headNum, headID, _, _, err := hub.HeadInfo(); err == nil {
 				headBlock = bstream.NewBlockRef(headID, headNum)
@@ -179,7 +197,7 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 			return cursor.LIB, headBlock, nil
 		}
 
-		return jctBlkGetter.foundBlock, jctBlkGetter.currentHead, nil
+		return jctBlkGetter.reorgJunctionBlock, jctBlkGetter.currentHead, nil
 	}
 }
 

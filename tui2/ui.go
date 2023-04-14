@@ -184,14 +184,13 @@ func (ui *UI) View() string {
 
 func (ui *UI) refreshSubstream() tea.Cmd {
 	requestInstance, err := ui.requestConfig.NewInstance()
-	ui.replayLog = requestInstance.ReplayLog
-
 	if err != nil {
 		return func() tea.Msg {
 			fmt.Printf("error: %+v\n", request.NewRequestInstance(requestInstance))
 			return streamui.StreamErrorMsg(err)
 		}
 	}
+	ui.replayLog = requestInstance.ReplayLog
 
 	return tea.Sequence(
 		func() tea.Msg {

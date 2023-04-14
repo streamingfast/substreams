@@ -66,11 +66,6 @@ func (bd *BlockScopedData) AllModuleOutputs() (out []*AnyModuleOutput) {
 func (req *Request) Validate() error {
 	seenStores := map[string]bool{}
 
-	if req.StartBlockNum < 0 {
-		// TODO(abourget): remove this check once we support StartBlockNum being negative
-		return fmt.Errorf("negative start block %d is not accepted", req.StartBlockNum)
-	}
-
 	if req.Modules == nil {
 		return fmt.Errorf("no modules found in request")
 	}

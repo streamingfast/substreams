@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/tools/test"
 	"os"
 	"strings"
 	"time"
@@ -137,7 +139,7 @@ func (ui *TUI) Cancel() {
 	ui.shutter.Shutdown(err)
 }
 
-func (ui *TUI) IncomingMessage(resp *pbsubstreamsrpc.Response) error {
+func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Response, testRunner *test.Runner) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreamsrpc.Response_BlockUndoSignal:
 		if ui.outputMode == OutputModeTUI {
@@ -148,6 +150,10 @@ func (ui *TUI) IncomingMessage(resp *pbsubstreamsrpc.Response) error {
 		}
 
 	case *pbsubstreamsrpc.Response_BlockScopedData:
+		if testRunner != nil {
+			_ = testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
+		}
+
 		if ui.outputMode == OutputModeTUI {
 			printClock(m.BlockScopedData)
 		}

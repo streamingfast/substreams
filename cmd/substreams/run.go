@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams/tools/test"
+	"go.uber.org/zap"
 	"io"
 	"os"
 	"strconv"
@@ -33,6 +35,8 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	runCmd.Flags().StringSliceP("params", "p", nil, "Set a parames for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+	runCmd.Flags().String("test-file", "", "runs a test file")
+	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -79,6 +83,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	if err := ApplyParams(cmd, pkg); err != nil {
 		return err
+	}
+
+	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	if err != nil {
+		return fmt.Errorf("building message descriptors: %w", err)
+	}
+
+	var testRunner *test.Runner
+	testFile := mustGetString(cmd, "test-file")
+	if testFile != "" {
+		zlog.Info("running test runner", zap.String(testFile, testFile))
+		testRunner, err = test.NewRunner(testFile, msgDescs, mustGetBool(cmd, "test-verbose"), zlog)
+		if err != nil {
+			return fmt.Errorf("failed to setup test runner: %w", err)
+		}
 	}
 
 	productionMode := mustGetBool(cmd, "production-mode")
@@ -173,7 +192,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	for {
 		resp, err := cli.Recv()
 		if resp != nil {
-			if err := ui.IncomingMessage(resp); err != nil {
+			if err := ui.IncomingMessage(ctx, resp, testRunner); err != nil {
 				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 			}
 		}
@@ -181,6 +200,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 			if err == io.EOF {
 				ui.Cancel()
 				fmt.Println("all done")
+				if testRunner != nil {
+					testRunner.LogResults()
+				}
+
 				return nil
 			}
 

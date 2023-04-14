@@ -9,7 +9,6 @@ import (
 	"github.com/alecthomas/chroma/quick"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -56,7 +55,7 @@ func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin 
 		return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))
 	}
 	in := anyin.GetValue()
-	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc.MessageDescriptor)
+	dynMsg := o.messageFactory.NewDynamicMessage(msgDesc.MessageDescriptor)
 	if err := dynMsg.Unmarshal(in); err != nil {
 		return Styles.ErrorLine.Render(
 			fmt.Sprintf("Failed unmarshalling message into %s: %s\n%s",

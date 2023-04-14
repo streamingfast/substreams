@@ -1,0 +1,20 @@
+tests:
+  - module: map_extract_data_types
+    block: 12369910
+    path: .feeGrowthGlobalUpdates[] | select(.poolAddress == "7858e59e0c01ea06df3af3d20ac7b0003275d4bf") | .newValue.value
+    expect: "40709313040992720268568262802"
+  - module: map_extract_data_types
+    block: 12369910
+    path: .foo
+    expect: "2.5"
+    op: float
+  - module: map_extract_data_types
+    block: 12369910
+    path: .feeGrowthGlobalUpdates[] | select(.poolAddress == "6c6bc977e13df9b0de53b251522280bb72383700") | .newValue.value
+    expect: "329334915253227784464544"
+  - module: map_extract_data_types
+    block: 12369910
+    path: .transactions[] | select(.id == "06e53c0e241686b10a7e3aa5d3af706144a486d291e2036489ed0c4b62f75cdd") | .gasUsed
+    expect: 217278
+    op: float
+    args: error=2

@@ -70,6 +70,14 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 	return g, nil
 }
 
+func MustNewModuleGraph(modules []*pbsubstreams.Module) *ModuleGraph {
+	g, err := NewModuleGraph(modules)
+	if err != nil {
+		panic(err)
+	}
+	return g
+}
+
 // ResetGraphHashes is to be called when you want to force a recomputation of the module hashes.
 func (graph *ModuleGraph) ResetGraphHashes() {
 	graph.currentHashesCache = make(map[string][]byte)
@@ -157,6 +165,22 @@ func (g *ModuleGraph) TopologicalSort() ([]*pbsubstreams.Module, bool) {
 	return res, ok
 }
 
+func (g *ModuleGraph) TopologicalSortKnownModules(known map[string]bool) ([]*pbsubstreams.Module, bool) {
+	order, ok := graph.TopSort(g)
+	if !ok {
+		return nil, ok
+	}
+
+	var res []*pbsubstreams.Module
+	for _, i := range order {
+		if known[g.indexIndex[i].Name] {
+			res = append(res, g.indexIndex[i])
+		}
+	}
+
+	return res, ok
+}
+
 func (g *ModuleGraph) AncestorsOf(moduleName string) ([]*pbsubstreams.Module, error) {
 	if _, found := g.moduleIndex[moduleName]; !found {
 		return nil, fmt.Errorf("could not find module %s in graph", moduleName)
@@ -191,13 +215,20 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbsubstreams.Modul
 	return result, nil
 }
 
-func (g *ModuleGraph) Context(moduleName string) (parents []string, children []string) {
+func (g *ModuleGraph) Context(moduleName string, knownModules map[string]bool) (parents []string, children []string) {
 	for _, m := range g.MustParentsOf(moduleName) {
+		if _, ok := knownModules[m.Name]; !ok {
+			continue
+		}
 		parents = append(parents, m.Name)
 	}
 	for _, m := range g.MustChildrenOf(moduleName) {
+		if _, ok := knownModules[m.Name]; !ok {
+			continue
+		}
 		children = append(children, m.Name)
 	}
+
 	return
 }
 
@@ -259,6 +290,21 @@ func (g *ModuleGraph) ChildrenOf(moduleName string) ([]*pbsubstreams.Module, err
 	for _, module := range resSet {
 		res = append(res, module)
 	}
+
+	sortedModules, ok := g.TopologicalSort()
+	if !ok {
+		return nil, fmt.Errorf("could not get topological sort of module graph")
+	}
+
+	topologicalIndex := map[string]int{}
+
+	for i, node := range sortedModules {
+		topologicalIndex[node.Name] = i
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return topologicalIndex[res[i].Name] > topologicalIndex[res[j].Name]
+	})
 
 	return res, nil
 }

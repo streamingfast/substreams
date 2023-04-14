@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -14,15 +14,23 @@ type ModuleSelectedMsg string
 // A vertical bar that allows you to select a module that has been seen
 type ModSelect struct {
 	common.Common
-	seen     map[string]bool
-	Modules  []string
+	seen map[string]bool
+
+	Modules      []string
+	ModulesIndex map[string]int
+
 	Selected int
+
+	moduleGraph *manifest.ModuleGraph
 }
 
-func New(c common.Common) *ModSelect {
+func New(c common.Common, manifestPath string) *ModSelect {
 	return &ModSelect{
-		seen:   map[string]bool{},
-		Common: c,
+		seen:         map[string]bool{},
+		ModulesIndex: map[string]int{},
+		Common:       c,
+
+		moduleGraph: manifest.MustNewModuleGraph(manifest.NewReader(manifestPath).MustRead().Modules.Modules),
 	}
 }
 
@@ -51,16 +59,39 @@ func (m *ModSelect) AddModule(modName string) {
 	if !m.seen[modName] {
 		m.Modules = append(m.Modules, modName)
 		m.seen[modName] = true
+
+		// sort the modules
+
+		sorted, _ := m.moduleGraph.TopologicalSortKnownModules(m.seen)
+
+		/// reverse the order of sorted
+		for i, j := 0, len(sorted)-1; i < j; i, j = i+1, j-1 {
+			sorted[i], sorted[j] = sorted[j], sorted[i]
+		}
+
+		newModules := make([]string, 0, len(m.Modules))
+		var newSelected int
+		for idx, mod := range sorted {
+			newModules = append(newModules, mod.Name)
+			if mod.Name == m.Modules[m.Selected] {
+				newSelected = idx
+			}
+		}
+
+		m.Modules = newModules
+		m.Selected = newSelected
 	}
 }
 
 func (m *ModSelect) dispatchModuleSelected() tea.Msg {
 	return ModuleSelectedMsg(m.Modules[m.Selected])
 }
+
 func (m *ModSelect) View() string {
 	if len(m.Modules) == 0 {
 		return ""
 	}
+
 	var firstPart, lastPart, tmp []string
 	var activeModule string
 	for idx, mod := range m.Modules {
@@ -75,11 +106,13 @@ func (m *ModSelect) View() string {
 	lastPart = tmp
 
 	sidePartsWidth := (m.Width-len(activeModule)-2)/2 - 3
+
 	leftModules := strings.Join(firstPart, "  ")
 	leftWidth := len(leftModules)
 	if leftWidth > sidePartsWidth {
 		leftModules = "..." + leftModules[leftWidth-sidePartsWidth:]
 	}
+
 	rightModules := strings.Join(lastPart, "  ")
 	rightWidth := len(rightModules)
 	if rightWidth > sidePartsWidth {
@@ -93,14 +126,17 @@ func (m *ModSelect) View() string {
 			alignRight.Render(leftModules),
 			Styles.SelectedModule.Render(activeModule),
 			alignLeft.Render(rightModules),
-		))
+		),
+	)
 }
 
 var Styles = struct {
-	Box              lipgloss.Style
-	SelectedModule   lipgloss.Style
-	UnselectedModule lipgloss.Style
+	Box               lipgloss.Style
+	SelectedModule    lipgloss.Style
+	HighlightedModule lipgloss.Style
+	UnselectedModule  lipgloss.Style
 }{
-	Box:            lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
-	SelectedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
+	Box:               lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
+	SelectedModule:    lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
+	HighlightedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("21")).Bold(true),
 }

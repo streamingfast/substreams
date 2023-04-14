@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"fmt"
 	"sort"
 	"testing"
 
@@ -35,8 +34,6 @@ func TestModuleGraph_ChildrenOf(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	fmt.Println(g.String())
-
 	children, err := g.ChildrenOf("C")
 	assert.NoError(t, err)
 
@@ -54,11 +51,35 @@ func TestModuleGraph_Context(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	parents, children := g.Context("G")
+	knownModules := map[string]bool{
+		"D": true,
+		"E": true,
+		"K": true,
+	}
+
+	parents, children := g.Context("G", knownModules)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(parents))
 	assert.Equal(t, parents, []string{"D", "E"})
+	assert.Equal(t, 1, len(children))
+	assert.Equal(t, children, []string{"K"})
+}
+
+func TestModuleGraph_Context_UnknownModules(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	knownModules := map[string]bool{
+		"D": true,
+		"K": true,
+	}
+
+	parents, children := g.Context("G", knownModules)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(parents))
+	assert.Equal(t, parents, []string{"D"})
 	assert.Equal(t, 1, len(children))
 	assert.Equal(t, children, []string{"K"})
 }

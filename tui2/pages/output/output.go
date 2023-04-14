@@ -63,13 +63,13 @@ type blockContext struct {
 	blockNum uint64
 }
 
-func New(c common.Common) *Output {
+func New(c common.Common, manifestPath string) *Output {
 	output := &Output{
 		Common:            c,
 		blocksPerModule:   make(map[string][]uint64),
 		payloads:          make(map[blockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:          make(map[uint64]string),
-		moduleSelector:    modselect.New(c),
+		moduleSelector:    modselect.New(c, manifestPath),
 		blockSelector:     blockselect.New(c),
 		outputView:        viewport.New(24, 80),
 		messageFactory:    dynamic.NewMessageFactoryWithDefaults(),

@@ -72,6 +72,15 @@ func NewReader(input string, opts ...Options) *Reader {
 	return r
 }
 
+func (r *Reader) MustRead() *pbsubstreams.Package {
+	pkg, err := r.Read()
+	if err != nil {
+		panic(err)
+	}
+
+	return pkg
+}
+
 func (r *Reader) Read() (*pbsubstreams.Package, error) {
 	if r.IsRemotePackage() {
 		return r.newPkgFromURL(r.input)

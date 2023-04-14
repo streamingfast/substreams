@@ -68,7 +68,7 @@ func (r *Runner) Test(
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	clock *pbsubstreams.Clock,
-) (results []*Result) {
+) error {
 	logger := r.logger.With(zap.Uint64("block_num", clock.Number))
 
 	blockTests, found := r.tests[clock.Number]
@@ -79,23 +79,34 @@ func (r *Runner) Test(
 
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
 		moduleName := out.Name
-		logger = logger.With(zap.String("module", moduleName))
 		moduleTests, found := blockTests[moduleName]
 		if !found {
-			logger.Debug("skipping module test no test found")
+			logger.Debug("skipping module test no test found", zap.String("module", out.Name))
 			continue
 		}
 
-		results = append(results, r.testMapModule(ctx, out, moduleTests, logger)...)
+		if err := r.testMapModule(ctx, out, moduleTests, logger); err != nil {
+			return fmt.Errorf("failed to run test on module  %q - %d: %w", out.Name, clock.Number, err)
+		}
 	}
 
-	//for _, out := range debugStoreOutputs {
-	//}
+	for _, out := range debugStoreOutputs {
+		moduleName := out.Name
+		moduleTests, found := blockTests[moduleName]
+		if !found {
+			logger.Debug("skipping module test no test found", zap.String("module", out.Name))
+			continue
+		}
+		if err := r.testStoreModule(ctx, out, moduleTests, logger); err != nil {
+			return fmt.Errorf("failed to run test on module  %q - %d: %w", out.Name, clock.Number, err)
+		}
+	}
 
-	return results
+	return nil
 }
 
-func (r *Runner) testMapModule(ctx context.Context, module *pbsubstreamsrpc.MapModuleOutput, tests []*Test, logger *zap.Logger) (out []*Result) {
+func (r *Runner) testMapModule(ctx context.Context, module *pbsubstreamsrpc.MapModuleOutput, tests []*Test, logger *zap.Logger) error {
+	logger = logger.With(zap.String("module", module.Name), zap.String("module_type", "map"))
 	moduleName := module.Name
 
 	msgDesc, ok := r.descs[moduleName]
@@ -131,6 +142,79 @@ func (r *Runner) testMapModule(ctx context.Context, module *pbsubstreamsrpc.MapM
 		return nil
 	}
 
+	return r.runTests(ctx, input, tests, logger)
+}
+
+type StorageDelta struct {
+	Operation string           `json:"op"`
+	Ordinal   uint64           `json:"ordinal"`
+	Key       string           `json:"key"`
+	OldValue  *json.RawMessage `json:"old,ommitempty"`
+	NewValue  *json.RawMessage `json:"new,ommitempty"`
+}
+
+func (r *Runner) testStoreModule(ctx context.Context, module *pbsubstreamsrpc.StoreModuleOutput, tests []*Test, logger *zap.Logger) error {
+	logger = logger.With(zap.String("module", module.Name), zap.String("module_type", "store"))
+	moduleName := module.Name
+
+	msgDesc, ok := r.descs[moduleName]
+	if !ok {
+		logger.Debug("skipping store module: unable to get store delta message descriptor")
+		return nil
+	}
+
+	var dynMsg *dynamic.Message
+	if msgDesc.ProtoMessageType != "" {
+		dynMsg = r.messageFactory.NewDynamicMessage(msgDesc.MessageDescriptor)
+		if dynMsg == nil {
+			logger.Warn("skipping store module: unable to create dynamic message for store delta decoding")
+			return nil
+		}
+	}
+
+	logger.Debug("running test on store deltas", zap.Int("delta_count", len(module.DebugStoreDeltas)))
+	for _, delta := range module.DebugStoreDeltas {
+		temp := &StorageDelta{
+			Operation: delta.Operation.String(),
+			Ordinal:   delta.Ordinal,
+			Key:       delta.Key,
+		}
+
+		if dynMsg == nil {
+			temp.OldValue = r.decodeString(delta.OldValue)
+			temp.NewValue = r.decodeString(delta.NewValue)
+		} else {
+			if temp.OldValue, ok = r.decodeDynamicStoreDeltas(dynMsg, delta.OldValue, logger); !ok {
+				return fmt.Errorf("failed to decode old value")
+			}
+
+			if temp.NewValue, ok = r.decodeDynamicStoreDeltas(dynMsg, delta.NewValue, logger); !ok {
+				return fmt.Errorf("failed to new valut")
+			}
+		}
+
+		cnt, err := json.Marshal(temp)
+		if err != nil {
+			return fmt.Errorf("failed to json marsla: %w", err)
+		}
+
+		var input interface{}
+		if err := json.Unmarshal(cnt, &input); err != nil {
+			logger.Debug("json unmarshalling ", zap.Error(err))
+			return nil
+		}
+
+		if err := r.runTests(ctx, input, tests, logger); err != nil {
+			return fmt.Errorf("failed to run tests: %w", err)
+		}
+
+	}
+
+	return nil
+}
+
+func (r *Runner) runTests(ctx context.Context, input interface{}, tests []*Test, logger *zap.Logger) error {
+
 	for _, test := range tests {
 		logger.Debug("running test", zap.String("path", test.path))
 		iter := test.code.RunWithContext(ctx, input) // or query.RunWithContext
@@ -152,8 +236,7 @@ func (r *Runner) testMapModule(ctx context.Context, module *pbsubstreamsrpc.MapM
 
 		valid, msg, err := test.comparable.Cmp(actual)
 		if err != nil {
-			logger.Warn("failed to run test", zap.Error(err))
-			continue
+			return fmt.Errorf("failed to run test %d - %s: %w", test.fileIndex, test.path, err)
 		}
 
 		result := &Result{
@@ -161,7 +244,6 @@ func (r *Runner) testMapModule(ctx context.Context, module *pbsubstreamsrpc.MapM
 			Valid: valid,
 			Msg:   msg,
 		}
-		out = append(out, result)
 		r.results = append(r.results, result)
 		if result.Valid {
 			r.passed++
@@ -169,7 +251,7 @@ func (r *Runner) testMapModule(ctx context.Context, module *pbsubstreamsrpc.MapM
 			r.failed++
 		}
 	}
-	return out
+	return nil
 }
 
 func (r *Runner) LogResults() {
@@ -187,4 +269,28 @@ func (r *Runner) LogResults() {
 	fmt.Println()
 	fmt.Printf("test result: ok. %d configured; %d passed; %d failed; %d not matched\n", r.configured, r.passed, r.failed, int(r.configured)-len(r.results))
 	fmt.Println()
+}
+
+func (r *Runner) decodeDynamicStoreDeltas(dynMsg *dynamic.Message, data []byte, logger *zap.Logger) (*json.RawMessage, bool) {
+	if len(data) == 0 {
+		return nil, true
+	}
+	if err := dynMsg.Unmarshal(data); err != nil {
+		logger.Debug("skipping module cannot failed to decode message", zap.Error(err))
+		return nil, false
+	}
+
+	cnt, err := dynMsg.MarshalJSON()
+	if err != nil {
+		logger.Debug("skipping module cannot failed to JSON marshal payload", zap.Error(err))
+		return nil, false
+	}
+	v := json.RawMessage(cnt)
+	return &v, true
+
+}
+
+func (r *Runner) decodeString(data []byte) *json.RawMessage {
+	v := json.RawMessage(fmt.Sprintf("%q", string(data)))
+	return &v
 }

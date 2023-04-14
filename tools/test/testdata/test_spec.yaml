@@ -18,3 +18,11 @@ tests:
     expect: 217278
     op: float
     args: error=2
+  - module: store_pool_liquidities
+    block: 12370014
+    path: select(.key == "liquidity:c2e9f25be6257c210d7adf0d4cd6e3e881ba25f8") | .new
+    expect: 222633640125805970242
+  - module: store_pools
+    block: 12370078
+    path: select(.key == "pool:6f48eca74b38d2936b02ab603ff4e36a6c0e3a77") | .new.token1.totalSupply
+    expect: 25916147047969262

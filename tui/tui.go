@@ -151,7 +151,9 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 
 	case *pbsubstreamsrpc.Response_BlockScopedData:
 		if testRunner != nil {
-			_ = testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
+			if err := testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock); err != nil {
+				fmt.Errorf("test runner failed: %w", err)
+			}
 		}
 
 		if ui.outputMode == OutputModeTUI {

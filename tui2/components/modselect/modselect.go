@@ -64,11 +64,6 @@ func (m *ModSelect) AddModule(modName string) {
 
 		sorted, _ := m.moduleGraph.TopologicalSortKnownModules(m.seen)
 
-		/// reverse the order of sorted
-		for i, j := 0, len(sorted)-1; i < j; i, j = i+1, j-1 {
-			sorted[i], sorted[j] = sorted[j], sorted[i]
-		}
-
 		newModules := make([]string, 0, len(m.Modules))
 		var newSelected int
 		for idx, mod := range sorted {

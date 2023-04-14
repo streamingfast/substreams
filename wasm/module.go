@@ -95,7 +95,7 @@ func (m *Module) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*
 	}
 	export := m.wasmInstance.GetExport(m.wasmStore, m.entrypoint)
 	if export == nil {
-		return nil, fmt.Errorf("failed to get entrypoint %q most likely does not exists", m.entrypoint)
+		return nil, fmt.Errorf("failed to get entrypoint %q most likely does not exist", m.entrypoint)
 	}
 	entrypoint := export.Func()
 	if entrypoint == nil {

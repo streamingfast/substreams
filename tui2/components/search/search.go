@@ -2,7 +2,6 @@ package search
 
 import (
 	"fmt"
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -11,10 +10,10 @@ import (
 
 type SearchClearedMsg bool
 type ApplySearchQueryMsg string
-type JumpToNextMatchMsg struct {
-	Positions []int
-}
-type JumpToPreviousMatchMsg JumpToNextMatchMsg
+type JumpToNextMatchMsg jumpToMatch
+type JumpToPreviousMatchMsg jumpToMatch
+
+type jumpToMatch []int
 
 type Search struct {
 	input textinput.Model
@@ -112,16 +111,14 @@ func (s *Search) SetPositions(positions []int) {
 }
 
 func (s *Search) jumpToNextMatch() tea.Cmd {
-	positions := s.matchPositions
 	return func() tea.Msg {
-		return JumpToNextMatchMsg{positions}
+		return JumpToNextMatchMsg(s.matchPositions)
 	}
 }
 
 func (s *Search) jumpToPreviousMatch() tea.Cmd {
-	positions := s.matchPositions
 	return func() tea.Msg {
-		return JumpToPreviousMatchMsg{positions}
+		return JumpToPreviousMatchMsg(s.matchPositions)
 	}
 }
 

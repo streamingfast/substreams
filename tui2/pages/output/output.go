@@ -92,6 +92,21 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case search.JumpToNextMatchMsg:
+		for _, pos := range msg {
+			if pos > o.outputView.YOffset {
+				o.outputView.YOffset = pos
+				break
+			}
+		}
+	case search.JumpToPreviousMatchMsg:
+		for i := len(msg) - 1; i >= 0; i-- {
+			pos := msg[i]
+			if pos < o.outputView.YOffset {
+				o.outputView.YOffset = pos
+				break
+			}
+		}
 	case request.NewRequestInstance:
 		o.msgDescs = msg.MsgDescs
 		o.blocksPerModule = make(map[string][]uint64)
@@ -158,35 +173,20 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
 		}
-
-		_, cmd := o.moduleSelector.Update(msg)
-		cmds = append(cmds, cmd)
-
-		_, cmd = o.blockSelector.Update(msg)
-		cmds = append(cmds, cmd)
-
-		o.outputView, cmd = o.outputView.Update(msg)
-		cmds = append(cmds, cmd)
 		o.outputViewYoffset[o.active] = o.outputView.YOffset
 
 		o.setViewportContent()
-
-	case search.JumpToNextMatchMsg:
-		for _, pos := range msg.Positions {
-			if pos > o.outputView.YOffset {
-				o.outputView.YOffset = pos
-				break
-			}
-		}
-	case search.JumpToPreviousMatchMsg:
-		for i := len(msg.Positions) - 1; i >= 0; i-- {
-			pos := msg.Positions[i]
-			if pos < o.outputView.YOffset {
-				o.outputView.YOffset = pos
-				break
-			}
-		}
 	}
+
+	_, cmd := o.moduleSelector.Update(msg)
+	cmds = append(cmds, cmd)
+
+	_, cmd = o.blockSelector.Update(msg)
+	cmds = append(cmds, cmd)
+
+	o.outputView, cmd = o.outputView.Update(msg)
+	cmds = append(cmds, cmd)
+
 	return o, tea.Batch(cmds...)
 }
 
@@ -284,10 +284,20 @@ func (o *Output) updateMatchingBlocks() tea.Cmd {
 	if !o.searchEnabled {
 		return nil
 	}
+	matchingBlocks := o.searchAllBlocksForModule(o.active.Module)
 	return func() tea.Msg {
-		matchingBlocks := o.searchAllBlocksForModule(o.active.Module)
 		return search.UpdateMatchingBlocks(matchingBlocks)
 	}
+}
+
+// REMOVEME
+func (o *Output) updateMatchingBlocksTemp() {
+	if !o.searchEnabled {
+		return
+	}
+	matchingBlocks := o.searchAllBlocksForModule(o.active.Module)
+
+	o.blockSelector.Update(search.UpdateMatchingBlocks(matchingBlocks))
 }
 
 func (o *Output) searchAllBlocksForModule(moduleName string) map[uint64]bool {

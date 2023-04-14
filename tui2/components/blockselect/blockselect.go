@@ -135,7 +135,8 @@ func (b *BlockSelect) View() string {
 		}
 
 		if colored[i] {
-			chr = Styles.searchMatchedBlock.Render(chr)
+			//chr = Styles.searchMatchedBlock.Render(chr)
+			chr = "8"
 		}
 
 		ptrsBar = append(ptrsBar, chr)

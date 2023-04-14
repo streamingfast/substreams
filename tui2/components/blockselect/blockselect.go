@@ -88,8 +88,6 @@ func (b *BlockSelect) View() string {
 
 		if b.blocksColored != nil && b.blocksColored[blk] {
 			colored[index] = true
-		} else {
-			colored[index] = false
 		}
 	}
 	var ptrsBar []string
@@ -103,10 +101,11 @@ func (b *BlockSelect) View() string {
 			chr = "⁝" // or: ⁞⁝⁚‧
 		}
 
+		style := Styles.searchUnmatchedBlock
 		if colored[i] {
-			//chr = Styles.searchMatchedBlock.Render(chr)
-			chr = "8"
+			style = Styles.searchMatchedBlock
 		}
+		chr = style.Render(chr)
 
 		ptrsBar = append(ptrsBar, chr)
 	}
@@ -142,21 +141,21 @@ func (b *BlockSelect) View() string {
 
 	return Styles.Box.Render(lipgloss.JoinVertical(0,
 		fmt.Sprintf("%s%s", humanize.Comma(int64(b.lowBlock)), highBlockStyle.Render(humanize.Comma(int64(b.highBlock)))),
-		Styles.Bar.Render(strings.Join(ptrsBar, "")),
+		strings.Join(ptrsBar, ""),
 		activeBlock,
 	))
 }
 
 var Styles = struct {
-	Box                lipgloss.Style
-	SelectedBlock      lipgloss.Style
-	CurrentBlock       lipgloss.Style
-	Bar                lipgloss.Style
-	searchMatchedBlock lipgloss.Style
+	Box                  lipgloss.Style
+	SelectedBlock        lipgloss.Style
+	CurrentBlock         lipgloss.Style
+	searchUnmatchedBlock lipgloss.Style
+	searchMatchedBlock   lipgloss.Style
 }{
-	Box:                lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
-	SelectedBlock:      lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
-	CurrentBlock:       lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
-	Bar:                lipgloss.NewStyle().Background(lipgloss.Color("235")),
-	searchMatchedBlock: lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	Box:                  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
+	SelectedBlock:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	CurrentBlock:         lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
+	searchUnmatchedBlock: lipgloss.NewStyle().Background(lipgloss.Color("235")),
+	searchMatchedBlock:   lipgloss.NewStyle().Background(lipgloss.Color("235")).Foreground(lipgloss.Color("9")).Bold(true),
 }

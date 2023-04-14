@@ -1,6 +1,8 @@
 package output
 
 import (
+	"sort"
+
 	"github.com/streamingfast/substreams/tui2/components/search"
 	"github.com/streamingfast/substreams/tui2/pages/request"
 
@@ -18,8 +20,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 )
-
-type ToggleSearchFocus bool
 
 type Output struct {
 	common.Common
@@ -45,8 +45,11 @@ type Output struct {
 
 	active            request.BlockContext // module + block
 	outputViewYoffset map[request.BlockContext]int
-	searchCtx         *search.Search
-	searchEnabled     bool
+
+	searchEnabled                   bool
+	searchCtx                       *search.Search
+	searchBlockNumsWithMatches      []uint64
+	searchMatchingOutputViewOffsets []int
 }
 
 func New(c common.Common, manifestPath string) *Output {
@@ -92,21 +95,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case search.JumpToNextMatchMsg:
-		for _, pos := range msg {
-			if pos > o.outputView.YOffset {
-				o.outputView.YOffset = pos
-				break
-			}
-		}
-	case search.JumpToPreviousMatchMsg:
-		for i := len(msg) - 1; i >= 0; i-- {
-			pos := msg[i]
-			if pos < o.outputView.YOffset {
-				o.outputView.YOffset = pos
-				break
-			}
-		}
+	case search.UpdateMatchingBlocks:
+		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
 	case request.NewRequestInstance:
 		o.msgDescs = msg.MsgDescs
 		o.blocksPerModule = make(map[string][]uint64)
@@ -160,21 +150,47 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
 		o.setViewportContent()
 		cmds = append(cmds, o.updateMatchingBlocks())
-	case blockselect.BlockSelectedMsg:
-		o.active.BlockNum = uint64(msg)
+	case blockselect.BlockChangedMsg:
+		newBlock := uint64(msg)
+		o.active.BlockNum = newBlock
+		o.blockSelector.SetActiveBlock(newBlock)
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
 		o.setViewportContent()
 	case tea.KeyMsg:
-		o.searchCtx.Update(msg)
+		_, cmd := o.searchCtx.Update(msg)
+		cmds = append(cmds, cmd)
 		switch msg.String() {
 		case "/":
 			o.searchEnabled = true
 			cmds = append(cmds, o.searchCtx.InitInput())
 		case "f":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
+		case "N":
+			for i := len(o.searchMatchingOutputViewOffsets) - 1; i >= 0; i-- {
+				pos := o.searchMatchingOutputViewOffsets[i]
+				if pos < o.outputView.YOffset {
+					o.outputView.YOffset = pos
+					break
+				}
+			}
+		case "n":
+			// msg was []int the list of matching positions.
+			for _, pos := range o.searchMatchingOutputViewOffsets {
+				if pos > o.outputView.YOffset {
+					o.outputView.YOffset = pos
+					break
+				}
+			}
+		case "o":
+			cmds = append(cmds, o.jumpToPreviousBlock())
+		case "p":
+			cmds = append(cmds, o.jumpToNextBlock())
+		case "O":
+			cmds = append(cmds, o.jumpToPreviousMatchingBlock())
+		case "P":
+			cmds = append(cmds, o.jumpToNextMatchingBlock())
 		}
 		o.outputViewYoffset[o.active] = o.outputView.YOffset
-
 		o.setViewportContent()
 	}
 
@@ -212,7 +228,7 @@ func (o *Output) setViewportContent() {
 			var positions []int
 			content, lines, positions = applySearchColoring(content, o.searchCtx.Query)
 			o.searchCtx.SetMatchCount(lines) //timesFound = lines
-			o.searchCtx.SetPositions(positions)
+			o.searchMatchingOutputViewOffsets = positions
 		}
 		o.lastDisplayContext = dpContext
 		o.outputView.SetContent(content)
@@ -249,19 +265,23 @@ func (o *Output) ShortHelp() []key.Binding {
 	return []key.Binding{
 		key.NewBinding(
 			key.WithKeys("u", "i"),
-			key.WithHelp("u/i", "Nav. modules"),
+			key.WithHelp("u/i", "nav. modules"),
 		),
 		key.NewBinding(
 			key.WithKeys("o", "p"),
-			key.WithHelp("o/p", "Nav. blocks"),
+			key.WithHelp("o/p", "nav. blocks"),
 		),
 		key.NewBinding(
 			key.WithKeys("up", "k", "down", "j"),
 			key.WithHelp("↑/k/↓/j", "up/down"),
 		),
 		key.NewBinding(
+			key.WithKeys("O", "P"),
+			key.WithHelp("O/P", "nav. matched blocks"),
+		),
+		key.NewBinding(
 			key.WithKeys("/"),
-			key.WithHelp("/", "Search"),
+			key.WithHelp("/", "search"),
 		),
 		key.NewBinding(
 			key.WithKeys("R"),
@@ -269,7 +289,7 @@ func (o *Output) ShortHelp() []key.Binding {
 		),
 		key.NewBinding(
 			key.WithKeys("f"),
-			key.WithHelp("f", "Bytes encoding"),
+			key.WithHelp("f", "bytes format"),
 		),
 	}
 }
@@ -319,4 +339,73 @@ func (o *Output) searchAllBlocksForModule(moduleName string) map[uint64]bool {
 		}
 	}
 	return out
+}
+
+func (o *Output) orderMatchingBlocks(msg search.UpdateMatchingBlocks) []uint64 {
+	l := make([]uint64, len(msg))
+	count := 0
+	for k := range msg {
+		l[count] = k
+		count++
+	}
+	sort.Slice(l, func(i, j int) bool { return l[i] < l[j] })
+	return l
+}
+
+func (o *Output) jumpToPreviousBlock() tea.Cmd {
+	withData := o.blocksPerModule[o.active.Module]
+	activeBlockNum := o.active.BlockNum
+	return func() tea.Msg {
+		var prevIdx int
+		for i, el := range withData {
+			if el >= activeBlockNum {
+				break
+			}
+			prevIdx = i
+		}
+		return blockselect.BlockChangedMsg(withData[prevIdx])
+	}
+}
+
+func (o *Output) jumpToNextBlock() tea.Cmd {
+	withData := o.blocksPerModule[o.active.Module]
+	activeBlockNum := o.active.BlockNum
+	return func() tea.Msg {
+		var prevIdx = len(withData) - 1
+		for i := prevIdx; i >= 0; i-- {
+			el := withData[i]
+			if el <= activeBlockNum {
+				break
+			}
+			prevIdx = i
+		}
+		return blockselect.BlockChangedMsg(withData[prevIdx])
+	}
+}
+
+func (o *Output) jumpToPreviousMatchingBlock() tea.Cmd {
+	activeBlock := o.active.BlockNum
+	blocks := o.searchBlockNumsWithMatches
+	return func() tea.Msg {
+		for i := len(blocks) - 1; i >= 0; i-- {
+			block := blocks[i]
+			if block < activeBlock {
+				return blockselect.BlockChangedMsg(block)
+			}
+		}
+		return nil
+	}
+}
+
+func (o *Output) jumpToNextMatchingBlock() tea.Cmd {
+	activeBlock := o.active.BlockNum
+	blocks := o.searchBlockNumsWithMatches
+	return func() tea.Msg {
+		for _, block := range blocks {
+			if block > activeBlock {
+				return blockselect.BlockChangedMsg(block)
+			}
+		}
+		return nil
+	}
 }

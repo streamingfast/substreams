@@ -5,10 +5,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
+type SelectNextModuleMsg string // TODO: use the same pattern as `blockselect`
+type SelectPreviousModuleMsg string
 type ModuleSelectedMsg string
 
 // A vertical bar that allows you to select a module that has been seen

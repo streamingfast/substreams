@@ -2,26 +2,23 @@ package search
 
 import (
 	"fmt"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
+type UpdateMatchingBlocks map[uint64]bool
 type SearchClearedMsg bool
 type ApplySearchQueryMsg string
-type JumpToNextMatchMsg jumpToMatch
-type JumpToPreviousMatchMsg jumpToMatch
-
-type jumpToMatch []int
 
 type Search struct {
 	input textinput.Model
 
-	enabled        bool
-	Query          string
-	timesFound     int
-	matchPositions []int
+	enabled    bool
+	Query      string
+	timesFound int
 }
 
 func New() *Search {
@@ -61,14 +58,7 @@ func (s *Search) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		} else {
 			switch msg.String() {
-			case "N":
-				cmds = append(cmds, s.jumpToPreviousMatch())
-			case "n":
-				cmds = append(cmds, s.jumpToNextMatch())
-				//case "O":
-				//	cmds = append(cmds, s.jumpToPreviousMatchingBlock())
-				//case "P":
-				//	cmds = append(cmds, s.jumpToNextMatchingBlock())
+
 			}
 		}
 	}
@@ -104,22 +94,6 @@ func (s *Search) cancelModal() tea.Cmd {
 
 func (s *Search) SetMatchCount(count int) {
 	s.timesFound = count
-}
-
-func (s *Search) SetPositions(positions []int) {
-	s.matchPositions = positions
-}
-
-func (s *Search) jumpToNextMatch() tea.Cmd {
-	return func() tea.Msg {
-		return JumpToNextMatchMsg(s.matchPositions)
-	}
-}
-
-func (s *Search) jumpToPreviousMatch() tea.Cmd {
-	return func() tea.Msg {
-		return JumpToPreviousMatchMsg(s.matchPositions)
-	}
 }
 
 func (s *Search) applySearchQuery(query string) tea.Cmd {

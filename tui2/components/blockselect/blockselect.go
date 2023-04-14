@@ -16,12 +16,13 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
-type BlockSelectedMsg uint64
+type BlockChangedMsg uint64
+type JumpToBlockMsg uint64
 
 type BlockSelect struct {
 	common.Common
 
-	BlocksWithData []uint64
+	blocksWithData []uint64
 	activeBlock    uint64
 	lowBlock       uint64
 	highBlock      uint64
@@ -37,10 +38,10 @@ func (b *BlockSelect) Init() tea.Cmd {
 }
 
 func (b *BlockSelect) SetAvailableBlocks(blocks []uint64) {
-	if len(b.BlocksWithData) == 0 && len(blocks) != 0 {
+	if len(b.blocksWithData) == 0 && len(blocks) != 0 {
 		b.activeBlock = blocks[0]
 	}
-	b.BlocksWithData = blocks
+	b.blocksWithData = blocks
 }
 
 func (b *BlockSelect) SetActiveBlock(blockNum uint64) {
@@ -58,41 +59,9 @@ func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case search.UpdateMatchingBlocks:
 		b.blocksColored = msg
 	case request.NewRequestInstance:
-		b.BlocksWithData = nil
-	case tea.KeyMsg:
-		if len(b.BlocksWithData) == 0 {
-			break
-		}
-		key := msg.String()
-		switch key {
-		case "o":
-			var prevIdx int
-			for i, el := range b.BlocksWithData {
-				if el >= b.activeBlock {
-					break
-				}
-				prevIdx = i
-			}
-			b.activeBlock = b.BlocksWithData[prevIdx]
-			cmds = append(cmds, b.dispatchBlockSelected)
-		case "p":
-			var prevIdx = len(b.BlocksWithData) - 1
-			for i := prevIdx; i >= 0; i-- {
-				el := b.BlocksWithData[i]
-				if el <= b.activeBlock {
-					break
-				}
-				prevIdx = i
-			}
-			b.activeBlock = b.BlocksWithData[prevIdx]
-			cmds = append(cmds, b.dispatchBlockSelected)
-		}
+		b.blocksWithData = nil
 	}
 	return b, tea.Batch(cmds...)
-}
-
-func (b *BlockSelect) dispatchBlockSelected() tea.Msg {
-	return BlockSelectedMsg(b.activeBlock)
 }
 
 func (b *BlockSelect) View() string {
@@ -110,7 +79,7 @@ func (b *BlockSelect) View() string {
 	ptrs := make([]int, int(bins))
 	colored := make(map[int]bool)
 
-	for _, blk := range b.BlocksWithData {
+	for _, blk := range b.blocksWithData {
 		index := int(float64(blk-b.lowBlock) / binSize)
 		if index >= len(ptrs) {
 			index = len(ptrs) - 1

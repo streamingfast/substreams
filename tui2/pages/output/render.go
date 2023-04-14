@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
+	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/muesli/termenv"
@@ -20,6 +21,7 @@ func (o *Output) renderPayload(in *pbsubstreamsrpc.AnyModuleOutput) string {
 		return ""
 	}
 	out := &strings.Builder{}
+	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
 	if debugInfo := in.DebugInfo(); debugInfo != nil {
 		for _, log := range debugInfo.Logs {

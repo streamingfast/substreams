@@ -37,8 +37,9 @@ type Output struct {
 	lowBlock  uint64
 	highBlock uint64
 
-	blocksPerModule map[string][]uint64
-	payloads        map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
+	blocksPerModule     map[string][]uint64
+	payloads            map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
+	bytesRepresentation dynamic.BytesRepresentation
 
 	blockIDs map[uint64]string
 
@@ -50,16 +51,17 @@ type Output struct {
 
 func New(c common.Common, manifestPath string) *Output {
 	output := &Output{
-		Common:            c,
-		blocksPerModule:   make(map[string][]uint64),
-		payloads:          make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
-		blockIDs:          make(map[uint64]string),
-		moduleSelector:    modselect.New(c, manifestPath),
-		blockSelector:     blockselect.New(c),
-		outputView:        viewport.New(24, 80),
-		messageFactory:    dynamic.NewMessageFactoryWithDefaults(),
-		outputViewYoffset: map[request.BlockContext]int{},
-		searchCtx:         search.New(),
+		Common:              c,
+		blocksPerModule:     make(map[string][]uint64),
+		payloads:            make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
+		blockIDs:            make(map[uint64]string),
+		moduleSelector:      modselect.New(c, manifestPath),
+		blockSelector:       blockselect.New(c),
+		outputView:          viewport.New(24, 80),
+		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
+		outputViewYoffset:   map[request.BlockContext]int{},
+		searchCtx:           search.New(),
+		bytesRepresentation: dynamic.BytesAsHex,
 	}
 	return output
 }
@@ -153,6 +155,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/":
 			o.searchEnabled = true
 			cmds = append(cmds, o.searchCtx.InitInput())
+		case "f":
+			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
 		}
 
 		_, cmd := o.moduleSelector.Update(msg)
@@ -262,6 +266,10 @@ func (o *Output) ShortHelp() []key.Binding {
 		key.NewBinding(
 			key.WithKeys("R"),
 			key.WithHelp("R", "refresh"),
+		),
+		key.NewBinding(
+			key.WithKeys("f"),
+			key.WithHelp("f", "Bytes encoding"),
 		),
 	}
 }

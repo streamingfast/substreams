@@ -13,6 +13,98 @@ var twenty = uint64(20)
 var thirty = uint64(30)
 
 // NewTestModules can be used in foreign packages for their test suite
+func NewSimpleTestModules() []*pbsubstreams.Module {
+	return []*pbsubstreams.Module{
+		{
+			Name:         "A",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+		},
+		{
+			Name:         "B",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "A",
+					}},
+				},
+			},
+		},
+		{
+			Name:         "C",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "A",
+					}},
+				},
+			},
+		},
+		{
+			Name:         "D",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "B",
+					}},
+				},
+				{
+					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "C",
+					}},
+				},
+			},
+		},
+		{
+			Name:         "E",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "B",
+					}},
+				},
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "D",
+					}},
+				},
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "X",
+					}},
+				},
+			},
+		},
+		{
+			Name:         "F",
+			InitialBlock: zero,
+			Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "D",
+					}},
+				},
+			},
+		},
+		{
+			Name:   "X",
+			Kind:   &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+			Inputs: nil,
+		},
+	}
+
+}
+
+// NewTestModules can be used in foreign packages for their test suite
 func NewTestModules() []*pbsubstreams.Module {
 	return []*pbsubstreams.Module{
 		{

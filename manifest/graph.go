@@ -151,6 +151,25 @@ func startBlockForModule(moduleIndex int, g *ModuleGraph) (out uint64, err error
 	return uint64(parentsInitialBlock), nil
 }
 
+func (g *ModuleGraph) ModuleNameFromIndex(index int) string {
+	return g.indexIndex[index].Name
+}
+
+func (g *ModuleGraph) ModuleIndexFromName(name string) int {
+	return g.moduleIndex[name]
+}
+
+func (g *ModuleGraph) Modules() []string {
+	var modules []string
+	for _, module := range g.modules {
+		modules = append(modules, module.Name)
+	}
+
+	SortModuleNamesByGraphTopology(modules, g)
+
+	return modules
+}
+
 func (g *ModuleGraph) TopologicalSort() ([]*pbsubstreams.Module, bool) {
 	order, ok := graph.TopSort(g)
 	if !ok {

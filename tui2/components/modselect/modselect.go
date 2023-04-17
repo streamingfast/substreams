@@ -1,6 +1,9 @@
 package modselect
 
 import (
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/yourbasic/graph"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,23 +20,45 @@ type ModuleSelectedMsg string
 // A vertical bar that allows you to select a module that has been seen
 type ModSelect struct {
 	common.Common
-	seen map[string]bool
 
-	Modules      []string
-	ModulesIndex map[string]int
+	Seen    map[string]bool
+	Modules []string
 
-	Selected int
+	columnsCache [][]int
+
+	Selected            int
+	SelectedColumn      int
+	SelectedColumnIndex int
+
+	Highlighted            int
+	HighlightedColumn      int
+	HighlightedColumnIndex int
 
 	moduleGraph *manifest.ModuleGraph
 }
 
 func New(c common.Common, manifestPath string) *ModSelect {
-	return &ModSelect{
-		seen:         map[string]bool{},
-		ModulesIndex: map[string]int{},
-		Common:       c,
+	graph := manifest.MustNewModuleGraph(manifest.NewReader(manifestPath).MustRead().Modules.Modules)
+	modules := graph.Modules()
 
-		moduleGraph: manifest.MustNewModuleGraph(manifest.NewReader(manifestPath).MustRead().Modules.Modules),
+	return &ModSelect{
+		Common:  c,
+		Seen:    map[string]bool{},
+		Modules: modules,
+
+		moduleGraph: graph,
+	}
+}
+
+func newTestModSelect(modules []*pbsubstreams.Module) *ModSelect {
+	graph := manifest.MustNewModuleGraph(modules)
+
+	return &ModSelect{
+		Common:  common.Common{},
+		Seen:    map[string]bool{},
+		Modules: graph.Modules(),
+
+		moduleGraph: graph,
 	}
 }
 
@@ -59,25 +84,9 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *ModSelect) AddModule(modName string) {
-	if !m.seen[modName] {
+	if !m.Seen[modName] {
 		m.Modules = append(m.Modules, modName)
-		m.seen[modName] = true
-
-		// sort the modules
-
-		sorted, _ := m.moduleGraph.TopologicalSortKnownModules(m.seen)
-
-		newModules := make([]string, 0, len(m.Modules))
-		var newSelected int
-		for idx, mod := range sorted {
-			newModules = append(newModules, mod.Name)
-			if mod.Name == m.Modules[m.Selected] {
-				newSelected = idx
-			}
-		}
-
-		m.Modules = newModules
-		m.Selected = newSelected
+		m.Seen[modName] = true
 	}
 }
 
@@ -133,8 +142,87 @@ var Styles = struct {
 	SelectedModule    lipgloss.Style
 	HighlightedModule lipgloss.Style
 	UnselectedModule  lipgloss.Style
+	UnavailableModule lipgloss.Style
 }{
 	Box:               lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
 	SelectedModule:    lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
 	HighlightedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("21")).Bold(true),
+	UnavailableModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("8")).Bold(false),
+	UnselectedModule:  lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("0")).Bold(false),
+}
+
+func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
+	if m.columnsCache != nil {
+		return m.columnsCache, nil
+	}
+
+	g := m.moduleGraph
+	_, distances := graph.ShortestPaths(g, targetNode)
+
+	alreadyAdded := map[string]bool{}
+	distanceMap := map[int64][]int{}
+
+	for i, d := range distances {
+		if d < 0 {
+			continue
+		}
+
+		module := g.ModuleNameFromIndex(i)
+		if _, ok := alreadyAdded[module]; ok {
+			continue
+		}
+
+		if distanceMap[d] == nil {
+			distanceMap[d] = []int{}
+		}
+		distanceMap[d] = append(distanceMap[d], i)
+	}
+
+	var distanceKeys []int64
+	for k := range distanceMap {
+		distanceKeys = append(distanceKeys, k)
+	}
+	sort.Slice(distanceKeys, func(i, j int) bool {
+		return distanceKeys[i] < distanceKeys[j]
+	})
+
+	res := make([][]int, len(distanceKeys))
+
+	for i, d := range distanceKeys {
+		res[i] = distanceMap[d]
+	}
+
+	m.columnsCache = res
+	return res, nil
+}
+
+func (m *ModSelect) GetRenderedColumns(targetNode int) ([][]string, error) {
+	columns, err := m.GetColumns(targetNode)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([][]string, len(columns))
+	for i, _ := range columns {
+		res[i] = make([]string, len(columns[i]))
+		for j, _ := range columns[i] {
+			modIdx := columns[i][j]
+			modStr := m.moduleGraph.ModuleNameFromIndex(modIdx)
+			if !m.Seen[modStr] {
+				res[i][j] = Styles.UnavailableModule.Render(modStr)
+				continue
+			}
+			if modIdx == m.Highlighted {
+				res[i][j] = Styles.HighlightedModule.Render(modStr)
+				continue
+			}
+			if modIdx == m.Selected {
+				res[i][j] = Styles.SelectedModule.Render(modStr)
+				continue
+			}
+			res[i][j] = Styles.UnselectedModule.Render(modStr)
+		}
+	}
+
+	return res, nil
 }

@@ -2,6 +2,7 @@ package progress
 
 import (
 	"fmt"
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/streamingfast/substreams/tui2/pages/request"
 	"time"
 
@@ -25,6 +26,7 @@ type Progress struct {
 	replayState string
 	targetBlock uint64
 
+	progressView      viewport.Model
 	progressUpdates   int
 	dataPayloads      int
 	updatedSecond     int64
@@ -36,19 +38,29 @@ type Progress struct {
 
 func New(c common.Common) *Progress {
 	return &Progress{
-		Common:      c,
-		KeyMap:      DefaultKeyMap(),
-		state:       "Initializing",
-		targetBlock: 0,
-		bars:        ranges.NewBars(c, 0),
+		Common:       c,
+		KeyMap:       DefaultKeyMap(),
+		state:        "Initializing",
+		targetBlock:  0,
+		progressView: viewport.New(24, 80),
+		bars:         ranges.NewBars(c, 0),
 	}
 }
 func (p *Progress) Init() tea.Cmd {
-	return p.bars.Init()
+	return tea.Batch(
+		p.bars.Init(),
+		p.progressView.Init(),
+	)
 }
 
 func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg.(type) {
+	case tea.KeyMsg:
+		var cmd tea.Cmd
+		p.progressView, cmd = p.progressView.Update(msg)
+		cmds = append(cmds, cmd)
 	case request.NewRequestInstance:
 		targetBlock := msg.(request.NewRequestInstance).Stream.TargetParallelProcessingBlock()
 		p.dataPayloads = 0
@@ -67,6 +79,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		p.updatesThisSecond += 1
 		p.bars.Update(msg)
+		p.progressView.SetContent(p.bars.View())
 	case stream.StreamErrorMsg:
 		p.state = fmt.Sprintf("Error: %s", msg)
 	case *replaylog.File:
@@ -104,7 +117,6 @@ func labelsMaxLen() int {
 }
 
 func (p *Progress) View() string {
-
 	infos := []string{
 		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
 		fmt.Sprintf("%d", p.targetBlock),
@@ -117,7 +129,7 @@ func (p *Progress) View() string {
 			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
 		)),
-		p.bars.View(),
+		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(p.progressView.View()),
 	)
 }
 
@@ -127,5 +139,7 @@ func (p *Progress) SetSize(w, h int) {
 	if p.bars != nil {
 		p.bars.SetSize(w, h-headerHeight)
 	}
+	p.progressView.Width = w
+	p.progressView.Height = h - headerHeight
 	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen()) // adjust status bar width to force word wrap: full width - labels width
 }

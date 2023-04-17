@@ -52,7 +52,7 @@ type Output struct {
 	searchMatchingOutputViewOffsets []int
 }
 
-func New(c common.Common, manifestPath string) *Output {
+func New(c common.Common, manifestPath string, outputModule string) *Output {
 	output := &Output{
 		Common:              c,
 		blocksPerModule:     make(map[string][]uint64),

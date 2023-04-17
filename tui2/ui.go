@@ -53,7 +53,7 @@ func New(reqConfig *request.RequestConfig) *UI {
 		pages: []common.Component{
 			request.New(c),
 			progress.New(c),
-			output.New(c, reqConfig.ManifestPath),
+			output.New(c, reqConfig.ManifestPath, reqConfig.OutputModule),
 		},
 		activePage:    progressPage,
 		tabs:          tabs.New(c, []string{"Request", "Progress", "Output"}),

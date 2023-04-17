@@ -24,7 +24,9 @@ type ModSelect struct {
 	Seen    map[string]bool
 	Modules []string
 
+	outputModule int
 	columnsCache [][]int
+	columnsIndex map[int][2]int
 
 	Selected            int
 	SelectedColumn      int
@@ -37,28 +39,34 @@ type ModSelect struct {
 	moduleGraph *manifest.ModuleGraph
 }
 
-func New(c common.Common, manifestPath string) *ModSelect {
-	graph := manifest.MustNewModuleGraph(manifest.NewReader(manifestPath).MustRead().Modules.Modules)
-	modules := graph.Modules()
+func New(c common.Common, manifestPath string, outputModule string) *ModSelect {
+	g := manifest.MustNewModuleGraph(manifest.NewReader(manifestPath).MustRead().Modules.Modules)
+	modules := g.Modules()
+
+	if outputModule == "" {
+		panic("output module is empty")
+	}
 
 	return &ModSelect{
-		Common:  c,
-		Seen:    map[string]bool{},
-		Modules: modules,
+		Common:       c,
+		Seen:         map[string]bool{},
+		Modules:      modules,
+		outputModule: g.ModuleIndexFromName(outputModule),
 
-		moduleGraph: graph,
+		moduleGraph: g,
 	}
 }
 
 func newTestModSelect(modules []*pbsubstreams.Module) *ModSelect {
-	graph := manifest.MustNewModuleGraph(modules)
+	g := manifest.MustNewModuleGraph(modules)
 
 	return &ModSelect{
-		Common:  common.Common{},
-		Seen:    map[string]bool{},
-		Modules: graph.Modules(),
+		Common:       common.Common{},
+		Seen:         map[string]bool{},
+		Modules:      g.Modules(),
+		outputModule: 4,
 
-		moduleGraph: graph,
+		moduleGraph: g,
 	}
 }
 
@@ -85,8 +93,20 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *ModSelect) AddModule(modName string) {
 	if !m.Seen[modName] {
-		m.Modules = append(m.Modules, modName)
+		isFirstDataModule := len(m.Seen) == 0
 		m.Seen[modName] = true
+
+		if isFirstDataModule {
+			ix := m.moduleGraph.ModuleIndexFromName(modName)
+			m.Selected = ix
+			m.Highlighted = m.Selected
+
+			colrow := m.columnsIndex[m.Selected]
+			m.SelectedColumn = colrow[0]
+			m.SelectedColumnIndex = colrow[1]
+			m.HighlightedColumn = m.SelectedColumn
+			m.HighlightedColumnIndex = m.SelectedColumnIndex
+		}
 	}
 }
 
@@ -137,20 +157,6 @@ func (m *ModSelect) View() string {
 	)
 }
 
-var Styles = struct {
-	Box               lipgloss.Style
-	SelectedModule    lipgloss.Style
-	HighlightedModule lipgloss.Style
-	UnselectedModule  lipgloss.Style
-	UnavailableModule lipgloss.Style
-}{
-	Box:               lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
-	SelectedModule:    lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
-	HighlightedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("21")).Bold(true),
-	UnavailableModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("8")).Bold(false),
-	UnselectedModule:  lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("0")).Bold(false),
-}
-
 func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
 	if m.columnsCache != nil {
 		return m.columnsCache, nil
@@ -193,10 +199,18 @@ func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
 	}
 
 	m.columnsCache = res
+
+	m.columnsIndex = make(map[int][2]int)
+	for i, col := range res {
+		for j, modIdx := range col {
+			m.columnsIndex[modIdx] = [2]int{i, j}
+		}
+	}
+
 	return res, nil
 }
 
-func (m *ModSelect) GetRenderedColumns(targetNode int) ([][]string, error) {
+func (m *ModSelect) GetRenderedColumns(targetNode int) ([]Column, error) {
 	columns, err := m.GetColumns(targetNode)
 	if err != nil {
 		return nil, err
@@ -224,5 +238,40 @@ func (m *ModSelect) GetRenderedColumns(targetNode int) ([][]string, error) {
 		}
 	}
 
-	return res, nil
+	var finalRes []Column
+	for _, col := range res {
+		finalRes = append(finalRes, col)
+	}
+
+	return finalRes, nil
+}
+
+type Column []string
+
+func (c Column) Len() int {
+	longest := 0
+	for _, v := range c {
+		if len(v) > longest {
+			longest = len(v)
+		}
+	}
+	return longest
+}
+
+func (c Column) String() string {
+	return strings.Join(c, "\n")
+}
+
+var Styles = struct {
+	Box               lipgloss.Style
+	SelectedModule    lipgloss.Style
+	HighlightedModule lipgloss.Style
+	UnselectedModule  lipgloss.Style
+	UnavailableModule lipgloss.Style
+}{
+	Box:               lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
+	SelectedModule:    lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
+	HighlightedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("21")).Bold(true),
+	UnavailableModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("8")).Bold(false),
+	UnselectedModule:  lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("0")).Bold(false),
 }

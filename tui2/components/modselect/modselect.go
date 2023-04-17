@@ -24,9 +24,9 @@ type ModSelect struct {
 	Seen    map[string]bool
 	Modules []string
 
-	outputModule int
-	columnsCache [][]int
-	columnsIndex map[int][2]int
+	outputModule  int
+	columnsCache  [][]int
+	locationIndex map[int][2]int
 
 	Selected            int
 	SelectedColumn      int
@@ -101,9 +101,9 @@ func (m *ModSelect) AddModule(modName string) {
 			m.Selected = ix
 			m.Highlighted = m.Selected
 
-			colrow := m.columnsIndex[m.Selected]
-			m.SelectedColumn = colrow[0]
-			m.SelectedColumnIndex = colrow[1]
+			loc := m.locationIndex[m.Selected]
+			m.SelectedColumn = loc[0]
+			m.SelectedColumnIndex = loc[1]
 			m.HighlightedColumn = m.SelectedColumn
 			m.HighlightedColumnIndex = m.SelectedColumnIndex
 		}
@@ -200,10 +200,10 @@ func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
 
 	m.columnsCache = res
 
-	m.columnsIndex = make(map[int][2]int)
+	m.locationIndex = make(map[int][2]int)
 	for i, col := range res {
 		for j, modIdx := range col {
-			m.columnsIndex[modIdx] = [2]int{i, j}
+			m.locationIndex[modIdx] = [2]int{i, j}
 		}
 	}
 

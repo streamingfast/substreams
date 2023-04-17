@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/abourget/llerrgroup"
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ func init() {
 	Cmd.AddCommand(cleanUpCmd)
 }
 
-//delete all partial files which are already merged into the kv store
+// delete all partial files which are already merged into the kv store
 func cleanUpE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
@@ -32,7 +33,7 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 	highestKVBlock := uint64(0)
 	partialFiles := map[uint64]string{}
 
-	files, err := store.ListSnapshotFiles(ctx)
+	files, err := store.ListSnapshotFiles(ctx, math.MaxUint64)
 	if err != nil {
 		return fmt.Errorf("failed to list snapshots: %w", err)
 	}

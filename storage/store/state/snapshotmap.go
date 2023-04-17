@@ -23,7 +23,7 @@ func (s *storeSnapshotsMap) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchState(ctx context.Context, storeConfigMap store.ConfigMap) (*storeSnapshotsMap, error) {
+func FetchState(ctx context.Context, storeConfigMap store.ConfigMap, below uint64) (*storeSnapshotsMap, error) {
 	state := &storeSnapshotsMap{
 		Snapshots: map[string]*storeSnapshots{},
 	}
@@ -39,7 +39,7 @@ func FetchState(ctx context.Context, storeConfigMap store.ConfigMap) (*storeSnap
 		storeConfig := config
 
 		eg.Go(func() error {
-			snapshots, err := listSnapshots(ctx, storeConfig)
+			snapshots, err := listSnapshots(ctx, storeConfig, below)
 			if err != nil {
 				return err
 			}

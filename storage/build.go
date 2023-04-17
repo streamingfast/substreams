@@ -18,8 +18,11 @@ func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.Config
 	if err := buildStoresStorageState(ctx, storeConfigMap, cacheSaveInterval, storeLinearHandoffBlock, out); err != nil {
 		return nil, err
 	}
-	if err := buildMappersStorageState(ctx, mapConfigs, cacheSaveInterval, requestStartBlock, linearHandoffBlock, out); err != nil {
-		return nil, err
+	// dev mode does not manage mappers states (output caches)
+	if details := reqctx.Details(ctx); details.ProductionMode {
+		if err := buildMappersStorageState(ctx, mapConfigs, cacheSaveInterval, requestStartBlock, linearHandoffBlock, details.OutputModule, out); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -27,7 +30,7 @@ func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.Config
 func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap, storeSnapshotsSaveInterval, storeLinearHandoff uint64, out ModuleStorageStateMap) error {
 	logger := reqctx.Logger(ctx)
 
-	state, err := storeState.FetchState(ctx, storeConfigMap)
+	state, err := storeState.FetchState(ctx, storeConfigMap, storeLinearHandoff)
 	if err != nil {
 		return fmt.Errorf("fetching stores states: %w", err)
 	}
@@ -51,13 +54,13 @@ func buildStoresStorageState(ctx context.Context, storeConfigMap store.ConfigMap
 	return nil
 }
 
-func buildMappersStorageState(ctx context.Context, execoutConfigs *execout.Configs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock uint64, out ModuleStorageStateMap) error {
-	stateMap, err := execoutState.FetchMappersState(ctx, execoutConfigs)
+func buildMappersStorageState(ctx context.Context, execoutConfigs *execout.Configs, execOutputSaveInterval, requestStartBlock, linearHandoffBlock uint64, outputModule string, out ModuleStorageStateMap) error {
+	stateMap, err := execoutState.FetchMappersState(ctx, execoutConfigs, outputModule)
 	if err != nil {
 		return fmt.Errorf("fetching execout states: %w", err)
 	}
-	// TODO(abourget): loop the `stateMap` instead, there shouldn't be
-	//  anything but mappers in there, so the error shouldn't trigger below.
+
+	// note: there is only a single state in this map
 	for modName, ranges := range stateMap.Snapshots {
 		if out[modName] != nil {
 			return fmt.Errorf("attempting to overwrite storage state for module %q", modName)

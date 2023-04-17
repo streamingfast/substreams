@@ -113,7 +113,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			}
 			storeStats := initializeStoreStats(conf)
 
-			stateStore, fileInfos, err := getStore(ctx, conf)
+			stateStore, fileInfos, err := getStore(ctx, conf, math.MaxUint64)
 			if err != nil {
 				if errors.Is(err, EmptyStoreError) {
 					zlog.Debug("skipping empty store", zap.String("module", module.Name))
@@ -232,9 +232,9 @@ func initializeStoreStats(conf *store.Config) *StoreStats {
 	return storeStats
 }
 
-func getStore(ctx context.Context, conf *store.Config) (store.Store, []*store.FileInfo, error) {
+func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Store, []*store.FileInfo, error) {
 	start := time.Now()
-	files, err := conf.ListSnapshotFiles(ctx)
+	files, err := conf.ListSnapshotFiles(ctx, below)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing snapshot files: %w", err)
 	}

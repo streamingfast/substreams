@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/derr"
@@ -115,7 +116,7 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 		)
 		cli.NoError(err, "unable to create store config")
 
-		out, err := store.ListSnapshotFiles(ctx)
+		out, err := store.ListSnapshotFiles(ctx, math.MaxUint64)
 		cli.NoError(err, "list snapshots")
 		for _, o := range out {
 			if o.Partial {

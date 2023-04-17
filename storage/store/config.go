@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -101,16 +102,25 @@ func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (int64, error
 	return size, nil
 }
 
-func (c *Config) ListSnapshotFiles(ctx context.Context) (files []*FileInfo, err error) {
+func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*FileInfo, err error) {
+	if below == 0 {
+		return nil, nil
+	}
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		if err := c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(filename)
 			if !ok {
 				return nil
 			}
+			if fileInfo.StartBlock >= 0 {
+				return io.EOF
+			}
 			files = append(files, fileInfo)
 			return nil
 		}); err != nil {
+			if err == io.EOF {
+				return nil
+			}
 			return fmt.Errorf("walking snapshots: %w", err)
 		}
 		return nil

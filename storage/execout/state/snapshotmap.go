@@ -7,9 +7,7 @@ import (
 	"sync"
 
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
-	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/substreams/storage/execout"
 )
 
@@ -26,40 +24,20 @@ func (s *SnapshotsMap) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchMappersState(ctx context.Context, configs *execout.Configs) (*SnapshotsMap, error) {
-	state := &SnapshotsMap{
-		Snapshots: map[string]block.Ranges{},
+func FetchMappersState(ctx context.Context, configs *execout.Configs, outputModule string) (*SnapshotsMap, error) {
+
+	config := configs.ConfigMap[outputModule]
+
+	if config == nil {
+		return nil, nil
 	}
 
-	eg := llerrgroup.New(10)
-
-	for _, config := range configs.ConfigMap {
-		if config.ModuleKind() != pbsubstreams.ModuleKindMap {
-			continue
-		}
-
-		if eg.Stop() {
-			break
-		}
-
-		storeName := config.Name()
-		storeConfig := config
-
-		eg.Go(func() error {
-			snapshots, err := listSnapshots(ctx, storeConfig)
-			if err != nil {
-				return err
-			}
-			state.Lock()
-			state.Snapshots[storeName] = snapshots
-			state.Unlock()
-			return nil
-		})
+	snapshots, err := listSnapshots(ctx, config)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := eg.Wait(); err != nil {
-		return nil, fmt.Errorf("running list snapshots: %w", err)
-	}
-
-	return state, nil
+	return &SnapshotsMap{
+		Snapshots: map[string]block.Ranges{outputModule: snapshots},
+	}, nil
 }

@@ -16,6 +16,33 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 )
 
+func (o *Output) wrapLogs(log string) string {
+	var result, line string
+	charCount := 0
+
+	for _, char := range log {
+		line += string(char)
+		charCount++
+
+		if charCount >= o.Width {
+			if result != "" {
+				result += "\n"
+			}
+			result += line
+			line = ""
+			charCount = 0
+		}
+	}
+
+	if line != "" {
+		if result != "" {
+			result += "\n"
+		}
+		result += line
+	}
+	return result
+}
+
 func (o *Output) renderPayload(in *pbsubstreamsrpc.AnyModuleOutput) string {
 	if in == nil {
 		return ""
@@ -26,7 +53,7 @@ func (o *Output) renderPayload(in *pbsubstreamsrpc.AnyModuleOutput) string {
 	if debugInfo := in.DebugInfo(); debugInfo != nil {
 		for _, log := range debugInfo.Logs {
 			out.WriteString(Styles.LogLabel.Render("log: "))
-			out.WriteString(Styles.LogLine.Render(log))
+			out.WriteString(Styles.LogLine.Render(o.wrapLogs(log)))
 			out.WriteString("\n")
 		}
 

@@ -405,7 +405,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 
 	resultMap := make(map[string]exec.ModuleExecutor)
 
-	eg := llerrgroup.New(10)
+	eg := llerrgroup.New(40)
 	mut := sync.Mutex{}
 	for _, mod := range modules {
 

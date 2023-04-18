@@ -95,6 +95,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case search.SearchClearedMsg:
+		o.searchEnabled = false
 	case search.UpdateMatchingBlocks:
 		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
 	case request.NewRequestInstance:

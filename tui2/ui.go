@@ -35,13 +35,14 @@ type UI struct {
 	requestConfig *request.RequestConfig // all boilerplate to pass down to refresh
 
 	common.Common
-	currentModalFunc common.ModalUpdateFunc
-	pages            []common.Component
-	activePage       page
-	footer           *footer.Footer
-	showFooter       bool
-	error            error
-	tabs             *tabs.Tabs
+	currentModalFunc       common.ModalUpdateFunc
+	currentModuleModalFunc common.ModuleModalUpdateFunc
+	pages                  []common.Component
+	activePage             page
+	footer                 *footer.Footer
+	showFooter             bool
+	error                  error
+	tabs                   *tabs.Tabs
 }
 
 func New(reqConfig *request.RequestConfig) *UI {
@@ -103,7 +104,13 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		ui.SetSize(msg.Width, msg.Height)
 	case common.SetModalUpdateFuncMsg:
-		ui.currentModalFunc = common.ModalUpdateFunc(msg)
+		if ui.currentModuleModalFunc == nil {
+			ui.currentModalFunc = common.ModalUpdateFunc(msg)
+		}
+	case common.SetModuleModalUpdateFuncMsg:
+		if ui.currentModalFunc == nil {
+			ui.currentModuleModalFunc = common.ModuleModalUpdateFunc(msg)
+		}
 	case search.ApplySearchQueryMsg:
 		ui.currentModalFunc = nil
 	case tea.KeyMsg:
@@ -112,6 +119,11 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if ui.currentModalFunc != nil {
 			_, cmd := ui.currentModalFunc(msg)
+			cmds = append(cmds, cmd)
+			return ui, tea.Batch(cmds...)
+		}
+		if ui.currentModuleModalFunc != nil {
+			_, cmd := ui.currentModuleModalFunc(msg)
 			cmds = append(cmds, cmd)
 			return ui, tea.Batch(cmds...)
 		}

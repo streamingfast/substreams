@@ -8,7 +8,7 @@ import (
 
 func TestGetColumns(t *testing.T) {
 	modSelect := newTestModSelect(manifest.NewSimpleTestModules())
-	g, err := modSelect.GetColumns(4)
+	g, err := modSelect.SetColumns()
 	assert.NoError(t, err)
 
 	want := [][]int{{4}, {1, 3, 6}, {0, 2}}
@@ -30,8 +30,12 @@ func TestModSelect_GetRenderedColumns(t *testing.T) {
 		"X": true,
 	}
 
-	r, err := modSelect.GetRenderedColumns(4)
+	r, err := modSelect.GetRenderedColumns()
 	assert.NoError(t, err)
 
 	_ = r
+}
+
+func TestColumnRender(t *testing.T) {
+
 }

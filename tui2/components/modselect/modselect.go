@@ -25,16 +25,18 @@ type ModSelect struct {
 	Modules []string
 
 	outputModule  int
-	columnsCache  [][]int
+	columns       [][]int
 	locationIndex map[int][2]int
 
-	Selected            int
-	SelectedColumn      int
-	SelectedColumnIndex int
+	Selected             int
+	SelectedColumn       int
+	SelectedColumnIndex  int
+	SelectedColumnLength int
 
-	Highlighted            int
-	HighlightedColumn      int
-	HighlightedColumnIndex int
+	Highlighted             int
+	HighlightedColumn       int
+	HighlightedColumnIndex  int
+	HighlightedColumnLength int
 
 	moduleGraph *manifest.ModuleGraph
 }
@@ -53,6 +55,8 @@ func New(c common.Common, manifestPath string, outputModule string) *ModSelect {
 		Modules:      modules,
 		outputModule: g.ModuleIndexFromName(outputModule),
 
+		locationIndex: make(map[int][2]int),
+
 		moduleGraph: g,
 	}
 }
@@ -65,6 +69,8 @@ func newTestModSelect(modules []*pbsubstreams.Module) *ModSelect {
 		Seen:         map[string]bool{},
 		Modules:      g.Modules(),
 		outputModule: 4,
+
+		locationIndex: make(map[int][2]int),
 
 		moduleGraph: g,
 	}
@@ -80,11 +86,58 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		switch msg.String() {
-		case "u":
-			m.Selected = (m.Selected - 1 + len(m.Modules)) % len(m.Modules)
-			cmds = append(cmds, m.dispatchModuleSelected)
+		case "a":
+			// go up in the current column
+			m.HighlightedColumnIndex--
+			if m.HighlightedColumnIndex < 0 {
+				m.HighlightedColumnIndex = m.HighlightedColumnLength - 1 // wrap around
+			}
+			m.Highlighted = m.columns[m.HighlightedColumn][m.HighlightedColumnIndex]
+		case "z":
+			// go down in the current column
+			m.HighlightedColumnIndex++
+			if m.HighlightedColumnIndex >= m.HighlightedColumnLength {
+				m.HighlightedColumnIndex = 0 // wrap around
+			}
+			m.Highlighted = m.columns[m.HighlightedColumn][m.HighlightedColumnIndex]
 		case "i":
-			m.Selected = (m.Selected + 1) % len(m.Modules)
+			// go right to the next column
+			if m.HighlightedColumn+1 >= len(m.columns) {
+				break //cannot go right. already at the end
+			}
+
+			m.HighlightedColumn++
+			m.HighlightedColumnIndex = 0
+			m.HighlightedColumnLength = len(m.columns[m.HighlightedColumn])
+			m.Highlighted = m.columns[m.HighlightedColumn][m.HighlightedColumnIndex]
+		case "u":
+			// go left to the previous column
+			if m.HighlightedColumn-1 < 0 {
+				break //cannot go left. already at the beginning
+			}
+
+			m.HighlightedColumn--
+			m.HighlightedColumnIndex = 0
+			m.HighlightedColumnLength = len(m.columns[m.HighlightedColumn])
+			m.Highlighted = m.columns[m.HighlightedColumn][m.HighlightedColumnIndex]
+		case "b":
+			if m.Highlighted == m.Selected {
+				break // nothing to do
+			}
+
+			//redraw all the things!
+			// reset the columns and location index
+			_, err := m.SetColumns()
+			if err != nil {
+				panic(err)
+			}
+
+			loc := m.locationIndex[m.Selected]
+			m.SelectedColumn = loc[0]
+			m.SelectedColumnIndex = loc[1]
+			m.HighlightedColumn = m.SelectedColumn
+			m.HighlightedColumnIndex = m.SelectedColumnIndex
+
 			cmds = append(cmds, m.dispatchModuleSelected)
 		}
 	}
@@ -101,6 +154,11 @@ func (m *ModSelect) AddModule(modName string) {
 			m.Selected = ix
 			m.Highlighted = m.Selected
 
+			_, err := m.SetColumns()
+			if err != nil {
+				panic(err)
+			}
+
 			loc := m.locationIndex[m.Selected]
 			m.SelectedColumn = loc[0]
 			m.SelectedColumnIndex = loc[1]
@@ -115,55 +173,72 @@ func (m *ModSelect) dispatchModuleSelected() tea.Msg {
 }
 
 func (m *ModSelect) View() string {
-	if len(m.Modules) == 0 {
+	if len(m.Seen) == 0 {
 		return ""
 	}
 
-	var firstPart, lastPart, tmp []string
-	var activeModule string
-	for idx, mod := range m.Modules {
-		if idx == m.Selected {
-			activeModule = mod
-			firstPart = tmp[:]
-			tmp = nil
-		} else {
-			tmp = append(tmp, mod)
-		}
-	}
-	lastPart = tmp
+	cs, _ := m.GetRenderedColumns()
 
-	sidePartsWidth := (m.Width-len(activeModule)-2)/2 - 3
+	var leftSide, rightSide []Column
+	var center Column
+	leftSide, center, rightSide = cs[:m.SelectedColumn], cs[m.SelectedColumn], cs[m.SelectedColumn+1:]
 
-	leftModules := strings.Join(firstPart, "  ")
-	leftWidth := len(leftModules)
-	if leftWidth > sidePartsWidth {
-		leftModules = "..." + leftModules[leftWidth-sidePartsWidth:]
-	}
+	_, _, _ = leftSide, center, rightSide
 
-	rightModules := strings.Join(lastPart, "  ")
-	rightWidth := len(rightModules)
-	if rightWidth > sidePartsWidth {
-		rightModules = rightModules[:sidePartsWidth] + "..."
-	}
+	return ""
 
-	alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Right)
-	alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Left)
-	return Styles.Box.MaxWidth(m.Width).Render(
-		lipgloss.JoinHorizontal(0.5,
-			alignRight.Render(leftModules),
-			Styles.SelectedModule.Render(activeModule),
-			alignLeft.Render(rightModules),
-		),
-	)
+	//var firstPart, lastPart, tmp []string
+	//var activeModule string
+	//for idx, mod := range m.Modules {
+	//	if idx == m.Selected {
+	//		activeModule = mod
+	//		firstPart = tmp[:]
+	//		tmp = nil
+	//	} else {
+	//		tmp = append(tmp, mod)
+	//	}
+	//}
+	//lastPart = tmp
+	//
+	//sidePartsWidth := (m.Width-len(activeModule)-2)/2 - 3
+	//
+	//leftModules := strings.Join(firstPart, "  ")
+	//leftWidth := len(leftModules)
+	//if leftWidth > sidePartsWidth {
+	//	leftModules = "..." + leftModules[leftWidth-sidePartsWidth:]
+	//}
+	//
+	//rightModules := strings.Join(lastPart, "  ")
+	//rightWidth := len(rightModules)
+	//if rightWidth > sidePartsWidth {
+	//	rightModules = rightModules[:sidePartsWidth] + "..."
+	//}
+	//
+	//alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Right)
+	//alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Left)
+	//return Styles.Box.MaxWidth(m.Width).Render(
+	//	lipgloss.JoinHorizontal(0.5,
+	//		alignRight.Render(leftModules),
+	//		Styles.SelectedModule.Render(activeModule),
+	//		alignLeft.Render(rightModules),
+	//	),
+	//)
 }
 
-func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
-	if m.columnsCache != nil {
-		return m.columnsCache, nil
+func (m *ModSelect) GetColumns() ([][]int, error) {
+	if m.columns == nil {
+		_, err := m.SetColumns()
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	return m.columns, nil
+}
+
+func (m *ModSelect) SetColumns() ([][]int, error) {
 	g := m.moduleGraph
-	_, distances := graph.ShortestPaths(g, targetNode)
+	_, distances := graph.ShortestPaths(g, m.Selected)
 
 	alreadyAdded := map[string]bool{}
 	distanceMap := map[int64][]int{}
@@ -198,7 +273,7 @@ func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
 		res[i] = distanceMap[d]
 	}
 
-	m.columnsCache = res
+	m.columns = res
 
 	m.locationIndex = make(map[int][2]int)
 	for i, col := range res {
@@ -210,11 +285,13 @@ func (m *ModSelect) GetColumns(targetNode int) ([][]int, error) {
 	return res, nil
 }
 
-func (m *ModSelect) GetRenderedColumns(targetNode int) ([]Column, error) {
-	columns, err := m.GetColumns(targetNode)
+func (m *ModSelect) GetRenderedColumns() ([]Column, error) {
+	columns, err := m.GetColumns()
 	if err != nil {
 		return nil, err
 	}
+
+	///trim max height and width
 
 	res := make([][]string, len(columns))
 	for i, _ := range columns {
@@ -248,7 +325,7 @@ func (m *ModSelect) GetRenderedColumns(targetNode int) ([]Column, error) {
 
 type Column []string
 
-func (c Column) Len() int {
+func (c Column) Width() int {
 	longest := 0
 	for _, v := range c {
 		if len(v) > longest {
@@ -258,8 +335,19 @@ func (c Column) Len() int {
 	return longest
 }
 
-func (c Column) String() string {
+func (c Column) Height() int {
+	return len(c)
+}
+
+func (c Column) String(maxHeight, maxWidth int) string {
 	return strings.Join(c, "\n")
+}
+
+func (c Column) Render(selected, maxHeight, maxWidth int) string {
+	//up := "▲"
+	//down := "▼"
+
+	return ""
 }
 
 var Styles = struct {

@@ -11,7 +11,7 @@ type ModuleExecutor interface {
 	// Name returns the name of the module as defined in the manifest.
 	Name() string
 	String() string
-	ResetWASMInstance()
+	ResetWASMCall()
 	FreeMem()
 	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	applyCachedOutput(value []byte) error

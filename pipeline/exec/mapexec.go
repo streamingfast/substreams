@@ -28,7 +28,7 @@ func (e *MapperModuleExecutor) Name() string { return e.moduleName }
 
 func (e *MapperModuleExecutor) String() string { return e.Name() }
 
-func (e *MapperModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
+func (e *MapperModuleExecutor) ResetWASMCall() { e.wasmModule.CurrentCall = nil }
 
 // todo: this is strange because it has to be done on both the store and the mapper
 // and in this case, we don't do anything
@@ -38,7 +38,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	ctx, span := reqctx.WithSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
-	var instance *wasm.Instance
+	var instance *wasm.Call
 	if instance, err = e.wasmCall(reader); err != nil {
 		return nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}

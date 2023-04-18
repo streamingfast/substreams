@@ -246,7 +246,7 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
 
-	executor.ResetWASMInstance()
+	executor.ResetWASMCall()
 
 	executorName := executor.Name()
 	hasValidOutput := executor.HasValidOutput()
@@ -423,7 +423,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 			modName := module.Name // to ensure it's enclosed
 			entrypoint := module.BinaryEntrypoint
 			code := reqModules.Binaries[module.BinaryIndex]
-			wasmModule, err := p.wasmRuntime.NewModule(ctx, code.Content, module.Name, entrypoint)
+			wasmModule, err := p.wasmRuntime.NewInstance(ctx, code.Content, module.Name, entrypoint)
 			if err != nil {
 				return fmt.Errorf("new wasm module: %w", err)
 			}

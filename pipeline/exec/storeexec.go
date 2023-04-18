@@ -22,9 +22,9 @@ func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store.DeltaA
 	return &StoreModuleExecutor{BaseExecutor: *baseExecutor, outputStore: outputStore}
 }
 
-func (e *StoreModuleExecutor) Name() string       { return e.moduleName }
-func (e *StoreModuleExecutor) String() string     { return e.Name() }
-func (e *StoreModuleExecutor) ResetWASMInstance() { e.wasmModule.CurrentInstance = nil }
+func (e *StoreModuleExecutor) Name() string   { return e.moduleName }
+func (e *StoreModuleExecutor) String() string { return e.Name() }
+func (e *StoreModuleExecutor) ResetWASMCall() { e.wasmModule.CurrentCall = nil }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 	deltas := &pbssinternal.StoreDeltas{}

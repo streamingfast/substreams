@@ -21,7 +21,7 @@ type Search struct {
 	timesFound int
 }
 
-func New() *Search {
+func NewSearch() *Search {
 	input := textinput.New()
 	input.Placeholder = ""
 	input.Prompt = "/"

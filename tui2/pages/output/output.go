@@ -47,9 +47,16 @@ type Output struct {
 	outputViewYoffset map[request.BlockContext]int
 
 	searchEnabled                   bool
+	moduleSearchEnabled             bool
+	moduleSearchView                *moduleSearchView
 	searchCtx                       *search.Search
 	searchBlockNumsWithMatches      []uint64
 	searchMatchingOutputViewOffsets []int
+}
+
+type moduleSearchView struct {
+	moduleSearch *search.ModuleSearch
+	graphView    viewport.Model
 }
 
 func New(c common.Common, manifestPath string, outputModule string) *Output {
@@ -63,8 +70,12 @@ func New(c common.Common, manifestPath string, outputModule string) *Output {
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[request.BlockContext]int{},
-		searchCtx:           search.New(),
+		searchCtx:           search.NewSearch(),
 		bytesRepresentation: dynamic.BytesAsHex,
+		moduleSearchView: &moduleSearchView{
+			moduleSearch: search.NewModuleSearch(),
+			graphView:    viewport.New(24, 79),
+		},
 	}
 	return output
 }
@@ -97,6 +108,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
+	case search.ModuleSearchClearedMsg:
+		o.moduleSearchEnabled = false
 	case search.UpdateMatchingBlocks:
 		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
 	case request.NewRequestInstance:
@@ -146,6 +159,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case search.ApplySearchQueryMsg:
 		o.setViewportContent()
 		cmds = append(cmds, o.updateMatchingBlocks())
+	case search.ApplyModuleSearchQueryMsg:
+		o.setViewportContent()
 	case modselect.ModuleSelectedMsg:
 		o.active.Module = string(msg)
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.active.Module])
@@ -162,9 +177,16 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_, cmd := o.searchCtx.Update(msg)
 		cmds = append(cmds, cmd)
 		switch msg.String() {
+		case "m":
+			if !o.searchEnabled {
+				o.moduleSearchEnabled = true
+				cmds = append(cmds, o.moduleSearchView.moduleSearch.InitInput())
+			}
 		case "/":
-			o.searchEnabled = true
-			cmds = append(cmds, o.searchCtx.InitInput())
+			if !o.moduleSearchEnabled {
+				o.searchEnabled = true
+				cmds = append(cmds, o.searchCtx.InitInput())
+			}
 		case "f":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
 		case "N":
@@ -284,6 +306,10 @@ func (o *Output) ShortHelp() []key.Binding {
 		key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "search"),
+		),
+		key.NewBinding(
+			key.WithKeys("m"),
+			key.WithHelp("m", "module search"),
 		),
 		key.NewBinding(
 			key.WithKeys("R"),

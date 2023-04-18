@@ -113,6 +113,8 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case search.ApplySearchQueryMsg:
 		ui.currentModalFunc = nil
+	case search.ApplyModuleSearchQueryMsg:
+		ui.currentModuleModalFunc = nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return ui, tea.Quit

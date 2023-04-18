@@ -17,7 +17,6 @@ type Instance struct {
 
 	name string
 
-	wasmCode     []byte
 	CurrentCall  *Call
 	entrypoint   string
 	wasmInstance *wasmtime.Instance
@@ -36,28 +35,18 @@ func (i *Instance) FreeMem() {
 	i.isClosed = true
 }
 
-func (r *Runtime) NewInstance(ctx context.Context, wasmCode []byte, name string, entrypoint string) (*Instance, error) {
-	cfg := wasmtime.NewConfig()
-	if r.maxFuel != 0 {
-		cfg.SetConsumeFuel(true)
-	}
-	engine := wasmtime.NewEngineWithConfig(cfg)
-	linker := wasmtime.NewLinker(engine)
-	store := wasmtime.NewStore(engine)
+func (r *Runtime) NewInstance(ctx context.Context, module *Module, name, entrypoint string) (*Instance, error) {
 
-	module, err := wasmtime.NewModule(store.Engine, wasmCode)
-	if err != nil {
-		return nil, fmt.Errorf("creating new module: %w", err)
-	}
+	linker := wasmtime.NewLinker(module.engine)
+	store := wasmtime.NewStore(module.engine)
 
 	m := &Instance{
 		runtime:    r,
-		wasmEngine: engine,
+		wasmEngine: module.engine,
 		wasmLinker: linker,
 		wasmStore:  store,
-		wasmModule: module,
+		wasmModule: module.module,
 		name:       name,
-		wasmCode:   wasmCode,
 		entrypoint: entrypoint,
 	}
 	if err := m.newImports(); err != nil {

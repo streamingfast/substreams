@@ -18,8 +18,8 @@ type TestConfig struct {
 	Block  uint64 `json:"block" yaml:"block"`
 	Path   string `json:"path" yaml:"path"`
 	Expect string `json:"expect" yaml:"expect"`
-	Op     string `json:"op;omitempty" yaml:"op"`
-	Args   string `json:"args;omitempty" yaml:"args"`
+	Op     string `json:"op,omitempty" yaml:"op"`
+	Args   string `json:"args,omitempty" yaml:"args"`
 }
 
 func (t *TestConfig) Test(idx int) (*Test, error) {

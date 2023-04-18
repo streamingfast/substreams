@@ -181,6 +181,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !o.searchEnabled {
 				o.moduleSearchEnabled = true
 				cmds = append(cmds, o.moduleSearchView.moduleSearch.InitInput())
+				o.setViewportContent()
 			}
 		case "/":
 			if !o.moduleSearchEnabled {
@@ -237,6 +238,13 @@ type displayContext struct {
 	payload           *pbsubstreamsrpc.AnyModuleOutput
 }
 
+func (o *Output) setModuleSearchView() string {
+	return lipgloss.JoinVertical(0,
+		o.moduleSearchView.moduleSearch.View(),
+		o.moduleSearchView.graphView.View(),
+	)
+}
+
 func (o *Output) setViewportContent() {
 	dpContext := &displayContext{
 		blockCtx:          o.active,
@@ -245,6 +253,10 @@ func (o *Output) setViewportContent() {
 		payload:           o.payloads[o.active],
 	}
 
+	if o.moduleSearchEnabled {
+		o.outputView.SetContent(o.setModuleSearchView())
+		return
+	}
 	if dpContext != o.lastDisplayContext {
 		content := o.renderPayload(dpContext.payload)
 		if dpContext.searchViewEnabled {

@@ -63,6 +63,9 @@ func (r *renderedOutput) highlighted() string {
 
 func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle bool) (out *renderedOutput) {
 	out = &renderedOutput{styledLogs: &strings.Builder{}}
+	if in == nil {
+		return out
+	}
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
 	if debugInfo := in.DebugInfo(); debugInfo != nil {
@@ -236,22 +239,25 @@ func applyKeywordSearch(content, query string) (string, int, []int) {
 }
 
 func applyJQSearch(content, query string) (string, int, []int) {
+	if len(content) == 0 {
+		return "", 0, nil
+	}
 	var positions []int
 
 	var decoded interface{}
 	err := json.Unmarshal([]byte(content), &decoded)
 	if err != nil {
-		return fmt.Sprintf("error unmarshalling json: %s", err), 0, nil
+		return fmt.Sprintf("error unmarshalling json from protobuf representation: %s", err), 0, nil
 	}
 
 	jqQuery, err := gojq.Parse(query)
 	if err != nil {
-		return fmt.Sprintf("error parsing jq query: %s", err), 0, nil
+		return fmt.Sprintf("error parsing jq expression: %s", err), 0, nil
 	}
 
 	code, err := gojq.Compile(jqQuery)
 	if err != nil {
-		return fmt.Sprintf("error compiling jq query: %s", err), 0, nil
+		return fmt.Sprintf("error compiling jq expression: %s", err), 0, nil
 	}
 
 	var lines []string
@@ -263,7 +269,12 @@ func applyJQSearch(content, query string) (string, int, []int) {
 			break
 		}
 		count++
-		log.Printf("MAMA %p %T %v %v", el, el, el, ok)
+
+		if err, ok := el.(error); ok {
+			lines = append(lines, "error: "+err.Error())
+			continue
+		}
+		//log.Printf("MAMA %p %T %v %v", el, el, el, ok)
 
 		cnt, err := json.MarshalIndent(el, "", "  ")
 		if err != nil {

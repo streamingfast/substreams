@@ -70,7 +70,7 @@ func New(c common.Common, manifestPath string, outputModule string) *Output {
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[request.BlockContext]int{},
-		searchCtx:           search.NewSearch(),
+		searchCtx:           search.NewSearch(c),
 		bytesRepresentation: dynamic.BytesAsHex,
 		moduleSearchView: &moduleSearchView{
 			moduleSearch: search.NewModuleSearch(),
@@ -97,6 +97,7 @@ func (o *Output) SetSize(w, h int) {
 	o.outputView.Height = h - 11
 	outputViewTopBorder := 1
 	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder
+	o.searchCtx.SetSize(w, h)
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -264,6 +265,7 @@ func (o *Output) setViewportContent() {
 
 			if displayCtx.searchJQMode {
 				content, matchCount, positions = applyJQSearch(vals.plainJSON, o.searchCtx.Current.Query)
+				content = highlightJSON(content)
 			} else {
 				content, matchCount, positions = applyKeywordSearch(content, o.searchCtx.Current.Query)
 			}
@@ -311,14 +313,7 @@ func (o *Output) ShortHelp() []key.Binding {
 			key.WithKeys("o", "p"),
 			key.WithHelp("o/p", "nav. blocks"),
 		),
-		key.NewBinding(
-			key.WithKeys("up", "k", "down", "j"),
-			key.WithHelp("↑/k/↓/j", "up/down"),
-		),
-		key.NewBinding(
-			key.WithKeys("O", "P"),
-			key.WithHelp("O/P", "nav. matched blocks"),
-		),
+
 		key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "search"),
@@ -331,16 +326,26 @@ func (o *Output) ShortHelp() []key.Binding {
 			key.WithKeys("R"),
 			key.WithHelp("R", "refresh"),
 		),
-		key.NewBinding(
-			key.WithKeys("f"),
-			key.WithHelp("f", "bytes format"),
-		),
 	}
 }
 
 func (o *Output) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		o.ShortHelp(),
+		{
+			key.NewBinding(
+				key.WithKeys("up", "k", "down", "j"),
+				key.WithHelp("↑/k/↓/j", "up/down"),
+			),
+			key.NewBinding(
+				key.WithKeys("O", "P"),
+				key.WithHelp("O/P", "nav. matched blocks"),
+			),
+			key.NewBinding(
+				key.WithKeys("f"),
+				key.WithHelp("f", "bytes format"),
+			),
+		},
 	}
 }
 

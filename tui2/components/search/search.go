@@ -19,6 +19,8 @@ type SearchQuery struct {
 }
 
 type Search struct {
+	common.Common
+
 	input textinput.Model
 
 	enabled bool
@@ -31,16 +33,21 @@ type Search struct {
 	timesFound int
 }
 
-func NewSearch() *Search {
+func NewSearch(c common.Common) *Search {
 	input := textinput.New()
 	input.Placeholder = ""
-	input.CharLimit = 256
-	input.Width = 80
+	input.CharLimit = 1024
+	input.Width = c.Width
 	return &Search{
-		input: input,
+		Common: c,
+		input:  input,
 	}
 }
 
+func (s *Search) SetSize(w, h int) {
+	s.Common.SetSize(w, h)
+	s.input.Width = w
+}
 func (s *Search) Init() tea.Cmd {
 	return nil
 }

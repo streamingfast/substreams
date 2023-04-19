@@ -120,6 +120,9 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q":
 			return ui, tea.Quit
+		case "?":
+			ui.footer.SetShowAll(!ui.footer.ShowAll())
+			ui.SetSize(ui.Width, ui.Height)
 		case "R":
 			return ui, ui.refreshSubstream()
 		}

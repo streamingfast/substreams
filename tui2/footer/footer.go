@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -88,9 +89,4 @@ func (f *Footer) Height() int {
 
 func UpdateKeyMapCmd(keymap help.KeyMap) tea.Msg {
 	return UpdateKeyMapMsg(keymap)
-}
-
-// ToggleFooterCmd sends a ToggleFooterMsg to show/hide the help footer.
-func ToggleFooterCmd() tea.Msg {
-	return ToggleFooterMsg{}
 }

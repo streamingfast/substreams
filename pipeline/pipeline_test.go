@@ -79,9 +79,12 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	wasmModule, err := wasm.NewRuntime(nil, 0).NewInstance(
+	runtime := wasm.NewRuntime(nil, 0)
+	module, err := runtime.NewModule(binary.Content)
+	require.NoError(t, err)
+	wasmModule, err := runtime.NewInstance(
 		context.Background(),
-		binary.Content,
+		module,
 		name,
 		name,
 	)

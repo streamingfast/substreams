@@ -58,7 +58,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 	//  state store in read mode)
 	if hasInput {
 		clock := outputGetter.Clock()
-		instance, err = e.wasmModule.NewInstance(clock, e.wasmArguments)
+		instance, err = e.wasmModule.NewCall(clock, e.wasmArguments)
 		if err != nil {
 			return nil, fmt.Errorf("new wasm instance: %w", err)
 		}

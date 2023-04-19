@@ -78,7 +78,7 @@ func (r *Runtime) NewInstance(ctx context.Context, module *Module, name, entrypo
 	return m, nil
 }
 
-func (i *Instance) NewInstance(clock *pbsubstreams.Clock, arguments []Argument) (*Call, error) {
+func (i *Instance) NewCall(clock *pbsubstreams.Clock, arguments []Argument) (*Call, error) {
 	if i.isClosed {
 		panic("module is closed")
 	}

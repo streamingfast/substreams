@@ -1,0 +1,2 @@
+{"module":"module_name","block":16371052,"path":".feeGrowthGlobalUpdates[] | select(.poolAddress == \"0x6c6bc977e13df9b0de53b251522280bb72383700\") | .newValue.value","expect":"10223378799466963208063206201"}
+{"module":"module_name","block":16371053,"path":".feeGrowthGlobalUpdates[] | select(.poolAddress == \"0x6c6bc977e13df9b0de53b251522280bb72383700\") | .newValue.value","expect":"10223378799466963208063206201"}

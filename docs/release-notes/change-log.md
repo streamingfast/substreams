@@ -50,6 +50,18 @@ communication (ex: `cursor`, `logs`...)
 * The response now contains a single module output
 * In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs`
 
+#### Substreams Test
+
+Added a basic Substreams testing framework that validates module outputs 
+against expected values. The testing framework currently runs on `substreams run` 
+command, where you can specify the following flags:
+
+* `test-file` Points to a file that contains your test specs
+* `test-verbose` Enables verbose mode while testing. 
+
+The test file, specifies the expected output for a given substreams 
+module at a given block.
+
 ### GUI Improvements
 
 * Added key 'f' shortcut for changing display encoding of bytes value (hex, pruned string, base64)

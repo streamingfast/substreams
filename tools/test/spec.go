@@ -1,12 +1,17 @@
 package test
 
 import (
+	"bufio"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"github.com/itchyny/gojq"
 	"github.com/streamingfast/substreams/tools/test/comparator"
 	"gopkg.in/yaml.v3"
 	"io"
 	"os"
+	"path/filepath"
+	"strconv"
 )
 
 type Spec struct {
@@ -45,7 +50,6 @@ func (t *TestConfig) Test(idx int) (*Test, error) {
 		fileIndex:  idx,
 		comparable: cmp,
 	}, nil
-
 }
 
 func readSpecFromFile(path string) (*Spec, error) {
@@ -55,10 +59,90 @@ func readSpecFromFile(path string) (*Spec, error) {
 	}
 	defer file.Close()
 
-	return readSpecFromReader(file)
+	ext := filepath.Ext(path)
+	switch ext {
+
+	case ".jsonl":
+		return readSpecFromJSONL(file)
+	case ".csv":
+		return readSpecFromCSV(file)
+	case ".yaml":
+		return readSpecFromYAML(file)
+	default:
+		return nil, fmt.Errorf("unsupported test file type %q", ext)
+	}
 }
 
-func readSpecFromReader(reader io.Reader) (*Spec, error) {
+func readSpecFromCSV(file io.Reader) (*Spec, error) {
+	csvReader := csv.NewReader(file)
+	csvReader.LazyQuotes = true
+	records, err := csvReader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse csv: %w", err)
+	}
+
+	spec := &Spec{
+		Tests: nil,
+	}
+	for idx, line := range records {
+		config, err := parseCSVLine(line)
+		if err != nil {
+			return nil, fmt.Errorf("unable parse line %d: %w", idx, err)
+		}
+		spec.Tests = append(spec.Tests, config)
+	}
+	return spec, nil
+}
+
+func parseCSVLine(line []string) (*TestConfig, error) {
+	if len(line) < 4 {
+		return nil, fmt.Errorf("must have at-least 4 values")
+	}
+
+	blockNum, err := strconv.ParseUint(line[1], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parse block num %q: %w", line[1], err)
+	}
+
+	config := &TestConfig{
+		Module: line[0],
+		Block:  blockNum,
+		Path:   line[2],
+		Expect: line[3],
+	}
+	if len(line) >= 5 {
+		config.Op = line[4]
+	}
+	if len(line) >= 6 {
+		config.Op = line[5]
+	}
+	return config, nil
+}
+func readSpecFromJSONL(file io.Reader) (*Spec, error) {
+	spec := &Spec{
+		Tests: nil,
+	}
+	reader := bufio.NewReader(file)
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("unable to read line: %w", err)
+		}
+
+		config := &TestConfig{}
+		err = json.Unmarshal(line, config)
+		if err != nil {
+			return nil, fmt.Errorf("unable unmarshal open object: %w", err)
+		}
+		spec.Tests = append(spec.Tests, config)
+	}
+	return spec, nil
+}
+
+func readSpecFromYAML(reader io.Reader) (*Spec, error) {
 	var spec *Spec
 	if err := yaml.NewDecoder(reader).Decode(&spec); err != nil {
 		return nil, fmt.Errorf("decode: %w", err)

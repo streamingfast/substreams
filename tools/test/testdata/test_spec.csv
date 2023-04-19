@@ -1,0 +1,3 @@
+module_name,16371052,.feeGrowthGlobalUpdates[] | select(.poolAddress == "0x6c6bc977e13df9b0de53b251522280bb72383700") | .newValue.value,10223378799466963208063206201
+module_name,16371053,.feeGrowthGlobalUpdates[] | select(.poolAddress == "0x6c6bc977e13df9b0de53b251522280bb72383700") | .newValue.value,10223378799466963208063206201
+module_name,16371053,.feeGrowthGlobalUpdates[],10223378799466963208063206201

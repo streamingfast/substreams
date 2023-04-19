@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/dynamic"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
 )
 
 type Runner struct {
@@ -218,7 +220,7 @@ func (r *Runner) runTests(ctx context.Context, input interface{}, tests []*Test,
 	for _, test := range tests {
 		logger.Debug("running test", zap.String("path", test.path))
 		iter := test.code.RunWithContext(ctx, input) // or query.RunWithContext
-		// we will asume there should be only 1 result
+		// we will assume there should be only 1 result
 		v, ok := iter.Next()
 		if !ok {
 			break

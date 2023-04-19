@@ -178,16 +178,12 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		switch msg.String() {
 		case "m":
-			if !o.searchEnabled {
-				o.moduleSearchEnabled = true
-				cmds = append(cmds, o.moduleSearchView.moduleSearch.InitInput())
-				o.setViewportContent()
-			}
+			o.moduleSearchEnabled = true
+			cmds = append(cmds, o.moduleSearchView.moduleSearch.InitInput())
+			o.setViewportContent()
 		case "/":
-			if !o.moduleSearchEnabled {
-				o.searchEnabled = true
-				cmds = append(cmds, o.searchCtx.InitInput())
-			}
+			o.searchEnabled = true
+			cmds = append(cmds, o.searchCtx.InitInput())
 		case "f":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
 		case "N":
@@ -236,6 +232,7 @@ type displayContext struct {
 	searchViewEnabled bool
 	searchQuery       string
 	payload           *pbsubstreamsrpc.AnyModuleOutput
+	searchJQMode      bool
 }
 
 func (o *Output) setModuleSearchView() string {
@@ -246,10 +243,11 @@ func (o *Output) setModuleSearchView() string {
 }
 
 func (o *Output) setViewportContent() {
-	dpContext := &displayContext{
+	displayCtx := &displayContext{
 		blockCtx:          o.active,
 		searchViewEnabled: o.searchEnabled,
-		searchQuery:       o.searchCtx.Query,
+		searchQuery:       o.searchCtx.Current.Query,
+		searchJQMode:      o.searchCtx.Current.JQMode,
 		payload:           o.payloads[o.active],
 	}
 
@@ -257,16 +255,22 @@ func (o *Output) setViewportContent() {
 		o.outputView.SetContent(o.setModuleSearchView())
 		return
 	}
-	if dpContext != o.lastDisplayContext {
-		content := o.renderPayload(dpContext.payload)
-		if dpContext.searchViewEnabled {
-			var lines int
+	if displayCtx != o.lastDisplayContext {
+		vals := o.renderedOutput(displayCtx.payload, true)
+		content := o.renderPayload(vals)
+		if displayCtx.searchViewEnabled {
+			var matchCount int
 			var positions []int
-			content, lines, positions = applySearchColoring(content, o.searchCtx.Query)
-			o.searchCtx.SetMatchCount(lines) //timesFound = lines
+
+			if displayCtx.searchJQMode {
+				content, matchCount, positions = applyJQSearch(vals.plainJSON, o.searchCtx.Current.Query)
+			} else {
+				content, matchCount, positions = applyKeywordSearch(content, o.searchCtx.Current.Query)
+			}
+			o.searchCtx.SetMatchCount(matchCount) //timesFound = lines
 			o.searchMatchingOutputViewOffsets = positions
 		}
-		o.lastDisplayContext = dpContext
+		o.lastDisplayContext = displayCtx
 		o.outputView.SetContent(content)
 	}
 
@@ -369,12 +373,16 @@ func (o *Output) searchAllBlocksForModule(moduleName string) map[uint64]bool {
 			BlockNum: block,
 		}
 		payload := o.payloads[blockCtx]
-		content := o.renderPayload(payload)
+		content := o.renderedOutput(payload, false)
 
-		var pos []int
-		_, _, pos = applySearchColoring(content, o.searchCtx.Query)
+		var count int
+		if o.searchCtx.Current.JQMode {
+			_, count, _ = applyJQSearch(content.plainJSON, o.searchCtx.Current.Query)
+		} else {
+			_, count, _ = applyKeywordSearch(content.plainLogs+content.plainJSON+content.plainOutput, o.searchCtx.Current.Query)
+		}
 
-		if len(pos) > 0 {
+		if count > 0 {
 			out[blockCtx.BlockNum] = true
 		}
 	}

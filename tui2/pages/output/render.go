@@ -2,12 +2,15 @@ package output
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
+	"github.com/itchyny/gojq"
 	"github.com/jhump/protoreflect/dynamic"
+
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/muesli/termenv"
@@ -43,69 +46,109 @@ func (o *Output) wrapLogs(log string) string {
 	return result
 }
 
-func (o *Output) renderPayload(in *pbsubstreamsrpc.AnyModuleOutput) string {
-	if in == nil {
-		return ""
-	}
-	out := &strings.Builder{}
+type renderedOutput struct {
+	plainLogs   string
+	plainJSON   string
+	plainOutput string
+
+	error error
+
+	styledLogs *strings.Builder
+	styledJSON string
+}
+
+func (r *renderedOutput) highlighted() string {
+	return ""
+}
+
+func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle bool) (out *renderedOutput) {
+	out = &renderedOutput{styledLogs: &strings.Builder{}}
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
 	if debugInfo := in.DebugInfo(); debugInfo != nil {
+		var plainLogs []string
 		for _, log := range debugInfo.Logs {
-			out.WriteString(Styles.LogLabel.Render("log: "))
-			out.WriteString(Styles.LogLine.Render(o.wrapLogs(log)))
-			out.WriteString("\n")
+			plainLogs = append(plainLogs, fmt.Sprintf("log: %s", log))
+			if withStyle {
+				out.styledLogs.WriteString(Styles.LogLabel.Render("log: "))
+				out.styledLogs.WriteString(Styles.LogLine.Render(o.wrapLogs(log)))
+				out.styledLogs.WriteString("\n")
+			}
 		}
-
-		if len(debugInfo.Logs) != 0 {
-			out.WriteString("\n")
+		if withStyle && len(debugInfo.Logs) != 0 {
+			out.styledLogs.WriteString("\n")
 		}
+		out.plainLogs = strings.Join(plainLogs, "\n")
 	}
 
 	if in.IsMap() && !in.IsEmpty() {
 		msgDesc := o.msgDescs[in.Name()]
-		out.WriteString(o.decodeDynamicMessage(msgDesc, in.MapOutput.MapOutput))
+		plain, err := o.decodeDynamicMessage(msgDesc, in.MapOutput.MapOutput)
+		if err != nil {
+			out.error = err
+		}
+		out.plainJSON = plain
+		if withStyle {
+			out.styledJSON = highlightJSON(plain)
+		}
 	}
 	if in.IsStore() {
 		if !in.IsEmpty() {
 			msgDesc := o.msgDescs[in.Name()]
-			out.WriteString(o.decodeDynamicStoreDeltas(in.StoreOutput.DebugStoreDeltas, msgDesc))
+			// TODO: implement a store deltas decoder separate from JSON and styled one.
+			out.plainOutput = o.decodeDynamicStoreDeltas(in.StoreOutput.DebugStoreDeltas, msgDesc)
 		} else {
-			out.WriteString("No deltas")
+			out.plainOutput = "No deltas"
 		}
 	}
-	return out.String()
-
+	return
 }
 
-func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin *anypb.Any) string {
+func (o *Output) renderPayload(in *renderedOutput) string {
+	out := &strings.Builder{}
+	if in.error != nil {
+		out.WriteString(Styles.ErrorLine.Render(in.error.Error()))
+		out.WriteString("\n")
+	}
+	out.WriteString(in.styledLogs.String())
+	out.WriteString(in.styledJSON)
+	out.WriteString(in.plainOutput)
+	return out.String()
+}
+
+func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin *anypb.Any) (string, error) {
 	if msgDesc.MessageDescriptor == nil {
-		// TODO: also add the bytes message, and rotate the format with `f`
-		return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))
+		return "", fmt.Errorf("no message descriptor for %s", anyin.MessageName())
+		//return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))
 	}
 	in := anyin.GetValue()
 	dynMsg := o.messageFactory.NewDynamicMessage(msgDesc.MessageDescriptor)
 	if err := dynMsg.Unmarshal(in); err != nil {
-		return Styles.ErrorLine.Render(
-			fmt.Sprintf("Failed unmarshalling message into %s: %s\n%s",
-				msgDesc.ProtoMessageType,
-				err.Error(),
-				decodeAsString(in),
-			),
+		return "", fmt.Errorf("failed unmarshalling message into %s: %s\n%s", msgDesc.ProtoMessageType,
+			err.Error(),
+			decodeAsString(in),
 		)
+		//return Styles.ErrorLine.Render(
+		//	fmt.Sprintf("Failed unmarshalling message into %s: %s\n%s",
+		//		msgDesc.ProtoMessageType,
+		//		err.Error(),
+		//		decodeAsString(in),
+		//	),
+		//)
 	}
 
 	cnt, err := dynMsg.MarshalJSONIndent()
 	if err != nil {
-		return Styles.ErrorLine.Render(
-			fmt.Sprintf("Failed marshalling into JSON: %s\nString representation: %s",
-				err.Error(),
-				decodeAsString(in),
-			),
-		)
+		return "", fmt.Errorf("failed marshalling into JSON: %s\nString representation: %s", err.Error(), decodeAsString(in))
+		//return Styles.ErrorLine.Render(
+		//	fmt.Sprintf("Failed marshalling into JSON: %s\nString representation: %s",
+		//		err.Error(),
+		//		decodeAsString(in),
+		//	),
+		//)
 	}
 
-	return highlightJSON(string(cnt))
+	return string(cnt), nil
 }
 
 func highlightJSON(in string) string {
@@ -126,18 +169,6 @@ func (o *Output) decodeDynamicStoreDeltas(deltas []*pbsubstreamsrpc.StoreDelta, 
 		out.WriteString("\n")
 	}
 	return out.String()
-}
-
-func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
-func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
-
-func decodeAsType(in []byte, typ string) string {
-	switch typ {
-	case "bytes":
-		return decodeAsHex(in)
-	default:
-		return string(in)
-	}
 }
 
 func (o *Output) decodeDelta(in []byte, msgDesc *manifest.ModuleDescriptor, oldNew string) string {
@@ -169,9 +200,21 @@ func (o *Output) decodeDelta(in []byte, msgDesc *manifest.ModuleDescriptor, oldN
 	return out.String()
 }
 
-func applySearchColoring(content, highlight string) (string, int, []int) {
-	highlight = strings.TrimSpace(highlight)
-	if highlight == "" {
+func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
+func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
+
+func decodeAsType(in []byte, typ string) string {
+	switch typ {
+	case "bytes":
+		return decodeAsHex(in)
+	default:
+		return string(in)
+	}
+}
+
+func applyKeywordSearch(content, query string) (string, int, []int) {
+	query = strings.TrimSpace(query)
+	if query == "" {
 		return content, 0, nil
 	}
 
@@ -180,14 +223,55 @@ func applySearchColoring(content, highlight string) (string, int, []int) {
 	newLines := make([]string, len(lines))
 	var totalCount int
 	for lineNo, line := range lines {
-		count := strings.Count(line, highlight)
+		count := strings.Count(line, query)
 		totalCount += count
 		if count != 0 {
-			newLines[lineNo] = strings.ReplaceAll(line, highlight, termenv.String(highlight).Reverse().String())
+			newLines[lineNo] = strings.ReplaceAll(line, query, termenv.String(query).Reverse().String())
 			positions = append(positions, lineNo)
 		} else {
 			newLines[lineNo] = line
 		}
 	}
 	return strings.Join(newLines, "\n"), totalCount, positions
+}
+
+func applyJQSearch(content, query string) (string, int, []int) {
+	var positions []int
+
+	var decoded interface{}
+	err := json.Unmarshal([]byte(content), &decoded)
+	if err != nil {
+		return fmt.Sprintf("error unmarshalling json: %s", err), 0, nil
+	}
+
+	jqQuery, err := gojq.Parse(query)
+	if err != nil {
+		return fmt.Sprintf("error parsing jq query: %s", err), 0, nil
+	}
+
+	code, err := gojq.Compile(jqQuery)
+	if err != nil {
+		return fmt.Sprintf("error compiling jq query: %s", err), 0, nil
+	}
+
+	var lines []string
+	var count int
+	it := code.Run(decoded)
+	for {
+		el, ok := it.Next()
+		if !ok {
+			break
+		}
+		count++
+		log.Printf("MAMA %p %T %v %v", el, el, el, ok)
+
+		cnt, err := json.MarshalIndent(el, "", "  ")
+		if err != nil {
+			return fmt.Sprintf("error marshalling json: %s", err), 0, nil
+		}
+
+		lines = append(lines, string(cnt))
+	}
+
+	return strings.Join(lines, "\n"), count, positions
 }

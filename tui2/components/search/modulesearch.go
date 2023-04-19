@@ -2,8 +2,10 @@ package search
 
 import (
 	"fmt"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -75,13 +77,13 @@ func (m *ModuleSearch) InitInput() tea.Cmd {
 	m.input.Focus()
 	m.input.SetValue("")
 	return func() tea.Msg {
-		return common.SetModuleModalUpdateFuncMsg(m.Update)
+		return common.SetModalUpdateFuncMsg(m.Update)
 	}
 }
 
 func (m *ModuleSearch) cancelModuleModal() tea.Cmd {
 	return func() tea.Msg {
-		return common.SetModuleModalUpdateFuncMsg(nil)
+		return common.SetModalUpdateFuncMsg(nil)
 	}
 }
 

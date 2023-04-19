@@ -53,6 +53,11 @@ communication (ex: `cursor`, `logs`...)
 ### GUI Improvements
 
 * Added key 'f' shortcut for changing display encoding of bytes value (hex, pruned string, base64)
+* Added `jq` search mode (hit `/` twice). Filters the output with the `jq` expression, and applies the search to match all blocks.
+* Added search history (with `up`/`down`), similar to `less`.
+* Running a search now applies it to all blocks, and highlights the matching ones.
+* Added `O` and `P`, to jump to prev/next block with matching search results.
+
 
 ## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
 

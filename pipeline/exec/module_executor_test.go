@@ -59,7 +59,7 @@ func (t *MockModuleExecutor) String() string {
 
 func (t *MockModuleExecutor) FreeMem() {}
 
-func (t *MockModuleExecutor) ResetWASMInstance() {}
+func (t *MockModuleExecutor) ResetWASMCall() {}
 
 func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	if t.RunFunc != nil {

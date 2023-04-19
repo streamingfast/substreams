@@ -101,9 +101,13 @@ prost = "0.11"
 
 [profile.release]
 lto = true
-opt-level = 's'
+opt-level = 'z'
 strip = "debuginfo"
 ```
+
+{% hint style="success" %}
+**Tip**: The `[profile.release]` section can dramatically reduce the size of your wasm code and its loading time in substreams engine. `lto = true` is always beneficial to performance. `opt-level = 'z'` optimizes for size, which results in a reduced "Time To First Byte", in some cases by several seconds, which is usually beneficial, but it may not always be the best choice for performance. [See more info](https://docs.rust-embedded.org/book/unsorted/speed-vs-size.html). We do, however, recommend it.  The `strip = "debuginfo"` will remove useful information from stack traces, but the faster load time still make it a good choice when iterating in development.
+{% endhint %}
 
 ### Create protobufs
 

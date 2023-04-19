@@ -1,30 +1,31 @@
 package wasm
 
 import (
+	"testing"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_IsValidSetStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "int64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, valueType: "int64"},
 			expect:   false,
 		},
 		{
 			name:     "different value",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "bigdecimal"},
 			expect:   true,
 		},
 	}
@@ -37,22 +38,22 @@ func Test_IsValidSetStore(t *testing.T) {
 func Test_IsValidSetIfNotExists(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, valueType: "int64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "int64"},
 			expect:   false,
 		},
 		{
 			name:     "different value",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, valueType: "bigdecimal"},
 			expect:   true,
 		},
 	}
@@ -65,22 +66,22 @@ func Test_IsValidSetIfNotExists(t *testing.T) {
 func Test_IsValidAppendStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, valueType: "string"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, valueType: "string"},
 			expect:   true,
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, valueType: "int64"},
 			expect:   false,
 		},
 		{
 			name:     "different value",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, valueType: "bigdecimal"},
 			expect:   true,
 		},
 	}
@@ -93,25 +94,25 @@ func Test_IsValidAppendStore(t *testing.T) {
 func Test_IsValidAddBigIntStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "bigint"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
 		},
 	}
 	for _, test := range tests {
@@ -123,25 +124,25 @@ func Test_IsValidAddBigIntStore(t *testing.T) {
 func Test_IsValidAddBigDecimalStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "bigdecimal"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
 		},
 	}
 	for _, test := range tests {
@@ -153,25 +154,25 @@ func Test_IsValidAddBigDecimalStore(t *testing.T) {
 func Test_IsValidAddInt64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "int64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 		},
 	}
 	for _, test := range tests {
@@ -183,25 +184,25 @@ func Test_IsValidAddInt64Store(t *testing.T) {
 func Test_IsValidAddFloat64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 		},
 	}
 	for _, test := range tests {
@@ -213,25 +214,25 @@ func Test_IsValidAddFloat64Store(t *testing.T) {
 func Test_IsValidSetMintInt64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "float64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
 		},
 	}
 	for _, test := range tests {
@@ -243,25 +244,25 @@ func Test_IsValidSetMintInt64Store(t *testing.T) {
 func Test_IsValidSetMintBigInt64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigint"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
 		},
 	}
 	for _, test := range tests {
@@ -273,25 +274,25 @@ func Test_IsValidSetMintBigInt64Store(t *testing.T) {
 func Test_IsValidSetMintFloat64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "float64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigdecimal"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 		},
 	}
 	for _, test := range tests {
@@ -303,25 +304,25 @@ func Test_IsValidSetMintFloat64Store(t *testing.T) {
 func Test_IsValidSetMinBigDecimalStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigdecimal"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigint"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
 		},
 	}
 	for _, test := range tests {
@@ -333,25 +334,25 @@ func Test_IsValidSetMinBigDecimalStore(t *testing.T) {
 func Test_IsValidSetMaxInt64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
 		},
 	}
 	for _, test := range tests {
@@ -363,25 +364,25 @@ func Test_IsValidSetMaxInt64Store(t *testing.T) {
 func Test_IsValidSetMaxBigIntStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigint"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigint"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "bigint"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
 		},
 	}
 	for _, test := range tests {
@@ -393,25 +394,25 @@ func Test_IsValidSetMaxBigIntStore(t *testing.T) {
 func Test_IsValidSetMaxFloat64Store(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "bigdecimal"},
 		},
 	}
 	for _, test := range tests {
@@ -423,25 +424,25 @@ func Test_IsValidSetMaxFloat64Store(t *testing.T) {
 func Test_IsValidSetMaxBigDecimalStore(t *testing.T) {
 	tests := []struct {
 		name     string
-		instance *Instance
+		instance *Call
 		expect   bool
 	}{
 		{
 			name:     "golden path",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "bigdecimal"},
 			expect:   true,
 		},
 		{
 			name:     "wrong type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, valueType: "float64"},
 		},
 		{
 			name:     "wrong policy",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, valueType: "int64"},
 		},
 		{
 			name:     "wrong policy, type",
-			instance: &Instance{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
+			instance: &Call{updatePolicy: pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, valueType: "float64"},
 		},
 	}
 	for _, test := range tests {

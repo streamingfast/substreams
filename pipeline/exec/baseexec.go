@@ -11,28 +11,28 @@ import (
 
 type BaseExecutor struct {
 	moduleName    string
-	wasmModule    *wasm.Module
+	wasmModule    *wasm.Instance
 	wasmArguments []wasm.Argument
 	entrypoint    string
 	tracer        ttrace.Tracer
 }
 
-func NewBaseExecutor(moduleName string, wasmModule *wasm.Module, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(moduleName string, wasmModule *wasm.Instance, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
 }
 func (e *BaseExecutor) FreeMem() { e.wasmModule.FreeMem() }
 
 func (e *BaseExecutor) moduleLogs() (logs []string, truncated bool) {
-	if instance := e.wasmModule.CurrentInstance; instance != nil {
+	if instance := e.wasmModule.CurrentCall; instance != nil {
 		return instance.Logs, instance.ReachedLogsMaxByteCount()
 	}
 	return
 }
 func (e *BaseExecutor) currentExecutionStack() []string {
-	return e.wasmModule.CurrentInstance.ExecutionStack
+	return e.wasmModule.CurrentCall.ExecutionStack
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (instance *wasm.Instance, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (instance *wasm.Call, err error) {
 	hasInput := false
 	for _, input := range e.wasmArguments {
 		switch v := input.(type) {

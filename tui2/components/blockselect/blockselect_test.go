@@ -26,11 +26,7 @@ func TestBlockSelect_Bar(t *testing.T) {
 		lowBlock:       1,
 		highBlock:      20,
 	}
-	expected := `┌───────────────────────────────────────────┐
-│1                                       20 │
-│ | | |           |                         │
-│                 ^ Current block: 18       │
-└───────────────────────────────────────────┘`
+	expected := "┌───────────────────────────────────────────┐\n│1                                       20 │\n│ ‧ ‧ ‧           ‧                         │\n│                 ^ Current block: 18       │\n└───────────────────────────────────────────┘"
 	assert.Equal(t, expected, Strip(b.View()))
 }
 

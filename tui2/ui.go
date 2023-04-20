@@ -9,6 +9,7 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/components/search"
 	"github.com/streamingfast/substreams/tui2/footer"
 	"github.com/streamingfast/substreams/tui2/pages/output"
@@ -85,9 +86,12 @@ func (ui *UI) Init() tea.Cmd {
 
 func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if bundle, ok := msg.(streamui.ReplayBundle); ok {
+		var seq []tea.Cmd
 		for _, el := range bundle {
-			_, _ = ui.update(el)
+			el := el
+			seq = append(seq, func() tea.Msg { return el })
 		}
+		return ui, tea.Sequence(seq...)
 	}
 	if ui.replayLog != nil {
 		if err := ui.replayLog.Push(msg); err != nil {
@@ -106,7 +110,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.currentModalFunc = common.ModalUpdateFunc(msg)
 	case search.ApplySearchQueryMsg:
 		ui.currentModalFunc = nil
-	case search.ApplyModuleSearchQueryMsg:
+	case modsearch.ApplyModuleSearchQueryMsg:
 		ui.currentModalFunc = nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -141,7 +145,6 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case streamui.ConnectingMsg:
 		case streamui.EndOfStreamMsg:
 		case streamui.InterruptStreamMsg:
-
 		}
 	case tabs.SelectTabMsg:
 		ui.activePage = page(msg)

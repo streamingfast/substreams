@@ -23,8 +23,7 @@ type Search struct {
 
 	input textinput.Model
 
-	enabled bool
-	jqMode  bool
+	jqMode bool
 
 	History        []SearchQuery
 	historyPointer int
@@ -33,7 +32,7 @@ type Search struct {
 	timesFound int
 }
 
-func NewSearch(c common.Common) *Search {
+func New(c common.Common) *Search {
 	input := textinput.New()
 	input.Placeholder = ""
 	input.CharLimit = 1024

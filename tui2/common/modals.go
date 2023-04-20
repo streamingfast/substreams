@@ -5,9 +5,11 @@ import tea "github.com/charmbracelet/bubbletea"
 type ModalUpdateFunc func(msg tea.Msg) (tea.Model, tea.Cmd)
 
 type SetModalUpdateFuncMsg ModalUpdateFunc
+type UpdateSeenModulesMsg []string
+type ModuleSelectedMsg string // Emitted to inform all components that a new module has been selected.
 
-type ModuleModalUpdateFunc func(msg tea.Msg) (tea.Model, tea.Cmd)
-
-type SetModuleModalUpdateFuncMsg ModuleModalUpdateFunc
-
-type SelectedModuleChangeMsg string
+func EmitModuleSelectedMsg(moduleName string) tea.Cmd {
+	return func() tea.Msg {
+		return ModuleSelectedMsg(moduleName)
+	}
+}

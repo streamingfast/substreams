@@ -1,18 +1,21 @@
 package output
 
 import (
+	"sort"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/dynamic"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
+	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 	"github.com/streamingfast/substreams/tui2/components/search"
 	"github.com/streamingfast/substreams/tui2/pages/request"
-	"sort"
 )
 
 type Output struct {
@@ -40,21 +43,15 @@ type Output struct {
 	active            request.BlockContext // module + block
 	outputViewYoffset map[request.BlockContext]int
 
+	moduleSearchEnabled bool
+	moduleSearchView    *modsearch.ModuleSearch
+	//moduleSearchView
+	outputModule string
+
 	searchEnabled                   bool
-	moduleSearchEnabled             bool
-	moduleSearchView                *moduleSearchView
-	outputModule                    string
 	searchCtx                       *search.Search
 	searchBlockNumsWithMatches      []uint64
 	searchMatchingOutputViewOffsets []int
-}
-
-type moduleSearchView struct {
-	moduleSearch     *search.ModuleSearch
-	graphView        viewport.Model
-	matchingModules  []string
-	highlightedMod   string
-	highlightedIndex int
 }
 
 func New(c common.Common, manifestPath string, outputModule string) *Output {
@@ -68,13 +65,10 @@ func New(c common.Common, manifestPath string, outputModule string) *Output {
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[request.BlockContext]int{},
-		searchCtx:           search.NewSearch(c),
+		searchCtx:           search.New(c),
 		bytesRepresentation: dynamic.BytesAsHex,
-		moduleSearchView: &moduleSearchView{
-			moduleSearch: search.NewModuleSearch(),
-			graphView:    viewport.New(24, 79),
-		},
-		outputModule: outputModule,
+		moduleSearchView:    modsearch.New(c),
+		outputModule:        outputModule,
 	}
 	return output
 }
@@ -92,14 +86,11 @@ func (o *Output) SetSize(w, h int) {
 	o.moduleSelector.SetSize(w, 2)
 	o.blockSelector.SetSize(w, 5)
 	o.outputView.Width = w
-	// header, block info in output
 	o.outputView.Height = h - 11
+	o.moduleSearchView.SetSize(w, o.outputView.Height)
 	outputViewTopBorder := 1
 	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder
 	o.searchCtx.SetSize(w, h)
-	
-	o.moduleSearchView.graphView.Height = h - 12
-	o.moduleSearchView.graphView.Width = o.outputView.Width
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -109,27 +100,9 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case search.UpdateModuleSearchQueryMsg:
-		o.moduleSearchView.highlightedMod = ""
-		o.moduleSearchView.moduleSearch.Query = string(msg)
-		o.setViewportContent()
-	case common.SelectedModuleChangeMsg:
-		searchData := o.moduleSearchView
-		switch msg {
-		case "up":
-			if !(searchData.highlightedIndex == 0) {
-				searchData.highlightedMod = searchData.matchingModules[searchData.highlightedIndex-1]
-				searchData.highlightedIndex--
-			}
-		case "down":
-			if !(searchData.highlightedIndex == len(searchData.matchingModules)-1) {
-				searchData.highlightedMod = searchData.matchingModules[searchData.highlightedIndex+1]
-				searchData.highlightedIndex++
-			}
-		}
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
-	case search.ModuleSearchClearedMsg:
+	case modsearch.DisableModuleSearch:
 		o.moduleSearchEnabled = false
 	case search.UpdateMatchingBlocks:
 		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
@@ -163,7 +136,9 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if _, found := o.payloads[blockCtx]; !found {
-				o.moduleSelector.AddModule(modName)
+				if o.moduleSelector.AddModule(modName) {
+					cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
+				}
 				if o.active.Module == "" {
 					o.active.Module = modName
 					o.active.BlockNum = blockNum
@@ -174,44 +149,32 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			o.payloads[blockCtx] = output
-			o.setViewportContent()
+			o.setOutputViewContent()
 		}
 
 	case search.ApplySearchQueryMsg:
-		o.setViewportContent()
+		o.setOutputViewContent()
 		cmds = append(cmds, o.updateMatchingBlocks())
-	case search.ApplyModuleSearchQueryMsg:
-		o.moduleSearchEnabled = false
-		o.active.Module = o.moduleSearchView.highlightedMod
-		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.active.Module])
-		o.outputView.YOffset = o.outputViewYoffset[o.active]
-		o.moduleSelector.Selected = o.getActiveModuleIndex()
-		cmds = append(cmds, o.moduleSelector.DispatchModuleSelected)
-		o.setViewportContent()
-		cmds = append(cmds, o.updateMatchingBlocks())
-
-	case modselect.ModuleSelectedMsg:
+	case common.ModuleSelectedMsg:
 		o.active.Module = string(msg)
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.active.Module])
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
-		o.setViewportContent()
+		o.setOutputViewContent()
 		cmds = append(cmds, o.updateMatchingBlocks())
 	case blockselect.BlockChangedMsg:
 		newBlock := uint64(msg)
 		o.active.BlockNum = newBlock
 		o.blockSelector.SetActiveBlock(newBlock)
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
-		o.setViewportContent()
+		o.setOutputViewContent()
 	case tea.KeyMsg:
 		_, cmd := o.searchCtx.Update(msg)
 		cmds = append(cmds, cmd)
 		switch msg.String() {
 		case "m":
-			if !o.searchEnabled {
-				o.moduleSearchEnabled = true
-				cmds = append(cmds, o.moduleSearchView.moduleSearch.InitInput())
-				o.setViewportContent()
-			}
+			o.moduleSearchEnabled = true
+			o.setOutputViewContent()
+			return o, o.moduleSearchView.InitInput()
 		case "/":
 			o.searchEnabled = true
 			cmds = append(cmds, o.searchCtx.InitInput())
@@ -243,10 +206,13 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, o.jumpToNextMatchingBlock())
 		}
 		o.outputViewYoffset[o.active] = o.outputView.YOffset
-		o.setViewportContent()
+		o.setOutputViewContent()
 	}
 
-	_, cmd := o.moduleSelector.Update(msg)
+	_, cmd := o.moduleSearchView.Update(msg)
+	cmds = append(cmds, cmd)
+
+	_, cmd = o.moduleSelector.Update(msg)
 	cmds = append(cmds, cmd)
 
 	_, cmd = o.blockSelector.Update(msg)
@@ -266,82 +232,13 @@ type displayContext struct {
 	searchJQMode      bool
 }
 
-func containsPortions(s, query string) bool {
-	queryIndex := 0
-	for _, r := range s {
-		if queryIndex < len(query) && r == rune(query[queryIndex]) {
-			queryIndex++
-		}
-	}
-	return queryIndex == len(query)
-}
-
-func (o *Output) setMatchingModules(query string) string {
-	searchData := o.moduleSearchView
-	matchingMods := make([]string, 0)
-	maxHeight := o.outputView.Height - 3
-	stringRows := make([]string, 0)
-
-	for _, mod := range o.moduleSelector.Modules {
-		if containsPortions(mod, query) {
-			matchingMods = append(matchingMods, mod)
-		}
-	}
-
-	if len(matchingMods) == 0 {
-		return ""
-	}
-
-	if searchData.highlightedMod == "" {
-		searchData.highlightedMod = matchingMods[0]
-		searchData.highlightedIndex = 0
-	}
-
-	searchData.matchingModules = matchingMods
-	matchingMods[searchData.highlightedIndex] = lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render(searchData.highlightedMod)
-
-	tmp := make([][]string, 0)
-	if len(matchingMods) > maxHeight {
-		for i := 0; i < len(matchingMods); i += maxHeight {
-			to := i + maxHeight
-			if to > len(matchingMods) {
-				to = len(matchingMods)
-			}
-			tmp = append(tmp, matchingMods[i:to])
-		}
-	} else {
-		tmp = append(tmp, matchingMods)
-	}
-
-	for _, row := range tmp {
-		stringRows = append(stringRows, lipgloss.JoinVertical(0, row...))
-	}
-
-	out := lipgloss.JoinHorizontal(0.5, stringRows...)
-	return out
-}
-
-func (o *Output) setModuleSearchView(query string) string {
-
-	o.moduleSearchView.graphView.SetContent(o.setMatchingModules(query))
-
-	return lipgloss.JoinVertical(0,
-		o.moduleSearchView.moduleSearch.View(),
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(o.Width-2).Render(o.moduleSearchView.graphView.View()),
-	)
-}
-
-func (o *Output) setViewportContent() {
+func (o *Output) setOutputViewContent() {
 	displayCtx := &displayContext{
 		blockCtx:          o.active,
 		searchViewEnabled: o.searchEnabled,
 		searchQuery:       o.searchCtx.Current.Query,
 		searchJQMode:      o.searchCtx.Current.JQMode,
 		payload:           o.payloads[o.active],
-	}
-	if o.moduleSearchEnabled {
-		o.outputView.SetContent(o.setModuleSearchView(o.moduleSearchView.moduleSearch.Query))
-		return
 	}
 	if displayCtx != o.lastDisplayContext {
 		vals := o.renderedOutput(displayCtx.payload, true)
@@ -372,12 +269,20 @@ func (o *Output) View() string {
 	if o.searchEnabled {
 		searchLine = o.searchCtx.View()
 	}
-	o.setViewportContent()
+	o.setOutputViewContent()
+
+	var middleBlock string
+	if o.moduleSearchEnabled {
+		middleBlock = o.moduleSearchView.View()
+	} else {
+		middleBlock = o.outputView.View()
+	}
+
 	out := lipgloss.JoinVertical(0,
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
 		"",
-		o.outputView.View(),
+		middleBlock,
 		searchLine,
 	)
 	return out

@@ -1,6 +1,7 @@
 package modselect
 
 import (
+	"log"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -9,8 +10,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
 )
-
-type ModuleSelectedMsg string
 
 // A vertical bar that allows you to select a module that has been seen
 type ModSelect struct {
@@ -46,41 +45,43 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "u":
-			m.Selected = (m.Selected - 1 + len(m.Modules)) % len(m.Modules)
-			cmds = append(cmds, m.DispatchModuleSelected)
+			newSelection := (m.Selected - 1 + len(m.Modules)) % len(m.Modules)
+			cmds = append(cmds, common.EmitModuleSelectedMsg(m.Modules[newSelection]))
 		case "i":
-			m.Selected = (m.Selected + 1) % len(m.Modules)
-			cmds = append(cmds, m.DispatchModuleSelected)
+			newSelection := (m.Selected + 1) % len(m.Modules)
+			cmds = append(cmds, common.EmitModuleSelectedMsg(m.Modules[newSelection]))
 		}
+	case common.ModuleSelectedMsg:
+		m.Selected = m.ModulesIndex[string(msg)]
+		log.Println("Module selected dude", msg, m.Selected)
 	}
 	return m, tea.Batch(cmds...)
 }
 
-func (m *ModSelect) AddModule(modName string) {
+func (m *ModSelect) AddModule(modName string) bool {
 	if !m.seen[modName] {
 		m.Modules = append(m.Modules, modName)
+		m.ModulesIndex[modName] = len(m.Modules) - 1
 		m.seen[modName] = true
-
-		// sort the modules
-
-		sorted, _ := m.moduleGraph.TopologicalSortKnownModules(m.seen)
-
-		newModules := make([]string, 0, len(m.Modules))
-		var newSelected int
-		for idx, mod := range sorted {
-			newModules = append(newModules, mod.Name)
-			if mod.Name == m.Modules[m.Selected] {
-				newSelected = idx
-			}
-		}
-
-		m.Modules = newModules
-		m.Selected = newSelected
+		//
+		//// sort the modules
+		//
+		//sorted, _ := m.moduleGraph.TopologicalSortKnownModules(m.seen)
+		//
+		//newModules := make([]string, 0, len(m.Modules))
+		//var newSelected int
+		//for idx, mod := range sorted {
+		//	newModules = append(newModules, mod.Name)
+		//	if mod.Name == m.Modules[m.Selected] {
+		//		newSelected = idx
+		//	}
+		//}
+		//
+		//m.Modules = newModules
+		//m.Selected = newSelected
+		return true
 	}
-}
-
-func (m *ModSelect) DispatchModuleSelected() tea.Msg {
-	return ModuleSelectedMsg(m.Modules[m.Selected])
+	return false
 }
 
 func (m *ModSelect) View() string {

@@ -112,7 +112,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 			if !ok {
 				return nil
 			}
-			if fileInfo.StartBlock >= 0 {
+			if fileInfo.StartBlock >= below {
 				return io.EOF
 			}
 			files = append(files, fileInfo)

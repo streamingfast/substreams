@@ -52,7 +52,7 @@ func New(reqConfig *request.RequestConfig) *UI {
 	ui := &UI{
 		Common: c,
 		pages: []common.Component{
-			request.New(c),
+			request.New(c, reqConfig),
 			progress.New(c),
 			output.New(c, reqConfig.ManifestPath, reqConfig.OutputModule),
 		},

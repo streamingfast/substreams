@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/tui2/components/explorer"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -58,20 +59,26 @@ type Request struct {
 
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
-	modulesView        viewport.Model
+	manifestView       viewport.Model
 	modulesViewContent string
+
+	moduleNavigator *explorer.Navigator
+	graphMode       bool
 }
 
-func New(c common.Common) *Request {
+func New(c common.Common, config *RequestConfig) *Request {
+	nav, _ := explorer.New(config.OutputModule, explorer.WithManifestFilePath(config.ManifestPath))
+
 	return &Request{
-		Common:      c,
-		modulesView: viewport.New(24, 80),
+		Common:          c,
+		manifestView:    viewport.New(24, 80),
+		moduleNavigator: nav,
 	}
 }
 
 func (r *Request) Init() tea.Cmd {
 	return tea.Batch(
-		r.modulesView.Init(),
+		r.manifestView.Init(),
 	)
 }
 
@@ -84,20 +91,36 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.Modules = msg.Modules
 		r.setModulesViewContent()
 	case tea.KeyMsg:
+		switch msg.String() {
+		case "g":
+			r.graphMode = !r.graphMode
+		}
 		var cmd tea.Cmd
-		r.modulesView, cmd = r.modulesView.Update(msg)
+		r.manifestView, cmd = r.manifestView.Update(msg)
+		cmds = append(cmds, cmd)
+		_, cmd = r.moduleNavigator.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 	return r, tea.Batch(cmds...)
 }
 
 func (r *Request) View() string {
-	lineCount := r.modulesView.TotalLineCount()
-	progress := float64(r.modulesView.YOffset+r.modulesView.Height-1) / float64(lineCount) * 100.0
+	lineCount := r.manifestView.TotalLineCount()
+	progress := float64(r.manifestView.YOffset+r.manifestView.Height-1) / float64(lineCount) * 100.0
+
+	var requestContent string
+	if r.graphMode {
+		requestContent = r.moduleNavigator.View()
+	} else {
+		requestContent = lipgloss.JoinVertical(0,
+			lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.manifestView.View()),
+			lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
+		)
+	}
+
 	return lipgloss.JoinVertical(0,
 		r.renderRequestSummary(),
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.modulesView.View()),
-		lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
+		requestContent,
 	)
 }
 
@@ -132,14 +155,14 @@ func (r *Request) renderRequestSummary() string {
 
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
-	r.modulesView.Width = w
-	r.modulesView.Height = h - 11
+	r.manifestView.Width = w
+	r.manifestView.Height = h - 11
 }
 
 func (r *Request) setModulesViewContent() {
 	content, _ := r.getViewportContent()
 	r.modulesViewContent = content
-	r.modulesView.SetContent(content)
+	r.manifestView.SetContent(content)
 }
 
 func (r *Request) getViewportContent() (string, error) {

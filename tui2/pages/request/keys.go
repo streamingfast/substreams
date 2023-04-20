@@ -13,6 +13,7 @@ func (r *Request) ShortHelp() []key.Binding {
 		keymap.RestartStream,
 		keymap.Help,
 		keymap.Quit,
+		keymap.GraphToggle,
 	}
 }
 func (r *Request) FullHelp() [][]key.Binding {

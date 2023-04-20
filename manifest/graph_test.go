@@ -51,35 +51,11 @@ func TestModuleGraph_Context(t *testing.T) {
 	g, err := NewModuleGraph(testModules)
 	assert.NoError(t, err)
 
-	knownModules := map[string]bool{
-		"D": true,
-		"E": true,
-		"K": true,
-	}
-
-	parents, children := g.Context("G", knownModules)
+	parents, children, err := g.Context("G")
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(parents))
 	assert.Equal(t, parents, []string{"D", "E"})
-	assert.Equal(t, 1, len(children))
-	assert.Equal(t, children, []string{"K"})
-}
-
-func TestModuleGraph_Context_UnknownModules(t *testing.T) {
-	g, err := NewModuleGraph(testModules)
-	assert.NoError(t, err)
-
-	knownModules := map[string]bool{
-		"D": true,
-		"K": true,
-	}
-
-	parents, children := g.Context("G", knownModules)
-	assert.NoError(t, err)
-
-	assert.Equal(t, 1, len(parents))
-	assert.Equal(t, parents, []string{"D"})
 	assert.Equal(t, 1, len(children))
 	assert.Equal(t, children, []string{"K"})
 }
@@ -499,12 +475,4 @@ func TestModuleGraph_ComputeInitialBlocks_WithThreeParentsEachContainingAInitial
 
 	_, err := NewModuleGraph(testModules)
 	assert.Equal(t, `cannot deterministically determine the initialBlock for module "D"; multiple inputs have conflicting initial blocks defined or inherited`, err.Error())
-}
-
-func TestModuleGraph_ArrayLayout(t *testing.T) {
-	g, err := NewModuleGraph(testModules)
-	require.NoError(t, err)
-
-	r, _, _ := g.ArrayLayout("G")
-	_ = r
 }

@@ -43,10 +43,15 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 		for j, input := range module.Inputs {
 			var moduleName string
 			if v := input.GetMap(); v != nil {
-				moduleName = v.ModuleName
+				moduleName = v.GetModuleName()
 			} else if v := input.GetStore(); v != nil {
-				moduleName = v.ModuleName
+				moduleName = v.GetModuleName()
+			} else if v := input.GetSource(); v != nil {
+				moduleName = v.GetType()
+			} else if v := input.GetParams(); v != nil {
+				moduleName = v.GetValue()
 			}
+
 			if moduleName == "" {
 				continue
 			}
@@ -155,8 +160,9 @@ func (g *ModuleGraph) ModuleNameFromIndex(index int) string {
 	return g.indexIndex[index].Name
 }
 
-func (g *ModuleGraph) ModuleIndexFromName(name string) int {
-	return g.moduleIndex[name]
+func (g *ModuleGraph) ModuleIndexFromName(name string) (int, bool) {
+	v, ok := g.moduleIndex[name]
+	return v, ok
 }
 
 func (g *ModuleGraph) Modules() []string {
@@ -234,19 +240,27 @@ func (g *ModuleGraph) AncestorStoresOf(moduleName string) ([]*pbsubstreams.Modul
 	return result, nil
 }
 
-func (g *ModuleGraph) Context(moduleName string, knownModules map[string]bool) (parents []string, children []string) {
-	for _, m := range g.MustParentsOf(moduleName) {
-		if _, ok := knownModules[m.Name]; !ok {
-			continue
-		}
-		parents = append(parents, m.Name)
+func (g *ModuleGraph) Context(moduleName string) (parents []string, children []string, err error) {
+	// loop over inputs to get parents
+	mod, found := g.ModuleIndexFromName(moduleName)
+	if !found {
+		return nil, nil, fmt.Errorf("could not find module %s in graph", moduleName)
 	}
-	for _, m := range g.MustChildrenOf(moduleName) {
-		if _, ok := knownModules[m.Name]; !ok {
+
+	inputSeen := map[string]bool{}
+	for _, input := range g.modules[mod].Inputs {
+		if inputSeen[input.Pretty()] {
 			continue
 		}
+		parents = append(parents, input.Pretty())
+		inputSeen[input.Pretty()] = true
+	}
+
+	for _, m := range g.MustChildrenOf(moduleName) {
 		children = append(children, m.Name)
 	}
+
+	sort.Strings(children)
 
 	return
 }
@@ -448,59 +462,59 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbsubstreams.Module, 
 	return res, nil
 }
 
-// ArrayLayout returns a 2D array of module indexes. The first layer of the array contains the target module,
-// and each subsequent layer contains the modules that depend on the modules in the previous layer.
-// It also returns a map of module indexes to their coordinates in the array.
-func (g *ModuleGraph) ArrayLayout(targetModule string) ([][]string, map[string][2]int, error) {
-	_, distances := graph.ShortestPaths(g, g.ModuleIndexFromName(targetModule))
-
-	alreadyAdded := map[string]bool{}
-	distanceMap := map[int64][]int{}
-
-	for i, d := range distances {
-		if d < 0 {
-			continue
-		}
-
-		module := g.ModuleNameFromIndex(i)
-		if _, ok := alreadyAdded[module]; ok {
-			continue
-		}
-
-		if distanceMap[d] == nil {
-			distanceMap[d] = []int{}
-		}
-		distanceMap[d] = append(distanceMap[d], i)
-	}
-
-	var distanceKeys []int64
-	for k := range distanceMap {
-		distanceKeys = append(distanceKeys, k)
-	}
-	sort.Slice(distanceKeys, func(i, j int) bool {
-		return distanceKeys[i] < distanceKeys[j]
-	})
-
-	res := make([][]string, len(distanceKeys))
-
-	for i, d := range distanceKeys {
-		tmp := distanceMap[d]
-		strRow := make([]string, len(tmp))
-		for j, idx := range tmp {
-			strRow[j] = g.ModuleNameFromIndex(idx)
-		}
-		res[i] = strRow
-	}
-
-	locationIndex := make(map[string][2]int)
-	for i, col := range res {
-		for j, modIdx := range col {
-			locationIndex[modIdx] = [2]int{i, j}
-		}
-	}
-
-	return res, locationIndex, nil
-}
+//// ArrayLayout returns a 2D array of module indexes. The first layer of the array contains the target module,
+//// and each subsequent layer contains the modules that depend on the modules in the previous layer.
+//// It also returns a map of module indexes to their coordinates in the array.
+//func (g *ModuleGraph) ArrayLayout(targetModule string) ([][]string, map[string][2]int, error) {
+//	_, distances := graph.ShortestPaths(g, g.ModuleIndexFromName(targetModule))
+//
+//	alreadyAdded := map[string]bool{}
+//	distanceMap := map[int64][]int{}
+//
+//	for i, d := range distances {
+//		if d < 0 {
+//			continue
+//		}
+//
+//		module := g.ModuleNameFromIndex(i)
+//		if _, ok := alreadyAdded[module]; ok {
+//			continue
+//		}
+//
+//		if distanceMap[d] == nil {
+//			distanceMap[d] = []int{}
+//		}
+//		distanceMap[d] = append(distanceMap[d], i)
+//	}
+//
+//	var distanceKeys []int64
+//	for k := range distanceMap {
+//		distanceKeys = append(distanceKeys, k)
+//	}
+//	sort.Slice(distanceKeys, func(i, j int) bool {
+//		return distanceKeys[i] < distanceKeys[j]
+//	})
+//
+//	res := make([][]string, len(distanceKeys))
+//
+//	for i, d := range distanceKeys {
+//		tmp := distanceMap[d]
+//		strRow := make([]string, len(tmp))
+//		for j, idx := range tmp {
+//			strRow[j] = g.ModuleNameFromIndex(idx)
+//		}
+//		res[i] = strRow
+//	}
+//
+//	locationIndex := make(map[string][2]int)
+//	for i, col := range res {
+//		for j, modIdx := range col {
+//			locationIndex[modIdx] = [2]int{i, j}
+//		}
+//	}
+//
+//	return res, locationIndex, nil
+//}
 
 func (g *ModuleGraph) ModuleInitialBlock(moduleName string) (uint64, error) {
 	if moduleIndex, found := g.moduleIndex[moduleName]; found {

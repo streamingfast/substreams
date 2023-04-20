@@ -225,7 +225,6 @@ func NewTestModules() []*pbsubstreams.Module {
 			},
 		},
 	}
-
 }
 
 func TestReadManifest(t testing.T, manifestPath string) *pbsubstreams.Package {

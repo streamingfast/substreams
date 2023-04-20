@@ -61,6 +61,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		p.progressView, cmd = p.progressView.Update(msg)
 		cmds = append(cmds, cmd)
+
 	case request.NewRequestInstance:
 		targetBlock := msg.(request.NewRequestInstance).Stream.TargetParallelProcessingBlock()
 		p.dataPayloads = 0

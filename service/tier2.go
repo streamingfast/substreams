@@ -105,7 +105,12 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	var err error
 	ctx := streamSrv.Context()
 
-	logger := reqctx.Logger(ctx).Named("tier2")
+	parentTraceID := tracing.GetTraceID(ctx)
+	newTraceID := tracing.NewRandomTraceID()
+
+	// Note: we are removing the logger from the context completely, because we want to override the trace_id given by the middleware
+	ctx = tracing.WithTraceID(ctx, newTraceID)
+	logger := s.logger.Named("tier2").With(zap.String("parent_trace_id", parentTraceID.String())).With(zap.Stringer("trace_id", newTraceID))
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
@@ -137,6 +142,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	for i := 0; i < len(moduleNames); i++ {
 		moduleNames[i] = request.Modules.Modules[i].Name
 	}
+
 	fields := []zap.Field{
 		zap.Uint64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),

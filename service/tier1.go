@@ -208,7 +208,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, true)
+	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, false)
 
 	//bytesMeter := tracking.NewBytesMeter(ctx)
 	//bytesMeter.Launch(ctx, respFunc)

@@ -1,7 +1,6 @@
 package output
 
 import (
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -392,52 +391,6 @@ var Styles = struct {
 	LogLabel:  lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
 	LogLine:   lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
 	ErrorLine: lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
-}
-
-func (o *Output) ShortHelp() []key.Binding {
-	return []key.Binding{
-		key.NewBinding(
-			key.WithKeys("u", "i"),
-			key.WithHelp("u/i", "nav. modules"),
-		),
-		key.NewBinding(
-			key.WithKeys("o", "p"),
-			key.WithHelp("o/p", "nav. blocks"),
-		),
-
-		key.NewBinding(
-			key.WithKeys("/"),
-			key.WithHelp("/", "search"),
-		),
-		key.NewBinding(
-			key.WithKeys("m"),
-			key.WithHelp("m", "module search"),
-		),
-		key.NewBinding(
-			key.WithKeys("R"),
-			key.WithHelp("R", "refresh"),
-		),
-	}
-}
-
-func (o *Output) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		o.ShortHelp(),
-		{
-			key.NewBinding(
-				key.WithKeys("up", "k", "down", "j"),
-				key.WithHelp("↑/k/↓/j", "up/down"),
-			),
-			key.NewBinding(
-				key.WithKeys("O", "P"),
-				key.WithHelp("O/P", "nav. matched blocks"),
-			),
-			key.NewBinding(
-				key.WithKeys("f"),
-				key.WithHelp("f", "bytes format"),
-			),
-		},
-	}
 }
 
 func (o *Output) updateMatchingBlocks() tea.Cmd {

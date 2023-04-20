@@ -8,13 +8,14 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type LinearReader struct {

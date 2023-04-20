@@ -68,7 +68,7 @@ func New(reqConfig *request.RequestConfig) *UI {
 func (ui *UI) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
-	cmds = append(cmds, ui.refreshSubstream())
+	cmds = append(cmds, ui.restartStream())
 	for _, pg := range ui.pages {
 		cmds = append(cmds, pg.Init())
 	}
@@ -123,8 +123,8 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			ui.footer.SetShowAll(!ui.footer.ShowAll())
 			ui.SetSize(ui.Width, ui.Height)
-		case "R":
-			return ui, ui.refreshSubstream()
+		case "r":
+			return ui, ui.restartStream()
 		}
 		_, cmd := ui.tabs.Update(msg)
 		cmds = append(cmds, cmd)
@@ -197,7 +197,7 @@ func (ui *UI) View() string {
 	)
 }
 
-func (ui *UI) refreshSubstream() tea.Cmd {
+func (ui *UI) restartStream() tea.Cmd {
 	requestInstance, err := ui.requestConfig.NewInstance()
 	if err != nil {
 		return func() tea.Msg {

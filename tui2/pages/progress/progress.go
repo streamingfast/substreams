@@ -2,9 +2,11 @@ package progress
 
 import (
 	"fmt"
-	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/streamingfast/substreams/tui2/pages/request"
 	"time"
+
+	"github.com/charmbracelet/bubbles/viewport"
+
+	"github.com/streamingfast/substreams/tui2/pages/request"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -20,7 +22,6 @@ type refreshProgress tea.Msg
 
 type Progress struct {
 	common.Common
-	KeyMap KeyMap
 
 	state       string
 	replayState string
@@ -39,7 +40,6 @@ type Progress struct {
 func New(c common.Common) *Progress {
 	return &Progress{
 		Common:       c,
-		KeyMap:       DefaultKeyMap(),
 		state:        "Initializing",
 		targetBlock:  0,
 		progressView: viewport.New(24, 80),

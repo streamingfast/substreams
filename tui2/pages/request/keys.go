@@ -1,29 +1,37 @@
 package request
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"github.com/charmbracelet/bubbles/key"
+
+	"github.com/streamingfast/substreams/tui2/keymap"
+)
 
 func (r *Request) ShortHelp() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(
-			key.WithKeys("up", "k", "down", "j"),
-			key.WithHelp("↑/k/↓/j", "up/down"),
-		),
-		key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "more"),
-		),
-		key.NewBinding(
-			key.WithKeys("q", "esc"),
-			key.WithHelp("q", "quit"),
-		),
-		key.NewBinding(
-			key.WithKeys("R"),
-			key.WithHelp("R", "refresh"),
-		),
+		keymap.UpDown,
+		keymap.ToggleProgressDisplayMode,
+		keymap.RestartStream,
+		keymap.Help,
+		keymap.Quit,
 	}
 }
 func (r *Request) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		r.ShortHelp(),
+		{
+			keymap.UpDown,
+			keymap.UpDownPage,
+		},
+		{
+			keymap.ToggleProgressDisplayMode,
+		},
+		{
+			keymap.RestartStream,
+		},
+		{
+			keymap.Help,
+		},
+		{
+			keymap.Quit,
+		},
 	}
 }

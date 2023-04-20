@@ -3,6 +3,7 @@ package ranges
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 )
@@ -57,12 +58,7 @@ func (b *Bars) SetSize(w, h int) {
 func (b *Bars) View() string {
 	var labels []string
 	var bars []string
-	for idx, bar := range b.bars {
-		if idx > b.Height-2 {
-			labels = append(labels, "  ...  ")
-			bars = append(bars, "")
-			continue
-		}
+	for _, bar := range b.bars {
 		labels = append(labels, lipgloss.NewStyle().Margin(0, 2).Render(bar.name))
 		bars = append(bars, bar.View())
 	}

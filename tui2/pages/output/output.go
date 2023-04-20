@@ -47,6 +47,7 @@ type Output struct {
 	moduleSearchView    *modsearch.ModuleSearch
 	//moduleSearchView
 	outputModule string
+	logsEnabled  bool
 
 	searchEnabled                   bool
 	searchCtx                       *search.Search
@@ -69,6 +70,7 @@ func New(c common.Common, manifestPath string, outputModule string) *Output {
 		bytesRepresentation: dynamic.BytesAsHex,
 		moduleSearchView:    modsearch.New(c),
 		outputModule:        outputModule,
+		logsEnabled:         true,
 	}
 	return output
 }
@@ -171,6 +173,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		_, cmd := o.searchCtx.Update(msg)
 		cmds = append(cmds, cmd)
 		switch msg.String() {
+		case "l":
+			o.logsEnabled = !o.logsEnabled
 		case "m":
 			o.moduleSearchEnabled = true
 			o.setOutputViewContent()
@@ -226,6 +230,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 type displayContext struct {
 	blockCtx          request.BlockContext
+	logsEnabled       bool
 	searchViewEnabled bool
 	searchQuery       string
 	payload           *pbsubstreamsrpc.AnyModuleOutput
@@ -234,6 +239,7 @@ type displayContext struct {
 
 func (o *Output) setOutputViewContent() {
 	displayCtx := &displayContext{
+		logsEnabled:       o.logsEnabled,
 		blockCtx:          o.active,
 		searchViewEnabled: o.searchEnabled,
 		searchQuery:       o.searchCtx.Current.Query,

@@ -68,20 +68,24 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 	}
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
-	if debugInfo := in.DebugInfo(); debugInfo != nil {
-		var plainLogs []string
-		for _, log := range debugInfo.Logs {
-			plainLogs = append(plainLogs, fmt.Sprintf("log: %s", log))
-			if withStyle {
-				out.styledLogs.WriteString(Styles.LogLabel.Render("log: "))
-				out.styledLogs.WriteString(Styles.LogLine.Render(o.wrapLogs(log)))
+	if o.logsEnabled {
+		if debugInfo := in.DebugInfo(); debugInfo != nil {
+			var plainLogs []string
+			for _, log := range debugInfo.Logs {
+				plainLogs = append(plainLogs, fmt.Sprintf("log: %s", log))
+				if withStyle {
+					out.styledLogs.WriteString(Styles.LogLabel.Render("log: "))
+					out.styledLogs.WriteString(Styles.LogLine.Render(o.wrapLogs(log)))
+					out.styledLogs.WriteString("\n")
+				}
+			}
+			if withStyle && len(debugInfo.Logs) != 0 {
 				out.styledLogs.WriteString("\n")
 			}
+			out.plainLogs = strings.Join(plainLogs, "\n")
 		}
-		if withStyle && len(debugInfo.Logs) != 0 {
-			out.styledLogs.WriteString("\n")
-		}
-		out.plainLogs = strings.Join(plainLogs, "\n")
+	} else {
+		out.plainLogs = ""
 	}
 
 	if in.IsMap() && !in.IsEmpty() {

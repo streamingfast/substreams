@@ -82,7 +82,7 @@ func (p *Progress) ShortHelp() []key.Binding {
 		p.KeyMap.CursorUp,
 		p.KeyMap.CursorDown,
 		p.KeyMap.Refresh,
-		p.KeyMap.ModeSwitch
+		p.KeyMap.ModeSwitch,
 	}
 }
 

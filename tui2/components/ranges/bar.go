@@ -1,6 +1,7 @@
 package ranges
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -62,5 +63,20 @@ func (b *Bar) View() string {
 			out = append(out, "░")
 		}
 	}
+	return "[" + strings.Join(out, "") + "]"
+}
+
+func (b *Bar) RangeView() string {
+	width := uint64(b.Width)
+	if width > 1000 {
+		return "[borked]"
+	}
+
+	in := b.ranges
+	lo := in.Lo()
+	hi := b.targetEndBlock
+	var out []string
+	out = append(out, fmt.Sprintf("%v - %v", lo, hi))
+
 	return "[" + strings.Join(out, "") + "]"
 }

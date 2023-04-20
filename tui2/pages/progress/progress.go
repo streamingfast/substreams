@@ -58,11 +58,6 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg.(type) {
 	case tea.KeyMsg:
-		switch msg.(tea.KeyMsg).String() {
-		case "m":
-			p.bars.RangeMode = !p.bars.RangeMode
-			p.progressView.SetContent(p.bars.View())
-		}
 		var cmd tea.Cmd
 		p.progressView, cmd = p.progressView.Update(msg)
 		cmds = append(cmds, cmd)

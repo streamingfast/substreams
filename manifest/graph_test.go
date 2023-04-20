@@ -500,3 +500,11 @@ func TestModuleGraph_ComputeInitialBlocks_WithThreeParentsEachContainingAInitial
 	_, err := NewModuleGraph(testModules)
 	assert.Equal(t, `cannot deterministically determine the initialBlock for module "D"; multiple inputs have conflicting initial blocks defined or inherited`, err.Error())
 }
+
+func TestModuleGraph_ArrayLayout(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+
+	r, _, _ := g.ArrayLayout("G")
+	_ = r
+}

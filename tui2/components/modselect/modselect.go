@@ -46,10 +46,10 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "u":
 			m.Selected = (m.Selected - 1 + len(m.Modules)) % len(m.Modules)
-			cmds = append(cmds, m.dispatchModuleSelected)
+			cmds = append(cmds, m.DispatchModuleSelected)
 		case "i":
 			m.Selected = (m.Selected + 1) % len(m.Modules)
-			cmds = append(cmds, m.dispatchModuleSelected)
+			cmds = append(cmds, m.DispatchModuleSelected)
 		}
 	}
 	return m, tea.Batch(cmds...)
@@ -78,7 +78,7 @@ func (m *ModSelect) AddModule(modName string) {
 	}
 }
 
-func (m *ModSelect) dispatchModuleSelected() tea.Msg {
+func (m *ModSelect) DispatchModuleSelected() tea.Msg {
 	return ModuleSelectedMsg(m.Modules[m.Selected])
 }
 

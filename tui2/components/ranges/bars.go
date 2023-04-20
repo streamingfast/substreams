@@ -12,7 +12,6 @@ type Bars struct {
 	targetBlock uint64
 
 	labelWidth int
-	RangeMode  bool
 	bars       []*Bar
 	barsMap    map[string]*Bar
 }
@@ -65,11 +64,7 @@ func (b *Bars) View() string {
 			continue
 		}
 		labels = append(labels, lipgloss.NewStyle().Margin(0, 2).Render(bar.name))
-		if b.RangeMode {
-			bars = append(bars, bar.RangeView())
-		} else {
-			bars = append(bars, bar.View())
-		}
+		bars = append(bars, bar.View())
 	}
 	return lipgloss.JoinVertical(0,
 		lipgloss.JoinHorizontal(0.5,

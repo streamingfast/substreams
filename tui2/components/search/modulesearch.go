@@ -11,6 +11,7 @@ import (
 
 type ModuleSearchClearedMsg bool
 type ApplyModuleSearchQueryMsg string
+type UpdateModuleSearchQueryMsg string
 
 type ModuleSearch struct {
 	input textinput.Model
@@ -44,6 +45,7 @@ func (m *ModuleSearch) View() string {
 
 func (m *ModuleSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+	var shouldUpdate bool
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if m.input.Focused() {
@@ -58,11 +60,19 @@ func (m *ModuleSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.input.Value() == "" {
 					cmds = append(cmds, m.cancelModuleModal(), m.clearModuleSearch)
 				}
+				shouldUpdate = true
+			case "up", "down":
+				cmds = append(cmds, m.selectedModuleChange(msg.String()))
+				return m, tea.Batch(cmds...)
+			default:
+				shouldUpdate = true
 			}
-
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
 			cmds = append(cmds, cmd)
+			if shouldUpdate {
+				cmds = append(cmds, m.updateModuleSearchQuery(m.input.Value()))
+			}
 
 		} else {
 			switch msg.String() {
@@ -93,6 +103,18 @@ func (m *ModuleSearch) applyModuleSearchQuery(query string) tea.Cmd {
 	}
 }
 
+func (m *ModuleSearch) updateModuleSearchQuery(query string) tea.Cmd {
+	return func() tea.Msg {
+		return UpdateModuleSearchQueryMsg(query)
+	}
+}
+
 func (m *ModuleSearch) clearModuleSearch() tea.Msg {
 	return ModuleSearchClearedMsg(true)
+}
+
+func (m *ModuleSearch) selectedModuleChange(direction string) tea.Cmd {
+	return func() tea.Msg {
+		return common.SelectedModuleChangeMsg(direction)
+	}
 }

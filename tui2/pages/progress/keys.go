@@ -22,8 +22,6 @@ type KeyMap struct {
 
 	// The quit-no-matter-what keybinding. This will be caught when filtering.
 	ForceQuit key.Binding
-
-	ModeChange key.Binding
 }
 
 // DefaultKeyMap returns a default set of keybindings.
@@ -69,11 +67,6 @@ func DefaultKeyMap() KeyMap {
 		),
 
 		ForceQuit: key.NewBinding(key.WithKeys("ctrl+c")),
-
-		ModeChange: key.NewBinding(
-			key.WithKeys("m"),
-			key.WithHelp("m", "switch mode"),
-		),
 	}
 }
 
@@ -82,7 +75,6 @@ func (p *Progress) ShortHelp() []key.Binding {
 		p.KeyMap.CursorUp,
 		p.KeyMap.CursorDown,
 		p.KeyMap.Refresh,
-		p.KeyMap.ModeChange,
 	}
 }
 

@@ -44,11 +44,11 @@ func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
 	return nil
 }
 
-func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) ModuleHash {
+func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
 	m.mu.RLock()
 	if cachedHash := m.cache[module.Name]; cachedHash != nil {
 		m.mu.RUnlock()
-		return cachedHash
+		return cachedHash, nil
 	}
 	m.mu.RUnlock()
 
@@ -67,7 +67,7 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	case *pbsubstreams.Module_KindStore_:
 		buf.WriteString("store")
 	default:
-		panic(fmt.Sprintf("invalid module file %T", module.Kind))
+		return nil, fmt.Errorf("invalid module file %T", module.Kind)
 	}
 
 	buf.WriteString("binary")
@@ -83,7 +83,10 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	buf.WriteString("ancestors")
 	ancestors, _ := graph.AncestorsOf(module.Name)
 	for _, ancestor := range ancestors {
-		sig := m.HashModule(modules, ancestor, graph)
+		sig, err := m.HashModule(modules, ancestor, graph)
+		if err != nil {
+			return nil, err
+		}
 		buf.Write(sig)
 	}
 
@@ -97,7 +100,7 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	m.mu.Lock()
 	m.cache[module.Name] = output
 	m.mu.Unlock()
-	return output
+	return output, nil
 }
 
 func inputName(input *pbsubstreams.Module_Input) string {

@@ -73,7 +73,11 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	moduleHashes := manifest.NewModuleHashes()
-	moduleHash := hex.EncodeToString(moduleHashes.HashModule(pkg.Modules, module, graph))
+	hash, err := moduleHashes.HashModule(pkg.Modules, module, graph)
+	if err != nil {
+		return err
+	}
+	moduleHash := hex.EncodeToString(hash)
 
 	outputModuleStore, err := stateStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
 	if err != nil {

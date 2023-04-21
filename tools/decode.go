@@ -138,7 +138,11 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("module %q not found", moduleName)
 	}
 
-	moduleHash := hex.EncodeToString(hashes.HashModule(pkg.Modules, matchingModule, moduleGraph))
+	hash, err := hashes.HashModule(pkg.Modules, matchingModule, moduleGraph)
+	if err != nil {
+		panic(err)
+	}
+	moduleHash := hex.EncodeToString(hash)
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
 	startBlock := execout.ComputeStartBlock(blockNumber, saveInterval)
@@ -214,8 +218,12 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	if matchingModule == nil {
 		return fmt.Errorf("module %q not found", moduleName)
 	}
+	hash, err := hashes.HashModule(pkg.Modules, matchingModule, moduleGraph)
+	if err != nil {
+		return err
+	}
 
-	moduleHash := hex.EncodeToString(hashes.HashModule(pkg.Modules, matchingModule, moduleGraph))
+	moduleHash := hex.EncodeToString(hash)
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
 	startBlock := execout.ComputeStartBlock(blockNumber, saveInterval)

@@ -74,7 +74,11 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			done := make(chan any)
 			defer close(done)
 
-			hash := hex.EncodeToString(hashes.HashModule(pkg.Modules, module, graph))
+			moduleHash, err := hashes.HashModule(pkg.Modules, module, graph)
+			if err != nil {
+				panic(err)
+			}
+			hash := hex.EncodeToString(moduleHash)
 
 			go func() {
 				for {

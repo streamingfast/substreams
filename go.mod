@@ -64,7 +64,6 @@ require (
 	golang.org/x/net v0.7.0
 	golang.org/x/oauth2 v0.0.0-20221006150949-b44042a4b9c1
 	google.golang.org/grpc v1.50.1
-	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -181,6 +180,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221014173430-6e2ab493f96b // indirect
 	gopkg.in/ini.v1 v1.51.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 retract v1.0.2 // Published at wrong tag.

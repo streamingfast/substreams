@@ -48,7 +48,9 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.usedModules = processModules
-	g.hashModules(graph)
+	if err := g.hashModules(graph); err != nil {
+		return fmt.Errorf("cannot hash module: %w", err)
+	}
 
 	g.outputModule = computeOutputModule(g.usedModules, outputModuleName)
 
@@ -118,11 +120,14 @@ func moduleNames(modules []*pbsubstreams.Module) (out []string) {
 	return
 }
 
-func (g *Graph) hashModules(graph *manifest.ModuleGraph) {
+func (g *Graph) hashModules(graph *manifest.ModuleGraph) error {
 	g.moduleHashes = manifest.NewModuleHashes()
 	for _, module := range g.usedModules {
-		g.moduleHashes.HashModule(g.requestModules, module, graph)
+		if _, err := g.moduleHashes.HashModule(g.requestModules, module, graph); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (g *Graph) ValidateRequestStartBlock(requestStartBlockNum uint64) error {

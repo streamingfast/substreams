@@ -65,8 +65,10 @@ func Test_HashModule(t *testing.T) {
 
 	graph, _ := NewModuleGraph(manifest.Modules)
 	hashes := NewModuleHashes()
-	hashMapPoolsCreated := hashes.HashModule(manifest, mapPoolsCreatedModule, graph)
-	hashMapPoolsInitialized := hashes.HashModule(manifest, mapPoolsInitializationModule, graph)
+	hashMapPoolsCreated, err := hashes.HashModule(manifest, mapPoolsCreatedModule, graph)
+	require.NoError(t, err)
+	hashMapPoolsInitialized, err := hashes.HashModule(manifest, mapPoolsInitializationModule, graph)
+	require.NoError(t, err)
 
 	require.NotEqual(t, hashMapPoolsInitialized, hashMapPoolsCreated)
 }

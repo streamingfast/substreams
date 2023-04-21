@@ -72,6 +72,7 @@ func NewTier1(
 		1000, // overridden by Options
 		subrequestSplitSize,
 		parallelSubRequests,
+		10,
 		0,
 		stateStore,
 		func(logger *zap.Logger) work.Worker {
@@ -159,6 +160,7 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 		s.runtimeConfig.CacheSaveInterval,
 		s.runtimeConfig.SubrequestsSplitSize,
 		s.runtimeConfig.ParallelSubrequests,
+		s.runtimeConfig.MaxJobsAhead,
 		s.runtimeConfig.MaxWasmFuel,
 		s.runtimeConfig.BaseObjectStore,
 		s.runtimeConfig.WorkerFactory,

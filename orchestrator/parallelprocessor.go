@@ -88,7 +88,7 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
-	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, outputGraph)
+	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}

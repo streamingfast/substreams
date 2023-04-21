@@ -10,6 +10,7 @@ type RuntimeConfig struct {
 
 	MaxWasmFuel          uint64 // if not 0, enable fuel consumption monitoring to stop runaway wasm module processing forever
 	SubrequestsSplitSize uint64 // in multiple of the SaveIntervals above
+	MaxJobsAhead         uint64 // limit execution of depencency jobs so they don't go too far ahead of the modules that depend on them (ex: module X is 2 million blocks ahead of module Y that depends on it, we don't want to schedule more module X jobs until Y caught up a little bit)
 	ParallelSubrequests  uint64 // how many sub-jobs to launch for a given user
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
@@ -22,7 +23,8 @@ func NewRuntimeConfig(
 	cacheSaveInterval uint64,
 	subrequestsSplitSize uint64,
 	parallelSubrequests uint64,
-	MaxWasmFuel uint64,
+	maxJobsAhead uint64,
+	maxWasmFuel uint64,
 	baseObjectStore dstore.Store,
 	workerFactory work.WorkerFactory,
 ) RuntimeConfig {
@@ -30,7 +32,8 @@ func NewRuntimeConfig(
 		CacheSaveInterval:    cacheSaveInterval,
 		SubrequestsSplitSize: subrequestsSplitSize,
 		ParallelSubrequests:  parallelSubrequests,
-		MaxWasmFuel:          MaxWasmFuel,
+		MaxJobsAhead:         maxJobsAhead,
+		MaxWasmFuel:          maxWasmFuel,
 		BaseObjectStore:      baseObjectStore,
 		WorkerFactory:        workerFactory,
 	}

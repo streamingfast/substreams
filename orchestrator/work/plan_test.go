@@ -22,11 +22,13 @@ import (
 
 func TestWorkPlanning(t *testing.T) {
 	tests := []struct {
-		name        string
-		upToBlock   uint64
-		subreqSplit int
-		state       storage.ModuleStorageStateMap
-		outMod      string
+		name           string
+		upToBlock      uint64
+		subreqSplit    int
+		state          storage.ModuleStorageStateMap
+		outMod         string
+		maxJobsAhead   uint64
+		productionMode bool
 
 		expectWaitingJobs []*Job
 		expectReadyJobs   []*Job
@@ -38,7 +40,9 @@ func TestWorkPlanning(t *testing.T) {
 			state: TestModStateMap(
 				TestStoreState("B", "0-10"),
 			),
-			outMod: "B",
+			maxJobsAhead:   10,
+			productionMode: false,
+			outMod:         "B",
 			expectReadyJobs: []*Job{
 				TestJob("B", "0-10", 5),
 			},
@@ -51,11 +55,54 @@ func TestWorkPlanning(t *testing.T) {
 				TestStoreState("As", "0-10,10-20,30-40,40-50,50-60"),
 				TestStoreState("B", "0-10"),
 			),
-			outMod: "As",
+			productionMode: false,
+			maxJobsAhead:   10,
+			outMod:         "As",
 			expectReadyJobs: []*Job{
 				TestJob("As", "0-20", 5),
 				TestJob("As", "30-50", 4),
 				TestJob("As", "50-60", 3),
+			},
+		},
+		{
+			name:        "double, not too far ahead",
+			upToBlock:   85,
+			subreqSplit: 20,
+			state: TestModStateMap(
+				TestStoreState("As", "0-10,10-20,30-40,40-50,50-60"),
+				TestStoreState("B", "0-10"),
+			),
+			productionMode: false,
+			maxJobsAhead:   1,
+			outMod:         "As",
+			expectWaitingJobs: []*Job{
+				TestJob("As", "50-60", 3),
+			},
+			expectReadyJobs: []*Job{
+				TestJob("As", "0-20", 5),
+				TestJob("As", "30-50", 4),
+			},
+		},
+		{
+			name:        "production, limited by maxJobsAhead and dependency",
+			upToBlock:   85,
+			subreqSplit: 20,
+			state: TestModStateMap(
+				TestStoreState("SimpleStore", "0-20,20-40,40-60"),
+				TestMapState("MapDependsOnStore", "0-20,20-40,40-60"),
+			),
+			maxJobsAhead:   1,
+			productionMode: true,
+			outMod:         "MapDependsOnStore",
+			expectWaitingJobs: []*Job{
+				TestJob("SimpleStore", "40-60", 4),
+				TestJobDeps("MapDependsOnStore", "20-40", 7, "SimpleStore"),
+				TestJobDeps("MapDependsOnStore", "40-60", 5, "SimpleStore"),
+			},
+			expectReadyJobs: []*Job{
+				TestJobDeps("MapDependsOnStore", "0-20", 9, "SimpleStore"),
+				TestJob("SimpleStore", "0-20", 8),
+				TestJob("SimpleStore", "20-40", 6),
 			},
 		},
 	}
@@ -63,13 +110,13 @@ func TestWorkPlanning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mods := manifest.NewTestModules()
-			outputGraph, err := outputmodules.NewOutputModuleGraph(test.outMod, false, &pbsubstreams.Modules{Modules: mods, Binaries: []*pbsubstreams.Binary{{}}})
+			outputGraph, err := outputmodules.NewOutputModuleGraph(test.outMod, test.productionMode, &pbsubstreams.Modules{Modules: mods, Binaries: []*pbsubstreams.Binary{{}}})
 			require.NoError(t, err)
 
-			plan, err := BuildNewPlan(context.Background(), test.state, uint64(test.subreqSplit), test.upToBlock, outputGraph)
+			plan, err := BuildNewPlan(context.Background(), test.state, uint64(test.subreqSplit), test.upToBlock, test.maxJobsAhead, outputGraph)
 			require.NoError(t, err)
 
-			assert.Equal(t, jobList(test.expectWaitingJobs), jobList(plan.waitingJobs), "waiting jobs")
+			assert.Equal(t, jobList(test.expectWaitingJobs), jobList(plan.waitingJobs), "waiting jobs") // these are not sorted by the engine
 			assert.Equal(t, jobList(test.expectReadyJobs), jobList(plan.readyJobs), "ready jobs")
 		})
 	}
@@ -117,63 +164,74 @@ func TestPlan_MarkDependencyComplete(t *testing.T) {
 }
 
 func TestPlan_NextJob(t *testing.T) {
+	mkJob := func(el string) (out *Job) {
+		return &Job{ModuleName: el, RequestRange: block.NewRange(0, 100)}
+	}
 	mkJobs := func(rng string) (out []*Job) {
 		for _, el := range strings.Split(rng, ",") {
 			if el != "" {
-				out = append(out, &Job{ModuleName: el})
+				out = append(out, mkJob(el))
 			}
 		}
 		return
 	}
 
 	tests := []struct {
-		name        string
-		waitingJobs []*Job
-		readyJobs   []*Job
-		expectJob   *Job
-		expectMore  bool
+		name                  string
+		waitingJobs           []*Job
+		readyJobs             []*Job
+		modulesReadyUpToBlock map[string]uint64
+		expectJob             *Job
+		expectMore            bool
 	}{
 		{
-			name:        "one ready,one waiting",
-			waitingJobs: mkJobs("As"),
-			readyJobs:   mkJobs("B"),
-			expectJob:   &Job{ModuleName: "B"},
-			expectMore:  true,
+			name:                  "one ready,one waiting",
+			waitingJobs:           mkJobs("As"),
+			readyJobs:             mkJobs("B"),
+			modulesReadyUpToBlock: map[string]uint64{"As": 0, "B": 0},
+			expectJob:             mkJob("B"),
+			expectMore:            true,
 		},
 		{
-			name:        "none ready,one waiting",
-			waitingJobs: mkJobs("As"),
-			readyJobs:   mkJobs(""),
-			expectJob:   nil,
-			expectMore:  true,
+			name:                  "none ready,one waiting",
+			waitingJobs:           mkJobs("As"),
+			readyJobs:             mkJobs(""),
+			modulesReadyUpToBlock: map[string]uint64{"As": 0},
+			expectJob:             nil,
+			expectMore:            true,
 		},
 		{
-			name:        "one ready,none waiting",
-			waitingJobs: mkJobs(""),
-			readyJobs:   mkJobs("As"),
-			expectJob:   &Job{ModuleName: "As"},
-			expectMore:  false,
+			name:                  "one ready,none waiting",
+			waitingJobs:           mkJobs(""),
+			readyJobs:             mkJobs("As"),
+			modulesReadyUpToBlock: map[string]uint64{"As": 0},
+			expectJob:             mkJob("As"),
+			expectMore:            false,
 		},
 		{
-			name:        "none ready,none waiting",
-			waitingJobs: mkJobs(""),
-			readyJobs:   mkJobs(""),
-			expectJob:   nil,
-			expectMore:  false,
+			name:                  "none ready,none waiting",
+			waitingJobs:           mkJobs(""),
+			readyJobs:             mkJobs(""),
+			modulesReadyUpToBlock: map[string]uint64{},
+			expectJob:             nil,
+			expectMore:            false,
 		},
 		{
-			name:        "two ready,none waiting",
-			waitingJobs: mkJobs(""),
-			readyJobs:   mkJobs("As,B,C"),
-			expectJob:   &Job{ModuleName: "As"},
-			expectMore:  true,
+			name:                  "two ready,none waiting",
+			waitingJobs:           mkJobs(""),
+			readyJobs:             mkJobs("As,B,C"),
+			modulesReadyUpToBlock: map[string]uint64{"As": 0, "B": 0, "C": 0},
+			expectJob:             mkJob("As"),
+			expectMore:            true,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := &Plan{
-				waitingJobs: test.waitingJobs,
-				readyJobs:   test.readyJobs,
+				waitingJobs:             test.waitingJobs,
+				readyJobs:               test.readyJobs,
+				modulesRunningUpToBlock: test.modulesReadyUpToBlock,
+				modulesReadyUpToBlock:   test.modulesReadyUpToBlock,
 			}
 
 			gotJob, gotMore := p.NextJob()

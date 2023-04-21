@@ -4,9 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
-
-This should be the last release before a breaking change in the API and handling of the reorgs and UNDO messages.
+## UNRELEASED
 
 ### Highlights
 
@@ -73,6 +71,14 @@ module at a given block.
 * Added `O` and `P`, to jump to prev/next block with matching search results.
 * Added module search with `m`, to quickly switch from module to module.
 
+### Engine Changes
+* Tier1 will now avoid scheduling modules if they are more than the equivalent of "10 subrequests" ahead of the slowest running module. This will should reduce load on tier2 when a substreams shows a bottleneck anyway and keep workers ready for when it needs them.
+
+
+## UNRELEASED (release/v1.0 branch)
+
+### BUGFIX
+* Prevent substreams panic when requested module has unknown value for "type"
 
 ## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
 

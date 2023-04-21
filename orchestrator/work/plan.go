@@ -20,26 +20,31 @@ import (
 type Plan struct {
 	ModulesStateMap storage.ModuleStorageStateMap
 
-	upToBlock uint64
+	maxBlocksAhead uint64
+	upToBlock      uint64
 
-	waitingJobs []*Job
-	readyJobs   []*Job
+	waitingJobs        []*Job
+	readyJobs          []*Job
+	schedulableModules []string
 
-	modulesReadyUpToBlock map[string]uint64
+	modulesRunningUpToBlock map[string]uint64 // module is either running or complete
+	modulesReadyUpToBlock   map[string]uint64
 
 	mu     sync.Mutex
 	logger *zap.Logger
 }
 
-func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, outputGraph *outputmodules.Graph) (*Plan, error) {
+func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStateMap, subrequestSplitSize, upToBlock uint64, maxJobsAhead uint64, outputGraph *outputmodules.Graph) (*Plan, error) {
 	logger := reqctx.Logger(ctx)
 	plan := &Plan{
-		ModulesStateMap: modulesStateMap,
-		upToBlock:       upToBlock,
-		logger:          logger,
+		ModulesStateMap:    modulesStateMap,
+		schedulableModules: outputGraph.SchedulableModuleNames(),
+		upToBlock:          upToBlock,
+		maxBlocksAhead:     subrequestSplitSize * (maxJobsAhead + 1),
+		logger:             logger,
 	}
 
-	if err := plan.splitWorkIntoJobs(subrequestSplitSize, outputGraph.SchedulableModuleNames(), outputGraph.OutputModule().Name, outputGraph.AncestorsFrom); err != nil {
+	if err := plan.splitWorkIntoJobs(subrequestSplitSize, outputGraph.OutputModule().Name, outputGraph.AncestorsFrom); err != nil {
 		return nil, fmt.Errorf("split to jobs: %w", err)
 	}
 
@@ -50,12 +55,12 @@ func BuildNewPlan(ctx context.Context, modulesStateMap storage.ModuleStorageStat
 	return plan, nil
 }
 
-func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, schedulableModules []string, outputModuleName string, ancestorsFrom func(string) []string) error {
+func (p *Plan) splitWorkIntoJobs(subrequestSplitSize uint64, outputModuleName string, ancestorsFrom func(string) []string) error {
 
-	stepSize := calculateHighestDependencyDepth(schedulableModules, p.ModulesStateMap, ancestorsFrom)
+	stepSize := calculateHighestDependencyDepth(p.schedulableModules, p.ModulesStateMap, ancestorsFrom)
 	highestJobOrdinal := int(p.upToBlock/subrequestSplitSize) * stepSize
 
-	for _, storeName := range schedulableModules {
+	for _, storeName := range p.schedulableModules {
 		modState := p.ModulesStateMap[storeName]
 		if modState == nil {
 			continue
@@ -123,8 +128,10 @@ func calculateHighestDependencyDepth(
 
 func (p *Plan) initModulesReadyUpToBlock() {
 	p.modulesReadyUpToBlock = make(map[string]uint64)
+	p.modulesRunningUpToBlock = make(map[string]uint64)
 	for modName, modState := range p.ModulesStateMap {
 		p.modulesReadyUpToBlock[modName] = modState.ReadyUpToBlock()
+		p.modulesRunningUpToBlock[modName] = p.modulesReadyUpToBlock[modName]
 	}
 }
 
@@ -145,11 +152,33 @@ func (p *Plan) bumpModuleUpToBlock(modName string, upToBlock uint64) {
 	}
 }
 
+const maxUint64 = uint64(1<<64 - 1)
+
+func (p *Plan) highestRunnableStartBlock() uint64 {
+	// Called with locked mutex
+
+	lowestModuleHeight := maxUint64
+	for _, modName := range p.schedulableModules {
+		if upTo, ok := p.modulesRunningUpToBlock[modName]; ok && upTo < lowestModuleHeight {
+			lowestModuleHeight = upTo
+		}
+	}
+
+	if maxUint64-lowestModuleHeight < p.maxBlocksAhead {
+		return maxUint64
+	}
+
+	return lowestModuleHeight + p.maxBlocksAhead
+}
+
+// promoteWaitingJobs moves jobs from waitingJobs to readyJobs
 func (p *Plan) promoteWaitingJobs() {
 	// Called with locked mutex
+
+	noJobAbove := p.highestRunnableStartBlock()
 	removeJobs := map[*Job]bool{}
 	for _, job := range p.waitingJobs {
-		if p.allDependenciesMet(job) {
+		if p.allDependenciesMet(job) && job.RequestRange.StartBlock < noJobAbove {
 			p.readyJobs = append(p.readyJobs, job)
 			removeJobs[job] = true
 		}
@@ -194,6 +223,8 @@ func (p *Plan) NextJob() (job *Job, more bool) {
 
 	job = p.readyJobs[0]
 	p.readyJobs = p.readyJobs[1:]
+
+	p.modulesRunningUpToBlock[job.ModuleName] = job.RequestRange.ExclusiveEndBlock
 	return job, p.hasMore()
 }
 

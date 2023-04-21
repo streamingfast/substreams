@@ -17,7 +17,8 @@ func TestJob(modName string, rng string, prio int) *Job {
 
 func TestPlanReadyJobs(jobs ...*Job) *Plan {
 	return &Plan{
-		readyJobs: jobs,
+		readyJobs:               jobs,
+		modulesRunningUpToBlock: map[string]uint64{},
 	}
 }
 

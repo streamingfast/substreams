@@ -208,6 +208,22 @@ func NewTestModules() []*pbsubstreams.Module {
 			Kind:   &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 			Inputs: nil,
 		},
+		{
+			Name:   "SimpleStore",
+			Kind:   &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
+			Inputs: nil,
+		},
+		{
+			Name: "MapDependsOnStore",
+			Kind: &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "SimpleStore",
+					}},
+				},
+			},
+		},
 	}
 
 }

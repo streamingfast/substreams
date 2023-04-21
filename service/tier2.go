@@ -54,6 +54,7 @@ func NewTier2(
 		0,
 		0, // tier2 don't send subrequests
 		0, // tier2 don't send subrequests
+		0, // tier2 don't send subrequests
 		stateStore,
 		nil,
 	)
@@ -129,6 +130,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		s.runtimeConfig.CacheSaveInterval,
 		s.runtimeConfig.SubrequestsSplitSize,
 		s.runtimeConfig.ParallelSubrequests,
+		s.runtimeConfig.MaxJobsAhead,
 		s.runtimeConfig.MaxWasmFuel,
 		s.runtimeConfig.BaseObjectStore,
 		s.runtimeConfig.WorkerFactory,

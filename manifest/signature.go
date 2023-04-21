@@ -76,8 +76,17 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 
 	buf.WriteString("inputs")
 	for _, input := range module.Inputs {
-		buf.WriteString(inputName(input))
-		buf.WriteString(inputValue(input))
+		name, err := inputName(input)
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(name)
+
+		value, err := inputValue(input)
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(value)
 	}
 
 	buf.WriteString("ancestors")
@@ -103,32 +112,32 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	return output, nil
 }
 
-func inputName(input *pbsubstreams.Module_Input) string {
+func inputName(input *pbsubstreams.Module_Input) (string, error) {
 	switch input.Input.(type) {
 	case *pbsubstreams.Module_Input_Store_:
-		return "store"
+		return "store", nil
 	case *pbsubstreams.Module_Input_Source_:
-		return "source"
+		return "source", nil
 	case *pbsubstreams.Module_Input_Map_:
-		return "map"
+		return "map", nil
 	case *pbsubstreams.Module_Input_Params_:
-		return "params"
+		return "params", nil
 	default:
-		panic(fmt.Sprintf("invalid input %T", input.Input))
+		return "", fmt.Errorf("invalid input %T", input.Input)
 	}
 }
 
-func inputValue(input *pbsubstreams.Module_Input) string {
+func inputValue(input *pbsubstreams.Module_Input) (string, error) {
 	switch input.Input.(type) {
 	case *pbsubstreams.Module_Input_Store_:
-		return input.GetStore().ModuleName
+		return input.GetStore().ModuleName, nil
 	case *pbsubstreams.Module_Input_Source_:
-		return input.GetSource().Type
+		return input.GetSource().Type, nil
 	case *pbsubstreams.Module_Input_Map_:
-		return input.GetMap().ModuleName
+		return input.GetMap().ModuleName, nil
 	case *pbsubstreams.Module_Input_Params_:
-		return input.GetParams().Value
+		return input.GetParams().Value, nil
 	default:
-		panic(fmt.Sprintf("invalid input %T", input.Input))
+		return "", fmt.Errorf("invalid input %T", input.Input)
 	}
 }

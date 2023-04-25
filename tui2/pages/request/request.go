@@ -186,7 +186,7 @@ func (r *Request) getViewportContent() (string, error) {
 			output += fmt.Sprintf("		- %s\n", module.Inputs[i])
 		}
 		output += fmt.Sprintln("	Outputs: ")
-		output += fmt.Sprintf("		%s\n", module.Output)
+		output += fmt.Sprintf("		- %s\n", module.Output)
 		output += moduleDoc
 		if i <= len(r.Modules.Modules)-1 {
 			output += "\n\n"
@@ -208,17 +208,12 @@ func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, mo
 func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
 	markdown := ""
 
-	markdown += "# " + fmt.Sprintf("%s - docs: ", module.Name)
+	markdown += "# " + fmt.Sprintf("docs: \n")
 	markdown += "\n"
 	if metadata.GetDoc() != "" {
-		markdown += "	[doc]: " + "	" + metadata.GetDoc()
+		markdown += "[doc]: " + "" + metadata.GetDoc()
 		markdown += "\n"
 	}
-	if metadata.Url != "" {
-		markdown += "	[url]: " + "	" + metadata.Url
-		markdown += "\n\n"
-	}
-	markdown += "	[version]: " + "	" + metadata.Version
 	markdown += "\n\n"
 
 	out, err := glamour.Render(markdown, "dark")

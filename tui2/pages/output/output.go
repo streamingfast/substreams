@@ -1,6 +1,7 @@
 package output
 
 import (
+	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -53,6 +54,9 @@ type Output struct {
 	searchCtx                       *search.Search
 	searchBlockNumsWithMatches      []uint64
 	searchMatchingOutputViewOffsets []int
+
+	blockSearchEnabled bool
+	blockSearchCtx     *blocksearch.BlockSearch
 }
 
 func New(c common.Common, manifestPath string, outputModule string) *Output {
@@ -67,6 +71,7 @@ func New(c common.Common, manifestPath string, outputModule string) *Output {
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[request.BlockContext]int{},
 		searchCtx:           search.New(c),
+		blockSearchCtx:      blocksearch.New(c),
 		bytesRepresentation: dynamic.BytesAsHex,
 		moduleSearchView:    modsearch.New(c),
 		outputModule:        outputModule,
@@ -104,6 +109,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
+		o.blockSearchEnabled = false
+		o.setOutputViewContent()
 	case modsearch.DisableModuleSearch:
 		o.moduleSearchEnabled = false
 	case search.UpdateMatchingBlocks:
@@ -164,15 +171,22 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.setOutputViewContent()
 		cmds = append(cmds, o.updateMatchingBlocks())
 	case blockselect.BlockChangedMsg:
-		newBlock := uint64(msg)
-		o.active.BlockNum = newBlock
-		o.blockSelector.SetActiveBlock(newBlock)
-		o.outputView.YOffset = o.outputViewYoffset[o.active]
-		o.setOutputViewContent()
+		if o.hasDataForBlock(uint64(msg)) {
+			newBlock := uint64(msg)
+			o.active.BlockNum = newBlock
+			o.blockSelector.SetActiveBlock(newBlock)
+			o.outputView.YOffset = o.outputViewYoffset[o.active]
+			o.setOutputViewContent()
+		} else {
+			o.blockSearchEnabled = true
+		}
 	case tea.KeyMsg:
 		_, cmd := o.searchCtx.Update(msg)
 		cmds = append(cmds, cmd)
 		switch msg.String() {
+		case "g":
+			o.blockSearchEnabled = !o.blockSearchEnabled
+			cmds = append(cmds, o.blockSearchCtx.InitInput())
 		case "l":
 			o.logsEnabled = !o.logsEnabled
 		case "m":
@@ -275,6 +289,10 @@ func (o *Output) View() string {
 	if o.searchEnabled {
 		searchLine = o.searchCtx.View()
 	}
+	if o.blockSearchEnabled {
+		searchLine = o.blockSearchCtx.View()
+	}
+
 	o.setOutputViewContent()
 
 	var middleBlock string
@@ -415,4 +433,13 @@ func (o *Output) getActiveModuleIndex() int {
 		}
 	}
 	return 0
+}
+
+func (o *Output) hasDataForBlock(num uint64) bool {
+	for _, b := range o.blockSelector.BlocksWithData {
+		if b == num {
+			return true
+		}
+	}
+	return false
 }

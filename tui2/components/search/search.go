@@ -91,7 +91,7 @@ msgSwitch:
 					JQMode: s.jqMode,
 				}
 
-				cmds = append(cmds, s.cancelModal())
+				cmds = append(cmds, s.CancelModal())
 
 				if newQuery.Query != "" {
 					s.Current = newQuery
@@ -105,7 +105,7 @@ msgSwitch:
 			case "backspace":
 				if s.input.Value() == "" {
 					s.input.Blur()
-					cmds = append(cmds, s.cancelModal(), s.clearSearch)
+					cmds = append(cmds, s.CancelModal(), s.clearSearch)
 				}
 			}
 
@@ -150,7 +150,7 @@ func (s *Search) InitInput() tea.Cmd {
 	}
 }
 
-func (s *Search) cancelModal() tea.Cmd {
+func (s *Search) CancelModal() tea.Cmd {
 	return func() tea.Msg {
 		return common.SetModalUpdateFuncMsg(nil)
 	}

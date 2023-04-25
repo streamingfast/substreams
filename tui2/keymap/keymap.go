@@ -19,3 +19,4 @@ var PrevNextSearchResult = key.NewBinding(key.WithHelp("n/N", "prev/next sear, k
 var Quit = key.NewBinding(key.WithHelp("q", "quit"), k)
 var ToggleProgressDisplayMode = key.NewBinding(key.WithHelp("m", "toggle display mode"), k)
 var GraphToggle = key.NewBinding(key.WithHelp("g", "toggle graph"), k)
+var GoToBlock = key.NewBinding(key.WithHelp("g", "go to block"), k)

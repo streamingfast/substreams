@@ -22,7 +22,7 @@ type JumpToBlockMsg uint64
 type BlockSelect struct {
 	common.Common
 
-	blocksWithData []uint64
+	BlocksWithData []uint64
 	activeBlock    uint64
 	lowBlock       uint64
 	highBlock      uint64
@@ -38,10 +38,10 @@ func (b *BlockSelect) Init() tea.Cmd {
 }
 
 func (b *BlockSelect) SetAvailableBlocks(blocks []uint64) {
-	if len(b.blocksWithData) == 0 && len(blocks) != 0 {
+	if len(b.BlocksWithData) == 0 && len(blocks) != 0 {
 		b.activeBlock = blocks[0]
 	}
-	b.blocksWithData = blocks
+	b.BlocksWithData = blocks
 }
 
 func (b *BlockSelect) SetActiveBlock(blockNum uint64) {
@@ -59,7 +59,7 @@ func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case search.UpdateMatchingBlocks:
 		b.blocksColored = msg
 	case request.NewRequestInstance:
-		b.blocksWithData = nil
+		b.BlocksWithData = nil
 	}
 	return b, tea.Batch(cmds...)
 }
@@ -79,7 +79,7 @@ func (b *BlockSelect) View() string {
 	ptrs := make([]int, int(bins))
 	colored := make(map[int]bool)
 
-	for _, blk := range b.blocksWithData {
+	for _, blk := range b.BlocksWithData {
 		index := int(float64(blk-b.lowBlock) / binSize)
 		if index >= len(ptrs) {
 			index = len(ptrs) - 1

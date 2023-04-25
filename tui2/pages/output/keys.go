@@ -13,6 +13,8 @@ func (o *Output) ShortHelp() []key.Binding {
 		keymap.Search,
 		keymap.ModuleSearch,
 		keymap.Help,
+		keymap.ToggleLogs,
+		keymap.GoToBlock,
 	}
 }
 

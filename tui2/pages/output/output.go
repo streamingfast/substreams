@@ -2,6 +2,7 @@ package output
 
 import (
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
+	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -55,6 +56,8 @@ type Output struct {
 	searchBlockNumsWithMatches      []uint64
 	searchMatchingOutputViewOffsets []int
 
+	errReceived error
+
 	blockSearchEnabled bool
 	blockSearchCtx     *blocksearch.BlockSearch
 }
@@ -107,6 +110,12 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case streamui.StreamErrorMsg:
+		o.errReceived = msg
+		newBlock := uint64(o.blockSelector.BlocksWithData[len(o.blockSelector.BlocksWithData)-1])
+		o.active.BlockNum = newBlock
+		o.blockSelector.SetActiveBlock(newBlock)
+		o.setOutputViewContent()
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
 		o.blockSearchEnabled = false
@@ -249,6 +258,7 @@ type displayContext struct {
 	searchQuery       string
 	payload           *pbsubstreamsrpc.AnyModuleOutput
 	searchJQMode      bool
+	errReceived       error
 }
 
 func (o *Output) setOutputViewContent() {
@@ -259,6 +269,7 @@ func (o *Output) setOutputViewContent() {
 		searchQuery:       o.searchCtx.Current.Query,
 		searchJQMode:      o.searchCtx.Current.JQMode,
 		payload:           o.payloads[o.active],
+		errReceived:       o.errReceived,
 	}
 	if displayCtx != o.lastDisplayContext {
 		vals := o.renderedOutput(displayCtx.payload, true)

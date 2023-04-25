@@ -120,6 +120,7 @@ func (s *BlockSearch) applyBlockSearchQuery(query string) tea.Cmd {
 
 func (s *BlockSearch) CheckValidQuery() (uint64, error) {
 	strippedQuery := strings.ReplaceAll(s.Current, ",", "")
+	strippedQuery = strings.ReplaceAll(strippedQuery, "#", "")
 	uintQuery, err := strconv.ParseUint(strippedQuery, 10, 64)
 	if err != nil {
 		return 0, err

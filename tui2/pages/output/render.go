@@ -47,14 +47,16 @@ func (o *Output) wrapLogs(log string) string {
 }
 
 type renderedOutput struct {
-	plainLogs   string
-	plainJSON   string
-	plainOutput string
+	plainErrorReceived string
+	plainLogs          string
+	plainJSON          string
+	plainOutput        string
 
 	error error
 
-	styledLogs *strings.Builder
-	styledJSON string
+	styledError *strings.Builder
+	styledLogs  *strings.Builder
+	styledJSON  string
 }
 
 func (r *renderedOutput) highlighted() string {
@@ -62,12 +64,15 @@ func (r *renderedOutput) highlighted() string {
 }
 
 func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle bool) (out *renderedOutput) {
-	out = &renderedOutput{styledLogs: &strings.Builder{}}
+	out = &renderedOutput{styledError: &strings.Builder{}, styledLogs: &strings.Builder{}}
 	if in == nil {
 		return out
 	}
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
+	if o.errReceived != nil {
+		out.styledError.WriteString(Styles.ErrorLine.Render(o.errReceived.Error()))
+	}
 	if o.logsEnabled {
 		if debugInfo := in.DebugInfo(); debugInfo != nil {
 			var plainLogs []string
@@ -116,6 +121,9 @@ func (o *Output) renderPayload(in *renderedOutput) string {
 	if in.error != nil {
 		out.WriteString(Styles.ErrorLine.Render(in.error.Error()))
 		out.WriteString("\n")
+	}
+	if o.errReceived != nil {
+		out.WriteString(in.styledError.String())
 	}
 	out.WriteString(in.styledLogs.String())
 	out.WriteString(in.styledJSON)

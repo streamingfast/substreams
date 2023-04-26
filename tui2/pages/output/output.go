@@ -196,7 +196,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "g":
 			o.blockSearchEnabled = !o.blockSearchEnabled
 			cmds = append(cmds, o.blockSearchCtx.InitInput())
-		case "l":
+		case "L":
 			o.logsEnabled = !o.logsEnabled
 		case "m":
 			o.moduleSearchEnabled = true

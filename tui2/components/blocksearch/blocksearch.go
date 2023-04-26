@@ -56,18 +56,23 @@ msgSwitch:
 		if s.input.Focused() {
 			switch msg.String() {
 			case "enter":
-				newQuery := s.input.Value()
-				s.Current = newQuery
-				s.History = append(s.History, newQuery)
-				uintQuery, err := s.CheckValidQuery()
-				if err != nil {
-					break
+				if s.input.Value() == "" {
+					s.input.Blur()
+					cmds = append(cmds, s.cancelModal(), s.clearSearch)
+				} else {
+					newQuery := s.input.Value()
+					s.Current = newQuery
+					s.History = append(s.History, newQuery)
+					uintQuery, err := s.CheckValidQuery()
+					if err != nil {
+						break
+					}
+					cmds = append(cmds, s.cancelModal())
+					cmds = append(cmds, func() tea.Msg { return blockselect.BlockChangedMsg(uintQuery) })
+					cmds = append(cmds, s.clearSearch)
+					s.input.Blur()
+					break msgSwitch
 				}
-				cmds = append(cmds, s.cancelModal())
-				cmds = append(cmds, func() tea.Msg { return blockselect.BlockChangedMsg(uintQuery) })
-				cmds = append(cmds, s.clearSearch)
-				s.input.Blur()
-				break msgSwitch
 			case "backspace":
 				if s.input.Value() == "" {
 					s.input.Blur()

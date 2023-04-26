@@ -6,6 +6,7 @@ deps: []
 build:
   excludes:
   - google
+  - sf/substreams/v1/test
 
 lint:
   use:

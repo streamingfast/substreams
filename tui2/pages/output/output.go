@@ -53,6 +53,7 @@ type Output struct {
 
 	searchEnabled                   bool
 	searchCtx                       *search.Search
+	keywordToSearchFor              string
 	searchBlockNumsWithMatches      []uint64
 	searchMatchingOutputViewOffsets []int
 
@@ -169,12 +170,29 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if modName == o.active.Module {
 					o.blockSelector.SetAvailableBlocks(o.blocksPerModule[modName])
 				}
+
+				if o.keywordToSearchFor != "" {
+					payload := o.payloads[blockCtx]
+					content := o.renderedOutput(payload, false)
+
+					var count int
+					_, count, _ = applyKeywordSearch(content.plainLogs+content.plainJSON+content.plainOutput, o.searchCtx.Current.Query)
+
+					matchingBlocks := o.searchAllBlocksForModule(o.active.Module)
+					if count > 0 {
+						matchingBlocks[blockNum] = true
+					}
+					cmds = append(cmds, func() tea.Msg {
+						return search.UpdateMatchingBlocks(matchingBlocks)
+					})
+				}
 			}
 			o.payloads[blockCtx] = output
 			o.setOutputViewContent()
 		}
 
 	case search.ApplySearchQueryMsg:
+		o.keywordToSearchFor = msg.Query
 		o.setOutputViewContent()
 		cmds = append(cmds, o.updateMatchingBlocks())
 	case common.ModuleSelectedMsg:

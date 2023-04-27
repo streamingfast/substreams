@@ -144,6 +144,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.msgDescs = msg.MsgDescs
 		ui.replayLog = msg.ReplayLog
 		ui.requestConfig = msg.RefreshCtx
+		cmds = append(cmds, ui.stream.Init())
 	case streamui.Msg:
 		switch msg {
 		case streamui.ConnectingMsg:
@@ -205,6 +206,7 @@ func (ui *UI) View() string {
 }
 
 func (ui *UI) restartStream() tea.Cmd {
+	ui.stream = nil
 	requestInstance, err := ui.requestConfig.NewInstance()
 	if err != nil {
 		return func() tea.Msg {
@@ -212,7 +214,6 @@ func (ui *UI) restartStream() tea.Cmd {
 			return streamui.StreamErrorMsg(err)
 		}
 	}
-	ui.replayLog = requestInstance.ReplayLog
 
 	return tea.Sequence(
 		func() tea.Msg {
@@ -221,7 +222,6 @@ func (ui *UI) restartStream() tea.Cmd {
 		func() tea.Msg {
 			return request.NewRequestInstance(requestInstance)
 		},
-		requestInstance.Stream.Init(),
 
 		func() tea.Msg {
 			if ui.replayLog.IsWriting() {

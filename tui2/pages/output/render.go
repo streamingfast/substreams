@@ -124,6 +124,7 @@ func (o *Output) renderPayload(in *renderedOutput) string {
 	}
 	if o.errReceived != nil {
 		out.WriteString(in.styledError.String())
+		out.WriteString("\n")
 	}
 	out.WriteString(in.styledLogs.String())
 	out.WriteString(in.styledJSON)

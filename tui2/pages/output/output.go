@@ -112,7 +112,10 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case streamui.StreamErrorMsg:
 		o.errReceived = msg
-		newBlock := uint64(o.blockSelector.BlocksWithData[len(o.blockSelector.BlocksWithData)-1])
+		newBlock := o.active.BlockNum
+		if len(o.blockSelector.BlocksWithData) > 0 {
+			newBlock = uint64(o.blockSelector.BlocksWithData[len(o.blockSelector.BlocksWithData)-1])
+		}
 		o.active.BlockNum = newBlock
 		o.blockSelector.SetActiveBlock(newBlock)
 		o.setOutputViewContent()
@@ -125,6 +128,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case search.UpdateMatchingBlocks:
 		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
 	case request.NewRequestInstance:
+		o.errReceived = nil
 		o.msgDescs = msg.MsgDescs
 		o.blocksPerModule = make(map[string][]uint64)
 		o.payloads = make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)

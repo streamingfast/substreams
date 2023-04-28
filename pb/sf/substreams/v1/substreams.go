@@ -1,6 +1,7 @@
 package pbsubstreams
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/streamingfast/bstream"
@@ -95,6 +96,11 @@ func ValidateRequest(req *Request, isSubRequest bool) error {
 			return fmt.Errorf("initial store snapshots for module: %q: no such 'store' module defined modules graph", storeSnapshot)
 		}
 	}
+
+	if err := validateSteps(req); err != nil && !isSubRequest {
+		return fmt.Errorf(`invalid "fork_steps": %w`, err)
+	}
+
 	return nil
 }
 
@@ -110,4 +116,32 @@ func validateOutputModule(req *Request) error {
 		return fmt.Errorf("multiple output modules is not accepted")
 	}
 	return nil
+}
+
+func validateSteps(req *Request) error {
+	if len(req.ForkSteps) == 0 {
+		return errors.New(`cannot be empty`)
+	}
+
+	if len(req.ForkSteps) == 1 {
+		step := req.ForkSteps[0]
+		if step == ForkStep_STEP_UNDO || step == ForkStep_STEP_UNKNOWN {
+			return fmt.Errorf("step %q cannot be specified alone", step)
+		}
+
+		return nil
+	}
+
+	if len(req.ForkSteps) == 2 {
+		step1 := req.ForkSteps[0]
+		step2 := req.ForkSteps[1]
+
+		if (step1 == ForkStep_STEP_NEW && step2 == ForkStep_STEP_UNDO) || (step1 == ForkStep_STEP_UNDO && step2 == ForkStep_STEP_NEW) {
+			return nil
+		}
+
+		return fmt.Errorf(`step %q and step %q cannot be provided together accepting %q and %q only`, step1, step2, ForkStep_STEP_NEW, ForkStep_STEP_UNDO)
+	}
+
+	return fmt.Errorf("accepting only 1 or 2 steps but there was %d steps provided", len(req.ForkSteps))
 }

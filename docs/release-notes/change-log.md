@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixes
+
+* [RPC] When only `STEP_IRREVERSIBLE` were requested on the request, it was not honored on the server. It now correctly sends only blocks that are Final.
+
+### Added
+
+* [CLI] The 'run' command now has a flag `--final-blocks-only` to request only irreversible/final blocks (default is to request `New` and `Undo` blocks).
+
 ## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
 
 This should be the last release before a breaking change in the API and handling of the reorgs and UNDO messages.

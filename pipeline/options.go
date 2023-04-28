@@ -29,3 +29,9 @@ func WithPostJobHook(f substreams.PostJobHook) Option {
 		p.postJobHooks = append(p.postJobHooks, f)
 	}
 }
+
+func WithFinalBlocksOnly() Option {
+	return func(p *Pipeline) {
+		p.finalBlocksOnly = true
+	}
+}

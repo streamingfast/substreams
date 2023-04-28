@@ -4,6 +4,7 @@ func TestNewRequest(startBlockNum int64, opts ...testNewRequestOption) *Request 
 	r := &Request{
 		StartBlockNum: startBlockNum,
 		Modules:       &Modules{},
+		ForkSteps:     []ForkStep{ForkStep_STEP_NEW, ForkStep_STEP_UNDO},
 	}
 	for _, opt := range opts {
 		r = opt(r)

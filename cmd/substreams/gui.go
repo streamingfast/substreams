@@ -30,6 +30,7 @@ func init() {
 	guiCmd.Flags().Int64P("start-block", "s", -1, "Start block to stream from. Defaults to -1, which means the initialBlock of the first module you are streaming")
 	guiCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	guiCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
+	runCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
@@ -44,8 +45,8 @@ var guiCmd = &cobra.Command{
 	Use:   "gui [<manifest>] <module_name>",
 	Short: "Stream module outputs from a given package on a remote endpoint",
 	Long: cli.Dedent(`
-		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find a file named 
-		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find a file named
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>'.
 	`),
 	RunE:         runGui,

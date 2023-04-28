@@ -25,6 +25,7 @@ func init() {
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
+	runCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
@@ -40,8 +41,8 @@ var runCmd = &cobra.Command{
 	Use:   "run [<manifest>] <module_name>",
 	Short: "Stream module outputs from a given package on a remote endpoint",
 	Long: cli.Dedent(`
-		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find a file named 
-		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find a file named
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>'.
 	`),
 	RunE:         runRun,
@@ -126,11 +127,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("stop block: %w", err)
 	}
 
+	steps := []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_NEW, pbsubstreams.ForkStep_STEP_UNDO}
+	if mustGetBool(cmd, "final-blocks-only") {
+		steps = []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE}
+	}
+
 	req := &pbsubstreams.Request{
 		StartBlockNum:                       startBlock,
 		StartCursor:                         mustGetString(cmd, "cursor"),
 		StopBlockNum:                        stopBlock,
-		ForkSteps:                           []pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
+		ForkSteps:                           steps,
 		Modules:                             pkg.Modules,
 		OutputModule:                        outputModule,
 		OutputModules:                       []string{outputModule}, //added for backwards compatibility, will be removed

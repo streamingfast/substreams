@@ -48,7 +48,8 @@ type Pipeline struct {
 
 	processingModule *processingModule
 
-	gate *gate
+	gate            *gate
+	finalBlocksOnly bool
 
 	forkHandler     *ForkHandler
 	execOutputCache *cache.Engine

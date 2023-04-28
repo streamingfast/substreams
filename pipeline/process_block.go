@@ -49,6 +49,9 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	}
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
+	if p.finalBlocksOnly && step == bstream.StepIrreversible {
+		step = bstream.StepNewIrreversible // with finalBlocksOnly, we never get NEW signals so we fake any 'irreversible' signal as both
+	}
 
 	span.SetAttributes(
 		attribute.String("block.id", block.Id),

@@ -277,6 +277,11 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 	}
 
 	opts := s.buildPipelineOptions(ctx, request)
+
+	if isSubRequest || isFinalBlocksOnlySteps(request.ForkSteps) {
+		opts = append(opts, pipeline.WithFinalBlocksOnly())
+	}
+
 	pipe := pipeline.New(
 		ctx,
 		outputGraph,
@@ -329,6 +334,7 @@ func (s *Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,
+		isFinalBlocksOnlySteps(request.ForkSteps),
 		cursorIsTarget,
 	)
 	if err != nil {
@@ -433,4 +439,12 @@ func (s *Service) toGRPCError(err error) error {
 	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
 	// data?
 	return status.Error(codes.Internal, err.Error())
+}
+
+func isFinalBlocksOnlySteps(steps []pbsubstreams.ForkStep) bool {
+	if len(steps) != 1 {
+		return false
+	}
+
+	return steps[0] == pbsubstreams.ForkStep_STEP_IRREVERSIBLE
 }

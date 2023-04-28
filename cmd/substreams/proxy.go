@@ -92,7 +92,7 @@ func (cs *ConnectServer) Blocks(
 }
 
 func init() {
-	proxyCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443.io:443", "Substreams gRPC endpoint")
+	proxyCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	proxyCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	proxyCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
 	proxyCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")

@@ -184,7 +184,7 @@ func (r *Request) getViewportContent() (string, error) {
 		output += fmt.Sprintf("%s\n\n", module.Name)
 		output += fmt.Sprintf("	Initial block: %v\n", module.InitialBlock)
 		output += fmt.Sprintln("	Inputs: ")
-		for i, _ := range module.Inputs {
+		for i := range module.Inputs {
 			output += fmt.Sprintf("		- %s\n", module.Inputs[i])
 		}
 		output += fmt.Sprintln("	Outputs: ")

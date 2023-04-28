@@ -52,14 +52,14 @@ communication (ex: `cursor`, `logs`...)
 
 #### Substreams Test
 
-Added a basic Substreams testing framework that validates module outputs 
-against expected values. The testing framework currently runs on `substreams run` 
+Added a basic Substreams testing framework that validates module outputs
+against expected values. The testing framework currently runs on `substreams run`
 command, where you can specify the following flags:
 
 * `test-file` Points to a file that contains your test specs
-* `test-verbose` Enables verbose mode while testing. 
+* `test-verbose` Enables verbose mode while testing.
 
-The test file, specifies the expected output for a given substreams 
+The test file, specifies the expected output for a given substreams
 module at a given block.
 
 ### GUI Improvements

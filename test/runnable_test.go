@@ -143,9 +143,7 @@ func (f *testRun) Logs() (out []string) {
 		case *pbsubstreamsrpc.Response_BlockScopedData:
 			for _, output := range r.BlockScopedData.AllModuleOutputs() {
 				if debugInfo := output.DebugInfo(); debugInfo != nil {
-					for _, log := range debugInfo.GetLogs() {
-						out = append(out, log)
-					}
+					out = append(out, debugInfo.GetLogs()...)
 				}
 			}
 		}

@@ -10,26 +10,30 @@ import (
 )
 
 func Test_ValidateRequest(t *testing.T) {
+	testOutputMap := withOutputModule("output_mod", "map")
+	testOutputStore := withOutputModule("output_mod", "store")
+
+	testBlockType := "sf.substreams.v1.test.Block"
+
 	tests := []struct {
 		name      string
 		request   *pbsubstreamsrpc.Request
 		blockType string
 		expect    error
 	}{
-		{"negative start block num", req(-1), "sf.substreams.v1.test.Block", fmt.Errorf("negative start block -1 is not accepted")},
-		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, "sf.substreams.v1.test.Block", fmt.Errorf("no modules found in request")},
-		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), "sf.substreams.v1.test.Block", nil},
-		{"single store output module is not accepted for none sub-request", req(1, withOutputModule("output_mod", "store")), "sf.substreams.v1.test.Block", fmt.Errorf("multiple output modules is not accepted")},
-		{"single map output module is accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), "sf.substreams.v1.test.Block", nil},
-		{"single store output module is  accepted for none sub-request", req(1, withOutputModule("output_mod", "map")), "sf.substreams.v1.test.Block", nil},
-		{name: "debug initial snapshots not accepted in production mode", request: req(1, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), expect: fmt.Errorf("debug initial snapshots not accepted in production mode")},
+		{"negative start block num", req(-1, testOutputMap), testBlockType, nil},
+		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, testBlockType, fmt.Errorf("validate request: no modules found in request")},
+		{"single legacy map output module is accepted for none sub-request", req(1, testOutputMap), testBlockType, nil},
+		{"single map output module is accepted for none sub-request", req(1, testOutputMap), testBlockType, nil},
+		{"single store output module is not accepted for none sub-request", req(1, testOutputStore), testBlockType, fmt.Errorf("validate request: output module must be of kind 'map'")},
+		{"debug initial snapshots not accepted in production mode", req(1, testOutputMap, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), "", fmt.Errorf(`validate request: cannot set 'debug-modules-initial-snapshot' in 'production-mode'`)},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := ValidateRequest(test.request, test.blockType)
 			if test.expect != nil {
-				require.Error(t, err)
+				require.EqualError(t, err, test.expect.Error())
 			} else {
 				require.NoError(t, err)
 			}

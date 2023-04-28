@@ -46,6 +46,10 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	clock := blockToClock(block)
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
+	if p.finalBlocksOnly && step == bstream.StepIrreversible {
+		step = bstream.StepNewIrreversible // with finalBlocksOnly, we never get NEW signals so we fake any 'irreversible' signal as both
+	}
+
 	finalBlockHeight := obj.(bstream.Stepable).FinalBlockHeight()
 	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
 

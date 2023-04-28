@@ -254,6 +254,9 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 				},
 			}))
 	}
+	if request.FinalBlocksOnly {
+		opts = append(opts, pipeline.WithFinalBlocksOnly())
+	}
 
 	pipe := pipeline.New(
 		ctx,
@@ -308,6 +311,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,
+		request.FinalBlocksOnly,
 		cursorIsTarget,
 	)
 	if err != nil {

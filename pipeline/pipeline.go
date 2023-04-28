@@ -55,7 +55,8 @@ type Pipeline struct {
 
 	processingModule *processingModule
 
-	gate *gate
+	gate            *gate
+	finalBlocksOnly bool
 
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef

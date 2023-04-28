@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/tools/test"
-	"go.uber.org/zap"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/streamingfast/substreams/tools/test"
+	"go.uber.org/zap"
 
 	"github.com/schollz/closestmatch"
 	"github.com/spf13/cobra"
@@ -28,6 +29,7 @@ func init() {
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
+	runCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
@@ -150,7 +152,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		StartBlockNum:                       startBlock,
 		StartCursor:                         mustGetString(cmd, "cursor"),
 		StopBlockNum:                        stopBlock,
-		FinalBlocksOnly:                     true,
+		FinalBlocksOnly:                     mustGetBool(cmd, "final-blocks-only"),
 		Modules:                             pkg.Modules,
 		OutputModule:                        outputModule,
 		ProductionMode:                      productionMode,
@@ -185,7 +187,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	ui.Connecting()
 	cli, err := ssClient.Blocks(streamCtx, req, callOpts...)
 	if err != nil && streamCtx.Err() != context.Canceled {
-		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
+		return fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err)
 	}
 	ui.Connected()
 

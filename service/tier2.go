@@ -222,6 +222,8 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	}
 
 	opts := s.buildPipelineOptions(ctx, request)
+	opts = append(opts, pipeline.WithFinalBlocksOnly())
+
 	pipe := pipeline.New(
 		ctx,
 		outputGraph,
@@ -258,6 +260,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		int64(requestDetails.ResolvedStartBlockNum),
 		request.StopBlockNum,
 		"",
+		true,
 		false,
 	)
 	if err != nil {

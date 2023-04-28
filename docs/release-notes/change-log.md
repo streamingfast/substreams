@@ -74,6 +74,14 @@ module at a given block.
 ### Engine Changes
 * Tier1 will now avoid scheduling modules if they are more than the equivalent of "10 subrequests" ahead of the slowest running module. This will should reduce load on tier2 when a substreams shows a bottleneck anyway and keep workers ready for when it needs them.
 
+### Service BUGFIXES
+
+* When only `STEP_IRREVERSIBLE` were requested (now through param `final_blocks_only=true`) on the request, it was honored on the server. It now correctly sends only blocks that are Final.
+
+### CLI
+
+* 'run' command now has flag `--final-blocks-only`
+
 
 ## UNRELEASED (release/v1.0 branch)
 

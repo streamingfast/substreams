@@ -2,10 +2,11 @@ package request
 
 import (
 	"fmt"
-	"github.com/streamingfast/substreams/tui2/components/explorer"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/streamingfast/substreams/tui2/components/explorer"
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -37,6 +38,7 @@ type RequestConfig struct {
 	DebugModulesInitialSnapshot []string
 	StartBlock                  int64
 	StopBlock                   string
+	FinalBlocksOnly             bool
 	OutputModule                string
 	SubstreamsClientConfig      *client.SubstreamsClientConfig
 	HomeDir                     string
@@ -251,6 +253,7 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,
 		StartCursor:                         c.Cursor,
+		FinalBlocksOnly:                     c.FinalBlocksOnly,
 		StopBlockNum:                        stopBlock,
 		Modules:                             pkg.Modules,
 		OutputModule:                        c.OutputModule,

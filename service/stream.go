@@ -24,11 +24,15 @@ func (sf *StreamFactory) New(
 	startBlockNum int64,
 	stopBlockNum uint64,
 	cursor string,
+	finalBlocksOnly bool,
 	cursorIsTarget bool,
 ) (Streamable, error) {
 	options := []stream.Option{
 		stream.WithStopBlock(stopBlockNum),
 		stream.WithCustomStepTypeFilter(bstream.StepsAll), // substreams always wants new, undo, new+irreversible, irreversible, stalled
+	}
+	if finalBlocksOnly {
+		options = append(options, stream.WithFinalBlocksOnly())
 	}
 
 	if cursor != "" {

@@ -119,7 +119,7 @@ func (s *Stream) StartStream() tea.Msg {
 
 	cli, err := s.client.Blocks(streamCtx, s.req, s.callOpts...)
 	if err != nil && streamCtx.Err() != context.Canceled {
-		return StreamErrorMsg(fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err))
+		return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 	}
 
 	s.conn = cli

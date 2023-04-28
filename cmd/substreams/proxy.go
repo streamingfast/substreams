@@ -74,7 +74,7 @@ func (cs *ConnectServer) Blocks(
 
 	cli, err := ssClient.Blocks(ctx, newReq, callOpts...)
 	if err != nil {
-		return fmt.Errorf("call sf.substreams.v1.Stream/Blocks: %w", err)
+		return fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err)
 	}
 
 	for {
@@ -121,7 +121,7 @@ func runProxy(cmd *cobra.Command, args []string) error {
 	}
 
 	reflector := grpcreflect.NewStaticReflector(
-		"sf.substreams.v1.Stream",
+		"sf.substreams.rpc.v2.Stream",
 	)
 
 	mux := http.NewServeMux()

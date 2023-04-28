@@ -153,7 +153,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		callOpts = append(callOpts, grpc.WaitForReady(false))
 		cli, err := ssClient.Blocks(ctx, subReq, callOpts...)
 		if err != nil {
-			zlog.Error("call sf.substreams.v1.Stream/Blocks", zap.Error(err))
+			zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.Error(err))
 			markFailure(endpoint, begin)
 			connClose()
 			cancel()

@@ -482,6 +482,7 @@ func returnModuleDataOutputs(
 		DebugMapOutputs:   extraMapModuleOutputs,
 		DebugStoreOutputs: extraStoreModuleOutputs,
 		Cursor:            cursor.ToOpaque(),
+		FinalBlockHeight:  cursor.LIB.Num(),
 	}
 
 	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {

@@ -170,8 +170,9 @@ func toBlockScopedData(module *pbsubstreams.Module, cacheItem *pboutput.Item) (*
 		HeadBlock: blockRef,
 	}
 	out := &pbsubstreamsrpc.BlockScopedData{
-		Cursor: cursor.ToOpaque(),
-		Clock:  clock,
+		Cursor:           cursor.ToOpaque(),
+		Clock:            clock,
+		FinalBlockHeight: blockRef.Num(),
 	}
 
 	m, err := toModuleOutput(module, cacheItem)

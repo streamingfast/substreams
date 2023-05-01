@@ -41,7 +41,7 @@ function generate_proto() {
 }
 
 function generate_system() {
-    echo "Generating Substreams system Protobuf descriptors"
+  echo "Generating Substreams system Protobuf descriptors"
   directory="`dirname $1`"
   if [[ ! -d "$directory" ]]; then
     mkdir "$directory" > /dev/null
@@ -50,7 +50,7 @@ function generate_system() {
   protoc -I$PROTO \
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
-    "$PROTO/sf/substreams/rpc/v2/clock.proto" \
+    "$PROTO/sf/substreams/v1/clock.proto" \
     "$PROTO/sf/substreams/rpc/v2/service.proto" \
     "$PROTO/google/protobuf/any.proto" \
     "$PROTO/google/protobuf/descriptor.proto" \

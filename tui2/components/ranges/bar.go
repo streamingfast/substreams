@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 )
@@ -29,8 +31,8 @@ func (b *Bar) Init() tea.Cmd { return nil }
 
 func (b *Bar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges:
-		for _, v := range msg.ProcessedRanges {
+	case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
+		for _, v := range msg.ProcessedRanges.ProcessedRanges {
 			b.ranges = mergeRangeLists(b.ranges, &blockRange{
 				Start: v.StartBlock,
 				End:   v.EndBlock,
@@ -72,11 +74,12 @@ func (b *Bar) RangeView() string {
 		return "[borked]"
 	}
 
-	in := b.ranges
-	lo := in.Lo()
-	hi := b.targetEndBlock
 	var out []string
-	out = append(out, fmt.Sprintf("%v - %v", lo, hi))
+	for _, el := range b.ranges {
+		out = append(out, fmt.Sprintf("%d+%d", el.Start, el.End-el.Start))
 
-	return "[" + strings.Join(out, "") + "]"
+	}
+
+	fullBar := "[" + strings.Join(out, " ") + "]"
+	return lipgloss.NewStyle().MaxWidth(b.Width).Render(fullBar)
 }

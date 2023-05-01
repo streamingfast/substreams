@@ -42,9 +42,6 @@ func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			bar.Update(mod.Type)
 		}
-		// loop through msg.Modules
-		// check if we have a Bar for that module, otherwise create it
-		// and update it with the proper messages.
 	}
 	return b, nil
 }

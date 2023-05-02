@@ -31,7 +31,7 @@ func Test_ValidateRequest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateRequest(test.request, test.blockType)
+			err := ValidateTier1Request(test.request, test.blockType)
 			if test.expect != nil {
 				require.EqualError(t, err, test.expect.Error())
 			} else {

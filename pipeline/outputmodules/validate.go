@@ -9,44 +9,48 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-// ValidateRequest is run by the server code.
-func ValidateRequest(request *pbsubstreamsrpc.Request, blockType string) error {
+// Deprecated: use ValidateTier1Request
+var ValidateRequest = ValidateTier1Request
+
+// ValidateTier1Request is run by the server code.
+func ValidateTier1Request(request *pbsubstreamsrpc.Request, blockType string) error {
 	if err := request.Validate(); err != nil {
-		return fmt.Errorf("validate request: %s", err)
+		return fmt.Errorf("validate tier1 request: %s", err)
 	}
 
-	if err := validateBinaryTypes(request.Modules.Binaries); err != nil {
-		return err
-	}
-
-	if err := manifest.ValidateModules(request.Modules); err != nil {
-		return fmt.Errorf("modules validation failed: %w", err)
-	}
-
-	if err := validateModuleGraph(request.Modules.Modules, request.OutputModule, blockType); err != nil {
+	err := validateRequest(request.Modules.Binaries, request.Modules, request.OutputModule, blockType)
+	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func ValidateInternalRequest(request *pbssinternal.ProcessRangeRequest, blockType string) error {
+func ValidateTier2Request(request *pbssinternal.ProcessRangeRequest, blockType string) error {
 	if err := request.Validate(); err != nil {
-		return fmt.Errorf("validate request: %s", err)
+		return fmt.Errorf("validate tier2 request: %s", err)
 	}
 
-	if err := validateBinaryTypes(request.Modules.Binaries); err != nil {
+	err := validateRequest(request.Modules.Binaries, request.Modules, request.OutputModule, blockType)
+	if err != nil {
 		return err
 	}
 
-	if err := manifest.ValidateModules(request.Modules); err != nil {
+	return nil
+}
+
+func validateRequest(binaries []*pbsubstreams.Binary, modules *pbsubstreams.Modules, outputModule string, blockType string) error {
+	if err := validateBinaryTypes(binaries); err != nil {
+		return err
+	}
+
+	if err := manifest.ValidateModules(modules); err != nil {
 		return fmt.Errorf("modules validation failed: %w", err)
 	}
 
-	if err := validateModuleGraph(request.Modules.Modules, request.OutputModule, blockType); err != nil {
+	if err := validateModuleGraph(modules.Modules, outputModule, blockType); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -56,7 +60,7 @@ func validateModuleGraph(mods []*pbsubstreams.Module, outputModule string, block
 		return fmt.Errorf("should have been able to derive modules graph: %w", err)
 	}
 
-	// Already validated by `ValidateRequest` above, so we can use the `Must...` version
+	// Already validated by `ValidateTier1Request` above, so we can use the `Must...` version
 	ancestors, err := graph.AncestorsOf(outputModule)
 	if err != nil {
 		return fmt.Errorf("computing ancestors of %q: %w", outputModule, err)

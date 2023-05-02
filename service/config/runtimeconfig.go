@@ -2,9 +2,12 @@ package config
 
 import (
 	"github.com/streamingfast/dstore"
+
 	"github.com/streamingfast/substreams/orchestrator/work"
 )
 
+// RuntimeConfig is a global configuration for the service.
+// It is passed down and should not be modified unless cloned.
 type RuntimeConfig struct {
 	CacheSaveInterval uint64
 
@@ -14,8 +17,9 @@ type RuntimeConfig struct {
 	ParallelSubrequests  uint64 // how many sub-jobs to launch for a given user
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
-	BaseObjectStore  dstore.Store
-	WorkerFactory    work.WorkerFactory
+	BaseObjectStore dstore.Store
+	WorkerFactory   work.WorkerFactory
+
 	WithRequestStats bool
 }
 

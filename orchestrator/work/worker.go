@@ -6,18 +6,19 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/client"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/client"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/reqctx"
 )
 
 var lastWorkerID uint64
@@ -107,7 +108,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 			}
 		}
 		return &Result{
-			Error: &RetryableErr{cause: fmt.Errorf("getting block stream: %w", err)},
+			Error: NewRetryableErr(fmt.Errorf("getting block stream: %w", err)),
 		}
 	}
 
@@ -155,7 +156,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				if err != nil {
 					span.SetStatus(codes.Error, err.Error())
 					return &Result{
-						Error: &RetryableErr{cause: fmt.Errorf("sending progress: %w", err)},
+						Error: NewRetryableErr(fmt.Errorf("sending progress: %w", err)),
 					}
 				}
 
@@ -167,6 +168,9 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				//respFunc(toRPCProcessedBytes(resp.ModuleName, bm.BytesReadDelta(), bm.BytesWrittenDelta(), bm.BytesRead(), bm.BytesWritten(), 0))
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
+				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow
+				// for that that would pick up the errors, and pack the remaining logs
+				// and reasons into a message. This is nowhere to be found now.
 				forwardResponse := toRPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
 				respFunc(forwardResponse)
 				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
@@ -188,7 +192,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				return &Result{}
 			}
 			return &Result{
-				Error: &RetryableErr{cause: fmt.Errorf("receiving stream resp: %w", err)},
+				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),
 			}
 		}
 	}

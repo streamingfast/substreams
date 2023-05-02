@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/streamingfast/derr"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
-	"go.uber.org/zap"
 )
 
 type Scheduler struct {
@@ -192,16 +193,20 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 
 		switch err.(type) {
 		case *work.RetryableErr:
-			logger.Debug("retryable error", zap.Error(err))
+			logger.Info("worker failed with retryable error", zap.Error(err))
 			return err
 		default:
 			if err != nil {
-				logger.Debug("not a retryable error", zap.Error(err))
+				logger.Info("worker failed with a non-retryable error", zap.Error(err))
 			}
 			nonRetryableError = err
 			return nil
 		}
 	})
+	if nonRetryableError != nil {
+		logger.Info("job failed", zap.Object("job", job), zap.Error(nonRetryableError))
+		return jobResult{err: nonRetryableError}
+	}
 
 	if err := ctx.Err(); err != nil {
 		logger.Info("job not completed", zap.Object("job", job), zap.Error(err))

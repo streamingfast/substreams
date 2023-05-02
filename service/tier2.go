@@ -11,6 +11,14 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -23,13 +31,6 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/tracking"
 	"github.com/streamingfast/substreams/wasm"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type Tier2Service struct {
@@ -126,17 +127,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
 	}
 
-	runtimeConfig := config.NewRuntimeConfig(
-		s.runtimeConfig.CacheSaveInterval,
-		s.runtimeConfig.SubrequestsSplitSize,
-		s.runtimeConfig.ParallelSubrequests,
-		s.runtimeConfig.MaxJobsAhead,
-		s.runtimeConfig.MaxWasmFuel,
-		s.runtimeConfig.BaseObjectStore,
-		s.runtimeConfig.WorkerFactory,
-	)
-	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
-
 	if request.Modules == nil {
 		return status.Error(codes.InvalidArgument, "missing modules in request")
 	}
@@ -154,7 +144,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(logger, streamSrv)
-	err = s.processRange(ctx, runtimeConfig, request, respFunc)
+	err = s.processRange(ctx, s.runtimeConfig, request, respFunc)
 	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -167,7 +157,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	if err := outputmodules.ValidateInternalRequest(request, s.blockType); err != nil {
+	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 

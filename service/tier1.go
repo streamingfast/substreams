@@ -14,6 +14,16 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/atomic"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
@@ -28,30 +38,21 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/tracking"
 	"github.com/streamingfast/substreams/wasm"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/atomic"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 type Tier1Service struct {
-	blockType           string
-	wasmExtensions      []wasm.WASMExtensioner
-	pipelineOptions     []pipeline.PipelineOptioner
-	streamFactoryFunc   StreamFactoryFunc
+	blockType         string
+	wasmExtensions    []wasm.WASMExtensioner
+	pipelineOptions   []pipeline.PipelineOptioner
+	streamFactoryFunc StreamFactoryFunc
+
+	runtimeConfig config.RuntimeConfig
+	tracer        ttrace.Tracer
+	logger        *zap.Logger
+
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
-
-	runtimeConfig config.RuntimeConfig
-
-	tracer ttrace.Tracer
-	logger *zap.Logger
 }
 
 var workerID atomic.Uint64
@@ -153,19 +154,13 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	span.SetAttributes(attribute.String("hostname", hostname))
 
 	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
-		s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
+		// WARN: we shouldn't mutate this object. It's globally shared.
+		// If we need to pass down a custom runtimeConfig (RuntimeConfig
+		// is by definition a global), we should refactor things around
+		// and perhaps clone it.
+		//
+		//s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
 	}
-
-	runtimeConfig := config.NewRuntimeConfig(
-		s.runtimeConfig.CacheSaveInterval,
-		s.runtimeConfig.SubrequestsSplitSize,
-		s.runtimeConfig.ParallelSubrequests,
-		s.runtimeConfig.MaxJobsAhead,
-		s.runtimeConfig.MaxWasmFuel,
-		s.runtimeConfig.BaseObjectStore,
-		s.runtimeConfig.WorkerFactory,
-	)
-	runtimeConfig.WithRequestStats = s.runtimeConfig.WithRequestStats
 
 	if request.Modules == nil {
 		return status.Error(codes.InvalidArgument, "missing modules in request")
@@ -186,9 +181,9 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	if id := auth.GetUserID(); id != "" {
 		fields = append(fields, zap.String("user_id", id))
 	}
-	logger.Info("incoming substreams Blocks request", fields...)
+	logger.Info("incoming Substreams Blocks request", fields...)
 
-	err = s.blocks(ctx, runtimeConfig, request, respFunc)
+	err = s.blocks(ctx, s.runtimeConfig, request, respFunc)
 	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -201,7 +196,7 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	if err := outputmodules.ValidateRequest(request, s.blockType); err != nil {
+	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 

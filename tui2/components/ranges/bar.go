@@ -68,7 +68,7 @@ func (b *Bar) View() string {
 	return "[" + strings.Join(out, "") + "]"
 }
 
-func (b *Bar) RangeView() string {
+func (b *Bar) RangeView(long bool) string {
 	width := uint64(b.Width)
 	if width > 1000 {
 		return "[borked]"
@@ -76,8 +76,11 @@ func (b *Bar) RangeView() string {
 
 	var out []string
 	for _, el := range b.ranges {
-		out = append(out, fmt.Sprintf("%d+%d", el.Start, el.End-el.Start))
-
+		if long {
+			out = append(out, fmt.Sprintf("%d-%d", el.Start, el.End))
+		} else {
+			out = append(out, fmt.Sprintf("%d+%d", el.Start, el.End-el.Start))
+		}
 	}
 
 	fullBar := "[" + strings.Join(out, " ") + "]"

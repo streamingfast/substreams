@@ -60,7 +60,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.(tea.KeyMsg).String() {
 		case "m":
-			p.bars.RangeMode = !p.bars.RangeMode
+			p.bars.Mode = (p.bars.Mode + 1) % 3
 			p.progressView.SetContent(p.bars.View())
 		}
 		var cmd tea.Cmd

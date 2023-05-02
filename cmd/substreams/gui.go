@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+
 	"github.com/streamingfast/substreams/tui2/pages/request"
 
 	"github.com/streamingfast/substreams/client"
@@ -79,7 +80,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
-		readAPIToken(cmd, "substreams-api-token-envvar"),
+		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)

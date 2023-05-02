@@ -7,8 +7,9 @@ import (
 	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"google.golang.org/grpc"
+
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type Msg int

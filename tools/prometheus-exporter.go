@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -15,12 +14,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 var status = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_status", Help: "Either 1 for successful subtreams request, or 0 for failure"}, []string{"endpoint"})
@@ -76,7 +76,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 
 	outputStreamName := moduleName
 
-	apiToken := readAPIToken(cmd, "substreams-api-token-envvar")
+	apiToken := ReadAPIToken(cmd, "substreams-api-token-envvar")
 	insecure := mustGetBool(cmd, "insecure")
 	plaintext := mustGetBool(cmd, "plaintext")
 	interval := mustGetDuration(cmd, "lookup_interval")
@@ -185,14 +185,4 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		cancel()
 
 	}
-}
-
-func readAPIToken(cmd *cobra.Command, envFlagName string) string {
-	envVar := mustGetString(cmd, envFlagName)
-	value := os.Getenv(envVar)
-	if value != "" {
-		return value
-	}
-
-	return os.Getenv("SF_API_TOKEN")
 }

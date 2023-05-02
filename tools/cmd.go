@@ -43,6 +43,7 @@ func mustGetString(cmd *cobra.Command, flagName string) string {
 	}
 	return val
 }
+
 func mustGetInt64(cmd *cobra.Command, flagName string) int64 {
 	val, err := cmd.Flags().GetInt64(flagName)
 	if err != nil {
@@ -68,6 +69,16 @@ func mustGetDuration(cmd *cobra.Command, flagName string) time.Duration {
 	val, err := cmd.Flags().GetDuration(flagName)
 	if err != nil {
 		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	return val
+}
+func mustGetStringSlice(cmd *cobra.Command, flagName string) []string {
+	val, err := cmd.Flags().GetStringSlice(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	if len(val) == 0 {
+		return nil
 	}
 	return val
 }
@@ -101,4 +112,14 @@ func ResolveManifestFile(input string) (manifestName string, err error) {
 		return filepath.Join(input, "substreams.yaml"), nil
 	}
 	return input, nil
+}
+
+func ReadAPIToken(cmd *cobra.Command, envFlagName string) string {
+	envVar := mustGetString(cmd, envFlagName)
+	value := os.Getenv(envVar)
+	if value != "" {
+		return value
+	}
+
+	return os.Getenv("SF_API_TOKEN")
 }

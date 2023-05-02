@@ -11,13 +11,14 @@ import (
 	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbrpcsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/tools"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 )
 
 var proxyCmd = &cobra.Command{
@@ -109,7 +110,7 @@ func runProxy(cmd *cobra.Command, args []string) error {
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
-		readAPIToken(cmd, "substreams-api-token-envvar"),
+		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)

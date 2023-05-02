@@ -4,21 +4,19 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/substreams/tools/test"
 	"go.uber.org/zap"
 
-	"github.com/schollz/closestmatch"
+	"github.com/streamingfast/substreams/tools/test"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui"
 )
@@ -83,7 +81,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	if err := ApplyParams(cmd, pkg); err != nil {
+	if err := manifest.ApplyParams(mustGetStringSlice(cmd, "params"), pkg); err != nil {
 		return err
 	}
 
@@ -132,7 +130,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
-		readAPIToken(cmd, "substreams-api-token-envvar"),
+		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
@@ -218,47 +216,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-}
-
-func ApplyParams(cmd *cobra.Command, pkg *pbsubstreams.Package) error {
-	params := mustGetStringSlice(cmd, "params")
-	for _, param := range params {
-		parts := strings.SplitN(param, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf(`param %q invalid, must be of the format: "module=value" or "imported:module=value"`, param)
-		}
-		var found bool
-		var closest []string
-		for _, mod := range pkg.Modules.Modules {
-			closest = append(closest, mod.Name)
-			if mod.Name == parts[0] {
-				if len(mod.Inputs) == 0 {
-					return fmt.Errorf("param for module %q: missing 'params' module input", mod.Name)
-				}
-				p := mod.Inputs[0].GetParams()
-				if p == nil {
-					return fmt.Errorf("param for module %q: first module input is not 'params'", mod.Name)
-				}
-				p.Value = parts[1]
-				found = true
-			}
-		}
-		if !found {
-			closeEnough := closestmatch.New(closest, []int{2}).Closest(parts[0])
-			return fmt.Errorf("param for module %q: module not found, did you mean %q ?", parts[0], closeEnough)
-		}
-	}
-	return nil
-}
-
-func readAPIToken(cmd *cobra.Command, envFlagName string) string {
-	envVar := mustGetString(cmd, envFlagName)
-	value := os.Getenv(envVar)
-	if value != "" {
-		return value
-	}
-
-	return os.Getenv("SF_API_TOKEN")
 }
 
 func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error) {

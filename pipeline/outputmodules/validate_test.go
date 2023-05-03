@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_ValidateRequest(t *testing.T) {
@@ -22,11 +23,11 @@ func Test_ValidateRequest(t *testing.T) {
 		expect    error
 	}{
 		{"negative start block num", req(-1, testOutputMap), testBlockType, nil},
-		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, testBlockType, fmt.Errorf("validate request: no modules found in request")},
+		{"no modules found in request", &pbsubstreamsrpc.Request{StartBlockNum: 1}, testBlockType, fmt.Errorf("validate tier1 request: no modules found in request")},
 		{"single legacy map output module is accepted for none sub-request", req(1, testOutputMap), testBlockType, nil},
 		{"single map output module is accepted for none sub-request", req(1, testOutputMap), testBlockType, nil},
-		{"single store output module is not accepted for none sub-request", req(1, testOutputStore), testBlockType, fmt.Errorf("validate request: output module must be of kind 'map'")},
-		{"debug initial snapshots not accepted in production mode", req(1, testOutputMap, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), "", fmt.Errorf(`validate request: cannot set 'debug-modules-initial-snapshot' in 'production-mode'`)},
+		{"single store output module is not accepted for none sub-request", req(1, testOutputStore), testBlockType, fmt.Errorf("validate tier1 request: output module must be of kind 'map'")},
+		{"debug initial snapshots not accepted in production mode", req(1, testOutputMap, withDebugInitialSnapshotForModules([]string{"foo"}), withProductionMode()), "", fmt.Errorf(`validate tier1 request: cannot set 'debug-modules-initial-snapshot' in 'production-mode'`)},
 	}
 
 	for _, test := range tests {

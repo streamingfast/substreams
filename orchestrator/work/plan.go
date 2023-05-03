@@ -6,8 +6,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
@@ -179,6 +180,7 @@ func (p *Plan) promoteWaitingJobs() {
 	removeJobs := map[*Job]bool{}
 	for _, job := range p.waitingJobs {
 		if p.allDependenciesMet(job) && job.RequestRange.StartBlock < noJobAbove {
+			// TODO: send a signal here?
 			p.readyJobs = append(p.readyJobs, job)
 			removeJobs[job] = true
 		}
@@ -195,6 +197,8 @@ func (p *Plan) promoteWaitingJobs() {
 }
 
 func (p *Plan) allDependenciesMet(job *Job) bool {
+	// TODO: if we shrink the number of dependent jobs,
+	//  send a signal for the number of waited upon jobs.
 	startBlock := job.RequestRange.StartBlock
 	for _, dep := range job.requiredModules {
 		depUpTo, ok := p.modulesReadyUpToBlock[dep]

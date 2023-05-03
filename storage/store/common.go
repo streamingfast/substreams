@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
-	"io"
 )
 
 func saveStore(ctx context.Context, store dstore.Store, filename string, content []byte) error {
@@ -19,7 +20,7 @@ func loadStore(ctx context.Context, store dstore.Store, filename string) (out []
 	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		r, err := store.OpenObject(ctx, filename)
 		if err != nil {
-			return fmt.Errorf("openning file: %w", err)
+			return fmt.Errorf("opening file: %w", err)
 		}
 		defer r.Close()
 		data, err := io.ReadAll(r)

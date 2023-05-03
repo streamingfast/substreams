@@ -7,19 +7,24 @@ import (
 	"sort"
 	"time"
 
+	"github.com/streamingfast/shutter"
+
 	"github.com/streamingfast/substreams/storage/store"
 
 	"github.com/abourget/llerrgroup"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
-	"go.uber.org/zap"
 )
 
 var SkipRange = errors.New("skip range")
 var PartialChunksDone = errors.New("partial chunks done")
 
 type StoreSquasher struct {
+	*shutter.Shutter
+
 	name                         string
 	store                        *store.FullKV
 	requestRange                 *block.Range
@@ -28,9 +33,8 @@ type StoreSquasher struct {
 	targetExclusiveEndBlockReach bool
 	nextExpectedStartBlock       uint64 // This goes from a lower number up to `targetExclusiveEndBlock`
 	//log                          *zap.Logger
-	partialsChunks      chan block.Ranges
-	waitForCompletionCh chan error
-	storeSaveInterval   uint64
+	partialsChunks    chan block.Ranges
+	storeSaveInterval uint64
 
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64)
 }
@@ -43,6 +47,7 @@ func NewStoreSquasher(
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) *StoreSquasher {
 	s := &StoreSquasher{
+		Shutter:                    shutter.New(),
 		name:                       initialStore.Name(),
 		store:                      initialStore,
 		targetExclusiveEndBlock:    targetExclusiveBlock,
@@ -50,7 +55,6 @@ func NewStoreSquasher(
 		onStoreCompletedUntilBlock: onStoreCompletedUntilBlock,
 		storeSaveInterval:          storeSaveInterval,
 		partialsChunks:             make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
-		waitForCompletionCh:        make(chan error),
 	}
 	return s
 }
@@ -69,8 +73,8 @@ func (s *StoreSquasher) waitForCompletion(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-s.waitForCompletionCh:
-		if err != nil {
+	case <-s.Terminated():
+		if err := s.Err(); err != nil {
 			return fmt.Errorf("store squasher waiting for completion: %w", err)
 		}
 		logger.Info("squasher completed")
@@ -87,6 +91,8 @@ func (s *StoreSquasher) squash(ctx context.Context, partialsChunks block.Ranges)
 	case s.partialsChunks <- partialsChunks:
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-s.Terminated():
+		return s.Err()
 	}
 	return nil
 }
@@ -96,6 +102,11 @@ func (s *StoreSquasher) logger(ctx context.Context) *zap.Logger {
 }
 
 func (s *StoreSquasher) launch(ctx context.Context) {
+	if err := s.processPartials(ctx); err != nil {
+		s.Shutdown(err)
+	}
+}
+func (s *StoreSquasher) processPartials(ctx context.Context) error {
 	logger := s.logger(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 
@@ -106,11 +117,9 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 	for {
 		if err := s.getPartialChunks(ctx); err != nil {
 			if errors.Is(err, PartialChunksDone) {
-				close(s.waitForCompletionCh)
-				return
+				return nil
 			}
-			s.waitForCompletionCh <- err
-			return
+			return err
 		}
 
 		eg := llerrgroup.New(250)
@@ -118,13 +127,11 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 
 		out, err := s.processRanges(ctx, eg)
 		if err != nil {
-			s.waitForCompletionCh <- err
-			return
+			return err
 		}
 
 		if err := eg.Wait(); err != nil {
-			s.waitForCompletionCh <- fmt.Errorf("waiting: %w", err)
-			return
+			return fmt.Errorf("waiting: %w", err)
 		}
 
 		if out.lastExclusiveEndBlock != 0 {

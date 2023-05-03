@@ -9,16 +9,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/streamingfast/shutter"
+
 	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/block"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func TestShouldSaveFullKV(t *testing.T) {
@@ -103,6 +106,7 @@ func TestStoreSquasher_squash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			partialsChunks := make(chan block.Ranges, 10)
 			squasher := &StoreSquasher{
+				Shutter:        shutter.New(),
 				name:           "mod",
 				partialsChunks: partialsChunks,
 			}
@@ -127,6 +131,7 @@ func TestStoreSquasher_sortRange(t *testing.T) {
 func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	ctx := context.Background()
 	s := &StoreSquasher{
+		Shutter:        shutter.New(),
 		partialsChunks: make(chan block.Ranges, 10),
 		ranges:         []*block.Range{},
 		store:          newTestStore(t, dstore.NewMockStore(nil), 0),

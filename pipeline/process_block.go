@@ -9,15 +9,17 @@ import (
 
 	"github.com/streamingfast/substreams/storage/execout"
 
-	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/bstream"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
@@ -260,6 +262,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.extraStoreModuleOutputs = nil
 	for _, executor := range p.moduleExecutors {
 		if err := p.execute(ctx, executor, execOutput); err != nil {
+			//p.returnFailureProgress(ctx, err, executor)
 			return fmt.Errorf("running executor %q: %w", executor.Name(), err)
 		}
 	}

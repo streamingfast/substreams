@@ -164,6 +164,8 @@ func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
 	logger := s.logger(ctx)
 
 	select {
+	case <-s.Terminated():
+		return s.Err()
 	case <-ctx.Done():
 		logger.Info("quitting on a close context")
 		return ctx.Err()

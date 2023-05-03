@@ -179,7 +179,11 @@ func (p *Plan) promoteWaitingJobs() {
 	noJobAbove := p.highestRunnableStartBlock()
 	removeJobs := map[*Job]bool{}
 	for _, job := range p.waitingJobs {
-		if p.allDependenciesMet(job) && job.RequestRange.StartBlock < noJobAbove {
+		if p.allDependenciesMet(job) {
+			if job.RequestRange.StartBlock >= noJobAbove {
+				p.logger.Info("skipping job because above threshold", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove))
+				continue
+			}
 			// TODO: send a signal here?
 			p.readyJobs = append(p.readyJobs, job)
 			removeJobs[job] = true
@@ -222,7 +226,9 @@ func (p *Plan) NextJob() (job *Job, more bool) {
 	defer p.mu.Unlock()
 
 	if len(p.readyJobs) == 0 {
-		return nil, p.hasMore()
+		more = p.hasMore()
+		p.logger.Info("no job ready")
+		return
 	}
 
 	job = p.readyJobs[0]

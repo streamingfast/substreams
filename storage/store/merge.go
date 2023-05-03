@@ -5,25 +5,26 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/streamingfast/substreams/manifest"
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func (b *baseStore) setKV(k string, v []byte) {
-	//if prev, ok := b.kv[k]; ok {
-	//	b.totalSizeBytes -= uint64(len(prev))
-	//} else {
-	//	b.totalSizeBytes += uint64(len(k))
-	//}
-	//b.totalSizeBytes += uint64(len(v))
+	if prev, ok := b.kv[k]; ok {
+		b.totalSizeBytes -= uint64(len(prev))
+	} else {
+		b.totalSizeBytes += uint64(len(k))
+	}
+	b.totalSizeBytes += uint64(len(v))
 	b.kv[k] = v
 }
 
 func (b *baseStore) setNewKV(k string, v []byte) {
-	//b.totalSizeBytes += uint64(len(k) + len(v))
+	b.totalSizeBytes += uint64(len(k) + len(v))
 	b.kv[k] = v
 }
 
@@ -39,8 +40,12 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		return fmt.Errorf("incompatible value types: cannot merge %q and %q", b.valueType, kvPartialStore.valueType)
 	}
 
+	partialKvTime := time.Now()
 	for _, prefix := range kvPartialStore.DeletedPrefixes {
 		b.DeletePrefix(kvPartialStore.lastOrdinal, prefix)
+	}
+	if len(kvPartialStore.DeletedPrefixes) > 0 {
+		b.logger.Info("deleting prefix", zap.String("delete", time.Since(partialKvTime).String()))
 	}
 
 	intoValueTypeLower := strings.ToLower(b.valueType)

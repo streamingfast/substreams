@@ -231,6 +231,7 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, squashableRange *block.Range) error {
 	logger := s.logger(ctx)
 
+	startTime := time.Now()
 	logger.Info("testing squashable range",
 		zap.Object("range", squashableRange),
 		zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock),
@@ -249,14 +250,19 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	)
 
 	nextStore := s.store.DerivePartialStore(squashableRange.StartBlock)
+
+	loadTime := time.Now()
 	if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 	}
+	loadTimeTook := time.Since(loadTime)
 
-	logger.Debug("merging next store loaded", zap.Object("store", nextStore))
+	mergeTime := time.Now()
+	logger.Info("merging next store loaded", zap.Object("store", nextStore))
 	if err := s.store.Merge(nextStore); err != nil {
 		return fmt.Errorf("merging: %w", err)
 	}
+	mergeTimeTook := time.Since(mergeTime)
 
 	logger.Debug("store merge", zap.Object("store", s.store))
 	s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
@@ -269,26 +275,37 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	}
 
 	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {
+		saveTime := time.Now()
 		_, writer, err := s.store.Save(squashableRange.ExclusiveEndBlock)
+		saveTimeTook := time.Since(saveTime)
 		if err != nil {
 			return fmt.Errorf("save full store: %w", err)
 		}
 
 		eg.Go(func() error {
+			// TODO: could this cause an issue if the writing takes more time than when trying to opening the file??
 			return writer.Write(ctx)
 		})
+
+		logger.Info(
+			"squashing time metrics",
+			zap.String("load_time", loadTimeTook.String()),
+			zap.String("merge_time", mergeTimeTook.String()),
+			zap.String("save_time", saveTimeTook.String()),
+			zap.String("total_time", time.Since(startTime).String()),
+		)
 	}
+
 	return nil
 }
 
 func (s *StoreSquasher) shouldSaveFullKV(storeInitialBlock uint64, squashableRange *block.Range) bool {
-
 	// we check if the squashableRange we just merged into our FullKV store, ends on a storeInterval boundary block
 	// If someone the storeSaveInterval
 
 	// squashable range must end on a store boundary block
 	isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
-	// we expect the range to be euqal to the store save interval, except if the range start block
+	// we expect the range to be equal to the store save interval, except if the range start block
 	// is the same as the store initial block
 	isFirstKvForModule := isSaveIntervalReached && squashableRange.StartBlock == storeInitialBlock
 	isCompletedKv := isSaveIntervalReached && squashableRange.Len()-s.storeSaveInterval == 0

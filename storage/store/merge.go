@@ -13,17 +13,17 @@ import (
 )
 
 func (b *baseStore) setKV(k string, v []byte) {
-	if prev, ok := b.kv[k]; ok {
-		b.totalSizeBytes -= uint64(len(prev))
-	} else {
-		b.totalSizeBytes += uint64(len(k))
-	}
-	b.totalSizeBytes += uint64(len(v))
+	//if prev, ok := b.kv[k]; ok {
+	//	b.totalSizeBytes -= uint64(len(prev))
+	//} else {
+	//	b.totalSizeBytes += uint64(len(k))
+	//}
+	//b.totalSizeBytes += uint64(len(v))
 	b.kv[k] = v
 }
 
 func (b *baseStore) setNewKV(k string, v []byte) {
-	b.totalSizeBytes += uint64(len(k) + len(v))
+	//b.totalSizeBytes += uint64(len(k) + len(v))
 	b.kv[k] = v
 }
 

@@ -228,10 +228,10 @@ func TestPlan_NextJob(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := &Plan{
-				waitingJobs:             test.waitingJobs,
-				readyJobs:               test.readyJobs,
-				modulesRunningUpToBlock: test.modulesReadyUpToBlock,
-				modulesReadyUpToBlock:   test.modulesReadyUpToBlock,
+				waitingJobs:           test.waitingJobs,
+				readyJobs:             test.readyJobs,
+				modulesReadyOrRunning: test.modulesReadyUpToBlock,
+				modulesReadyUpToBlock: test.modulesReadyUpToBlock,
 			}
 
 			gotJob, gotMore := p.NextJob()

@@ -28,8 +28,8 @@ type Plan struct {
 	readyJobs          []*Job
 	schedulableModules []string
 
-	modulesRunningUpToBlock map[string]uint64 // module is either running or complete
-	modulesReadyUpToBlock   map[string]uint64
+	highestModuleRunningBlock map[string]uint64
+	modulesReadyUpToBlock     map[string]uint64
 
 	mu     sync.Mutex
 	logger *zap.Logger
@@ -129,10 +129,9 @@ func calculateHighestDependencyDepth(
 
 func (p *Plan) initModulesReadyUpToBlock() {
 	p.modulesReadyUpToBlock = make(map[string]uint64)
-	p.modulesRunningUpToBlock = make(map[string]uint64)
+	p.highestModuleRunningBlock = make(map[string]uint64)
 	for modName, modState := range p.ModulesStateMap {
 		p.modulesReadyUpToBlock[modName] = modState.ReadyUpToBlock()
-		p.modulesRunningUpToBlock[modName] = p.modulesReadyUpToBlock[modName]
 	}
 }
 
@@ -161,7 +160,12 @@ func (p *Plan) highestRunnableStartBlock() (uint64, string) {
 	lowestModuleHeight := maxUint64
 	var lowestModules string
 	for _, modName := range p.schedulableModules {
-		upTo, ok := p.modulesRunningUpToBlock[modName]
+		highestRunning, ok := p.highestModuleRunningBlock[modName]
+		highestReady, ok := p.modulesReadyUpToBlock[modName]
+		upTo := highestReady
+		if highestRunning > upTo {
+			upTo = highestRunning
+		}
 		if ok {
 			switch {
 			case upTo < lowestModuleHeight:
@@ -246,7 +250,7 @@ func (p *Plan) NextJob() (job *Job, more bool) {
 	job = p.readyJobs[0]
 	p.readyJobs = p.readyJobs[1:]
 
-	p.modulesRunningUpToBlock[job.ModuleName] = job.RequestRange.ExclusiveEndBlock
+	p.highestModuleRunningBlock[job.ModuleName] = job.RequestRange.ExclusiveEndBlock
 	return job, p.hasMore()
 }
 

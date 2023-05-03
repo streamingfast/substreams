@@ -155,35 +155,43 @@ func (p *Plan) bumpModuleUpToBlock(modName string, upToBlock uint64) {
 
 const maxUint64 = uint64(1<<64 - 1)
 
-func (p *Plan) highestRunnableStartBlock() uint64 {
+func (p *Plan) highestRunnableStartBlock() (uint64, string) {
 	// Called with locked mutex
 
 	lowestModuleHeight := maxUint64
+	var lowestModules string
 	for _, modName := range p.schedulableModules {
-		if upTo, ok := p.modulesRunningUpToBlock[modName]; ok && upTo < lowestModuleHeight {
-			lowestModuleHeight = upTo
+		upTo, ok := p.modulesRunningUpToBlock[modName]
+		if ok {
+			switch {
+			case upTo < lowestModuleHeight:
+				lowestModuleHeight = upTo
+				lowestModules = modName
+			case upTo == lowestModuleHeight:
+				lowestModules = lowestModules + "," + modName
+			}
 		}
 	}
 
 	if maxUint64-lowestModuleHeight < p.maxBlocksAhead {
-		return maxUint64
+		return maxUint64, lowestModules
 	}
 
-	return lowestModuleHeight + p.maxBlocksAhead
+	return lowestModuleHeight + p.maxBlocksAhead, lowestModules
 }
 
 // promoteWaitingJobs moves jobs from waitingJobs to readyJobs
 func (p *Plan) promoteWaitingJobs() {
 	// Called with locked mutex
 
-	noJobAbove := p.highestRunnableStartBlock()
+	noJobAbove, cause := p.highestRunnableStartBlock()
 	removeJobs := map[*Job]bool{}
 	printSkippingLog := true
 	for _, job := range p.waitingJobs {
 		if p.allDependenciesMet(job) {
 			if job.RequestRange.StartBlock >= noJobAbove {
 				if printSkippingLog {
-					p.logger.Info("skipping job because above threshold (next messages skipped)", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove))
+					p.logger.Info("skipping job because above threshold (next messages skipped)", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove), zap.String("modules_causing_restriction", cause))
 					printSkippingLog = false
 				}
 				continue

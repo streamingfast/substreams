@@ -3,6 +3,8 @@ package work
 import (
 	"strings"
 
+	"go.uber.org/zap"
+
 	state2 "github.com/streamingfast/substreams/storage/store/state"
 
 	"github.com/streamingfast/substreams/storage/execout/state"
@@ -17,8 +19,9 @@ func TestJob(modName string, rng string, prio int) *Job {
 
 func TestPlanReadyJobs(jobs ...*Job) *Plan {
 	return &Plan{
-		readyJobs:             jobs,
-		modulesReadyOrRunning: map[string]uint64{},
+		readyJobs:                 jobs,
+		highestModuleRunningBlock: map[string]uint64{},
+		logger:                    zap.NewNop(),
 	}
 }
 

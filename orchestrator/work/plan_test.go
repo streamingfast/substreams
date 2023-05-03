@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
 	"github.com/streamingfast/substreams/storage/store/state"
@@ -228,10 +230,11 @@ func TestPlan_NextJob(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := &Plan{
-				waitingJobs:           test.waitingJobs,
-				readyJobs:             test.readyJobs,
-				modulesReadyOrRunning: test.modulesReadyUpToBlock,
-				modulesReadyUpToBlock: test.modulesReadyUpToBlock,
+				waitingJobs:               test.waitingJobs,
+				readyJobs:                 test.readyJobs,
+				highestModuleRunningBlock: test.modulesReadyUpToBlock,
+				modulesReadyUpToBlock:     test.modulesReadyUpToBlock,
+				logger:                    zap.NewNop(),
 			}
 
 			gotJob, gotMore := p.NextJob()

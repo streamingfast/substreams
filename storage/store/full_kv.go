@@ -6,8 +6,9 @@ import (
 
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 
-	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/block"
 )
 
 var _ Store = (*FullKV)(nil)
@@ -32,6 +33,7 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	return &PartialKV{
 		baseStore:    b,
 		initialBlock: initialBlock,
+		seen:         make(map[string]bool),
 	}
 }
 

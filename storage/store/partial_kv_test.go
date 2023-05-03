@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
 func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {

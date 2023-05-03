@@ -1,14 +1,17 @@
 package store
 
 import (
-	"go.uber.org/zap"
 	"testing"
 
-	"github.com/streamingfast/substreams/manifest"
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/require"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/manifest"
+
 	"github.com/stretchr/testify/assert"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func TestStore_Merge(t *testing.T) {
@@ -384,7 +387,7 @@ func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_Kind
 		},
 	}
 
-	return &PartialKV{baseStore: b, DeletedPrefixes: deletedPrefixes}
+	return &PartialKV{baseStore: b, DeletedPrefixes: deletedPrefixes, seen: make(map[string]bool)}
 }
 
 func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *FullKV {

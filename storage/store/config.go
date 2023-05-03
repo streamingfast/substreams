@@ -7,9 +7,10 @@ import (
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -82,6 +83,7 @@ func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialK
 	return &PartialKV{
 		baseStore:    c.newBaseStore(logger),
 		initialBlock: initialBlock,
+		seen:         make(map[string]bool),
 	}
 }
 

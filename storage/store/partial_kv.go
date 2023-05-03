@@ -6,8 +6,9 @@ import (
 
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 
-	"github.com/streamingfast/substreams/block"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/block"
 )
 
 var _ Store = (*PartialKV)(nil)
@@ -19,6 +20,7 @@ type PartialKV struct {
 	DeletedPrefixes []string
 
 	loadedFrom string
+	seen       map[string]bool
 }
 
 func (p *PartialKV) Roll(lastBlock uint64) {
@@ -87,7 +89,10 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, er
 func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
 	p.baseStore.DeletePrefix(ord, prefix)
 
-	p.DeletedPrefixes = append(p.DeletedPrefixes, prefix)
+	if !p.seen[prefix] {
+		p.DeletedPrefixes = append(p.DeletedPrefixes, prefix)
+		p.seen[prefix] = true
+	}
 }
 
 func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error) {

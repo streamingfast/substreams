@@ -135,7 +135,6 @@ func (s *StoreSquasher) processPartials(ctx context.Context) error {
 		}
 
 		if out.lastExclusiveEndBlock != 0 {
-			s.onStoreCompletedUntilBlock(s.name, out.lastExclusiveEndBlock)
 			reqStats.RecordStoreSquasherProgress(s.name, out.lastExclusiveEndBlock)
 		}
 
@@ -213,6 +212,8 @@ func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group)
 		if err != nil {
 			return nil, fmt.Errorf("process range %s: %w", squashableRange.String(), err)
 		}
+		// This will inform the scheduler that this range has progressed, as it affects jobs dependending on it
+		s.onStoreCompletedUntilBlock(s.name, squashableRange.ExclusiveEndBlock)
 
 		out.squashCount++
 

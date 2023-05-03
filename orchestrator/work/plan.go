@@ -178,10 +178,14 @@ func (p *Plan) promoteWaitingJobs() {
 
 	noJobAbove := p.highestRunnableStartBlock()
 	removeJobs := map[*Job]bool{}
+	printSkippingLog := true
 	for _, job := range p.waitingJobs {
 		if p.allDependenciesMet(job) {
 			if job.RequestRange.StartBlock >= noJobAbove {
-				p.logger.Info("skipping job because above threshold", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove))
+				if printSkippingLog {
+					p.logger.Info("skipping job because above threshold (next messages skipped)", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove))
+					printSkippingLog = false
+				}
 				continue
 			}
 			// TODO: send a signal here?

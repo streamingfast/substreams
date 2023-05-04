@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
@@ -49,7 +50,8 @@ type Pipeline struct {
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 
-	respFunc func(substreams.ResponseFromAnyTier) error
+	respFunc         func(substreams.ResponseFromAnyTier) error
+	lastProgressSent time.Time
 
 	stores         *Stores
 	execoutStorage *execout.Configs

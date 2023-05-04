@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/substreams/block"
@@ -13,6 +14,8 @@ import (
 	"github.com/streamingfast/substreams/tracking"
 	"go.uber.org/zap"
 )
+
+const progressMessageInterval = time.Millisecond * 200
 
 // OnStreamTerminated performs flush of store and setting trailers when the stream terminated gracefully from our point of view.
 // If the stream terminated gracefully, we return `nil` otherwise, the original is returned.
@@ -54,14 +57,17 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	}
 
 	if p.stores.partialsWritten != nil {
-		p.respFunc(&pbssinternal.ProcessRangeResponse{
-			ModuleName: reqDetails.OutputModule,
-			Type: &pbssinternal.ProcessRangeResponse_Completed{
-				Completed: &pbssinternal.Completed{
-					AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
+		if time.Since(p.lastProgressSent) > progressMessageInterval {
+			p.respFunc(&pbssinternal.ProcessRangeResponse{
+				ModuleName: reqDetails.OutputModule,
+				Type: &pbssinternal.ProcessRangeResponse_Completed{
+					Completed: &pbssinternal.Completed{
+						AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
+					},
 				},
-			},
-		})
+			})
+			p.lastProgressSent = time.Now()
+		}
 	}
 
 	return nil

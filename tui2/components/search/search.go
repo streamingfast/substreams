@@ -10,6 +10,7 @@ import (
 )
 
 type UpdateMatchingBlocks map[uint64]bool
+type AddMatchingBlock uint64
 type SearchClearedMsg bool
 type ApplySearchQueryMsg SearchQuery
 

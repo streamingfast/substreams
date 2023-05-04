@@ -128,6 +128,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.moduleSearchEnabled = false
 	case search.UpdateMatchingBlocks:
 		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
+	case search.AddMatchingBlock:
+		o.searchBlockNumsWithMatches = append(o.searchBlockNumsWithMatches, uint64(msg))
 	case request.NewRequestInstance:
 		o.errReceived = nil
 		o.msgDescs = msg.MsgDescs
@@ -172,19 +174,11 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				if o.keywordToSearchFor != "" {
-					payload := o.payloads[blockCtx]
-					content := o.renderedOutput(payload, false)
-
-					var count int
-					_, count, _ = applyKeywordSearch(content.plainLogs+content.plainJSON+content.plainOutput, o.searchCtx.Current.Query)
-
-					matchingBlocks := o.searchAllBlocksForModule(o.active.Module)
-					if count > 0 {
-						matchingBlocks[blockNum] = true
+					if hasKeyword := o.searchIncomingBlockInModule(o.active.Module, blockNum); hasKeyword {
+						cmds = append(cmds, func() tea.Msg {
+							return search.AddMatchingBlock(blockNum)
+						})
 					}
-					cmds = append(cmds, func() tea.Msg {
-						return search.UpdateMatchingBlocks(matchingBlocks)
-					})
 				}
 			}
 			o.payloads[blockCtx] = output
@@ -388,6 +382,30 @@ func (o *Output) searchAllBlocksForModule(moduleName string) map[uint64]bool {
 		}
 	}
 	return out
+}
+
+func (o *Output) searchIncomingBlockInModule(moduleName string, block uint64) bool {
+	var hasSearch bool
+
+	blockCtx := request.BlockContext{
+		Module:   moduleName,
+		BlockNum: block,
+	}
+	payload := o.payloads[blockCtx]
+	content := o.renderedOutput(payload, false)
+
+	var count int
+	if o.searchCtx.Current.JQMode {
+		_, count, _ = applyJQSearch(content.plainJSON, o.searchCtx.Current.Query)
+	} else {
+		_, count, _ = applyKeywordSearch(content.plainLogs+content.plainJSON+content.plainOutput, o.searchCtx.Current.Query)
+	}
+
+	if count > 0 {
+		hasSearch = true
+	}
+
+	return hasSearch
 }
 
 func (o *Output) orderMatchingBlocks(msg search.UpdateMatchingBlocks) []uint64 {

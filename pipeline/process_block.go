@@ -221,7 +221,9 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 
 	if reqDetails.ShouldReturnProgressMessages() {
 		if reqDetails.IsSubRequest {
-			if err = p.returnInternalModuleProgressOutputs(clock); err != nil {
+			forceSend := (clock.Number+1)%p.runtimeConfig.CacheSaveInterval == 0
+
+			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {
 				return fmt.Errorf("failed to return modules progress %w", err)
 			}
 		} else {

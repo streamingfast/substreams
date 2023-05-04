@@ -188,18 +188,18 @@ func (p *Plan) highestRunnableStartBlock() (uint64, string) {
 func (p *Plan) promoteWaitingJobs() {
 	// Called with locked mutex
 
-	noJobAbove, cause := p.highestRunnableStartBlock()
+	//noJobAbove, cause := p.highestRunnableStartBlock()
 	removeJobs := map[*Job]bool{}
-	printSkippingLog := true
+	//printSkippingLog := true
 	for _, job := range p.waitingJobs {
 		if p.allDependenciesMet(job) {
-			if job.RequestRange.StartBlock >= noJobAbove {
-				if printSkippingLog {
-					p.logger.Info("skipping job because above threshold (next messages skipped)", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove), zap.String("modules_causing_restriction", cause))
-					printSkippingLog = false
-				}
-				continue
-			}
+			//if job.RequestRange.StartBlock >= noJobAbove {
+			//	if printSkippingLog {
+			//		p.logger.Info("skipping job because above threshold (next messages skipped)", zap.String("job", job.String()), zap.Uint64("no_job_above", noJobAbove), zap.String("modules_causing_restriction", cause))
+			//		printSkippingLog = false
+			//	}
+			//	continue
+			//}
 			// TODO: send a signal here?
 			p.readyJobs = append(p.readyJobs, job)
 			removeJobs[job] = true

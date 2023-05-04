@@ -102,9 +102,8 @@ func (s *StoreSquasher) logger(ctx context.Context) *zap.Logger {
 }
 
 func (s *StoreSquasher) launch(ctx context.Context) {
-	if err := s.processPartials(ctx); err != nil {
-		s.Shutdown(err)
-	}
+	err := s.processPartials(ctx)
+	s.Shutdown(err)
 }
 func (s *StoreSquasher) processPartials(ctx context.Context) error {
 	logger := s.logger(ctx)

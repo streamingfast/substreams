@@ -57,15 +57,14 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	}
 
 	if p.stores.partialsWritten != nil {
-			p.respFunc(&pbssinternal.ProcessRangeResponse{
-				ModuleName: reqDetails.OutputModule,
-				Type: &pbssinternal.ProcessRangeResponse_Completed{
-					Completed: &pbssinternal.Completed{
-						AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
-					},
+		p.respFunc(&pbssinternal.ProcessRangeResponse{
+			ModuleName: reqDetails.OutputModule,
+			Type: &pbssinternal.ProcessRangeResponse_Completed{
+				Completed: &pbssinternal.Completed{
+					AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
 				},
-			})
-		}
+			},
+		})
 	}
 
 	return nil

@@ -378,7 +378,8 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock) err
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock) error {
-	if p.respFunc != nil {
+	if p.respFunc != nil && time.Since(p.lastProgressSent) > progressMessageInterval {
+		p.lastProgressSent = time.Now()
 		out := &pbssinternal.ProcessRangeResponse{
 			ModuleName: p.processingModule.name,
 			Type: &pbssinternal.ProcessRangeResponse_ProcessedRange{

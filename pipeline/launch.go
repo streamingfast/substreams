@@ -57,7 +57,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	}
 
 	if p.stores.partialsWritten != nil {
-		if time.Since(p.lastProgressSent) > progressMessageInterval {
 			p.respFunc(&pbssinternal.ProcessRangeResponse{
 				ModuleName: reqDetails.OutputModule,
 				Type: &pbssinternal.ProcessRangeResponse_Completed{
@@ -66,7 +65,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 					},
 				},
 			})
-			p.lastProgressSent = time.Now()
 		}
 	}
 

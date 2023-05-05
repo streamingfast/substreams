@@ -8,61 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Highlights
 
-This release introduces a new RPC protocol and the old one has been removed. The new RPC protocol is in a new Protobuf package `sf.substreams.rpc.v2` and it drastically changes how chain re-orgs are signaled to the user.
+This release introduces a new RPC protocol and the old one has been removed. The new RPC protocol is in a new Protobuf package `sf.substreams.rpc.v2` and it drastically changes how chain re-orgs are signaled to the user. Here the highlights of this release:
 
-#### Getting rid of "Undo" payload during re-org
+- Getting rid of `undo` payload during re-org
+- `substreams gui` Improvements
+- Substreams integration testing
+- Substreams Protobuf definitions updated
 
-Previously, the GRPC endpoint `sf.substreams.v1.Stream/Blocks` would
-send a payload with the corresponding "step", NEW or UNDO.
+#### Getting rid of `undo` payload during re-org
 
-Unfortunately, this led to some cases where the payload could not be
-deterministically generated for old blocks that had been forked out, resulting
-in a stalling request, a failure, or in some worst cases, incomplete data.
+Previously, the GRPC endpoint `sf.substreams.v1.Stream/Blocks` would send a payload with the corresponding "step", NEW or UNDO.
 
-The new design, under `sf.substreams.rpc.v2.Stream/Blocks`, takes care of these
-situations by removing the 'step' component and using these two messages types:
+Unfortunately, this led to some cases where the payload could not be deterministically generated for old blocks that had been forked out, resulting in a stalling request, a failure, or in some worst cases, incomplete data.
+
+The new design, under `sf.substreams.rpc.v2.Stream/Blocks`, takes care of these situations by removing the 'step' component and using these two messages types:
 * `sf.substreams.rpc.v2.BlockScopedData` when chain progresses, with the payload
-* `sf.substreams.rpc.v2.BlockUndoSignal` during a reorg, with the last valid blocknum+hash
+* `sf.substreams.rpc.v2.BlockUndoSignal` during a reorg, with the last valid block number + block hash
 
-The client now has the burden of keeping the necessary means of performing the
-undo actions (ex: a map of previous values for each block). The BlockScopedData
-message now includes the `final_block_height` to let you know when this "undo
-data" can be discarded.
+The client now has the burden of keeping the necessary means of performing the undo actions (ex: a map of previous values for each block). The BlockScopedData message now includes the `final_block_height` to let you know when this "undo data" can be discarded.
 
-With these changes, a substreams server can even handle a cursor for a block
-that it has never seen, provided that it is a valid cursor, by signaling the
-client to revert up to the last known final block, trading efficiency for
-resilience in these extreme cases.
+With these changes, a substreams server can even handle a cursor for a block that it has never seen, provided that it is a valid cursor, by signaling the client to revert up to the last known final block, trading efficiency for resilience in these extreme cases.
 
-#### Separating Tier1 vs Tier2 GRPC protocol (for Substreams server operators)
-
-Now that the `Blocks` request has been moved from `sf.substreams.v1` to
-`sf.substreams.rpc.v2`, the communication between a substreams instance acting
-as tier1 and a tier2 instance that performs the background processing has also
-been reworked, and put under `sf.substreams.internal.v2.Stream/ProcessRange`.
-It has also been stripped of parameters that were not used for that level of
-communication (ex: `cursor`, `logs`...)
-
-#### Other changes in Protobuf messages
-
-* Deprecating the "Request" and "Response" messages, with some others, from `sf.substreams.v1`, now that they moved to `sf.substreams.rpc.v2`
-* The new request excludes fields and usages that were already deprecated, like using multiple `module_outputs`
-* The response now contains a single module output
-* In dev mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs`
-
-#### Substreams Test
-
-Added a basic Substreams testing framework that validates module outputs
-against expected values. The testing framework currently runs on `substreams run`
-command, where you can specify the following flags:
-
-* `test-file` Points to a file that contains your test specs
-* `test-verbose` Enables verbose mode while testing.
-
-The test file, specifies the expected output for a given substreams
-module at a given block.
-
-### GUI Improvements
+### `substreams gui` Improvements
 
 * Added key 'f' shortcut for changing display encoding of bytes value (hex, pruned string, base64)
 * Added `jq` search mode (hit `/` twice). Filters the output with the `jq` expression, and applies the search to match all blocks.
@@ -71,21 +38,45 @@ module at a given block.
 * Added `O` and `P`, to jump to prev/next block with matching search results.
 * Added module search with `m`, to quickly switch from module to module.
 
-### Service BUGFIXES
+#### Substreams integration testing
 
-* When only `STEP_IRREVERSIBLE` were requested (now through param `final_blocks_only=true`) on the request, it was NOT honored on the server. It now correctly sends only blocks that are Final.
-* Fixed a possible "hang" behavior when a file was not found in time
-* Reduce number of tier2 progress messages to prevent backpressure coming from handling those messages
-* Prevent slow processing of duplicate "delete_prefix" operations when squashing
+Added a basic Substreams testing framework that validates module outputs against expected values.
+The testing framework currently runs on `substreams run` command, where you can specify the following flags:
 
-### CLI
+* `test-file` Points to a file that contains your test specs
+* `test-verbose` Enables verbose mode while testing.
 
-* 'run' command now has flag `--final-blocks-only`
+The test file, specifies the expected output for a given substreams module at a given block.
 
-## [1.0.4](https://github.com/streamingfast/substreams/releases/tag/v1.0.4)
+#### Substreams Protobuf definitions updated
 
-### BUGFIX
+We changed the Substreams Protobuf definitions making a major overhaul of the RPC communication. This is a **breaking change** for those consuming Substreams through gRPC.
+
+> **Note** The is no breaking changes for Substreams developers regarding your Rust code, Substreams manifest and Substreams package.
+
+* Removed the `Request` and `Response` messages (and related) from `sf.substreams.v1`, they have been moved to `sf.substreams.rpc.v2`. You will need to update your usage if you were consuming Substreams through gRPC.
+* The new `Request` excludes fields and usages that were already deprecated, like using multiple `module_outputs`.
+* The `Response` now contains a single module output
+* In `development` mode, the additional modules output can be inspected under `debug_map_outputs` and `debug_store_outputs`.
+
+##### Separating Tier1 vs Tier2 gRPC protocol (for Substreams server operators)
+
+Now that the `Blocks` request has been moved from `sf.substreams.v1` to `sf.substreams.rpc.v2`, the communication between a substreams instance acting
+as tier1 and a tier2 instance that performs the background processing has also been reworked, and put under `sf.substreams.internal.v2.Stream/ProcessRange`. It has also been stripped of parameters that were not used for that level of communication (ex: `cursor`, `logs`...)
+
+### Fixed
+
+* The `final_blocks_only: true` on the `Request` was not honored on the server. It now correctly sends only blocks that are final/irreversible (according to Firehose rules).
+
 * Prevent substreams panic when requested module has unknown value for "type"
+
+### Added
+
+* The `substreams run` command now has flag `--final-blocks-only`
+
+### Changed
+
+* Tier1 will now avoid scheduling modules if they are more than the equivalent of "10 subrequests" ahead of the slowest running module. This will should reduce load on tier2 when a substreams shows a bottleneck anyway and keep workers ready for when it needs them.
 
 ## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
 

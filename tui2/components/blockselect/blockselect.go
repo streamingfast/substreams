@@ -59,6 +59,9 @@ func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case search.UpdateMatchingBlocks:
 		b.blocksColored = msg
 	case search.AddMatchingBlock:
+		if b.blocksColored == nil {
+			b.blocksColored = make(map[uint64]bool)
+		}
 		b.blocksColored[uint64(msg)] = true
 	case request.NewRequestInstance:
 		b.BlocksWithData = nil

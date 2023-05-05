@@ -71,12 +71,12 @@ module at a given block.
 * Added `O` and `P`, to jump to prev/next block with matching search results.
 * Added module search with `m`, to quickly switch from module to module.
 
-### Engine Changes
-* Tier1 will now avoid scheduling modules if they are more than the equivalent of "10 subrequests" ahead of the slowest running module. This will should reduce load on tier2 when a substreams shows a bottleneck anyway and keep workers ready for when it needs them.
-
 ### Service BUGFIXES
 
-* When only `STEP_IRREVERSIBLE` were requested (now through param `final_blocks_only=true`) on the request, it was honored on the server. It now correctly sends only blocks that are Final.
+* When only `STEP_IRREVERSIBLE` were requested (now through param `final_blocks_only=true`) on the request, it was NOT honored on the server. It now correctly sends only blocks that are Final.
+* Fixed a possible "hang" behavior when a file was not found in time
+* Reduce number of tier2 progress messages to prevent backpressure coming from handling those messages
+* Prevent slow processing of duplicate "delete_prefix" operations when squashing
 
 ### CLI
 

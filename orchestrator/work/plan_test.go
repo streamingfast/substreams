@@ -29,7 +29,6 @@ func TestWorkPlanning(t *testing.T) {
 		subreqSplit    int
 		state          storage.ModuleStorageStateMap
 		outMod         string
-		maxJobsAhead   uint64
 		productionMode bool
 
 		expectWaitingJobs []*Job
@@ -42,7 +41,6 @@ func TestWorkPlanning(t *testing.T) {
 			state: TestModStateMap(
 				TestStoreState("B", "0-10"),
 			),
-			maxJobsAhead:   10,
 			productionMode: false,
 			outMod:         "B",
 			expectReadyJobs: []*Job{
@@ -58,53 +56,11 @@ func TestWorkPlanning(t *testing.T) {
 				TestStoreState("B", "0-10"),
 			),
 			productionMode: false,
-			maxJobsAhead:   10,
 			outMod:         "As",
 			expectReadyJobs: []*Job{
 				TestJob("As", "0-20", 5),
 				TestJob("As", "30-50", 4),
 				TestJob("As", "50-60", 3),
-			},
-		},
-		{
-			name:        "double, not too far ahead",
-			upToBlock:   85,
-			subreqSplit: 20,
-			state: TestModStateMap(
-				TestStoreState("As", "0-10,10-20,30-40,40-50,50-60"),
-				TestStoreState("B", "0-10"),
-			),
-			productionMode: false,
-			maxJobsAhead:   1,
-			outMod:         "As",
-			expectWaitingJobs: []*Job{
-				TestJob("As", "50-60", 3),
-			},
-			expectReadyJobs: []*Job{
-				TestJob("As", "0-20", 5),
-				TestJob("As", "30-50", 4),
-			},
-		},
-		{
-			name:        "production, limited by maxJobsAhead and dependency",
-			upToBlock:   85,
-			subreqSplit: 20,
-			state: TestModStateMap(
-				TestStoreState("SimpleStore", "0-20,20-40,40-60"),
-				TestMapState("MapDependsOnStore", "0-20,20-40,40-60"),
-			),
-			maxJobsAhead:   1,
-			productionMode: true,
-			outMod:         "MapDependsOnStore",
-			expectWaitingJobs: []*Job{
-				TestJob("SimpleStore", "40-60", 4),
-				TestJobDeps("MapDependsOnStore", "20-40", 7, "SimpleStore"),
-				TestJobDeps("MapDependsOnStore", "40-60", 5, "SimpleStore"),
-			},
-			expectReadyJobs: []*Job{
-				TestJobDeps("MapDependsOnStore", "0-20", 9, "SimpleStore"),
-				TestJob("SimpleStore", "0-20", 8),
-				TestJob("SimpleStore", "20-40", 6),
 			},
 		},
 	}
@@ -115,7 +71,7 @@ func TestWorkPlanning(t *testing.T) {
 			outputGraph, err := outputmodules.NewOutputModuleGraph(test.outMod, test.productionMode, &pbsubstreams.Modules{Modules: mods, Binaries: []*pbsubstreams.Binary{{}}})
 			require.NoError(t, err)
 
-			plan, err := BuildNewPlan(context.Background(), test.state, uint64(test.subreqSplit), test.upToBlock, test.maxJobsAhead, outputGraph)
+			plan, err := BuildNewPlan(context.Background(), test.state, uint64(test.subreqSplit), test.upToBlock, 0, outputGraph)
 			require.NoError(t, err)
 
 			assert.Equal(t, jobList(test.expectWaitingJobs), jobList(plan.waitingJobs), "waiting jobs") // these are not sorted by the engine

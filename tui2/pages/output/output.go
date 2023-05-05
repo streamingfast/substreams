@@ -1,9 +1,10 @@
 package output
 
 import (
+	"sort"
+
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
-	"sort"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -430,6 +431,9 @@ func (o *Output) jumpToPreviousBlock() tea.Cmd {
 			}
 			prevIdx = i
 		}
+		if len(withData) <= prevIdx {
+			return nil
+		}
 		return blockselect.BlockChangedMsg(withData[prevIdx])
 	}
 }
@@ -439,6 +443,9 @@ func (o *Output) jumpToNextBlock() tea.Cmd {
 	activeBlockNum := o.active.BlockNum
 	return func() tea.Msg {
 		var prevIdx = len(withData) - 1
+		if prevIdx == -1 {
+			return nil
+		}
 		for i := prevIdx; i >= 0; i-- {
 			el := withData[i]
 			if el <= activeBlockNum {

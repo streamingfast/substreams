@@ -74,10 +74,6 @@ as tier1 and a tier2 instance that performs the background processing has also b
 
 * The `substreams run` command now has flag `--final-blocks-only`
 
-### Changed
-
-* Tier1 will now avoid scheduling modules if they are more than the equivalent of "10 subrequests" ahead of the slowest running module. This will should reduce load on tier2 when a substreams shows a bottleneck anyway and keep workers ready for when it needs them.
-
 ## [1.0.3](https://github.com/streamingfast/substreams/releases/tag/v1.0.3)
 
 This should be the last release before a breaking change in the API and handling of the reorgs and UNDO messages.

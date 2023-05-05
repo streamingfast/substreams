@@ -20,8 +20,9 @@ The StreamingFast team is also available on [Discord](https://discord.gg/jZwqxJA
 
 Use your API Key to obtain a shorter-lived authentication token using `curl`:
 
-<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{<a data-footnote-ref href="#user-content-fn-2">"api_key"</a>: "your-secret-key"}'
-</code></pre>
+```bash
+curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{<a data-footnote-ref href="#user-content-fn-2">"api_key"</a>: "your-secret-key"}'
+```
 
 ### Set your environment variable
 

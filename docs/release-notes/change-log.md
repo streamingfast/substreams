@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## UNRELEASED
+## [v1.1.1](https://github.com/streamingfast/substreams/releases/tag/v1.1.1)
 
 ### Highlights
 
@@ -82,8 +82,7 @@ module at a given block.
 
 * 'run' command now has flag `--final-blocks-only`
 
-
-## UNRELEASED (release/v1.0 branch)
+## [1.0.4](https://github.com/streamingfast/substreams/releases/tag/v1.0.4)
 
 ### BUGFIX
 * Prevent substreams panic when requested module has unknown value for "type"

@@ -23,11 +23,12 @@ An `inputs` of type `source` represents a chain-specific, Firehose-provisioned p
 
 The `source` `inputs` type \_\_ is defined in the Substreams manifest. It is important to specify the correct `Block` object for the chain.
 
-<pre class="language-yaml" data-title="manifest excerpt"><code class="lang-yaml">modules:
+```yaml
+modules:
 - name: my_mod
   inputs:
-  - <a data-footnote-ref href="#user-content-fn-1">source: sf.ethereum.type.v2.Block</a>
-</code></pre>
+  - source: sf.ethereum.type.v2.Block
+```
 
 #### `Clock` object
 
@@ -56,7 +57,7 @@ An input of type `map` represents the output of another `map` module. It defines
 The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.
 
 {% hint style="warning" %}
-**Important**_**:**_ The graph built by input dependencies is a Directed Acyclic Graph, which means there can be no circular dependencies.
+**Important**: The graph built by input dependencies is a Directed Acyclic Graph, which means there can be no circular dependencies.
 {% endhint %}
 
 Define the `map` input type in the manifest and choose a name for the `map` reflecting the logic contained within it.
@@ -112,7 +113,7 @@ Substreams uses two types of `mode` for modules:
 `get` mode provides a key-value store readily queryable and guaranteed to be in sync with the block being processed.
 
 {% hint style="success" %}
-**Tip**_**:**_ `get` `mode` is the default mode for modules.
+**Tip**: `get` `mode` is the default mode for modules.
 {% endhint %}
 
 ### `delta` mode

@@ -31,7 +31,6 @@ func init() {
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
-
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 	rootCmd.AddCommand(guiCmd)
 }

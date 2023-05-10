@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20230407143220-06c919ae8476
+	github.com/streamingfast/bstream v0.0.2-0.20230510120201-be3cdaba81bd
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20221125175206-82e01d420d45
 	github.com/streamingfast/dgrpc v0.0.0-20230113212008-1898f17e0ac7

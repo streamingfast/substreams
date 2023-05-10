@@ -187,7 +187,7 @@ func (ui *UI) SetSize(w, h int) {
 }
 
 func (ui *UI) View() string {
-	headline := ui.Styles.Header.Copy().Render("Substreams GUI")
+	headline := ui.Styles.Header.Render("Substreams GUI")
 
 	if ui.stream != nil {
 		headline = ui.Styles.Header.Copy().Foreground(lipgloss.Color(ui.stream.StreamColor())).Render("Substreams GUI")

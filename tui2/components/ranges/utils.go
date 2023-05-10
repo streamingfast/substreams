@@ -41,10 +41,10 @@ func (r ranges) String() string {
 
 // Covered assumes block ranges have reduced overlaps/junctions.
 func (r ranges) PartiallyCovered(lo, hi uint64) bool {
+	if r.Covered(lo, hi) {
+		return true
+	}
 	for _, blockRange := range r {
-		if r.Covered(lo, hi) {
-			return true
-		}
 		if blockRange.Start <= lo && lo <= blockRange.End {
 			return true
 		}

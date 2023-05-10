@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -34,9 +35,10 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
-	runCmd.Flags().StringSliceP("params", "p", nil, "Set a parames for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+	runCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
+	runCmd.Flags().Bool("last-block", false, "Log the last block run with the corresponding cursor in a file named last_block.txt")
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -188,6 +190,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err)
 	}
 	ui.Connected()
+	latestBlock := startBlock
+	latestCursor := ""
 
 	for {
 		resp, err := cli.Recv()
@@ -195,8 +199,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 			if err := ui.IncomingMessage(ctx, resp, testRunner); err != nil {
 				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 			}
+			switch m := resp.Message.(type) {
+			case *pbsubstreamsrpc.Response_BlockScopedData:
+				latestBlock = int64(m.BlockScopedData.Clock.Number)
+				latestCursor = m.BlockScopedData.Cursor
+			default:
+				// do nothing
+			}
 		}
 		if err != nil {
+			lastBlock := mustGetBool(cmd, "last-block")
+			if lastBlock {
+				d1 := []byte(fmt.Sprintf("%d:%s\n", latestBlock, latestCursor))
+				_ = os.WriteFile("last_block.txt", d1, 0644)
+			}
+
 			if err == io.EOF {
 				ui.Cancel()
 				fmt.Println("all done")

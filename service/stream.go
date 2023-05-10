@@ -30,6 +30,7 @@ func (sf *StreamFactory) New(
 	options := []stream.Option{
 		stream.WithStopBlock(stopBlockNum),
 		stream.WithCustomStepTypeFilter(bstream.StepsAll), // substreams always wants new, undo, new+irreversible, irreversible, stalled
+		stream.WithLogger(zlog),
 	}
 	if finalBlocksOnly {
 		options = append(options, stream.WithFinalBlocksOnly())

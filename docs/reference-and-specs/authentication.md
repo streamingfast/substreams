@@ -20,8 +20,9 @@ The StreamingFast team is also available on [Discord](https://discord.gg/jZwqxJA
 
 Use your API Key to obtain a shorter-lived authentication token using `curl`:
 
-<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{<a data-footnote-ref href="#user-content-fn-2">"api_key"</a>: "your-secret-key"}'
-</code></pre>
+```bash
+curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{<a data-footnote-ref href="#user-content-fn-2">"api_key"</a>: "your-secret-key"}'
+```
 
 ### Set your environment variable
 
@@ -37,12 +38,13 @@ The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs
 
 Place this function in your terminal profile (`.bashrc` or `.zshrc`), for a quick all-in-one token fetcher:
 
-<pre class="language-bash" data-overflow="wrap"><code class="lang-bash">export STREAMINGFAST_KEY=server_YOUR_KEY_HERE
+```bash
+export STREAMINGFAST_KEY=server_YOUR_KEY_HERE
 function sftoken {
-    export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | <a data-footnote-ref href="#user-content-fn-3">jq</a> -r .token)
-    echo "Token set on in SUBSTREAMS_API_TOKEN"
+  export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | <a data-footnote-ref href="#user-content-fn-3">jq</a> -r .token)
+  echo "Token set on in SUBSTREAMS_API_TOKEN"
 }
-</code></pre>
+```
 
 Then obtain a new key and set it in your environment by running:
 

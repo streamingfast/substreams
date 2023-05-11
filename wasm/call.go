@@ -190,7 +190,12 @@ func (c *Call) validateWithTwoValueTypes(stateFunc string, updatePolicy pbsubstr
 
 func (c *Call) traceStateWrites(stateFunc, key string) {
 	store := c.outputStore
-	line := fmt.Sprintf("%s::%s key: %q, store details: %s", store.Name(), stateFunc, key, store.String())
+	var line string
+	if store == nil {
+		line = fmt.Sprintf("%s key: %q", stateFunc, key)
+	} else {
+		line = fmt.Sprintf("%s::%s key: %q, store details: %s", store.Name(), stateFunc, key, store.String())
+	}
 	c.ExecutionStack = append(c.ExecutionStack, line)
 }
 

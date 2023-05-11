@@ -32,10 +32,19 @@ func Test_IsValidSetStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateSetStore())
+			expectPanic(t, test.expect, test.instance.validateSetStore)
 		})
 	}
 }
+
+func expectPanic(t *testing.T, shouldPanic bool, f func(key string)) {
+	if shouldPanic {
+		assert.NotPanics(t, func() { f("key") })
+	} else {
+		assert.Panics(t, func() { f("key") })
+	}
+}
+
 func Test_IsValidSetIfNotExists(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -60,7 +69,7 @@ func Test_IsValidSetIfNotExists(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateSetIfNotExists())
+			expectPanic(t, test.expect, test.instance.validateSetIfNotExists)
 		})
 	}
 }
@@ -88,7 +97,7 @@ func Test_IsValidAppendStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateAppend())
+			expectPanic(t, test.expect, test.instance.validateAppend)
 		})
 	}
 }
@@ -118,7 +127,7 @@ func Test_IsValidAddBigIntStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateAddBigInt())
+			expectPanic(t, test.expect, test.instance.validateAddBigInt)
 		})
 	}
 }
@@ -148,7 +157,7 @@ func Test_IsValidAddBigDecimalStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateAddBigDecimal())
+			expectPanic(t, test.expect, test.instance.validateAddBigDecimal)
 		})
 	}
 }
@@ -178,7 +187,7 @@ func Test_IsValidAddInt64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateAddInt64())
+			expectPanic(t, test.expect, test.instance.validateAddInt64)
 		})
 	}
 }
@@ -208,7 +217,7 @@ func Test_IsValidAddFloat64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidAddFloat64Store())
+			expectPanic(t, test.expect, test.instance.validateAddFloat64)
 		})
 	}
 }
@@ -238,7 +247,7 @@ func Test_IsValidSetMintInt64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.validateSetMinInt64())
+			expectPanic(t, test.expect, test.instance.validateSetMinInt64)
 		})
 	}
 }
@@ -268,7 +277,7 @@ func Test_IsValidSetMintBigInt64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMinBigIntStore())
+			expectPanic(t, test.expect, test.instance.validateSetMinBigInt)
 		})
 	}
 }
@@ -298,7 +307,7 @@ func Test_IsValidSetMintFloat64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMinFloat64Store())
+			expectPanic(t, test.expect, test.instance.validateSetMinFloat64)
 		})
 	}
 }
@@ -328,7 +337,7 @@ func Test_IsValidSetMinBigDecimalStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMinBigDecimalStore())
+			expectPanic(t, test.expect, test.instance.validateSetMinBigDecimal)
 		})
 	}
 }
@@ -358,7 +367,7 @@ func Test_IsValidSetMaxInt64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMaxInt64Store())
+			expectPanic(t, test.expect, test.instance.validateSetMaxInt64)
 		})
 	}
 }
@@ -388,7 +397,7 @@ func Test_IsValidSetMaxBigIntStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMaxBigIntStore())
+			expectPanic(t, test.expect, test.instance.validateSetMaxBigInt)
 		})
 	}
 }
@@ -418,7 +427,7 @@ func Test_IsValidSetMaxFloat64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMaxFloat64Store())
+			expectPanic(t, test.expect, test.instance.validateSetMaxFloat64)
 		})
 	}
 }
@@ -448,7 +457,7 @@ func Test_IsValidSetMaxBigDecimalStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMaxBigDecimalStore())
+			expectPanic(t, test.expect, test.instance.validateSetMaxBigDecimal)
 		})
 	}
 }

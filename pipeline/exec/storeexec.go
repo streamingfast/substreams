@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
+
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
-	"google.golang.org/protobuf/proto"
 )
 
 type StoreModuleExecutor struct {
@@ -24,7 +25,6 @@ func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store.DeltaA
 
 func (e *StoreModuleExecutor) Name() string   { return e.moduleName }
 func (e *StoreModuleExecutor) String() string { return e.Name() }
-func (e *StoreModuleExecutor) ResetWASMCall() { e.wasmModule.CurrentCall = nil }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 	deltas := &pbssinternal.StoreDeltas{}

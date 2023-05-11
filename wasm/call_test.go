@@ -3,8 +3,9 @@ package wasm
 import (
 	"testing"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func Test_IsValidSetStore(t *testing.T) {
@@ -31,7 +32,7 @@ func Test_IsValidSetStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetStore())
+			assert.Equal(t, test.expect, test.instance.validateSetStore())
 		})
 	}
 }
@@ -59,7 +60,7 @@ func Test_IsValidSetIfNotExists(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetIfNotExists())
+			assert.Equal(t, test.expect, test.instance.validateSetIfNotExists())
 		})
 	}
 }
@@ -87,7 +88,7 @@ func Test_IsValidAppendStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidAppendStore())
+			assert.Equal(t, test.expect, test.instance.validateAppend())
 		})
 	}
 }
@@ -117,7 +118,7 @@ func Test_IsValidAddBigIntStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidAddBigIntStore())
+			assert.Equal(t, test.expect, test.instance.validateAddBigInt())
 		})
 	}
 }
@@ -147,7 +148,7 @@ func Test_IsValidAddBigDecimalStore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidAddBigDecimalStore())
+			assert.Equal(t, test.expect, test.instance.validateAddBigDecimal())
 		})
 	}
 }
@@ -177,7 +178,7 @@ func Test_IsValidAddInt64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidAddInt64Store())
+			assert.Equal(t, test.expect, test.instance.validateAddInt64())
 		})
 	}
 }
@@ -237,7 +238,7 @@ func Test_IsValidSetMintInt64Store(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expect, test.instance.IsValidSetMinInt64Store())
+			assert.Equal(t, test.expect, test.instance.validateSetMinInt64())
 		})
 	}
 }

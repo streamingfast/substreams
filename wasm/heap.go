@@ -29,11 +29,7 @@ func NewHeap(memory *wasmtime.Memory, allocator, dealloc *wasmtime.Func, store *
 	}
 }
 
-func (h *Heap) Write(bytes []byte, from string) (int32, error) {
-	return h.WriteAndTrack(bytes, true, from)
-}
-
-func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, error) {
+func (h *Heap) Write(bytes []byte, track bool, from string) (int32, error) {
 	size := len(bytes)
 	results, err := h.allocator.Call(h.store, int32(size))
 	if err != nil {

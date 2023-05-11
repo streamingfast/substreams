@@ -1,38 +1,44 @@
 package exec
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/storage/execout"
-
-	"github.com/streamingfast/substreams/wasm"
+	"github.com/tetratelabs/wazero/api"
 	ttrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/wasm"
 )
 
 type BaseExecutor struct {
+	ctx context.Context
+
 	moduleName    string
-	wasmModule    *wasm.Instance
+	wasmModule    *wasm.Module
 	wasmArguments []wasm.Argument
 	entrypoint    string
 	tracer        ttrace.Tracer
+
+	cachedInstance api.Module
+
+	// Results
+	logs           []string
+	logsTruncated  bool
+	executionStack []string
 }
 
-func NewBaseExecutor(moduleName string, wasmModule *wasm.Instance, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
-	return &BaseExecutor{moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
-}
-func (e *BaseExecutor) FreeMem() { e.wasmModule.FreeMem() }
-
-func (e *BaseExecutor) moduleLogs() (logs []string, truncated bool) {
-	if instance := e.wasmModule.CurrentCall; instance != nil {
-		return instance.Logs, instance.ReachedLogsMaxByteCount()
-	}
-	return
-}
-func (e *BaseExecutor) currentExecutionStack() []string {
-	return e.wasmModule.CurrentCall.ExecutionStack
+func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule *wasm.Module, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+	return &BaseExecutor{ctx: ctx, moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (instance *wasm.Call, err error) {
+const CACHE_ENABLED = false
+
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
+	e.logs = nil
+	e.logsTruncated = false
+	e.executionStack = nil
+
 	hasInput := false
 	for _, input := range e.wasmArguments {
 		switch v := input.(type) {
@@ -58,23 +64,37 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 	//  state store in read mode)
 	if hasInput {
 		clock := outputGetter.Clock()
-		instance, err = e.wasmModule.NewCall(clock, e.wasmArguments)
+		var mod api.Module
+		mod, call, err = e.wasmModule.ExecuteNewCall(e.ctx, e.cachedInstance, clock, e.moduleName, e.entrypoint, e.wasmArguments)
 		if err != nil {
-			return nil, fmt.Errorf("new wasm instance: %w", err)
-		}
 
-		if err = instance.Execute(); err != nil {
 			errExecutor := ErrorExecutor{
-				message:    err.Error(),
-				stackTrace: instance.ExecutionStack,
+				message: err.Error(),
+			}
+			if call != nil {
+				errExecutor.stackTrace = call.ExecutionStack
 			}
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %v", clock.Number, e.moduleName, errExecutor.Error())
 		}
-		err = instance.Cleanup()
-
-		if err != nil {
-			return nil, fmt.Errorf("block %d: module %q: wasm heap clear failed: %w", clock.Number, e.moduleName, err)
+		if CACHE_ENABLED {
+			e.cachedInstance = mod
 		}
+		e.logs = call.Logs
+		e.logsTruncated = call.ReachedLogsMaxByteCount()
+		e.executionStack = call.ExecutionStack
 	}
 	return
+}
+
+func (e *BaseExecutor) Close() {
+	if e.cachedInstance != nil {
+		e.cachedInstance.Close(e.ctx)
+	}
+}
+
+func (e *BaseExecutor) lastExecutionLogs() (logs []string, truncated bool) {
+	return e.logs, e.logsTruncated
+}
+func (e *BaseExecutor) lastExecutionStack() []string {
+	return e.executionStack
 }

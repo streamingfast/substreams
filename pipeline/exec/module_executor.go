@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"github.com/streamingfast/substreams/storage/execout"
 
-	"github.com/streamingfast/substreams/reqctx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/reqctx"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
@@ -69,7 +70,7 @@ func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleEx
 }
 
 func fillModuleOutputMetadata(executor ModuleExecutor, in *pbssinternal.ModuleOutput) {
-	logs, truncated := executor.moduleLogs()
+	logs, truncated := executor.lastExecutionLogs()
 
 	in.ModuleName = executor.Name()
 	in.Logs = logs

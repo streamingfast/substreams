@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream/stream"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/tracking"
-	"go.uber.org/zap"
 )
 
 const progressMessageInterval = time.Millisecond * 200
@@ -25,7 +26,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	bytesMeter := tracking.GetBytesMeter(ctx)
 
 	for _, executor := range p.moduleExecutors {
-		executor.FreeMem()
+		executor.Close()
 	}
 
 	if !errors.Is(err, stream.ErrStopBlockReached) && !errors.Is(err, io.EOF) {

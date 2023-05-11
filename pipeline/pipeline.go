@@ -39,7 +39,7 @@ type Pipeline struct {
 	postBlockHooks     []substreams.BlockHook
 	postJobHooks       []substreams.PostJobHook
 
-	wasmRuntime     *wasm.Runtime
+	wasmRuntime     *wasm.Registry
 	outputGraph     *outputmodules.Graph
 	moduleExecutors []exec.ModuleExecutor
 
@@ -76,7 +76,7 @@ func New(
 	outputGraph *outputmodules.Graph,
 	stores *Stores,
 	execoutStorage *execout.Configs,
-	wasmRuntime *wasm.Runtime,
+	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc func(substreams.ResponseFromAnyTier) error,
@@ -248,8 +248,6 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) (err error) {
 	logger := reqctx.Logger(ctx)
-
-	executor.ResetWASMCall()
 
 	executorName := executor.Name()
 	hasValidOutput := executor.HasValidOutput()
@@ -433,17 +431,15 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 		}
 
 		entrypoint := module.BinaryEntrypoint
-		instance, err := p.wasmRuntime.NewInstance(ctx, loadedModules[module.BinaryIndex], module.Name, module.BinaryEntrypoint)
-		if err != nil {
-			return fmt.Errorf("new wasm module: %w", err)
-		}
+		mod := loadedModules[module.BinaryIndex]
 
 		switch kind := module.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outType := strings.TrimPrefix(module.Output.Type, "proto:")
 			baseExecutor := exec.NewBaseExecutor(
+				ctx,
 				module.Name,
-				instance,
+				mod,
 				inputs,
 				entrypoint,
 				tracer,
@@ -462,8 +458,9 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 			inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
 
 			baseExecutor := exec.NewBaseExecutor(
+				ctx,
 				module.Name,
-				instance,
+				mod,
 				inputs,
 				entrypoint,
 				tracer,

@@ -226,7 +226,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	wasmRuntime := wasm.NewRuntime(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
+	wasmRuntime := wasm.NewRegistry(s.wasmExtensions, runtimeConfig.MaxWasmFuel)
 
 	execOutputConfigs, err := execout.NewConfigs(s.runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {

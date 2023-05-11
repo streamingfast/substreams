@@ -7,9 +7,10 @@ import (
 
 	"github.com/streamingfast/substreams/storage/execout"
 
+	"github.com/stretchr/testify/assert"
+
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/stretchr/testify/assert"
 )
 
 type MockExecOutput struct {
@@ -57,16 +58,14 @@ func (t *MockModuleExecutor) String() string {
 	return fmt.Sprintf("TestModuleExecutor(%s)", t.name)
 }
 
-func (t *MockModuleExecutor) FreeMem() {}
-
-func (t *MockModuleExecutor) ResetWASMCall() {}
-
 func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	if t.RunFunc != nil {
 		return t.RunFunc(ctx, reader)
 	}
 	return nil, nil, fmt.Errorf("not implemented")
 }
+
+func (t *MockModuleExecutor) Close() {}
 
 func (t *MockModuleExecutor) HasValidOutput() bool {
 	return t.cacheable
@@ -86,14 +85,14 @@ func (t *MockModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOu
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (t *MockModuleExecutor) moduleLogs() (logs []string, truncated bool) {
+func (t *MockModuleExecutor) lastExecutionLogs() (logs []string, truncated bool) {
 	if t.LogsFunc != nil {
 		return t.LogsFunc()
 	}
 	return nil, false
 }
 
-func (t *MockModuleExecutor) currentExecutionStack() []string {
+func (t *MockModuleExecutor) lastExecutionStack() []string {
 	if t.StackFunc != nil {
 		return t.StackFunc()
 	}

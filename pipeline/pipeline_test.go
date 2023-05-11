@@ -5,8 +5,15 @@ import (
 	"testing"
 	"time"
 
+	store2 "github.com/streamingfast/substreams/storage/store"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -16,11 +23,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestPipeline_runExecutor(t *testing.T) {
@@ -77,10 +80,10 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	runtime := wasm.NewRuntime(nil, 0)
-	module, err := runtime.NewModule(binary.Content)
+	registry := wasm.NewRegistry(nil, 0)
+	module, err := registry.NewModule(binary.Content)
 	require.NoError(t, err)
-	wasmModule, err := runtime.NewInstance(
+	wasmModule, err := module.NewInstance(
 		context.Background(),
 		module,
 		name,
@@ -90,6 +93,7 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 
 	return exec.NewMapperModuleExecutor(
 		exec.NewBaseExecutor(
+			context.Background(),
 			name,
 			wasmModule,
 			[]wasm.Argument{

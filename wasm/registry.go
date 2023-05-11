@@ -2,12 +2,15 @@ package wasm
 
 import "fmt"
 
-type Runtime struct {
+// Registry from Substreams's perspective is a singleton that is
+// reused across requests, from which we instantiate Modules (wasm code provided by the users)
+// and from which we instantiate Instances (one for each executions within each blocks).
+type Registry struct {
 	extensions map[string]map[string]WASMExtension
 	maxFuel    uint64
 }
 
-func (r *Runtime) registerWASMExtension(namespace string, importName string, ext WASMExtension) {
+func (r *Registry) registerWASMExtension(namespace string, importName string, ext WASMExtension) {
 	if namespace == "state" {
 		panic("cannot extend 'state' wasm namespace")
 	}
@@ -30,8 +33,8 @@ func (r *Runtime) registerWASMExtension(namespace string, importName string, ext
 	r.extensions[namespace][importName] = ext
 }
 
-func NewRuntime(extensions []WASMExtensioner, maxFuel uint64) *Runtime {
-	r := &Runtime{
+func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
+	r := &Registry{
 		maxFuel: maxFuel,
 	}
 	for _, ext := range extensions {

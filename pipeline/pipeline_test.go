@@ -83,19 +83,12 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	registry := wasm.NewRegistry(nil, 0)
 	module, err := registry.NewModule(binary.Content)
 	require.NoError(t, err)
-	wasmModule, err := module.NewInstance(
-		context.Background(),
-		module,
-		name,
-		name,
-	)
-	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(
 		exec.NewBaseExecutor(
 			context.Background(),
 			name,
-			wasmModule,
+			module,
 			[]wasm.Argument{
 				wasm.NewParamsInput("my test params"),
 				wasm.NewSourceInput("sf.substreams.v1.test.Block"),

@@ -282,13 +282,13 @@ var stateFuncs = []funcs{
 		[]parm{i32, i64, i32, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := int(stack[0])
+			storeIndex := uint32(stack[0])
 			ord := stack[1]
 			key := readStringFromStack(mod, stack[2:])
 			outputPtr := uint32(stack[4])
 			call := fromContext(ctx)
 
-			if storeIndex+1 > len(call.inputStores) {
+			if int(storeIndex+1) > len(call.inputStores) {
 				call.returnError(fmt.Errorf("'get_at' failed: invalid store index %d, %d stores declared", storeIndex, len(call.inputStores)))
 			}
 
@@ -310,12 +310,12 @@ var stateFuncs = []funcs{
 		[]parm{i32, i32, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := int(stack[0])
+			storeIndex := uint32(stack[0])
 			ord := stack[1]
 			key := readStringFromStack(mod, stack[2:])
 			call := fromContext(ctx)
 
-			if storeIndex+1 > len(call.inputStores) {
+			if int(storeIndex+1) > len(call.inputStores) {
 				call.returnError(fmt.Errorf("'has_at' failed: invalid store index %d, %d stores declared", storeIndex, len(call.inputStores)))
 			}
 
@@ -335,12 +335,12 @@ var stateFuncs = []funcs{
 		[]parm{i32, i32, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := int(stack[0])
+			storeIndex := uint32(stack[0])
 			key := readStringFromStack(mod, stack[1:])
 			outputPtr := uint32(stack[3])
 			call := fromContext(ctx)
 
-			if storeIndex+1 > len(call.inputStores) {
+			if int(storeIndex+1) > len(call.inputStores) {
 				call.returnError(fmt.Errorf("'get_first' failed: invalid store index %d, %d stores declared", storeIndex, len(call.inputStores)))
 			}
 
@@ -363,11 +363,11 @@ var stateFuncs = []funcs{
 		[]parm{i32, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := int(stack[0])
+			storeIndex := uint32(stack[0])
 			key := readStringFromStack(mod, stack[1:])
 			call := fromContext(ctx)
 
-			if storeIndex+1 > len(call.inputStores) {
+			if int(storeIndex+1) > len(call.inputStores) {
 				call.returnError(fmt.Errorf("'has_first' failed: invalid store index %d, %d stores declared", storeIndex, len(call.inputStores)))
 			}
 
@@ -386,12 +386,12 @@ var stateFuncs = []funcs{
 		[]parm{i32, i32, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := int(int32(stack[0]))
+			storeIndex := uint32(stack[0])
 			key := readStringFromStack(mod, stack[1:])
 			outputPtr := uint32(stack[3])
 			call := fromContext(ctx)
 
-			if storeIndex+1 > len(call.inputStores) {
+			if int(storeIndex+1) > len(call.inputStores) {
 				call.returnError(fmt.Errorf("'get_last' failed: invalid store index %d, %d stores declared", storeIndex, len(call.inputStores)))
 			}
 
@@ -414,11 +414,11 @@ var stateFuncs = []funcs{
 		[]parm{i32, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := int(stack[0])
+			storeIndex := uint32(stack[0])
 			key := readStringFromStack(mod, stack[1:])
 			call := fromContext(ctx)
 
-			if storeIndex+1 > len(call.inputStores) {
+			if int(storeIndex+1) > len(call.inputStores) {
 				call.returnError(fmt.Errorf("'has_last' failed: invalid store index %d, %d stores declared", storeIndex, len(call.inputStores)))
 			}
 

@@ -12,10 +12,11 @@ import (
 var loggerFuncs = []funcs{
 	{
 		"println",
-		[]parm{i32, i32},
+		[]parm{i32, i32}, // ptr, len
 		[]parm{},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			ptr, length := uint32(stack[0]), uint32(stack[1])
+			message := readStringFromStack(mod, stack[0:])
+			length := uint32(stack[1])
 			call := fromContext(ctx)
 
 			if call.ReachedLogsMaxByteCount() {
@@ -27,7 +28,6 @@ var loggerFuncs = []funcs{
 				panic(fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length))))
 			}
 
-			message := readString(mod, ptr, length)
 			if tracer.Enabled() {
 				zlog.Debug(message, zap.String("module_name", call.moduleName))
 			}

@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 )
@@ -31,8 +30,9 @@ var envFuncs = []funcs{
 		[]parm{},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			call := fromContext(ctx)
-			call.returnValue = readBytesFromStack(mod, stack[0:])
-			fmt.Println("OUTPUT MODULE", call.clock.Number, call.moduleName, string(call.returnValue))
+			msg := readBytesFromStack(mod, stack[0:])
+			call.returnValue = make([]byte, uint32(stack[1]))
+			copy(call.returnValue, msg)
 		}),
 	},
 }

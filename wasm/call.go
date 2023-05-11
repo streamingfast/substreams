@@ -194,7 +194,7 @@ func (c *Call) traceStateWrites(stateFunc, key string) {
 	c.ExecutionStack = append(c.ExecutionStack, line)
 }
 
-func (c *Call) traceStateReads(stateFunc string, storeIndex int, found bool, key string) {
+func (c *Call) traceStateReads(stateFunc string, storeIndex uint32, found bool, key string) {
 	store := c.inputStores[storeIndex]
 	line := fmt.Sprintf("%s::%s key: %q, found: %v, store details: %s", store.Name(), stateFunc, key, found, store.String())
 	c.ExecutionStack = append(c.ExecutionStack, line)

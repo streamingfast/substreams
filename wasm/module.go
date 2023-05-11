@@ -71,18 +71,18 @@ func (r *Registry) NewModule(wasmCode []byte) (*Module, error) {
 	}, nil
 }
 
-func (m *Module) instantiateModule(ctx context.Context) (wazero.Runtime, api.Module, error) {
+func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 	for _, hostMod := range m.hostModules {
 		if m.wazRuntime.Module(hostMod.Name()) != nil {
 			continue
 		}
 		_, err := m.wazRuntime.InstantiateModule(ctx, hostMod, m.wazModuleConfig.WithName(hostMod.Name()))
 		if err != nil {
-			return nil, nil, fmt.Errorf("instantiating host module %q: %w", hostMod.Name(), err)
+			return nil, fmt.Errorf("instantiating host module %q: %w", hostMod.Name(), err)
 		}
 	}
 	mod, err := m.wazRuntime.InstantiateModule(ctx, m.userModule, m.wazModuleConfig.WithName(""))
-	return nil, mod, err
+	return mod, err
 }
 
 type parm = api.ValueType

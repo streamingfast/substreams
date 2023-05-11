@@ -50,16 +50,15 @@ type Call struct {
 //}
 
 func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (mod api.Module, call *Call, err error) {
-	//if cachedInstance != nil {
-	//	mod = cachedInstance
-	//} else {
-	_, mod, err = m.instantiateModule(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not instantiate wasm module for %q: %w", moduleName, err)
+	if cachedInstance != nil {
+		mod = cachedInstance
+	} else {
+		mod, err = m.instantiateModule(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not instantiate wasm module for %q: %w", moduleName, err)
+		}
+		defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
 	}
-	defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
-	//defer runtime.Close(ctx)
-	//}
 
 	f := mod.ExportedFunction(entrypoint)
 	if f == nil {

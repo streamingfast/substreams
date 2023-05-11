@@ -67,7 +67,6 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		var mod api.Module
 		mod, call, err = e.wasmModule.ExecuteNewCall(e.ctx, e.cachedInstance, clock, e.moduleName, e.entrypoint, e.wasmArguments)
 		if err != nil {
-
 			errExecutor := ErrorExecutor{
 				message: err.Error(),
 			}

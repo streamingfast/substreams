@@ -2,6 +2,7 @@ package progress
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -34,7 +35,8 @@ type Progress struct {
 	updatesPerSecond  int
 	updatesThisSecond int
 
-	bars *ranges.Bars
+	bars   *ranges.Bars
+	curErr string
 }
 
 func New(c common.Common) *Progress {
@@ -87,7 +89,8 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.bars.Update(msg)
 		p.progressView.SetContent(p.bars.View())
 	case stream.StreamErrorMsg:
-		p.state = fmt.Sprintf("Error: %s", msg)
+		p.state = fmt.Sprintf("Error")
+		p.curErr = msg.(stream.StreamErrorMsg).Error()
 	case *replaylog.File:
 		p.replayState = " [saving to replay log]"
 	}
@@ -122,6 +125,33 @@ func labelsMaxLen() int {
 	return width
 }
 
+func wrapString(input string, screenWidth int) (string, int) {
+	words := strings.Fields(input)
+	var wrappedString strings.Builder
+	var lineLength int
+	lineCount := 1
+
+	for _, word := range words {
+		wordLen := len(word)
+
+		if lineLength+wordLen+1 > screenWidth {
+			wrappedString.WriteString("\n")
+			lineLength = 0
+			lineCount++
+		}
+
+		if lineLength > 0 {
+			wrappedString.WriteString(" ")
+			lineLength++
+		}
+
+		wrappedString.WriteString(word)
+		lineLength += wordLen
+	}
+
+	return wrappedString.String(), lineCount
+}
+
 func (p *Progress) View() string {
 	infos := []string{
 		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
@@ -130,6 +160,18 @@ func (p *Progress) View() string {
 		p.Styles.StatusBarValue.Render(p.state + p.replayState),
 	}
 
+	if p.state == "Error" {
+		errorStringWrapped, lineCount := wrapString(p.curErr, p.Width)
+
+		return lipgloss.JoinVertical(0,
+			lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
+				lipgloss.JoinVertical(1, labels...),
+				lipgloss.JoinVertical(0, infos...),
+			)),
+			lipgloss.NewStyle().Background(lipgloss.Color("9")).Width(p.Width).Render(errorStringWrapped),
+			lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Height(p.progressView.Height-lineCount).Render(p.progressView.View()),
+		)
+	}
 	return lipgloss.JoinVertical(0,
 		lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
 			lipgloss.JoinVertical(1, labels...),
@@ -137,6 +179,7 @@ func (p *Progress) View() string {
 		)),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(p.progressView.View()),
 	)
+
 }
 
 func (p *Progress) SetSize(w, h int) {

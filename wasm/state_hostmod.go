@@ -22,7 +22,6 @@ var stateFuncs = []funcs{
 			call.validateSetStore(key)
 
 			call.outputStore.SetBytes(ord, key, value)
-			call.traceStateWrites("set", key)
 		}),
 	},
 	{
@@ -192,7 +191,7 @@ var stateFuncs = []funcs{
 			value := readStringFromStack(mod, stack[3:])
 			call := fromContext(ctx)
 
-			call.validateSetMinFloat64(key)
+			call.validateSetMinBigDecimal(key)
 
 			toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
 			if err != nil {
@@ -259,7 +258,7 @@ var stateFuncs = []funcs{
 			value := readStringFromStack(mod, stack[3:])
 			call := fromContext(ctx)
 
-			call.validateSetMaxFloat64(key)
+			call.validateSetMaxBigDecimal(key)
 
 			toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
 			if err != nil {

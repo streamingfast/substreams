@@ -3,13 +3,11 @@ package output
 import (
 	"sort"
 
-	"github.com/streamingfast/substreams/tui2/components/blocksearch"
-	streamui "github.com/streamingfast/substreams/tui2/stream"
-
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -112,15 +110,6 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case streamui.StreamErrorMsg:
-		o.errReceived = msg
-		newBlock := o.active.BlockNum
-		if len(o.blockSelector.BlocksWithData) > 0 {
-			newBlock = uint64(o.blockSelector.BlocksWithData[len(o.blockSelector.BlocksWithData)-1])
-		}
-		o.active.BlockNum = newBlock
-		o.blockSelector.SetActiveBlock(newBlock)
-		o.setOutputViewContent()
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
 		o.blockSearchEnabled = false

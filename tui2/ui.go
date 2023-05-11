@@ -104,10 +104,6 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
-	case streamui.StreamErrorMsg:
-		ui.activePage = page(2)
-		ui.footer.SetKeyMap(ui.pages[ui.activePage])
-		ui.SetSize(ui.Width, ui.Height)
 	case tea.WindowSizeMsg:
 		ui.SetSize(msg.Width, msg.Height)
 	case common.SetModalUpdateFuncMsg:

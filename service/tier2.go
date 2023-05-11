@@ -252,6 +252,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		"",
 		true,
 		false,
+		logger.Named("stream"),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)

@@ -308,6 +308,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		cursor,
 		request.FinalBlocksOnly,
 		cursorIsTarget,
+		logger.Named("stream"),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)

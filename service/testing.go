@@ -42,5 +42,6 @@ func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc S
 }
 
 func (s *Tier2Service) TestBlocks(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
-	return s.processRange(ctx, s.runtimeConfig, request, respFunc)
+	// The TraceID must be the same between tier1 and tier2, otherwise tier1 will not find the file produced by tier2 correctly
+	return s.processRange(ctx, s.runtimeConfig, request, respFunc, "00000000000000000000000000000000")
 }

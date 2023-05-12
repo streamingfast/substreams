@@ -12,6 +12,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -42,6 +43,15 @@ func (c *SubstreamsClientConfig) PlainText() bool {
 
 func (c *SubstreamsClientConfig) JWT() string {
 	return c.jwt
+}
+
+func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddString("client_endpoint", c.endpoint)
+	encoder.AddBool("client_plaintext", c.plaintext)
+	encoder.AddBool("client_insecure", c.insecure)
+	encoder.AddBool("jwt_set", c.jwt != "")
+
+	return nil
 }
 
 type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, err error)

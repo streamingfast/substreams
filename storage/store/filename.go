@@ -8,16 +8,13 @@ import (
 	"github.com/streamingfast/substreams/block"
 )
 
-var stateFileRegex *regexp.Regexp
-
-func init() {
-	stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.(kv|partial)`)
-}
+var stateFileRegex = regexp.MustCompile(`([\d]+)-([\d]+)(?:\.([^\.]+))?\.(kv|partial)`)
 
 type FileInfo struct {
 	Filename   string
 	StartBlock uint64
 	EndBlock   uint64
+	TraceID    string
 	Partial    bool
 }
 
@@ -29,12 +26,14 @@ func parseFileName(filename string) (*FileInfo, bool) {
 
 	end := uint64(mustAtoi(res[0][1]))
 	start := uint64(mustAtoi(res[0][2]))
-	partial := res[0][3] == "partial"
+	traceID := res[0][3]
+	partial := res[0][4] == "partial"
 
 	return &FileInfo{
 		Filename:   filename,
 		StartBlock: start,
 		EndBlock:   end,
+		TraceID:    traceID,
 		Partial:    partial,
 	}, true
 }
@@ -43,8 +42,8 @@ func fullStateFilePrefix(blockNum uint64) string {
 	return fmt.Sprintf("%010d", blockNum)
 }
 
-func partialFileName(r *block.Range) string {
-	return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
+func partialFileName(r *block.Range, traceID string) string {
+	return fmt.Sprintf("%010d-%010d.%s.partial", r.ExclusiveEndBlock, r.StartBlock, traceID)
 }
 
 func fullStateFileName(r *block.Range) string {

@@ -10,7 +10,7 @@ import (
 
 type ConfigMap map[string]*Config
 
-func NewConfigMap(baseObjectStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes) (out ConfigMap, err error) {
+func NewConfigMap(baseObjectStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, traceID string) (out ConfigMap, err error) {
 	out = make(ConfigMap)
 	for _, storeModule := range storeModules {
 		c, err := NewConfig(
@@ -20,6 +20,7 @@ func NewConfigMap(baseObjectStore dstore.Store, storeModules []*pbsubstreams.Mod
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			baseObjectStore,
+			traceID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new store config for %q: %w", storeModule.Name, err)

@@ -58,14 +58,14 @@ func (s *Scheduler) Schedule(ctx context.Context, pool work.WorkerPool) (err err
 	result := make(chan jobResult)
 
 	wg := &sync.WaitGroup{}
-	logger.Debug("launching scheduler")
+	logger.Info("launching scheduler")
 
 	go func() {
 		allJobsStarted := false
 		for !allJobsStarted {
 			allJobsStarted = s.run(ctx, wg, result, pool)
 		}
-		logger.Info("scheduler finished starting jobs. waiting for them to complete")
+		logger.Info("scheduler finished starting jobs, waiting for them to complete")
 
 		wg.Wait()
 		logger.Info("all jobs completed")
@@ -147,7 +147,7 @@ func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (e
 				return nil
 			}
 			if err := s.processJobResult(ctx, jobResult); err != nil {
-				return fmt.Errorf("process job result for target %q: %w", jobResult.job.ModuleName, err)
+				return fmt.Errorf("process job result for module %q: %w", jobResult.job.ModuleName, err)
 			}
 		}
 	}
@@ -155,7 +155,7 @@ func (s *Scheduler) gatherResults(ctx context.Context, result chan jobResult) (e
 
 func (s *Scheduler) processJobResult(ctx context.Context, result jobResult) error {
 	if result.err != nil {
-		return fmt.Errorf("worker ended in error: %w", result.err)
+		return fmt.Errorf("job ended in error: %w", result.err)
 	}
 
 	if result.partialsWritten != nil {

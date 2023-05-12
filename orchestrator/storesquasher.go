@@ -7,16 +7,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/streamingfast/shutter"
-
-	"github.com/streamingfast/substreams/storage/store"
-
 	"github.com/abourget/llerrgroup"
-	"go.uber.org/zap"
-
+	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
+	"go.uber.org/zap"
 )
 
 var SkipRange = errors.New("skip range")
@@ -27,7 +24,6 @@ type StoreSquasher struct {
 
 	name                         string
 	store                        *store.FullKV
-	requestRange                 *block.Range
 	ranges                       block.Ranges
 	targetExclusiveEndBlock      uint64 // The upper bound of this Squasher's responsibility
 	targetExclusiveEndBlockReach bool

@@ -178,7 +178,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 			nextExpectedStartBlock:       0,  // we are expecting the first partial to be completed
 			storeSaveInterval:            10, // store files contains 10 blocks
 			squashableRange:              block.NewRange(0, 10),
-			expectPartialFilenameLoaded:  "0000000010-0000000000.partial",
+			expectPartialFilenameLoaded:  "0000000010-0000000000.testTraceID.partial",
 			expectNextExpectedStartBlock: 10,
 			expectShouldSaveFullStore:    true,
 		},
@@ -250,6 +250,7 @@ func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *st
 		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
 		"",
 		testStore,
+		"testTraceID",
 	)
 	require.NoError(t, err)
 

@@ -25,9 +25,22 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
+
+	// traceID uniquely identifies the connection ID so that store can be
+	// written to unique filename preventing some races when multiple Substreams
+	// request works on the same range.
+	traceID string
 }
 
-func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (*Config, error) {
+func NewConfig(
+	name string,
+	moduleInitialBlock uint64,
+	moduleHash string,
+	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
+	valueType string,
+	store dstore.Store,
+	traceID string,
+) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -43,6 +56,7 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, update
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     1_073_741_824, // 1GiB
 		itemSizeLimit:      10_485_760,    // 10MiB
+		traceID:            traceID,
 	}, nil
 }
 

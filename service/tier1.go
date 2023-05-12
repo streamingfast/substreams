@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth/authenticator"
-	"github.com/streamingfast/dgrpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -188,7 +187,7 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
-		logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
+		logger.Info("unexpected termination of stream of blocks", zap.Error(err))
 	}
 
 	return grpcError
@@ -230,7 +229,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), tracing.GetTraceID(ctx).String())
+	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -393,8 +392,6 @@ func toGRPCError(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
 	}
-
-	dgrpc.AsGRPCError(err)
 
 	var errInvalidArg *stream.ErrInvalidArg
 	if errors.As(err, &errInvalidArg) {

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
+
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/block"
 )
 
 var _ Store = (*PartialKV)(nil)
@@ -104,7 +106,7 @@ func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error
 }
 
 func (p *PartialKV) storageFilename(exclusiveEndBlock uint64) string {
-	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock), p.traceID)
+	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock))
 }
 
 func (p *PartialKV) String() string {

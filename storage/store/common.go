@@ -22,7 +22,6 @@ func loadStore(ctx context.Context, store dstore.Store, filename string) (out []
 		if err != nil {
 			return fmt.Errorf("opening file: %w", err)
 		}
-
 		defer r.Close()
 		data, err := io.ReadAll(r)
 		if err != nil {

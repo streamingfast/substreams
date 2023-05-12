@@ -110,13 +110,11 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.UpdatePolicy,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.ValueType,
 				baseDStore,
-				"",
 			)
 			if err != nil {
 				zlog.Error("creating store config", zap.Error(err))
 				return
 			}
-
 			storeStats := initializeStoreStats(conf)
 
 			stateStore, fileInfos, err := getStore(ctx, conf, math.MaxUint64)

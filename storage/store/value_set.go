@@ -39,10 +39,10 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 
 	b.bumpOrdinal(ord)
 
-	val, found := b.GetLast(key)
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
+	val, found := b.GetLast(key)
 	var delta *pbssinternal.StoreDelta
 	if found {
 		delta = &pbssinternal.StoreDelta{

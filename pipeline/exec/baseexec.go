@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/tetratelabs/wazero/api"
 	ttrace "go.opentelemetry.io/otel/trace"
@@ -32,7 +33,7 @@ func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule *wasm.Mo
 	return &BaseExecutor{ctx: ctx, moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
 }
 
-const CACHE_ENABLED = false
+var CACHE_ENABLED = os.Getenv("WAZERO_CACHE_ENABLED") != ""
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil

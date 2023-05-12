@@ -78,6 +78,8 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		}
 		if CACHE_ENABLED {
 			e.cachedInstance = mod
+		} else {
+			_ = mod.Close(e.ctx)
 		}
 		e.logs = call.Logs
 		e.logsTruncated = call.ReachedLogsMaxByteCount()

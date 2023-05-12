@@ -113,7 +113,7 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 						return
 					}
 
-					if err := writeOutputToHeap(ctx, mod, outputPtr, out, importName); err != nil {
+					if err := call.writeOutputToHeap(ctx, mod, outputPtr, out, importName); err != nil {
 						panic(fmt.Errorf("write output to heap %w", err))
 					}
 				}), []parm{i32, i32, i32}, []parm{}).
@@ -172,28 +172,4 @@ func readBytes(mod api.Module, ptr, length uint32) []byte {
 		panic(fmt.Sprintf("could not read string, ptr=%d, len=%d", ptr, length))
 	}
 	return bytes
-}
-
-func writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) uint32 {
-	stack := []uint64{uint64(len(data))}
-	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
-		panic("out of memory: " + from)
-	}
-	ptr := uint32(stack[0])
-	if ok := mod.Memory().Write(ptr, data); !ok {
-		panic("could not write to memory: " + from)
-	}
-	return ptr
-}
-
-func writeOutputToHeap(ctx context.Context, mod api.Module, outputPtr uint32, value []byte, importName string) error {
-	valuePtr := writeToHeap(ctx, mod, value, importName+":writeOutputToHeap1")
-	mem := mod.Memory()
-	if ok := mem.WriteUint32Le(outputPtr, valuePtr); !ok {
-		panic("could not write to memory: " + importName + ":WriteUint32Le:1")
-	}
-	if ok := mem.WriteUint32Le(outputPtr+4, uint32(len(value))); !ok {
-		panic("could not write to memory: " + importName + ":WriteUint32Le:2")
-	}
-	return nil
 }

@@ -296,7 +296,7 @@ var stateFuncs = []funcs{
 			if !found {
 				stack[0] = 0
 			} else {
-				if err := writeOutputToHeap(ctx, mod, outputPtr, value, call.moduleName); err != nil {
+				if err := call.writeOutputToHeap(ctx, mod, outputPtr, value, call.moduleName); err != nil {
 					call.returnError(fmt.Errorf("writing output to heap: %w", err))
 				}
 				stack[0] = 1
@@ -349,7 +349,7 @@ var stateFuncs = []funcs{
 			if !found {
 				stack[0] = 0
 			} else {
-				if err := writeOutputToHeap(ctx, mod, outputPtr, value, call.moduleName); err != nil {
+				if err := call.writeOutputToHeap(ctx, mod, outputPtr, value, call.moduleName); err != nil {
 					call.returnError(fmt.Errorf("writing output to heap: %w", err))
 				}
 				stack[0] = 1
@@ -400,7 +400,7 @@ var stateFuncs = []funcs{
 			if !found {
 				stack[0] = 0
 			} else {
-				if err := writeOutputToHeap(ctx, mod, outputPtr, value, call.moduleName); err != nil {
+				if err := call.writeOutputToHeap(ctx, mod, outputPtr, value, call.moduleName); err != nil {
 					call.returnError(fmt.Errorf("writing output to heap: %w", err))
 				}
 				stack[0] = 1

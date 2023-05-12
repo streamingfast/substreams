@@ -3,6 +3,8 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 
@@ -32,6 +34,8 @@ type Call struct {
 	Logs           []string
 	LogsByteCount  uint64
 	ExecutionStack []string
+
+	allocations []allocation
 }
 
 //func (m *Module) NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (*Call, error) {
@@ -57,7 +61,8 @@ func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, 
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not instantiate wasm module for %q: %w", moduleName, err)
 		}
-		defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
+		// Closed by the caller.
+		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
 	}
 
 	f := mod.ExportedFunction(entrypoint)
@@ -84,7 +89,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, 
 			args = append(args, uint64(len(call.inputStores)-1))
 		case ValueArgument:
 			cnt := v.Value()
-			ptr := writeToHeap(ctx, mod, cnt, input.Name())
+			ptr := call.writeToHeap(ctx, mod, cnt, input.Name())
 			length := uint64(len(cnt))
 			args = append(args, uint64(ptr), length)
 		default:
@@ -93,6 +98,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, 
 	}
 
 	_, err = f.Call(withContext(ctx, call), args...)
+	//defer call.deallocate(ctx, mod)
 	if err != nil {
 		if call.panicError != nil {
 			return mod, call, call.panicError
@@ -101,6 +107,52 @@ func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, 
 	}
 
 	return mod, call, nil
+}
+
+//var CACHE_ENABLED = os.Getenv("WAZERO_CACHE_ENABLED") != ""
+
+func (c *Call) writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) uint32 {
+	stack := []uint64{uint64(len(data))}
+	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
+		panic(fmt.Errorf("alloc from %q failed: %w", from, err))
+	}
+	ptr := uint32(stack[0])
+	if ok := mod.Memory().Write(ptr, data); !ok {
+		panic("could not write to memory: " + from)
+	}
+	//if CACHE_ENABLED {
+	//	c.allocations = append(c.allocations, allocation{ptr: ptr, length: uint32(len(data))})
+	//}
+	return ptr
+}
+
+func (c *Call) writeOutputToHeap(ctx context.Context, mod api.Module, outputPtr uint32, value []byte, importName string) error {
+	valuePtr := c.writeToHeap(ctx, mod, value, importName+":writeOutputToHeap1")
+	mem := mod.Memory()
+	if ok := mem.WriteUint32Le(outputPtr, valuePtr); !ok {
+		panic("could not write to memory: " + importName + ":WriteUint32Le:1")
+	}
+	if ok := mem.WriteUint32Le(outputPtr+4, uint32(len(value))); !ok {
+		panic("could not write to memory: " + importName + ":WriteUint32Le:2")
+	}
+	return nil
+}
+
+type allocation struct {
+	ptr    uint32
+	length uint32
+}
+
+func (c *Call) deallocate(ctx context.Context, mod api.Module) {
+	sort.Slice(c.allocations, func(i, j int) bool {
+		return c.allocations[i].ptr < c.allocations[j].ptr
+	})
+	dealloc := mod.ExportedFunction("dealloc")
+	for _, alloc := range c.allocations {
+		if err := dealloc.CallWithStack(ctx, []uint64{uint64(alloc.ptr), uint64(alloc.length)}); err != nil {
+			panic(fmt.Errorf("could not deallocate memory at %d: %w", alloc.ptr, err))
+		}
+	}
 }
 
 func (c *Call) Err() error {

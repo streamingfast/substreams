@@ -35,7 +35,7 @@ source $HOME/.cargo/env # to configure your current shell
 
 #### `wasm32-unknown-unknown` target
 
-Ensure you have the `wasm32-unknown-unknown` target installed on your Rust installation, if ensure, you can install it with:
+Ensure you have the `wasm32-unknown-unknown` target installed on your Rust installation, if unsure, you can install it with:
 
 ```bash
 rustup target add wasm32-unknown-unknown

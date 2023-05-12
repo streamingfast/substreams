@@ -54,9 +54,11 @@ type Call struct {
 //}
 
 func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (mod api.Module, call *Call, err error) {
+	//t0 := time.Now()
 	if cachedInstance != nil {
 		mod = cachedInstance
 	} else {
+		//fmt.Println("Instantiate")
 		mod, err = m.instantiateModule(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not instantiate wasm module for %q: %w", moduleName, err)
@@ -64,11 +66,13 @@ func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, 
 		// Closed by the caller.
 		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
 	}
-
+	//fmt.Println("Timing 1", time.Since(t0))
+	//t0 = time.Now()
 	f := mod.ExportedFunction(entrypoint)
 	if f == nil {
 		return mod, nil, fmt.Errorf("could not find entrypoint function %q for module %q", entrypoint, moduleName)
 	}
+	//fmt.Println("Timing 2", time.Since(t0))
 
 	call = &Call{
 		moduleName: moduleName,
@@ -113,6 +117,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, 
 
 func (c *Call) writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) uint32 {
 	stack := []uint64{uint64(len(data))}
+	//fmt.Println("Writing length", len(data))
 	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
 		panic(fmt.Errorf("alloc from %q failed: %w", from, err))
 	}
@@ -120,6 +125,7 @@ func (c *Call) writeToHeap(ctx context.Context, mod api.Module, data []byte, fro
 	if ok := mod.Memory().Write(ptr, data); !ok {
 		panic("could not write to memory: " + from)
 	}
+	fmt.Println("Memory size:", mod.Memory().Size())
 	//if CACHE_ENABLED {
 	//	c.allocations = append(c.allocations, allocation{ptr: ptr, length: uint32(len(data))})
 	//}
@@ -144,6 +150,7 @@ type allocation struct {
 }
 
 func (c *Call) deallocate(ctx context.Context, mod api.Module) {
+	t0 := time.Now()
 	sort.Slice(c.allocations, func(i, j int) bool {
 		return c.allocations[i].ptr < c.allocations[j].ptr
 	})
@@ -153,6 +160,7 @@ func (c *Call) deallocate(ctx context.Context, mod api.Module) {
 			panic(fmt.Errorf("could not deallocate memory at %d: %w", alloc.ptr, err))
 		}
 	}
+	fmt.Println("deallocae", time.Since(t0))
 }
 
 func (c *Call) Err() error {

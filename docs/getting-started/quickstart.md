@@ -91,7 +91,7 @@ version = "1.0.0"
 edition = "2021"
 
 [lib]
-name = "substreams.yaml"
+name = "substreams"
 crate-type = ["cdylib"]
 
 [dependencies]

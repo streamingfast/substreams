@@ -182,6 +182,10 @@ Compile your Substreams module.
 cargo build --release --target wasm32-unknown-unknown
 ```
 
+{% hint style="info" %}
+**Note**: If you have a lots of weird compilation errors like `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, see [Rust installation]( ../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) for instructions how to install it.
+{% endhint %}
+
 ### Execute
 
 To execute, or run, the example use the `substreams` [`run`](../reference-and-specs/command-line-interface.md#run) command:

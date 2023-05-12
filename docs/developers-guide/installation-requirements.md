@@ -33,6 +33,14 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env # to configure your current shell
 ```
 
+#### `wasm32-unknown-unknown` target
+
+Ensure you have the `wasm32-unknown-unknown` target installed on your Rust installation, if ensure, you can install it with:
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
 ### Buf installation
 
 Buf simplifies the generation of typed structures in any language. Buf uses a remote builder executed on the Buf server, so an internet connection is required to generate Rust bindings from Protobuf definitions.

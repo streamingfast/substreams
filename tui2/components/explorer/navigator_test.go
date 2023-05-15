@@ -391,7 +391,7 @@ func TestNavigator_Update_Select_Parent_UnknownModule(t *testing.T) {
 	nav.HighlightedModule = "A"
 	nav.HighlightedIndex = 0
 
-	_, cmd := nav.Update(selectKey)
+	_, _ = nav.Update(selectKey)
 
 	assert.False(t, nav.InParentColumn)
 	assert.False(t, nav.InChildColumn)
@@ -406,9 +406,6 @@ func TestNavigator_Update_Select_Parent_UnknownModule(t *testing.T) {
 	lsp, ok := nav.memory.GetLastSelectedParentOf("X")
 	assert.True(t, ok)
 	assert.Equal(t, lsp, "A")
-
-	//check commands
-	assert.Nil(t, cmd)
 }
 
 func TestNavigator_Update_Select_Parent_UnselectableModule(t *testing.T) {

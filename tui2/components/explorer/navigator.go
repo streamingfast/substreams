@@ -51,8 +51,8 @@ func (n *NavigatorMemory) SetLastSelectedChildOf(modName, childName string) {
 }
 
 type Navigator struct {
-	graph  *manifest.ModuleGraph
-	memory *NavigatorMemory
+	graph        *manifest.ModuleGraph
+	memory       *NavigatorMemory
 
 	SelectedModule    string
 	HighlightedModule string
@@ -342,6 +342,8 @@ func (n *Navigator) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			n.CurrentGrandChildPreviewColumn = []string{}
 			n.CurrentGrandParentPreviewColumn = []string{}
 			n.CurrentPreviewColumn = []string{}
+
+			cmds = append(cmds, common.EmitModuleSelectedMsg(n.SelectedModule))
 		}
 	}
 

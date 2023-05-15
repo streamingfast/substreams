@@ -15,6 +15,7 @@ func (o *Output) ShortHelp() []key.Binding {
 		keymap.Help,
 		keymap.ToggleLogs,
 		keymap.GoToBlock,
+		keymap.ModGraphView,
 	}
 }
 

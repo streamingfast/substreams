@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/substreams/tui2/components/explorer"
-
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -63,18 +61,13 @@ type Request struct {
 	Modules            *pbsubstreams.Modules
 	manifestView       viewport.Model
 	modulesViewContent string
-
-	moduleNavigator *explorer.Navigator
-	graphMode       bool
 }
 
-func New(c common.Common, config *RequestConfig) *Request {
-	nav, _ := explorer.New(config.OutputModule, explorer.WithManifestFilePath(config.ManifestPath))
+func New(c common.Common) *Request {
 
 	return &Request{
-		Common:          c,
-		manifestView:    viewport.New(24, 80),
-		moduleNavigator: nav,
+		Common:       c,
+		manifestView: viewport.New(24, 80),
 	}
 }
 
@@ -93,14 +86,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.Modules = msg.Modules
 		r.setModulesViewContent()
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "g":
-			r.graphMode = !r.graphMode
-		}
 		var cmd tea.Cmd
 		r.manifestView, cmd = r.manifestView.Update(msg)
-		cmds = append(cmds, cmd)
-		_, cmd = r.moduleNavigator.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 	return r, tea.Batch(cmds...)
@@ -110,15 +97,10 @@ func (r *Request) View() string {
 	lineCount := r.manifestView.TotalLineCount()
 	progress := float64(r.manifestView.YOffset+r.manifestView.Height-1) / float64(lineCount) * 100.0
 
-	var requestContent string
-	if r.graphMode {
-		requestContent = r.moduleNavigator.View()
-	} else {
-		requestContent = lipgloss.JoinVertical(0,
-			lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.manifestView.View()),
-			lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
-		)
-	}
+	requestContent := lipgloss.JoinVertical(0,
+		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.manifestView.View()),
+		lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
+	)
 
 	return lipgloss.JoinVertical(0,
 		r.renderRequestSummary(),

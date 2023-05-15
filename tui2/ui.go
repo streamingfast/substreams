@@ -1,7 +1,6 @@
 package tui2
 
 import (
-	"fmt"
 	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -206,7 +205,6 @@ func (ui *UI) restartStream() tea.Cmd {
 	requestInstance, err := ui.requestConfig.NewInstance()
 	if err != nil {
 		return func() tea.Msg {
-			fmt.Printf("error: %+v\n", request.NewRequestInstance(requestInstance))
 			return streamui.StreamErrorMsg(err)
 		}
 	}

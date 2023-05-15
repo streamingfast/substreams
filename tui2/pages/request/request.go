@@ -61,6 +61,7 @@ type Request struct {
 	Modules            *pbsubstreams.Modules
 	manifestView       viewport.Model
 	modulesViewContent string
+	traceId            string
 }
 
 func New(c common.Common) *Request {
@@ -89,6 +90,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		r.manifestView, cmd = r.manifestView.Update(msg)
 		cmds = append(cmds, cmd)
+	case *pbsubstreamsrpc.Response_Session:
+		r.traceId = msg.Session.TraceId
 	}
 	return r, tea.Batch(cmds...)
 }
@@ -115,6 +118,7 @@ func (r *Request) renderRequestSummary() string {
 		"Endpoint: ",
 		"Production mode: ",
 		"Initial snapshots: ",
+		"Trace ID: ",
 	}
 	values := []string{
 		fmt.Sprintf("%s", summary.Manifest),
@@ -126,6 +130,7 @@ func (r *Request) renderRequestSummary() string {
 	} else {
 		values = append(values, r.Styles.StatusBarValue.Render(fmt.Sprintf("None")))
 	}
+	values = append(values, fmt.Sprintf("%s", r.traceId))
 
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
 

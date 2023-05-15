@@ -158,6 +158,8 @@ func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 		return m.DebugSnapshotData
 	case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
 		return m.DebugSnapshotComplete
+	case *pbsubstreamsrpc.Response_Session:
+		return m
 	}
 	return ResponseUnknownMsg(fmt.Sprintf("%T", resp.Message))
 }

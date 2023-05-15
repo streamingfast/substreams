@@ -150,7 +150,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	case *pbsubstreams.Module_KindMap_:
 		return fmt.Errorf("no states are available for a mapper")
 	case *pbsubstreams.Module_KindStore_:
-		return searchStateModule(ctx, startBlock, saveInterval, moduleHash, key, matchingModule, objStore, protoFiles)
+		return searchStateModule(ctx, startBlock, moduleHash, key, matchingModule, objStore, protoFiles)
 	}
 	return fmt.Errorf("module has an unknown")
 }
@@ -279,8 +279,7 @@ func searchOutputsModule(
 
 func searchStateModule(
 	ctx context.Context,
-	startBlock,
-	saveInterval uint64,
+	startBlock uint64,
 	moduleHash string,
 	key string,
 	module *pbsubstreams.Module,
@@ -292,7 +291,7 @@ func searchStateModule(
 		return fmt.Errorf("initializing store config module %q: %w", module.Name, err)
 	}
 	moduleStore := config.NewFullKV(zlog)
-	if err = moduleStore.Load(ctx, startBlock+saveInterval); err != nil {
+	if err = moduleStore.Load(ctx, startBlock); err != nil {
 		return fmt.Errorf("unable to load file: %w", err)
 	}
 
@@ -325,7 +324,7 @@ func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDes
 		msgDesc = file.FindMessage(strings.TrimPrefix(protoDefinition, "proto:"))
 		if msgDesc != nil {
 			switch module.Kind.(type) {
-			case *pbsubstreams.Module_KindMap_:
+			case *pbsubstreams.Module_KindMap_, *pbsubstreams.Module_KindStore_:
 				dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 				val, err := unmarshalData(data, dynMsg)
 				if err != nil {

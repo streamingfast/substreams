@@ -55,6 +55,7 @@ func (c *Config) ModuleInitialBlock() uint64          { return c.moduleInitialBl
 
 func (c *Config) ListSnapshotFiles(ctx context.Context) (files FileInfos, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		files = nil
 		if err := c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, err := parseFileName(filename)
 			if err != nil {

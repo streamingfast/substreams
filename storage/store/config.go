@@ -109,6 +109,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 		return nil, nil
 	}
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		files = nil
 		if err := c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(filename)
 			if !ok {

@@ -158,6 +158,7 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 
 func walkFiles(ctx context.Context, store dstore.Store, processor func(filename string) string) (files []string, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		files = nil
 		if err := store.Walk(ctx, "", func(filename string) (err error) {
 			files = append(files, processor(filename))
 			return nil

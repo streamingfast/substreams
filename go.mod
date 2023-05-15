@@ -10,7 +10,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20230510131449-6b591d74130d
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
-	github.com/streamingfast/derr v0.0.0-20230503162645-8024f6bcc854
+	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20230113212008-1898f17e0ac7
 	github.com/streamingfast/dstore v0.1.1-0.20230511202333-4f4ccf11a05f
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338

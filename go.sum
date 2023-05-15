@@ -649,6 +649,8 @@ github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5/go.mod h1:YStE7
 github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec/go.mod h1:ulVfui/yGXmPBbt9aAqCWdAjM7YxnZkYHzvQktLfw3M=
 github.com/streamingfast/derr v0.0.0-20230503162645-8024f6bcc854 h1:+nWzSnmWVNQN8rXW6TuMs8qnsJOre7MwcR5Yv+KWfeU=
 github.com/streamingfast/derr v0.0.0-20230503162645-8024f6bcc854/go.mod h1:QSm/AfaDsE0k1xBYi0lW580YJ/WDV/FKZI628tkZR0Y=
+github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1 h1:xJB7rXnOHLesosMjfwWsEL2i/40mFSkzenEb3M0qTyM=
+github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1/go.mod h1:QSm/AfaDsE0k1xBYi0lW580YJ/WDV/FKZI628tkZR0Y=
 github.com/streamingfast/dgrpc v0.0.0-20230113212008-1898f17e0ac7 h1:eMbubEy/Q7Yuah8uSTRmo4MUbJ2mP0BOHM+3qfFyP4M=
 github.com/streamingfast/dgrpc v0.0.0-20230113212008-1898f17e0ac7/go.mod h1:eOuThj6Ix7vG5FxtGQNvkWxjRzDO+ApXO8mvgBqkksY=
 github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8 h1:NSXRm1UBMQ9LoKMh5gBY410v6Gc1ZCvKtdoarsAIzb4=

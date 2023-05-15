@@ -114,17 +114,14 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	return nil, false
 }
 
-func (c *File) Load(ctx context.Context) (loaded bool, err error) {
+func (c *File) Load(ctx context.Context) error {
 	filename := computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
 	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.BoundedRange))
 
-	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		objectReader, err := c.store.OpenObject(ctx, filename)
 		if err == dstore.ErrNotFound {
-			// TODO(abourget,stepd): proper design would be that RetryContext could handle a `NotRetryableError`
-			//  that would terminate the Retry loop, and unwrap the NotRetryableError and return it
-			//  to the caller. We're hacking our way here.
-			return nil
+			return derr.NewFatalError(err)
 		}
 
 		if err != nil {
@@ -145,11 +142,8 @@ func (c *File) Load(ctx context.Context) (loaded bool, err error) {
 		c.kv = outputData.Kv
 
 		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.BoundedRange))
-		loaded = true
 		return nil
 	})
-
-	return
 }
 
 func (c *File) Save(ctx context.Context) (func(), error) {

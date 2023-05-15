@@ -255,14 +255,16 @@ func searchOutputsModule(
 	targetRange := block.NewBoundedRange(module.InitialBlock, saveInterval, startBlock, startBlock-startBlock%saveInterval+saveInterval)
 	outputCache := modStore.NewFile(targetRange)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
-	found, err := outputCache.Load(ctx)
-	if err != nil {
-		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
-	}
-	if !found {
-		return fmt.Errorf("can't find cache at block %d storeURL %q", blockNumber, moduleStore.BaseURL().String())
-	}
+	if err := outputCache.Load(ctx); err != nil {
+		if err == dstore.ErrNotFound {
+			return fmt.Errorf("can't find cache at block %d storeURL %q", blockNumber, moduleStore.BaseURL().String())
+		}
 
+		if err != nil {
+			return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
+		}
+	}
+	
 	fmt.Println()
 	payloadBytes, found := outputCache.GetAtBlock(blockNumber)
 	if !found {

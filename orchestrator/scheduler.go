@@ -181,12 +181,8 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 	request := job.CreateRequest(requestModules)
 
 	var workResult *work.Result
-	var nonRetryableError error
 
-	_ = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		if nonRetryableError != nil {
-			return nonRetryableError
-		}
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 
 		workResult = worker.Work(ctx, request, s.respFunc)
 		err := workResult.Error
@@ -198,14 +194,14 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 		default:
 			if err != nil {
 				logger.Info("worker failed with a non-retryable error", zap.Error(err))
+				return derr.NewFatalError(err)
 			}
-			nonRetryableError = err
 			return nil
 		}
 	})
-	if nonRetryableError != nil {
-		logger.Info("job failed", zap.Object("job", job), zap.Error(nonRetryableError))
-		return jobResult{err: nonRetryableError}
+	if err != nil {
+		logger.Info("job failed", zap.Object("job", job), zap.Error(err))
+		return jobResult{err: err}
 	}
 
 	if err := ctx.Err(); err != nil {

@@ -3,9 +3,9 @@ package state
 import (
 	"fmt"
 
-	"github.com/streamingfast/substreams/utils"
-
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage/store"
+	"github.com/streamingfast/substreams/utils"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -15,13 +15,10 @@ type StoreStorageState struct {
 	ModuleName         string
 	ModuleInitialBlock uint64
 
-	InitialCompleteRange *FullStoreFile // Points to a complete .kv file, to initialize the store upon getting started.
-	PartialsMissing      PartialStoreFiles
-	PartialsPresent      PartialStoreFiles
+	InitialCompleteFile *store.FileInfo // Points to a complete .kv file, to initialize the store upon getting started.
+	PartialsMissing     block.Ranges
+	PartialsPresent     store.FileInfos
 }
-
-type FullStoreFile = block.Range
-type PartialStoreFiles = block.Ranges
 
 func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *storeSnapshots) (out *StoreStorageState, err error) {
 	out = &StoreStorageState{ModuleName: modName, ModuleInitialBlock: modInitBlock}
@@ -30,16 +27,16 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 	}
 
 	completeSnapshot := snapshots.LastCompleteSnapshotBefore(workUpToBlockNum)
-	if completeSnapshot != nil && completeSnapshot.ExclusiveEndBlock <= modInitBlock {
+	if completeSnapshot != nil && completeSnapshot.Range.ExclusiveEndBlock <= modInitBlock {
 		return nil, fmt.Errorf("cannot have saved last store before module's init block")
 	}
 
 	parallelProcessStartBlock := modInitBlock
 	if completeSnapshot != nil {
-		parallelProcessStartBlock = completeSnapshot.ExclusiveEndBlock
-		out.InitialCompleteRange = (*FullStoreFile)(block.NewRange(modInitBlock, completeSnapshot.ExclusiveEndBlock))
+		parallelProcessStartBlock = completeSnapshot.Range.ExclusiveEndBlock
+		out.InitialCompleteFile = completeSnapshot
 
-		if completeSnapshot.ExclusiveEndBlock == workUpToBlockNum {
+		if completeSnapshot.Range.ExclusiveEndBlock == workUpToBlockNum {
 			return
 		}
 	}
@@ -47,10 +44,10 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 	for ptr := parallelProcessStartBlock; ptr < workUpToBlockNum; {
 		end := utils.MinOf(ptr-ptr%storeSaveInterval+storeSaveInterval, workUpToBlockNum)
 		newPartial := block.NewRange(ptr, end)
-		if !snapshots.ContainsPartial(newPartial) {
+		if partialFile := snapshots.findPartial(newPartial); partialFile == nil {
 			out.PartialsMissing = append(out.PartialsMissing, newPartial)
 		} else {
-			out.PartialsPresent = append(out.PartialsPresent, newPartial)
+			out.PartialsPresent = append(out.PartialsPresent, partialFile)
 		}
 		ptr = end
 	}
@@ -64,22 +61,26 @@ func (s *StoreStorageState) BatchRequests(subreqSplitSize uint64) block.Ranges {
 }
 
 func (s *StoreStorageState) InitialProgressRanges() (out block.Ranges) {
-	if s.InitialCompleteRange != nil {
-		out = append(out, s.InitialCompleteRange)
+	if s.InitialCompleteFile != nil {
+		out = append(out, s.InitialCompleteFile.Range)
 	}
-	out = append(out, s.PartialsPresent.Merged()...)
+	out = append(out, s.PartialsPresent.Ranges().Merged()...)
 	return
 }
 func (s *StoreStorageState) ReadyUpToBlock() uint64 {
-	if s.InitialCompleteRange == nil {
+	if s.InitialCompleteFile == nil {
 		return s.ModuleInitialBlock
 	}
-	return s.InitialCompleteRange.ExclusiveEndBlock
+	return s.InitialCompleteFile.Range.ExclusiveEndBlock
 }
 
 func (w *StoreStorageState) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("store_name", w.ModuleName)
-	enc.AddString("intial_range", w.InitialCompleteRange.String())
+	bRange := "None"
+	if w.InitialCompleteFile != nil {
+		bRange = w.InitialCompleteFile.Range.String()
+	}
+	enc.AddString("intial_range", bRange)
 	enc.AddInt("partial_missing", len(w.PartialsMissing))
 	enc.AddInt("partial_present", len(w.PartialsPresent))
 	return nil

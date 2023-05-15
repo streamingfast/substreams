@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Notes
+
+#### Operators upgrade procedure
+
+> **Note** This upgrade procedure is applies if your Substreams deployment topology includes both `tier1` and `tier2` processes. If you have defined somewhere the config value `substreams-tier2: true`, then this applies to you, otherwise, if you can ignore the upgrade procedure.
+
+This release includes a small change in the internal RPC layer between `tier1` processes and `tier2` processes. This change requires an ordered upgrade of the processes to avoid errors.
+
+The components should be deployed in this order:
+1. Deploy and roll out `tier1` processes first
+2. Deploy and roll out `tier2` processes in second
+
+If you upgrade in the wrong order or if somehow `tier2` processes start using the new protocol without `tier1` being aware, user will end up with backend error(s) saying that some partial file are not found. Those will be resolved only when `tier1` processes have been upgraded successfully.
+
+### Fixed
+
+* Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.
+
 ## [v1.1.1](https://github.com/streamingfast/substreams/releases/tag/v1.1.1)
 
 ### Highlights

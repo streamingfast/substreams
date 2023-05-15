@@ -3,11 +3,12 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
+	"testing"
+
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io"
-	"testing"
 )
 
 func TestConfig_ListSnapshotFiles(t *testing.T) {
@@ -35,7 +36,7 @@ func TestConfig_ListSnapshotFiles(t *testing.T) {
 				return err
 			}
 		}
-		return io.EOF
+		return nil
 	}
 
 	c := &Config{objStore: testStore}

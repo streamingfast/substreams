@@ -35,7 +35,7 @@ func NewRange(startBlock, exclusiveEndBlock uint64) *Range {
 
 func (r *Range) String() string {
 	if r == nil {
-		return fmt.Sprintf("[nil)")
+		return "[nil)"
 	}
 	return fmt.Sprintf("[%d, %d)", r.StartBlock, r.ExclusiveEndBlock)
 }

@@ -6,14 +6,14 @@ import (
 	"math"
 	"testing"
 
-	"github.com/streamingfast/substreams/orchestrator/work"
-
-	"go.uber.org/atomic"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/storage/store"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
@@ -24,6 +24,7 @@ type TestWorker struct {
 	blockProcessedCallBack blockProcessedCallBack
 	testTempDir            string
 	id                     uint64
+	traceID                *string
 }
 
 var workerID atomic.Uint64
@@ -49,7 +50,7 @@ func (w *TestWorker) Work(ctx context.Context, request *pbssinternal.ProcessRang
 		zap.Uint64("stop_block_num", request.StopBlockNum),
 	)
 	subrequestsSplitSize := uint64(10)
-	if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize, 1, 0); err != nil {
+	if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, true, w.blockProcessedCallBack, w.testTempDir, subrequestsSplitSize, 1, 0, w.traceID); err != nil {
 		return &work.Result{
 			Error: fmt.Errorf("processing sub request: %w", err),
 		}
@@ -60,28 +61,31 @@ func (w *TestWorker) Work(ctx context.Context, request *pbssinternal.ProcessRang
 		zap.Uint64("stop_block_num", request.StopBlockNum),
 	)
 
-	var blockRanges []*block.Range
+	var partialFiles store.FileInfos
 	if request.StopBlockNum-uint64(request.StartBlockNum) > subrequestsSplitSize {
-		blockRanges = splitBlockRanges(request.StopBlockNum, subrequestsSplitSize)
+		partialFiles = splitFileRanges(request.StopBlockNum, subrequestsSplitSize)
 	} else {
-		blockRanges = []*block.Range{
-			{
-				StartBlock:        uint64(request.StartBlockNum),
-				ExclusiveEndBlock: request.StopBlockNum,
-			},
+		traceID := service.TestTraceID
+		if w.traceID != nil {
+			traceID = *w.traceID
+		}
+
+		partialFiles = store.FileInfos{
+			store.NewPartialFileInfo(uint64(request.StartBlockNum), request.StopBlockNum, traceID),
 		}
 	}
+
 	return &work.Result{
-		PartialsWritten: blockRanges,
-		Error:           nil,
+		PartialFilesWritten: partialFiles,
+		Error:               nil,
 	}
 }
 
-// splitBlockRanges for example: called when subrequestsSplitSize is 10 and request
+// splitFileRanges for example: called when subrequestsSplitSize is 10 and request
 // has a start block of 1 and stop block of 20 -> splits to [[1, 10), [10, 20)]
-func splitBlockRanges(stopBlockNum, subrequestsSplitSize uint64) []*block.Range {
-	var blockRanges block.Ranges
-	nbSplitRequests := int(math.Ceil(float64(stopBlockNum / subrequestsSplitSize)))
+func splitFileRanges(stopBlockNum, subrequestsSplitSize uint64) store.FileInfos {
+	var fileRanges store.FileInfos
+	nbSplitRequests := int(math.Ceil(float64(stopBlockNum) / float64(subrequestsSplitSize)))
 
 	for i := 0; i < nbSplitRequests; i++ {
 		blockRange := &block.Range{
@@ -94,7 +98,8 @@ func splitBlockRanges(stopBlockNum, subrequestsSplitSize uint64) []*block.Range 
 		if i == nbSplitRequests-1 {
 			blockRange.ExclusiveEndBlock = stopBlockNum
 		}
-		blockRanges = append(blockRanges, blockRange)
+
+		fileRanges = append(fileRanges, store.NewPartialFileInfo(blockRange.StartBlock, blockRange.ExclusiveEndBlock, ""))
 	}
-	return blockRanges
+	return fileRanges
 }

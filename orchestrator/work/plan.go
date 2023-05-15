@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 
@@ -152,12 +153,10 @@ func (p *Plan) bumpModuleUpToBlock(modName string, upToBlock uint64) {
 	}
 }
 
-const maxUint64 = uint64(1<<64 - 1)
-
 func (p *Plan) highestRunnableStartBlock() (uint64, string) {
 	// Called with locked mutex
 
-	lowestModuleHeight := maxUint64
+	lowestModuleHeight := uint64(math.MaxUint64)
 	var lowestModules string
 	for _, modName := range p.schedulableModules {
 		highestRunning, ok := p.highestModuleRunningBlock[modName]
@@ -177,8 +176,8 @@ func (p *Plan) highestRunnableStartBlock() (uint64, string) {
 		}
 	}
 
-	if maxUint64-lowestModuleHeight < p.maxBlocksAhead {
-		return maxUint64, lowestModules
+	if math.MaxUint64-lowestModuleHeight < p.maxBlocksAhead {
+		return math.MaxUint64, lowestModules
 	}
 
 	return lowestModuleHeight + p.maxBlocksAhead, lowestModules

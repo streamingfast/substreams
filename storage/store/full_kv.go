@@ -5,10 +5,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/storage/store/marshaller"
-
 	"go.uber.org/zap"
-
-	"github.com/streamingfast/substreams/block"
 )
 
 var _ Store = (*FullKV)(nil)
@@ -37,18 +34,13 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	}
 }
 
-func (s *FullKV) storageFilename(exclusiveEndBlock uint64) string {
-	return fullStateFileName(block.NewRange(s.moduleInitialBlock, exclusiveEndBlock))
-}
+func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
+	s.loadedFrom = file.Filename
+	s.logger.Debug("loading full store state from file", zap.String("fileName", file.Filename))
 
-func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
-	fileName := s.storageFilename(exclusiveEndBlock)
-	s.loadedFrom = fileName
-	s.logger.Debug("loading full store state from file", zap.String("fileName", fileName))
-
-	data, err := loadStore(ctx, s.objStore, fileName)
+	data, err := loadStore(ctx, s.objStore, file.Filename)
 	if err != nil {
-		return fmt.Errorf("load full store %s at %s: %w", s.name, fileName, err)
+		return fmt.Errorf("load full store %s at %s: %w", s.name, file.Filename, err)
 	}
 
 	storeData, size, err := s.marshaller.Unmarshal(data)
@@ -62,14 +54,14 @@ func (s *FullKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 		s.kv = make(map[string][]byte)
 	}
 
-	s.logger.Debug("full store loaded", zap.String("fileName", fileName), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size))
+	s.logger.Debug("full store loaded", zap.String("fileName", file.Filename), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size))
 	return nil
 }
 
 // Save is to be called ONLY when we just passed the
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
-func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error) {
+func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
 	stateData := &marshaller.StoreData{
@@ -81,21 +73,20 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error
 		return nil, nil, fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	filename := s.storageFilename(endBoundaryBlock)
-	brange := block.NewRange(s.moduleInitialBlock, endBoundaryBlock)
+	file := NewCompleteFileInfo(s.moduleInitialBlock, endBoundaryBlock)
 
 	s.logger.Info("saving store",
-		zap.String("file_name", filename),
-		zap.Object("block_range", brange),
+		zap.String("file_name", file.Filename),
+		zap.Object("block_range", file.Range),
 	)
 
 	fw := &fileWriter{
 		store:    s.objStore,
-		filename: filename,
+		filename: file.Filename,
 		content:  content,
 	}
 
-	return brange, fw, nil
+	return file, fw, nil
 }
 
 func (s *FullKV) Reset() {

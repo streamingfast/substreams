@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,9 +18,9 @@ func TestWorkUnits_init(t *testing.T) {
 		snapshots    *storeSnapshots // store's Last block saved from the store's Info file
 		reqStart     uint64          // the request's absolute start block
 
-		expectInitLoad    *block.Range // Used for LoadFrom()
-		expectMissing     block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
-		expectPresent     block.Ranges // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
+		expectInitLoad    *store.FileInfo // Used for LoadFrom()
+		expectMissing     block.Ranges    // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
+		expectPresent     store.FileInfos // sent to the user as already processed, and passed to the Squasher, the first Covered is expected to match the expectStoreInit
 		storeSaveInterval uint64
 	}
 
@@ -32,9 +33,9 @@ func TestWorkUnits_init(t *testing.T) {
 			modInitBlock:      modInitBlock,
 			reqStart:          reqStart,
 		}
-		c.expectInitLoad = block.ParseRange(expectInitLoad)
+		c.expectInitLoad = store.CompleteFile(expectInitLoad)
 		c.expectMissing = block.ParseRanges(expectMissing)
-		c.expectPresent = block.ParseRanges(expectPresent)
+		c.expectPresent = store.PartialFiles(expectPresent)
 		return c
 	}
 
@@ -105,7 +106,7 @@ func TestWorkUnits_init(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wu, err := NewStoreStorageState("mod", tt.storeSaveInterval, tt.modInitBlock, tt.reqStart, tt.snapshots)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectInitLoad, wu.InitialCompleteRange)
+			assert.Equal(t, tt.expectInitLoad, wu.InitialCompleteFile)
 			assert.Equal(t,
 				tt.expectMissing.String(),
 				wu.PartialsMissing.String(),
@@ -126,11 +127,12 @@ func parseSnapshotSpec(in string) *storeSnapshots {
 	for _, el := range strings.Split(in, ",") {
 		el = strings.Trim(el, " ")
 		partial := strings.Contains(el, "p")
-		partRange := block.ParseRange(strings.Trim(el, "p"))
+		partRange := strings.Trim(el, "p")
+
 		if partial {
-			out.Partials = append(out.Partials, partRange)
+			out.Partials = append(out.Partials, store.PartialFile(partRange))
 		} else {
-			out.Completes = append(out.Completes, partRange)
+			out.Completes = append(out.Completes, store.CompleteFile(partRange))
 		}
 	}
 	out.Sort()

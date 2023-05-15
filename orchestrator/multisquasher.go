@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage"
@@ -25,7 +24,7 @@ type MultiSquasher struct {
 type squashable interface {
 	launch(ctx context.Context)
 	waitForCompletion(ctx context.Context) error
-	squash(ctx context.Context, partialsChunks block.Ranges) error
+	squash(ctx context.Context, partialFiles store.FileInfos) error
 	moduleName() string
 }
 
@@ -76,7 +75,15 @@ func NewMultiSquasher(
 	}, nil
 }
 
-func buildStoreSquasher(ctx context.Context, storeSnapshotsSaveInterval uint64, storeConfig *store.Config, logger *zap.Logger, storeStorageState *storeState.StoreStorageState, upToBlock uint64, onStoreCompletedUntilBlock func(storeName string, blockNum uint64)) (*StoreSquasher, error) {
+func buildStoreSquasher(
+	ctx context.Context,
+	storeSnapshotsSaveInterval uint64,
+	storeConfig *store.Config,
+	logger *zap.Logger,
+	storeStorageState *storeState.StoreStorageState,
+	upToBlock uint64,
+	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
+) (*StoreSquasher, error) {
 	storeModuleName := storeConfig.Name()
 	startingStore := storeConfig.NewFullKV(logger)
 
@@ -84,23 +91,23 @@ func buildStoreSquasher(ctx context.Context, storeSnapshotsSaveInterval uint64, 
 	//  can we derive it from a prior store? Did we REALLY need to initialize the store from which this
 	//  one is derived?
 	var storeSquasher *StoreSquasher
-	if storeStorageState.InitialCompleteRange == nil {
+	if storeStorageState.InitialCompleteFile == nil {
 		logger.Debug("setting up initial store",
 			zap.String("store", storeModuleName),
-			zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
+			zap.String("initial_store_range", "None"),
 		)
 		storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
 	} else {
-		logger.Debug("loading initial store",
-			zap.String("store", storeModuleName),
-			zap.Object("initial_store_file", storeStorageState.InitialCompleteRange),
-		)
-		if err := startingStore.Load(ctx, storeStorageState.InitialCompleteRange.ExclusiveEndBlock); err != nil {
-			return nil, fmt.Errorf("load store %q: range %s: %w", storeModuleName, storeStorageState.InitialCompleteRange, err)
-		}
-		storeSquasher = NewStoreSquasher(startingStore, upToBlock, storeStorageState.InitialCompleteRange.ExclusiveEndBlock, storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+		initialRange := storeStorageState.InitialCompleteFile.Range
 
-		onStoreCompletedUntilBlock(storeModuleName, storeStorageState.InitialCompleteRange.ExclusiveEndBlock)
+		logger.Debug("loading initial store", zap.String("store", storeModuleName), zap.Stringer("initial_store_range", initialRange))
+		if err := startingStore.Load(ctx, storeStorageState.InitialCompleteFile); err != nil {
+			return nil, fmt.Errorf("load store %q with initial complete range %q: %w", storeModuleName, initialRange, err)
+		}
+
+		storeSquasher = NewStoreSquasher(startingStore, upToBlock, initialRange.ExclusiveEndBlock, storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+
+		onStoreCompletedUntilBlock(storeModuleName, initialRange.ExclusiveEndBlock)
 	}
 
 	if len(storeStorageState.PartialsMissing) == 0 {
@@ -121,13 +128,13 @@ func (s *MultiSquasher) Launch(ctx context.Context) {
 	}
 }
 
-func (s *MultiSquasher) Squash(ctx context.Context, moduleName string, partialsRanges block.Ranges) error {
+func (s *MultiSquasher) Squash(ctx context.Context, moduleName string, partialsFiles store.FileInfos) error {
 	squashableStore, ok := s.storeSquashers[moduleName]
 	if !ok {
 		return fmt.Errorf("module %q was not found in storeSquashers module registry", moduleName)
 	}
 
-	return squashableStore.squash(ctx, partialsRanges)
+	return squashableStore.squash(ctx, partialsFiles)
 }
 
 func (s *MultiSquasher) Wait(ctx context.Context) (out store.Map, err error) {
@@ -168,7 +175,7 @@ func (s *MultiSquasher) getFinalStores() (out store.Map, err error) {
 				errs = append(errs, fmt.Sprintf("module %s: target %d not reached (next expected: %d)", storeSquasher.moduleName(), s.targetExclusiveBlock, storeSquasher.nextExpectedStartBlock))
 			}
 			if !storeSquasher.IsEmpty() {
-				errs = append(errs, fmt.Sprintf("module %s: missing ranges %s", storeSquasher.moduleName(), storeSquasher.ranges))
+				errs = append(errs, fmt.Sprintf("module %s: missing ranges %s", storeSquasher.moduleName(), storeSquasher.files))
 			}
 
 			out.Set(storeSquasher.store)

@@ -36,7 +36,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		},
 	}
 
-	br, writer, err := kvs.Save(123)
+	file, writer, err := kvs.Save(123)
 	require.NoError(t, err)
 
 	err = writer.Write(context.Background())
@@ -56,7 +56,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		},
 	}
 
-	err = kvl.Load(context.Background(), br.ExclusiveEndBlock)
+	err = kvl.Load(context.Background(), file)
 	require.NoError(t, err)
 	require.NotNilf(t, kvl.kv, "kvl.kv is nil")
 }

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -10,6 +11,9 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/orchestrator/work"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -120,7 +124,7 @@ func TestForkHandling(t *testing.T) {
 	for _, test := range tests {
 
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(1, 1, 7, test.module)
+			run := newTestRun(t, 1, 1, 7, test.module)
 			run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 				return &ForkBlockGenerator{
 					initialLIB:    bstream.NewBlockRef("0a", 0),
@@ -169,48 +173,49 @@ func TestForkHandling(t *testing.T) {
 
 func TestOneStoreOneMap(t *testing.T) {
 	tests := []struct {
-		name        string
-		startBlock  int64
-		linearBlock uint64
-		stopBlock   uint64
-		production  bool
-		expectCount int
-		expectFiles []string
+		name                  string
+		startBlock            int64
+		linearBlock           uint64
+		stopBlock             uint64
+		production            bool
+		preWork               testPreWork
+		expectedResponseCount int
+		expectFiles           []string
 	}{
 		{
-			name:        "dev_mode_backprocess",
-			startBlock:  25,
-			linearBlock: 25,
-			stopBlock:   29,
-			production:  false,
-			expectCount: 4,
+			name:                  "dev_mode_backprocess",
+			startBlock:            25,
+			linearBlock:           25,
+			stopBlock:             29,
+			production:            false,
+			expectedResponseCount: 4,
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
-				"states/0000000025-0000000020.partial",
+				"states/0000000025-0000000020.00000000000000000000000000000000.partial",
 			},
 		},
 		{
-			name:        "dev_mode_backprocess_then_save_state",
-			startBlock:  25,
-			linearBlock: 25,
-			stopBlock:   32,
-			production:  false,
-			expectCount: 7,
+			name:                  "dev_mode_backprocess_then_save_state",
+			startBlock:            25,
+			linearBlock:           25,
+			stopBlock:             32,
+			production:            false,
+			expectedResponseCount: 7,
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
-				"states/0000000025-0000000020.partial",
+				"states/0000000025-0000000020.00000000000000000000000000000000.partial",
 				"states/0000000030-0000000001.kv",
 			},
 		},
 		{
-			name:        "prod_mode_back_forward_to_lib",
-			startBlock:  25,
-			linearBlock: 27,
-			stopBlock:   29,
-			production:  true,
-			expectCount: 4,
+			name:                  "prod_mode_back_forward_to_lib",
+			startBlock:            25,
+			linearBlock:           27,
+			stopBlock:             29,
+			production:            true,
+			expectedResponseCount: 4,
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
@@ -218,12 +223,12 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 		},
 		{
-			name:        "prod_mode_back_forward_to_stop",
-			startBlock:  25,
-			linearBlock: 29,
-			stopBlock:   29,
-			production:  true,
-			expectCount: 4,
+			name:                  "prod_mode_back_forward_to_stop",
+			startBlock:            25,
+			linearBlock:           29,
+			stopBlock:             29,
+			production:            true,
+			expectedResponseCount: 4,
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
@@ -231,12 +236,12 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 		},
 		{
-			name:        "prod_mode_back_forward_to_stop_passed_boundary",
-			startBlock:  25,
-			linearBlock: 38,
-			stopBlock:   38,
-			production:  true,
-			expectCount: 13,
+			name:                  "prod_mode_back_forward_to_stop_passed_boundary",
+			startBlock:            25,
+			linearBlock:           38,
+			stopBlock:             38,
+			production:            true,
+			expectedResponseCount: 13,
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
@@ -246,48 +251,131 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 		},
 		{
-			name:        "prod_mode_start_before_linear_and_firstboundary",
-			startBlock:  7,
-			linearBlock: 8,
-			stopBlock:   9,
-			production:  true,
-			expectCount: 2,
+			name:                  "prod_mode_start_before_linear_and_firstboundary",
+			startBlock:            7,
+			linearBlock:           8,
+			stopBlock:             9,
+			production:            true,
+			expectedResponseCount: 2,
 			expectFiles: []string{
 				"outputs/0000000001-0000000008.output",
 			},
 		},
 		{
-			name:        "prod_mode_start_before_linear_then_pass_firstboundary",
-			startBlock:  7,
-			linearBlock: 8,
-			stopBlock:   15,
-			production:  true,
-			expectCount: 8,
+			name:                  "prod_mode_start_before_linear_then_pass_firstboundary",
+			startBlock:            7,
+			linearBlock:           8,
+			stopBlock:             15,
+			production:            true,
+			expectedResponseCount: 8,
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"outputs/0000000001-0000000008.output",
+			},
+		},
+		{
+			name:        "prod_mode_partial_existing",
+			startBlock:  1,
+			linearBlock: 29,
+			stopBlock:   29,
+			production:  true,
+			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
+				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "11111111111111111111")
+			},
+			expectedResponseCount: 28,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"outputs/0000000001-0000000010.output",
+				"outputs/0000000010-0000000020.output",
+				"outputs/0000000020-0000000029.output",
+			},
+		},
+		{
+			name:        "prod_mode_multiple_partial_different_trace_id",
+			startBlock:  1,
+			linearBlock: 29,
+			stopBlock:   29,
+			production:  true,
+			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
+				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "11111111111111111111")
+				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "22222222222222222222")
+			},
+			expectedResponseCount: 28,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"outputs/0000000001-0000000010.output",
+				"outputs/0000000010-0000000020.output",
+				"outputs/0000000020-0000000029.output",
+
+				// Leftover that for now is sadly never pruner/deleted from the final storage location
+				"states/0000000010-0000000001.22222222222222222222.partial",
+			},
+		},
+		{
+			name:        "prod_mode_partial_legacy_generated",
+			startBlock:  1,
+			linearBlock: 29,
+			stopBlock:   29,
+			production:  true,
+			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
+				// Using an empty trace id brings up the old behavior where files are not suffixed with a trace id
+				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "")
+			},
+			expectedResponseCount: 28,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"outputs/0000000001-0000000010.output",
+				"outputs/0000000010-0000000020.output",
+				"outputs/0000000020-0000000029.output",
+			},
+		},
+		{
+			name:        "prod_mode_multiple_partial_mixed_legacy_and_new",
+			startBlock:  1,
+			linearBlock: 29,
+			stopBlock:   29,
+			production:  true,
+			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
+				// Using an empty trace id brings up the old behavior where files are not suffixed with a trace id
+				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "")
+				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "11111111111111111111")
+			},
+			expectedResponseCount: 28,
+			expectFiles: []string{
+				"states/0000000010-0000000001.kv",
+				"states/0000000020-0000000001.kv",
+				"outputs/0000000001-0000000010.output",
+				"outputs/0000000010-0000000020.output",
+				"outputs/0000000020-0000000029.output",
+
+				// Leftover that for now is sadly never pruner/deleted from the final storage location
+				"states/0000000010-0000000001.11111111111111111111.partial",
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			run := newTestRun(test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64")
+			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64")
 			run.ProductionMode = test.production
 			run.ParallelSubrequests = 5
+			run.PreWork = test.preWork
 			require.NoError(t, run.Run(t))
 
 			mapOutput := run.MapOutput("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 
-			assert.Equal(t, test.expectCount, strings.Count(mapOutput, "\n"))
+			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
 			assertFiles(t, run.TempDir, test.expectFiles...)
 		})
 	}
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
-	run := newTestRun(30, 41, 41, "assert_test_store_delete_prefix")
+	run := newTestRun(t, 30, 41, 41, "assert_test_store_delete_prefix")
 	run.BlockProcessedCallback = func(ctx *execContext) {
 		if ctx.block.Number == 40 {
 			s, storeFound := ctx.stores.Get("test_store_delete_prefix")
@@ -301,7 +389,7 @@ func TestStoreDeletePrefix(t *testing.T) {
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(1, 31, 31, "assert_all_test")
+	run := newTestRun(t, 1, 31, 31, "assert_all_test")
 
 	require.NoError(t, run.Run(t))
 
@@ -309,7 +397,7 @@ func TestAllAssertions(t *testing.T) {
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	run := newTestRun(10000, 10001, 10001, "test_map")
+	run := newTestRun(t, 10000, 10001, 10001, "test_map")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -348,10 +436,27 @@ func listFiles(t *testing.T, tempDir string) []string {
 }
 
 func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
-	storedFiles := listFiles(t, tempDir)
-	assert.Len(t, storedFiles, len(wantedFiles))
-	filenames := strings.Join(storedFiles, "\n")
-	for _, re := range wantedFiles {
-		assert.Regexp(t, re, filenames)
+	producedFiles := listFiles(t, tempDir)
+
+	actualFiles := make([]string, len(producedFiles))
+	for i, f := range producedFiles {
+		parts := strings.Split(f, string(os.PathSeparator))
+		actualFiles[i] = filepath.Join(parts[3:]...)
 	}
+
+	assert.ElementsMatch(t, wantedFiles, actualFiles)
+}
+
+func partialPreWork(t *testing.T, start, end uint64, module string, run *testRun, workerFactory work.WorkerFactory, traceID string) {
+	worker := workerFactory(zlog)
+	worker.(*TestWorker).traceID = &traceID
+
+	result := worker.Work(run.Context, &pbssinternal.ProcessRangeRequest{
+		StartBlockNum: start,
+		StopBlockNum:  end,
+		OutputModule:  module,
+		Modules:       run.Package.Modules,
+	}, nil)
+	require.NoError(t, result.Error)
+	require.Equal(t, store.PartialFiles(fmt.Sprintf("%d-%d", start, end), store.TraceIDParam(traceID)), result.PartialFilesWritten)
 }

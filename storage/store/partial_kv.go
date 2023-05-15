@@ -5,10 +5,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/storage/store/marshaller"
-
 	"go.uber.org/zap"
-
-	"github.com/streamingfast/substreams/block"
 )
 
 var _ Store = (*PartialKV)(nil)
@@ -30,14 +27,13 @@ func (p *PartialKV) Roll(lastBlock uint64) {
 
 func (p *PartialKV) InitialBlock() uint64 { return p.initialBlock }
 
-func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
-	filename := p.storageFilename(exclusiveEndBlock)
-	p.loadedFrom = filename
-	p.logger.Debug("loading partial store state from file", zap.String("filename", filename))
+func (p *PartialKV) Load(ctx context.Context, file *FileInfo) error {
+	p.loadedFrom = file.Filename
+	p.logger.Debug("loading partial store state from file", zap.String("filename", file.Filename))
 
-	data, err := loadStore(ctx, p.objStore, filename)
+	data, err := loadStore(ctx, p.objStore, file.Filename)
 	if err != nil {
-		return fmt.Errorf("load partial store %s at %s: %w", p.name, filename, err)
+		return fmt.Errorf("load partial store %s at %s: %w", p.name, file.Filename, err)
 	}
 
 	storeData, size, err := p.marshaller.Unmarshal(data)
@@ -52,11 +48,11 @@ func (p *PartialKV) Load(ctx context.Context, exclusiveEndBlock uint64) error {
 	p.totalSizeBytes = size
 	p.DeletedPrefixes = storeData.DeletePrefixes
 
-	p.logger.Debug("partial store loaded", zap.String("filename", filename), zap.Int("key_count", len(p.kv)), zap.Uint64("data_size", size))
+	p.logger.Debug("partial store loaded", zap.String("filename", file.Filename), zap.Int("key_count", len(p.kv)), zap.Uint64("data_size", size))
 	return nil
 }
 
-func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error) {
+func (p *PartialKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
 	stateData := &marshaller.StoreData{
@@ -69,21 +65,16 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, er
 		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}
 
-	filename := p.storageFilename(endBoundaryBlock)
-
-	brange := block.NewRange(p.initialBlock, endBoundaryBlock)
-	p.logger.Info("partial store save written",
-		zap.String("file_name", filename),
-		zap.Object("block_range", brange),
-	)
+	file := NewPartialFileInfo(p.initialBlock, endBoundaryBlock, p.traceID)
+	p.logger.Info("partial store save written", zap.String("file_name", file.Filename), zap.Stringer("block_range", file.Range))
 
 	fw := &fileWriter{
 		store:    p.objStore,
-		filename: filename,
+		filename: file.Filename,
 		content:  content,
 	}
 
-	return brange, fw, nil
+	return file, fw, nil
 }
 
 func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
@@ -95,18 +86,13 @@ func (p *PartialKV) DeletePrefix(ord uint64, prefix string) {
 	}
 }
 
-func (p *PartialKV) DeleteStore(ctx context.Context, endBlock uint64) (err error) {
-	filename := p.storageFilename(endBlock)
-	zlog.Debug("deleting partial store file", zap.String("file_name", filename))
+func (p *PartialKV) DeleteStore(ctx context.Context, file *FileInfo) (err error) {
+	zlog.Debug("deleting partial store file", zap.String("file_name", file.Filename))
 
-	if err = p.objStore.DeleteObject(ctx, filename); err != nil {
-		zlog.Warn("deleting file", zap.String("file_name", filename), zap.Error(err))
+	if err = p.objStore.DeleteObject(ctx, file.Filename); err != nil {
+		zlog.Warn("deleting file", zap.String("file_name", file.Filename), zap.Error(err))
 	}
 	return err
-}
-
-func (p *PartialKV) storageFilename(exclusiveEndBlock uint64) string {
-	return partialFileName(block.NewRange(p.initialBlock, exclusiveEndBlock))
 }
 
 func (p *PartialKV) String() string {

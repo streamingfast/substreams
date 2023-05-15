@@ -6,14 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
-
 	"github.com/streamingfast/bstream"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -21,11 +14,16 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 )
 
 type processingModule struct {
@@ -69,6 +67,8 @@ type Pipeline struct {
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
+
+	traceID string
 }
 
 func New(
@@ -80,6 +80,7 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc func(substreams.ResponseFromAnyTier) error,
+	traceID string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -93,6 +94,7 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
+		traceID:         traceID,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -170,9 +172,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 		} else {
 			fullStore := storeConfig.NewFullKV(logger)
 
-			//fixme: should we check if we don't have a boundary finished to not load ?
 			if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
-				if err := fullStore.Load(ctx, reqDetails.ResolvedStartBlockNum); err != nil {
+				file := store.NewCompleteFileInfo(fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
+				if err := fullStore.Load(ctx, file); err != nil {
 					return nil, fmt.Errorf("load full store: %w", err)
 				}
 			}
@@ -286,13 +288,11 @@ func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleNam
 
 	if storeOutputs := toRPCStoreModuleOutputs(output); storeOutputs != nil {
 		p.extraStoreModuleOutputs = append(p.extraStoreModuleOutputs, storeOutputs)
-		return
 	}
+
 	if mapOutput := toRPCMapModuleOutputs(output); mapOutput != nil {
 		p.extraMapModuleOutputs = append(p.extraMapModuleOutputs, mapOutput)
 	}
-	return
-
 }
 
 func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.StoreModuleOutput) {
@@ -300,6 +300,7 @@ func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrp
 	if deltas == nil {
 		return nil
 	}
+
 	return &pbsubstreamsrpc.StoreModuleOutput{
 		Name:             in.ModuleName,
 		DebugStoreDeltas: toRPCDeltas(deltas),
@@ -312,14 +313,19 @@ func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrp
 }
 
 func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
-	for _, d := range in.StoreDeltas {
-		out = append(out, &pbsubstreamsrpc.StoreDelta{
+	if len(in.StoreDeltas) == 0 {
+		return nil
+	}
+
+	out = make([]*pbsubstreamsrpc.StoreDelta, len(in.StoreDeltas))
+	for i, d := range in.StoreDeltas {
+		out[i] = &pbsubstreamsrpc.StoreDelta{
 			Operation: toRPCOperation(d.Operation),
 			Ordinal:   d.Ordinal,
 			Key:       d.Key,
 			OldValue:  d.OldValue,
 			NewValue:  d.NewValue,
-		})
+		}
 	}
 	return
 }

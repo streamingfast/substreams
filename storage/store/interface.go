@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -52,11 +51,11 @@ type PartialStore interface {
 }
 
 type Loadable interface {
-	Load(ctx context.Context, atBlock uint64) error
+	Load(ctx context.Context, file *FileInfo) error
 }
 
 type Savable interface {
-	Save(endBoundaryBlock uint64) (*block.Range, *fileWriter, error)
+	Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error)
 }
 
 type Resettable interface {

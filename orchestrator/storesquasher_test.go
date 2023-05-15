@@ -5,23 +5,19 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 
-	"github.com/streamingfast/shutter"
-
-	"github.com/streamingfast/substreams/reqctx"
-	store2 "github.com/streamingfast/substreams/storage/store"
-
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/shutter"
+	"github.com/streamingfast/substreams/block"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-
-	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func TestShouldSaveFullKV(t *testing.T) {
@@ -87,24 +83,24 @@ func TestShouldSaveFullKV(t *testing.T) {
 func TestStoreSquasher_squash(t *testing.T) {
 	tests := []struct {
 		name        string
-		ranges      block.Ranges
+		ranges      store.FileInfos
 		expectErr   error
 		expectCount int
 	}{
 		{
 			name:        "squash with ranges",
-			ranges:      block.ParseRanges("0-10,20-30"),
+			ranges:      store.PartialFiles("0-10,20-30"),
 			expectCount: 1,
 		},
 		{
 			name:      "squash without ranges",
-			ranges:    []*block.Range{},
+			ranges:    store.FileInfos{},
 			expectErr: fmt.Errorf("partialsChunks is empty for module \"mod\""),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			partialsChunks := make(chan block.Ranges, 10)
+			partialsChunks := make(chan store.FileInfos, 10)
 			squasher := &StoreSquasher{
 				Shutter:        shutter.New(),
 				name:           "mod",
@@ -123,19 +119,19 @@ func TestStoreSquasher_squash(t *testing.T) {
 	}
 }
 func TestStoreSquasher_sortRange(t *testing.T) {
-	s := &StoreSquasher{ranges: block.ParseRanges("10-20,40-50,0-10")}
+	s := &StoreSquasher{files: store.PartialFiles("10-20,40-50,0-10")}
 	s.sortRange()
-	assert.Equal(t, block.ParseRanges("0-10,10-20,40-50"), s.ranges)
+	assert.Equal(t, store.PartialFiles("0-10,10-20,40-50"), s.files)
 }
 
 func TestStoreSquasher_ensureContiguity(t *testing.T) {
-	s := &StoreSquasher{ranges: block.ParseRanges("10-20,40-50,45-48")}
+	s := &StoreSquasher{files: store.PartialFiles("10-20,40-50,45-48")}
 	assert.Error(t, s.ensureNoOverlap())
 
-	s = &StoreSquasher{ranges: block.ParseRanges("10-20,40-50")}
+	s = &StoreSquasher{files: store.PartialFiles("10-20,40-50")}
 	assert.NoError(t, s.ensureNoOverlap())
 
-	s = &StoreSquasher{ranges: block.ParseRanges("10-20,20-50")}
+	s = &StoreSquasher{files: store.PartialFiles("10-20,20-50")}
 	assert.NoError(t, s.ensureNoOverlap())
 }
 
@@ -143,16 +139,16 @@ func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	ctx := context.Background()
 	s := &StoreSquasher{
 		Shutter:        shutter.New(),
-		partialsChunks: make(chan block.Ranges, 10),
-		ranges:         []*block.Range{},
+		partialsChunks: make(chan store.FileInfos, 10),
+		files:          store.FileInfos{},
 		store:          newTestStore(t, dstore.NewMockStore(nil), 0),
 	}
 	go func() {
-		s.partialsChunks <- block.ParseRanges("0-10")
+		s.partialsChunks <- store.PartialFiles("0-10")
 	}()
 	err := s.accumulateMorePartials(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(s.ranges))
+	assert.Equal(t, 1, len(s.files))
 
 	cacnelCtx, cancelFunc := context.WithCancel(ctx)
 	go func() {
@@ -177,7 +173,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 		storeInitialBlock            uint64
 		nextExpectedStartBlock       uint64
 		storeSaveInterval            uint64
-		squashableRange              *block.Range
+		squashableFile               *store.FileInfo
 		expectPartialFilenameLoaded  string
 		expectNextExpectedStartBlock uint64
 		expectShouldSaveFullStore    bool
@@ -188,8 +184,8 @@ func TestStoreSquasher_processRange(t *testing.T) {
 			storeInitialBlock:            0,  // modules starts at 0
 			nextExpectedStartBlock:       0,  // we are expecting the first partial to be completed
 			storeSaveInterval:            10, // store files contains 10 blocks
-			squashableRange:              block.NewRange(0, 10),
-			expectPartialFilenameLoaded:  "0000000010-0000000000.partial",
+			squashableFile:               store.PartialFile("0-10", store.TraceIDParam("testTraceID")),
+			expectPartialFilenameLoaded:  "0000000010-0000000000.testTraceID.partial",
 			expectNextExpectedStartBlock: 10,
 			expectShouldSaveFullStore:    true,
 		},
@@ -198,15 +194,15 @@ func TestStoreSquasher_processRange(t *testing.T) {
 			storeInitialBlock:      0,  // modules starts at 0
 			nextExpectedStartBlock: 0,  // we are expecting the first partial to be completed
 			storeSaveInterval:      10, // store files contains 10 blocks
-			squashableRange:        block.NewRange(10, 20),
-			expectError:            SkipRange,
+			squashableFile:         store.PartialFile("10-20", store.TraceIDParam("testTraceID")),
+			expectError:            SkipFile,
 		},
 		{
 			name:                   "called when ranges out of order",
 			storeInitialBlock:      0,  // modules starts at 0
 			nextExpectedStartBlock: 50, // we are expecting the first partial to be completed
 			storeSaveInterval:      10, // store files contains 10 blocks
-			squashableRange:        block.NewRange(40, 50),
+			squashableFile:         store.PartialFile("40-50", store.TraceIDParam("testTraceID")),
 			expectError:            fmt.Errorf("non contiguous ranges were added to the store squasher, expected 50, got 40, ranges: "),
 		},
 	}
@@ -222,7 +218,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				if strings.HasSuffix(name, ".partial") {
 					loadedPartialFilename = name
 				}
-				return newPartialKVContent(t, map[string][]byte{}, &store2.FullKV{}), nil
+				return newPartialKVContent(t, map[string][]byte{}, &store.FullKV{}), nil
 			}
 			testStore.WriteObjectFunc = func(ctx context.Context, base string, f io.Reader) error {
 				if strings.HasSuffix(base, ".kv") {
@@ -238,7 +234,7 @@ func TestStoreSquasher_processRange(t *testing.T) {
 			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
 				ProductionMode: false,
 			})
-			err := squasher.processRange(ctx, eg, test.squashableRange)
+			err := squasher.processSquashableFile(ctx, eg, test.squashableFile)
 			require.NoError(t, eg.Wait())
 
 			if test.expectError != nil {
@@ -253,23 +249,24 @@ func TestStoreSquasher_processRange(t *testing.T) {
 	}
 }
 
-func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *store2.FullKV {
-	c, err := store2.NewConfig(
+func newTestStore(t *testing.T, testStore dstore.Store, initialBlock uint64) *store.FullKV {
+	c, err := store.NewConfig(
 		"mod",
 		initialBlock,
 		"mod.hash",
 		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
 		"",
 		testStore,
+		"testTraceID",
 	)
 	require.NoError(t, err)
 
 	return c.NewFullKV(zap.NewNop())
 }
 
-func newPartialKVContent(t *testing.T, data map[string][]byte, kv *store2.FullKV) io.ReadCloser {
+func newPartialKVContent(t *testing.T, data map[string][]byte, kv *store.FullKV) io.ReadCloser {
 	//marshaller := kv.Marshaller()
 	//content, err := marshaller.Marshal(data)
 	//require.NoError(t, err)
-	return ioutil.NopCloser(bytes.NewReader([]byte{}))
+	return io.NopCloser(bytes.NewReader([]byte{}))
 }

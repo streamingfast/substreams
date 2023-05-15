@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/streamingfast/substreams/block"
@@ -77,9 +78,16 @@ func TestFileName(t *testing.T) {
 	prefix := fullStateFilePrefix(10000)
 	require.Equal(t, "0000010000", prefix)
 
-	stateFileName := fullStateFileName(&block.Range{StartBlock: 100, ExclusiveEndBlock: 10000})
+	stateFileName := FullStateFileName(&block.Range{StartBlock: 100, ExclusiveEndBlock: 10000})
 	require.Equal(t, "0000010000-0000000100.kv", stateFileName)
 
-	partialFileName := partialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000})
-	require.Equal(t, "0000020000-0000010000.partial", partialFileName)
+	partialFileName := PartialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000}, "abc")
+	require.Equal(t, "0000020000-0000010000.abc.partial", partialFileName)
+
+	partialFileNameLegacy := PartialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000}, "")
+	require.Equal(t, "0000020000-0000010000.partial", partialFileNameLegacy)
+}
+
+func fullStateFilePrefix(blockNum uint64) string {
+	return fmt.Sprintf("%010d", blockNum)
 }

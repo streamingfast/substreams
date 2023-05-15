@@ -31,8 +31,8 @@ var decodeOutputsModuleCmd = &cobra.Command{
 	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> <key>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
-		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find a file named 
-		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find a file named
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode outputs", `
@@ -50,8 +50,8 @@ var decodeStatesModuleCmd = &cobra.Command{
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
-		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find a file named 
-		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find a file named
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode states", `
@@ -247,6 +247,10 @@ func searchOutputsModule(
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
 	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore, zlog)
+	if err != nil {
+		return fmt.Errorf("execout new config: %w", err)
+	}
+
 	moduleStore, err := stateStore.SubStore(moduleHash + "/outputs")
 	if err != nil {
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
@@ -264,7 +268,7 @@ func searchOutputsModule(
 			return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
 		}
 	}
-	
+
 	fmt.Println()
 	payloadBytes, found := outputCache.GetAtBlock(blockNumber)
 	if !found {
@@ -288,12 +292,14 @@ func searchStateModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	config, err := store.NewConfig(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore)
+	config, err := store.NewConfig(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore, "")
 	if err != nil {
 		return fmt.Errorf("initializing store config module %q: %w", module.Name, err)
 	}
 	moduleStore := config.NewFullKV(zlog)
-	if err = moduleStore.Load(ctx, startBlock); err != nil {
+
+	file := store.NewCompleteFileInfo(module.InitialBlock, startBlock)
+	if err = moduleStore.Load(ctx, file); err != nil {
 		return fmt.Errorf("unable to load file: %w", err)
 	}
 

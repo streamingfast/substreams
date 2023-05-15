@@ -233,7 +233,8 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, false)
+
+	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, nil, s.blockType)
 	if err != nil {
@@ -278,7 +279,7 @@ func (s *Tier1Service) blocks(ctx context.Context, runtimeConfig config.RuntimeC
 		zap.String("output_module", request.OutputModule),
 	)
 	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
-		return fmt.Errorf("error building pipeline: %w", err)
+		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
 	if requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
 		return pipe.OnStreamTerminated(ctx, nil)

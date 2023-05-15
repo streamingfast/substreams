@@ -118,11 +118,11 @@ func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 	if reqDetails.IsSubRequest {
 		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
 		if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
-			return fmt.Errorf("failed to load stores: %w", err)
+			return fmt.Errorf("failed to setup subrequest stores: %w", err)
 		}
 	} else {
 		if storeMap, err = p.runParallelProcess(ctx); err != nil {
-			return fmt.Errorf("failed setup request: %w", err)
+			return fmt.Errorf("failed run_parallel_process: %w", err)
 		}
 	}
 	p.stores.SetStoreMap(storeMap)

@@ -160,7 +160,7 @@ func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 	case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
 		return m.DebugSnapshotComplete
 	case *pbsubstreamsrpc.Response_Session:
-		return m
+		return m.Session
 	}
 	return ResponseUnknownMsg(fmt.Sprintf("%T", resp.Message))
 }

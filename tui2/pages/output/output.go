@@ -323,6 +323,15 @@ func (o *Output) View() string {
 		searchLine = o.blockSearchCtx.View()
 	}
 
+	o.setOutputViewContent()
+	
+	var middleBlock string
+	if o.moduleSearchEnabled {
+		middleBlock = o.moduleSearchView.View()
+	} else {
+		middleBlock = o.outputView.View()
+	}
+
 	if o.moduleNavigatorMode {
 		return lipgloss.JoinVertical(0,
 			o.moduleSelector.View(),
@@ -331,15 +340,6 @@ func (o *Output) View() string {
 			o.moduleNavigator.View(),
 			searchLine,
 		)
-	}
-
-	o.setOutputViewContent()
-
-	var middleBlock string
-	if o.moduleSearchEnabled {
-		middleBlock = o.moduleSearchView.View()
-	} else {
-		middleBlock = o.outputView.View()
 	}
 
 	out := lipgloss.JoinVertical(0,

@@ -20,7 +20,7 @@ import (
 )
 
 var SkipRange = errors.New("skip range")
-var PartialChunksDone = errors.New("partial chunks done")
+var PartialsChannelClosed = errors.New("partial chunks done")
 
 type StoreSquasher struct {
 	*shutter.Shutter
@@ -114,8 +114,8 @@ func (s *StoreSquasher) processPartials(ctx context.Context) error {
 	defer metrics.SquashersEnded.Inc()
 
 	for {
-		if err := s.getPartialChunks(ctx); err != nil {
-			if errors.Is(err, PartialChunksDone) {
+		if err := s.accumulateMorePartials(ctx); err != nil {
+			if errors.Is(err, PartialsChannelClosed) {
 				return nil
 			}
 			return err
@@ -158,7 +158,23 @@ func (s *StoreSquasher) sortRange() {
 	})
 }
 
-func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
+func (s *StoreSquasher) ensureNoOverlap() error {
+	if len(s.ranges) < 2 {
+		return nil
+	}
+	end := len(s.ranges) - 2
+	for i := 0; i < end; i++ {
+		left := s.ranges[i]
+		right := s.ranges[i+1]
+		if left.ExclusiveEndBlock <= right.StartBlock {
+			return fmt.Errorf("sorted ranges overlapping, left: %s, right: %s", left, right)
+		}
+	}
+
+	return nil
+}
+
+func (s *StoreSquasher) accumulateMorePartials(ctx context.Context) error {
 	logger := s.logger(ctx)
 
 	select {
@@ -171,11 +187,14 @@ func (s *StoreSquasher) getPartialChunks(ctx context.Context) error {
 	case partialsChunks, ok := <-s.partialsChunks:
 		if !ok {
 			logger.Info("squashing done, no more partial chunks to squash")
-			return PartialChunksDone
+			return PartialsChannelClosed
 		}
 		logger.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
 		s.ranges = append(s.ranges, partialsChunks...)
 		s.sortRange()
+		if err := s.ensureNoOverlap(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -107,6 +107,7 @@ func buildStoreSquasher(ctx context.Context, storeSnapshotsSaveInterval uint64, 
 		storeSquasher.targetExclusiveEndBlockReach = true
 	}
 	if len(storeStorageState.PartialsPresent) != 0 {
+		// FIXME: risk of race if we were to write more than the channel's buffer (100, pushing to s.partialsChunks within this `squash` method).
 		if err := storeSquasher.squash(ctx, storeStorageState.PartialsPresent); err != nil {
 			return nil, fmt.Errorf("first squash: %w", err)
 		}

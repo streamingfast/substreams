@@ -128,6 +128,14 @@ func TestStoreSquasher_sortRange(t *testing.T) {
 	assert.Equal(t, block.ParseRanges("0-10,10-20,40-50"), s.ranges)
 }
 
+func TestStoreSquasher_ensureContiguity(t *testing.T) {
+	s := &StoreSquasher{ranges: block.ParseRanges("10-20,40-50,45-48")}
+	assert.Error(t, s.ensureNoOverlap())
+
+	s = &StoreSquasher{ranges: block.ParseRanges("10-20,40-50")}
+	assert.NoError(t, s.ensureNoOverlap())
+}
+
 func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	ctx := context.Background()
 	s := &StoreSquasher{
@@ -139,7 +147,7 @@ func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	go func() {
 		s.partialsChunks <- block.ParseRanges("0-10")
 	}()
-	err := s.getPartialChunks(ctx)
+	err := s.accumulateMorePartials(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(s.ranges))
 
@@ -147,16 +155,16 @@ func TestStoreSquasher_getPartialChunks(t *testing.T) {
 	go func() {
 		cancelFunc()
 	}()
-	err = s.getPartialChunks(cacnelCtx)
+	err = s.accumulateMorePartials(cacnelCtx)
 	require.Error(t, err)
 	assert.Equal(t, context.Canceled, err)
 
 	go func() {
 		close(s.partialsChunks)
 	}()
-	err = s.getPartialChunks(ctx)
+	err = s.accumulateMorePartials(ctx)
 	require.Error(t, err)
-	assert.Equal(t, PartialChunksDone, err)
+	assert.Equal(t, PartialsChannelClosed, err)
 }
 
 func TestStoreSquasher_processRange(t *testing.T) {

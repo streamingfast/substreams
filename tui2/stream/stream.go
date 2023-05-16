@@ -95,6 +95,7 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 		*pbsubstreamsrpc.ModulesProgress,
 		*pbsubstreamsrpc.InitialSnapshotData,
 		*pbsubstreamsrpc.InitialSnapshotComplete,
+		*pbsubstreamsrpc.Response_Session,
 		ResponseUnknownMsg:
 		return s.readNextMessage
 	case Msg:

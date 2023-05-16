@@ -134,6 +134,9 @@ func TestStoreSquasher_ensureContiguity(t *testing.T) {
 
 	s = &StoreSquasher{ranges: block.ParseRanges("10-20,40-50")}
 	assert.NoError(t, s.ensureNoOverlap())
+
+	s = &StoreSquasher{ranges: block.ParseRanges("10-20,20-50")}
+	assert.NoError(t, s.ensureNoOverlap())
 }
 
 func TestStoreSquasher_getPartialChunks(t *testing.T) {

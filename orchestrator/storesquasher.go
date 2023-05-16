@@ -162,15 +162,14 @@ func (s *StoreSquasher) ensureNoOverlap() error {
 	if len(s.ranges) < 2 {
 		return nil
 	}
-	end := len(s.ranges) - 2
+	end := len(s.ranges) - 1
 	for i := 0; i < end; i++ {
 		left := s.ranges[i]
 		right := s.ranges[i+1]
-		if left.ExclusiveEndBlock <= right.StartBlock {
+		if right.StartBlock < left.ExclusiveEndBlock {
 			return fmt.Errorf("sorted ranges overlapping, left: %s, right: %s", left, right)
 		}
 	}
-
 	return nil
 }
 

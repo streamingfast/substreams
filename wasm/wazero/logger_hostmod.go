@@ -34,12 +34,7 @@ var loggerFuncs = []funcs{
 				zlog.Debug(message, zap.String("module_name", call.ModuleName))
 			}
 
-			// len(<string>) in Go count number of bytes and not characters, so we are good here
-			call.LogsByteCount += uint64(len(message))
-			if !call.ReachedLogsMaxByteCount() {
-				call.Logs = append(call.Logs, message)
-				call.ExecutionStack = append(call.ExecutionStack, fmt.Sprintf("log: %s", message))
-			}
+			call.AppendLog(message)
 			return
 		}),
 	},

@@ -83,7 +83,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		//fmt.Println("Instantiate")
 		mod, err = m.instantiateModule(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("could not instantiate wasm module for %q: %w", call.ModuleName, err)
+			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 		}
 		// Closed by the caller.
 		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
@@ -92,7 +92,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	//t0 = time.Now()
 	f := mod.ExportedFunction(call.Entrypoint)
 	if f == nil {
-		return mod, fmt.Errorf("could not find entrypoint function %q for module %q", call.Entrypoint, call.ModuleName)
+		return mod, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
 	}
 	//fmt.Println("Timing 2", time.Since(t0))
 
@@ -117,10 +117,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	_, err = f.Call(wasm.WithContext(ctx, call), args...)
 	//defer call.deallocate(ctx, mod)
 	if err != nil {
-		if call.PanicError != nil {
-			return mod, call.PanicError
-		}
-		return mod, fmt.Errorf("executing module %q: %w", call.ModuleName, err)
+		return mod, fmt.Errorf("call: %w", err)
 	}
 
 	return mod, nil
@@ -132,11 +129,11 @@ func writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) 
 	stack := []uint64{uint64(len(data))}
 	//fmt.Println("Writing length", len(data))
 	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
-		panic(fmt.Errorf("alloc from %q failed: %w", from, err))
+		panic(fmt.Errorf("alloc from: %w", err))
 	}
 	ptr := uint32(stack[0])
 	if ok := mod.Memory().Write(ptr, data); !ok {
-		panic("could not write to memory: " + from)
+		panic("could not write to memory")
 	}
 	//fmt.Println("Memory size:", mod.Memory().Size())
 	//if CACHE_ENABLED {

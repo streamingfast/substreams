@@ -67,14 +67,15 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		var mod wasm.Instance
 		call := wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
 		mod, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
-		if err != nil {
+		if panicErr := call.Err(); panicErr != nil {
 			errExecutor := ErrorExecutor{
-				message: err.Error(),
-			}
-			if call != nil {
-				errExecutor.stackTrace = call.ExecutionStack
+				message:    panicErr.Error(),
+				stackTrace: call.ExecutionStack,
 			}
 			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %v", clock.Number, e.moduleName, errExecutor.Error())
+		}
+		if err != nil {
+			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %v", clock.Number, e.moduleName, err)
 		}
 		if CACHE_ENABLED {
 			e.cachedInstance = mod

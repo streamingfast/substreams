@@ -233,14 +233,7 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			value, found := call.DoGetAt(int(storeIndex), ord, key)
-			if !found {
-				stack[0] = 0
-			} else {
-				if err := writeOutputToHeap(ctx, mod, outputPtr, value); err != nil {
-					call.ReturnError(fmt.Errorf("writing output to heap: %w", err))
-				}
-				stack[0] = 1
-			}
+			setStackAndOutput(ctx, stack, call, found, mod, outputPtr, value)
 		}),
 	},
 	{
@@ -254,11 +247,7 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			found := call.DoHasAt(int(storeIndex), ord, key)
-			if !found {
-				stack[0] = 0
-			} else {
-				stack[0] = 1
-			}
+			setStack0Bool(stack, found)
 		}),
 	},
 	{
@@ -272,14 +261,7 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			value, found := call.DoGetFirst(int(storeIndex), key)
-			if !found {
-				stack[0] = 0
-			} else {
-				if err := writeOutputToHeap(ctx, mod, outputPtr, value); err != nil {
-					call.ReturnError(fmt.Errorf("writing output to heap: %w", err))
-				}
-				stack[0] = 1
-			}
+			setStackAndOutput(ctx, stack, call, found, mod, outputPtr, value)
 		}),
 	},
 	{
@@ -292,11 +274,7 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			found := call.DoHasFirst(int(storeIndex), key)
-			if !found {
-				stack[0] = 0
-			} else {
-				stack[0] = 1
-			}
+			setStack0Bool(stack, found)
 		}),
 	},
 	{
@@ -310,14 +288,7 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			value, found := call.DoGetLast(int(storeIndex), key)
-			if !found {
-				stack[0] = 0
-			} else {
-				if err := writeOutputToHeap(ctx, mod, outputPtr, value); err != nil {
-					call.ReturnError(fmt.Errorf("writing output to heap: %w", err))
-				}
-				stack[0] = 1
-			}
+			setStackAndOutput(ctx, stack, call, found, mod, outputPtr, value)
 		}),
 	},
 	{
@@ -330,11 +301,26 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			found := call.DoHasLast(int(storeIndex), key)
-			if !found {
-				stack[0] = 0
-			} else {
-				stack[0] = 1
-			}
+			setStack0Bool(stack, found)
 		}),
 	},
+}
+
+func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, mod api.Module, outputPtr uint32, value []byte) {
+	if !found {
+		stack[0] = 0
+	} else {
+		if err := writeOutputToHeap(ctx, mod, outputPtr, value); err != nil {
+			call.ReturnError(fmt.Errorf("writing output to heap: %w", err))
+		}
+		stack[0] = 1
+	}
+}
+
+func setStack0Bool(stack []uint64, value bool) {
+	if value {
+		stack[0] = 1
+	} else {
+		stack[0] = 0
+	}
 }

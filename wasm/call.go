@@ -24,8 +24,8 @@ type Call struct {
 
 	valueType string
 
-	ReturnValue []byte
-	PanicError  *PanicError
+	returnValue []byte
+	panicError  *PanicError
 
 	Logs           []string
 	LogsByteCount  uint64
@@ -41,7 +41,6 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, ar
 		Entrypoint: entrypoint,
 	}
 
-	//var args []uint64
 	for _, input := range arguments {
 		switch v := input.(type) {
 		case *StoreWriterOutput:
@@ -50,13 +49,8 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, ar
 			call.valueType = v.ValueType
 		case *StoreReaderInput:
 			call.inputStores = append(call.inputStores, v.Store)
-			//args = append(args, uint64(len(call.inputStores)-1))
 		case ValueArgument:
 			// Handled in ÈxecuteNewCall()
-			//cnt := v.Value()
-			//ptr := call.writeToHeap(ctx, mod, cnt, input.Name())
-			//length := uint64(len(cnt))
-			//args = append(args, uint64(ptr), length)
 		default:
 			panic("unknown wasm argument type")
 		}
@@ -100,11 +94,28 @@ func (c *Call) deallocate(ctx context.Context, mod api.Module) {
 }
 
 func (c *Call) Err() error {
-	return c.PanicError
+	return c.panicError
 }
 
 func (c *Call) Output() []byte {
-	return c.ReturnValue
+	return c.returnValue
+}
+func (c *Call) SetReturnValue(msg []byte) {
+	c.returnValue = make([]byte, len(msg))
+	copy(c.returnValue, msg)
+}
+
+func (c *Call) SetPanicError(message string, filename string, lineNo int, colNo int) {
+	c.panicError = NewPanicError(message, filename, lineNo, colNo)
+}
+
+func (c *Call) AppendLog(message string) {
+	// len(<string>) in Go count number of bytes and not characters, so we are good here
+	c.LogsByteCount += uint64(len(message))
+	if !c.ReachedLogsMaxByteCount() {
+		c.Logs = append(c.Logs, message)
+		c.ExecutionStack = append(c.ExecutionStack, fmt.Sprintf("log: %s", message))
+	}
 }
 
 func (c *Call) SetOutputStore(store store.Store) {

@@ -20,10 +20,9 @@ var envFuncs = []funcs{
 			if filePtr := stack[2]; filePtr != 0 {
 				filename = readStringFromStack(mod, stack[2:])
 			}
-
 			call := wasm.FromContext(ctx)
 
-			call.PanicError = wasm.NewPanicError(message, filename, int(lineNo), int(colNo))
+			call.SetPanicError(message, filename, int(lineNo), int(colNo))
 		}),
 	},
 	{
@@ -31,10 +30,10 @@ var envFuncs = []funcs{
 		[]parm{i32, i32},
 		[]parm{},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			call := wasm.FromContext(ctx)
 			msg := readBytesFromStack(mod, stack[0:])
-			call.ReturnValue = make([]byte, uint32(stack[1]))
-			copy(call.ReturnValue, msg)
+			call := wasm.FromContext(ctx)
+
+			call.SetReturnValue(msg)
 		}),
 	},
 }

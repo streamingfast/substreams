@@ -65,7 +65,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	if hasInput {
 		clock := outputGetter.Clock()
 		var mod wasm.Instance
-		call := wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
+		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
 		mod, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
 		if panicErr := call.Err(); panicErr != nil {
 			errExecutor := ErrorExecutor{

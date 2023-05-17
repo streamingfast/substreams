@@ -94,7 +94,10 @@ func (c *Call) deallocate(ctx context.Context, mod api.Module) {
 }
 
 func (c *Call) Err() error {
-	return c.panicError
+	if c.panicError != nil {
+		return c.panicError
+	}
+	return nil
 }
 
 func (c *Call) Output() []byte {

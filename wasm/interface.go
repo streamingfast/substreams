@@ -48,12 +48,3 @@ var runtimes = map[string]ModuleFactory{}
 func RegisterModuleFactory(name string, factory ModuleFactory) {
 	runtimes[name] = factory
 }
-
-func RuntimeName(in ModuleFactory) string {
-	for k, v := range runtimes {
-		if v == in {
-			return k
-		}
-	}
-	return "unknown"
-}

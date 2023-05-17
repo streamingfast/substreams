@@ -55,14 +55,17 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 			}
 		}
 	}
-	runtime := runtimes["wazero"]
+	runtimeName := "wazero"
+	runtime := runtimes[runtimeName]
+	//fmt.Println("RUNTIME CHOSEN", runtimeName, runtime)
 	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
 		selectedRuntime := runtimes[selectRuntime]
 		if selectedRuntime == nil {
-			zlog.Warn("CANNOT FIND WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR, USING DEFAULT", zap.String("runtime", RuntimeName(runtime)))
+			zlog.Warn("CANNOT FIND WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR, USING DEFAULT", zap.String("runtime", runtimeName))
 		} else {
+			runtimeName = selectRuntime
 			runtime = selectedRuntime
-			zlog.Warn("USING WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR", zap.String("runtime", RuntimeName(runtime)))
+			zlog.Warn("USING WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR", zap.String("runtime", runtimeName))
 		}
 	}
 	r.runtimeStack = runtime

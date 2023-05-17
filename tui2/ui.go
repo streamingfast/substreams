@@ -2,6 +2,7 @@ package tui2
 
 import (
 	"log"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -29,6 +30,9 @@ const (
 )
 
 type UI struct {
+	memoized string
+	lastView time.Time
+
 	msgDescs      map[string]*manifest.ModuleDescriptor
 	stream        *streamui.Stream
 	replayLog     *replaylog.File
@@ -104,6 +108,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		ui.forceRefresh()
 		ui.SetSize(msg.Width, msg.Height)
 	case common.SetModalUpdateFuncMsg:
 		ui.currentModalFunc = common.ModalUpdateFunc(msg)
@@ -112,6 +117,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case modsearch.ApplyModuleSearchQueryMsg:
 		ui.currentModalFunc = nil
 	case tea.KeyMsg:
+		ui.forceRefresh()
 		if msg.String() == "ctrl+c" {
 			return ui, tea.Quit
 		}
@@ -147,10 +153,12 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case streamui.InterruptStreamMsg:
 		}
 	case tabs.SelectTabMsg:
+		ui.forceRefresh()
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
 		ui.SetSize(ui.Width, ui.Height)
 	case tabs.ActiveTabMsg:
+		ui.forceRefresh()
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
 		ui.SetSize(ui.Width, ui.Height) // For when the footer changes size here
@@ -185,19 +193,31 @@ func (ui *UI) SetSize(w, h int) {
 	}
 }
 
+func (ui *UI) forceRefresh() {
+	ui.lastView = time.Time{}
+}
+
 func (ui *UI) View() string {
+	switch ui.activePage {
+	case progressPage:
+		if time.Since(ui.lastView) < time.Millisecond*100 {
+			return ui.memoized
+		}
+		ui.lastView = time.Now()
+	}
 	headline := ui.Styles.Header.Render("Substreams GUI")
 
 	if ui.stream != nil {
 		headline = ui.Styles.Header.Copy().Foreground(lipgloss.Color(ui.stream.StreamColor())).Render("Substreams GUI")
 	}
 
-	return lipgloss.JoinVertical(0,
+	ui.memoized = lipgloss.JoinVertical(0,
 		headline,
 		ui.Styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
 	)
+	return ui.memoized
 }
 
 func (ui *UI) restartStream() tea.Cmd {

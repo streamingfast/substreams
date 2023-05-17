@@ -8,9 +8,9 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-func writeToHeap(ctx context.Context, inst *instance, data []byte) (uint32, error) {
+func writeToHeap(ctx context.Context, inst *instance, track bool, data []byte) (uint32, error) {
 	size := len(data)
-	stack := []uint64{uint64(len(data))}
+	stack := []uint64{uint64(size)}
 	if err := inst.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
 		return 0, fmt.Errorf("alloc from: %w", err)
 	}
@@ -18,15 +18,15 @@ func writeToHeap(ctx context.Context, inst *instance, data []byte) (uint32, erro
 	if ok := inst.Memory().Write(ptr, data); !ok {
 		return 0, fmt.Errorf("could not write to memory")
 	}
-	fmt.Println("Memory size:", inst.Memory().Size(), ptr, size)
-	if size != 0 {
+	//fmt.Println("  writeToHeap/alloc:", inst.Memory().Size(), ptr, size)
+	if track && size != 0 {
 		inst.allocations = append(inst.allocations, allocation{ptr: ptr, length: uint32(size)})
 	}
 	return ptr, nil
 }
 
 func writeOutputToHeap(ctx context.Context, inst *instance, outputPtr uint32, value []byte) error {
-	valuePtr, err := writeToHeap(ctx, inst, value)
+	valuePtr, err := writeToHeap(ctx, inst, false, value)
 	if err != nil {
 		return fmt.Errorf("writing value: %w", err)
 	}
@@ -38,6 +38,19 @@ func writeOutputToHeap(ctx context.Context, inst *instance, outputPtr uint32, va
 		return errors.New("writing WriteUint32Le:2 to memory")
 	}
 	return nil
+}
+
+func deallocate(ctx context.Context, i *instance) {
+	//t0 := time.Now()
+	dealloc := i.ExportedFunction("dealloc")
+	for _, alloc := range i.allocations {
+		//fmt.Println("  dealloc", alloc.ptr, alloc.length)
+		if err := dealloc.CallWithStack(ctx, []uint64{uint64(alloc.ptr), uint64(alloc.length)}); err != nil {
+			panic(fmt.Errorf("could not deallocate %d bytes from memory at %d: %w", alloc.length, alloc.ptr, err))
+		}
+	}
+	//fmt.Println("deallocate took", time.Since(t0), len(i.allocations), i.Memory().Size())
+	i.allocations = nil
 }
 
 func readBytesFromStack(mod api.Module, stack []uint64) []byte {

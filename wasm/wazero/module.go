@@ -116,7 +116,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			args = append(args, uint64(inputStoreCount-1))
 		case wasm.ValueArgument:
 			cnt := v.Value()
-			ptr, err := writeToHeap(ctx, inst, cnt)
+			ptr, err := writeToHeap(ctx, inst, true, cnt)
 			if err != nil {
 				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)
 			}
@@ -126,8 +126,6 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			panic("unknown wasm argument type")
 		}
 	}
-
-	fmt.Println("Calling function: ", call.Entrypoint)
 
 	_, err = f.Call(wasm.WithContext(withInstanceContext(ctx, inst), call), args...)
 	if err != nil {

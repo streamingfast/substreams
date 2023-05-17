@@ -3,7 +3,6 @@ package wasmtime
 import (
 	"encoding/binary"
 	"fmt"
-	"sort"
 
 	"github.com/bytecodealliance/wasmtime-go/v4"
 )
@@ -58,9 +57,11 @@ func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, erro
 	}
 
 	ptr := results.(int32)
-	l := len(bytes)
-	if track && l != 0 {
-		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: l})
+
+	//fmt.Println("  writeToHeap/alloc:", ptr, size)
+
+	if track && size != 0 {
+		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: size})
 	}
 	return h.WriteAtPtr(bytes, ptr, from)
 }
@@ -72,10 +73,8 @@ func (h *Heap) WriteAtPtr(bytes []byte, ptr int32, from string) (int32, error) {
 }
 
 func (h *Heap) Clear() error {
-	sort.Slice(h.allocations, func(i, j int) bool {
-		return h.allocations[i].ptr < h.allocations[j].ptr
-	})
 	for _, a := range h.allocations {
+		//fmt.Println("  dealloc", a.ptr, a.length)
 		if _, err := h.dealloc.Call(h.store, a.ptr, int32(a.length)); err != nil {
 			return fmt.Errorf("deallocating memory at ptr %d: %w", a.ptr, err)
 		}

@@ -9,5 +9,6 @@ target
 /substreams
 .fleet
 /codegen/test_substreams/src/
+/build
 
 replay.log

@@ -1,0 +1,4 @@
+global:
+  binary: substreams
+  language: golang
+  variant: application

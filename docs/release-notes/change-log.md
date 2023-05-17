@@ -12,7 +12,7 @@ This release contains bug fixes and speed/scaling improvements around the Substr
 
 This release contains an important bug that could have generated corrupted `store` state files. This is important for developers and operators.
 
-#### Developers
+#### Sinkers & Developers
 
 The `store` state files will be fully deleted on the Substreams server to start fresh again. The impact for you as a developer is that Substreams that were fully synced will now need to re-generate from initial block the store's state. So you might see long delays before getting a new block data while the Substreams engine is re-computing the `store` states from scratch.
 

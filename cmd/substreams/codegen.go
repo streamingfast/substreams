@@ -41,9 +41,12 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 	}
 
 	var protoDefinitions []*desc.FileDescriptor
-	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
+	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
 		protoDefinitions = pd
 	}))
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
 
 	manifestAbsPath, err := filepath.Abs(manifestPath)
 	if err != nil {

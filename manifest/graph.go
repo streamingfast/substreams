@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"sort"
 
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/yourbasic/graph"
+	"go.uber.org/zap"
 )
 
 type ModuleGraph struct {

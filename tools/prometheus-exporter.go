@@ -64,7 +64,11 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	blockNum, err := strconv.ParseInt(blockHeight, 10, 64)
 	addr := mustGetString(cmd, "listen-addr")
 
-	manifestReader := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)

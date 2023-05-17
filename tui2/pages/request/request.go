@@ -303,7 +303,11 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 }
 
 func readManifest(manifestPath string) (*manifest.ModuleGraph, *pbsubstreams.Package, error) {
-	manifestReader := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("manifest reader: %w", err)
+	}
+
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)

@@ -41,10 +41,11 @@ func TestReader_Read(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		args      args
-		want      *pbsubstreams.Package
-		assertion require.ErrorAssertionFunc
+		name          string
+		args          args
+		want          *pbsubstreams.Package
+		assertionNew  require.ErrorAssertionFunc
+		assertionRead require.ErrorAssertionFunc
 	}{
 		{
 			"bare_minimum.yaml",
@@ -61,6 +62,7 @@ func TestReader_Read(t *testing.T) {
 				},
 			},
 			require.NoError,
+			require.NoError,
 		},
 		{
 			"from_folder",
@@ -76,6 +78,7 @@ func TestReader_Read(t *testing.T) {
 					},
 				},
 			},
+			require.NoError,
 			require.NoError,
 		},
 		{
@@ -96,6 +99,7 @@ func TestReader_Read(t *testing.T) {
 				},
 			},
 			require.NoError,
+			require.NoError,
 		},
 		{
 			"imports_relative_path.yaml",
@@ -115,6 +119,7 @@ func TestReader_Read(t *testing.T) {
 					},
 				},
 			},
+			require.NoError,
 			require.NoError,
 		},
 		{
@@ -140,6 +145,7 @@ func TestReader_Read(t *testing.T) {
 				},
 			},
 			require.NoError,
+			require.NoError,
 		},
 		{
 			"imports_http_url.yaml",
@@ -163,6 +169,7 @@ func TestReader_Read(t *testing.T) {
 					},
 				},
 			},
+			require.NoError,
 			require.NoError,
 		},
 		{
@@ -193,6 +200,7 @@ func TestReader_Read(t *testing.T) {
 				},
 			},
 			require.NoError,
+			require.NoError,
 		},
 		{
 			"protobuf_files_relative_path.yaml",
@@ -211,6 +219,7 @@ func TestReader_Read(t *testing.T) {
 				},
 			},
 			require.NoError,
+			require.NoError,
 		},
 		{
 			"protobuf_importPaths_relative_path.yaml",
@@ -228,6 +237,7 @@ func TestReader_Read(t *testing.T) {
 					},
 				},
 			},
+			require.NoError,
 			require.NoError,
 		},
 		{
@@ -253,17 +263,20 @@ func TestReader_Read(t *testing.T) {
 				},
 			},
 			require.NoError,
+			require.NoError,
 		},
 		{
 			"invalid_map_module.yaml",
 			args{},
 			nil,
+			require.NoError,
 			require.Error,
 		},
 		{
 			"invalid_unknown_field.yaml",
 			args{},
 			nil,
+			require.NoError,
 			require.Error,
 		},
 	}
@@ -287,15 +300,16 @@ func TestReader_Read(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			r := NewReader(manifestPath, readerOptions...)
-
 			workingDir := ""
 			if tt.args.workingDirectory != "" {
 				workingDir = tt.args.workingDirectory
 			}
 
+			r, err := newReader(manifestPath, workingDir, readerOptions...)
+			tt.assertionNew(t, err)
+
 			got, err := r.read(workingDir)
-			tt.assertion(t, err)
+			tt.assertionRead(t, err)
 			assertProtoEqual(t, tt.want, got)
 		})
 	}

@@ -54,7 +54,11 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 	cli.NoError(err, "New state store")
 
 	zlog.Info("Reading Substreams manifest")
-	manifestReader := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
 	pkg, err := manifestReader.Read()
 	cli.NoError(err, "Read Substreams manifest")
 

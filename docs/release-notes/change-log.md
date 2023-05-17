@@ -28,6 +28,10 @@ If you upgrade in the wrong order or if somehow `tier2` processes start using th
 
 * Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.
 
+### Changed
+
+* [`library`]: The `manifest.NewReader` signature changed and will now return a `*Reader, error` (previously `*Reader`).
+
 ### Added
 
 * [`library`]: The `manifest.Reader` gained the ability to infer the path if provided with input `""` based on the current working directory.

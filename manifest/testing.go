@@ -230,7 +230,7 @@ func NewTestModules() []*pbsubstreams.Module {
 func TestReadManifest(t testing.T, manifestPath string) *pbsubstreams.Package {
 	t.Helper()
 
-	manifestReader := NewReader(manifestPath)
+	manifestReader := MustNewReader(manifestPath)
 	pkg, err := manifestReader.Read()
 	require.NoError(t, err)
 	return pkg

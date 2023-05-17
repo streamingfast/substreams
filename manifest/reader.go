@@ -15,11 +15,10 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/dstore"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
-
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 var httpClient = &http.Client{
@@ -50,7 +49,7 @@ func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)
 }
 
 type Reader struct {
-	input                       string
+	resolvedInput               string
 	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
 
 	// cached values
@@ -61,15 +60,70 @@ type Reader struct {
 	//options
 	skipSourceCodeImportValidation bool
 	skipModuleOutputTypeValidation bool
+
+	constructorErr error
 }
 
-func NewReader(input string, opts ...Options) *Reader {
-	r := &Reader{input: input}
+func NewReader(input string, opts ...Options) (*Reader, error) {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get working directory: %w", err)
+	}
+
+	return newReader(input, workingDir, opts...)
+}
+
+func MustNewReader(input string, opts ...Options) *Reader {
+	reader, err := NewReader(input, opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return reader
+}
+
+func newReader(input string, workingDir string, opts ...Options) (*Reader, error) {
+	r := &Reader{resolvedInput: input}
 	for _, opt := range opts {
 		r = opt(r)
 	}
 
-	return r
+	var err error
+	r.resolvedInput, err = resolveInput(input, workingDir)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Substreams manifest %q: %w", input, err)
+	}
+
+	return r, nil
+}
+
+func resolveInput(input string, workingDir string) (string, error) {
+	if isRemotePackage(input) {
+		return input, nil
+	}
+
+	// If empty, assign input to be `pwd`/substreams.yaml
+	if input == "" {
+		input = filepath.Join(workingDir, "substreams.yaml")
+	}
+
+	// It's supposed to be a directory or a file, so we should be able to stat it and it should exists
+	stat, err := os.Stat(input)
+	if err != nil {
+		// Stat error already says 'stat' so no wrapping
+		return "", err
+	}
+
+	// If it's a directory, we look actually for '<input>/substreams.yaml'
+	if stat.IsDir() {
+		input = filepath.Join(input, "substreams.yaml")
+	}
+
+	return input, nil
+}
+
+func (r *Reader) ResolvedInput() string {
+	return r.resolvedInput
 }
 
 func (r *Reader) MustRead() *pbsubstreams.Package {
@@ -82,6 +136,10 @@ func (r *Reader) MustRead() *pbsubstreams.Package {
 }
 
 func (r *Reader) Read() (*pbsubstreams.Package, error) {
+	if r.constructorErr != nil {
+		return nil, r.constructorErr
+	}
+
 	workingDir, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get working directory: %w", err)
@@ -92,29 +150,10 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 
 func (r *Reader) read(workingDir string) (*pbsubstreams.Package, error) {
 	if r.IsRemotePackage() {
-		return r.newPkgFromURL(r.input)
+		return r.newPkgFromURL(r.resolvedInput)
 	}
 
-	input := r.input
-
-	// If empty, assign input to be `pwd`/substreams.yaml
-	if input == "" {
-		input = filepath.Join(workingDir, "substreams.yaml")
-	}
-
-	// It's supposed to be a directory or a file, so we should be able to stat it and it should exists
-	stat, err := os.Stat(input)
-	if err != nil {
-		// Stat error already says 'stat' so no wrapping
-		return nil, err
-	}
-
-	// If it's a directory, we look actually for '<input>/substreams.yaml'
-	if stat.IsDir() {
-		input = filepath.Join(input, "substreams.yaml")
-	}
-
-	// If it's ending in .yaml, it's a Substreams source file
+	input := r.resolvedInput
 	if strings.HasSuffix(input, ".yaml") {
 		pkg, protoDefinitions, err := r.newPkgFromManifest(input)
 		if err != nil {
@@ -127,14 +166,17 @@ func (r *Reader) read(workingDir string) (*pbsubstreams.Package, error) {
 		return pkg, nil
 	}
 
-	// In all other cases, assume it's a Substreams package file
 	return r.newPkgFromFile(input)
 }
 
 // IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over
 // HTTP/HTTPS, Google Cloud Storage, S3 or Azure Storage.
 func (r *Reader) IsRemotePackage() bool {
-	u, err := url.Parse(r.input)
+	return isRemotePackage(r.resolvedInput)
+}
+
+func isRemotePackage(in string) bool {
+	u, err := url.Parse(in)
 	if err != nil {
 		return false
 	}
@@ -149,7 +191,7 @@ func (r *Reader) IsLocalManifest() bool {
 		return false
 	}
 
-	return strings.HasSuffix(r.input, ".yaml")
+	return strings.HasSuffix(r.resolvedInput, ".yaml")
 }
 
 func (r *Reader) newPkgFromFile(inputFilePath string) (pkg *pbsubstreams.Package, err error) {
@@ -474,7 +516,7 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		importName := kv[0]
 		importPath := manif.resolvePath(kv[1])
 
-		subpkgReader := NewReader(importPath)
+		subpkgReader := MustNewReader(importPath)
 		subpkg, err := subpkgReader.Read()
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)

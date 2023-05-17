@@ -106,7 +106,12 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
 	}
 
-	pkg, err := manifest.NewReader(manifestPath).Read()
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
@@ -183,7 +188,12 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
 	}
 
-	pkg, err := manifest.NewReader(manifestPath).Read()
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}

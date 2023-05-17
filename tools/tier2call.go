@@ -38,7 +38,11 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	startBlock, _ := strconv.ParseInt(args[2], 10, 64)
 	stopBlock, _ := strconv.ParseInt(args[3], 10, 64)
 
-	manifestReader := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)

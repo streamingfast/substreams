@@ -45,7 +45,10 @@ func runPack(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	manifestReader := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
 
 	if !manifestReader.IsLocalManifest() {
 		return fmt.Errorf(`"pack" can only be use to pack local manifest file`)

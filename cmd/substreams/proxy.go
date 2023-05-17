@@ -51,7 +51,11 @@ func (cs *ConnectServer) Blocks(
 	}
 
 	if cs.Manifest != "" {
-		manifestReader := manifest.NewReader(cs.Manifest)
+		manifestReader, err := manifest.NewReader(cs.Manifest)
+		if err != nil {
+			return fmt.Errorf("manifest reader: %w", err)
+		}
+
 		pkg, err := manifestReader.Read()
 		if err != nil {
 			return fmt.Errorf("read manifest %q: %w", cs.Manifest, err)

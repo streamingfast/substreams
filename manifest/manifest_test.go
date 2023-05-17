@@ -90,7 +90,7 @@ inputs:
 //}
 
 func TestManifest_ToProto(t *testing.T) {
-	reader := NewReader("./test/test_manifest.yaml")
+	reader := MustNewReader("./test/test_manifest.yaml")
 	pkg, err := reader.Read()
 	require.NoError(t, err)
 

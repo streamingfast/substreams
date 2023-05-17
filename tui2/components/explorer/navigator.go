@@ -2,12 +2,13 @@ package explorer
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
-	"strings"
-	"sync"
 )
 
 type NavigatorMemory struct {
@@ -51,8 +52,8 @@ func (n *NavigatorMemory) SetLastSelectedChildOf(modName, childName string) {
 }
 
 type Navigator struct {
-	graph        *manifest.ModuleGraph
-	memory       *NavigatorMemory
+	graph  *manifest.ModuleGraph
+	memory *NavigatorMemory
 
 	SelectedModule    string
 	HighlightedModule string
@@ -79,7 +80,7 @@ type Option func(*Navigator)
 
 func WithManifestFilePath(path string) Option {
 	return func(n *Navigator) {
-		n.graph = manifest.MustNewModuleGraph(manifest.NewReader(path).MustRead().Modules.Modules)
+		n.graph = manifest.MustNewModuleGraph(manifest.MustNewReader(path).MustRead().Modules.Modules)
 	}
 }
 

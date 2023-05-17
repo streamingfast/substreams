@@ -44,7 +44,11 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating base store: %w", err)
 	}
 
-	manifestReader := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)

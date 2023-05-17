@@ -29,7 +29,7 @@ func New(c common.Common, manifestPath string) *ModSelect {
 		seen:         map[string]bool{},
 		ModulesIndex: map[string]int{},
 		Common:       c,
-		moduleGraph:  manifest.MustNewModuleGraph(manifest.NewReader(manifestPath).MustRead().Modules.Modules),
+		moduleGraph:  manifest.MustNewModuleGraph(manifest.MustNewReader(manifestPath).MustRead().Modules.Modules),
 	}
 }
 

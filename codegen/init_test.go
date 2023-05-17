@@ -14,7 +14,7 @@ func InitTestGenerator(t *testing.T) *Generator {
 
 	var protoDefinitions []*desc.FileDescriptor
 	manifestPath := "./test_substreams/substreams.yaml"
-	manifestReader := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
+	manifestReader := manifest.MustNewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
 		protoDefinitions = pd
 	}))
 

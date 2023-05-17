@@ -286,13 +286,10 @@ func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleNam
 
 	if storeOutputs := toRPCStoreModuleOutputs(output); storeOutputs != nil {
 		p.extraStoreModuleOutputs = append(p.extraStoreModuleOutputs, storeOutputs)
-		return
 	}
 	if mapOutput := toRPCMapModuleOutputs(output); mapOutput != nil {
 		p.extraMapModuleOutputs = append(p.extraMapModuleOutputs, mapOutput)
 	}
-	return
-
 }
 
 func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.StoreModuleOutput) {

@@ -22,6 +22,7 @@ You need to clear the state store and remove all the files that are stored under
 
 ### Fixed
 
+* Fix a bug where not all extra modules would be sent back on debug mode
 * Fixed a bug in tier1 that could result in corrupted state files when getting close to chain HEAD
 * Fixed some performance and stalling issues when using GCS for blocks
 * Fixed storage logs not being shown properly

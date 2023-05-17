@@ -4,11 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [v1.1.2](https://github.com/streamingfast/substreams/releases/tag/v1.1.2)
 
-### Notes
+### Notes for operators
 
-#### Operators upgrade procedure
+#### You need to clear the state store
+
+* Since we found a bug that could corrupt state files, you will need to remove all the files that are stored under `state-store-url`.
+
+#### Upgrade procedure
 
 > **Note** This upgrade procedure is applies if your Substreams deployment topology includes both `tier1` and `tier2` processes. If you have defined somewhere the config value `substreams-tier2: true`, then this applies to you, otherwise, if you can ignore the upgrade procedure.
 
@@ -23,6 +27,15 @@ If you upgrade in the wrong order or if somehow `tier2` processes start using th
 ### Fixed
 
 * Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.
+* Fixed a bug in tier1 that could result in corrupted state files when getting close to chain HEAD
+* Fixed some performance and stalling issues when using google storage for blocks
+* Fixed storage logs not being shown properly
+* GUI: Fixed panic race condition
+* GUI: Cosmetic changes
+
+### Added
+
+* GUI: Added traceID 
 
 ## [v1.1.1](https://github.com/streamingfast/substreams/releases/tag/v1.1.1)
 

@@ -29,6 +29,12 @@ The components should be deployed in this order:
 
 If you upgrade in the wrong order or if somehow `tier2` processes start using the new protocol without `tier1` being aware, user will end up with backend error(s) saying that some partial file are not found. Those will be resolved only when `tier1` processes have been upgraded successfully.
 
+### Added
+
+* Support for the `wazero` WASM runtime. Enable by setting the `SUBSTREAMS_WASM_RUNTIME=wazero`. The default value stays `wasmtime`.
+  * Added support for caching wasm instances, at the risk of leaking global state between calls. Enable with `SUBSTREAMS_WASM_CACHE_ENABLED=true`.
+
+
 ### Fixed
 
 * Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.

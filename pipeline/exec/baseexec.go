@@ -32,7 +32,7 @@ func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Mod
 	return &BaseExecutor{ctx: ctx, moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
 }
 
-var CACHE_ENABLED = os.Getenv("WAZERO_CACHE_ENABLED") != ""
+var InstanceCacheEnabled = os.Getenv("SUBSTREAMS_WASM_CACHE_ENABLED") != ""
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil
@@ -64,9 +64,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	//  state store in read mode)
 	if hasInput {
 		clock := outputGetter.Clock()
-		var mod wasm.Instance
+		var inst wasm.Instance
 		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
-		mod, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
+		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
 		if panicErr := call.Err(); panicErr != nil {
 			errExecutor := ErrorExecutor{
 				message:    panicErr.Error(),
@@ -77,10 +77,15 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		if err != nil {
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %v", clock.Number, e.moduleName, err)
 		}
-		if CACHE_ENABLED {
-			e.cachedInstance = mod
+		if InstanceCacheEnabled {
+			if err := inst.Cleanup(e.ctx); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
+			}
+			e.cachedInstance = inst
 		} else {
-			_ = mod.Close(e.ctx)
+			if err := inst.Close(e.ctx); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+			}
 		}
 		e.logs = call.Logs
 		e.logsTruncated = call.ReachedLogsMaxByteCount()
@@ -89,10 +94,11 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	return
 }
 
-func (e *BaseExecutor) Close() {
+func (e *BaseExecutor) Close(ctx context.Context) error {
 	if e.cachedInstance != nil {
-		e.cachedInstance.Close(e.ctx)
+		return e.cachedInstance.Close(ctx)
 	}
+	return nil
 }
 
 func (e *BaseExecutor) lastExecutionLogs() (logs []string, truncated bool) {

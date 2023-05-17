@@ -44,6 +44,7 @@ type Pipeline struct {
 
 	wasmRuntime     *wasm.Registry
 	outputGraph     *outputmodules.Graph
+	loadedModules   map[uint32]wasm.Module
 	moduleExecutors []exec.ModuleExecutor
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
@@ -426,6 +427,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 		}
 		loadedModules[module.BinaryIndex] = m
 	}
+	p.loadedModules = loadedModules
 
 	for _, module := range modules {
 		inputs, err := p.renderWasmInputs(module)

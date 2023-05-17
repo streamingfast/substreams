@@ -73,7 +73,23 @@ func newModule(ctx context.Context, wasmCode []byte, registry *wasm.Registry) (w
 	}, nil
 }
 
-func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (returnInstance wasm.Instance, err error) {
+func (m *Module) Close(ctx context.Context) error {
+	closeFuncs := []func(context.Context) error{
+		m.wazRuntime.Close,
+		m.userModule.Close,
+	}
+	for _, hostMod := range m.hostModules {
+		closeFuncs = append(closeFuncs, hostMod.Close)
+	}
+	for _, f := range closeFuncs {
+		if err := f(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (inst wasm.Instance, err error) {
 	//t0 := time.Now()
 
 	var mod api.Module
@@ -88,11 +104,12 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		// Closed by the caller.
 		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
 	}
+	inst = &instance{mod}
 	//fmt.Println("Timing 1", time.Since(t0))
 	//t0 = time.Now()
 	f := mod.ExportedFunction(call.Entrypoint)
 	if f == nil {
-		return mod, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
+		return inst, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
 	}
 	//fmt.Println("Timing 2", time.Since(t0))
 
@@ -106,7 +123,10 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			args = append(args, uint64(inputStoreCount-1))
 		case wasm.ValueArgument:
 			cnt := v.Value()
-			ptr := writeToHeap(ctx, mod, cnt, input.Name())
+			ptr, err := writeToHeap(ctx, mod, cnt)
+			if err != nil {
+				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)
+			}
 			length := uint64(len(cnt))
 			args = append(args, uint64(ptr), length)
 		default:
@@ -117,40 +137,17 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	_, err = f.Call(wasm.WithContext(ctx, call), args...)
 	//defer call.deallocate(ctx, mod)
 	if err != nil {
-		return mod, fmt.Errorf("call: %w", err)
+		return inst, fmt.Errorf("call: %w", err)
 	}
 
-	return mod, nil
+	return inst, nil
 }
 
-//var CACHE_ENABLED = os.Getenv("WAZERO_CACHE_ENABLED") != ""
-
-func writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) uint32 {
-	stack := []uint64{uint64(len(data))}
-	//fmt.Println("Writing length", len(data))
-	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
-		panic(fmt.Errorf("alloc from: %w", err))
-	}
-	ptr := uint32(stack[0])
-	if ok := mod.Memory().Write(ptr, data); !ok {
-		panic("could not write to memory")
-	}
-	//fmt.Println("Memory size:", mod.Memory().Size())
-	//if CACHE_ENABLED {
-	//	c.allocations = append(c.allocations, allocation{ptr: ptr, length: uint32(len(data))})
-	//}
-	return ptr
+type instance struct {
+	api.Module
 }
 
-func writeOutputToHeap(ctx context.Context, mod api.Module, outputPtr uint32, value []byte) error {
-	valuePtr := writeToHeap(ctx, mod, value, "writeOutputToHeap1")
-	mem := mod.Memory()
-	if ok := mem.WriteUint32Le(outputPtr, valuePtr); !ok {
-		panic("could not write to memory WriteUint32Le:1")
-	}
-	if ok := mem.WriteUint32Le(outputPtr+4, uint32(len(value))); !ok {
-		panic("could not write to memory WriteUint32Le:2")
-	}
+func (i *instance) Cleanup(ctx context.Context) error {
 	return nil
 }
 
@@ -173,6 +170,14 @@ type parm = api.ValueType
 var i32 = api.ValueTypeI32
 var i64 = api.ValueTypeI64
 var f64 = api.ValueTypeF64
+
+type funcs struct {
+	name  string
+	input []parm
+	//inputNames  []string
+	output []parm
+	f      api.GoModuleFunction
+}
 
 func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry *wasm.Registry) (out []wazero.CompiledModule, err error) {
 	for namespace, imports := range registry.Extensions {
@@ -211,8 +216,6 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 	return
 }
 
-//func addExtensionFunction
-
 func addHostFunctions(ctx context.Context, runtime wazero.Runtime, moduleName string, funcs []funcs) (wazero.CompiledModule, error) {
 	build := runtime.NewHostModuleBuilder(moduleName)
 	for _, f := range funcs {
@@ -222,37 +225,4 @@ func addHostFunctions(ctx context.Context, runtime wazero.Runtime, moduleName st
 			Export(f.name)
 	}
 	return build.Compile(ctx)
-}
-
-type funcs struct {
-	name  string
-	input []parm
-	//inputNames  []string
-	output []parm
-	f      api.GoModuleFunction
-}
-
-func readBytesFromStack(mod api.Module, stack []uint64) []byte {
-	ptr, length := uint32(stack[0]), uint32(stack[1])
-	return readBytes(mod, ptr, length)
-}
-func readStringFromStack(mod api.Module, stack []uint64) string {
-	ptr, length := uint32(stack[0]), uint32(stack[1])
-	return readString(mod, ptr, length)
-}
-
-func readString(mod api.Module, ptr, len uint32) string {
-	bytes, ok := mod.Memory().Read(ptr, len)
-	if !ok {
-		panic(fmt.Sprintf("could not read string, ptr=%d, len=%d", ptr, len))
-	}
-	return string(bytes)
-}
-
-func readBytes(mod api.Module, ptr, length uint32) []byte {
-	bytes, ok := mod.Memory().Read(ptr, length)
-	if !ok {
-		panic(fmt.Sprintf("could not read string, ptr=%d, len=%d", ptr, length))
-	}
-	return bytes
 }

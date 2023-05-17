@@ -26,7 +26,14 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	bytesMeter := tracking.GetBytesMeter(ctx)
 
 	for _, executor := range p.moduleExecutors {
-		executor.Close()
+		if err := executor.Close(ctx); err != nil {
+			return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
+		}
+	}
+	for idx, mod := range p.loadedModules {
+		if err := mod.Close(ctx); err != nil {
+			return fmt.Errorf("closing wasm module %d: %w", idx, err)
+		}
 	}
 
 	if !errors.Is(err, stream.ErrStopBlockReached) && !errors.Is(err, io.EOF) {

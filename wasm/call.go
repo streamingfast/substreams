@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/tetratelabs/wazero/api"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -114,6 +115,9 @@ func (c *Call) SetPanicError(message string, filename string, lineNo int, colNo 
 
 func (c *Call) AppendLog(message string) {
 	// len(<string>) in Go count number of bytes and not characters, so we are good here
+	if len(message) > MaxLogByteCount {
+		panic(fmt.Errorf("message to log is too big, size is %s, max is %s", humanize.IBytes(uint64(len(message))), humanize.IBytes(uint64(MaxLogByteCount))))
+	}
 	c.LogsByteCount += uint64(len(message))
 	if !c.ReachedLogsMaxByteCount() {
 		c.Logs = append(c.Logs, message)

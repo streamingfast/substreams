@@ -39,6 +39,9 @@ func (r *Registry) registerWASMExtension(namespace string, importName string, ex
 	}
 	r.Extensions[namespace][importName] = ext
 }
+func (r *Registry) GetMaxFuel() uint64 {
+	return r.maxFuel
+}
 
 func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, error) {
 	return r.runtimeStack.NewModule(ctx, wasmCode, r)
@@ -55,7 +58,7 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 			}
 		}
 	}
-	runtimeName := "wazero"
+	runtimeName := "wasmtime" // fallback engine
 	runtime := runtimes[runtimeName]
 	//fmt.Println("RUNTIME CHOSEN", runtimeName, runtime)
 	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {

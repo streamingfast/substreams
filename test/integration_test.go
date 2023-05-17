@@ -17,6 +17,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store"
+	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
 

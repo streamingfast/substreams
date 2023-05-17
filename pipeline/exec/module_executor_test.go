@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/streamingfast/substreams/storage/execout"
-
 	"github.com/stretchr/testify/assert"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/execout"
 )
 
 type MockExecOutput struct {
@@ -50,25 +49,16 @@ type MockModuleExecutor struct {
 
 var _ ModuleExecutor = (*MockModuleExecutor)(nil)
 
-func (t *MockModuleExecutor) Name() string {
-	return t.name
-}
-
-func (t *MockModuleExecutor) String() string {
-	return fmt.Sprintf("TestModuleExecutor(%s)", t.name)
-}
+func (t *MockModuleExecutor) Name() string                    { return t.name }
+func (t *MockModuleExecutor) String() string                  { return fmt.Sprintf("TestModuleExecutor(%s)", t.name) }
+func (t *MockModuleExecutor) Close(ctx context.Context) error { return nil }
+func (t *MockModuleExecutor) HasValidOutput() bool            { return t.cacheable }
 
 func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	if t.RunFunc != nil {
 		return t.RunFunc(ctx, reader)
 	}
 	return nil, nil, fmt.Errorf("not implemented")
-}
-
-func (t *MockModuleExecutor) Close() {}
-
-func (t *MockModuleExecutor) HasValidOutput() bool {
-	return t.cacheable
 }
 
 func (t *MockModuleExecutor) applyCachedOutput(value []byte) error {

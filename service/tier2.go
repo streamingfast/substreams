@@ -62,7 +62,7 @@ func NewTier2(
 	s = &Tier2Service{
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,
-		tracer:        otel.GetTracerProvider().Tracer("service"),
+		tracer:        otel.GetTracerProvider().Tracer("tier2"),
 	}
 
 	zlog.Info("registering substreams metrics")
@@ -144,7 +144,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(logger, streamSrv)
-	err = s.processRange(ctx, s.runtimeConfig, request, respFunc)
+	err = s.processRange(ctx, s.runtimeConfig, request, respFunc, parentTraceID.String())
 	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -154,7 +154,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	return grpcError
 }
 
-func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
+func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, parentTraceID string) error {
 	logger := reqctx.Logger(ctx)
 
 	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
@@ -186,7 +186,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), parentTraceID)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -223,6 +223,8 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		execOutputCacheEngine,
 		runtimeConfig,
 		respFunc,
+		// This must always be the parent/global trace id, the one that comes from tier1
+		parentTraceID,
 		opts...,
 	)
 

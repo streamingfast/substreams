@@ -5,11 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
-
-	store2 "github.com/streamingfast/substreams/storage/store"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
@@ -17,11 +12,14 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
+	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -164,7 +162,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 	objStore := dstore.NewMockStore(nil)
 
 	for _, conf := range configs {
-		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
+		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore, "")
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
 

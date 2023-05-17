@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -23,7 +24,7 @@ type in struct {
 	respFunc substreams.ResponseFunc
 }
 type out struct {
-	partialsWritten []*block.Range
+	partialsWritten store.FileInfos
 	err             error
 }
 
@@ -42,19 +43,19 @@ func TestSchedulerInOut(t *testing.T) {
 		&pbsubstreams.Modules{Modules: mods},
 	)
 	var accumulatedRanges block.Ranges
-	sched.OnStoreJobTerminated = func(_ context.Context, mod string, partialsWritten block.Ranges) error {
+	sched.OnStoreJobTerminated = func(_ context.Context, mod string, partialFilesWritten store.FileInfos) error {
 		assert.Equal(t, "B", mod)
-		accumulatedRanges = append(accumulatedRanges, partialsWritten...)
+		accumulatedRanges = append(accumulatedRanges, partialFilesWritten.Ranges()...)
 		return nil
 	}
 	go func() {
 		in := <-inchan
 		rng := fmt.Sprintf("%d-%d", in.request.StartBlockNum, in.request.StopBlockNum)
-		outchan <- out{partialsWritten: block.ParseRanges(rng)}
+		outchan <- out{partialsWritten: store.PartialFiles(rng)}
 
 		in = <-inchan
 		rng = fmt.Sprintf("%d-%d", in.request.StartBlockNum, in.request.StopBlockNum)
-		outchan <- out{partialsWritten: block.ParseRanges(rng)}
+		outchan <- out{partialsWritten: store.PartialFiles(rng)}
 	}()
 
 	assert.NoError(t, sched.Schedule(context.Background(), runnerPool))
@@ -76,8 +77,8 @@ func testRunnerPool(parallelism int) (work.WorkerPool, chan in, chan out) {
 				inchan <- in{request, respFunc}
 				out := <-outchan
 				return &work.Result{
-					PartialsWritten: out.partialsWritten,
-					Error:           out.err,
+					PartialFilesWritten: out.partialsWritten,
+					Error:               out.err,
 				}
 			})
 		},

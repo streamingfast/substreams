@@ -7,19 +7,16 @@ import (
 	"sort"
 	"time"
 
-	"github.com/streamingfast/shutter"
-
-	"github.com/streamingfast/substreams/storage/store"
-
 	"github.com/abourget/llerrgroup"
-	"go.uber.org/zap"
-
+	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
+	"go.uber.org/zap"
 )
 
-var SkipRange = errors.New("skip range")
+var SkipFile = errors.New("skip file")
 var PartialsChannelClosed = errors.New("partial chunks done")
 
 type StoreSquasher struct {
@@ -27,14 +24,12 @@ type StoreSquasher struct {
 
 	name                         string
 	store                        *store.FullKV
-	requestRange                 *block.Range
-	ranges                       block.Ranges
+	files                        store.FileInfos
 	targetExclusiveEndBlock      uint64 // The upper bound of this Squasher's responsibility
 	targetExclusiveEndBlockReach bool
 	nextExpectedStartBlock       uint64 // This goes from a lower number up to `targetExclusiveEndBlock`
-	//log                          *zap.Logger
-	partialsChunks    chan block.Ranges
-	storeSaveInterval uint64
+	partialsChunks               chan store.FileInfos
+	storeSaveInterval            uint64
 
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64)
 }
@@ -54,7 +49,7 @@ func NewStoreSquasher(
 		nextExpectedStartBlock:     nextExpectedStartBlock,
 		onStoreCompletedUntilBlock: onStoreCompletedUntilBlock,
 		storeSaveInterval:          storeSaveInterval,
-		partialsChunks:             make(chan block.Ranges, 100 /* before buffering the upstream requests? */),
+		partialsChunks:             make(chan store.FileInfos, 100 /* before buffering the upstream requests? */),
 	}
 	return s
 }
@@ -82,7 +77,7 @@ func (s *StoreSquasher) waitForCompletion(ctx context.Context) error {
 	}
 }
 
-func (s *StoreSquasher) squash(ctx context.Context, partialsChunks block.Ranges) error {
+func (s *StoreSquasher) squash(ctx context.Context, partialsChunks store.FileInfos) error {
 	if len(partialsChunks) == 0 {
 		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
 	}
@@ -153,23 +148,26 @@ type rangeProgress struct {
 }
 
 func (s *StoreSquasher) sortRange() {
-	sort.Slice(s.ranges, func(i, j int) bool {
-		return s.ranges[i].StartBlock < s.ranges[j].ExclusiveEndBlock
+	sort.Slice(s.files, func(i, j int) bool {
+		return s.files[i].Range.StartBlock < s.files[j].Range.ExclusiveEndBlock
 	})
 }
 
 func (s *StoreSquasher) ensureNoOverlap() error {
-	if len(s.ranges) < 2 {
+	if len(s.files) < 2 {
 		return nil
 	}
-	end := len(s.ranges) - 1
+
+	end := len(s.files) - 1
 	for i := 0; i < end; i++ {
-		left := s.ranges[i]
-		right := s.ranges[i+1]
-		if right.StartBlock < left.ExclusiveEndBlock {
-			return fmt.Errorf("sorted ranges overlapping, left: %s, right: %s", left, right)
+		left := s.files[i]
+		right := s.files[i+1]
+
+		if right.Range.StartBlock < left.Range.ExclusiveEndBlock {
+			return fmt.Errorf("sorted ranges overlapping, left: %s, right: %s", left.Range, right.Range)
 		}
 	}
+
 	return nil
 }
 
@@ -189,7 +187,7 @@ func (s *StoreSquasher) accumulateMorePartials(ctx context.Context) error {
 			return PartialsChannelClosed
 		}
 		logger.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
-		s.ranges = append(s.ranges, partialsChunks...)
+		s.files = append(s.files, partialsChunks...)
 		s.sortRange()
 		if err := s.ensureNoOverlap(); err != nil {
 			return err
@@ -209,67 +207,67 @@ func (s *StoreSquasher) accumulateMorePartials(ctx context.Context) error {
 
 func (s *StoreSquasher) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rangeProgress, error) {
 	logger := s.logger(ctx)
-	logger.Info("processing range", zap.Int("range_count", len(s.ranges)))
+	logger.Info("processing range", zap.Int("range_count", len(s.files)))
 	out := &rangeProgress{}
 	for {
 		if eg.Stop() {
 			break
 		}
 
-		if len(s.ranges) == 0 {
+		if len(s.files) == 0 {
 			logger.Info("no more ranges to squash")
 			return out, nil
 		}
 
-		squashableRange := s.ranges[0]
-		err := s.processRange(ctx, eg, squashableRange)
-		if err == SkipRange {
+		squashableFile := s.files[0]
+		err := s.processSquashableFile(ctx, eg, squashableFile)
+		if err == SkipFile {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("process range %s: %w", squashableRange.String(), err)
+			return nil, fmt.Errorf("process squashable file on range %q: %w", squashableFile.Range.String(), err)
 		}
 		// This will inform the scheduler that this range has progressed, as it affects jobs dependending on it
-		s.onStoreCompletedUntilBlock(s.name, squashableRange.ExclusiveEndBlock)
+		s.onStoreCompletedUntilBlock(s.name, squashableFile.Range.ExclusiveEndBlock)
 
 		out.squashCount++
 
-		s.ranges = s.ranges[1:]
+		s.files = s.files[1:]
 
-		if squashableRange.ExclusiveEndBlock == s.targetExclusiveEndBlock {
+		if squashableFile.Range.ExclusiveEndBlock == s.targetExclusiveEndBlock {
 			s.targetExclusiveEndBlockReach = true
 		}
-		logger.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.Uint64("end_block", squashableRange.ExclusiveEndBlock))
-		out.lastExclusiveEndBlock = squashableRange.ExclusiveEndBlock
+		logger.Debug("signaling the jobs planner that we completed", zap.String("module", s.name), zap.String("file", squashableFile.Filename))
+		out.lastExclusiveEndBlock = squashableFile.Range.ExclusiveEndBlock
 	}
 	return out, nil
 }
 
-func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, squashableRange *block.Range) error {
+func (s *StoreSquasher) processSquashableFile(ctx context.Context, eg *llerrgroup.Group, squashableFile *store.FileInfo) error {
 	logger := s.logger(ctx)
 
 	startTime := time.Now()
 	logger.Info("testing squashable range",
-		zap.Object("range", squashableRange),
+		zap.Stringer("range", squashableFile.Range),
 		zap.Uint64("next_expected_start_block", s.nextExpectedStartBlock),
 	)
 
-	if squashableRange.StartBlock < s.nextExpectedStartBlock {
-		return fmt.Errorf("non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.nextExpectedStartBlock, squashableRange.StartBlock, s.ranges)
+	if squashableFile.Range.StartBlock < s.nextExpectedStartBlock {
+		return fmt.Errorf("non contiguous ranges were added to the store squasher, expected %d, got %d, ranges: %s", s.nextExpectedStartBlock, squashableFile.Range.StartBlock, s.files)
 	}
-	if s.nextExpectedStartBlock != squashableRange.StartBlock {
-		return SkipRange
+	if s.nextExpectedStartBlock != squashableFile.Range.StartBlock {
+		return SkipFile
 	}
 
 	logger.Debug("found range to merge",
-		zap.Stringer("squashable", s),
-		zap.Stringer("squashable_range", squashableRange),
+		zap.Stringer("squasher", s),
+		zap.String("squashable_file", squashableFile.Filename),
 	)
 
-	nextStore := s.store.DerivePartialStore(squashableRange.StartBlock)
+	nextStore := s.store.DerivePartialStore(squashableFile.Range.StartBlock)
 
 	loadTime := time.Now()
-	if err := nextStore.Load(ctx, squashableRange.ExclusiveEndBlock); err != nil {
+	if err := nextStore.Load(ctx, squashableFile); err != nil {
 		return fmt.Errorf("initializing next partial store %q: %w", s.name, err)
 	}
 	loadTimeTook := time.Since(loadTime)
@@ -282,18 +280,18 @@ func (s *StoreSquasher) processRange(ctx context.Context, eg *llerrgroup.Group, 
 	mergeTimeTook := time.Since(mergeTime)
 
 	logger.Debug("store merge", zap.Object("store", s.store))
-	s.nextExpectedStartBlock = squashableRange.ExclusiveEndBlock
+	s.nextExpectedStartBlock = squashableFile.Range.ExclusiveEndBlock
 
-	if reqctx.Details(ctx).ProductionMode || squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0 {
+	if reqctx.Details(ctx).ProductionMode || squashableFile.Range.ExclusiveEndBlock%s.storeSaveInterval == 0 {
 		logger.Info("deleting store", zap.Stringer("store", nextStore))
 		eg.Go(func() error {
-			return nextStore.DeleteStore(ctx, squashableRange.ExclusiveEndBlock)
+			return nextStore.DeleteStore(ctx, squashableFile)
 		})
 	}
 
-	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableRange) {
+	if s.shouldSaveFullKV(s.store.InitialBlock(), squashableFile.Range) {
 		saveTime := time.Now()
-		_, writer, err := s.store.Save(squashableRange.ExclusiveEndBlock)
+		_, writer, err := s.store.Save(squashableFile.Range.ExclusiveEndBlock)
 		saveTimeTook := time.Since(saveTime)
 		if err != nil {
 			return fmt.Errorf("save full store: %w", err)
@@ -330,7 +328,7 @@ func (s *StoreSquasher) shouldSaveFullKV(storeInitialBlock uint64, squashableRan
 }
 
 func (s *StoreSquasher) IsEmpty() bool {
-	return len(s.ranges) == 0
+	return len(s.files) == 0
 }
 
 func (s *StoreSquasher) String() string {
@@ -338,5 +336,5 @@ func (s *StoreSquasher) String() string {
 	if s.targetExclusiveEndBlockReach {
 		add = " (target reached)"
 	}
-	return fmt.Sprintf("%s%s: [%s]", s.name, add, s.ranges)
+	return fmt.Sprintf("%s%s: [%s]", s.name, add, s.files)
 }

@@ -91,7 +91,7 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, b
 	span.SetAttributes(attribute.String("store", saveStore.Name()))
 	defer span.EndWithErr(&err)
 
-	blockRange, writer, err := saveStore.Save(boundaryBlock)
+	file, writer, err := saveStore.Save(boundaryBlock)
 	if err != nil {
 		return fmt.Errorf("saving store %q at boundary %d: %w", saveStore.Name(), boundaryBlock, err)
 	}
@@ -101,8 +101,12 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, b
 	}
 
 	if reqctx.Details(ctx).ShouldReturnWrittenPartials(saveStore.Name()) {
-		s.partialsWritten = append(s.partialsWritten, blockRange)
-		reqctx.Logger(ctx).Debug("adding partials written", zap.Object("range", blockRange), zap.Stringer("ranges", s.partialsWritten), zap.Uint64("boundary_block", boundaryBlock))
+		s.partialsWritten = append(s.partialsWritten, file.Range)
+		reqctx.Logger(ctx).Debug("adding partials written",
+			zap.Stringer("range", file.Range),
+			zap.Stringer("ranges", s.partialsWritten),
+			zap.Uint64("boundary_block", boundaryBlock),
+		)
 
 		if v, ok := saveStore.(store.PartialStore); ok {
 			reqctx.Span(ctx).AddEvent("store_roll_trigger")

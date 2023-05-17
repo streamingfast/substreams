@@ -40,11 +40,11 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 
 	for _, file := range files {
 		if file.Partial {
-			partialFiles[file.EndBlock] = file.Filename
+			partialFiles[file.Range.ExclusiveEndBlock] = file.Filename
 		}
 
-		if !file.Partial && file.EndBlock > highestKVBlock {
-			highestKVBlock = file.EndBlock
+		if !file.Partial && file.Range.ExclusiveEndBlock > highestKVBlock {
+			highestKVBlock = file.Range.ExclusiveEndBlock
 			return nil
 		}
 	}

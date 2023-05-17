@@ -10,16 +10,25 @@ import (
 )
 
 type storeSnapshots struct {
-	Completes block.Ranges // Shortest completes first, largest last.
-	Partials  block.Ranges // First partials first, last
+	Completes store.FileInfos // Shortest completes first, largest last.
+	Partials  store.FileInfos // First partials first, last
 }
 
 func (s *storeSnapshots) Sort() {
-	sort.Slice(s.Completes, func(i, j int) bool {
-		return s.Completes[i].ExclusiveEndBlock < s.Completes[j].ExclusiveEndBlock
+	sort.SliceStable(s.Completes, func(i, j int) bool {
+		return s.Completes[i].Range.ExclusiveEndBlock < s.Completes[j].Range.ExclusiveEndBlock
 	})
-	sort.Slice(s.Partials, func(i, j int) bool {
-		return s.Partials[i].StartBlock < s.Partials[j].StartBlock
+	sort.SliceStable(s.Partials, func(i, j int) bool {
+		left := s.Partials[i]
+		right := s.Partials[j]
+
+		// Sort by start block first, then by trace ID so at least we
+		// take partials all from the same producer.
+		if left.Range.StartBlock == right.Range.StartBlock {
+			return left.TraceID < right.TraceID
+		}
+
+		return left.Range.StartBlock < right.Range.StartBlock
 	})
 }
 
@@ -31,13 +40,13 @@ func (s *storeSnapshots) LastCompletedBlock() uint64 {
 	if len(s.Completes) == 0 {
 		return 0
 	}
-	return s.Completes[len(s.Completes)-1].ExclusiveEndBlock
+	return s.Completes[len(s.Completes)-1].Range.ExclusiveEndBlock
 }
 
-func (s *storeSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *block.Range {
+func (s *storeSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *store.FileInfo {
 	for i := len(s.Completes); i > 0; i-- {
 		comp := s.Completes[i-1]
-		if comp.ExclusiveEndBlock > blockNum {
+		if comp.Range.ExclusiveEndBlock > blockNum {
 			continue
 		}
 		return comp
@@ -45,13 +54,14 @@ func (s *storeSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *block.Rang
 	return nil
 }
 
-func (s *storeSnapshots) ContainsPartial(r *block.Range) bool {
+// findPartial returns the partial file that matches the given range, or nil if none matches.
+func (s *storeSnapshots) findPartial(r *block.Range) *store.FileInfo {
 	for _, file := range s.Partials {
-		if file.StartBlock == r.StartBlock && file.ExclusiveEndBlock == r.ExclusiveEndBlock {
-			return true
+		if r.Equals(file.Range) {
+			return file
 		}
 	}
-	return false
+	return nil
 }
 
 type Snapshot struct {
@@ -69,11 +79,10 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64)
 
 	for _, file := range files {
 		if file.Partial {
-			out.Partials = append(out.Partials, block.NewRange(file.StartBlock, file.EndBlock))
+			out.Partials = append(out.Partials, file)
 		} else {
-			out.Completes = append(out.Completes, block.NewRange(file.StartBlock, file.EndBlock))
+			out.Completes = append(out.Completes, file)
 		}
-
 	}
 	out.Sort()
 	return out, nil

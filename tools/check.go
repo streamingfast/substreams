@@ -41,8 +41,8 @@ func checkE(cmd *cobra.Command, args []string) error {
 		if !file.Partial {
 			continue
 		}
-		currentRange := block.NewRange(file.StartBlock, file.EndBlock)
 
+		currentRange := file.Range
 		if prevRange == nil {
 			prevRange = currentRange
 			continue
@@ -64,7 +64,7 @@ func newStore(storeURL string) (*store2.FullKV, dstore.Store, error) {
 		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
 	}
 
-	config, err := store2.NewConfig("", 0, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore)
+	config, err := store2.NewConfig("", 0, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore, "")
 	if err != nil {
 		return nil, nil, err
 	}

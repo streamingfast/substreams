@@ -6,26 +6,25 @@ import (
 	"io"
 	"sync/atomic"
 
+	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/client"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
-
-	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/client"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/reqctx"
 )
 
 var lastWorkerID uint64
 
 type Result struct {
-	PartialsWritten []*block.Range
-	Error           error
+	PartialFilesWritten store.FileInfos
+	Error               error
 }
 
 type Worker interface {
@@ -182,7 +181,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Info("worker done")
 				return &Result{
-					PartialsWritten: toRPCBlockRanges(r.Completed.AllProcessedRanges),
+					PartialFilesWritten: toRPCPartialFiles(r.Completed),
 				}
 			}
 		}
@@ -272,12 +271,10 @@ func toRPCRangeProgressResponse(moduleName string, start, end uint64) *pbsubstre
 	}
 }
 
-func toRPCBlockRanges(in []*pbssinternal.BlockRange) (out []*block.Range) {
-	for _, b := range in {
-		out = append(out, &block.Range{
-			StartBlock:        b.StartBlock,
-			ExclusiveEndBlock: b.EndBlock,
-		})
+func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {
+	out = make(store.FileInfos, len(completed.AllProcessedRanges))
+	for i, b := range completed.AllProcessedRanges {
+		out[i] = store.NewPartialFileInfo(b.StartBlock, b.EndBlock, completed.TraceId)
 	}
 	return
 }

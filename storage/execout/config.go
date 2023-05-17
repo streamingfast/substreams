@@ -55,21 +55,23 @@ func (c *Config) ModuleInitialBlock() uint64          { return c.moduleInitialBl
 
 func (c *Config) ListSnapshotFiles(ctx context.Context) (files FileInfos, err error) {
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		// We must reset accumulated files between each retry
 		files = nil
-		if err := c.objStore.Walk(ctx, "", func(filename string) (err error) {
+
+		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, err := parseFileName(filename)
 			if err != nil {
+				c.logger.Warn("seen exec output file that we don't know how to parse", zap.String("filename", filename), zap.Error(err))
 				return nil
 			}
+
 			files = append(files, fileInfo)
 			return nil
-		}); err != nil {
-			return fmt.Errorf("walking snapshots: %w", err)
-		}
-		return nil
+		})
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("walking files: %s", err)
 	}
+
 	return files, nil
 }

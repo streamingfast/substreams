@@ -114,7 +114,8 @@ func mapTypeToUpdateMsg(in any) any {
 		*pbsubstreamsrpc.BlockScopedData,
 		*pbsubstreamsrpc.ModulesProgress,
 		*pbsubstreamsrpc.InitialSnapshotData,
-		*pbsubstreamsrpc.InitialSnapshotComplete:
+		*pbsubstreamsrpc.InitialSnapshotComplete,
+		*pbsubstreamsrpc.SessionInit:
 		return m
 	}
 	panic("unsupported payload")
@@ -130,7 +131,8 @@ func (f *File) Push(msg tea.Msg) error {
 		*pbsubstreamsrpc.BlockScopedData,
 		*pbsubstreamsrpc.ModulesProgress,
 		*pbsubstreamsrpc.InitialSnapshotData,
-		*pbsubstreamsrpc.InitialSnapshotComplete:
+		*pbsubstreamsrpc.InitialSnapshotComplete,
+		*pbsubstreamsrpc.SessionInit:
 
 		anyMsg, err := anypb.New(msg.(proto.Message))
 		if err != nil {

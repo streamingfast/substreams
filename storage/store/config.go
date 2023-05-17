@@ -3,13 +3,14 @@ package store
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -24,22 +25,9 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
-
-	// traceID uniquely identifies the connection ID so that store can be
-	// written to unique filename preventing some races when multiple Substreams
-	// request works on the same range.
-	traceID string
 }
 
-func NewConfig(
-	name string,
-	moduleInitialBlock uint64,
-	moduleHash string,
-	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
-	valueType string,
-	store dstore.Store,
-	traceID string,
-) (*Config, error) {
+func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string, store dstore.Store) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
@@ -55,7 +43,6 @@ func NewConfig(
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     1_073_741_824, // 1GiB
 		itemSizeLimit:      10_485_760,    // 10MiB
-		traceID:            traceID,
 	}, nil
 }
 
@@ -121,30 +108,28 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 	if below == 0 {
 		return nil, nil
 	}
-
-	logger := logging.Logger(ctx, zlog)
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		// We need to clear each time we start because a previous retry could have accumulated a partial state
 		files = nil
-
-		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
+		if err := c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(filename)
 			if !ok {
-				logger.Warn("seen snapshot file that we don't know how to parse", zap.String("filename", filename))
 				return nil
 			}
-
-			if fileInfo.Range.StartBlock >= below {
-				return dstore.StopIteration
+			if fileInfo.StartBlock >= below {
+				return io.EOF
 			}
-
 			files = append(files, fileInfo)
 			return nil
-		})
+		}); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf("walking snapshots: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("walking files: %s", err)
+		return nil, err
 	}
-
 	return files, nil
 }

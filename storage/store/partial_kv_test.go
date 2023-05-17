@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
 func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
@@ -36,7 +37,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		},
 	}
 
-	file, writer, err := kvs.Save(123)
+	br, writer, err := kvs.Save(123)
 	require.NoError(t, err)
 
 	err = writer.Write(context.Background())
@@ -56,7 +57,7 @@ func TestPartialKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		},
 	}
 
-	err = kvl.Load(context.Background(), file)
+	err = kvl.Load(context.Background(), br.ExclusiveEndBlock)
 	require.NoError(t, err)
 	require.NotNilf(t, kvl.kv, "kvl.kv is nil")
 }

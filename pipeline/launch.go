@@ -67,7 +67,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 			Type: &pbssinternal.ProcessRangeResponse_Completed{
 				Completed: &pbssinternal.Completed{
 					AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
-					TraceId:            p.traceID,
 				},
 			},
 		})

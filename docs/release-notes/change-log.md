@@ -6,36 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [v1.1.2](https://github.com/streamingfast/substreams/releases/tag/v1.1.2)
 
-### Notes for operators
+### Highlights
 
-#### You need to clear the state store
+This release contains bug fixes and speed/scaling improvements around the Substreams engine. It also contains few small enhancements for `substreams gui`.
 
-* Since we found a bug that could corrupt state files, you will need to remove all the files that are stored under `state-store-url`.
+This release contains an important bug that could have generated corrupted `store` state files. This is important for developers and operators.
 
-#### Upgrade procedure
+#### Developers
 
-> **Note** This upgrade procedure is applies if your Substreams deployment topology includes both `tier1` and `tier2` processes. If you have defined somewhere the config value `substreams-tier2: true`, then this applies to you, otherwise, if you can ignore the upgrade procedure.
+The `store` state files will be fully deleted on the Substreams server to start fresh again. The impact for you as a developer is that Substreams that were fully synced will now need to re-generate from initial block the store's state. So you might see long delays before getting a new block data while the Substreams engine is re-computing the `store` states from scratch.
 
-This release includes a small change in the internal RPC layer between `tier1` processes and `tier2` processes. This change requires an ordered upgrade of the processes to avoid errors.
+### Operators
 
-The components should be deployed in this order:
-1. Deploy and roll out `tier1` processes first
-2. Deploy and roll out `tier2` processes in second
-
-If you upgrade in the wrong order or if somehow `tier2` processes start using the new protocol without `tier1` being aware, user will end up with backend error(s) saying that some partial file are not found. Those will be resolved only when `tier1` processes have been upgraded successfully.
+You need to clear the state store and remove all the files that are stored under `substreams-state-store-url` flag. You can also make it point to a brand new folder and delete the old one after the rollout.
 
 ### Fixed
 
-* Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.
 * Fixed a bug in tier1 that could result in corrupted state files when getting close to chain HEAD
-* Fixed some performance and stalling issues when using google storage for blocks
+* Fixed some performance and stalling issues when using GCS for blocks
 * Fixed storage logs not being shown properly
 * GUI: Fixed panic race condition
 * GUI: Cosmetic changes
 
 ### Added
 
-* GUI: Added traceID 
+* GUI: Added traceID
 
 ## [v1.1.1](https://github.com/streamingfast/substreams/releases/tag/v1.1.1)
 

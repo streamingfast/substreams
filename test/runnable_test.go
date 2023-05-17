@@ -20,7 +20,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
@@ -31,10 +30,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerFactory)
-
 type testRun struct {
-	Package                *pbsubstreams.Package
 	Cursor                 *bstream.Cursor
 	StartBlock             int64
 	ExclusiveEndBlock      uint64
@@ -45,10 +41,7 @@ type testRun struct {
 	BlockProcessedCallback blockProcessedCallBack
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	ProductionMode         bool
-	// PreWork can be done to perform tier2 work in advance, to simulate when
-	// pre-existing data is available in different conditions
-	PreWork testPreWork
-	Context context.Context // custom top-level context, defaults to context.Background()
+	Context                context.Context // custom top-level context, defaults to context.Background()
 
 	Params map[string]string
 
@@ -56,10 +49,8 @@ type testRun struct {
 	TempDir   string
 }
 
-func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleName string) *testRun {
-	pkg := manifest.TestReadManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
-
-	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
+func newTestRun(startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleName string) *testRun {
+	return &testRun{StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
 }
 
 func (f *testRun) Run(t *testing.T) error {
@@ -67,16 +58,15 @@ func (f *testRun) Run(t *testing.T) error {
 	if f.Context != nil {
 		ctx = f.Context
 	}
-
 	ctx = reqctx.WithLogger(ctx, zlog)
 
 	testTempDir := t.TempDir()
+	fmt.Println("Running test in temp dir: ", testTempDir)
 	f.TempDir = testTempDir
 
 	ctx = withTestTracing(t, ctx)
-	if f.Context == nil {
-		f.Context = ctx
-	}
+
+	pkg := manifest.TestReadManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
 
 	opaqueCursor := ""
 	if f.Cursor != nil {
@@ -86,7 +76,7 @@ func (f *testRun) Run(t *testing.T) error {
 		StartBlockNum:  f.StartBlock,
 		StopBlockNum:   f.ExclusiveEndBlock,
 		StartCursor:    opaqueCursor,
-		Modules:        f.Package.Modules,
+		Modules:        pkg.Modules,
 		OutputModule:   f.ModuleName,
 		ProductionMode: f.ProductionMode,
 	}
@@ -94,7 +84,7 @@ func (f *testRun) Run(t *testing.T) error {
 	if f.Params != nil {
 		for k, v := range f.Params {
 			var found bool
-			for _, mod := range f.Package.Modules.Modules {
+			for _, mod := range pkg.Modules.Modules {
 				if k == mod.Name {
 					assert.NotZero(t, len(mod.Inputs))
 					p := mod.Inputs[0].GetParams()
@@ -127,7 +117,7 @@ func (f *testRun) Run(t *testing.T) error {
 	}
 
 	workerFactory := func(_ *zap.Logger) work.Worker {
-		return &TestWorker{
+		w := &TestWorker{
 			t:                      t,
 			responseCollector:      newResponseCollector(),
 			newBlockGenerator:      newBlockGenerator,
@@ -135,10 +125,7 @@ func (f *testRun) Run(t *testing.T) error {
 			testTempDir:            testTempDir,
 			id:                     workerID.Inc(),
 		}
-	}
-
-	if f.PreWork != nil {
-		f.PreWork(t, f, workerFactory)
+		return w
 	}
 
 	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, testTempDir, f.SubrequestsSplitSize, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
@@ -233,7 +220,6 @@ func processInternalRequest(
 	subrequestsSplitSize uint64,
 	parallelSubrequests uint64,
 	linearHandoffBlockNum uint64,
-	traceID *string,
 ) error {
 	t.Helper()
 
@@ -257,7 +243,7 @@ func processInternalRequest(
 	)
 	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
 
-	return svc.TestBlocks(ctx, request, responseCollector.Collect, traceID)
+	return svc.TestBlocks(ctx, request, responseCollector.Collect)
 }
 
 func processRequest(

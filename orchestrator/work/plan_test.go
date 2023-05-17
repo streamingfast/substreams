@@ -11,7 +11,6 @@ import (
 
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
-	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/storage/store/state"
 
 	"github.com/streamingfast/substreams/block"
@@ -363,7 +362,7 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 			fields: fields{
 				ModulesStateMap: storage.ModuleStorageStateMap{
 					"A": &state.StoreStorageState{
-						InitialCompleteFile: store.CompleteFile("1-20"),
+						InitialCompleteRange: &state.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
 					},
 				},
 			},
@@ -376,7 +375,7 @@ func TestPlan_initModulesReadyUpToBlock(t *testing.T) {
 			fields: fields{
 				ModulesStateMap: storage.ModuleStorageStateMap{
 					"A": &state.StoreStorageState{
-						InitialCompleteFile: store.CompleteFile("1-20"),
+						InitialCompleteRange: &state.FullStoreFile{StartBlock: 1, ExclusiveEndBlock: 20},
 					},
 					"B": &state.StoreStorageState{
 						ModuleInitialBlock: 1,
@@ -594,23 +593,23 @@ func TestPlan_initialProgressMessages(t *testing.T) {
 	}{
 		{
 			modState: &state.StoreStorageState{
-				ModuleName:          "A",
-				InitialCompleteFile: store.CompleteFile("1-10"),
-				PartialsPresent:     store.PartialFiles("20-30,40-50,50-60"),
+				ModuleName:           "A",
+				InitialCompleteRange: block.ParseRange("1-10"),
+				PartialsPresent:      block.ParseRanges("20-30,40-50,50-60"),
 			},
 			expectedProgress: "A:r1-10,20-30,40-60",
 		},
 		{
 			modState: &state.StoreStorageState{
-				ModuleName:          "A",
-				InitialCompleteFile: store.CompleteFile("1-10"),
+				ModuleName:           "A",
+				InitialCompleteRange: block.ParseRange("1-10"),
 			},
 			expectedProgress: "A:r1-10",
 		},
 		{
 			modState: &state.StoreStorageState{
 				ModuleName:      "A",
-				PartialsPresent: store.PartialFiles("10-20"),
+				PartialsPresent: block.ParseRanges("10-20"),
 			},
 			expectedProgress: "A:r10-20",
 		},

@@ -110,13 +110,11 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.UpdatePolicy,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.ValueType,
 				baseDStore,
-				"",
 			)
 			if err != nil {
 				zlog.Error("creating store config", zap.Error(err))
 				return
 			}
-
 			storeStats := initializeStoreStats(conf)
 
 			stateStore, fileInfos, err := getStore(ctx, conf, math.MaxUint64)
@@ -147,7 +145,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			}
 
 			storeStats.FileInfo = &FileInfo{
-				FileBlockRange: latestFile.Range,
+				FileBlockRange: block.NewRange(latestFile.StartBlock, latestFile.EndBlock),
 				FileName:       latestFile.Filename,
 				FileSize:       fileSize,
 				FileSizeGrowth: growth,
@@ -266,7 +264,7 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 
 	start = time.Now()
 	sort.Slice(kvFiles, func(i, j int) bool { //reverse sort
-		return kvFiles[i].Range.ExclusiveEndBlock >= kvFiles[j].Range.ExclusiveEndBlock
+		return kvFiles[i].EndBlock >= kvFiles[j].EndBlock
 	})
 	zlog.Debug("sorting snapshot files", zap.Duration("duration", time.Now().Sub(start)))
 
@@ -281,7 +279,7 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 
 	start = time.Now()
 	s := conf.NewFullKV(zlog)
-	err = s.Load(ctx, latestFile)
+	err = s.Load(ctx, latestFile.EndBlock)
 	if err != nil {
 		return nil, nil, fmt.Errorf("loading store: %w", err)
 	}

@@ -90,8 +90,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		r.manifestView, cmd = r.manifestView.Update(msg)
 		cmds = append(cmds, cmd)
-	case *pbsubstreamsrpc.Response_Session:
-		r.traceId = msg.Session.TraceId
+	case *pbsubstreamsrpc.SessionInit:
+		r.traceId = msg.TraceId
 	}
 	return r, tea.Batch(cmds...)
 }

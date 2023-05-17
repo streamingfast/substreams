@@ -14,3 +14,7 @@ type PanicError struct {
 func (e *PanicError) Error() string {
 	return fmt.Sprintf("panic in the wasm: %q at %s:%d:%d", e.message, e.filename, e.lineNumber, e.columnNumber)
 }
+
+func NewPanicError(message, filename string, lineNumber, columnNumber int) *PanicError {
+	return &PanicError{message, filename, lineNumber, columnNumber}
+}

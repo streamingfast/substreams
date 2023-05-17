@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tetratelabs/wazero/api"
 	ttrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/streamingfast/substreams/storage/execout"
@@ -16,12 +15,12 @@ type BaseExecutor struct {
 	ctx context.Context
 
 	moduleName    string
-	wasmModule    *wasm.Module
+	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
 	entrypoint    string
 	tracer        ttrace.Tracer
 
-	cachedInstance api.Module
+	cachedInstance wasm.Instance
 
 	// Results
 	logs           []string
@@ -29,7 +28,7 @@ type BaseExecutor struct {
 	executionStack []string
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule *wasm.Module, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{ctx: ctx, moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
 }
 
@@ -65,8 +64,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	//  state store in read mode)
 	if hasInput {
 		clock := outputGetter.Clock()
-		var mod api.Module
-		mod, call, err = e.wasmModule.ExecuteNewCall(e.ctx, e.cachedInstance, clock, e.moduleName, e.entrypoint, e.wasmArguments)
+		var mod wasm.Instance
+		call := wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
+		mod, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
 		if err != nil {
 			errExecutor := ErrorExecutor{
 				message: err.Error(),

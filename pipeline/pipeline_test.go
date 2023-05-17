@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
-	store2 "github.com/streamingfast/substreams/storage/store"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -23,7 +22,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	"go.uber.org/zap"
+	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
 
 func TestPipeline_runExecutor(t *testing.T) {
@@ -80,8 +79,10 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
+	ctx := context.Background()
+
 	registry := wasm.NewRegistry(nil, 0)
-	module, err := registry.NewModule(binary.Content)
+	module, err := registry.NewModule(ctx, binary.Content)
 	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(

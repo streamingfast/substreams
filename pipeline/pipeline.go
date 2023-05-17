@@ -7,6 +7,12 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -20,9 +26,6 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	"go.opentelemetry.io/otel"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 )
 
 type processingModule struct {
@@ -411,13 +414,13 @@ func (p *Pipeline) buildWASM(ctx context.Context, modules []*pbsubstreams.Module
 	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
-	loadedModules := make(map[uint32]*wasm.Module)
+	loadedModules := make(map[uint32]wasm.Module)
 	for _, module := range modules {
 		if _, exists := loadedModules[module.BinaryIndex]; exists {
 			continue
 		}
 		code := reqModules.Binaries[module.BinaryIndex]
-		m, err := p.wasmRuntime.NewModule(code.Content)
+		m, err := p.wasmRuntime.NewModule(ctx, code.Content)
 		if err != nil {
 			return fmt.Errorf("new wasm module: %w", err)
 		}

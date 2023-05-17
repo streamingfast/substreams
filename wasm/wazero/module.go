@@ -1,4 +1,4 @@
-package wasm
+package wazero
 
 import (
 	"context"
@@ -7,29 +7,32 @@ import (
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+
+	"github.com/streamingfast/substreams/wasm"
 )
 
 // A Module represents a wazero.Runtime that clears and is destroyed upon completion of a request.
 // It has the pre-compiled `env` host module, as well as pre-compiled WASM code provided by the user
 type Module struct {
-	registry *Registry
-
 	wazRuntime      wazero.Runtime
 	wazModuleConfig wazero.ModuleConfig
 	hostModules     []wazero.CompiledModule
 	userModule      wazero.CompiledModule
 }
 
-func (r *Registry) NewModule(wasmCode []byte) (*Module, error) {
+func init() {
+	wasm.RegisterModuleFactory("wazero", wasm.ModuleFactoryFunc(newModule))
+}
+
+func newModule(ctx context.Context, wasmCode []byte, registry *wasm.Registry) (wasm.Module, error) {
 	// What's the effect of `ctx` here? Will it kill all the WASM if it cancels?
 	// TODO: try with: wazero.NewRuntimeConfigCompiler()
 	// TODO: try config := wazero.NewRuntimeConfig().WithCompilationCache(cache)
-	ctx := context.Background()
 	runtimeConfig := wazero.NewRuntimeConfigCompiler()
 	// TODO: can we use some caching in the RuntimeConfig so perhaps we reuse
 	// things across runtimes creations?
 	runtime := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
-	hostModules, err := addExtensionFunctions(ctx, runtime, r)
+	hostModules, err := addExtensionFunctions(ctx, runtime, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -63,12 +66,95 @@ func (r *Registry) NewModule(wasmCode []byte) (*Module, error) {
 	}
 
 	return &Module{
-		registry:        r,
 		wazModuleConfig: wazero.NewModuleConfig(),
 		wazRuntime:      runtime,
 		userModule:      mod,
 		hostModules:     hostModules,
 	}, nil
+}
+
+func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (returnInstance wasm.Instance, err error) {
+	//t0 := time.Now()
+
+	var mod api.Module
+	if cachedInstance != nil {
+		mod = cachedInstance.(api.Module)
+	} else {
+		//fmt.Println("Instantiate")
+		mod, err = m.instantiateModule(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("could not instantiate wasm module for %q: %w", call.ModuleName, err)
+		}
+		// Closed by the caller.
+		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
+	}
+	//fmt.Println("Timing 1", time.Since(t0))
+	//t0 = time.Now()
+	f := mod.ExportedFunction(call.Entrypoint)
+	if f == nil {
+		return mod, fmt.Errorf("could not find entrypoint function %q for module %q", call.Entrypoint, call.ModuleName)
+	}
+	//fmt.Println("Timing 2", time.Since(t0))
+
+	var args []uint64
+	var inputStoreCount int
+	for _, input := range arguments {
+		switch v := input.(type) {
+		case *wasm.StoreWriterOutput:
+		case *wasm.StoreReaderInput:
+			inputStoreCount++
+			args = append(args, uint64(inputStoreCount-1))
+		case wasm.ValueArgument:
+			cnt := v.Value()
+			ptr := writeToHeap(ctx, mod, cnt, input.Name())
+			length := uint64(len(cnt))
+			args = append(args, uint64(ptr), length)
+		default:
+			panic("unknown wasm argument type")
+		}
+	}
+
+	_, err = f.Call(wasm.WithContext(ctx, call), args...)
+	//defer call.deallocate(ctx, mod)
+	if err != nil {
+		if call.PanicError != nil {
+			return mod, call.PanicError
+		}
+		return mod, fmt.Errorf("executing module %q: %w", call.ModuleName, err)
+	}
+
+	return mod, nil
+}
+
+//var CACHE_ENABLED = os.Getenv("WAZERO_CACHE_ENABLED") != ""
+
+func writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) uint32 {
+	stack := []uint64{uint64(len(data))}
+	//fmt.Println("Writing length", len(data))
+	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
+		panic(fmt.Errorf("alloc from %q failed: %w", from, err))
+	}
+	ptr := uint32(stack[0])
+	if ok := mod.Memory().Write(ptr, data); !ok {
+		panic("could not write to memory: " + from)
+	}
+	//fmt.Println("Memory size:", mod.Memory().Size())
+	//if CACHE_ENABLED {
+	//	c.allocations = append(c.allocations, allocation{ptr: ptr, length: uint32(len(data))})
+	//}
+	return ptr
+}
+
+func writeOutputToHeap(ctx context.Context, mod api.Module, outputPtr uint32, value []byte) error {
+	valuePtr := writeToHeap(ctx, mod, value, "writeOutputToHeap1")
+	mem := mod.Memory()
+	if ok := mem.WriteUint32Le(outputPtr, valuePtr); !ok {
+		panic("could not write to memory WriteUint32Le:1")
+	}
+	if ok := mem.WriteUint32Le(outputPtr+4, uint32(len(value))); !ok {
+		panic("could not write to memory WriteUint32Le:2")
+	}
+	return nil
 }
 
 func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
@@ -91,18 +177,18 @@ var i32 = api.ValueTypeI32
 var i64 = api.ValueTypeI64
 var f64 = api.ValueTypeF64
 
-func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry *Registry) (out []wazero.CompiledModule, err error) {
-	for namespace, imports := range registry.extensions {
+func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry *wasm.Registry) (out []wazero.CompiledModule, err error) {
+	for namespace, imports := range registry.Extensions {
 		builder := runtime.NewHostModuleBuilder(namespace)
 		for importName, f := range imports {
 			builder.NewFunctionBuilder().
 				WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 					ptr, length, outputPtr := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
 					data := readBytes(mod, ptr, length)
-					call := fromContext(ctx)
+					call := wasm.FromContext(ctx)
 					traceID := tracing.GetTraceID(ctx).String()
 
-					out, err := f(ctx, traceID, call.clock, data)
+					out, err := f(ctx, traceID, call.Clock, data)
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}
@@ -113,7 +199,7 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 						return
 					}
 
-					if err := call.writeOutputToHeap(ctx, mod, outputPtr, out, importName); err != nil {
+					if err := writeOutputToHeap(ctx, mod, outputPtr, out); err != nil {
 						panic(fmt.Errorf("write output to heap %w", err))
 					}
 				}), []parm{i32, i32, i32}, []parm{}).

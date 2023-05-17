@@ -1,13 +1,20 @@
 package wasm
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"go.uber.org/zap"
+)
 
 // Registry from Substreams's perspective is a singleton that is
 // reused across requests, from which we instantiate Modules (wasm code provided by the users)
 // and from which we instantiate Instances (one for each executions within each blocks).
 type Registry struct {
-	extensions map[string]map[string]WASMExtension
-	maxFuel    uint64
+	Extensions   map[string]map[string]WASMExtension
+	maxFuel      uint64
+	runtimeStack ModuleFactory
 }
 
 func (r *Registry) registerWASMExtension(namespace string, importName string, ext WASMExtension) {
@@ -21,16 +28,20 @@ func (r *Registry) registerWASMExtension(namespace string, importName string, ex
 		panic("cannot extend 'logger' wasm namespace")
 	}
 
-	if r.extensions == nil {
-		r.extensions = map[string]map[string]WASMExtension{}
+	if r.Extensions == nil {
+		r.Extensions = map[string]map[string]WASMExtension{}
 	}
-	if r.extensions[namespace] == nil {
-		r.extensions[namespace] = map[string]WASMExtension{}
+	if r.Extensions[namespace] == nil {
+		r.Extensions[namespace] = map[string]WASMExtension{}
 	}
-	if r.extensions[namespace][importName] != nil {
+	if r.Extensions[namespace][importName] != nil {
 		panic(fmt.Sprintf("wasm extension namespace %q function %q already defined", namespace, importName))
 	}
-	r.extensions[namespace][importName] = ext
+	r.Extensions[namespace][importName] = ext
+}
+
+func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, error) {
+	return r.runtimeStack.NewModule(ctx, wasmCode, r)
 }
 
 func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
@@ -44,5 +55,16 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 			}
 		}
 	}
+	runtime := runtimes["wazero"]
+	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
+		selectedRuntime := runtimes[selectRuntime]
+		if selectedRuntime == nil {
+			zlog.Warn("CANNOT FIND WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR, USING DEFAULT", zap.String("runtime", RuntimeName(runtime)))
+		} else {
+			runtime = selectedRuntime
+			zlog.Warn("USING WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR", zap.String("runtime", RuntimeName(runtime)))
+		}
+	}
+	r.runtimeStack = runtime
 	return r
 }

@@ -3,22 +3,20 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sort"
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
 
-	"github.com/streamingfast/substreams/storage/store"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 type Call struct {
-	ctx context.Context
-
-	moduleName string
-	wasmModule *Module
-	entrypoint string
+	Clock      *pbsubstreams.Clock // Used by WASM extensions
+	ModuleName string
+	Entrypoint string
 
 	inputStores  []store.Reader
 	outputStore  store.Store
@@ -26,16 +24,45 @@ type Call struct {
 
 	valueType string
 
-	clock *pbsubstreams.Clock // Used by WASM extensions
-
-	returnValue []byte
-	panicError  *PanicError
+	ReturnValue []byte
+	PanicError  *PanicError
 
 	Logs           []string
 	LogsByteCount  uint64
 	ExecutionStack []string
 
 	allocations []allocation
+}
+
+func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) *Call {
+	call := &Call{
+		Clock:      clock,
+		ModuleName: moduleName,
+		Entrypoint: entrypoint,
+	}
+
+	//var args []uint64
+	for _, input := range arguments {
+		switch v := input.(type) {
+		case *StoreWriterOutput:
+			call.outputStore = v.Store
+			call.updatePolicy = v.UpdatePolicy
+			call.valueType = v.ValueType
+		case *StoreReaderInput:
+			call.inputStores = append(call.inputStores, v.Store)
+			//args = append(args, uint64(len(call.inputStores)-1))
+		case ValueArgument:
+			// Handled in ÈxecuteNewCall()
+			//cnt := v.Value()
+			//ptr := call.writeToHeap(ctx, mod, cnt, input.Name())
+			//length := uint64(len(cnt))
+			//args = append(args, uint64(ptr), length)
+		default:
+			panic("unknown wasm argument type")
+		}
+	}
+
+	return call
 }
 
 //func (m *Module) NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (*Call, error) {
@@ -52,97 +79,6 @@ type Call struct {
 //	i.wasmStore.AddFuel(i.registry.maxFuel)
 //}
 //}
-
-func (m *Module) ExecuteNewCall(ctx context.Context, cachedInstance api.Module, clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (mod api.Module, call *Call, err error) {
-	//t0 := time.Now()
-	if cachedInstance != nil {
-		mod = cachedInstance
-	} else {
-		//fmt.Println("Instantiate")
-		mod, err = m.instantiateModule(ctx)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not instantiate wasm module for %q: %w", moduleName, err)
-		}
-		// Closed by the caller.
-		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
-	}
-	//fmt.Println("Timing 1", time.Since(t0))
-	//t0 = time.Now()
-	f := mod.ExportedFunction(entrypoint)
-	if f == nil {
-		return mod, nil, fmt.Errorf("could not find entrypoint function %q for module %q", entrypoint, moduleName)
-	}
-	//fmt.Println("Timing 2", time.Since(t0))
-
-	call = &Call{
-		moduleName: moduleName,
-		clock:      clock,
-		wasmModule: m,
-		entrypoint: entrypoint,
-	}
-
-	var args []uint64
-	for _, input := range arguments {
-		switch v := input.(type) {
-		case *StoreWriterOutput:
-			call.outputStore = v.Store
-			call.updatePolicy = v.UpdatePolicy
-			call.valueType = v.ValueType
-		case *StoreReaderInput:
-			call.inputStores = append(call.inputStores, v.Store)
-			args = append(args, uint64(len(call.inputStores)-1))
-		case ValueArgument:
-			cnt := v.Value()
-			ptr := call.writeToHeap(ctx, mod, cnt, input.Name())
-			length := uint64(len(cnt))
-			args = append(args, uint64(ptr), length)
-		default:
-			panic("unknown wasm argument type")
-		}
-	}
-
-	_, err = f.Call(withContext(ctx, call), args...)
-	//defer call.deallocate(ctx, mod)
-	if err != nil {
-		if call.panicError != nil {
-			return mod, call, call.panicError
-		}
-		return mod, call, fmt.Errorf("executing module %q: %w", call.moduleName, err)
-	}
-
-	return mod, call, nil
-}
-
-//var CACHE_ENABLED = os.Getenv("WAZERO_CACHE_ENABLED") != ""
-
-func (c *Call) writeToHeap(ctx context.Context, mod api.Module, data []byte, from string) uint32 {
-	stack := []uint64{uint64(len(data))}
-	//fmt.Println("Writing length", len(data))
-	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
-		panic(fmt.Errorf("alloc from %q failed: %w", from, err))
-	}
-	ptr := uint32(stack[0])
-	if ok := mod.Memory().Write(ptr, data); !ok {
-		panic("could not write to memory: " + from)
-	}
-	fmt.Println("Memory size:", mod.Memory().Size())
-	//if CACHE_ENABLED {
-	//	c.allocations = append(c.allocations, allocation{ptr: ptr, length: uint32(len(data))})
-	//}
-	return ptr
-}
-
-func (c *Call) writeOutputToHeap(ctx context.Context, mod api.Module, outputPtr uint32, value []byte, importName string) error {
-	valuePtr := c.writeToHeap(ctx, mod, value, importName+":writeOutputToHeap1")
-	mem := mod.Memory()
-	if ok := mem.WriteUint32Le(outputPtr, valuePtr); !ok {
-		panic("could not write to memory: " + importName + ":WriteUint32Le:1")
-	}
-	if ok := mem.WriteUint32Le(outputPtr+4, uint32(len(value))); !ok {
-		panic("could not write to memory: " + importName + ":WriteUint32Le:2")
-	}
-	return nil
-}
 
 type allocation struct {
 	ptr    uint32
@@ -164,67 +100,154 @@ func (c *Call) deallocate(ctx context.Context, mod api.Module) {
 }
 
 func (c *Call) Err() error {
-	return c.panicError
+	return c.PanicError
 }
 
 func (c *Call) Output() []byte {
-	return c.returnValue
+	return c.ReturnValue
 }
 
 func (c *Call) SetOutputStore(store store.Store) {
 	c.outputStore = store
 }
 
-const maxLogByteCount = 128 * 1024 // 128 KiB
+const MaxLogByteCount = 128 * 1024 // 128 KiB
 
 func (c *Call) ReachedLogsMaxByteCount() bool {
-	return c.LogsByteCount >= maxLogByteCount
+	return c.LogsByteCount >= MaxLogByteCount
 }
 
-func (c *Call) validateSetStore(key string) {
+func (c *Call) DoSet(ord uint64, key string, value []byte) {
 	c.validateSimple("set", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, key)
+	c.outputStore.SetBytes(ord, key, value)
 }
-func (c *Call) validateSetIfNotExists(key string) {
+func (c *Call) DoSetIfNotExists(ord uint64, key string, value []byte) {
 	c.validateSimple("set_if_not_exists", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, key)
+	c.outputStore.SetBytesIfNotExists(ord, key, value)
 }
-func (c *Call) validateAppend(key string) {
+func (c *Call) DoAppend(ord uint64, key string, value []byte) {
 	c.validateSimple("append", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, key)
+	if err := c.outputStore.Append(ord, key, value); err != nil {
+		c.ReturnError(fmt.Errorf("appending to store: %w", err))
+	}
 }
-func (c *Call) validateAddBigInt(key string) {
+func (c *Call) DoDeletePrefix(ord uint64, prefix string) {
+	c.traceStateWrites("delete_prefix", prefix)
+	c.outputStore.DeletePrefix(ord, prefix)
+}
+func (c *Call) DoAddBigInt(ord uint64, key string, value string) {
 	c.validateWithValueType("add_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigint", key)
+
+	toAdd, _ := new(big.Int).SetString(value, 10)
+	c.outputStore.SumBigInt(ord, key, toAdd)
 }
-func (c *Call) validateAddBigDecimal(key string) {
+func (c *Call) DoAddBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("add_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigdecimal", "bigfloat", key)
+
+	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	if err != nil {
+		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
+	}
+	c.outputStore.SumBigDecimal(ord, key, toAdd)
 }
-func (c *Call) validateAddInt64(key string) {
+func (c *Call) DoAddInt64(ord uint64, key string, value int64) {
 	c.validateWithValueType("add_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", key)
+	c.outputStore.SumInt64(ord, key, value)
 }
-func (c *Call) validateAddFloat64(key string) {
+func (c *Call) DoAddFloat64(ord uint64, key string, value float64) {
 	c.validateWithValueType("add_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "float64", key)
+	c.outputStore.SumFloat64(ord, key, value)
 }
-func (c *Call) validateSetMinInt64(key string) {
+func (c *Call) DoSetMinInt64(ord uint64, key string, value int64) {
 	c.validateWithValueType("set_min_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "int64", key)
+	c.outputStore.SetMinInt64(ord, key, value)
 }
-func (c *Call) validateSetMinBigInt(key string) {
+func (c *Call) DoSetMinBigInt(ord uint64, key string, value string) {
 	c.validateWithValueType("set_min_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigint", key)
+	toSet, _ := new(big.Int).SetString(value, 10)
+	c.outputStore.SetMinBigInt(ord, key, toSet)
 }
-func (c *Call) validateSetMinFloat64(key string) {
+func (c *Call) DoSetMinFloat64(ord uint64, key string, value float64) {
 	c.validateWithValueType("set_min_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "float64", key)
+	c.outputStore.SetMinFloat64(ord, key, value)
 }
-func (c *Call) validateSetMinBigDecimal(key string) {
+func (c *Call) DoSetMinBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_min_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigdecimal", "bigfloat", key)
+	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	if err != nil {
+		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
+	}
+	c.outputStore.SetMinBigDecimal(ord, key, toAdd)
 }
-func (c *Call) validateSetMaxInt64(key string) {
+func (c *Call) DoSetMaxInt64(ord uint64, key string, value int64) {
 	c.validateWithValueType("set_max_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "int64", key)
+	c.outputStore.SetMaxInt64(ord, key, value)
 }
-func (c *Call) validateSetMaxBigInt(key string) {
+func (c *Call) DoSetMaxBigInt(ord uint64, key string, value string) {
 	c.validateWithValueType("set_max_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigint", key)
+	toSet, _ := new(big.Int).SetString(value, 10)
+	c.outputStore.SetMaxBigInt(ord, key, toSet)
+
 }
-func (c *Call) validateSetMaxFloat64(key string) {
+func (c *Call) DoSetMaxFloat64(ord uint64, key string, value float64) {
 	c.validateWithValueType("set_max_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "float64", key)
+	c.outputStore.SetMaxFloat64(ord, key, value)
 }
-func (c *Call) validateSetMaxBigDecimal(key string) {
+func (c *Call) DoSetMaxBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_max_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigdecimal", "bigfloat", key)
+	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	if err != nil {
+		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
+	}
+	c.outputStore.SetMaxBigDecimal(ord, key, toAdd)
+}
+
+func (c *Call) DoGetAt(storeIndex int, ord uint64, key string) (value []byte, found bool) {
+	c.validateStoreIndex(storeIndex, "get_at")
+	readStore := c.inputStores[storeIndex]
+	c.traceStateReads("get_at", storeIndex, found, key)
+	return readStore.GetAt(ord, key)
+}
+
+func (c *Call) DoHasAt(storeIndex int, ord uint64, key string) (found bool) {
+	c.validateStoreIndex(storeIndex, "has_at")
+	readStore := c.inputStores[storeIndex]
+	c.traceStateReads("has_at", storeIndex, found, key)
+	return readStore.HasAt(ord, key)
+}
+
+func (c *Call) DoGetFirst(storeIndex int, key string) (value []byte, found bool) {
+	c.validateStoreIndex(storeIndex, "get_first")
+	readStore := c.inputStores[storeIndex]
+	c.traceStateReads("get_first", storeIndex, found, key)
+	return readStore.GetFirst(key)
+}
+
+func (c *Call) DoHasFirst(storeIndex int, key string) (found bool) {
+	c.validateStoreIndex(storeIndex, "has_first")
+	readStore := c.inputStores[storeIndex]
+	c.traceStateReads("has_first", storeIndex, found, key)
+	return readStore.HasFirst(key)
+}
+
+func (c *Call) DoGetLast(storeIndex int, key string) (value []byte, found bool) {
+	c.validateStoreIndex(storeIndex, "get_last")
+	readStore := c.inputStores[storeIndex]
+	c.traceStateReads("get_last", storeIndex, found, key)
+	return readStore.GetLast(key)
+}
+
+func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
+	c.validateStoreIndex(storeIndex, "has_last")
+	readStore := c.inputStores[storeIndex]
+	c.traceStateReads("has_last", storeIndex, found, key)
+	return readStore.HasLast(key)
+}
+
+func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {
+	if storeIndex+1 > len(c.inputStores) {
+		c.ReturnError(fmt.Errorf("%q failed: invalid store index %d, %d stores declared", stateFunc, storeIndex, len(c.inputStores)))
+	}
 }
 
 func (c *Call) validateSimple(stateFunc string, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, key string) {
@@ -259,18 +282,18 @@ func (c *Call) traceStateWrites(stateFunc, key string) {
 	c.ExecutionStack = append(c.ExecutionStack, line)
 }
 
-func (c *Call) traceStateReads(stateFunc string, storeIndex uint32, found bool, key string) {
+func (c *Call) traceStateReads(stateFunc string, storeIndex int, found bool, key string) {
 	store := c.inputStores[storeIndex]
 	line := fmt.Sprintf("%s::%s key: %q, found: %v, store details: %s", store.Name(), stateFunc, key, found, store.String())
 	c.ExecutionStack = append(c.ExecutionStack, line)
 }
 
 func (c *Call) returnInvalidPolicy(stateFunc, policy string) {
-	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s", c.moduleName, stateFunc, policy))
+	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s", c.ModuleName, stateFunc, policy))
 }
 
-func (c *Call) returnError(err error) {
-	panic(fmt.Errorf("module %q: %w", c.moduleName, err))
+func (c *Call) ReturnError(err error) {
+	panic(fmt.Errorf("module %q: %w", c.ModuleName, err))
 }
 
 var policyMap = map[pbsubstreams.Module_KindStore_UpdatePolicy]string{

@@ -1,9 +1,11 @@
-package wasm
+package wazero
 
 import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+
+	"github.com/streamingfast/substreams/wasm"
 )
 
 var envFuncs = []funcs{
@@ -19,9 +21,9 @@ var envFuncs = []funcs{
 				filename = readStringFromStack(mod, stack[2:])
 			}
 
-			call := fromContext(ctx)
+			call := wasm.FromContext(ctx)
 
-			call.panicError = &PanicError{message, filename, int(lineNo), int(colNo)}
+			call.PanicError = wasm.NewPanicError(message, filename, int(lineNo), int(colNo))
 		}),
 	},
 	{
@@ -29,10 +31,10 @@ var envFuncs = []funcs{
 		[]parm{i32, i32},
 		[]parm{},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			call := fromContext(ctx)
+			call := wasm.FromContext(ctx)
 			msg := readBytesFromStack(mod, stack[0:])
-			call.returnValue = make([]byte, uint32(stack[1]))
-			copy(call.returnValue, msg)
+			call.ReturnValue = make([]byte, uint32(stack[1]))
+			copy(call.ReturnValue, msg)
 		}),
 	},
 }

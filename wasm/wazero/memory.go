@@ -8,28 +8,29 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-func writeToHeap(ctx context.Context, mod api.Module, data []byte) (uint32, error) {
+func writeToHeap(ctx context.Context, inst *instance, data []byte) (uint32, error) {
+	size := len(data)
 	stack := []uint64{uint64(len(data))}
-	if err := mod.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
+	if err := inst.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
 		return 0, fmt.Errorf("alloc from: %w", err)
 	}
 	ptr := uint32(stack[0])
-	if ok := mod.Memory().Write(ptr, data); !ok {
+	if ok := inst.Memory().Write(ptr, data); !ok {
 		return 0, fmt.Errorf("could not write to memory")
 	}
-	//fmt.Println("Memory size:", mod.Memory().Size())
-	//if CACHE_ENABLED {
-	//	c.allocations = append(c.allocations, allocation{ptr: ptr, length: uint32(len(data))})
-	//}
+	fmt.Println("Memory size:", inst.Memory().Size(), ptr, size)
+	if size != 0 {
+		inst.allocations = append(inst.allocations, allocation{ptr: ptr, length: uint32(size)})
+	}
 	return ptr, nil
 }
 
-func writeOutputToHeap(ctx context.Context, mod api.Module, outputPtr uint32, value []byte) error {
-	valuePtr, err := writeToHeap(ctx, mod, value)
+func writeOutputToHeap(ctx context.Context, inst *instance, outputPtr uint32, value []byte) error {
+	valuePtr, err := writeToHeap(ctx, inst, value)
 	if err != nil {
 		return fmt.Errorf("writing value: %w", err)
 	}
-	mem := mod.Memory()
+	mem := inst.Memory()
 	if ok := mem.WriteUint32Le(outputPtr, valuePtr); !ok {
 		return errors.New("writing WriteUint32Le:1 to memory")
 	}

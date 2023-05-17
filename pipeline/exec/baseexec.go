@@ -3,7 +3,6 @@ package exec
 import (
 	"context"
 	"fmt"
-	"os"
 
 	ttrace "go.opentelemetry.io/otel/trace"
 
@@ -20,7 +19,8 @@ type BaseExecutor struct {
 	entrypoint    string
 	tracer        ttrace.Tracer
 
-	cachedInstance wasm.Instance
+	instanceCacheEnabled bool
+	cachedInstance       wasm.Instance
 
 	// Results
 	logs           []string
@@ -28,11 +28,17 @@ type BaseExecutor struct {
 	executionStack []string
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
-	return &BaseExecutor{ctx: ctx, moduleName: moduleName, wasmModule: wasmModule, wasmArguments: wasmArguments, entrypoint: entrypoint, tracer: tracer}
+func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+	return &BaseExecutor{
+		ctx:                  ctx,
+		moduleName:           moduleName,
+		wasmModule:           wasmModule,
+		instanceCacheEnabled: cacheEnabled,
+		wasmArguments:        wasmArguments,
+		entrypoint:           entrypoint,
+		tracer:               tracer,
+	}
 }
-
-var InstanceCacheEnabled = os.Getenv("SUBSTREAMS_WASM_CACHE_ENABLED") != ""
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil
@@ -77,7 +83,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		if err != nil {
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %v", clock.Number, e.moduleName, err)
 		}
-		if InstanceCacheEnabled {
+		if e.instanceCacheEnabled {
 			if err := inst.Cleanup(e.ctx); err != nil {
 				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
 			}

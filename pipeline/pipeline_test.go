@@ -91,6 +91,7 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 			context.Background(),
 			name,
 			module,
+			false, // could exercice with cache enabled too
 			[]wasm.Argument{
 				wasm.NewParamsInput("my test params"),
 				wasm.NewSourceInput("sf.substreams.v1.test.Block"),

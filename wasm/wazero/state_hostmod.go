@@ -9,6 +9,20 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 )
 
+type parm = api.ValueType
+
+var i32 = api.ValueTypeI32
+var i64 = api.ValueTypeI64
+var f64 = api.ValueTypeF64
+
+type funcs struct {
+	name  string
+	input []parm
+	//inputNames  []string
+	output []parm
+	f      api.GoModuleFunction
+}
+
 var stateFuncs = []funcs{
 	{
 		"set",
@@ -231,9 +245,10 @@ var stateFuncs = []funcs{
 			key := readStringFromStack(mod, stack[2:])
 			outputPtr := uint32(stack[4])
 			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
 
 			value, found := call.DoGetAt(int(storeIndex), ord, key)
-			setStackAndOutput(ctx, stack, call, found, mod, outputPtr, value)
+			setStackAndOutput(ctx, stack, call, found, inst, outputPtr, value)
 		}),
 	},
 	{
@@ -259,9 +274,10 @@ var stateFuncs = []funcs{
 			key := readStringFromStack(mod, stack[1:])
 			outputPtr := uint32(stack[3])
 			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
 
 			value, found := call.DoGetFirst(int(storeIndex), key)
-			setStackAndOutput(ctx, stack, call, found, mod, outputPtr, value)
+			setStackAndOutput(ctx, stack, call, found, inst, outputPtr, value)
 		}),
 	},
 	{
@@ -286,9 +302,10 @@ var stateFuncs = []funcs{
 			key := readStringFromStack(mod, stack[1:])
 			outputPtr := uint32(stack[3])
 			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
 
 			value, found := call.DoGetLast(int(storeIndex), key)
-			setStackAndOutput(ctx, stack, call, found, mod, outputPtr, value)
+			setStackAndOutput(ctx, stack, call, found, inst, outputPtr, value)
 		}),
 	},
 	{
@@ -306,11 +323,11 @@ var stateFuncs = []funcs{
 	},
 }
 
-func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, mod api.Module, outputPtr uint32, value []byte) {
+func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *instance, outputPtr uint32, value []byte) {
 	if !found {
 		stack[0] = 0
 	} else {
-		if err := writeOutputToHeap(ctx, mod, outputPtr, value); err != nil {
+		if err := writeOutputToHeap(ctx, inst, outputPtr, value); err != nil {
 			call.ReturnError(fmt.Errorf("writing output to heap: %w", err))
 		}
 		stack[0] = 1

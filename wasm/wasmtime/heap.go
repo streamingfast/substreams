@@ -58,8 +58,9 @@ func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, erro
 	}
 
 	ptr := results.(int32)
-	if track {
-		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: len(bytes)})
+	l := len(bytes)
+	if track && l != 0 {
+		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: l})
 	}
 	return h.WriteAtPtr(bytes, ptr, from)
 }

@@ -1,14 +1,10 @@
 package wasm
 
 import (
-	"context"
 	"fmt"
 	"math/big"
-	"sort"
-	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/tetratelabs/wazero/api"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
@@ -31,8 +27,6 @@ type Call struct {
 	Logs           []string
 	LogsByteCount  uint64
 	ExecutionStack []string
-
-	allocations []allocation
 }
 
 func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) *Call {
@@ -74,25 +68,6 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, ar
 //	i.wasmStore.AddFuel(i.registry.maxFuel)
 //}
 //}
-
-type allocation struct {
-	ptr    uint32
-	length uint32
-}
-
-func (c *Call) deallocate(ctx context.Context, mod api.Module) {
-	t0 := time.Now()
-	sort.Slice(c.allocations, func(i, j int) bool {
-		return c.allocations[i].ptr < c.allocations[j].ptr
-	})
-	dealloc := mod.ExportedFunction("dealloc")
-	for _, alloc := range c.allocations {
-		if err := dealloc.CallWithStack(ctx, []uint64{uint64(alloc.ptr), uint64(alloc.length)}); err != nil {
-			panic(fmt.Errorf("could not deallocate memory at %d: %w", alloc.ptr, err))
-		}
-	}
-	fmt.Println("deallocae", time.Since(t0))
-}
 
 func (c *Call) Err() error {
 	if c.panicError != nil {

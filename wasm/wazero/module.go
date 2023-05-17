@@ -89,29 +89,22 @@ func (m *Module) Close(ctx context.Context) error {
 	return nil
 }
 
-func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (inst wasm.Instance, err error) {
-	//t0 := time.Now()
-
+func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
 	var mod api.Module
 	if cachedInstance != nil {
 		mod = cachedInstance.(api.Module)
 	} else {
-		//fmt.Println("Instantiate")
 		mod, err = m.instantiateModule(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 		}
-		// Closed by the caller.
-		//defer mod.Close(ctx) // Otherwise, deferred to the BaseExecutor.Close() when cached.
 	}
-	inst = &instance{mod}
-	//fmt.Println("Timing 1", time.Since(t0))
-	//t0 = time.Now()
+	inst := &instance{Module: mod}
+
 	f := mod.ExportedFunction(call.Entrypoint)
 	if f == nil {
 		return inst, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
 	}
-	//fmt.Println("Timing 2", time.Since(t0))
 
 	var args []uint64
 	var inputStoreCount int
@@ -123,7 +116,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			args = append(args, uint64(inputStoreCount-1))
 		case wasm.ValueArgument:
 			cnt := v.Value()
-			ptr, err := writeToHeap(ctx, mod, cnt)
+			ptr, err := writeToHeap(ctx, inst, cnt)
 			if err != nil {
 				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)
 			}
@@ -134,21 +127,14 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		}
 	}
 
-	_, err = f.Call(wasm.WithContext(ctx, call), args...)
-	//defer call.deallocate(ctx, mod)
+	fmt.Println("Calling function: ", call.Entrypoint)
+
+	_, err = f.Call(wasm.WithContext(withInstanceContext(ctx, inst), call), args...)
 	if err != nil {
 		return inst, fmt.Errorf("call: %w", err)
 	}
 
 	return inst, nil
-}
-
-type instance struct {
-	api.Module
-}
-
-func (i *instance) Cleanup(ctx context.Context) error {
-	return nil
 }
 
 func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
@@ -165,28 +151,15 @@ func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 	return mod, err
 }
 
-type parm = api.ValueType
-
-var i32 = api.ValueTypeI32
-var i64 = api.ValueTypeI64
-var f64 = api.ValueTypeF64
-
-type funcs struct {
-	name  string
-	input []parm
-	//inputNames  []string
-	output []parm
-	f      api.GoModuleFunction
-}
-
 func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry *wasm.Registry) (out []wazero.CompiledModule, err error) {
 	for namespace, imports := range registry.Extensions {
 		builder := runtime.NewHostModuleBuilder(namespace)
 		for importName, f := range imports {
 			builder.NewFunctionBuilder().
-				WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+				WithGoFunction(api.GoFunc(func(ctx context.Context, stack []uint64) {
+					inst := instanceFromContext(ctx)
 					ptr, length, outputPtr := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
-					data := readBytes(mod, ptr, length)
+					data := readBytes(inst, ptr, length)
 					call := wasm.FromContext(ctx)
 					traceID := tracing.GetTraceID(ctx).String()
 
@@ -201,7 +174,7 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 						return
 					}
 
-					if err := writeOutputToHeap(ctx, mod, outputPtr, out); err != nil {
+					if err := writeOutputToHeap(ctx, inst, outputPtr, out); err != nil {
 						panic(fmt.Errorf("write output to heap %w", err))
 					}
 				}), []parm{i32, i32, i32}, []parm{}).

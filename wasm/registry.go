@@ -12,9 +12,10 @@ import (
 // reused across requests, from which we instantiate Modules (wasm code provided by the users)
 // and from which we instantiate Instances (one for each executions within each blocks).
 type Registry struct {
-	Extensions   map[string]map[string]WASMExtension
-	maxFuel      uint64
-	runtimeStack ModuleFactory
+	Extensions           map[string]map[string]WASMExtension
+	maxFuel              uint64
+	runtimeStack         ModuleFactory
+	instanceCacheEnabled bool
 }
 
 func (r *Registry) registerWASMExtension(namespace string, importName string, ext WASMExtension) {
@@ -39,9 +40,8 @@ func (r *Registry) registerWASMExtension(namespace string, importName string, ex
 	}
 	r.Extensions[namespace][importName] = ext
 }
-func (r *Registry) GetMaxFuel() uint64 {
-	return r.maxFuel
-}
+func (r *Registry) MaxFuel() uint64            { return r.maxFuel }
+func (r *Registry) InstanceCacheEnabled() bool { return r.instanceCacheEnabled }
 
 func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, error) {
 	return r.runtimeStack.NewModule(ctx, wasmCode, r)
@@ -58,19 +58,28 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 			}
 		}
 	}
+
+	if cache := os.Getenv("SUBSTREAMS_WASM_CACHE_ENABLED"); cache != "" {
+		r.instanceCacheEnabled = cache != "false"
+	}
+	cacheField := zap.Bool("cache_enabled", r.instanceCacheEnabled)
+
 	runtimeName := "wasmtime" // fallback engine
 	runtime := runtimes[runtimeName]
 	//fmt.Println("RUNTIME CHOSEN", runtimeName, runtime)
 	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
 		selectedRuntime := runtimes[selectRuntime]
 		if selectedRuntime == nil {
-			zlog.Warn("CANNOT FIND WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR, USING DEFAULT", zap.String("runtime", runtimeName))
+			panic(fmt.Errorf("could not find wasm runtime specified by `SUBSTREAMS_WASM_RUNTIME` env var: %q", selectRuntime))
 		} else {
 			runtimeName = selectRuntime
 			runtime = selectedRuntime
-			zlog.Warn("USING WASM RUNTIME SPECIFIED IN SUBSTREAMS_WASM_RUNTIME ENV VAR", zap.String("runtime", runtimeName))
+			zlog.Info("using wasm runtime specified by env var", zap.String("runtime", runtimeName), cacheField)
 		}
+	} else {
+		zlog.Info("using default wasm runtime", zap.String("runtime", runtimeName), cacheField)
 	}
 	r.runtimeStack = runtime
+
 	return r
 }

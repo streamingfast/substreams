@@ -135,7 +135,7 @@ func TestForkHandling(t *testing.T) {
 			run.ModuleName = test.module
 			run.ProductionMode = test.production
 			run.BlockProcessedCallback = test.inProcessValidation
-			err := run.Run(t)
+			err := run.Run(t, test.name)
 
 			require.NoError(t, err)
 			i := 0
@@ -371,7 +371,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			run.ProductionMode = test.production
 			run.ParallelSubrequests = 5
 			run.PreWork = test.preWork
-			require.NoError(t, run.Run(t))
+			require.NoError(t, run.Run(t, test.name))
 
 			mapOutput := run.MapOutput("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
@@ -392,14 +392,14 @@ func TestStoreDeletePrefix(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, run.Run(t))
+	require.NoError(t, run.Run(t, "test_store_delete_prefix"))
 }
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
 	run := newTestRun(t, 1, 31, 31, "assert_all_test")
 
-	require.NoError(t, run.Run(t))
+	require.NoError(t, run.Run(t, "assert_all_test"))
 
 	assert.Len(t, listFiles(t, run.TempDir), 90) // All these .kv files on disk
 }
@@ -416,7 +416,7 @@ func Test_SimpleMapModule(t *testing.T) {
 	run.ParallelSubrequests = 5
 	run.Context = cancelledContext(100 * time.Millisecond)
 
-	require.NoError(t, run.Run(t))
+	require.NoError(t, run.Run(t, "test_map"))
 }
 
 func cancelledContext(delay time.Duration) context.Context {

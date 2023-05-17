@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEnd
 	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
 }
 
-func (f *testRun) Run(t *testing.T) error {
+func (f *testRun) Run(t *testing.T, testName string) error {
 	ctx := context.Background()
 	if f.Context != nil {
 		ctx = f.Context
@@ -73,7 +74,8 @@ func (f *testRun) Run(t *testing.T) error {
 	testTempDir := t.TempDir()
 	f.TempDir = testTempDir
 
-	ctx = withTestTracing(t, ctx)
+	ctx, endFunc := withTestTracing(t, ctx, testName)
+	defer endFunc()
 	if f.Context == nil {
 		f.Context = ctx
 	}
@@ -202,22 +204,29 @@ func (f *testRun) MapOutput(modName string) string {
 	return "\n" + strings.Join(moduleOutputs, "\n")
 }
 
-func withTestTracing(t *testing.T, ctx context.Context) context.Context {
+func withTestTracing(t *testing.T, ctx context.Context, testName string) (context.Context, func()) {
 	t.Helper()
 	tracingEnabled := os.Getenv("SF_TRACING") != ""
+	endFunc := func() {}
 	if tracingEnabled {
 		fmt.Println("Running test with tracing enabled: ", os.Getenv("SF_TRACING"))
 		require.NoError(t, tracing.SetupOpenTelemetry("substreams"))
 		ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
-		spanCtx, span := reqctx.WithSpan(ctx, "substreams_request_test")
-		defer func() {
+		spanCtx, span := reqctx.WithSpan(ctx, testName)
+		endFunc = func() {
 			span.End()
 			fmt.Println("Test complete waiting 20s for tracing to be sent")
 			time.Sleep(20 * time.Second)
-		}()
+		}
 		ctx = spanCtx
+		_, newSpan := reqctx.Tracer(ctx).Start(ctx, "something_start")
+		newSpan.SetAttributes(attribute.Int64("block_num", 1))
+		time.Sleep(2 * time.Second)
+		newSpan.AddEvent("something_append")
+		newSpan.End()
+
 	}
-	return ctx
+	return ctx, endFunc
 }
 
 func processInternalRequest(

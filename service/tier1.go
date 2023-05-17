@@ -136,11 +136,11 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 
 	logger := reqctx.Logger(ctx).Named("tier1")
 	respFunc := responseHandler(logger, streamSrv)
-
+	traceId := tracing.GetTraceID(ctx).String()
 	respFunc(&pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_Session{
 			Session: &pbsubstreamsrpc.SessionInit{
-				TraceId: tracing.GetTraceID(ctx).String(),
+				TraceId: traceId,
 			},
 		},
 	})
@@ -150,6 +150,9 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
 	defer span.EndWithErr(&err)
+
+	span.SetAttributes(attribute.Int64("tier", 1))
+	span.SetAttributes(attribute.String("trace_id", traceId))
 
 	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))

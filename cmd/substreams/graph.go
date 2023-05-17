@@ -7,7 +7,6 @@ import (
 	"github.com/streamingfast/cli"
 
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/tools"
 )
 
 var graphCmd = &cobra.Command{
@@ -28,13 +27,9 @@ func init() {
 }
 
 func runManifestGraph(cmd *cobra.Command, args []string) error {
-	manifestPathRaw := ""
+	manifestPath := ""
 	if len(args) == 1 {
-		manifestPathRaw = args[0]
-	}
-	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
+		manifestPath = args[0]
 	}
 
 	manifestReader := manifest.NewReader(manifestPath)

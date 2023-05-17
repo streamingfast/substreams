@@ -28,6 +28,12 @@ If you upgrade in the wrong order or if somehow `tier2` processes start using th
 
 * Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.
 
+### Added
+
+* [`library`]: The `manifest.Reader` gained the ability to infer the path if provided with input `""` based on the current working directory.
+
+* [`library`]: The `manifest.Reader` gained the ability to infer the path if provided with input that is a directory.
+
 ## [v1.1.2](https://github.com/streamingfast/substreams/releases/tag/v1.1.2)
 
 ### Highlights

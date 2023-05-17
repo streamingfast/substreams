@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/streamingfast/cli"
-	"github.com/streamingfast/substreams/tools"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
@@ -20,8 +19,8 @@ var infoCmd = &cobra.Command{
 	Use:   "info [<manifest_file>]",
 	Short: "Display package modules and docs",
 	Long: cli.Dedent(`
-		Display package modules and docs. The manifest is optional as it will try to find a file named 
-		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains 
+		Display package modules and docs. The manifest is optional as it will try to find a file named
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains
 		a 'substreams.yaml' file in place of '<manifest_file>'.
 	`),
 	RunE:         runInfo,
@@ -34,14 +33,9 @@ func init() {
 }
 
 func runInfo(cmd *cobra.Command, args []string) error {
-	manifestPathRaw := ""
-
+	manifestPath := ""
 	if len(args) == 1 {
-		manifestPathRaw = args[0]
-	}
-	manifestPath, err := tools.ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
+		manifestPath = args[0]
 	}
 
 	manifestReader := manifest.NewReader(manifestPath)

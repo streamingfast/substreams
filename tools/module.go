@@ -36,17 +36,13 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	moduleName := args[0]
-	manifestPathRaw := ""
+	manifestPath := ""
 	if len(args) == 3 {
-		manifestPathRaw = args[1]
+		manifestPath = args[1]
 		args = args[1:]
 	}
 
 	stateStoreURL := args[1]
-	manifestPath, err := ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
-	}
 
 	zlog.Info("found state store",
 		zap.String("module_name", moduleName),

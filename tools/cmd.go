@@ -15,11 +15,8 @@
 package tools
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -81,37 +78,6 @@ func mustGetStringSlice(cmd *cobra.Command, flagName string) []string {
 		return nil
 	}
 	return val
-}
-
-func ResolveManifestFile(input string) (manifestName string, err error) {
-	if input == "" {
-		_, err := os.Stat("substreams.yaml")
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return "", fmt.Errorf("no manifest entered in directory without a manifest")
-			}
-			return "", fmt.Errorf("finding manifest: %w", err)
-		}
-
-		return "substreams.yaml", nil
-	} else if strings.HasSuffix(input, ".spkg") {
-		return input, nil
-	}
-
-	inputInfo, err := os.Stat(input)
-	if err != nil {
-		return "", fmt.Errorf("read input file info: %w", err)
-	}
-
-	if inputInfo.IsDir() {
-		potentialManifest := filepath.Join(inputInfo.Name(), "substreams.yaml")
-		_, err := os.Stat(potentialManifest)
-		if err != nil {
-			return "", fmt.Errorf("finding manifest in directory: %w", err)
-		}
-		return filepath.Join(input, "substreams.yaml"), nil
-	}
-	return input, nil
 }
 
 func ReadAPIToken(cmd *cobra.Command, envFlagName string) string {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,12 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
-
-	"github.com/streamingfast/substreams/tui2/pages/request"
-
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
+	"github.com/streamingfast/substreams/tui2/pages/request"
 )
 
 func init() {
@@ -61,8 +60,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) || strings.Contains(args[0], ".") {
 			return fmt.Errorf("parameter entered likely a manifest file, don't forget to include a '<module_name>' in your command")
 		}
-		// At this point, we assume the user invoked `substreams run <module_name>` so we `ResolveManifestFile` using the empty string since no argument has been passed.
-		manifestPath, err = tools.ResolveManifestFile("")
+		// At this point, we assume the user invoked `substreams run <module_name>` so we `resolveManifestFile` using the empty string since no argument has been passed.
+		manifestPath, err = resolveManifestFile("")
 		if err != nil {
 			return fmt.Errorf("resolving manifest: %w", err)
 		}
@@ -130,4 +129,43 @@ func runGui(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// resolveManifestFile is solely nowadays by `substreams gui`. That is because manifest.Reader
+// now has the ability to resolve itself to the correct location.
+//
+// However `substreams gui` displays the value, so we want to display the resolved
+// value to the user.
+//
+// FIXME: Find a way to share this with manifest.Reader somehow. Maybe as a method on
+// on the reader which would resolve the file, sharing the internal logic.
+func resolveManifestFile(input string) (manifestName string, err error) {
+	if input == "" {
+		_, err := os.Stat("substreams.yaml")
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("no manifest entered in directory without a manifest")
+			}
+			return "", fmt.Errorf("finding manifest: %w", err)
+		}
+
+		return "substreams.yaml", nil
+	} else if strings.HasSuffix(input, ".spkg") {
+		return input, nil
+	}
+
+	inputInfo, err := os.Stat(input)
+	if err != nil {
+		return "", fmt.Errorf("read input file info: %w", err)
+	}
+
+	if inputInfo.IsDir() {
+		potentialManifest := filepath.Join(inputInfo.Name(), "substreams.yaml")
+		_, err := os.Stat(potentialManifest)
+		if err != nil {
+			return "", fmt.Errorf("finding manifest in directory: %w", err)
+		}
+		return filepath.Join(input, "substreams.yaml"), nil
+	}
+	return input, nil
 }

@@ -78,18 +78,14 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	saveInterval := mustGetUint64(cmd, "save-interval")
 
-	manifestPathRaw := ""
+	manifestPath := ""
 	if len(args) == 5 {
-		manifestPathRaw = args[0]
+		manifestPath = args[0]
 		args = args[1:]
 	}
 
 	moduleName := args[0]
 	storeURL := args[1]
-	manifestPath, err := ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
-	}
 	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
@@ -159,18 +155,14 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	saveInterval := mustGetUint64(cmd, "save-interval")
 
-	manifestPathRaw := ""
+	manifestPath := ""
 	if len(args) == 5 {
-		manifestPathRaw = args[0]
+		manifestPath = args[0]
 		args = args[1:]
 	}
 
 	moduleName := args[0]
 	storeURL := args[1]
-	manifestPath, err := ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
-	}
 	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)

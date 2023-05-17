@@ -82,12 +82,41 @@ func (r *Reader) MustRead() *pbsubstreams.Package {
 }
 
 func (r *Reader) Read() (*pbsubstreams.Package, error) {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get working directory: %w", err)
+	}
+
+	return r.read(workingDir)
+}
+
+func (r *Reader) read(workingDir string) (*pbsubstreams.Package, error) {
 	if r.IsRemotePackage() {
 		return r.newPkgFromURL(r.input)
 	}
 
-	if strings.HasSuffix(r.input, ".yaml") {
-		pkg, protoDefinitions, err := r.newPkgFromManifest(r.input)
+	input := r.input
+
+	// If empty, assign input to be `pwd`/substreams.yaml
+	if input == "" {
+		input = filepath.Join(workingDir, "substreams.yaml")
+	}
+
+	// It's supposed to be a directory or a file, so we should be able to stat it and it should exists
+	stat, err := os.Stat(input)
+	if err != nil {
+		// Stat error already says 'stat' so no wrapping
+		return nil, err
+	}
+
+	// If it's a directory, we look actually for '<input>/substreams.yaml'
+	if stat.IsDir() {
+		input = filepath.Join(input, "substreams.yaml")
+	}
+
+	// If it's ending in .yaml, it's a Substreams source file
+	if strings.HasSuffix(input, ".yaml") {
+		pkg, protoDefinitions, err := r.newPkgFromManifest(input)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +127,8 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 		return pkg, nil
 	}
 
-	return r.newPkgFromFile(r.input)
+	// In all other cases, assume it's a Substreams package file
+	return r.newPkgFromFile(input)
 }
 
 // IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over

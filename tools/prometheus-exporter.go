@@ -30,8 +30,8 @@ var prometheusCmd = &cobra.Command{
 	Use:   "prometheus-exporter <endpoint[,endpoint[,...]]> [<manifest>] <module_name> <block_height>",
 	Short: "run substreams client periodically on a single block, exporting the values in prometheus format",
 	Long: cli.Dedent(`
-		Run substreams client periodically on a single block, exporting the values in prometheus format. The manifest is optional as it will try to find a file named 
-		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml' 
+		Run substreams client periodically on a single block, exporting the values in prometheus format. The manifest is optional as it will try to find a file named
+		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>'.
 	`),
 	RunE:         runPrometheus,
@@ -53,14 +53,10 @@ func init() {
 func runPrometheus(cmd *cobra.Command, args []string) error {
 
 	endpoints := strings.Split(args[0], ",")
-	manifestPathRaw := ""
+	manifestPath := ""
 	if len(args) == 4 {
-		manifestPathRaw = args[1]
+		manifestPath = args[1]
 		args = args[1:]
-	}
-	manifestPath, err := ResolveManifestFile(manifestPathRaw)
-	if err != nil {
-		return fmt.Errorf("resolving manifest: %w", err)
 	}
 	moduleName := args[1]
 	blockHeight := args[2]

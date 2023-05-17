@@ -1,14 +1,15 @@
-package tools
+package main
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestResolveManifestFile(t *testing.T) {
+func Test_resolveManifestFile(t *testing.T) {
 	type args struct {
 		input       string
 		dirToMake   string
@@ -92,7 +93,7 @@ func TestResolveManifestFile(t *testing.T) {
 			err = os.Chdir(root)
 			require.NoError(t, err)
 
-			gotManifestName, err := ResolveManifestFile(tt.args.input)
+			gotManifestName, err := resolveManifestFile(tt.args.input)
 			tt.assertion(t, err)
 			assert.Equal(t, tt.wantManifestName, gotManifestName)
 		})

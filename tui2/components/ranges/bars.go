@@ -12,6 +12,9 @@ type Bars struct {
 	common.Common
 	targetBlock uint64
 
+	TotalBlocks uint64
+	BarCount    uint64
+
 	labelWidth int
 	Mode       int
 	bars       []*Bar
@@ -43,6 +46,12 @@ func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			bar.Update(mod.Type)
 		}
 	}
+	var totalBlocks uint64
+	for _, bar := range b.bars {
+		totalBlocks += bar.totalBlocks
+	}
+	b.TotalBlocks = totalBlocks
+	b.BarCount = uint64(len(b.bars))
 	return b, nil
 }
 

@@ -31,6 +31,8 @@ type Progress struct {
 	progressView      viewport.Model
 	progressUpdates   int
 	dataPayloads      int
+	blocksPerSecond   uint64
+	blocksThisSecond  uint64
 	updatedSecond     int64
 	updatesPerSecond  int
 	updatesThisSecond int
@@ -84,6 +86,10 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.updatesPerSecond = p.updatesThisSecond
 			p.updatesThisSecond = 0
 			p.updatedSecond = thisSec
+			if p.blocksThisSecond > 0 {
+				p.blocksPerSecond = p.bars.TotalBlocks - p.blocksThisSecond
+			}
+			p.blocksThisSecond = p.bars.TotalBlocks
 		}
 		p.updatesThisSecond += 1
 		p.bars.Update(msg)
@@ -109,7 +115,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 var labels = []string{
-	"Parallel engine progress messages: ",
+	"Parallel engine blocks processed: ",
 	"Target block: ",
 	"Data payloads received: ",
 	"Status: ",
@@ -153,8 +159,12 @@ func wrapString(input string, screenWidth int) (string, int) {
 }
 
 func (p *Progress) View() string {
+	blocksPerSecondPerModule := ""
+	if p.bars.BarCount != 0 && p.blocksPerSecond != 0 {
+		blocksPerSecondPerModule = fmt.Sprintf(", %d per module", p.blocksPerSecond/p.bars.BarCount)
+	}
 	infos := []string{
-		fmt.Sprintf("%d (%d block/sec)", p.progressUpdates, p.updatesPerSecond),
+		fmt.Sprintf("%d (%d per second%s)", p.bars.TotalBlocks, p.blocksPerSecond, blocksPerSecondPerModule),
 		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
 		p.Styles.StatusBarValue.Render(p.state + p.replayState),

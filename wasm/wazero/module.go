@@ -3,6 +3,7 @@ package wazero
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/tetratelabs/wazero"
@@ -14,6 +15,7 @@ import (
 // A Module represents a wazero.Runtime that clears and is destroyed upon completion of a request.
 // It has the pre-compiled `env` host module, as well as pre-compiled WASM code provided by the user
 type Module struct {
+	sync.Mutex
 	wazRuntime      wazero.Runtime
 	wazModuleConfig wazero.ModuleConfig
 	hostModules     []wazero.CompiledModule
@@ -136,6 +138,9 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 }
 
 func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
+	m.Lock()
+	defer m.Unlock()
+
 	for _, hostMod := range m.hostModules {
 		if m.wazRuntime.Module(hostMod.Name()) != nil {
 			continue

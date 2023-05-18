@@ -8,10 +8,11 @@ import (
 )
 
 type Graph struct {
-	requestModules *pbsubstreams.Modules
-	usedModules    []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
-	moduleHashes   *manifest.ModuleHashes
-	stores         []*pbsubstreams.Module // subset of allModules: only the stores
+	requestModules    *pbsubstreams.Modules
+	usedModules       []*pbsubstreams.Module   // all modules that need to be processed (requested directly or a required module ancestor)
+	stagedUsedModules [][]*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	moduleHashes      *manifest.ModuleHashes
+	stores            []*pbsubstreams.Module // subset of allModules: only the stores
 
 	outputModule *pbsubstreams.Module
 
@@ -19,11 +20,12 @@ type Graph struct {
 	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
 }
 
-func (g *Graph) OutputModule() *pbsubstreams.Module   { return g.outputModule }
-func (g *Graph) Stores() []*pbsubstreams.Module       { return g.stores }
-func (g *Graph) UsedModules() []*pbsubstreams.Module  { return g.usedModules }
-func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
-func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
+func (g *Graph) OutputModule() *pbsubstreams.Module          { return g.outputModule }
+func (g *Graph) Stores() []*pbsubstreams.Module              { return g.stores }
+func (g *Graph) UsedModules() []*pbsubstreams.Module         { return g.usedModules }
+func (g *Graph) StagedUsedModules() [][]*pbsubstreams.Module { return g.stagedUsedModules }
+func (g *Graph) IsOutputModule(name string) bool             { return g.outputModule.Name == name }
+func (g *Graph) ModuleHashes() *manifest.ModuleHashes        { return g.moduleHashes }
 
 func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{
@@ -48,6 +50,8 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.usedModules = processModules
+	g.stagedUsedModules = computeStages(processModules)
+
 	if err := g.hashModules(graph); err != nil {
 		return fmt.Errorf("cannot hash module: %w", err)
 	}
@@ -69,6 +73,62 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.schedulableAncestorsMap = ancestorsMap
 
 	return nil
+}
+
+func computeStages(mods []*pbsubstreams.Module) (stages [][]*pbsubstreams.Module) {
+	seen := map[string]bool{}
+
+	for i := 0; ; i++ {
+		if len(seen) == len(mods) {
+			break
+		}
+		var stage []*pbsubstreams.Module
+	modLoop:
+		for _, mod := range mods {
+			switch mod.Kind.(type) {
+			case *pbsubstreams.Module_KindMap_:
+				if i%2 == 0 {
+					continue
+				}
+			case *pbsubstreams.Module_KindStore_:
+				if i%2 == 1 {
+					continue
+				}
+			}
+
+			if seen[mod.Name] {
+				continue
+			}
+
+			for _, dep := range mod.Inputs {
+				var depModName string
+				switch input := dep.Input.(type) {
+				case *pbsubstreams.Module_Input_Params_:
+					continue
+				case *pbsubstreams.Module_Input_Source_:
+					continue
+				case *pbsubstreams.Module_Input_Map_:
+					depModName = input.Map.ModuleName
+				case *pbsubstreams.Module_Input_Store_:
+					depModName = input.Store.ModuleName
+				default:
+					panic(fmt.Errorf("unsupported input type %T", dep.Input))
+				}
+				if !seen[depModName] {
+					continue modLoop
+				}
+			}
+
+			stage = append(stage, mod)
+		}
+		if len(stage) != 0 {
+			stages = append(stages, stage)
+			for _, mod := range stage {
+				seen[mod.Name] = true
+			}
+		}
+	}
+	return stages
 }
 
 func computeOutputModule(mods []*pbsubstreams.Module, outputModule string) *pbsubstreams.Module {

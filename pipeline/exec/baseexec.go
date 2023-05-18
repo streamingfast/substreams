@@ -40,6 +40,8 @@ func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Mod
 	}
 }
 
+//var Timer time.Duration
+
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
@@ -71,8 +73,11 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	if hasInput {
 		clock := outputGetter.Clock()
 		var inst wasm.Instance
+
+		//t0 := time.Now()
 		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
 		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
+		//Timer += time.Since(t0)
 		if panicErr := call.Err(); panicErr != nil {
 			errExecutor := ErrorExecutor{
 				message:    panicErr.Error(),

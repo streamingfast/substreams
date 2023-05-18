@@ -319,7 +319,9 @@ func (o *Output) setOutputViewContent(forcedRender bool) {
 		o.outputView.SetContent(content)
 
 		o.lastOutputContent = content
-		o.firstBlockSeen = false
+		if content != "" {
+			o.firstBlockSeen = false
+		}
 	} else {
 		o.outputView.SetContent(o.lastOutputContent)
 	}

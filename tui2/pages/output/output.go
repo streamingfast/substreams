@@ -104,6 +104,7 @@ func (o *Output) SetSize(w, h int) {
 	o.blockSelector.SetSize(w, 5)
 	o.outputView.Width = w
 	o.outputView.Height = h - 11
+	o.moduleNavigator.FrameHeight = h - 11
 
 	o.moduleSearchView.SetSize(w, o.outputView.Height)
 	outputViewTopBorder := 1
@@ -324,7 +325,7 @@ func (o *Output) View() string {
 	}
 
 	o.setOutputViewContent()
-	
+
 	var middleBlock string
 	if o.moduleSearchEnabled {
 		middleBlock = o.moduleSearchView.View()

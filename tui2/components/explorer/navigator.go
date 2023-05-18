@@ -74,6 +74,7 @@ type Navigator struct {
 	mutex             sync.RWMutex
 
 	longestModuleName int
+	FrameHeight       int
 }
 
 type Option func(*Navigator)
@@ -355,6 +356,26 @@ func (n *Navigator) dispatchModuleSelected() tea.Msg {
 	return common.EmitModuleSelectedMsg(n.HighlightedModule)
 }
 
+func tallestCol(arrs ...[]string) int {
+	max := 0
+
+	for _, arr := range arrs {
+		if len(arr) > max {
+			max = len(arr)
+		}
+	}
+
+	return max
+}
+
+func (n *Navigator) getRemainingLines(occupiedHeight int) string {
+	str := ""
+	for i := 0; i < n.FrameHeight-occupiedHeight-1; i++ {
+		str += "\n"
+	}
+	return str
+}
+
 func (n *Navigator) View() string {
 	//generate a string of spaces of length longestModuleName
 	spaces := strings.Repeat(" ", n.longestModuleName+10)
@@ -572,13 +593,19 @@ func (n *Navigator) View() string {
 		rightPreviewSide = lipgloss.JoinVertical(lipgloss.Left, append([]string{spaces}, grandchildren...)...)
 	}
 
-	res := lipgloss.JoinHorizontal(lipgloss.Center,
+	verticalSpace := tallestCol(parents, children, grandparents, grandchildren, preview)
+	content := lipgloss.JoinHorizontal(lipgloss.Center,
 		leftPreviewSide,
 		leftSide,
 		middle,
 		rightSide,
 		rightPreviewSide,
 	)
+	res := lipgloss.JoinVertical(0,
+		content,
+		fmt.Sprintf("%s", n.getRemainingLines(verticalSpace)),
+	)
+
 	return res
 }
 

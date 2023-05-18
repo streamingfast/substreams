@@ -1,8 +1,9 @@
 package output
 
 import (
-	"github.com/streamingfast/substreams/tui2/components/explorer"
 	"sort"
+
+	"github.com/streamingfast/substreams/tui2/components/explorer"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -30,11 +31,11 @@ type Output struct {
 	blockSelector      *blockselect.BlockSelect
 	outputView         viewport.Model
 	lastDisplayContext *displayContext
-	lastOutputContent  interface{}
-	//lastRenderedContent string
+	lastOutputContent  string
 
-	lowBlock  uint64
-	highBlock uint64
+	lowBlock       uint64
+	highBlock      uint64
+	firstBlockSeen bool
 
 	blocksPerModule     map[string][]uint64
 	payloads            map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
@@ -86,6 +87,7 @@ func New(c common.Common, manifestPath string, outputModule string, config *requ
 		outputModule:        outputModule,
 		logsEnabled:         true,
 		moduleNavigator:     nav,
+		firstBlockSeen:      false,
 	}
 	return output
 }
@@ -122,7 +124,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
 		o.blockSearchEnabled = false
-		o.setOutputViewContent()
+		o.setOutputViewContent(true)
 	case modsearch.DisableModuleSearch:
 		o.moduleSearchEnabled = false
 	case search.UpdateMatchingBlocks:
@@ -181,18 +183,18 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			o.payloads[blockCtx] = output
-			o.setOutputViewContent()
+			o.setOutputViewContent(false)
 		}
 
 	case search.ApplySearchQueryMsg:
 		o.keywordToSearchFor = msg.Query
-		o.setOutputViewContent()
+		o.setOutputViewContent(true)
 		cmds = append(cmds, o.updateMatchingBlocks())
 	case common.ModuleSelectedMsg:
 		o.active.Module = string(msg)
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.active.Module])
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
-		o.setOutputViewContent()
+		o.setOutputViewContent(true)
 		cmds = append(cmds, o.updateMatchingBlocks())
 	case blockselect.BlockChangedMsg:
 		if o.hasDataForBlock(uint64(msg)) {
@@ -200,7 +202,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			o.active.BlockNum = newBlock
 			o.blockSelector.SetActiveBlock(newBlock)
 			o.outputView.YOffset = o.outputViewYoffset[o.active]
-			o.setOutputViewContent()
+			o.setOutputViewContent(true)
 		} else {
 			o.blockSearchEnabled = true
 		}
@@ -210,14 +212,16 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "M":
 			o.moduleNavigatorMode = !o.moduleNavigatorMode
+			o.setOutputViewContent(true)
 		case "=":
 			o.blockSearchEnabled = !o.blockSearchEnabled
 			cmds = append(cmds, o.blockSearchCtx.InitInput())
 		case "L":
 			o.logsEnabled = !o.logsEnabled
+			o.setOutputViewContent(true)
 		case "m":
 			o.moduleSearchEnabled = true
-			o.setOutputViewContent()
+			o.setOutputViewContent(true)
 			return o, o.moduleSearchView.InitInput()
 		case "/":
 			o.searchEnabled = true
@@ -250,7 +254,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, o.jumpToNextMatchingBlock())
 		}
 		o.outputViewYoffset[o.active] = o.outputView.YOffset
-		o.setOutputViewContent()
+		o.setOutputViewContent(false)
 	}
 
 	_, cmd := o.moduleSearchView.Update(msg)
@@ -281,7 +285,7 @@ type displayContext struct {
 	errReceived       error
 }
 
-func (o *Output) setOutputViewContent() {
+func (o *Output) setOutputViewContent(forcedRender bool) {
 	displayCtx := &displayContext{
 		logsEnabled:       o.logsEnabled,
 		blockCtx:          o.active,
@@ -291,7 +295,8 @@ func (o *Output) setOutputViewContent() {
 		payload:           o.payloads[o.active],
 		errReceived:       o.errReceived,
 	}
-	if displayCtx != o.lastDisplayContext {
+
+	if !o.firstBlockSeen || forcedRender {
 		vals := o.renderedOutput(displayCtx.payload, true)
 		content := o.renderPayload(vals)
 		if displayCtx.searchViewEnabled {
@@ -309,8 +314,12 @@ func (o *Output) setOutputViewContent() {
 		}
 		o.lastDisplayContext = displayCtx
 		o.outputView.SetContent(content)
-	}
 
+		o.lastOutputContent = content
+		o.firstBlockSeen = true
+	} else {
+		o.outputView.SetContent(o.lastOutputContent)
+	}
 }
 
 func (o *Output) View() string {
@@ -324,7 +333,7 @@ func (o *Output) View() string {
 		searchLine = o.blockSearchCtx.View()
 	}
 
-	o.setOutputViewContent()
+	o.setOutputViewContent(false)
 
 	var middleBlock string
 	if o.moduleSearchEnabled {

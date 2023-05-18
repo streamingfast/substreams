@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [v1.1.3](https://github.com/streamingfast/substreams/releases/tag/v1.1.3)
 
 ### Highlights
 
@@ -27,6 +27,8 @@ If you upgrade in the wrong order or if somehow `tier2` processes start using th
 ### Fixed
 
 * Fixed a race when multiple Substreams request execute on the same `.spkg`, it was causing races between the two executors.
+* GUI: fixed an issue which would slow down message consumption when progress page was shown in ascii art "bars" mode
+* GUI: fixed the display of blocks per second to represent actual blocks, not messages count
 
 ### Changed
 

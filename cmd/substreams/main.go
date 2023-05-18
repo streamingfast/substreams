@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"runtime/debug"
 	"strings"
 )
@@ -19,7 +20,7 @@ func main() {
 	setup()
 
 	if err := rootCmd.Execute(); err != nil {
-
+		os.Exit(1)
 	}
 }
 

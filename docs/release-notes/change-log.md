@@ -30,6 +30,8 @@ If you upgrade in the wrong order or if somehow `tier2` processes start using th
 
 ### Changed
 
+* [`binary`]: Commands `substreams <...>` that fails now correctly return an exit code 1.
+
 * [`library`]: The `manifest.NewReader` signature changed and will now return a `*Reader, error` (previously `*Reader`).
 
 ### Added

@@ -87,7 +87,7 @@ func New(c common.Common, manifestPath string, outputModule string, config *requ
 		outputModule:        outputModule,
 		logsEnabled:         true,
 		moduleNavigator:     nav,
-		firstBlockSeen:      false,
+		firstBlockSeen:      true,
 	}
 	return output
 }
@@ -183,6 +183,9 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			o.payloads[blockCtx] = output
+			if o.firstBlockSeen {
+				o.active = blockCtx
+			}
 			o.setOutputViewContent(false)
 		}
 
@@ -296,7 +299,7 @@ func (o *Output) setOutputViewContent(forcedRender bool) {
 		errReceived:       o.errReceived,
 	}
 
-	if !o.firstBlockSeen || forcedRender {
+	if o.firstBlockSeen || forcedRender {
 		vals := o.renderedOutput(displayCtx.payload, true)
 		content := o.renderPayload(vals)
 		if displayCtx.searchViewEnabled {
@@ -316,7 +319,7 @@ func (o *Output) setOutputViewContent(forcedRender bool) {
 		o.outputView.SetContent(content)
 
 		o.lastOutputContent = content
-		o.firstBlockSeen = true
+		o.firstBlockSeen = false
 	} else {
 		o.outputView.SetContent(o.lastOutputContent)
 	}

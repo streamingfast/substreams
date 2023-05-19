@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
@@ -30,6 +31,7 @@ func BuildRequestDetails(
 		DebugInitialStoreSnapshotForModules: request.DebugInitialStoreSnapshotForModules,
 		ProductionMode:                      request.ProductionMode,
 		StopBlockNum:                        request.StopBlockNum,
+		UniqueID:                            nextUniqueID(),
 	}
 
 	req.ResolvedStartBlockNum, req.ResolvedCursor, undoSignal, err = resolveStartBlockNum(ctx, request, resolveCursor, getHeadBlock)
@@ -57,8 +59,15 @@ func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest
 		StopBlockNum:          request.StopBlockNum,
 		LinearHandoffBlockNum: request.StopBlockNum,
 		ResolvedStartBlockNum: request.StartBlockNum,
+		UniqueID:              nextUniqueID(),
 	}
 	return req
+}
+
+var uniqueRequestIDCounter = &atomic.Uint64{}
+
+func nextUniqueID() uint64 {
+	return uniqueRequestIDCounter.Add(1)
 }
 
 func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {

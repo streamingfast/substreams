@@ -272,8 +272,9 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 }
 
 func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {
+	requestDetails := reqctx.Details(ctx)
 	for _, pipeOpts := range s.pipelineOptions {
-		opts = append(opts, pipeOpts.PipelineOptions(ctx, request.StartBlockNum, request.StopBlockNum, tracing.GetTraceID(ctx).String())...)
+		opts = append(opts, pipeOpts.PipelineOptions(ctx, request.StartBlockNum, request.StopBlockNum, requestDetails.UniqueIDString())...)
 	}
 	return
 }

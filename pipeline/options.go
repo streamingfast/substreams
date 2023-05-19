@@ -8,7 +8,7 @@ import (
 )
 
 type PipelineOptioner interface {
-	PipelineOptions(ctx context.Context, startBlock, stopBlock uint64, traceID string) []Option
+	PipelineOptions(ctx context.Context, startBlock, stopBlock uint64, requestID string) []Option
 }
 
 type Option func(p *Pipeline)

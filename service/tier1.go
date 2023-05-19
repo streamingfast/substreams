@@ -332,7 +332,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipeline.Option) {
 	reqDetails := reqctx.Details(ctx)
 	for _, pipeOpts := range s.pipelineOptions {
-		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum, tracing.GetTraceID(ctx).String())...)
+		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum, reqDetails.UniqueIDString())...)
 	}
 	return
 }

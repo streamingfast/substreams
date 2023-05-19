@@ -7,8 +7,8 @@ import (
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
 	"github.com/dustin/go-humanize"
-	tracing "github.com/streamingfast/sf-tracing"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
 
@@ -136,9 +136,9 @@ func (i *Instance) newExtensionFunction(ctx context.Context, namespace, name str
 
 		data := heap.ReadBytes(ptr, length)
 
-		traceID := tracing.GetTraceID(ctx).String()
+		requestID := reqctx.Details(ctx).UniqueIDString()
 
-		out, err := f(ctx, traceID, i.CurrentCall.clock, data)
+		out, err := f(ctx, requestID, i.CurrentCall.clock, data)
 		if err != nil {
 			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
 		}

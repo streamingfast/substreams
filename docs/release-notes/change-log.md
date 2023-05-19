@@ -6,8 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+* BREAKING: The module hashing algorithm wrongfully changed the hash for imported modules, which made it impossible to leverage caches when composing new substreams off of imported ones.
+  * Operationally, if you want to keep your caches, you will need to copy or move the old hashes to the new ones.
+    * You can obtain the prior hashes for a given spkg with: `substreams info my.spkg`, using a prior release of the `substreams`
+    * With a more recent `substreams` release, you can obtain the new hashes with the same command.
+    * You can then `cp` or `mv` the caches for each module hash.
+  * You can also ignore this change. This will simply invalidate your cache.
+
 ### Added
-* Scheduler tracing
+
+* Added Tracing capabilities, using https://github.com/streamingfast/sf-tracing . See repository for details on how to enable.
 
 ## [v1.1.3](https://github.com/streamingfast/substreams/releases/tag/v1.1.3)
 

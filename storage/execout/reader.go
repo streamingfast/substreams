@@ -56,7 +56,9 @@ func (r *LinearReader) Launch(ctx context.Context) {
 	logger.Info("launching downloader", zap.Uint64("start_block", r.requestStartBlock), zap.Uint64("exclusive_end_block", r.exclusiveEndBlock))
 
 	go func() {
+		ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/pipeline/linear_reader")
 		err := r.run(ctx)
+		span.EndWithErr(&err)
 		r.Shutdown(err)
 	}()
 }

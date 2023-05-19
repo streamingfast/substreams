@@ -67,3 +67,14 @@ func WithMaxWasmFuelPerBlockModule(maxFuel uint64) Option {
 		}
 	}
 }
+
+func WithModuleExecutionTracing() Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.runtimeConfig.ModuleExecutionTracing = true
+		case *Tier2Service:
+			s.runtimeConfig.ModuleExecutionTracing = true
+		}
+	}
+}

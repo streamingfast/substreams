@@ -9,8 +9,6 @@ import (
 
 	"github.com/streamingfast/substreams/storage/execout"
 
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/bstream"
@@ -23,8 +21,7 @@ import (
 )
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
-	ctx, span := reqctx.WithSpan(p.ctx, "process_block")
-	defer span.EndWithErr(&err)
+	ctx := p.ctx
 
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
@@ -54,12 +51,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 
 	finalBlockHeight := obj.(bstream.Stepable).FinalBlockHeight()
 	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
-
-	span.SetAttributes(
-		attribute.String("block.id", block.Id),
-		attribute.Int64("block.num", int64(block.Number)),
-		attribute.Stringer("block.step", step),
-	)
 
 	reqStats.RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
@@ -252,7 +243,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 }
 
 func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput) (err error) {
-	ctx, span := reqctx.WithSpan(ctx, "modules_executions")
+	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
 	// TODO(abourget): get the module executors lazily from the OutputModulesGraph

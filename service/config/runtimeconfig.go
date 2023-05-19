@@ -20,7 +20,8 @@ type RuntimeConfig struct {
 	BaseObjectStore dstore.Store
 	WorkerFactory   work.WorkerFactory
 
-	WithRequestStats bool
+	WithRequestStats       bool
+	ModuleExecutionTracing bool
 }
 
 func NewRuntimeConfig(
@@ -40,5 +41,7 @@ func NewRuntimeConfig(
 		MaxWasmFuel:          maxWasmFuel,
 		BaseObjectStore:      baseObjectStore,
 		WorkerFactory:        workerFactory,
+		// overridden by Tier Options
+		ModuleExecutionTracing: false,
 	}
 }

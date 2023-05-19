@@ -3,7 +3,6 @@ package exec
 import (
 	"context"
 	"fmt"
-
 	"github.com/streamingfast/substreams/storage/execout"
 
 	"github.com/streamingfast/substreams/reqctx"
@@ -18,14 +17,13 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	modName := executor.Name()
 
 	reqStats := reqctx.ReqStats(ctx)
-
 	var err error
 
-	ctx, span := reqctx.WithSpan(ctx, "module_execution")
+	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "module_execution")
 	defer span.EndWithErr(&err)
 
 	logger = logger.With(zap.String("module_name", modName))
-	span.SetAttributes(attribute.String("module.name", modName))
+	span.SetAttributes(attribute.String("substreams.module.name", modName))
 
 	logger.Debug("running module")
 
@@ -33,7 +31,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	if err != nil {
 		return nil, nil, fmt.Errorf("check cache output exists: %w", err)
 	}
-	span.SetAttributes(attribute.Bool("module.cached", cached))
+	span.SetAttributes(attribute.Bool("substreams.module.cached", cached))
 
 	if cached {
 		reqStats.RecordOutputCacheHit()

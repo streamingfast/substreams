@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
 	"sort"
 	"time"
 
@@ -97,7 +98,13 @@ func (s *StoreSquasher) logger(ctx context.Context) *zap.Logger {
 }
 
 func (s *StoreSquasher) launch(ctx context.Context) {
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/pipeline/store_squasher/%s/squashing", s.name))
+	span.SetAttributes(
+		attribute.Int64("target_exclusive_end_block", int64(s.targetExclusiveEndBlock)),
+		attribute.Int64("next_expected_start_block", int64(s.nextExpectedStartBlock)),
+	)
 	err := s.processPartials(ctx)
+	span.EndWithErr(&err)
 	s.Shutdown(err)
 }
 func (s *StoreSquasher) processPartials(ctx context.Context) error {

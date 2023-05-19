@@ -19,9 +19,10 @@ type Stores struct {
 	configs         store.ConfigMap
 	StoreMap        store.Map
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
+	tier            string
 }
 
-func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool) *Stores {
+func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool, tier string) *Stores {
 	// FIXME(abourget): a StoreBoundary should exist for EACH Store
 	//  because the module's Initial Block could change the range of each
 	//  store.
@@ -30,6 +31,7 @@ func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestS
 		configs:      storeConfigs,
 		isSubRequest: isSubRequest,
 		bounder:      bounder,
+		tier:         tier,
 	}
 }
 
@@ -87,8 +89,8 @@ func (s *Stores) saveStoresSnapshots(ctx context.Context, boundaryBlock uint64) 
 }
 
 func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, boundaryBlock uint64) (err error) {
-	ctx, span := reqctx.WithSpan(ctx, "save_store_snapshot")
-	span.SetAttributes(attribute.String("store", saveStore.Name()))
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/stores/save_store_snapshot", s.tier))
+	span.SetAttributes(attribute.String("subtreams.store", saveStore.Name()))
 	defer span.EndWithErr(&err)
 
 	file, writer, err := saveStore.Save(boundaryBlock)

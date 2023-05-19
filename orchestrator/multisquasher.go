@@ -83,14 +83,14 @@ func buildStoreSquasher(
 	storeStorageState *storeState.StoreStorageState,
 	upToBlock uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
-) (*StoreSquasher, error) {
+) (storeSquasher *StoreSquasher, err error) {
+
 	storeModuleName := storeConfig.Name()
 	startingStore := storeConfig.NewFullKV(logger)
 
 	// TODO(abourget): can we use the Factory here? Can we not rely on the fact it was created apriori?
 	//  can we derive it from a prior store? Did we REALLY need to initialize the store from which this
 	//  one is derived?
-	var storeSquasher *StoreSquasher
 	if storeStorageState.InitialCompleteFile == nil {
 		logger.Debug("setting up initial store",
 			zap.String("store", storeModuleName),
@@ -99,7 +99,6 @@ func buildStoreSquasher(
 		storeSquasher = NewStoreSquasher(startingStore, upToBlock, startingStore.InitialBlock(), storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
 	} else {
 		initialRange := storeStorageState.InitialCompleteFile.Range
-
 		logger.Debug("loading initial store", zap.String("store", storeModuleName), zap.Stringer("initial_store_range", initialRange))
 		if err := startingStore.Load(ctx, storeStorageState.InitialCompleteFile); err != nil {
 			return nil, fmt.Errorf("load store %q with initial complete range %q: %w", storeModuleName, initialRange, err)

@@ -37,7 +37,7 @@ func (w *TestWorker) Work(ctx context.Context, request *pbssinternal.ProcessRang
 	w.t.Helper()
 	var err error
 
-	ctx, span := reqctx.WithSpan(ctx, "running_job_test")
+	ctx, span := reqctx.WithSpan(ctx, "substreams/running/test")
 	defer span.EndWithErr(&err)
 
 	logger := reqctx.Logger(ctx)

@@ -18,6 +18,7 @@ var detailsKey = contextKeyType(0)
 var tracerKey = contextKeyType(2)
 var spanKey = contextKeyType(3)
 var reqStatsKey = contextKeyType(4)
+var moduleExecutionTracingConfigKey = contextKeyType(5)
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())
@@ -57,7 +58,16 @@ func Span(ctx context.Context) ISpan {
 	return &noopSpan{}
 }
 
-func WithSpan(ctx context.Context, name string) (context.Context, *span) {
+func WithModuleExecutionSpan(ctx context.Context, name string) (context.Context, ISpan) {
+	if !ModuleExecutionTracing(ctx) {
+		return ctx, &noopSpan{}
+	}
+	ctx, nativeSpan := Tracer(ctx).Start(ctx, name)
+	s := &span{Span: nativeSpan, name: name}
+	return context.WithValue(ctx, spanKey, s), s
+}
+
+func WithSpan(ctx context.Context, name string) (context.Context, ISpan) {
 	ctx, nativeSpan := Tracer(ctx).Start(ctx, name)
 	s := &span{Span: nativeSpan, name: name}
 	return context.WithValue(ctx, spanKey, s), s
@@ -105,4 +115,16 @@ func Details(ctx context.Context) *RequestDetails {
 
 func WithRequest(ctx context.Context, req *RequestDetails) context.Context {
 	return context.WithValue(ctx, detailsKey, req)
+}
+
+func ModuleExecutionTracing(ctx context.Context) bool {
+	tracer := ctx.Value(moduleExecutionTracingConfigKey)
+	if t, ok := tracer.(bool); ok {
+		return t
+	}
+	return false
+}
+
+func WithModuleExecutionTracing(ctx context.Context) context.Context {
+	return context.WithValue(ctx, moduleExecutionTracingConfigKey, true)
 }

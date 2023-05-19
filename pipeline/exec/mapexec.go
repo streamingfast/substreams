@@ -35,7 +35,7 @@ func (e *MapperModuleExecutor) ResetWASMCall() { e.wasmModule.CurrentCall = nil 
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
 func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-	ctx, span := reqctx.WithSpan(ctx, "exec_map")
+	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
 	var instance *wasm.Call

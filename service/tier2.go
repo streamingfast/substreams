@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -38,10 +37,9 @@ type Tier2Service struct {
 	wasmExtensions    []wasm.WASMExtensioner
 	pipelineOptions   []pipeline.PipelineOptioner
 	streamFactoryFunc StreamFactoryFunc
-
-	runtimeConfig config.RuntimeConfig
-	tracer        ttrace.Tracer
-	logger        *zap.Logger
+	runtimeConfig     config.RuntimeConfig
+	tracer            ttrace.Tracer
+	logger            *zap.Logger
 }
 
 func NewTier2(
@@ -62,7 +60,7 @@ func NewTier2(
 	s = &Tier2Service{
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,
-		tracer:        otel.GetTracerProvider().Tracer("tier2"),
+		tracer:        tracing.GetTracer(),
 	}
 
 	zlog.Info("registering substreams metrics")
@@ -111,14 +109,16 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	newTraceID := tracing.NewRandomTraceID()
 
 	// Note: we are removing the logger from the context completely, because we want to override the trace_id given by the middleware
-	ctx = tracing.WithTraceID(ctx, newTraceID)
+	//ctx = tracing.WithTraceID(ctx, newTraceID)
 	logger := s.logger.Named("tier2").With(zap.String("parent_trace_id", parentTraceID.String())).With(zap.Stringer("trace_id", newTraceID))
 
 	ctx = logging.WithLogger(ctx, logger)
+
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
-	ctx, span := reqctx.WithSpan(ctx, "substreams_request")
+	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
 	defer span.EndWithErr(&err)
+	span.SetAttributes(attribute.Int64("substreams.tier", 2))
 
 	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
@@ -144,7 +144,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(logger, streamSrv)
-	err = s.processRange(ctx, s.runtimeConfig, request, respFunc, parentTraceID.String())
+	err = s.processRange(ctx, request, respFunc, parentTraceID.String())
 	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -154,7 +154,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	return grpcError
 }
 
-func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.RuntimeConfig, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, parentTraceID string) error {
+func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, parentTraceID string) error {
 	logger := reqctx.Logger(ctx)
 
 	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
@@ -166,7 +166,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	ctx, requestStats := setupRequestStats(ctx, logger, runtimeConfig.WithRequestStats, true)
+	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, true)
 
 	// bytesMeter := tracking.NewBytesMeter(ctx)
 	// bytesMeter.Launch(ctx, respFunc)
@@ -174,23 +174,26 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
+	if s.runtimeConfig.ModuleExecutionTracing {
+		ctx = reqctx.WithModuleExecutionTracing(ctx)
+	}
 
 	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	wasmRuntime := wasm.NewRuntime(s.wasmExtensions, runtimeConfig.MaxWasmFuel)
+	wasmRuntime := wasm.NewRuntime(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
 
-	execOutputConfigs, err := execout.NewConfigs(runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), runtimeConfig.CacheSaveInterval, logger)
+	execOutputConfigs, err := execout.NewConfigs(s.runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), parentTraceID)
+	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), parentTraceID)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true, "tier2")
 
 	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
 	//  * in direct mode, this would mean we start writing files after the handoff,
@@ -206,7 +209,7 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		true,
 	)
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, runtimeConfig, execOutWriter, s.blockType)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -221,9 +224,10 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		runtimeConfig,
+		s.runtimeConfig,
 		respFunc,
 		// This must always be the parent/global trace id, the one that comes from tier1
+		"tier2",
 		parentTraceID,
 		opts...,
 	)
@@ -259,7 +263,10 @@ func (s *Tier2Service) processRange(ctx context.Context, runtimeConfig config.Ru
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
 	}
+
+	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
 	streamErr = blockStream.Run(ctx)
+	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }

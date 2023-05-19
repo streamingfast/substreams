@@ -6,12 +6,10 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 )
 
-// noopSpan is an implementation of Span that preforms no operations.
+// noopSpan is an implementation of span that preforms no operations.
 type noopSpan struct{}
 
-func (n *noopSpan) EndWithErr(e *error) {
-	panic("implement me")
-}
+func (n *noopSpan) EndWithErr(e *error) {}
 
 // SpanContext returns an empty span context.
 func (n *noopSpan) SpanContext() ttrace.SpanContext { return ttrace.SpanContext{} }

@@ -77,11 +77,15 @@ func (w *RemoteWorker) ID() string {
 
 func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
 	var err error
-	ctx, span := reqctx.WithSpan(ctx, "running_job")
+
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.StartBlockNum, request.StopBlockNum))
 	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.String("output_module", request.OutputModule))
-	span.SetAttributes(attribute.Int64("start_block", int64(request.StartBlockNum)))
-	span.SetAttributes(attribute.Int64("stop_block", int64(request.StopBlockNum)))
+	span.SetAttributes(
+		attribute.String("substreams.output_module", request.OutputModule),
+		attribute.Int64("substreams.start_block", int64(request.StartBlockNum)),
+		attribute.Int64("substreams.stop_block", int64(request.StopBlockNum)),
+		attribute.Int64("substreams.worker_id", int64(w.id)),
+	)
 	logger := w.logger
 
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
@@ -135,7 +139,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 		logger = logger.With(zap.String("remote_hostname", remoteHostname))
 	}
 
-	span.SetAttributes(attribute.String("remote_hostname", remoteHostname))
+	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
 	for {
 		select {

@@ -37,7 +37,7 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 }
 
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	return s.blocks(ctx, s.runtimeConfig, request, respFunc)
+	return s.blocks(ctx, request, respFunc)
 }
 
 func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc StreamFactoryFunc) *Tier2Service {
@@ -55,5 +55,5 @@ func (s *Tier2Service) TestBlocks(ctx context.Context, request *pbssinternal.Pro
 		traceID = &TestTraceID
 	}
 
-	return s.processRange(ctx, s.runtimeConfig, request, respFunc, *traceID)
+	return s.processRange(ctx, request, respFunc, *traceID)
 }

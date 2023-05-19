@@ -21,7 +21,6 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
@@ -68,6 +67,7 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
+	tier    string
 	traceID string
 }
 
@@ -80,6 +80,7 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc func(substreams.ResponseFromAnyTier) error,
+	tier string,
 	traceID string,
 	opts ...Option,
 ) *Pipeline {
@@ -94,6 +95,7 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
+		tier:            tier,
 		traceID:         traceID,
 	}
 	for _, opt := range opts {
@@ -105,8 +107,6 @@ func New(
 func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
-	ctx, span := reqctx.WithSpan(ctx, "pipeline_init")
-	defer span.EndWithErr(&err)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
 		for _, modOut := range moduleOutputs {
@@ -156,14 +156,17 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 	}
 }
 
-func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error) {
+func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Map, err error) {
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/pipeline/store_setup", p.tier))
+	defer span.EndWithErr(&err)
+
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 
 	outputModuleName := reqDetails.OutputModule
 
 	ttrace.SpanContextFromContext(context.Background())
-	storeMap := store.NewMap()
+	storeMap = store.NewMap()
 
 	for name, storeConfig := range p.stores.configs {
 		if name == outputModuleName {
@@ -188,7 +191,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (store.Map, error)
 
 // runParallelProcess
 func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(ctx, "parallelprocess")
+	ctx, span := reqctx.WithSpan(p.ctx, fmt.Sprintf("substreams/%s/pipeline/parallel_process", p.tier))
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
 	reqStats := reqctx.ReqStats(ctx)
@@ -235,11 +238,7 @@ func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Cloc
 }
 
 func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clock) (err error) {
-	_, span := reqctx.WithSpan(ctx, "pre_block_hooks")
-	defer span.EndWithErr(&err)
-
 	for _, hook := range p.preBlockHooks {
-		span.AddEvent("running_pre_block_hook", ttrace.WithAttributes(attribute.String("hook", fmt.Sprintf("%T", hook))))
 		if err := hook(ctx, clock); err != nil {
 			return fmt.Errorf("pre block hook: %w", err)
 		}

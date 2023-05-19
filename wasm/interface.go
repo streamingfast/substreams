@@ -19,7 +19,7 @@ type WASMExtensioner interface {
 // serialized as protobuf messages.
 //
 // Such a function needs to be registered through RegisterRuntime.
-type WASMExtension func(ctx context.Context, traceID string, clock *pbsubstreams.Clock, in []byte) (out []byte, err error)
+type WASMExtension func(ctx context.Context, requestID string, clock *pbsubstreams.Clock, in []byte) (out []byte, err error)
 
 // WASM VM specific implementation to create a new Module, which is an abstraction
 // around a runtime and pre-compiled WASM modules.

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
-	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -164,9 +164,8 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					ptr, length, outputPtr := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
 					data := readBytes(inst, ptr, length)
 					call := wasm.FromContext(ctx)
-					traceID := tracing.GetTraceID(ctx).String()
 
-					out, err := f(ctx, traceID, call.Clock, data)
+					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}

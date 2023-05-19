@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
-	tracing "github.com/streamingfast/sf-tracing"
 
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -43,9 +43,7 @@ func (i *instance) newExtensionFunction(ctx context.Context, namespace, name str
 	return func(ptr, length, outputPtr int32) {
 		data := i.Heap.ReadBytes(ptr, length)
 
-		traceID := tracing.GetTraceID(ctx).String()
-
-		out, err := f(ctx, traceID, i.CurrentCall.Clock, data)
+		out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), i.CurrentCall.Clock, data)
 		if err != nil {
 			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
 		}

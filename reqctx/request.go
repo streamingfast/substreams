@@ -1,6 +1,8 @@
 package reqctx
 
 import (
+	"strconv"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -17,9 +19,14 @@ type RequestDetails struct {
 
 	LinearHandoffBlockNum uint64
 	StopBlockNum          uint64
+	UniqueID              uint64
 
 	ProductionMode bool
 	IsSubRequest   bool
+}
+
+func (d *RequestDetails) UniqueIDString() string {
+	return strconv.FormatUint(d.UniqueID, 10)
 }
 
 func (d *RequestDetails) IsOutputModule(modName string) bool {

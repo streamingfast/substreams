@@ -647,6 +647,8 @@ github.com/streamingfast/protoreflect v0.0.0-20230414203421-018294174fdc h1:poYC
 github.com/streamingfast/protoreflect v0.0.0-20230414203421-018294174fdc/go.mod h1:jD/2GMKKE6OqX8qTjhADU1e6DShO+gavG9e0Q693nKo=
 github.com/streamingfast/sf-tracing v0.0.0-20230518173934-07a78a90432e h1:O6KUSWGVFXgRIteKjxotWJEhaD/NDMpQsbXBHHQpY5c=
 github.com/streamingfast/sf-tracing v0.0.0-20230518173934-07a78a90432e/go.mod h1:Apcb4QwMpbFurrJQEIwz2LtQQZNMYkSO0IuZu1lGM8k=
+github.com/streamingfast/sf-tracing v0.0.0-20230519113358-f3dc5e582d12 h1:qdzKCVI7pi5UaxONGhDE92x4lmIYttzv8FxqOpOfA4A=
+github.com/streamingfast/sf-tracing v0.0.0-20230519113358-f3dc5e582d12/go.mod h1:Apcb4QwMpbFurrJQEIwz2LtQQZNMYkSO0IuZu1lGM8k=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14 h1:/HCMj7plThWPFXsj/O8f+zDIAtXciwP4rK6tb+9UvPQ=

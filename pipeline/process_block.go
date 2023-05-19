@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/streamingfast/bstream"
-	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

@@ -31,6 +31,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
@@ -402,6 +403,10 @@ func toGRPCError(err error) error {
 
 	if errors.Is(err, context.DeadlineExceeded) {
 		return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
+	}
+
+	if errors.Is(err, exec.ErrWasmDeterministicExec) {
+		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	dgrpc.AsGRPCError(err)

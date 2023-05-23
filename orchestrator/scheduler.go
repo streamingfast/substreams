@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -191,17 +192,20 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 
 		switch err.(type) {
 		case *work.RetryableErr:
-			logger.Info("worker failed with retryable error", zap.Error(err))
+			logger.Debug("worker failed with retryable error", zap.Error(err))
 			return err
 		default:
 			if err != nil {
-				logger.Info("worker failed with a non-retryable error", zap.Error(err))
 				return derr.NewFatalError(err)
 			}
 			return nil
 		}
 	})
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			logger.Debug("job canceled", zap.Object("job", job), zap.Error(err))
+			return jobResult{err: err}
+		}
 		logger.Info("job failed", zap.Object("job", job), zap.Error(err))
 		return jobResult{err: err}
 	}

@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/streamingfast/substreams/storage/execout"
@@ -8,6 +9,8 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
 )
+
+var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
 
 type BaseExecutor struct {
 	moduleName    string
@@ -64,11 +67,11 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (ins
 		}
 
 		if err = instance.Execute(); err != nil {
-			errExecutor := ErrorExecutor{
+			errExecutor := &ErrorExecutor{
 				message:    err.Error(),
 				stackTrace: instance.ExecutionStack,
 			}
-			return nil, fmt.Errorf("block %d: module %q: wasm execution failed: %v", clock.Number, e.moduleName, errExecutor.Error())
+			return nil, fmt.Errorf("block %d: module %q: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, errExecutor.Error())
 		}
 		err = instance.Cleanup()
 

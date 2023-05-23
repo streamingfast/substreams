@@ -17,7 +17,9 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var lastWorkerID uint64
@@ -157,6 +159,11 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				forwardResponse := toRPCRangeProgressResponse(resp.ModuleName, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
 				err := respFunc(forwardResponse)
 				if err != nil {
+					if ctx.Err() != nil {
+						return &Result{
+							Error: ctx.Err(),
+						}
+					}
 					span.SetStatus(codes.Error, err.Error())
 					return &Result{
 						Error: NewRetryableErr(fmt.Errorf("sending progress: %w", err)),
@@ -193,6 +200,18 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 		if err != nil {
 			if err == io.EOF {
 				return &Result{}
+			}
+			if ctx.Err() != nil {
+				return &Result{
+					Error: ctx.Err(),
+				}
+			}
+			if s, ok := status.FromError(err); ok {
+				if s.Code() == grpcCodes.InvalidArgument {
+					return &Result{
+						Error: err,
+					}
+				}
 			}
 			return &Result{
 				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),

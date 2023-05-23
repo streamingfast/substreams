@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     * You can then `cp` or `mv` the caches for each module hash.
   * You can also ignore this change. This will simply invalidate your cache.
 
+* Jobs that fail deterministically (during WASM execution) on tier2 will fail faster, without retries from tier1.
+
 ### Added
 
 * Added Tracing capabilities, using https://github.com/streamingfast/sf-tracing . See repository for details on how to enable.

@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/streamingfast/derr"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
-	"go.uber.org/zap"
 )
 
 type Scheduler struct {
@@ -204,15 +205,15 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			logger.Debug("job canceled", zap.Object("job", job), zap.Error(err))
-			return jobResult{err: err}
+			return jobResult{job: job, err: err}
 		}
 		logger.Info("job failed", zap.Object("job", job), zap.Error(err))
-		return jobResult{err: err}
+		return jobResult{job: job, err: err}
 	}
 
 	if err := ctx.Err(); err != nil {
 		logger.Info("job not completed", zap.Object("job", job), zap.Error(err))
-		return jobResult{err: err}
+		return jobResult{job: job, err: err}
 	}
 
 	jr := fromWorkResult(job, workResult)

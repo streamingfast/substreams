@@ -55,7 +55,6 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	reqStats.RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
 	if err = p.processBlock(ctx, block, clock, cursor, step, finalBlockHeight, reorgJunctionBlock); err != nil {
-		p.runPostJobHooks(ctx, clock)
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 	return

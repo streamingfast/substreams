@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## UNRELEASED
+
+### Changed
+
+* Changed default behavior concerning Caching of WASM instances: previous behavior was to keep the WASM instance, at the risk of leaking global state between calls. Default behavior is now to NOT cache the instance, resulting in an unfortunate performance hit of 50%. To keep previous behavior (at the risk of allowing non-deterministic behavior in the substreams code), set `SUBSTREAMS_WASM_CACHE_ENABLED=true`
+
+### Added
+
+* EXPERIMENTAL Support for the `wazero` WASM runtime. Enable by setting the `SUBSTREAMS_WASM_RUNTIME=wazero`. The default value stays `wasmtime`. Wazero may produce different results than wasmtime at the moment, use at your own risk.
+
 ## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
 
 ### HIGHLIGHTS
@@ -53,12 +63,6 @@ The components should be deployed in this order:
 2. Deploy and roll out `tier2` processes in second
 
 If you upgrade in the wrong order or if somehow `tier2` processes start using the new protocol without `tier1` being aware, user will end up with backend error(s) saying that some partial file are not found. Those will be resolved only when `tier1` processes have been upgraded successfully.
-
-### Added
-
-* Support for the `wazero` WASM runtime. Enable by setting the `SUBSTREAMS_WASM_RUNTIME=wazero`. The default value stays `wasmtime`.
-  * Added support for caching wasm instances, at the risk of leaking global state between calls. Enable with `SUBSTREAMS_WASM_CACHE_ENABLED=true`.
-
 
 ### Fixed
 

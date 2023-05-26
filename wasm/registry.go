@@ -64,7 +64,7 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 	}
 	cacheField := zap.Bool("cache_enabled", r.instanceCacheEnabled)
 
-	runtimeName := "wazero" // fallback engine
+	runtimeName := "wasmtime" // fallback engine
 	runtime := runtimes[runtimeName]
 	//fmt.Println("RUNTIME CHOSEN", runtimeName, runtime)
 	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {

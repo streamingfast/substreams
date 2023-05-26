@@ -1,0 +1,245 @@
+specVersion: v0.1.0
+package:
+  name: univ3
+  version: v0.0.0
+  url: https://github.com/streamingfast/substreams-uniswap-v3
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy01.wasm
+
+modules:
+  - name: map_pools_created
+    kind: map
+    initialBlock: 12369621
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:uniswap.types.v1.Pools
+
+  - name: store_pools_created
+    kind: store
+    updatePolicy: set
+    valueType: proto:uniswap.types.v1.Pool
+    inputs:
+      - map: map_pools_created
+
+  - name: store_tokens
+    kind: store
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_pools_created
+
+  - name: store_pool_count
+    kind: store
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - map: map_pools_created
+
+  - name: map_tokens_whitelist_pools
+    kind: map
+    initialBlock: 12369621
+    inputs:
+      - map: map_pools_created
+    output:
+      type: proto:uniswap.types.v1.ERC20Tokens
+
+  - name: store_tokens_whitelist_pools
+    kind: store
+    updatePolicy: append
+    valueType: string
+    inputs:
+      - map: map_tokens_whitelist_pools
+
+  - name: map_extract_data_types
+    kind: map
+    initialBlock: 12369621
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+      - store: store_pools_created
+    output:
+      type: proto:uniswap.types.v1.Events
+
+  - name: store_pool_sqrt_price
+    kind: store
+    updatePolicy: set
+    valueType: proto:uniswap.types.v1.Events.PoolSqrtPrice
+    inputs:
+      - map: map_extract_data_types
+
+  - name: store_prices
+    kind: store
+    updatePolicy: set
+    initialBlock: 12369621
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+      - store: store_pools_created
+
+  - name: store_pool_liquidities
+    kind: store
+    updatePolicy: set
+    initialBlock: 12369621
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+
+  - name: store_total_tx_counts
+    kind: store
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+
+  - name: store_swaps_volume
+    kind: store
+    updatePolicy: add
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+      - store: store_pools_created
+      - store: store_total_tx_counts
+      - store: store_eth_prices
+
+  - name: store_native_amounts
+    kind: store
+    updatePolicy: set
+    valueType: bigdecimal
+    inputs:
+      - map: map_extract_data_types
+
+  - name: store_eth_prices
+    kind: store
+    updatePolicy: set
+    initialBlock: 12369621
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+      - store: store_pools_created
+      - store: store_prices
+      - store: store_tokens_whitelist_pools
+      - store: store_native_amounts
+      - store: store_pool_liquidities
+
+  - name: store_token_tvl
+    kind: store
+    initialBlock: 12369621
+    updatePolicy: add
+    valueType: bigdecimal
+    inputs:
+      - map: map_extract_data_types
+
+  - name: store_derived_tvl
+    kind: store
+    initialBlock: 12369621
+    updatePolicy: set
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+      - store: store_token_tvl
+      - store: store_pools_created
+      - store: store_eth_prices
+
+  - name: store_derived_factory_tvl
+    kind: store
+    initialBlock: 12369621
+    updatePolicy: add
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_derived_tvl
+        mode: deltas
+
+  - name: store_ticks_liquidities
+    kind: store
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_extract_data_types
+
+  - name: store_positions
+    kind: store
+    updatePolicy: set
+    valueType: proto:uniswap.types.v1.Events.PositionEvent
+    inputs:
+      - map: map_extract_data_types
+
+  - name: store_min_windows
+    kind: store
+    updatePolicy: min
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_prices
+        mode: deltas
+      - store: store_eth_prices
+        mode: deltas
+
+  - name: store_max_windows
+    kind: store
+    updatePolicy: max
+    valueType: bigdecimal
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_prices
+        mode: deltas
+      - store: store_eth_prices
+        mode: deltas
+
+  - name: graph_out
+    kind: map
+    initialBlock: 12369621
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - store: store_pool_count
+        mode: deltas
+      - store: store_total_tx_counts
+        mode: deltas
+      - store: store_swaps_volume
+        mode: deltas
+      - store: store_derived_factory_tvl
+        mode: deltas
+      - store: store_eth_prices
+        mode: deltas
+      - map: map_extract_data_types
+      - map: map_pools_created
+      - store: store_pool_sqrt_price
+        mode: deltas
+      - store: store_pool_sqrt_price
+      - store: store_pool_liquidities
+        mode: deltas
+      - store: store_token_tvl
+        mode: deltas
+      - store: store_prices
+        mode: deltas
+      - store: store_prices
+      - store: store_tokens
+      - store: store_tokens
+        mode: deltas
+      - store: store_tokens_whitelist_pools
+        mode: deltas
+      - store: store_derived_tvl
+        mode: deltas
+      - store: store_ticks_liquidities
+        mode: deltas
+      - store: store_total_tx_counts
+      - store: store_eth_prices
+      - store: store_positions
+      - store: store_min_windows
+        mode: deltas
+      - store: store_max_windows
+        mode: deltas
+
+    output:
+      type: proto:sf.substreams.entity.v1.EntityChanges

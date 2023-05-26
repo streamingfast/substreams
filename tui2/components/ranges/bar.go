@@ -49,7 +49,7 @@ func (b *Bar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b *Bar) View() string {
-	width := uint64(b.Width)
+	width := uint64(b.Width - 2)
 	if width > 1000 {
 		return "[borked]"
 	}

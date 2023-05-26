@@ -38,7 +38,7 @@ The details of the run command are:
 
 * `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams.
 * `-t +1` or `--stop-block` only requests a single block; the stop block is the manifest's `initialBlock` + 1.
-* `substreams.yaml` is the path where you have defined your [Substreams manifest](https://github.com/streamingfast/substreams-docs/blob/master/docs/guides/docs/reference/manifests.html). You can use a `.spkg` or `substreams.yaml` configuration file.
+* `substreams.yaml` is the path where you have defined your [Substreams manifest](manifests.md). You can use a `.spkg` or `substreams.yaml` configuration file.
 * `module_name` is the module we want to `run`, referring to the module name [defined in the Substreams manifest](manifests.md#modules-.name).
 
 {% hint style="success" %}

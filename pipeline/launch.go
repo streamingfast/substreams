@@ -38,6 +38,8 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 		}
 	}
 
+	p.runPostJobHooks(ctx, p.lastFinalClock)
+
 	if !errors.Is(err, stream.ErrStopBlockReached) && !errors.Is(err, io.EOF) {
 		return err
 	}

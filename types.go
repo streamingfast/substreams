@@ -36,5 +36,8 @@ func NewSnapshotComplete() *pbsubstreamsrpc.Response {
 	}
 }
 
+// BlockHooks will always be called with a valid clock
 type BlockHook func(ctx context.Context, clock *pbsubstreams.Clock) error
+
+// PostJobHooks will be called at the end of a job. The clock can be `nil` in some circumstances, or it can be >= job.StopBlock
 type PostJobHook func(ctx context.Context, clock *pbsubstreams.Clock) error

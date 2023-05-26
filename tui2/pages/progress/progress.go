@@ -196,7 +196,7 @@ func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
 	p.Common.SetSize(w, h)
 	if p.bars != nil {
-		p.bars.SetSize(w, h-headerHeight)
+		p.bars.SetSize(w-2 /* borders */, h-headerHeight)
 	}
 	p.progressView.Width = w
 	p.progressView.Height = h - headerHeight

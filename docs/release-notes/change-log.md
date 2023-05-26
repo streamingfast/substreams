@@ -4,10 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
+
+### HIGHLIGHTS
+
+* Module hashing changed to fix cache reuse on substreams use imported modules
+* Memory leak fixed on rpc-enabled servers
+* GUI more responsive
+
+### Fixed
+
+* BREAKING: The module hashing algorithm wrongfully changed the hash for imported modules, which made it impossible to leverage caches when composing new substreams off of imported ones.
+  * Operationally, if you want to keep your caches, you will need to copy or move the old hashes to the new ones.
+    * You can obtain the prior hashes for a given spkg with: `substreams info my.spkg`, using a prior release of the `substreams`
+    * With a more recent `substreams` release, you can obtain the new hashes with the same command.
+    * You can then `cp` or `mv` the caches for each module hash.
+  * You can also ignore this change. This will simply invalidate your cache.
+
+* Fixed a memory leak where "PostJobHooks" were not always called. These are used to hook in rpc calls in ethereum chain. They are now always called, even if no block has been processed (can be called with `nil` value for the clock)
+* Jobs that fail deterministically (during WASM execution) on tier2 will fail faster, without retries from tier1.
+* `substreams gui` command now handles params flag (it was ignored)
+* Substeams GUI responsiveness improved significantly when handling large payloads
 
 ### Added
-* Scheduler tracing
+
+* Added Tracing capabilities, using https://github.com/streamingfast/sf-tracing . See repository for details on how to enable.
+
+### Known issues
+
+* If the cached substreams states are missing a 'full-kv' file in its sequence (not a normal scenario), requests will fail with `opening file: not found` https://github.com/streamingfast/substreams/issues/222
 
 ## [v1.1.3](https://github.com/streamingfast/substreams/releases/tag/v1.1.3)
 

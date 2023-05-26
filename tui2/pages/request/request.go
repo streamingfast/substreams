@@ -131,7 +131,6 @@ func (r *Request) renderRequestSummary() string {
 		values = append(values, r.Styles.StatusBarValue.Render(fmt.Sprintf("None")))
 	}
 	values = append(values, fmt.Sprintf("%s", r.traceId))
-
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
 
 	return style.Render(

@@ -181,7 +181,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
 				file := store.NewCompleteFileInfo(fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
 				if err := fullStore.Load(ctx, file); err != nil {
-					return nil, fmt.Errorf("load full store: %w", err)
+					return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
 				}
 			}
 

@@ -100,7 +100,7 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	}
 
 	buf.WriteString("entrypoint")
-	buf.WriteString(module.Name)
+	buf.WriteString(module.BinaryEntrypoint)
 
 	h := sha1.New()
 	h.Write(buf.Bytes())
@@ -129,14 +129,14 @@ func inputName(input *pbsubstreams.Module_Input) (string, error) {
 
 func inputValue(input *pbsubstreams.Module_Input) (string, error) {
 	switch input.Input.(type) {
-	case *pbsubstreams.Module_Input_Store_:
-		return input.GetStore().ModuleName, nil
 	case *pbsubstreams.Module_Input_Source_:
 		return input.GetSource().Type, nil
-	case *pbsubstreams.Module_Input_Map_:
-		return input.GetMap().ModuleName, nil
 	case *pbsubstreams.Module_Input_Params_:
 		return input.GetParams().Value, nil
+	case *pbsubstreams.Module_Input_Store_:
+		return "", nil // this is accounted for in the `AncestorOf()` tree
+	case *pbsubstreams.Module_Input_Map_:
+		return "", nil // this is accounted for in the `AncestorOf()` tree
 	default:
 		return "", fmt.Errorf("invalid input %T", input.Input)
 	}

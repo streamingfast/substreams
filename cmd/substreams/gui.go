@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/manifest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,18 @@ func runGui(cmd *cobra.Command, args []string) error {
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
+
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+	pkg, err := manifestReader.Read()
+	if err != nil {
+		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+	if err := manifest.ApplyParams(mustGetStringSlice(cmd, "params"), pkg); err != nil {
+		return err
+	}
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

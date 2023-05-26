@@ -1,0 +1,28 @@
+specVersion: v0.1.0
+package:
+  name: univ3_kv
+  version: v0.1.0
+  url: https://github.com/streamingfast/substreams-uniswap-v3-info
+
+imports:
+  uniswapv3: ./univ3-first.yaml
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy02.wasm
+
+modules:
+  - name: kv_out
+    kind: map
+    initialBlock: 12369621
+    inputs:
+      - map: uniswapv3:map_pools_created
+      - store: uniswapv3:store_total_tx_counts
+        mode: deltas
+      - store: uniswapv3:store_swaps_volume
+        mode: deltas
+      - store: uniswapv3:store_derived_tvl
+        mode: deltas
+    output:
+      type: proto:sf.substreams.sink.kv.v1.KVOperations

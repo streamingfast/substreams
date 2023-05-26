@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
+
+### HIGHLIGHTS
+
+* Module hashing changed to fix cache reuse on substreams use imported modules
+* Memory leak fixed on rpc-enabled servers
+* GUI more responsive
 
 ### Fixed
 
@@ -15,11 +21,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     * You can then `cp` or `mv` the caches for each module hash.
   * You can also ignore this change. This will simply invalidate your cache.
 
+* Fixed a memory leak where "PostJobHooks" were not always called. These are used to hook in rpc calls in ethereum chain. They are now always called, even if no block has been processed (can be called with `nil` value for the clock)
 * Jobs that fail deterministically (during WASM execution) on tier2 will fail faster, without retries from tier1.
+* `substreams gui` command now handles params flag (it was ignored)
+* Substeams GUI responsiveness improved significantly when handling large payloads
 
 ### Added
 
 * Added Tracing capabilities, using https://github.com/streamingfast/sf-tracing . See repository for details on how to enable.
+
+### Known issues
+
+* If the cached substreams states are missing a 'full-kv' file in its sequence (not a normal scenario), requests will fail with `opening file: not found` https://github.com/streamingfast/substreams/issues/222
 
 ## [v1.1.3](https://github.com/streamingfast/substreams/releases/tag/v1.1.3)
 

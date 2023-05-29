@@ -66,7 +66,7 @@ func MustNewFromString(s string) *BigDecimal {
 // NewFromString creates a new BigDecimal from a string representation, essentially
 // the parse from string operation.
 func NewFromString(s string) (*BigDecimal, error) {
-	base_part, exponent_value := s, int64(0)
+	basePart, exponentValue := s, int64(0)
 	if loc := strings.IndexAny(s, "eE"); loc != -1 {
 		// let (base, exp) = (&s[..loc], &s[loc + 1..]);
 		//
@@ -83,35 +83,35 @@ func NewFromString(s string) (*BigDecimal, error) {
 			return nil, fmt.Errorf("invalid exponent value %q: %w", expRaw, err)
 		}
 
-		base_part = base
-		exponent_value = exp
+		basePart = base
+		exponentValue = exp
 	}
 
-	if base_part == "" {
+	if basePart == "" {
 		return nil, fmt.Errorf("failed to parse empty string")
 	}
 
-	digits, decimal_offset := base_part, int64(0)
+	digits, decimalOffset := basePart, int64(0)
 	if loc := strings.IndexAny(s, "."); loc != -1 {
 		// let (lead, trail) = (&base_part[..loc], &base_part[loc + 1..]);
-		lead, trail := base_part[:loc], base_part[loc+1:]
+		lead, trail := basePart[:loc], basePart[loc+1:]
 
 		// let mut digits = String::from(lead);
 		// digits.push_str(trail);
 		// copy leading characters + trailing characters after '.' into the digits string
 		digits = lead + trail
-		decimal_offset = int64(len(trail))
+		decimalOffset = int64(len(trail))
 	}
 
 	// let scale = decimal_offset - exponent_value;
 	// let big_int = try!(BigInt::from_str_radix(&digits, radix));
-	scale := decimal_offset - exponent_value
-	big_int, ok := (&big.Int{}).SetString(digits, 10)
+	scale := decimalOffset - exponentValue
+	bigInt, ok := (&big.Int{}).SetString(digits, 10)
 	if !ok {
 		return nil, fmt.Errorf("invalid digits part %q", digits)
 	}
 
-	out := &BigDecimal{Int: big_int, Scale: scale}
+	out := &BigDecimal{Int: bigInt, Scale: scale}
 	out.normalizeInPlace()
 
 	return out, nil
@@ -119,36 +119,36 @@ func NewFromString(s string) (*BigDecimal, error) {
 
 func (z *BigDecimal) String() string {
 	//   // Aquire the absolute integer as a decimal string
-	//   let mut abs_int = self.int_val.abs().to_str_radix(10);
+	//   let mut absInt = self.int_val.abs().to_str_radix(10);
 	// It's more efficient to do String and remove the '-' to make it absolute than to use (&big.Int{}).Abs.Text(10)
-	abs_int := strings.TrimPrefix(z.Int.Text(10), "-")
+	absInt := strings.TrimPrefix(z.Int.Text(10), "-")
 
 	// Split the representation at the decimal point
 	//   let (before, after) = if self.scale >= abs_int.len() as i64 {
 	var before, after string
-	if z.Scale >= int64(len(abs_int)) {
+	if z.Scale >= int64(len(absInt)) {
 		// First case: the integer representation falls completely behind the decimal point
 		//     let scale = self.scale as usize;
 		//     let after = "0".repeat(scale - abs_int.len()) + abs_int.as_str();
 		//     ("0".to_string(), after)
-		before, after = "0", strings.Repeat("0", int(z.Scale)-len(abs_int))+abs_int
+		before, after = "0", strings.Repeat("0", int(z.Scale)-len(absInt))+absInt
 	} else {
 		// Second case: the integer representation falls around, or before the decimal point
 		//     let location = abs_int.len() as i64 - self.scale;
 		//     if location > abs_int.len() as i64 {
-		location := int64(len(abs_int)) - z.Scale
-		if location > int64(len(abs_int)) {
+		location := int64(len(absInt)) - z.Scale
+		if location > int64(len(absInt)) {
 			// Case 2.1, entirely before the decimal point, we should prepend zeros
 			//   let zeros = location as usize - abs_int.len();
 			//   let abs_int = abs_int + "0".repeat(zeros as usize).as_str();
 			//   (abs_int, "".to_string())
-			zeros := location - int64(len(abs_int))
-			before, after = abs_int+strings.Repeat("0", int(zeros)), ""
+			zeros := location - int64(len(absInt))
+			before, after = absInt+strings.Repeat("0", int(zeros)), ""
 		} else {
 			// Case 2.2, somewhere around the decimal point, just split it in two
 			// 		  let after = abs_int.split_off(location as usize);
 			// 		  (abs_int, after)
-			before, after = abs_int[0:location], abs_int[location:]
+			before, after = absInt[0:location], absInt[location:]
 		}
 	}
 
@@ -216,7 +216,7 @@ func (z *BigDecimal) takeAndScale(x *BigDecimal, newScale int64) *BigDecimal {
 	// 	BigDecimal::new(self.int_val, new_scale)
 	// }
 	if newScale > x.Scale {
-		z.Int.Mul(x.Int, ten_to_the(uint64(newScale-x.Scale)))
+		z.Int.Mul(x.Int, tenToThe(uint64(newScale-x.Scale)))
 		z.Scale = newScale
 
 		return z
@@ -227,7 +227,7 @@ func (z *BigDecimal) takeAndScale(x *BigDecimal, newScale int64) *BigDecimal {
 	// 	BigDecimal::new(self.int_val, new_scale)
 	// }
 	if newScale < x.Scale {
-		z.Int.Quo(x.Int, ten_to_the(uint64(x.Scale-newScale)))
+		z.Int.Quo(x.Int, tenToThe(uint64(x.Scale-newScale)))
 		z.Scale = newScale
 
 		return z
@@ -285,7 +285,7 @@ func (z *BigDecimal) withPrecisionInPlace(prec uint64) {
 		trace("with_prec: digits > prec")
 
 		diff := digits - prec
-		p := ten_to_the(diff)
+		p := tenToThe(diff)
 
 		var q *big.Int
 		// let (mut q, r) = self.int_val.div_rem(&p);
@@ -295,7 +295,7 @@ func (z *BigDecimal) withPrecisionInPlace(prec uint64) {
 		// check for "leading zero" in remainder term; otherwise round
 		tenTimesR := (&big.Int{}).Mul(bigTen, r)
 		if p.Cmp(tenTimesR) == -1 {
-			roundingTerm := get_rounding_term(r)
+			roundingTerm := getRoundingTerm(r)
 			q = q.Add(q, roundingTerm)
 			trace("with_prec: digits > prec adding rounding term %s", roundingTerm)
 		}
@@ -311,9 +311,9 @@ func (z *BigDecimal) withPrecisionInPlace(prec uint64) {
 		trace("with_prec: digits < prec")
 
 		diff := prec - digits
-		p := ten_to_the(diff)
+		p := tenToThe(diff)
 
-		z.Int = (p).Mul(z.Int, p)
+		z.Int = z.Int.Mul(z.Int, p)
 		z.Scale = z.Scale + int64(diff)
 		trace("with_prec: digits < prec got (bigint %s, exp %d)", z.Int, z.Scale)
 
@@ -339,7 +339,7 @@ func (b *BigDecimal) digits() uint64 {
 	trace("digits: guess digits %d", digits)
 
 	// let mut num = ten_to_the(digits);
-	num := ten_to_the(digits)
+	num := (&big.Int{}).Set(tenToThe(digits))
 	trace("digits: num %s", num)
 
 	// while int >= &num {
@@ -356,12 +356,24 @@ func (b *BigDecimal) digits() uint64 {
 	return digits
 }
 
-func ten_to_the(pow uint64) *big.Int {
-	// FIXME: Use a pre-computed value for the the first 35 ([0,35])
+var tenToPrecomputeTable []*big.Int
+
+func init() {
+	tenToPrecomputeTable = make([]*big.Int, 35+1)
+	for i := 0; i <= 35; i++ {
+		tenToPrecomputeTable[i] = (&big.Int{}).Exp(bigTen, big.NewInt(int64(i)), nil)
+	}
+}
+
+func tenToThe(pow uint64) *big.Int {
+	if pow < uint64(len(tenToPrecomputeTable)) {
+		return tenToPrecomputeTable[pow]
+	}
+
 	return (&big.Int{}).Exp(bigTen, big.NewInt(int64(pow)), nil)
 }
 
-func get_rounding_term(num *big.Int) *big.Int {
+func getRoundingTerm(num *big.Int) *big.Int {
 	if num.Sign() == 0 {
 		return bigZero
 	}
@@ -371,7 +383,7 @@ func get_rounding_term(num *big.Int) *big.Int {
 	digits := uint64(float64(bits) / 3.3219280949)
 
 	// let mut n = ten_to_the(digits);
-	n := ten_to_the(digits)
+	n := (&big.Int{}).Set(tenToThe(digits))
 
 	// loop-method
 	for {

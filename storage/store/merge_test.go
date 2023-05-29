@@ -373,6 +373,8 @@ func TestStore_Merge(t *testing.T) {
 					actual := string(v)
 					assert.Equal(t, expected, actual)
 				}
+				assert.Nil(t, test.prev.deltas, "merge should not keep leftover deltas")
+				assert.Zero(t, test.prev.lastOrdinal, "merge should not keep non-zero lastOrdinal")
 			}
 		})
 	}

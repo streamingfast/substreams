@@ -286,6 +286,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		return fmt.Errorf("update policy %q not supported", b.updatePolicy) // should have been validated already
 	}
 
+	b.Reset() // Merge should never keep deltas or ordinals
 	return nil
 }
 

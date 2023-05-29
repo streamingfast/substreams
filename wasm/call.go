@@ -39,6 +39,7 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, ar
 	for _, input := range arguments {
 		switch v := input.(type) {
 		case *StoreWriterOutput:
+			v.Store.Reset()
 			call.outputStore = v.Store
 			call.updatePolicy = v.UpdatePolicy
 			call.valueType = v.ValueType

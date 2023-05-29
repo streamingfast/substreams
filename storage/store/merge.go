@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/bigdecimal"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -113,14 +114,14 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			sum := func(a, b *big.Float) *big.Float {
-				return new(big.Float).SetPrec(100).Add(a, b).SetPrec(100)
+			sum := func(a, b *bigdecimal.BigDecimal) string {
+				return bigdecimal.New().Add(a, b).String()
 			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
-				v0 := foundOrZeroBigFloat(v0b, fv0)
-				v1 := foundOrZeroBigFloat(v, true)
-				b.setKV(k, bigFloatToBytes(sum(v0, v1)))
+				v0 := foundOrZeroBigDecimal(v0b, fv0)
+				v1 := foundOrZeroBigDecimal(v, true)
+				b.setKV(k, []byte(sum(v0, v1)))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -299,6 +300,13 @@ func foundOrZeroInt64(in []byte, found bool) int64 {
 		return 0
 	}
 	return int64(val)
+}
+
+func foundOrZeroBigDecimal(in []byte, found bool) *bigdecimal.BigDecimal {
+	if !found {
+		return bigdecimal.Zero()
+	}
+	return bigdecimal.MustNewFromString(string(in))
 }
 
 func foundOrZeroBigFloat(in []byte, found bool) *big.Float {

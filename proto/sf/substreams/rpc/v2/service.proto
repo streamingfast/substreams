@@ -54,14 +54,13 @@ message Response {
   oneof message {
     SessionInit session = 1; // Always sent first
     ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
-    BlockScopedData block_scoped_data = 3; 
+    BlockScopedData block_scoped_data = 3;
     BlockUndoSignal block_undo_signal = 4;
 
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
     InitialSnapshotData debug_snapshot_data = 10;
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
     InitialSnapshotComplete debug_snapshot_complete = 11;
-
   }
 }
 
@@ -70,7 +69,7 @@ message Response {
 // with a block number above 'last_valid_block' has been reverted
 // on-chain. Delete that data and restart from 'last_valid_cursor'
 message BlockUndoSignal {
-  sf.substreams.v1.BlockRef last_valid_block = 1; 
+  sf.substreams.v1.BlockRef last_valid_block = 1;
   string last_valid_cursor = 2;
 }
 

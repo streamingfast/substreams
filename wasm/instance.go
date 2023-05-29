@@ -107,6 +107,7 @@ func (i *Instance) NewCall(clock *pbsubstreams.Clock, arguments []Argument) (*Ca
 	for _, input := range arguments {
 		switch v := input.(type) {
 		case *StoreWriterOutput:
+			v.Store.Reset()
 			i.CurrentCall.outputStore = v.Store
 			i.CurrentCall.updatePolicy = v.UpdatePolicy
 			i.CurrentCall.valueType = v.ValueType

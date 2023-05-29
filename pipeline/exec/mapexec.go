@@ -39,6 +39,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	defer span.EndWithErr(&err)
 
 	var instance *wasm.Call
+	fmt.Println("calling mapper", e.Name())
 	if instance, err = e.wasmCall(reader); err != nil {
 		return nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
@@ -46,6 +47,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	if instance != nil {
 		out = instance.Output()
 	}
+	fmt.Println("got output", out)
 
 	modOut, err := e.toModuleOutput(out)
 	if err != nil {

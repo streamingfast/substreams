@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/streamingfast/substreams/bigdecimal"
 	"github.com/streamingfast/substreams/manifest"
 )
 
@@ -84,7 +85,7 @@ func (m *Instance) addBigDecimal(ord int64, keyPtr, keyLength, valPtr, valLength
 	key := m.Heap.ReadString(keyPtr, keyLength)
 	value := m.Heap.ReadString(valPtr, valLength)
 
-	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	toAdd, err := bigdecimal.NewFromString(string(value))
 	if err != nil {
 		returnStateError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}

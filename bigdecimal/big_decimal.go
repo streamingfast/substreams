@@ -261,6 +261,9 @@ func (z *BigDecimal) normalizeInPlace() {
 
 	// let int_val = num_bigint::BigInt::from_radix_be(sign, &digits, 10).unwrap();
 	z.Int, _ = (&big.Int{}).SetString(digits, 10)
+	if z.Int == nil {
+		z.Int = big.NewInt(0)
+	}
 	if sign == -1 {
 		z.Int = z.Int.Neg(z.Int)
 	}

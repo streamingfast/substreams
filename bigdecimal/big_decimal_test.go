@@ -83,6 +83,7 @@ func TestBigDecimal_NewFromString(t *testing.T) {
 		{"1555555555555555555555555555555555", "1555555555555555555555555555555555", 0},
 		{"15555555555555555555555555555555555", "1555555555555555555555555555555556", -1},
 		{"155555555555555555555555555555555555", "1555555555555555555555555555555556", -2},
+		{"0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "0", 149},
 	}
 	for _, tt := range tests {
 		t.Run(tt.value, func(t *testing.T) {
@@ -96,6 +97,7 @@ func TestBigDecimal_NewFromString(t *testing.T) {
 
 			actual, err := NewFromString(tt.value)
 			require.NoError(t, err)
+			require.NotNil(t, actual.Int)
 
 			msg := []any{
 				"For %s [BigInt (expected %s, actual %s), Scale (expected %d, actual %d)]",

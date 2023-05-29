@@ -3,6 +3,8 @@ package store
 import (
 	"math/big"
 	"strconv"
+
+	"github.com/streamingfast/substreams/bigdecimal"
 )
 
 func (b *baseStore) SumBigInt(ord uint64, key string, value *big.Int) {
@@ -53,18 +55,18 @@ func (b *baseStore) SumFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
 }
 
-func (b *baseStore) SumBigDecimal(ord uint64, key string, value *big.Float) {
-	sum := new(big.Float)
-	val, found := b.GetAt(ord, key)
+func (b *baseStore) SumBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal) {
+	sum := bigdecimal.New()
+	v, found := b.GetAt(ord, key)
 	if !found {
 		sum = value
 	} else {
-		prev, _, err := big.ParseFloat(string(val), 10, 100, big.ToNearestEven)
-		if prev == nil || err != nil {
+		prev, err := bigdecimal.NewFromString(string(v))
+		if err != nil || prev == nil {
 			sum = value
 		} else {
-			sum.Add(prev, value)
+			sum = bigdecimal.New().Add(prev, value)
 		}
 	}
-	b.set(ord, key, []byte(sum.Text('g', 100)))
+	b.set(ord, key, []byte(sum.String()))
 }

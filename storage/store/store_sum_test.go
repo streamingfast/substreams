@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/streamingfast/substreams/bigdecimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -151,22 +152,22 @@ func TestStoreSumBigFloat(t *testing.T) {
 		name          string
 		key           string
 		existingValue []byte
-		value         *big.Float
-		expectedValue *big.Float
+		value         *bigdecimal.BigDecimal
+		expectedValue *bigdecimal.BigDecimal
 	}{
 		{
 			name:          "found",
 			key:           "key",
 			existingValue: []byte("3.0"),
-			value:         big.NewFloat(4),
-			expectedValue: big.NewFloat(7),
+			value:         bigdecimal.MustNewFromString("4"),
+			expectedValue: bigdecimal.MustNewFromString("7"),
 		},
 		{
 			name:          "not found",
 			key:           "key",
 			existingValue: nil,
-			value:         big.NewFloat(4),
-			expectedValue: big.NewFloat(4),
+			value:         bigdecimal.MustNewFromString("4"),
+			expectedValue: bigdecimal.MustNewFromString("4"),
 		},
 	}
 
@@ -183,10 +184,9 @@ func TestStoreSumBigFloat(t *testing.T) {
 				t.Errorf("value not found")
 			}
 
-			actualInt, _, err := big.ParseFloat(string(actual), 10, 100, big.ToNearestEven)
-			assert.NoError(t, err)
+			parsedActual := bigdecimal.MustNewFromString(string(actual))
 
-			assert.Equal(t, 0, actualInt.Cmp(test.expectedValue))
+			assert.Equal(t, parsedActual.String(), test.expectedValue.String())
 		})
 	}
 }

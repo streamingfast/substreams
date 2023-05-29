@@ -6,6 +6,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 
+	"github.com/streamingfast/substreams/bigdecimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -138,7 +139,7 @@ func (c *Call) DoAddBigInt(ord uint64, key string, value string) {
 func (c *Call) DoAddBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("add_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigdecimal", "bigfloat", key)
 
-	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	toAdd, err := bigdecimal.NewFromString(string(value))
 	if err != nil {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}

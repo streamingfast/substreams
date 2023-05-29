@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/streamingfast/substreams/bigdecimal"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -155,5 +156,5 @@ type SumFloat64Setter interface {
 	SumFloat64(ord uint64, key string, value float64)
 }
 type SumBigDecimalSetter interface {
-	SumBigDecimal(ord uint64, key string, value *big.Float)
+	SumBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal)
 }

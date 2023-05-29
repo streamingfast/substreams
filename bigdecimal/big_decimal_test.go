@@ -129,6 +129,7 @@ func TestBigDecimal_Add(t *testing.T) {
 		{"small_positive_inverted", args{"1.234", "12.34"}, "13.574"},
 		{"small_negative", args{"12.34", "-1.234"}, "11.106"},
 		{"small_negative_inverted", args{"-1.234", "12.34"}, "11.106"},
+		{"equal_decimals", args{"1.23", "1.23"}, "2.46"},
 		{"really_big_+_really_small", args{"1234e6", "1234e-6"}, "1234000000.001234"},
 		{"really_small_+_really_big", args{"1234e-6", "1234e6"}, "1234000000.001234"},
 		{"no_meaning_decimals_+_1", args{"18446744073709551616.0", "1"}, "18446744073709551617"},

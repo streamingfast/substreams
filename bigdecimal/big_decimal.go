@@ -177,6 +177,7 @@ func (z *BigDecimal) Add(left *BigDecimal, right *BigDecimal) *BigDecimal {
 	// 	Ordering::Equal => { lhs.int_val += rhs.int_val; return lhs }
 	case left.Scale == right.Scale:
 		z.Int.Add(left.Int, right.Int)
+		z.Scale = left.Scale
 		return z
 
 	// Ordering::Less => lhs.take_and_scale(rhs.scale) + rhs,

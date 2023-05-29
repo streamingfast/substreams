@@ -59,10 +59,10 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 		}
 	}
 
-	if cache := os.Getenv("SUBSTREAMS_WASM_CACHE_ENABLED"); cache != "" {
-		r.instanceCacheEnabled = cache == "true"
+	if cache := os.Getenv("SUBSTREAMS_WASM_CACHE_ENABLED"); cache == "true" {
+		zlog.Warn("Running with WASM cache because SUBSTREAMS_WASM_CACHE_ENABLED variable was set -- this will produce non-deterministic output and poison your cache. Never use the WASM cache in production.")
+		r.instanceCacheEnabled = true
 	}
-	zlog.Warn("Running with WASM cache because SUBSTREAMS_WASM_CACHE_ENABLED variable was set -- this will produce non-deterministic output and poison your cache. Never use the WASM cache in production.")
 	cacheField := zap.Bool("cache_enabled", r.instanceCacheEnabled)
 
 	runtimeName := "wazero" // default

@@ -6,13 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## UNRELEASED
 
+### Highlights
+
+This release fixes data determinism issues. This comes at a 20% performance cost but is necessary for integration with The Graph ecosystem.
+
+#### Operators
+
+* When upgrading a substreams server to this version, you should delete all existing module caches to benefit from deterministic output
+
+### Fixed
+
+* When running in development mode with a start-block in the future on a cold cache, you would sometimes get invalid "updates" from the store passed down to your modules that depend on them. It did not impact the caches but caused 
+
 ### Changed
 
-* Changed default behavior concerning Caching of WASM instances: previous behavior was to keep the WASM instance, at the risk of leaking global state between calls. Default behavior is now to NOT cache the instance, resulting in an unfortunate performance hit of 50%. To keep previous behavior (at the risk of allowing non-deterministic behavior in the substreams code), set `SUBSTREAMS_WASM_CACHE_ENABLED=true`
-
-### Added
-
-* EXPERIMENTAL Support for the `wazero` WASM runtime. Enable by setting the `SUBSTREAMS_WASM_RUNTIME=wazero`. The default value stays `wasmtime`. Wazero may produce different results than wasmtime at the moment, use at your own risk.
+* Changed default WASM engine from `wasmtime` to `wazero`, use `SUBSTREAMS_WASM_RUNTIME=wasmtime` to revert to prior engine.
 
 ## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
 

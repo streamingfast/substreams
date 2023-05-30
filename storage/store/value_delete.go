@@ -1,6 +1,7 @@
 package store
 
 import (
+	"sort"
 	"strings"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -26,6 +27,7 @@ import (
 func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
 	b.bumpOrdinal(ord)
 
+	var deltas []*pbssinternal.StoreDelta
 	for key, val := range b.kv {
 		if !strings.HasPrefix(key, prefix) {
 			continue
@@ -38,6 +40,10 @@ func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
 			NewValue:  nil,
 		}
 		b.ApplyDelta(delta)
-		b.deltas = append(b.deltas, delta)
+		deltas = append(deltas, delta)
 	}
+	sort.Slice(deltas, func(i, j int) bool {
+		return deltas[i].Key < deltas[j].Key
+	})
+	b.deltas = append(b.deltas, deltas...)
 }

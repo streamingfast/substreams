@@ -83,7 +83,8 @@ func TestBigDecimal_NewFromString(t *testing.T) {
 		{"1555555555555555555555555555555555", "1555555555555555555555555555555555", 0},
 		{"15555555555555555555555555555555555", "1555555555555555555555555555555556", -1},
 		{"155555555555555555555555555555555555", "1555555555555555555555555555555556", -2},
-		{"0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "0", 149},
+		{"0.00000000000000000000000000000000", "0", 0},
+		{"0.10000000000000000000000000000000", "1", 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.value, func(t *testing.T) {
@@ -113,6 +114,38 @@ func TestBigDecimal_NewFromString(t *testing.T) {
 
 }
 
+func TestBigDecimal_Cmp(t *testing.T) {
+	type args struct {
+		left  string
+		right string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{"zero", args{"0", "0"}, 0},
+		{"small_positive", args{"12.34", "1.234"}, 1},
+		{"small_positive_inverted", args{"1.234", "12.34"}, -1},
+		{"small_negative", args{"12.34", "-1.234"}, 1},
+		{"small_negative_inverted", args{"-1.234", "12.34"}, -1},
+		{"equal_decimals", args{"1.23", "1.23"}, 0},
+		{"equal_negative", args{"-1.23", "-1.23"}, 0},
+		{"two_negative", args{"-1.23", "-4.23"}, 1},
+		{"really_big_+_really_small", args{"1234e6", "1234e-6"}, 1},
+		{"really_small_+_really_big", args{"1234e-6", "1234e6"}, -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			x := MustNewFromString(tt.args.left)
+			y := MustNewFromString(tt.args.right)
+
+			assert.Equal(t, tt.want, x.Cmp(y), "x.{Int, Scale}: {%s, %d}, y.{Int, Scale}: {%s, %d}", x.Int, x.Scale, y.Int, y.Scale)
+		})
+	}
+}
+
 func TestBigDecimal_Add(t *testing.T) {
 	type args struct {
 		left  string
@@ -125,6 +158,7 @@ func TestBigDecimal_Add(t *testing.T) {
 		want string
 	}{
 		{"zero", args{"0", "0"}, "0"},
+		{"zero_with_decs", args{"0.000000000000000000000000000000000000000", "0.000000000000000000000000000000000000000"}, "0"},
 		{"small_positive", args{"12.34", "1.234"}, "13.574"},
 		{"small_positive_inverted", args{"1.234", "12.34"}, "13.574"},
 		{"small_negative", args{"12.34", "-1.234"}, "11.106"},
@@ -141,7 +175,7 @@ func TestBigDecimal_Add(t *testing.T) {
 			x := MustNewFromString(tt.args.left)
 			y := MustNewFromString(tt.args.right)
 
-			assert.Equal(t, tt.want, z.Add(x, y).String(), "x.{Int, Scale}: {%s, %d}, y.{Int, Scale}: {%s, %d}", x.Int, x.Scale, y.Int, y.Scale)
+			assert.Equal(t, tt.want, z.Add(x, y).String(), "x.{Int, Scale}: {%s, %d}, y.{Int, Scale}: {%s, %d} equals z.{Int, Scale}: {%s, %d}", x.Int, x.Scale, y.Int, y.Scale, z.Int, z.Scale)
 		})
 	}
 }
@@ -164,6 +198,8 @@ func TestBigDecimal_String(t *testing.T) {
 		{"-0.1", args{-1, 1}},
 		{"-0.01", args{-1, 2}},
 		{"13.574", args{13574, 3}},
+		{"132.4", args{132400000, 6}},
+		{"0", args{0, 9}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {

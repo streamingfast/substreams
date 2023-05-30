@@ -78,9 +78,14 @@ func NewFromString(s string) (*BigDecimal, error) {
 		// slice up to `loc` and 1 after to skip the 'e' char
 		base, expRaw := s[:loc], strings.TrimPrefix(s[loc+1:], "+")
 
-		exp, err := strconv.ParseInt(expRaw, 0, 64)
+		negPrefix := ""
+		if strings.HasPrefix(expRaw, "-") {
+			negPrefix = "-"
+		}
+		normalized := negPrefix + strings.TrimLeft(expRaw, "-0")
+		exp, err := strconv.ParseInt(normalized, 0, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid exponent value %q: %w", expRaw, err)
+			return nil, fmt.Errorf("invalid exponent value %q on value %q: %w", expRaw, s, err)
 		}
 
 		basePart = base
@@ -152,6 +157,8 @@ func (z *BigDecimal) String() string {
 		}
 	}
 
+	after = strings.TrimRight(after, "0")
+
 	// Concatenate everything
 	//   let complete_without_sign = if !after.is_empty() { before + "." + after.as_str() else { before };
 	completeWithoutSign := before
@@ -169,7 +176,7 @@ func (z *BigDecimal) String() string {
 
 func (z *BigDecimal) IsZero() bool {
 	// The `Sign` calls on big.Int returns 0 if number is equal 0 (-1 or 1 otherwise)
-	return z.Scale == 0 && z.Int.Sign() == 0
+	return z.Int.Sign() == 0
 }
 
 func (z *BigDecimal) Add(left *BigDecimal, right *BigDecimal) *BigDecimal {
@@ -199,6 +206,20 @@ func (z *BigDecimal) Add(left *BigDecimal, right *BigDecimal) *BigDecimal {
 	default:
 		panic("unreachable, we cover all cases (==, <, >)")
 	}
+}
+
+// Cmp returns either 1, 0 or -1, comparing left against right
+func (left *BigDecimal) Cmp(right *BigDecimal) int {
+	switch {
+	case left.IsZero() && right.IsZero():
+		return 0
+	case left.Scale == right.Scale:
+		return left.Int.Cmp(right.Int)
+	}
+	if left.Scale < right.Scale {
+		return 1
+	}
+	return -1
 }
 
 func (z *BigDecimal) takeAndScale(x *BigDecimal, newScale int64) *BigDecimal {
@@ -240,6 +261,7 @@ func (z *BigDecimal) takeAndScale(x *BigDecimal, newScale int64) *BigDecimal {
 
 func (z *BigDecimal) normalizeInPlace() {
 	if z.IsZero() {
+		z.Scale = 0
 		return
 	}
 

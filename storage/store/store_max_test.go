@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/streamingfast/substreams/bigdecimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -209,40 +210,40 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 		name          string
 		store         *baseStore
 		key           string
-		existingValue *big.Float
-		value         *big.Float
-		expectedValue *big.Float
+		existingValue *bigdecimal.BigDecimal
+		value         *bigdecimal.BigDecimal
+		expectedValue *bigdecimal.BigDecimal
 	}{
 		{
 			name:          "found less",
 			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
-			existingValue: big.NewFloat(3),
-			value:         big.NewFloat(4),
-			expectedValue: big.NewFloat(4),
+			existingValue: bigdecimal.MustNewFromString("3"),
+			value:         bigdecimal.MustNewFromString("4"),
+			expectedValue: bigdecimal.MustNewFromString("4"),
 		},
 		{
 			name:          "found greater",
 			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
-			existingValue: big.NewFloat(5),
-			value:         big.NewFloat(4),
-			expectedValue: big.NewFloat(5),
+			existingValue: bigdecimal.MustNewFromString("5"),
+			value:         bigdecimal.MustNewFromString("4"),
+			expectedValue: bigdecimal.MustNewFromString("5"),
 		},
 		{
 			name:          "not found",
 			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
 			existingValue: nil,
-			value:         big.NewFloat(4),
-			expectedValue: big.NewFloat(4),
+			value:         bigdecimal.MustNewFromString("4"),
+			expectedValue: bigdecimal.MustNewFromString("4"),
 		},
 	}
 
-	initTestStore := func(b *baseStore, key string, value *big.Float) {
+	initTestStore := func(b *baseStore, key string, value *bigdecimal.BigDecimal) {
 		b.kv = map[string][]byte{}
 		if value != nil {
-			b.kv[key] = []byte(value.Text('g', -1))
+			b.kv[key] = []byte(value.String())
 		}
 	}
 
@@ -256,7 +257,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 				t.Errorf("value not found")
 			}
 
-			actualInt, _, err := big.ParseFloat(string(actual), 10, 100, big.ToNearestEven)
+			actualInt, err := bigdecimal.NewFromString(string(actual))
 			assert.NoError(t, err)
 
 			assert.Equal(t, 0, actualInt.Cmp(test.expectedValue))

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+
+	"github.com/streamingfast/substreams/bigdecimal"
 )
 
 func (b *baseStore) SetMaxBigInt(ord uint64, key string, value *big.Int) {
@@ -55,19 +57,19 @@ func (b *baseStore) SetMaxFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(max, 'g', 100, 64)))
 }
 
-func (b *baseStore) SetMaxBigDecimal(ord uint64, key string, value *big.Float) {
-	max := new(big.Float)
+func (b *baseStore) SetMaxBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal) {
+	max := bigdecimal.New()
 	val, found := b.GetAt(ord, key)
 	if !found {
 		max = value
 	} else {
-		prev, _, err := big.ParseFloat(string(val), 10, 100, big.ToNearestEven)
+		prev, err := bigdecimal.NewFromString(string(val))
 
-		if err != nil || value.Cmp(prev) > 0 {
+		if err != nil || value.Cmp(prev) == 1 {
 			max = value
 		} else {
 			max = prev
 		}
 	}
-	b.set(ord, key, []byte(max.Text('g', -1)))
+	b.set(ord, key, []byte(max.String()))
 }

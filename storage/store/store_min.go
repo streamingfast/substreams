@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+
+	"github.com/streamingfast/substreams/bigdecimal"
 )
 
 func (b *baseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
@@ -55,13 +57,13 @@ func (b *baseStore) SetMinFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }
 
-func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value *big.Float) {
-	min := new(big.Float)
+func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal) {
+	min := bigdecimal.New()
 	val, found := b.GetAt(ord, key)
 	if !found {
 		min = value
 	} else {
-		prev, _, err := big.ParseFloat(string(val), 10, 100, big.ToNearestEven)
+		prev, err := bigdecimal.NewFromString(string(val))
 
 		if err != nil || value.Cmp(prev) <= 0 {
 			min = value
@@ -69,5 +71,5 @@ func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value *big.Float) {
 			min = prev
 		}
 	}
-	b.set(ord, key, []byte(min.Text('g', -1)))
+	b.set(ord, key, []byte(min.String()))
 }

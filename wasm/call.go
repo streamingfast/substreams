@@ -168,7 +168,7 @@ func (c *Call) DoSetMinFloat64(ord uint64, key string, value float64) {
 }
 func (c *Call) DoSetMinBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_min_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigdecimal", "bigfloat", key)
-	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	toAdd, err := bigdecimal.NewFromString(value)
 	if err != nil {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
@@ -190,7 +190,7 @@ func (c *Call) DoSetMaxFloat64(ord uint64, key string, value float64) {
 }
 func (c *Call) DoSetMaxBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_max_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigdecimal", "bigfloat", key)
-	toAdd, _, err := big.ParseFloat(value, 10, 100, big.ToNearestEven) // corresponds to SumBigDecimal's read of the kv value
+	toAdd, err := bigdecimal.NewFromString(value)
 	if err != nil {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}

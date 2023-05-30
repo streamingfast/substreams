@@ -185,22 +185,22 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			max := func(a, b *big.Float) *big.Float {
+			max := func(a, b *bigdecimal.BigDecimal) *bigdecimal.BigDecimal {
 				if a.Cmp(b) <= 0 {
 					return b
 				}
 				return a
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigFloat(v, true)
+				v1 := foundOrZeroBigDecimal(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.setNewKV(k, bigFloatToBytes(v1))
+					b.setNewKV(k, []byte(v1.String()))
 					continue
 				}
-				v0 := foundOrZeroBigFloat(v, true)
+				v0 := foundOrZeroBigDecimal(v, true)
 
-				b.setKV(k, bigFloatToBytes(max(v0, v1)))
+				b.setNewKV(k, []byte(max(v0, v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
@@ -264,21 +264,21 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			min := func(a, b *big.Float) *big.Float {
+			min := func(a, b *bigdecimal.BigDecimal) *bigdecimal.BigDecimal {
 				if a.Cmp(b) <= 0 {
 					return a
 				}
 				return b
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigFloat(v, true)
+				v1 := foundOrZeroBigDecimal(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.setNewKV(k, bigFloatToBytes(v1))
+					b.setNewKV(k, []byte(v1.String()))
 					continue
 				}
-				v0 := foundOrZeroBigFloat(v, true)
-				b.setKV(k, bigFloatToBytes(min(v0, v1)))
+				v0 := foundOrZeroBigDecimal(v, true)
+				b.setNewKV(k, []byte(min(v0, v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)

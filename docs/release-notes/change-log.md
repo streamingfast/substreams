@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## UNRELEASED
+## Unreleased
 
 ### Highlights
 
@@ -13,6 +13,10 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 #### Operators
 
 * When upgrading a substreams server to this version, you should delete all existing module caches to benefit from deterministic output
+
+### Added 
+
+* Tier1 now records deterministic failures in wasm, "blacklists" identical requests for 10 minutes (by serving them the same InvalidArgument error) with a forced incremental backoff. This prevents accidental bad actors from hogging tier2 resources when their substreams cannot go passed a certain block.
 
 ### Fixed
 

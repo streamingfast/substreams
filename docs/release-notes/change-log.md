@@ -16,11 +16,13 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 
 ### Fixed
 
-* When running in development mode with a start-block in the future on a cold cache, you would sometimes get invalid "updates" from the store passed down to your modules that depend on them. It did not impact the caches but caused 
+* When running in development mode with a start-block in the future on a cold cache, you would sometimes get invalid "updates" from the store passed down to your modules that depend on them. It did not impact the caches but caused invalid output.
+* The WASM engine was incorrectly reusing memory, preventing deterministic output. It made things go faster, but at the cost of determinism. Memory is now reset between WASM executions on each block.
 
 ### Changed
 
-* Changed default WASM engine from `wasmtime` to `wazero`, use `SUBSTREAMS_WASM_RUNTIME=wasmtime` to revert to prior engine.
+* Changed default WASM engine from `wasmtime` to `wazero`, use `SUBSTREAMS_WASM_RUNTIME=wasmtime` to revert to prior engine. Note that `wasmtime` will now run a lot slower than before because resetting the memory in `wasmtime` is more expensive than in `wazero`.
+* Execution of modules is now done in parallel within a single instance, based on a tree of module dependencies.
 
 ## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
 

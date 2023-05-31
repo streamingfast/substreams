@@ -33,7 +33,7 @@ var decodeOutputsModuleCmd = &cobra.Command{
 	Long: cli.Dedent(`
 		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
-		file in place of '<manifest_file>'.
+		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode outputs", `
 		map_pools_created gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
@@ -52,7 +52,7 @@ var decodeStatesModuleCmd = &cobra.Command{
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
 		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
-		file in place of '<manifest_file>'.
+		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode states", `
 		store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth

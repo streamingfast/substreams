@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/dstore"
@@ -19,8 +21,11 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
+	"gopkg.in/yaml.v2"
 )
 
+var IPFSURL string
+var IPFSTimeout time.Duration
 var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
@@ -181,7 +186,7 @@ func isRemotePackage(in string) bool {
 		return false
 	}
 
-	return u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az"
+	return u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az" || u.Scheme == "ipfs"
 }
 
 // IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
@@ -213,6 +218,10 @@ func (r *Reader) newPkgFromURL(fileURL string) (pkg *pbsubstreams.Package, err e
 		return r.newPkgFromStore(fileURL)
 	}
 
+	if u.Scheme == "ipfs" {
+		return r.newPkgFromIPFS(u.Host)
+	}
+
 	resp, err := httpClient.Get(fileURL)
 	if err != nil {
 		return nil, fmt.Errorf("error downloading %q: %w", fileURL, err)
@@ -233,6 +242,56 @@ func (r *Reader) newPkgFromStore(fileURL string) (pkg *pbsubstreams.Package, err
 	cnt, err := dstore.ReadObject(ctx, fileURL)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %q: %w", fileURL, err)
+	}
+
+	return r.fromContents(cnt)
+}
+
+type subgraphManifest struct {
+	DataSources []struct {
+		Kind   string `yaml:"kind"`
+		Source struct {
+			Package struct {
+				File map[string]string `yaml:"file"`
+			} `yaml:"package"`
+		} `yaml:"source"`
+	} `yaml:"dataSources"`
+}
+
+func readIPFSContent(hash string, sh *ipfs.Shell) ([]byte, error) {
+	readCloser, err := sh.Cat(hash)
+	if err != nil {
+		return nil, err
+	}
+	defer readCloser.Close()
+	return ioutil.ReadAll(readCloser)
+}
+
+func (r *Reader) newPkgFromIPFS(hash string) (pkg *pbsubstreams.Package, err error) {
+	sh := ipfs.NewShell(IPFSURL)
+	sh.SetTimeout(IPFSTimeout)
+
+	cnt, err := readIPFSContent(hash, sh)
+	if err != nil {
+		return nil, err
+	}
+
+	manifest := &subgraphManifest{}
+	err = yaml.Unmarshal(cnt, manifest)
+	if err != nil || len(manifest.DataSources) == 0 {
+		// not a valid manifest, maybe it's the spkg itself
+		return r.fromContents(cnt)
+	}
+
+	if manifest.DataSources[0].Kind != "substreams" {
+		return nil, fmt.Errorf("given ipfs hash is not a substreams-based subgraph")
+	}
+
+	spkgHash := manifest.DataSources[0].Source.Package.File["/"]
+
+	cnt, err = readIPFSContent(spkgHash, sh)
+	if err != nil {
+		return nil, err
 	}
 
 	return r.fromContents(cnt)

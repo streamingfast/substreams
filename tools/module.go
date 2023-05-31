@@ -22,7 +22,7 @@ var moduleCmd = &cobra.Command{
 	Long: cli.Dedent(`
 		Returns the state of the module on the state store. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
-		file in place of '<manifest_file>'.
+		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	Args: cobra.RangeArgs(2, 3),
 	RunE: moduleRunE,

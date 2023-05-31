@@ -44,7 +44,7 @@ var runCmd = &cobra.Command{
 	Long: cli.Dedent(`
 		Stream module outputs from a given package on a remote endpoint. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
-		file in place of '<manifest_file>'.
+		'substreams.yaml' file in place of '<manifest_file>', or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	RunE:         runRun,
 	Args:         cobra.RangeArgs(1, 2),

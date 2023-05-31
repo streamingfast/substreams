@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/substreams"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -37,7 +39,12 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 }
 
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	return s.blocks(ctx, request, respFunc)
+	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
+	if err != nil {
+		return stream.NewErrInvalidArg(err.Error())
+	}
+
+	return s.blocks(ctx, request, outputGraph, respFunc)
 }
 
 func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc StreamFactoryFunc) *Tier2Service {

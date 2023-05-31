@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream/hub"
@@ -42,13 +44,15 @@ import (
 )
 
 type Tier1Service struct {
-	blockType         string
-	wasmExtensions    []wasm.WASMExtensioner
-	pipelineOptions   []pipeline.PipelineOptioner
-	streamFactoryFunc StreamFactoryFunc
-	runtimeConfig     config.RuntimeConfig
-	tracer            ttrace.Tracer
-	logger            *zap.Logger
+	blockType          string
+	wasmExtensions     []wasm.WASMExtensioner
+	pipelineOptions    []pipeline.PipelineOptioner
+	failedRequestsLock sync.RWMutex
+	failedRequests     map[string]*recordedFailure
+	streamFactoryFunc  StreamFactoryFunc
+	runtimeConfig      config.RuntimeConfig
+	tracer             ttrace.Tracer
+	logger             *zap.Logger
 
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
@@ -81,9 +85,10 @@ func NewTier1(
 		},
 	)
 	s = &Tier1Service{
-		runtimeConfig: runtimeConfig,
-		blockType:     blockType,
-		tracer:        tracing.GetTracer(),
+		runtimeConfig:  runtimeConfig,
+		blockType:      blockType,
+		tracer:         tracing.GetTracer(),
+		failedRequests: make(map[string]*recordedFailure),
 	}
 
 	zlog.Info("registering substreams metrics")
@@ -185,27 +190,48 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	}
 	logger.Info("incoming Substreams Blocks request", fields...)
 
-	err = s.blocks(ctx, request, respFunc)
-	grpcError = toGRPCError(err)
-
-	if grpcError != nil && status.Code(grpcError) == codes.Internal {
-		logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
-	}
-
-	return grpcError
-}
-
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	logger := reqctx.Logger(ctx)
-
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
-		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
+		return toGRPCError(stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error()))
 	}
 
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
+
+	requestID := fmt.Sprintf("%s:%d:%d:%s:%t:%t:%s",
+		outputGraph.ModuleHashes().Get(request.OutputModule),
+		request.StartBlockNum,
+		request.StopBlockNum,
+		request.StartCursor,
+		request.ProductionMode,
+		request.FinalBlocksOnly,
+		strings.Join(request.DebugInitialStoreSnapshotForModules, ","),
+	)
+
+	if err := s.errorFromRecordedFailure(requestID); err != nil {
+		logger.Debug("failing fast on known failing request", zap.String("request_id", requestID))
+		return err
+	}
+
+	err = s.blocks(ctx, request, outputGraph, respFunc)
+	grpcError = toGRPCError(err)
+
+	if grpcError != nil {
+		switch status.Code(grpcError) {
+		case codes.Internal:
+			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
+		case codes.InvalidArgument:
+			logger.Debug("recording failure on request", zap.String("request_id", requestID))
+			s.recordFailure(requestID, grpcError)
+		}
+	}
+
+	return grpcError
+}
+
+func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
+	logger := reqctx.Logger(ctx)
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, false)
 
@@ -397,6 +423,10 @@ func toGRPCError(err error) error {
 		return nil
 	}
 
+	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
+		return grpcError.Err()
+	}
+
 	if errors.Is(err, context.Canceled) {
 		return status.Error(codes.Canceled, "source canceled")
 	}
@@ -408,8 +438,6 @@ func toGRPCError(err error) error {
 	if errors.Is(err, exec.ErrWasmDeterministicExec) {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
-
-	dgrpc.AsGRPCError(err)
 
 	var errInvalidArg *stream.ErrInvalidArg
 	if errors.As(err, &errInvalidArg) {

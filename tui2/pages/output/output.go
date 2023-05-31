@@ -67,8 +67,11 @@ type Output struct {
 	moduleNavigator     *explorer.Navigator
 }
 
-func New(c common.Common, manifestPath string, outputModule string, config *request.RequestConfig) *Output {
-	nav, _ := explorer.New(config.OutputModule, explorer.WithManifestFilePath(config.ManifestPath))
+func New(c common.Common, manifestPath string, outputModule string, config *request.RequestConfig) (*Output, error) {
+	nav, err := explorer.New(config.OutputModule, explorer.WithManifestFilePath(config.ManifestPath))
+	if err != nil {
+		return nil, err
+	}
 
 	output := &Output{
 		Common:              c,
@@ -89,7 +92,7 @@ func New(c common.Common, manifestPath string, outputModule string, config *requ
 		moduleNavigator:     nav,
 		firstBlockSeen:      true,
 	}
-	return output
+	return output, nil
 }
 
 func (o *Output) Init() tea.Cmd {

@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/manifest"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/streamingfast/substreams/manifest"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -135,7 +136,10 @@ func runGui(cmd *cobra.Command, args []string) error {
 		FinalBlocksOnly:             mustGetBool(cmd, "final-blocks-only"),
 	}
 
-	ui := tui2.New(requestConfig)
+	ui, err := tui2.New(requestConfig)
+	if err != nil {
+		return err
+	}
 	prog := tea.NewProgram(ui, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("gui error: %w", err)

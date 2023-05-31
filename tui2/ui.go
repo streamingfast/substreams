@@ -48,16 +48,21 @@ type UI struct {
 	tabs             *tabs.Tabs
 }
 
-func New(reqConfig *request.RequestConfig) *UI {
+func New(reqConfig *request.RequestConfig) (*UI, error) {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
+	}
+
+	out, err := output.New(c, reqConfig.ManifestPath, reqConfig.OutputModule, reqConfig)
+	if err != nil {
+		return nil, err
 	}
 	ui := &UI{
 		Common: c,
 		pages: []common.Component{
 			request.New(c),
 			progress.New(c),
-			output.New(c, reqConfig.ManifestPath, reqConfig.OutputModule, reqConfig),
+			out,
 		},
 		activePage:    progressPage,
 		tabs:          tabs.New(c, []string{"Request", "Progress", "Output"}),
@@ -66,7 +71,7 @@ func New(reqConfig *request.RequestConfig) *UI {
 	}
 	ui.footer = footer.New(c, ui.pages[0])
 
-	return ui
+	return ui, nil
 }
 
 func (ui *UI) Init() tea.Cmd {

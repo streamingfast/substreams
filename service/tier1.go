@@ -140,14 +140,6 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 
 	logger := reqctx.Logger(ctx).Named("tier1")
 	respFunc := responseHandler(logger, streamSrv)
-	traceId := tracing.GetTraceID(ctx).String()
-	respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Session{
-			Session: &pbsubstreamsrpc.SessionInit{
-				TraceId: traceId,
-			},
-		},
-	})
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
@@ -243,6 +235,20 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
+	// this will eventually be controlled by the request, probably from the JWT
+	requestDetails.MaxParallelJobs = s.runtimeConfig.ParallelSubrequests
+
+	traceId := tracing.GetTraceID(ctx).String()
+	respFunc(&pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Session{
+			Session: &pbsubstreamsrpc.SessionInit{
+				TraceId:            traceId,
+				ResolvedStartBlock: requestDetails.ResolvedStartBlockNum,
+				LinearHandoffBlock: requestDetails.LinearHandoffBlockNum,
+				MaxParallelWorkers: requestDetails.MaxParallelJobs,
+			},
+		},
+	})
 
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {

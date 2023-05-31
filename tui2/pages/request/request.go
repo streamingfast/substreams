@@ -62,6 +62,9 @@ type Request struct {
 	manifestView       viewport.Model
 	modulesViewContent string
 	traceId            string
+	resolvedStartBlock uint64
+	linearHandoffBlock uint64
+	parallelWorkers    uint64
 }
 
 func New(c common.Common) *Request {
@@ -92,6 +95,9 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	case *pbsubstreamsrpc.SessionInit:
 		r.traceId = msg.TraceId
+		r.resolvedStartBlock = msg.ResolvedStartBlock
+		r.linearHandoffBlock = msg.LinearHandoffBlock
+		r.parallelWorkers = msg.MaxParallelWorkers
 	}
 	return r, tea.Batch(cmds...)
 }
@@ -116,21 +122,30 @@ func (r *Request) renderRequestSummary() string {
 	labels := []string{
 		"Package: ",
 		"Endpoint: ",
+		"Start Block: ",
 		"Production mode: ",
-		"Initial snapshots: ",
 		"Trace ID: ",
+		"Parallel Workers: ",
 	}
+
+	handoffStr := ""
+	if r.resolvedStartBlock != r.linearHandoffBlock {
+		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
+	}
+
 	values := []string{
 		fmt.Sprintf("%s", summary.Manifest),
 		fmt.Sprintf("%s", summary.Endpoint),
+		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
 		fmt.Sprintf("%v", summary.ProductionMode),
+		r.traceId,
+		fmt.Sprintf("%d", r.parallelWorkers),
 	}
 	if len(summary.InitialSnapshot) > 0 {
+		labels = append(labels, "Initial snapshots: ")
 		values = append(values, fmt.Sprintf("%s", strings.Join(summary.InitialSnapshot, ", ")))
-	} else {
-		values = append(values, r.Styles.StatusBarValue.Render(fmt.Sprintf("None")))
 	}
-	values = append(values, fmt.Sprintf("%s", r.traceId))
+
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
 
 	return style.Render(

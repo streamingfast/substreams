@@ -7,8 +7,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 
-	"github.com/streamingfast/substreams/tui2/pages/request"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -28,14 +26,15 @@ type Progress struct {
 	replayState string
 	targetBlock uint64
 
-	progressView      viewport.Model
-	progressUpdates   int
-	dataPayloads      int
-	blocksPerSecond   uint64
-	blocksThisSecond  uint64
-	updatedSecond     int64
-	updatesPerSecond  int
-	updatesThisSecond int
+	progressView       viewport.Model
+	progressUpdates    int
+	dataPayloads       int
+	blocksPerSecond    uint64
+	blocksThisSecond   uint64
+	updatedSecond      int64
+	updatesPerSecond   int
+	updatesThisSecond  int
+	maxParallelWorkers uint64
 
 	bars   *ranges.Bars
 	curErr string
@@ -71,11 +70,13 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.progressView, cmd = p.progressView.Update(msg)
 		cmds = append(cmds, cmd)
 
-	case request.NewRequestInstance:
-		targetBlock := msg.(request.NewRequestInstance).Stream.TargetParallelProcessingBlock()
+	case *pbsubstreamsrpc.SessionInit:
+		sessionInit := msg.(*pbsubstreamsrpc.SessionInit)
+		linearHandoff := sessionInit.LinearHandoffBlock
+		p.targetBlock = sessionInit.ResolvedStartBlock
 		p.dataPayloads = 0
-		p.targetBlock = targetBlock
-		p.bars = ranges.NewBars(p.Common, targetBlock)
+		p.maxParallelWorkers = sessionInit.MaxParallelWorkers
+		p.bars = ranges.NewBars(p.Common, linearHandoff)
 		p.bars.Init()
 	case *pbsubstreamsrpc.BlockScopedData:
 		p.dataPayloads += 1
@@ -160,11 +161,15 @@ func wrapString(input string, screenWidth int) (string, int) {
 
 func (p *Progress) View() string {
 	blocksPerSecondPerModule := ""
+	maxWorkers := ""
+	if p.maxParallelWorkers != 0 {
+		maxWorkers = fmt.Sprintf(", %d max workers", p.maxParallelWorkers)
+	}
 	if p.bars.BarCount != 0 && p.blocksPerSecond != 0 {
 		blocksPerSecondPerModule = fmt.Sprintf(", %d per module", p.blocksPerSecond/p.bars.BarCount)
 	}
 	infos := []string{
-		fmt.Sprintf("%d (%d per second%s)", p.bars.TotalBlocks, p.blocksPerSecond, blocksPerSecondPerModule),
+		fmt.Sprintf("%d (%d per second%s%s)", p.bars.TotalBlocks, p.blocksPerSecond, blocksPerSecondPerModule, maxWorkers),
 		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
 		p.Styles.StatusBarValue.Render(p.state + p.replayState),

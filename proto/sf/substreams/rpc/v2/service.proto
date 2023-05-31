@@ -87,6 +87,9 @@ message BlockScopedData {
 
 message SessionInit  {
   string trace_id = 1;
+  uint64 resolved_start_block = 2;
+  uint64 linear_handoff_block = 3;
+  uint64 max_parallel_workers = 4;
 }
 
 message InitialSnapshotComplete {

@@ -46,10 +46,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// It's ok to use `StartBlockNum` directly instead of effective start block (start block
 		// of cursor if present, `StartBlockNum` otherwise) because this is only used in backprocessing
 		// `barmode` which is effective only when no cursor has been passed yet.
-		m.BackprocessingCompleteAtBlock = uint64(m.Request.StartBlockNum)
+		if m.Request.StartBlockNum > 0 {
+			m.BackprocessingCompleteAtBlock = uint64(m.Request.StartBlockNum)
+		}
 		return m, nil
 	case *pbsubstreamsrpc.Response_Session:
 		m.TraceID = msg.Session.TraceId
+		m.BackprocessingCompleteAtBlock = msg.Session.ResolvedStartBlock
 
 	case *pbsubstreamsrpc.ModuleProgress:
 		m.Updates += 1

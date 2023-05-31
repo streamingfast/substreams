@@ -1,10 +1,10 @@
-package wasm
+package wasmtime
 
 import (
+	"encoding/binary"
 	"fmt"
-	"sort"
 
-	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
+	"github.com/bytecodealliance/wasmtime-go/v4"
 )
 
 type allocation struct {
@@ -29,6 +29,22 @@ func NewHeap(memory *wasmtime.Memory, allocator, dealloc *wasmtime.Func, store *
 	}
 }
 
+func writeOutputToHeap(i *instance, outputPtr int32, value []byte) error {
+	valuePtr, err := i.Heap.WriteAndTrack(value, false, "WriteOutputToHeap1")
+	if err != nil {
+		return fmt.Errorf("writing value to heap: %w", err)
+	}
+	returnValue := make([]byte, 8)
+	binary.LittleEndian.PutUint32(returnValue[0:4], uint32(valuePtr))
+	binary.LittleEndian.PutUint32(returnValue[4:], uint32(len(value)))
+
+	_, err = i.Heap.WriteAtPtr(returnValue, outputPtr, "WriteOutputToHeap2")
+	if err != nil {
+		return fmt.Errorf("writing pointer %d to heap: %w", valuePtr, err)
+	}
+	return nil
+}
+
 func (h *Heap) Write(bytes []byte, from string) (int32, error) {
 	return h.WriteAndTrack(bytes, true, from)
 }
@@ -41,8 +57,11 @@ func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, erro
 	}
 
 	ptr := results.(int32)
-	if track {
-		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: len(bytes)})
+
+	//fmt.Println("  writeToHeap/alloc:", ptr, size)
+
+	if track && size != 0 {
+		h.allocations = append(h.allocations, &allocation{ptr: ptr, length: size})
 	}
 	return h.WriteAtPtr(bytes, ptr, from)
 }
@@ -54,10 +73,8 @@ func (h *Heap) WriteAtPtr(bytes []byte, ptr int32, from string) (int32, error) {
 }
 
 func (h *Heap) Clear() error {
-	sort.Slice(h.allocations, func(i, j int) bool {
-		return h.allocations[i].ptr < h.allocations[j].ptr
-	})
 	for _, a := range h.allocations {
+		//fmt.Println("  dealloc", a.ptr, a.length)
 		if _, err := h.dealloc.Call(h.store, a.ptr, int32(a.length)); err != nil {
 			return fmt.Errorf("deallocating memory at ptr %d: %w", a.ptr, err)
 		}
@@ -75,16 +92,3 @@ func (h *Heap) ReadBytes(ptr int32, length int32) []byte {
 	data := h.memory.UnsafeData(h.store)
 	return data[ptr : ptr+length]
 }
-
-//func (h *Heap) PrintMem() {
-//	data := h.memory.Data()
-//	for i, datum := range data {
-//		if i > 1024 {
-//			if datum == 0 {
-//				continue
-//			}
-//		}
-//		fmt.Print(datum, ", ")
-//	}
-//	fmt.Print("\n")
-//}

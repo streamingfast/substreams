@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"github.com/streamingfast/bstream"
+
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -49,5 +50,6 @@ func (f *ForkHandler) removeReversibleOutput(blockID string) {
 }
 
 func (f *ForkHandler) addReversibleOutput(moduleOutput *pbssinternal.ModuleOutput, blockID string) {
+	// TODO: ADD MUTEX
 	f.reversibleOutputs[blockID] = append(f.reversibleOutputs[blockID], moduleOutput)
 }

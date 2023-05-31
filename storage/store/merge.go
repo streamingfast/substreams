@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/shopspring/decimal"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -113,14 +114,11 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			sum := func(a, b *big.Float) *big.Float {
-				return new(big.Float).SetPrec(100).Add(a, b).SetPrec(100)
-			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
-				v0 := foundOrZeroBigFloat(v0b, fv0)
-				v1 := foundOrZeroBigFloat(v, true)
-				b.setKV(k, bigFloatToBytes(sum(v0, v1)))
+				v0 := foundOrZeroBigDecimal(v0b, fv0)
+				v1 := foundOrZeroBigDecimal(v, true)
+				b.setKV(k, []byte(v0.Add(v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -184,22 +182,22 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			max := func(a, b *big.Float) *big.Float {
+			max := func(a, b decimal.Decimal) decimal.Decimal {
 				if a.Cmp(b) <= 0 {
 					return b
 				}
 				return a
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigFloat(v, true)
+				v1 := foundOrZeroBigDecimal(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.setNewKV(k, bigFloatToBytes(v1))
+					b.setNewKV(k, []byte(v1.String()))
 					continue
 				}
-				v0 := foundOrZeroBigFloat(v, true)
+				v0 := foundOrZeroBigDecimal(v, true)
 
-				b.setKV(k, bigFloatToBytes(max(v0, v1)))
+				b.setNewKV(k, []byte(max(v0, v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
@@ -263,21 +261,21 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			min := func(a, b *big.Float) *big.Float {
+			min := func(a, b decimal.Decimal) decimal.Decimal {
 				if a.Cmp(b) <= 0 {
 					return a
 				}
 				return b
 			}
 			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigFloat(v, true)
+				v1 := foundOrZeroBigDecimal(v, true)
 				v, found := b.kv[k]
 				if !found {
-					b.setNewKV(k, bigFloatToBytes(v1))
+					b.setNewKV(k, []byte(v1.String()))
 					continue
 				}
-				v0 := foundOrZeroBigFloat(v, true)
-				b.setKV(k, bigFloatToBytes(min(v0, v1)))
+				v0 := foundOrZeroBigDecimal(v, true)
+				b.setNewKV(k, []byte(min(v0, v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -299,6 +297,17 @@ func foundOrZeroInt64(in []byte, found bool) int64 {
 		return 0
 	}
 	return int64(val)
+}
+
+func foundOrZeroBigDecimal(in []byte, found bool) decimal.Decimal {
+	if !found {
+		return decimal.NewFromInt(0)
+	}
+	out, err := decimal.NewFromString(string(in))
+	if err != nil {
+		panic(err)
+	}
+	return out.Truncate(34)
 }
 
 func foundOrZeroBigFloat(in []byte, found bool) *big.Float {

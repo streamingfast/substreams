@@ -11,11 +11,14 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	_ "github.com/streamingfast/substreams/wasm/wasmtime"
+	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
 
 func TestForkHandling(t *testing.T) {

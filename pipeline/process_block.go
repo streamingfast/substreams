@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"io"
 	"runtime/debug"
-
-	"github.com/streamingfast/substreams/storage/execout"
-
-	"github.com/streamingfast/substreams/reqctx"
+	"sync"
 
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/substreams/metrics"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/execout"
 )
 
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
@@ -205,9 +206,14 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
+	//blockDuration = 0
+	//exec.Timer = 0
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
+	//sumCount++
+	//sumDuration += exec.Timer
+	//fmt.Println("accumulated time for all modules", exec.Timer, "avg", sumDuration/time.Duration(sumCount))
 
 	if reqDetails.ShouldReturnProgressMessages() {
 		if reqDetails.IsSubRequest {
@@ -241,6 +247,9 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 	return nil
 }
 
+// var blockDuration time.Duration
+// var sumDuration time.Duration
+// var sumCount int
 func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
@@ -252,12 +261,105 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.mapModuleOutput = nil
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
-	for _, executor := range p.moduleExecutors {
-		if err := p.execute(ctx, executor, execOutput); err != nil {
-			//p.returnFailureProgress(ctx, err, executor)
-			return fmt.Errorf("running executor %q: %w", executor.Name(), err)
+	for _, stage := range p.moduleExecutors {
+		//t0 := time.Now()
+		//
+		if len(stage) < 2 {
+			//fmt.Println("Linear stage", len(stage))
+			for _, executor := range stage {
+				res := p.execute(ctx, executor, execOutput)
+				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
+					return fmt.Errorf("applying executor results %q: %w", executor.Name(), res.err)
+				}
+			}
+		} else {
+			results := make([]resultObj, len(stage))
+			wg := sync.WaitGroup{}
+			//fmt.Println("Parallelized in stage", stageIdx, len(stage))
+			for i, executor := range stage {
+				wg.Add(1)
+				i := i
+				executor := executor
+				go func() {
+					defer wg.Done()
+					res := p.execute(ctx, executor, execOutput)
+					results[i] = res
+				}()
+			}
+			wg.Wait()
+
+			for i, result := range results {
+				executor := stage[i]
+				if result.err != nil {
+					//p.returnFailureProgress(ctx, err, executor)
+					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
+				}
+				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
+					return fmt.Errorf("applying executor results %q: %w", executor.Name(), result.err)
+				}
+			}
 		}
+		//blockDuration += time.Since(t0)
 	}
 
 	return nil
+}
+
+type resultObj struct {
+	output *pbssinternal.ModuleOutput
+	bytes  []byte
+	err    error
+}
+
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
+	logger := reqctx.Logger(ctx)
+
+	executorName := executor.Name()
+	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
+
+	moduleOutput, outputBytes, runError := exec.RunModule(ctx, executor, execOutput)
+	return resultObj{moduleOutput, outputBytes, runError}
+}
+
+func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
+	executorName := executor.Name()
+	hasValidOutput := executor.HasValidOutput()
+
+	moduleOutput, outputBytes, runError := res.output, res.bytes, res.err
+	if runError != nil {
+		if hasValidOutput {
+			p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
+		}
+		return fmt.Errorf("execute module: %w", runError)
+	}
+
+	if !hasValidOutput {
+		return nil
+	}
+	p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
+	if err := execOutput.Set(executorName, outputBytes); err != nil {
+		return fmt.Errorf("set output cache: %w", err)
+	}
+	if moduleOutput != nil {
+		p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Id)
+	}
+	return nil
+}
+
+func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
+	if p.isOutputModule(moduleName) {
+		p.mapModuleOutput = toRPCMapModuleOutputs(output)
+		return
+	}
+	if isProduction {
+		return
+	}
+
+	if storeOutputs := toRPCStoreModuleOutputs(output); storeOutputs != nil {
+		p.extraStoreModuleOutputs = append(p.extraStoreModuleOutputs, storeOutputs)
+	}
+
+	if mapOutput := toRPCMapModuleOutputs(output); mapOutput != nil {
+		p.extraMapModuleOutputs = append(p.extraMapModuleOutputs, mapOutput)
+	}
 }

@@ -7,6 +7,12 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -16,11 +22,8 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
+	_ "github.com/streamingfast/substreams/wasm/wasmtime"
+	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
 
 func TestPipeline_runExecutor(t *testing.T) {
@@ -56,7 +59,8 @@ func TestPipeline_runExecutor(t *testing.T) {
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, test.moduleName)
-			err := pipe.execute(ctx, executor, execOutput)
+			res := pipe.execute(ctx, executor, execOutput)
+			err := pipe.applyExecutionResult(ctx, executor, res, execOutput)
 			require.NoError(t, err)
 			output, found := execOutput.Values[test.moduleName]
 			require.Equal(t, true, found)
@@ -77,21 +81,18 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	runtime := wasm.NewRuntime(nil, 0)
-	module, err := runtime.NewModule(binary.Content)
-	require.NoError(t, err)
-	wasmModule, err := runtime.NewInstance(
-		context.Background(),
-		module,
-		name,
-		name,
-	)
+	ctx := context.Background()
+
+	registry := wasm.NewRegistry(nil, 0)
+	module, err := registry.NewModule(ctx, binary.Content)
 	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(
 		exec.NewBaseExecutor(
+			context.Background(),
 			name,
-			wasmModule,
+			module,
+			false, // could exercice with cache enabled too
 			[]wasm.Argument{
 				wasm.NewParamsInput("my test params"),
 				wasm.NewSourceInput("sf.substreams.v1.test.Block"),

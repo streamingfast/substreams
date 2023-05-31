@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -130,7 +130,7 @@ type MaxFloat64Setter interface {
 	SetMaxFloat64(ord uint64, key string, value float64)
 }
 type MaxBigDecimalSetter interface {
-	SetMaxBigDecimal(ord uint64, key string, value *big.Float)
+	SetMaxBigDecimal(ord uint64, key string, value decimal.Decimal)
 }
 
 type MinBigIntSetter interface {
@@ -143,7 +143,7 @@ type MinFloat64Setter interface {
 	SetMinFloat64(ord uint64, key string, value float64)
 }
 type MinBigDecimalSetter interface {
-	SetMinBigDecimal(ord uint64, key string, value *big.Float)
+	SetMinBigDecimal(ord uint64, key string, value decimal.Decimal)
 }
 
 type SumBigIntSetter interface {
@@ -156,5 +156,5 @@ type SumFloat64Setter interface {
 	SumFloat64(ord uint64, key string, value float64)
 }
 type SumBigDecimalSetter interface {
-	SumBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal)
+	SumBigDecimal(ord uint64, key string, value decimal.Decimal)
 }

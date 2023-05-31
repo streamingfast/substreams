@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream/stream"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/tracking"
-	"go.uber.org/zap"
 )
 
 const progressMessageInterval = time.Millisecond * 200
@@ -24,8 +25,17 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	reqDetails := reqctx.Details(ctx)
 	bytesMeter := tracking.GetBytesMeter(ctx)
 
-	for _, executor := range p.moduleExecutors {
-		executor.FreeMem()
+	for _, stage := range p.moduleExecutors {
+		for _, executor := range stage {
+			if err := executor.Close(ctx); err != nil {
+				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
+			}
+		}
+	}
+	for idx, mod := range p.loadedModules {
+		if err := mod.Close(ctx); err != nil {
+			return fmt.Errorf("closing wasm module %d: %w", idx, err)
+		}
 	}
 
 	p.runPostJobHooks(ctx, p.lastFinalClock)

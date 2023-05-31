@@ -1,10 +1,11 @@
 package orchestrator
 
-import "C"
 import (
 	"context"
 	"fmt"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
@@ -12,7 +13,6 @@ import (
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"
-	"go.uber.org/zap"
 )
 
 // MultiSquasher produces _complete_ stores, by merging backing partial stores.

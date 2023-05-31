@@ -7,8 +7,9 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/require"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 var testModules = NewTestModules()

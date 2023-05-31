@@ -5,8 +5,8 @@ import (
 	"math/big"
 
 	"github.com/dustin/go-humanize"
+	"github.com/shopspring/decimal"
 
-	"github.com/streamingfast/substreams/bigdecimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -139,11 +139,11 @@ func (c *Call) DoAddBigInt(ord uint64, key string, value string) {
 func (c *Call) DoAddBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("add_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "bigdecimal", "bigfloat", key)
 
-	toAdd, err := bigdecimal.NewFromString(string(value))
+	toAdd, err := decimal.NewFromString(string(value))
 	if err != nil {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
-	c.outputStore.SumBigDecimal(ord, key, toAdd)
+	c.outputStore.SumBigDecimal(ord, key, toAdd.Truncate(34))
 }
 func (c *Call) DoAddInt64(ord uint64, key string, value int64) {
 	c.validateWithValueType("add_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", key)
@@ -168,11 +168,11 @@ func (c *Call) DoSetMinFloat64(ord uint64, key string, value float64) {
 }
 func (c *Call) DoSetMinBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_min_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigdecimal", "bigfloat", key)
-	toAdd, err := bigdecimal.NewFromString(value)
+	toAdd, err := decimal.NewFromString(value)
 	if err != nil {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
-	c.outputStore.SetMinBigDecimal(ord, key, toAdd)
+	c.outputStore.SetMinBigDecimal(ord, key, toAdd.Truncate(34))
 }
 func (c *Call) DoSetMaxInt64(ord uint64, key string, value int64) {
 	c.validateWithValueType("set_max_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "int64", key)
@@ -190,11 +190,11 @@ func (c *Call) DoSetMaxFloat64(ord uint64, key string, value float64) {
 }
 func (c *Call) DoSetMaxBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_max_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigdecimal", "bigfloat", key)
-	toAdd, err := bigdecimal.NewFromString(value)
+	toAdd, err := decimal.NewFromString(value)
 	if err != nil {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
-	c.outputStore.SetMaxBigDecimal(ord, key, toAdd)
+	c.outputStore.SetMaxBigDecimal(ord, key, toAdd.Truncate(34))
 }
 
 func (c *Call) DoGetAt(storeIndex int, ord uint64, key string) (value []byte, found bool) {

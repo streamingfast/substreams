@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStoreSumBigInt(t *testing.T) {
@@ -152,22 +153,22 @@ func TestStoreSumBigFloat(t *testing.T) {
 		name          string
 		key           string
 		existingValue []byte
-		value         *bigdecimal.BigDecimal
-		expectedValue *bigdecimal.BigDecimal
+		value         decimal.Decimal
+		expectedValue decimal.Decimal
 	}{
 		{
 			name:          "found",
 			key:           "key",
 			existingValue: []byte("3.0"),
-			value:         bigdecimal.MustNewFromString("4"),
-			expectedValue: bigdecimal.MustNewFromString("7"),
+			value:         decimal.NewFromInt(4),
+			expectedValue: decimal.NewFromInt(7),
 		},
 		{
 			name:          "not found",
 			key:           "key",
 			existingValue: nil,
-			value:         bigdecimal.MustNewFromString("4"),
-			expectedValue: bigdecimal.MustNewFromString("4"),
+			value:         decimal.NewFromInt(4),
+			expectedValue: decimal.NewFromInt(4),
 		},
 	}
 
@@ -184,7 +185,8 @@ func TestStoreSumBigFloat(t *testing.T) {
 				t.Errorf("value not found")
 			}
 
-			parsedActual := bigdecimal.MustNewFromString(string(actual))
+			parsedActual, err := decimal.NewFromString(string(actual))
+			require.NoError(t, err)
 
 			assert.Equal(t, parsedActual.String(), test.expectedValue.String())
 		})

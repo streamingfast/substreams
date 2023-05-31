@@ -9,7 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -114,14 +114,11 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			sum := func(a, b *bigdecimal.BigDecimal) string {
-				return bigdecimal.New().Add(a, b).String()
-			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
 				v0 := foundOrZeroBigDecimal(v0b, fv0)
 				v1 := foundOrZeroBigDecimal(v, true)
-				b.setKV(k, []byte(sum(v0, v1)))
+				b.setKV(k, []byte(v0.Add(v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
@@ -185,7 +182,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			max := func(a, b *bigdecimal.BigDecimal) *bigdecimal.BigDecimal {
+			max := func(a, b decimal.Decimal) decimal.Decimal {
 				if a.Cmp(b) <= 0 {
 					return b
 				}
@@ -264,7 +261,7 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			min := func(a, b *bigdecimal.BigDecimal) *bigdecimal.BigDecimal {
+			min := func(a, b decimal.Decimal) decimal.Decimal {
 				if a.Cmp(b) <= 0 {
 					return a
 				}
@@ -302,11 +299,15 @@ func foundOrZeroInt64(in []byte, found bool) int64 {
 	return int64(val)
 }
 
-func foundOrZeroBigDecimal(in []byte, found bool) *bigdecimal.BigDecimal {
+func foundOrZeroBigDecimal(in []byte, found bool) decimal.Decimal {
 	if !found {
-		return bigdecimal.Zero()
+		return decimal.NewFromInt(0)
 	}
-	return bigdecimal.MustNewFromString(string(in))
+	out, err := decimal.NewFromString(string(in))
+	if err != nil {
+		panic(err)
+	}
+	return out.Truncate(34)
 }
 
 func foundOrZeroBigFloat(in []byte, found bool) *big.Float {

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -206,43 +206,44 @@ func TestStoreSetMaxFloat64(t *testing.T) {
 }
 
 func TestStoreSetMaxBigFloat(t *testing.T) {
+	nilDecimal := decimal.Decimal{}
 	tests := []struct {
 		name          string
 		store         *baseStore
 		key           string
-		existingValue *bigdecimal.BigDecimal
-		value         *bigdecimal.BigDecimal
-		expectedValue *bigdecimal.BigDecimal
+		existingValue decimal.Decimal
+		value         decimal.Decimal
+		expectedValue decimal.Decimal
 	}{
 		{
 			name:          "found less",
 			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
-			existingValue: bigdecimal.MustNewFromString("3"),
-			value:         bigdecimal.MustNewFromString("4"),
-			expectedValue: bigdecimal.MustNewFromString("4"),
+			existingValue: decimal.NewFromInt(3),
+			value:         decimal.NewFromInt(4),
+			expectedValue: decimal.NewFromInt(4),
 		},
 		{
 			name:          "found greater",
 			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
-			existingValue: bigdecimal.MustNewFromString("5"),
-			value:         bigdecimal.MustNewFromString("4"),
-			expectedValue: bigdecimal.MustNewFromString("5"),
+			existingValue: decimal.NewFromInt(5),
+			value:         decimal.NewFromInt(4),
+			expectedValue: decimal.NewFromInt(5),
 		},
 		{
 			name:          "not found",
 			store:         newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "", nil),
 			key:           "key",
-			existingValue: nil,
-			value:         bigdecimal.MustNewFromString("4"),
-			expectedValue: bigdecimal.MustNewFromString("4"),
+			existingValue: nilDecimal,
+			value:         decimal.NewFromInt(4),
+			expectedValue: decimal.NewFromInt(4),
 		},
 	}
 
-	initTestStore := func(b *baseStore, key string, value *bigdecimal.BigDecimal) {
+	initTestStore := func(b *baseStore, key string, value decimal.Decimal) {
 		b.kv = map[string][]byte{}
-		if value != nil {
+		if value != nilDecimal {
 			b.kv[key] = []byte(value.String())
 		}
 	}
@@ -257,7 +258,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 				t.Errorf("value not found")
 			}
 
-			actualInt, err := bigdecimal.NewFromString(string(actual))
+			actualInt, err := decimal.NewFromString(string(actual))
 			assert.NoError(t, err)
 
 			assert.Equal(t, 0, actualInt.Cmp(test.expectedValue))

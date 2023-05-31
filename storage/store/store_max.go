@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 )
 
 func (b *baseStore) SetMaxBigInt(ord uint64, key string, value *big.Int) {
@@ -57,19 +57,17 @@ func (b *baseStore) SetMaxFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(max, 'g', 100, 64)))
 }
 
-func (b *baseStore) SetMaxBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal) {
-	max := bigdecimal.New()
+func (b *baseStore) SetMaxBigDecimal(ord uint64, key string, value decimal.Decimal) {
 	val, found := b.GetAt(ord, key)
 	if !found {
-		max = value
-	} else {
-		prev, err := bigdecimal.NewFromString(string(val))
-
-		if err != nil || value.Cmp(prev) == 1 {
-			max = value
-		} else {
-			max = prev
-		}
+		b.set(ord, key, []byte(value.String()))
+		return
 	}
-	b.set(ord, key, []byte(max.String()))
+	prev, err := decimal.NewFromString(string(val))
+	prev.Truncate(34)
+	if err != nil || value.Cmp(prev) == 1 {
+		b.set(ord, key, []byte(value.String()))
+		return
+	}
+	b.set(ord, key, []byte(prev.String()))
 }

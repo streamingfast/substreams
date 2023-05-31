@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 )
 
 func (b *baseStore) SumBigInt(ord uint64, key string, value *big.Int) {
@@ -55,18 +55,18 @@ func (b *baseStore) SumFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(sum, 'g', 100, 64)))
 }
 
-func (b *baseStore) SumBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal) {
-	sum := bigdecimal.New()
+func (b *baseStore) SumBigDecimal(ord uint64, key string, value decimal.Decimal) {
 	v, found := b.GetAt(ord, key)
 	if !found {
-		sum = value
-	} else {
-		prev, err := bigdecimal.NewFromString(string(v))
-		if err != nil || prev == nil {
-			sum = value
-		} else {
-			sum = bigdecimal.New().Add(prev, value)
-		}
+		b.set(ord, key, []byte(value.String()))
+		return
 	}
+	prev, err := decimal.NewFromString(string(v))
+	prev.Truncate(34)
+	if err != nil {
+		b.set(ord, key, []byte(value.String()))
+		return
+	}
+	sum := prev.Add(value)
 	b.set(ord, key, []byte(sum.String()))
 }

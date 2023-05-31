@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/streamingfast/substreams/bigdecimal"
+	"github.com/shopspring/decimal"
 )
 
 func (b *baseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
@@ -57,19 +57,17 @@ func (b *baseStore) SetMinFloat64(ord uint64, key string, value float64) {
 	b.set(ord, key, []byte(strconv.FormatFloat(min, 'g', 100, 64)))
 }
 
-func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value *bigdecimal.BigDecimal) {
-	min := bigdecimal.New()
+func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value decimal.Decimal) {
 	val, found := b.GetAt(ord, key)
 	if !found {
-		min = value
-	} else {
-		prev, err := bigdecimal.NewFromString(string(val))
-
-		if err != nil || value.Cmp(prev) <= 0 {
-			min = value
-		} else {
-			min = prev
-		}
+		b.set(ord, key, []byte(value.String()))
+		return
 	}
-	b.set(ord, key, []byte(min.String()))
+	prev, err := decimal.NewFromString(string(val))
+	prev.Truncate(34)
+	if err != nil || value.Cmp(prev) <= 0 {
+		b.set(ord, key, []byte(value.String()))
+		return
+	}
+	b.set(ord, key, []byte(prev.String()))
 }

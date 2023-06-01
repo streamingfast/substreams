@@ -258,14 +258,14 @@ func (p *Plan) hasMore() bool {
 }
 
 func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) error {
-	progressMessages := p.initialProgressMessages()
+	progressMessages := p.InitialProgressMessages()
 	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Plan) initialProgressMessages() (out []*pbsubstreamsrpc.ModuleProgress) {
+func (p *Plan) InitialProgressMessages() (out []*pbsubstreamsrpc.ModuleProgress) {
 	for storeName, modState := range p.ModulesStateMap {
 		var more []*pbsubstreamsrpc.BlockRange
 		for _, rng := range modState.InitialProgressRanges() {

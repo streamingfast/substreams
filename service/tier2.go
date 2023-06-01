@@ -161,6 +161,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
+	// FIXME: here, we validate that we have only modules on the same
+	// stage, otherwise we fall back.
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, true, request.Modules)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())

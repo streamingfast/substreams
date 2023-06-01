@@ -51,16 +51,11 @@ func (r *BoundedRange) computeInitialBounds() *Range {
 	if r.requestExclusiveEndBlock < r.moduleInitBlock {
 		return nil
 	}
-	// fixme: simple solution for the production-mode issue
-	flooredRequestStartBlock := r.requestStartBlock
-	if r.requestStartBlock%r.interval != 0 {
-		flooredRequestStartBlock = r.requestStartBlock - r.requestStartBlock%r.interval
-		if flooredRequestStartBlock < r.moduleInitBlock {
-			flooredRequestStartBlock = r.moduleInitBlock
-		}
-	}
+
+	floorRequestStartBlock := r.requestStartBlock - r.requestStartBlock%r.interval
+
 	lowerBound := utils.MaxOf(
-		flooredRequestStartBlock,
+		floorRequestStartBlock,
 		r.moduleInitBlock,
 	)
 	upperBound := utils.MinOf(

@@ -49,6 +49,8 @@ func NewExecOutputStorageState(config *execout.Config, saveInterval, requestStar
 			requestStartBlock = modInitBlock
 		}
 	}
+	// TODO(abourget): this is the logic of the Segmenter, building off segments.
+	// we're probably doing that multiple places.
 	for ptr := requestStartBlock; ptr < linearHandoffBlock; {
 		end := utils.MinOf(ptr-ptr%saveInterval+saveInterval, linearHandoffBlock)
 		blockRange := block.NewRange(ptr, end)

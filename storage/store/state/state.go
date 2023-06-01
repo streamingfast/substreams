@@ -3,10 +3,11 @@ package state
 import (
 	"fmt"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/utils"
-	"go.uber.org/zap/zapcore"
 )
 
 // ModuleStorageState contains all the file-related ranges of store snapshots
@@ -39,7 +40,8 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 			return
 		}
 	}
-
+	// TODO(abourget): this is duplicated from the ExecOutStorageState, and it
+	// belongs to a Segmenter.
 	for ptr := parallelProcessStartBlock; ptr < workUpToBlockNum; {
 		end := utils.MinOf(ptr-ptr%storeSaveInterval+storeSaveInterval, workUpToBlockNum)
 		out.PartialsMissing = append(out.PartialsMissing, block.NewRange(ptr, end))

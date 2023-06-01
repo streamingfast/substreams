@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap/zapcore"
 )
 
 // Job is a single unit of scheduling, meaning it is a request that goes to a
@@ -32,10 +33,6 @@ func NewJob(storeName string, requestRange *block.Range, requiredModules []strin
 		priority:        priority,
 	}
 	return j
-}
-
-func (j *Job) Matches(moduleName string, blockNum uint64) bool {
-	return j.ModuleName == moduleName && j.RequestRange.Contains(blockNum)
 }
 
 func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbssinternal.ProcessRangeRequest {

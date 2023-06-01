@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"go.opentelemetry.io/otel"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-
-	"github.com/streamingfast/bstream"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -173,6 +172,8 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 	for name, storeConfig := range p.stores.configs {
 		if name == outputModuleName {
+			// FIXME: in the new scheduler, we can set multiple partial stores, because
+			// they are all produced at the same stage.
 			partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
 			storeMap.Set(partialStore)
 		} else {

@@ -7,6 +7,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -15,9 +19,6 @@ import (
 	"github.com/streamingfast/substreams/storage"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/storage/store/state"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func TestWorkPlanning(t *testing.T) {
@@ -84,39 +85,6 @@ func jobList(jobs []*Job) string {
 		out = append(out, job.String())
 	}
 	return strings.Join(out, "\n")
-}
-
-func TestPlan_MarkDependencyComplete(t *testing.T) {
-	type fields struct {
-		ModulesStateMap       storage.ModuleStorageStateMap
-		upToBlock             uint64
-		waitingJobs           []*Job
-		readyJobs             []*Job
-		modulesReadyUpToBlock map[string]uint64
-	}
-	type args struct {
-		modName   string
-		upToBlock uint64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Plan{
-				ModulesStateMap:       tt.fields.ModulesStateMap,
-				upToBlock:             tt.fields.upToBlock,
-				waitingJobs:           tt.fields.waitingJobs,
-				readyJobs:             tt.fields.readyJobs,
-				modulesReadyUpToBlock: tt.fields.modulesReadyUpToBlock,
-			}
-			p.MarkDependencyComplete(tt.args.modName, tt.args.upToBlock)
-		})
-	}
 }
 
 func TestPlan_NextJob(t *testing.T) {
@@ -615,7 +583,7 @@ func TestPlan_initialProgressMessages(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			p := &Plan{ModulesStateMap: TestModStateMap(test.modState)}
 
-			out := p.initialProgressMessages()
+			out := p.InitialProgressMessages()
 
 			assert.Equal(t, test.expectedProgress, reduceProgressMessages(out))
 		})

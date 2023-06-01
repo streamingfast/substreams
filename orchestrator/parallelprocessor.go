@@ -6,6 +6,8 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/scheduler"
+	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
@@ -18,9 +20,7 @@ import (
 
 type ParallelProcessor struct {
 	plan             *work.Plan
-	scheduler        *Scheduler
-	squasher         *MultiSquasher
-	workerPool       work.WorkerPool
+	scheduler        *scheduler.Scheduler
 	execOutputReader *execout.LinearReader
 }
 
@@ -88,34 +88,46 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
+	streamOut := NewStreamOut(respFunc)
+	sched, err := scheduler.New(ctx, streamOut, reqDetails.Modules)
+	if err != nil {
+		return nil, err
+	}
+
 	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}
 
+	sched.Planner = plan
+
+	streamOut.InitialProgressMessages(plan.InitialProgressMessages())
 	if err := plan.SendInitialProgressMessages(respFunc); err != nil {
 		return nil, fmt.Errorf("send initial progress: %w", err)
 	}
 
-	scheduler := NewScheduler(plan, respFunc, reqDetails.Modules)
+	//scheduler := NewScheduler(plan, respFunc, reqDetails.Modules)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
+	squasher, err := squasher.NewMulti(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum)
 	if err != nil {
 		return nil, err
 	}
 
-	squasher, err := NewMultiSquasher(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum, scheduler.OnStoreCompletedUntilBlock)
-	if err != nil {
-		return nil, err
-	}
+	sched.Squasher = squasher
 
-	scheduler.OnStoreJobTerminated = squasher.Squash
+	//scheduler.OnStoreJobTerminated = squasher.Squash
 
 	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
 
+	sched.RunnerPool = runnerPool
+
 	return &ParallelProcessor{
 		plan:             plan,
-		scheduler:        scheduler,
-		squasher:         squasher,
-		workerPool:       runnerPool,
+		scheduler:        sched,
 		execOutputReader: execOutputReader,
 	}, nil
 }
@@ -124,16 +136,17 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 	if b.execOutputReader != nil {
 		b.execOutputReader.Launch(ctx)
 	}
-	b.squasher.Launch(ctx)
+	//b.squasher.Launch(ctx)
 
-	if err := b.scheduler.Schedule(ctx, b.workerPool); err != nil {
+	if err := b.scheduler.Run(ctx); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	storeMap, err = b.squasher.Wait(ctx)
-	if err != nil {
-		return nil, err
-	}
+	storeMap := b.scheduler.FinalStoreMap()
+	//storeMap, err = b.squasher.Wait(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	if b.execOutputReader != nil {
 		select {

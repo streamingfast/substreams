@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/responses"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -88,7 +89,7 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
-	streamOut := NewStreamOut(respFunc)
+	streamOut := responses.New(respFunc)
 	sched, err := scheduler.New(ctx, streamOut, reqDetails.Modules)
 	if err != nil {
 		return nil, err
@@ -121,9 +122,9 @@ func BuildParallelProcessor(
 
 	//scheduler.OnStoreJobTerminated = squasher.Squash
 
-	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
+	workerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
 
-	sched.RunnerPool = runnerPool
+	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{
 		plan:             plan,

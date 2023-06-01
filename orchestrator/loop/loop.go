@@ -5,44 +5,14 @@ import "context"
 // loop is the micro framework for the Scheduler's event loop,
 // heavily inspired by BubbleTea, which we use for the substreams GUI.
 
-type Msg any
-
-type Cmd func() Msg
-
-func Batch(cmds ...Cmd) Cmd {
-	var validCmds []Cmd
-	for _, c := range cmds {
-		if c == nil {
-			continue
-		}
-		validCmds = append(validCmds, c)
-	}
-	if len(validCmds) == 0 {
-		return nil
-	}
-	return func() Msg {
-		return BatchMsg(validCmds)
-	}
-}
-
-type BatchMsg []Cmd
-
-func Sequence(cmds ...Cmd) Cmd {
-	return func() Msg {
-		return SequenceMsg(cmds)
-	}
-}
-
-type SequenceMsg []Cmd
-
 type EventLoop struct {
 	ctx        context.Context
 	msgs       chan Msg
 	updateFunc func(msg Msg) Cmd
 }
 
-func NewEventLoop(ctx context.Context, updateFunc func(msg Msg) Cmd) *EventLoop {
-	return &EventLoop{
+func NewEventLoop(ctx context.Context, updateFunc func(msg Msg) Cmd) EventLoop {
+	return EventLoop{
 		ctx:        ctx,
 		msgs:       make(chan Msg, 1000),
 		updateFunc: updateFunc,
@@ -50,7 +20,7 @@ func NewEventLoop(ctx context.Context, updateFunc func(msg Msg) Cmd) *EventLoop 
 }
 
 func (l *EventLoop) Run() (err error) {
-	cmds := make(chan loop.Cmd, 1000)
+	cmds := make(chan Cmd, 1000)
 	// main execution loop
 	done := l.handleCommands(cmds)
 loop:
@@ -60,12 +30,17 @@ loop:
 			err = l.ctx.Err()
 			break loop
 		case msg := <-l.msgs:
-			cmd := l.update(msg, cmds)
+			var cmd Cmd
+			cmd, err = l.update(msg, cmds)
+			if err != nil {
+				break loop
+			}
 			if cmd == nil {
 				continue
 			}
 			go func() {
-				l.Send(cmd())
+				msg := cmd()
+				l.Send(msg)
 			}()
 		}
 	}
@@ -80,15 +55,17 @@ func (l *EventLoop) Send(msg Msg) {
 	}
 }
 
-func (l *EventLoop) update(msg Msg, cmds chan Cmd) Cmd {
+func (l *EventLoop) update(msg Msg, cmds chan Cmd) (Cmd, error) {
 	switch msg := msg.(type) {
-	case BatchMsg:
+	case quitMsg:
+		return nil, msg.err
+	case batchMsg:
 		for _, cmd := range msg {
 			cmds <- cmd
 		}
-		return nil
+		return nil, nil
 
-	case SequenceMsg:
+	case sequenceMsg:
 		go func() {
 			// Execute commands one at a time, in order.
 			for _, cmd := range msg {
@@ -97,7 +74,7 @@ func (l *EventLoop) update(msg Msg, cmds chan Cmd) Cmd {
 		}()
 	}
 
-	return l.updateFunc(msg)
+	return l.updateFunc(msg), nil
 }
 
 func (l *EventLoop) handleCommands(cmds chan Cmd) chan struct{} {

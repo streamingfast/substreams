@@ -5,76 +5,89 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/orchestrator/responses"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/work"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 type Scheduler struct {
-	ctx       context.Context
-	EventLoop loop.EventLoop
+	ctx context.Context
+	loop.EventLoop
+
+	stream                 *responses.Stream
+	upstreamRequestModules *pbsubstreams.Modules
 
 	Planner    *work.Plan
 	Squasher   *squasher.Multi
-	RunnerPool work.WorkerPool
+	WorkerPool work.WorkerPool
 
 	// Status:
 	JobStatus    []*work.Job
 	WorkerStatus map[string]string
 
 	stagedModules StagedModules
+
+	// Output
+	outputStoreMap store.Map
 }
 
-func New(ctx context.Context) *Scheduler {
+func New(ctx context.Context, stream *responses.Stream, upstreamRequestModules *pbsubstreams.Modules) *Scheduler {
 	s := &Scheduler{
-		ctx: ctx,
+		ctx:                    ctx,
+		stream:                 stream,
+		upstreamRequestModules: upstreamRequestModules,
 	}
 	s.EventLoop = loop.NewEventLoop(ctx, s.Update)
 	return s
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
+	var cmds []loop.Cmd
+
 	switch msg := msg.(type) {
-	case work.JobFinished:
-		return loop.Batch(
-			s.mergePartial(msg.Range),
-			ScheduleNextJobMsg(),
-		)
-	case ObservedPartialReadyMsg:
-		s.killPotentiallyRunningJob(msg.JobID)
-		s.mergePartial(msg.Range)
-		return ScheduleNextJobMsg()
-	case work.JobFailed:
+	case JobStartedMsg:
+	case JobFailedMsg:
 		s.updateJobFailed(msg)
 		return ScheduleNextJobMsg()
+	case JobSucceededMsg:
+		s.jobs[msg.JobID].Finished = true
+		s.stages[msg.Stage].segments[msg.Segment].Completed = true
+		return s.checkFullStoresPresence(stage, segment)
+	case JobFinishedMsg:
+		return loop.Batch(
+			s.mergePartial(msg.Range),
+			ScheduleNextJob(),
+		)
 
-	case work.JobStarted:
-	case MergeStarted:
-	case MergeFinished:
-	case MergeFailed:
+	case StoragePartialFoundMsg:
+		s.killPotentiallyRunningJob(msg.JobID)
+		s.mergePartial(msg.Range)
+		return ScheduleNextJob()
 
-	case WorkerAvailable:
+	case MergeStartedMsg:
+	case MergeFinishedMsg:
+	case MergeFailedMsg:
+
+	case WorkerAvailableMsg:
 		s.workers.AppendWaiting(msg.worker)
 		return ScheduleNextJobMsg()
 
-	case ScheduleNextJob:
-		job := s.nextJob()
+	case ScheduleNextJobMsg:
+		job := s.Planner.NextJob()
 		if job == nil {
 			return nil
 		}
-		if len(s.workers.PendingCount()) == 0 {
+		if len(s.WorkerPool.PendingCount()) == 0 {
 			return nil
 		}
 		worker := s.workers.Borrow()
 		return s.runJob(worker, msg.job)
 
-	case JobSucceeded:
-		s.jobs[msg.JobID].Finished = true
-		s.stages[msg.Stage].segments[msg.Segment].Completed = true
-		return s.checkFullStoresPresence(stage, segment)
-
 	case FullStoresPresent:
 		stage := s.stages[msg.Stage]
-		sq := s.squashers[msg.Stage]
+		sq := s.Squasher[msg.Stage]
 
 		if len(msg.Stores) != len(stage.Stores) {
 			return nil
@@ -93,8 +106,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				cmds = append(cmds, storeSquasher.MergeRange(mergeRange))
 			}
 		}
-		return loop.Batch(cmds...)
 	}
+
+	return loop.Batch(cmds...)
 }
 
 func (s *storeSquasher) NextRangeToMerge() *block.Range {
@@ -107,34 +121,14 @@ func (s *storeSquasher) NextRangeToMerge() *block.Range {
 }
 
 func (s *storeSquasher) MergeRange(r *block.Range) loop.Cmd {
-	return loop.Sequence{
+	return loop.Sequence(
 		MergeStartedMsg(),
-		func() Msg {
+		func() loop.Msg {
 
 		},
-	}
+	)
 }
 
-func (s *Scheduler) FinalStoreMap() map[string]Store {
-	return s.stores
+func (s *Scheduler) FinalStoreMap() store.Map {
+	return s.outputStoreMap
 }
-
-type StagedModules []*StageProgress // staged, alphanumerically sorted module names
-
-type StageProgress struct {
-	modules []*ModuleProgress
-}
-
-type ModuleProgress struct {
-	name string
-
-	readyUpToBlock     uint64
-	mergedUpToBlock    uint64
-	scheduledUpToBlock uint64
-
-	completedJobs []*work.Job
-	runningJobs   []*work.Job
-}
-
-// Algorithm for planning the Next Jobs:
-// We need to start from the last stage, first segment.

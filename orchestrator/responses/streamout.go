@@ -1,20 +1,20 @@
-package orchestrator
+package responses
 
 import (
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
-type StreamOut struct {
+type Stream struct {
 	respFunc substreams.ResponseFunc
 }
 
-func NewStreamOut(respFunc substreams.ResponseFunc) *StreamOut {
-	return &StreamOut{
+func New(respFunc substreams.ResponseFunc) *Stream {
+	return &Stream{
 		respFunc: respFunc,
 	}
 }
 
-func (s *StreamOut) InitialProgressMessage(in []*pbsubstreamsrpc.ModuleProgress) {
+func (s *Stream) InitialProgressMessage(in []*pbsubstreamsrpc.ModuleProgress) {
 	s.respFunc(substreams.NewModulesProgressResponse(in))
 }

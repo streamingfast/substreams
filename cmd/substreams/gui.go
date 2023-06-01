@@ -93,7 +93,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
-	if err := manifest.ApplyParams(mustGetStringSlice(cmd, "params"), pkg); err != nil {
+	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
 		return err
 	}
 

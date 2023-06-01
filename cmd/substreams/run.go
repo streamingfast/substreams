@@ -31,7 +31,7 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
-	runCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+	runCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Commas are argument delimiters and cannot be used within the parameter value. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
 	rootCmd.AddCommand(runCmd)

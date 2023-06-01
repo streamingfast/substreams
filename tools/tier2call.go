@@ -25,7 +25,7 @@ func init() {
 	tier2CallCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	tier2CallCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 
-	tier2CallCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+	tier2CallCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Commas are argument delimiters and cannot be used within the parameter value. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 
 	Cmd.AddCommand(tier2CallCmd)
 }

@@ -31,7 +31,7 @@ func init() {
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
-	guiCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Commas are argument delimiters and cannot be used within the parameter value. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+	guiCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 	rootCmd.AddCommand(guiCmd)
 }

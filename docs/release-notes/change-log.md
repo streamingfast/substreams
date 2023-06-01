@@ -30,6 +30,7 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 
 * Changed default WASM engine from `wasmtime` to `wazero`, use `SUBSTREAMS_WASM_RUNTIME=wasmtime` to revert to prior engine. Note that `wasmtime` will now run a lot slower than before because resetting the memory in `wasmtime` is more expensive than in `wazero`.
 * Execution of modules is now done in parallel within a single instance, based on a tree of module dependencies.
+* The `substreams gui` and `substreams run` now accept commas inside a `param` value. For example: `substreams run --param=p1=bar,baz,qux --param=p2=foo,baz`. However, you can no longer pass multiple parameters using an ENV variable, or a `.yaml` config file.
 
 ## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
 

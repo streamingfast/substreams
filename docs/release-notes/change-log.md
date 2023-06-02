@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [v1.1.5](https://github.com/streamingfast/substreams/releases/tag/v1.1.5)
 
 ### Highlights
 
@@ -25,6 +25,7 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 * When talking to an updated server, the gui will not overflow on a negative start block, using the newly available resolvedStartBlock instead.
 * When running in development mode with a start-block in the future on a cold cache, you would sometimes get invalid "updates" from the store passed down to your modules that depend on them. It did not impact the caches but caused invalid output.
 * The WASM engine was incorrectly reusing memory, preventing deterministic output. It made things go faster, but at the cost of determinism. Memory is now reset between WASM executions on each block.
+* The GUI no longer panics when an invalid output-module is given as argument
 
 ### Changed
 

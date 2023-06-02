@@ -39,12 +39,12 @@ func (r *BoundedRange) IsPartial() bool {
 	return !r.AlignsWithUpperBound()
 }
 
-func (r *BoundedRange) AlignsWithLowerBound() bool {
-	return r.Range.StartBlock%r.interval == 0
-}
-
 func (r *BoundedRange) AlignsWithUpperBound() bool {
 	return r.Range.ExclusiveEndBlock%r.interval == 0
+}
+
+func (r *BoundedRange) AlignsWithLowerBound() bool {
+	return r.Range.StartBlock%r.interval == 0
 }
 
 func (r *BoundedRange) computeInitialBounds() *Range {

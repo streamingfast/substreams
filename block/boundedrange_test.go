@@ -38,6 +38,16 @@ func TestBoundedRange_computeInitialBounds(t *testing.T) {
 			"8-10",
 		},
 		{
+			"just above module init block",
+			fields{8, 9, 20},
+			"8-10",
+		},
+		{
+			"below module init block 2",
+			fields{8, 9, 20},
+			"8-10",
+		},
+		{
 			"init block beyond",
 			fields{32, 2, 8},
 			"nil",

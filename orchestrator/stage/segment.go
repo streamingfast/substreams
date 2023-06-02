@@ -1,9 +1,6 @@
 package stage
 
-// State for a given StageSegment in a given Stage
-type StageSegment struct {
-	state SegmentState
-}
+import "github.com/streamingfast/substreams/block"
 
 type SegmentState int
 
@@ -18,4 +15,5 @@ const (
 type SegmentID struct {
 	Segment int
 	Stage   int
+	Range   *block.Range
 }

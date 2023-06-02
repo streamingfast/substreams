@@ -7,7 +7,7 @@ package block
 type Segmenter struct {
 	interval           uint64
 	graphInitBlock     uint64 // Lowest module init block across the requested module graph.
-	moduleInitBlock    uint64
+	moduleInitBlock    uint64 // FIXME: This doesn't need to exist anymore.
 	linearHandoffBlock uint64
 
 	countFromBegin      int

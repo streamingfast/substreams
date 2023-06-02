@@ -2,7 +2,6 @@ package stage
 
 import (
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/storage"
 )
@@ -10,8 +9,8 @@ import (
 type Stages struct {
 	*block.Segmenter
 
-	stages   []*Stage
-	segments [][]SegmentState // segments[SegmentIndex][StageIndex]
+	stages []*Stage
+	state  [][]SegmentState // state[SegmentIndex][StageIndex]
 
 	completedSegments int
 }
@@ -59,26 +58,68 @@ func NewStages(
 // Algorithm for planning the Next Jobs:
 // We need to start from the last stage, first segment.
 
-func (s Stages) NextJob() *work.Job {
-	nextSegment := s.completedSegments
-	if len(s.segments) < nextSegment-1 {
-
-	}
-	for stageIndex, stage := range s.stages {
-		for segmentIndex, segment := range stage.segments {
-			if segment != SegmentPending {
+func (s *Stages) NextJob() *SegmentID {
+	// FIXME: eventually, we can start from s.completedSegments, and push `completedSegments`
+	// each time contiguous segments are completed for all stages.
+	segmentIdx := 0
+	for {
+		if segmentIdx > s.CountFromBegin() {
+			break
+		}
+		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
+			segmentState := s.state[segmentIdx][stageIdx]
+			if segmentState != SegmentPending {
 				continue
 			}
-			// check if all dependencies are resolved
-			// mark it Reserved
-			// and MarkJobScheduled(segment SegmentID)
-			// and MarkJobCompleted(segment SegmentID)
+			if s.stages[stageIdx].FirstModuleSegment() > segmentIdx {
+				// TODO: FirstModuleSegment() takes this functionality out of the Segmenter
+				// the Segmenter will only consider things from the graphInitBlock
+				// and this stage's lowest module init block will be set as a
+				// property of the `Stage` struct, and this condition will use that
+				// variable.
+				// We'll query the Segmenter for `IndexForBlock(module.InitialBlock)` and use that as the "FirstModuleSegment"
+
+				// Don't process stages where all modules's initial blocks are only later
+				continue
+			}
+			if !s.dependenciesCompleted(segmentIdx, stageIdx) {
+				continue
+			}
+
+			s.state[segmentIdx][stageIdx] = SegmentScheduled
+			return &SegmentID{
+				Stage:   stageIdx,
+				Segment: segmentIdx,
+				Range:   s.Range(segmentIdx),
+			}
 		}
+		if len(s.state) <= segmentIdx {
+			s.growSegments(32)
+		}
+		segmentIdx++
 	}
+
+	return nil
+}
+
+func (s *Stages) MarkJobCompleted(segment SegmentID) {
+	s.state[segment.Segment][segment.Stage] = SegmentCompleted
 }
 
 func (s *Stages) growSegments(by int) {
 	for i := 0; i < by; i++ {
-		s.segments = append(s.segments, make([]SegmentState, len(s.stages)))
+		s.state = append(s.state, make([]SegmentState, len(s.stages)))
 	}
+}
+
+func (s *Stages) dependenciesCompleted(segmentIdx int, stageIdx int) bool {
+	if segmentIdx == 0 {
+		return true
+	}
+	for i := stageIdx; i >= 0; i-- {
+		if s.state[segmentIdx-1][i] != SegmentCompleted {
+			return false
+		}
+	}
+	return true
 }

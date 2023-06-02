@@ -15,7 +15,6 @@ import (
 
 	"github.com/streamingfast/substreams/storage"
 
-	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
@@ -255,14 +254,6 @@ func (p *Plan) NextJob() (job *Job, more bool) {
 
 func (p *Plan) hasMore() bool {
 	return len(p.readyJobs)+len(p.waitingJobs) > 0
-}
-
-func (p *Plan) SendInitialProgressMessages(respFunc substreams.ResponseFunc) error {
-	progressMessages := p.InitialProgressMessages()
-	if err := respFunc(substreams.NewModulesProgressResponse(progressMessages)); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (p *Plan) InitialProgressMessages() (out []*pbsubstreamsrpc.ModuleProgress) {

@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage"
@@ -17,16 +18,12 @@ import (
 )
 
 // Multi produces _complete_ stores, by merging backing partial stores.
+//
+// It also produces complete store snapshots, which are dependencies
+// for the segment following the snapshot.
 type Multi struct {
-	storeSquashers       map[string]squashable
+	Modules              map[string]squashable
 	targetExclusiveBlock uint64
-}
-
-type squashable interface {
-	//launch(ctx context.Context)
-	waitForCompletion(ctx context.Context) error
-	squash(ctx context.Context, partialFiles store.FileInfos) error
-	moduleName() string
 }
 
 // NewMulti receives stores, initializes them and fetches them from
@@ -71,7 +68,7 @@ func NewMulti(
 	}
 
 	return &Multi{
-		storeSquashers:       storeSquashers,
+		Modules:              storeSquashers,
 		targetExclusiveBlock: upToBlock,
 	}, nil
 }
@@ -117,20 +114,30 @@ func buildStoreSquasher(
 	return storeSquasher, nil
 }
 
-func (s *Multi) Launch(ctx context.Context) {
-	for _, squasher := range s.storeSquashers {
-		go squasher.launch(ctx)
-	}
+//func (s *Multi) Launch(ctx context.Context) {
+//	for _, squasher := range s.Modules {
+//		go squasher.launch(ctx)
+//	}
+//}
+
+func (s *Multi) MergeNextRange(modName string) loop.Cmd {
+	single := s.Modules[modName]
+	return single.MergeNextRange()
 }
 
-func (s *Multi) Squash(ctx context.Context, moduleName string, partialsFiles store.FileInfos) error {
-	squashableStore, ok := s.storeSquashers[moduleName]
-	if !ok {
-		return fmt.Errorf("module %q was not found in storeSquashers module registry", moduleName)
-	}
-
-	return squashableStore.squash(ctx, partialsFiles)
+func (s *Multi) AddPartials(modName string, files ...*store.File) loop.Cmd {
+	single := s.Modules[modName]
+	return single.AddPartials(files...)
 }
+
+//func (s *Multi) Squash(ctx context.Context, moduleName string, partialsFiles store.FileInfos) error {
+//	squashableStore, ok := s.Modules[moduleName]
+//	if !ok {
+//		return fmt.Errorf("module %q was not found in storeSquashers module registry", moduleName)
+//	}
+//
+//	return squashableStore.squash(ctx, partialsFiles)
+//}
 
 func (s *Multi) Wait(ctx context.Context) (out store.Map, err error) {
 	if err := s.waitUntilCompleted(ctx); err != nil {
@@ -148,9 +155,9 @@ func (s *Multi) Wait(ctx context.Context) (out store.Map, err error) {
 func (s *Multi) waitUntilCompleted(ctx context.Context) error {
 	logger := reqctx.Logger(ctx)
 	logger.Info("squasher waiting until all are completed",
-		zap.Int("store_count", len(s.storeSquashers)),
+		zap.Int("store_count", len(s.Modules)),
 	)
-	for _, squashableStore := range s.storeSquashers {
+	for _, squashableStore := range s.Modules {
 		logger.Info("shutting down squasher",
 			zap.String("module", squashableStore.moduleName()),
 		)
@@ -161,6 +168,16 @@ func (s *Multi) waitUntilCompleted(ctx context.Context) error {
 	return nil
 }
 
+func (s *Multi) FinalStoreMap() store.Map {
+	out := store.NewMap()
+	for _, squashable := range s.Modules {
+		if storeSquasher, ok := squashable.(*Single); ok {
+			out[storeSquasher.moduleName()] = storeSquasher.store
+		}
+	}
+	return out
+}
+
 func (s *Multi) getFinalStores() (out store.Map, err error) {
 	// TODO: those here are conditions to interrupt the scheduler, as
 	//  they are the final goal of the Scheduler: produce such a map.
@@ -168,7 +185,7 @@ func (s *Multi) getFinalStores() (out store.Map, err error) {
 	//  and terminate its loop with the final map.
 	out = store.NewMap()
 	var errs []string
-	for _, squashable := range s.storeSquashers {
+	for _, squashable := range s.Modules {
 		if storeSquasher, ok := squashable.(*Single); ok {
 			if !storeSquasher.targetExclusiveEndBlockReach {
 				errs = append(errs, fmt.Sprintf("module %s: target %d not reached (next expected: %d)", storeSquasher.moduleName(), s.targetExclusiveBlock, storeSquasher.nextExpectedStartBlock))

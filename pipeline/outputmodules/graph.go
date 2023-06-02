@@ -13,6 +13,7 @@ type Graph struct {
 	stagedUsedModules [][]*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
 	moduleHashes      *manifest.ModuleHashes
 	stores            []*pbsubstreams.Module // subset of allModules: only the stores
+	lowestInitBlock   uint64
 
 	outputModule *pbsubstreams.Module
 
@@ -26,6 +27,7 @@ func (g *Graph) UsedModules() []*pbsubstreams.Module         { return g.usedModu
 func (g *Graph) StagedUsedModules() [][]*pbsubstreams.Module { return g.stagedUsedModules }
 func (g *Graph) IsOutputModule(name string) bool             { return g.outputModule.Name == name }
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes        { return g.moduleHashes }
+func (g *Graph) LowestInitBlock() uint64                     { return g.lowestInitBlock }
 
 func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{
@@ -51,6 +53,7 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	}
 	g.usedModules = processModules
 	g.stagedUsedModules = computeStages(processModules)
+	g.lowestInitBlock = computeLowestInitBlock(processModules)
 
 	if err := g.hashModules(graph); err != nil {
 		return fmt.Errorf("cannot hash module: %w", err)
@@ -73,6 +76,16 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.schedulableAncestorsMap = ancestorsMap
 
 	return nil
+}
+
+func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
+	lowest := modules[0].InitialBlock
+	for _, mod := range modules {
+		if mod.InitialBlock < lowest {
+			lowest = mod.InitialBlock
+		}
+	}
+	return lowest
 }
 
 func computeStages(mods []*pbsubstreams.Module) (stages [][]*pbsubstreams.Module) {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -20,82 +21,95 @@ import (
 var SkipFile = errors.New("skip file")
 var PartialsChannelClosed = errors.New("partial chunks done")
 
+type squashable interface {
+	MergeNextRange() loop.Cmd
+	AddPartials(files ...*store.FileInfo) loop.Cmd
+
+	//launch(ctx context.Context)
+	waitForCompletion(ctx context.Context) error
+	squash(ctx context.Context, partialFiles store.FileInfos) error
+	moduleName() string
+}
+
+type SingleState int
+
+const (
+	SingleIdle SingleState = iota
+	SingleMerging
+)
+
 type Single struct {
 	*shutter.Shutter
 
+	state SingleState
+
 	name                         string
+	logger                       *zap.Logger
 	store                        *store.FullKV
 	files                        store.FileInfos
 	targetExclusiveEndBlock      uint64 // The upper bound of this Squasher's responsibility
 	targetExclusiveEndBlockReach bool
 	nextExpectedStartBlock       uint64 // This goes from a lower number up to `targetExclusiveEndBlock`
-	partialsChunks               chan store.FileInfos
 	storeSaveInterval            uint64
 
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64)
 }
 
 func NewSingle(
+	ctx context.Context,
 	initialStore *store.FullKV,
 	targetExclusiveBlock,
 	nextExpectedStartBlock uint64,
 	storeSaveInterval uint64,
 	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) *Single {
+	logger := reqctx.Logger(ctx).With(zap.String("store_name", initialStore.Name()), zap.String("module_hash", initialStore.ModuleHash()))
 	s := &Single{
 		Shutter:                    shutter.New(),
 		name:                       initialStore.Name(),
+		logger:                     logger,
 		store:                      initialStore,
 		targetExclusiveEndBlock:    targetExclusiveBlock,
 		nextExpectedStartBlock:     nextExpectedStartBlock,
 		onStoreCompletedUntilBlock: onStoreCompletedUntilBlock,
 		storeSaveInterval:          storeSaveInterval,
-		partialsChunks:             make(chan store.FileInfos, 100 /* before buffering the upstream requests? */),
 	}
 	return s
 }
 
-func (s *Single) moduleName() string { return s.name }
-
-func (s *Single) waitForCompletion(ctx context.Context) error {
-	logger := s.logger(ctx)
-
-	// TODO(abourget): unsure what this line means, a `close()` doesn't wait?
-	logger.Info("waiting form terminate after partials chucks chan empty")
-	close(s.partialsChunks)
-
-	logger.Info("waiting for completion")
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-s.Terminated():
-		if err := s.Err(); err != nil {
-			return fmt.Errorf("store squasher waiting for completion: %w", err)
-		}
-		logger.Info("squasher completed")
+func (s *Single) MergeNextRange() loop.Cmd {
+	if s.state != StateIdle {
+		return nil
+	}
+	// TODO: check whether we're in a state to actually merge anything
+	//  is there some contiguous stuff I can do?
+	//  If not, return nil
+	return func() loop.Msg {
+		// TODO: Do the actual merging
 		return nil
 	}
 }
 
-func (s *Single) squash(ctx context.Context, partialsChunks store.FileInfos) error {
-	if len(partialsChunks) == 0 {
-		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
-	}
+func (s *Single) moduleName() string { return s.name }
 
-	select {
-	case s.partialsChunks <- partialsChunks:
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-s.Terminated():
-		return s.Err()
-	}
-	return nil
-}
-
-func (s *Single) logger(ctx context.Context) *zap.Logger {
-	return reqctx.Logger(ctx).With(zap.String("store_name", s.store.Name()), zap.String("module_hash", s.store.ModuleHash()))
-}
+//func (s *Single) squash(ctx context.Context, partialsChunks store.FileInfos) error {
+//	if len(partialsChunks) == 0 {
+//		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
+//	}
+//
+//	select {
+//	case s.partialsChunks <- partialsChunks:
+//	case <-ctx.Done():
+//		return ctx.Err()
+//	case <-s.Terminated():
+//		return s.Err()
+//	}
+//	return nil
+//}
+//
+//func (s *Single) logger(ctx context.Context) *zap.Logger {
+//	return
+//}
 
 //func (s *Single) launch(ctx context.Context) {
 //	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/pipeline/store_squasher/%s/squashing", s.name))
@@ -110,14 +124,14 @@ func (s *Single) logger(ctx context.Context) *zap.Logger {
 
 // TODO: this function needs to be turned into a message
 func (s *Single) processPartials(ctx context.Context) error {
-	logger := s.logger(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 
-	logger.Info("launching store squasher")
+	s.logger.Info("launching store squasher")
 	metrics.SquashersStarted.Inc()
 	defer metrics.SquashersEnded.Inc()
 
 	for {
+		// TODO: renamed to AddPartials
 		if err := s.accumulateMorePartials(ctx); err != nil {
 			if errors.Is(err, PartialsChannelClosed) {
 				return nil
@@ -147,7 +161,7 @@ func (s *Single) processPartials(ctx context.Context) error {
 			metrics.SquashesLaunched.AddInt(int(out.squashCount))
 			avgDuration = totalDuration / time.Duration(out.squashCount)
 		}
-		logger.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
+		s.logger.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
 	}
 }
 
@@ -180,27 +194,12 @@ func (s *Single) ensureNoOverlap() error {
 	return nil
 }
 
-func (s *Single) accumulateMorePartials(ctx context.Context) error {
-	logger := s.logger(ctx)
+func (s *Single) AddPartials(files ...*store.FileInfo) loop.Cmd {
+	s.files = append(s.files, files...)
+	s.sortRange()
 
-	select {
-	case <-s.Terminated():
-		return s.Err()
-	case <-ctx.Done():
-		logger.Info("quitting on a close context")
-		return ctx.Err()
-
-	case partialsChunks, ok := <-s.partialsChunks:
-		if !ok {
-			logger.Info("squashing done, no more partial chunks to squash")
-			return PartialsChannelClosed
-		}
-		logger.Info("got partials chunks", zap.Stringer("partials_chunks", partialsChunks))
-		s.files = append(s.files, partialsChunks...)
-		s.sortRange()
-		if err := s.ensureNoOverlap(); err != nil {
-			return err
-		}
+	if err := s.ensureNoOverlap(); err != nil {
+		return loop.Quit(err)
 	}
 	return nil
 }

@@ -51,7 +51,7 @@ func TestSegmenter_Count(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewSegmenter(uint64(tt.fields.interval), uint64(tt.fields.moduleTreeInitialBlock), "modName", uint64(tt.fields.currentModuleInitBlock), uint64(tt.fields.linearHandoffBlock))
+			s := NewSegmenter(uint64(tt.fields.interval), uint64(tt.fields.moduleTreeInitialBlock), uint64(tt.fields.currentModuleInitBlock), uint64(tt.fields.linearHandoffBlock))
 			assert.Equalf(t, tt.countBegin, s.CountFromBegin(), "CountFromBegin()")
 			assert.Equalf(t, tt.countModuleInit, s.CountFromModuleInit(), "CountFromModuleInit()")
 			assert.Equalf(t, tt.firstModuleSegment, s.FirstModuleSegment(), "FirstModuleSegment()")
@@ -61,8 +61,8 @@ func TestSegmenter_Count(t *testing.T) {
 
 func TestSegmenter_IndexWithBlock(t *testing.T) {
 	s := Segmenter{
-		interval:            10,
-		moduleTreeInitBlock: 121,
+		interval:       10,
+		graphInitBlock: 121,
 	}
 	assert.Panics(t, func() { s.IndexWithBlock(119) })
 	assert.Panics(t, func() { s.IndexWithBlock(120) })

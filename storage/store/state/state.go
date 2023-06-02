@@ -17,7 +17,11 @@ type StoreStorageState struct {
 	ModuleInitialBlock uint64
 
 	InitialCompleteFile *store.FileInfo // Points to a complete .kv file, to initialize the store upon getting started.
-	PartialsMissing     block.Ranges
+	// TODO: we don't have PartialsPresent here, but that's what would
+	// be useful with the new Scheduler, because we could plan
+	// on watching them, or not plan a job if the partial is already there
+	// simply add it to our `partialsChunks` (files on the squashable)
+	PartialsMissing block.Ranges
 }
 
 func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workUpToBlockNum uint64, snapshots *storeSnapshots) (out *StoreStorageState, err error) {

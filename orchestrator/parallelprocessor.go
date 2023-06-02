@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/responses"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
@@ -20,7 +21,6 @@ import (
 )
 
 type ParallelProcessor struct {
-	plan             *work.Plan
 	scheduler        *scheduler.Scheduler
 	execOutputReader *execout.LinearReader
 }
@@ -89,8 +89,8 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
-	streamOut := responses.New(respFunc)
-	sched, err := scheduler.New(ctx, streamOut, reqDetails.Modules)
+	stream := responses.New(respFunc)
+	sched, err := scheduler.New(ctx, stream, outputGraph)
 	if err != nil {
 		return nil, err
 	}
@@ -99,35 +99,25 @@ func BuildParallelProcessor(
 	if err != nil {
 		return nil, fmt.Errorf("build work plan: %w", err)
 	}
-
 	sched.Planner = plan
 
-	streamOut.InitialProgressMessages(plan.InitialProgressMessages())
-	if err := plan.SendInitialProgressMessages(respFunc); err != nil {
-		return nil, fmt.Errorf("send initial progress: %w", err)
-	}
+	stream.InitialProgressMessages(plan.InitialProgressMessages())
 
-	//scheduler := NewScheduler(plan, respFunc, reqDetails.Modules)
-	//if err != nil {
-	//	return nil, err
-	//}
+	sched.Stages = stage.NewStages(outputGraph, plan.ModulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum)
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
 	squasher, err := squasher.NewMulti(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum)
 	if err != nil {
 		return nil, err
 	}
-
 	sched.Squasher = squasher
 
 	//scheduler.OnStoreJobTerminated = squasher.Squash
 
-	workerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
-
+	workerPool := work.NewWorkerPool(ctx, int(runtimeConfig.ParallelSubrequests), runtimeConfig.WorkerFactory)
 	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{
-		plan:             plan,
 		scheduler:        sched,
 		execOutputReader: execOutputReader,
 	}, nil
@@ -143,11 +133,7 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	storeMap := b.scheduler.FinalStoreMap()
-	//storeMap, err = b.squasher.Wait(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	storeMap = b.scheduler.FinalStoreMap()
 
 	if b.execOutputReader != nil {
 		select {

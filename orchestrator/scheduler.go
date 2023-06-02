@@ -84,7 +84,7 @@ func jobsSummary(jobs map[string]*work.Job) (out []string) {
 }
 
 func (s *Scheduler) run(ctx context.Context, wg *sync.WaitGroup, result chan jobResult, pool work.WorkerPool) (finished bool) {
-	worker := pool.Borrow(ctx)
+	worker := pool.Borrow()
 	if worker == nil {
 		return true
 	}

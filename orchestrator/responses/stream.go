@@ -15,6 +15,6 @@ func New(respFunc substreams.ResponseFunc) *Stream {
 	}
 }
 
-func (s *Stream) InitialProgressMessage(in []*pbsubstreamsrpc.ModuleProgress) {
+func (s *Stream) InitialProgressMessages(in []*pbsubstreamsrpc.ModuleProgress) {
 	s.respFunc(substreams.NewModulesProgressResponse(in))
 }

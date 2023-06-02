@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -15,8 +18,6 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 type in struct {
@@ -90,7 +91,7 @@ func TestScheduler_runOne(t *testing.T) {
 	tests := []struct {
 		name             string
 		plan             *work.Plan
-		parallelism      uint64
+		parallelism      int
 		expectMoreJobs   bool
 		expectPoolLength int
 	}{
@@ -125,7 +126,7 @@ func TestScheduler_runOne(t *testing.T) {
 	}
 }
 
-func testNoopRunnerPool(parallelism uint64) work.WorkerPool {
+func testNoopRunnerPool(parallelism int) work.WorkerPool {
 	ctx := context.Background()
 	runnerPool := work.NewWorkerPool(ctx, parallelism,
 		func(logger *zap.Logger) work.Worker {

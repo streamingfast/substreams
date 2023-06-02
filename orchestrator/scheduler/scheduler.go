@@ -3,12 +3,12 @@ package scheduler
 import (
 	"context"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/responses"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -16,119 +16,132 @@ type Scheduler struct {
 	ctx context.Context
 	loop.EventLoop
 
-	stream                 *responses.Stream
-	upstreamRequestModules *pbsubstreams.Modules
+	stream      *responses.Stream
+	outputGraph *outputmodules.Graph
 
 	Planner    *work.Plan
 	Squasher   *squasher.Multi
-	WorkerPool work.WorkerPool
+	WorkerPool *work.WorkerPool
 
 	// Status:
 	JobStatus    []*work.Job
 	WorkerStatus map[string]string
 
-	stagedModules StagedModules
-
-	// Output
-	outputStoreMap store.Map
+	Stages stage.Stages
 }
 
-func New(ctx context.Context, stream *responses.Stream, upstreamRequestModules *pbsubstreams.Modules) *Scheduler {
+func New(ctx context.Context, stream *responses.Stream, outputGraph *outputmodules.Graph) *Scheduler {
 	s := &Scheduler{
-		ctx:                    ctx,
-		stream:                 stream,
-		upstreamRequestModules: upstreamRequestModules,
+		ctx:         ctx,
+		stream:      stream,
+		outputGraph: outputGraph, // upstreamRequestModules is replaced by outputGraph.UsedModules(), UNLESS the consumer wanted ALL the Requested modules.. even those who are not necessary to satisfy this request (that would be.. waste)
 	}
-	s.EventLoop = loop.NewEventLoop(ctx, s.Update)
+	s.EventLoop = loop.NewEventLoop(s.Update)
+	s.init()
 	return s
+}
+
+func (s *Scheduler) init() {
+	// create the `stagedModules` based on the `Modules`
+	// and the desired output module.
+	// Launch the command to fetch the first state on disk
+	//   and a Message saying we have all the storage snapshots
+	//   ready.
+	// Initialize the store.Map
+	// Kickstart the Jobs processing
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
-	case JobStartedMsg:
-	case JobFailedMsg:
-		s.updateJobFailed(msg)
-		return ScheduleNextJobMsg()
-	case JobSucceededMsg:
-		s.jobs[msg.JobID].Finished = true
-		s.stages[msg.Stage].segments[msg.Segment].Completed = true
-		return s.checkFullStoresPresence(stage, segment)
-	case JobFinishedMsg:
-		return loop.Batch(
-			s.mergePartial(msg.Range),
-			ScheduleNextJob(),
-		)
+	// INTERACTIONS WITH JOB PROCESSING
+	// INTERACTIONS WITH THE WORKER POOL (Borrow, Return)
+	// DYNAMIC BUILDING OF THE PLAN
+	// CALCULATION OF THE NUMBER OF STAGES
+	// COMPUTATION OF NEXT JOB (and its stage, and promoteWaitingJob, ..etc
 
-	case StoragePartialFoundMsg:
+	// Split packages?
+	// `runner` with a Job, and the `runJob` stuff
+	// `plan` package, with the Planner stuff
+	// `worker` with the Worker, and its Pool
+	// `storage` with commands and functions that reach out for different storage states?
+	// `squasher`, already there
+
+	case work.MsgJobStarted:
+	case work.MsgJobFailed:
+		// TODO: When job fails, do we not quit??
+		//  The retry loop is within the job execution, so we wouldn't redo it here
+		s.JobStatus.MarkFailed(msg)
+		return work.CmdScheduleNextJob()
+	case work.MsgJobSucceeded:
+		s.JobStatus.MarkFinished(msg.JobID)
+		s.Stages.MarkSegmentCompleted(msg.Stage, msg.Segment)
+		return s.checkFullStoresPresence(stage, segment)
+		// or:
+		//return loop.Batch(
+		//	s.mergePartial(msg.Range),
+		//	ScheduleNextJob(),
+		//)
+
+	case MsgStoragePartialFound:
 		s.killPotentiallyRunningJob(msg.JobID)
 		s.mergePartial(msg.Range)
-		return ScheduleNextJob()
+		return work.CmdScheduleNextJob()
 
-	case MergeStartedMsg:
-	case MergeFinishedMsg:
-	case MergeFailedMsg:
+	case work.MsgWorkerFreed:
+		s.WorkerPool.Return(msg.Worker)
+		return work.CmdScheduleNextJob()
 
-	case WorkerAvailableMsg:
-		s.workers.AppendWaiting(msg.worker)
-		return ScheduleNextJobMsg()
-
-	case ScheduleNextJobMsg:
+	case work.MsgScheduleNextJob:
 		job := s.Planner.NextJob()
 		if job == nil {
 			return nil
 		}
-		if len(s.WorkerPool.PendingCount()) == 0 {
+		if !s.WorkerPool.WorkerAvailable() {
 			return nil
 		}
-		worker := s.workers.Borrow()
-		return s.runJob(worker, msg.job)
+		worker := s.WorkerPool.Borrow()
+		return loop.Batch(
+			s.runJob(worker, msg.job),
+			work.CmdScheduleNextJob(),
+		)
 
 	case FullStoresPresent:
-		stage := s.stages[msg.Stage]
+		stage := s.Stages[msg.Stage]
 		sq := s.Squasher[msg.Stage]
 
 		if len(msg.Stores) != len(stage.Stores) {
 			return nil
 		}
 
-		sq.addFullStoresPresent(msg.Segment, msg.Stores)
-
 		return loop.Batch(
 			s.killPotentiallyRunningJob(msg.Stage, msg.Segment),
-			s.mergeStage(msg.Stage),
+			loop.Sequence(
+				s.Squasher.AddPartials(msg.StoreName, msg.Files...),
+				s.mergeStage(msg.Stage),
+			),
 		)
-	case MergeStage:
-		sq := s.squashers[msg.Stage]
-		for _, storeSquasher := range sq.Stores {
-			if mergeRange := storeSquasher.NextRangeToMerge(); mergeRange != nil {
-				cmds = append(cmds, storeSquasher.MergeRange(mergeRange))
-			}
+
+	case squasher.MsgMergeStarted:
+	case squasher.MsgMergeFinished:
+	case squasher.MsgMergeFailed:
+
+	case squasher.MsgMergeStage:
+		for _, mod := range s.outputGraph.StagedUsedModules()[msg.Stage] {
+			cmds = append(cmds, s.Squasher.MergeNextRange(mod.Name)) //Modules[mod.Name].MergeNextRange())
 		}
+		//sq := s.squashers[msg.Stage]
+		//for _, storeSquasher := range sq.Stores {
+		//	if mergeRange := storeSquasher.NextRangeToMerge(); mergeRange != nil {
+		//		cmds = append(cmds, storeSquasher.MergeRange(mergeRange))
+		//	}
+		//}
 	}
 
 	return loop.Batch(cmds...)
 }
 
-func (s *storeSquasher) NextRangeToMerge() *block.Range {
-	if s.Status != Waiting {
-		return nil
-	}
-	// TODO: compute whether the store Squasher has some things that are
-	// ready and contiguous, in which case we return
-	// the Range.
-}
-
-func (s *storeSquasher) MergeRange(r *block.Range) loop.Cmd {
-	return loop.Sequence(
-		MergeStartedMsg(),
-		func() loop.Msg {
-
-		},
-	)
-}
-
 func (s *Scheduler) FinalStoreMap() store.Map {
-	return s.outputStoreMap
+	return s.Squasher.FinalStoreMap()
 }

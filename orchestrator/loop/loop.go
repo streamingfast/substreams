@@ -11,15 +11,15 @@ type EventLoop struct {
 	updateFunc func(msg Msg) Cmd
 }
 
-func NewEventLoop(ctx context.Context, updateFunc func(msg Msg) Cmd) EventLoop {
+func NewEventLoop(updateFunc func(msg Msg) Cmd) EventLoop {
 	return EventLoop{
-		ctx:        ctx,
 		msgs:       make(chan Msg, 1000),
 		updateFunc: updateFunc,
 	}
 }
 
-func (l *EventLoop) Run() (err error) {
+func (l *EventLoop) Run(ctx context.Context) (err error) {
+	l.ctx = ctx
 	cmds := make(chan Cmd, 1000)
 	// main execution loop
 	done := l.handleCommands(cmds)

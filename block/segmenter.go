@@ -5,25 +5,22 @@ package block
 // Range for the segment. We can obtain info on the Segment too (if it's Partial, Complete, etc..)
 
 type Segmenter struct {
-	moduleName string
-
-	interval               uint64
-	moduleTreeInitBlock    uint64
-	currentModuleInitBlock uint64
-	linearHandoffBlock     uint64
+	interval           uint64
+	graphInitBlock     uint64 // Lowest module init block across the requested module graph.
+	moduleInitBlock    uint64
+	linearHandoffBlock uint64
 
 	countFromBegin      int
 	countFromModuleInit int
 	firstModuleSegment  int
 }
 
-func NewSegmenter(interval uint64, moduleTreeInitBlock uint64, moduleName string, moduleInitBlock uint64, linearHandoffBlock uint64) *Segmenter {
+func NewSegmenter(interval uint64, moduleTreeInitBlock uint64, moduleInitBlock uint64, linearHandoffBlock uint64) *Segmenter {
 	s := &Segmenter{
-		interval:               interval,
-		moduleTreeInitBlock:    moduleTreeInitBlock,
-		moduleName:             moduleName,
-		currentModuleInitBlock: moduleInitBlock,
-		linearHandoffBlock:     linearHandoffBlock,
+		interval:           interval,
+		graphInitBlock:     moduleTreeInitBlock,
+		moduleInitBlock:    moduleInitBlock,
+		linearHandoffBlock: linearHandoffBlock,
 	}
 	s.countFromBegin = s.computeCountFromBegin()
 	s.countFromModuleInit = s.computeCountFromModuleInit()
@@ -36,19 +33,19 @@ func (s *Segmenter) CountFromModuleInit() int { return s.countFromModuleInit }
 func (s *Segmenter) FirstModuleSegment() int  { return s.firstModuleSegment }
 
 func (s *Segmenter) computeCountFromBegin() int {
-	treeInitSegment := s.moduleTreeInitBlock / s.interval
+	graphInitSegment := s.graphInitBlock / s.interval
 	handoffSegment := s.linearHandoffBlock / s.interval
-	return int(handoffSegment - treeInitSegment + 1)
+	return int(handoffSegment - graphInitSegment + 1)
 }
 
 func (s *Segmenter) computeFirstModuleSegment() int {
-	treeInitSegment := s.moduleTreeInitBlock / s.interval
-	modInitSegment := s.currentModuleInitBlock / s.interval
-	return int(modInitSegment - treeInitSegment)
+	graphInitSegment := s.graphInitBlock / s.interval
+	modInitSegment := s.moduleInitBlock / s.interval
+	return int(modInitSegment - graphInitSegment)
 }
 
 func (s *Segmenter) computeCountFromModuleInit() int {
-	modInitSegment := s.currentModuleInitBlock / s.interval
+	modInitSegment := s.moduleInitBlock / s.interval
 	handoffSegment := s.linearHandoffBlock / s.interval
 	return int(handoffSegment - modInitSegment + 1)
 }
@@ -57,15 +54,19 @@ func (s *Segmenter) Range(idx int) *Range {
 	// TODO: handle here the boundary checks, and we want a version with Range()
 	// and AlignedRange() which aligns on either one or both sides
 	// LowerAlignedRange(), UpperAlignedRange()
+
+	// PORT from boundedrange.go
 	return nil
 }
 func (s *Segmenter) Index(r *Range) int {
 	// TODO: implement
+
+	// PORT from boundedrange.go
 	return 0
 }
 func (s *Segmenter) IndexWithBlock(blockNum uint64) int {
 	blockSegment := blockNum / s.interval
-	treeInitSegment := s.moduleTreeInitBlock / s.interval
+	treeInitSegment := s.graphInitBlock / s.interval
 	return int(blockSegment - treeInitSegment)
 }
 func (s *Segmenter) IsPartial(segmentIndex int) bool {

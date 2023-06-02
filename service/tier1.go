@@ -201,7 +201,8 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 		strings.Join(request.DebugInitialStoreSnapshotForModules, ","),
 	)
 
-	if err := s.errorFromRecordedFailure(requestID); err != nil {
+	//	s.resolveCursor
+	if err := s.errorFromRecordedFailure(requestID, request.ProductionMode, request.StartBlockNum, request.StartCursor); err != nil {
 		logger.Debug("failing fast on known failing request", zap.String("request_id", requestID))
 		return err
 	}

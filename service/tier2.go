@@ -3,14 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
-	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
-	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -25,8 +25,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -41,9 +41,15 @@ type Tier2Service struct {
 }
 
 func NewTier2(
+	logger *zap.Logger,
+	mergedBlocksStore dstore.Store,
+
 	stateStore dstore.Store,
+	stateBundleSize uint64,
+
 	blockType string,
 	opts ...Option,
+
 ) (s *Tier2Service) {
 
 	runtimeConfig := config.NewRuntimeConfig(
@@ -59,10 +65,16 @@ func NewTier2(
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,
 		tracer:        tracing.GetTracer(),
+		logger:        logger,
 	}
 
-	zlog.Info("registering substreams metrics")
-	metrics.MetricSet.Register()
+	sf := &StreamFactory{
+		mergedBlocksStore: mergedBlocksStore,
+	}
+
+	s.streamFactoryFunc = sf.New
+
+	metrics.RegisterMetricSet(logger)
 
 	for _, opt := range opts {
 		opt(s)
@@ -77,24 +89,6 @@ func (s *Tier2Service) BaseStateStore() dstore.Store {
 
 func (s *Tier2Service) BlockType() string {
 	return s.blockType
-}
-
-func (s *Tier2Service) Register(
-	server dgrpcserver.Server,
-	mergedBlocksStore dstore.Store,
-	_ dstore.Store,
-	_ *hub.ForkableHub,
-	logger *zap.Logger) {
-
-	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-	}
-
-	s.streamFactoryFunc = sf.New
-	s.logger = logger
-	server.RegisterService(func(gs grpc.ServiceRegistrar) {
-		pbssinternal.RegisterSubstreamsServer(gs, s)
-	})
 }
 
 func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) (grpcError error) {
@@ -283,4 +277,20 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		sendMetering(ctx, logger, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
+}
+
+func updateStreamHeadersHostname(setHeader func(metadata.MD) error, logger *zap.Logger) string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
+		hostname = "unknown host"
+	}
+	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
+		md := metadata.New(map[string]string{"host": hostname})
+		err = setHeader(md)
+		if err != nil {
+			logger.Warn("cannot send header metadata", zap.Error(err))
+		}
+	}
+	return hostname
 }

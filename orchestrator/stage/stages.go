@@ -3,7 +3,6 @@ package stage
 import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
-	"github.com/streamingfast/substreams/storage"
 )
 
 type Stages struct {
@@ -17,15 +16,15 @@ type Stages struct {
 
 func NewStages(
 	outputGraph *outputmodules.Graph,
-	storageMap storage.ModuleStorageStateMap,
 	interval uint64,
 	upToBlock uint64,
 ) (out *Stages) {
 	lowestGraphInitBlock := outputGraph.LowestInitBlock()
 	allStages := outputGraph.StagedUsedModules()
 	lastIndex := len(allStages) - 1
+	seg := block.NewSegmenter(interval, lowestGraphInitBlock, upToBlock)
 	out = &Stages{
-		Segmenter: block.NewSegmenter(interval, lowestGraphInitBlock, lowestGraphInitBlock, upToBlock),
+		Segmenter: seg,
 	}
 	for idx, stage := range allStages {
 		isLastStage := idx == lastIndex
@@ -38,32 +37,38 @@ func NewStages(
 		}
 		lowestStageInitBlock := stage[0].InitialBlock
 		for _, mod := range stage {
-			//store := storageMap[mod.Name]
 			stageState.modules = append(stageState.modules, &ModuleState{
-				name:      mod.Name,
-				Segmenter: block.NewSegmenter(interval, lowestGraphInitBlock, mod.InitialBlock, upToBlock),
+				name: mod.Name,
 			})
 			if lowestStageInitBlock > mod.InitialBlock {
 				lowestStageInitBlock = mod.InitialBlock
 			}
 		}
 
-		stageState.Segmenter = block.NewSegmenter(interval, lowestGraphInitBlock, lowestStageInitBlock, upToBlock)
+		stageState.firstSegment = seg.IndexForBlock(lowestStageInitBlock)
 
 		out.stages = append(out.stages, stageState)
 	}
 	return out
 }
 
-// Algorithm for planning the Next Jobs:
-// We need to start from the last stage, first segment.
-
 func (s *Stages) NextJob() *SegmentID {
+	// TODO: before calling NextJob, keep a small reserve (10% ?) of workers
+	//  so that when a job finishes, it can start immediately a potentially
+	//  higher priority one (we'll go do all those first-level jobs
+	//  but we want to keep the diagonal balanced).
+	// TODO: Another option is to have an algorithm that doesn't return a job
+	//  right away when there are too much jobs scheduled before others
+	//  in a given stage.
+
 	// FIXME: eventually, we can start from s.completedSegments, and push `completedSegments`
 	// each time contiguous segments are completed for all stages.
 	segmentIdx := 0
 	for {
-		if segmentIdx > s.CountFromBegin() {
+		if len(s.state) <= segmentIdx {
+			s.growSegments()
+		}
+		if segmentIdx >= s.Count() {
 			break
 		}
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
@@ -71,14 +76,7 @@ func (s *Stages) NextJob() *SegmentID {
 			if segmentState != SegmentPending {
 				continue
 			}
-			if s.stages[stageIdx].FirstModuleSegment() > segmentIdx {
-				// TODO: FirstModuleSegment() takes this functionality out of the Segmenter
-				// the Segmenter will only consider things from the graphInitBlock
-				// and this stage's lowest module init block will be set as a
-				// property of the `Stage` struct, and this condition will use that
-				// variable.
-				// We'll query the Segmenter for `IndexForBlock(module.InitialBlock)` and use that as the "FirstModuleSegment"
-
+			if segmentIdx < s.stages[stageIdx].firstSegment {
 				// Don't process stages where all modules's initial blocks are only later
 				continue
 			}
@@ -93,20 +91,23 @@ func (s *Stages) NextJob() *SegmentID {
 				Range:   s.Range(segmentIdx),
 			}
 		}
-		if len(s.state) <= segmentIdx {
-			s.growSegments(32)
-		}
 		segmentIdx++
 	}
-
 	return nil
 }
 
-func (s *Stages) MarkJobCompleted(segment SegmentID) {
-	s.state[segment.Segment][segment.Stage] = SegmentCompleted
+func (s *Stages) MarkJobCompleted(segment int, stage int) {
+	if s.state[segment][stage] != SegmentScheduled {
+		panic("cannot mark job completed if it was not scheduled")
+	}
+	s.state[segment][stage] = SegmentCompleted
 }
 
-func (s *Stages) growSegments(by int) {
+func (s *Stages) growSegments() {
+	by := len(s.state)
+	if by == 0 {
+		by = 2
+	}
 	for i := 0; i < by; i++ {
 		s.state = append(s.state, make([]SegmentState, len(s.stages)))
 	}
@@ -116,7 +117,10 @@ func (s *Stages) dependenciesCompleted(segmentIdx int, stageIdx int) bool {
 	if segmentIdx == 0 {
 		return true
 	}
-	for i := stageIdx; i >= 0; i-- {
+	if stageIdx == 0 {
+		return true
+	}
+	for i := stageIdx - 1; i >= 0; i-- {
 		if s.state[segmentIdx-1][i] != SegmentCompleted {
 			return false
 		}

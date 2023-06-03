@@ -103,7 +103,7 @@ func BuildParallelProcessor(
 
 	stream.InitialProgressMessages(plan.InitialProgressMessages())
 
-	sched.Stages = stage.NewStages(outputGraph, plan.ModulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum)
+	sched.Stages = stage.NewStages(outputGraph, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum)
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
 	squasher, err := squasher.NewMulti(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum)

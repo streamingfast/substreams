@@ -1,12 +1,7 @@
 package stage
 
-import (
-	"github.com/streamingfast/substreams/block"
-)
-
 type ModuleState struct {
 	name string
-	*block.Segmenter
 
 	completedSegments int
 	scheduledSegments map[int]bool

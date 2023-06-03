@@ -51,15 +51,15 @@ func TestSegmenter_IndexWithBlock(t *testing.T) {
 		interval:     10,
 		initialBlock: 121,
 	}
-	assert.Panics(t, func() { s.IndexWithBlock(119) })
-	assert.Panics(t, func() { s.IndexWithBlock(120) })
-	assert.Equal(t, 0, s.IndexWithBlock(121))
-	assert.Equal(t, 0, s.IndexWithBlock(122))
-	assert.Equal(t, 0, s.IndexWithBlock(129))
-	assert.Equal(t, 1, s.IndexWithBlock(130))
-	assert.Equal(t, 1, s.IndexWithBlock(131))
-	assert.Equal(t, 1, s.IndexWithBlock(139))
-	assert.Equal(t, 2, s.IndexWithBlock(140))
+	assert.Panics(t, func() { s.IndexForBlock(119) })
+	assert.Panics(t, func() { s.IndexForBlock(120) })
+	assert.Equal(t, 0, s.IndexForBlock(121))
+	assert.Equal(t, 0, s.IndexForBlock(122))
+	assert.Equal(t, 0, s.IndexForBlock(129))
+	assert.Equal(t, 1, s.IndexForBlock(130))
+	assert.Equal(t, 1, s.IndexForBlock(131))
+	assert.Equal(t, 1, s.IndexForBlock(139))
+	assert.Equal(t, 2, s.IndexForBlock(140))
 }
 
 func TestSegmenter_firstRange(t *testing.T) {

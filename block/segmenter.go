@@ -46,17 +46,27 @@ func (s *Segmenter) firstRange() *Range {
 }
 
 func (s *Segmenter) rangeFromBegin(idx int) *Range {
+	if idx >= s.count {
+		panic("segment index out of range")
+	}
 	baseBlock := s.initialBlock - s.initialBlock%s.interval
 	baseBlock += uint64(idx) * s.interval
-	return NewRange(baseBlock, utils.MinOf(baseBlock+s.interval, s.linearHandoffBlock))
+	upperBound := baseBlock + s.interval
+	return NewRange(baseBlock, utils.MinOf(upperBound, s.linearHandoffBlock))
 }
 
-func (s *Segmenter) IndexWithBlock(blockNum uint64) int {
+func (s *Segmenter) IndexForBlock(blockNum uint64) int {
+	if blockNum > s.linearHandoffBlock {
+		panic("block number out of range")
+	}
 	blockSegment := blockNum / s.interval
 	initSegment := s.initialBlock / s.interval
 	return int(blockSegment - initSegment)
 }
 
 func (s *Segmenter) IsPartial(segmentIndex int) bool {
+	if segmentIndex >= s.count {
+		panic("segment index out of range")
+	}
 	return s.Range(segmentIndex).ExclusiveEndBlock%s.interval != 0
 }

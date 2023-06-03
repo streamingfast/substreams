@@ -1,14 +1,13 @@
 package stage
 
 import (
-	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Stage struct {
-	*block.Segmenter
-
 	kind Kind
+
+	firstSegment int
 
 	modules []*ModuleState
 }

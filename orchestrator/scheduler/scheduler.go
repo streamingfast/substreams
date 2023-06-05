@@ -56,17 +56,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	switch msg := msg.(type) {
 	// INTERACTIONS WITH JOB PROCESSING
-	// INTERACTIONS WITH THE WORKER POOL (Borrow, Return)
-	// DYNAMIC BUILDING OF THE PLAN
-	// CALCULATION OF THE NUMBER OF STAGES
-	// COMPUTATION OF NEXT JOB (and its stage, and promoteWaitingJob, ..etc
-
-	// Split packages?
-	// `runner` with a Job, and the `runJob` stuff
-	// `plan` package, with the Planner stuff
-	// `worker` with the Worker, and its Pool
-	// `storage` with commands and functions that reach out for different storage states?
-	// `squasher`, already there
 
 	case work.MsgJobStarted:
 	case work.MsgJobFailed:

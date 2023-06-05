@@ -84,7 +84,7 @@ func (s *Stages) NextJob() *SegmentID {
 				continue
 			}
 
-			s.state[segmentIdx][stageIdx] = SegmentScheduled
+			s.markSegmentScheduled(segmentIdx, stageIdx)
 			return &SegmentID{
 				Stage:   stageIdx,
 				Segment: segmentIdx,
@@ -94,13 +94,6 @@ func (s *Stages) NextJob() *SegmentID {
 		segmentIdx++
 	}
 	return nil
-}
-
-func (s *Stages) MarkJobCompleted(segment int, stage int) {
-	if s.state[segment][stage] != SegmentScheduled {
-		panic("cannot mark job completed if it was not scheduled")
-	}
-	s.state[segment][stage] = SegmentCompleted
 }
 
 func (s *Stages) growSegments() {

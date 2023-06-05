@@ -55,28 +55,24 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
-	// INTERACTIONS WITH JOB PROCESSING
-
 	case work.MsgJobStarted:
 	case work.MsgJobFailed:
-		// TODO: When job fails, do we not quit??
-		//  The retry loop is within the job execution, so we wouldn't redo it here
-		s.JobStatus.MarkFailed(msg)
-		return work.CmdScheduleNextJob()
+		cmds = append(cmds, loop.Quit(msg.Error))
+
 	case work.MsgJobSucceeded:
 		s.JobStatus.MarkFinished(msg.JobID)
-		s.Stages.MarkSegmentCompleted(msg.Stage, msg.Segment)
-		return s.checkFullStoresPresence(stage, segment)
-		// or:
-		//return loop.Batch(
-		//	s.mergePartial(msg.Range),
-		//	ScheduleNextJob(),
-		//)
+		s.Stages.MarkSegmentPartialPresent(msg.Stage, msg.Segment)
+		cmds = append(cmds,
+			s.continueMergingWork(),
+			work.CmdScheduleNextJob(),
+		)
 
 	case MsgStoragePartialFound:
-		s.killPotentiallyRunningJob(msg.JobID)
-		s.mergePartial(msg.Range)
-		return work.CmdScheduleNextJob()
+		cmds = append(cmds, s.continueMergingWork())
+		job := s.killPotentiallyRunningJob(msg.JobID)
+		if job != nil {
+			cmds = append(cmds, work.CmdScheduleNextJob())
+		}
 
 	case work.MsgWorkerFreed:
 		s.WorkerPool.Return(msg.Worker)
@@ -129,6 +125,15 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	}
 
 	return loop.Batch(cmds...)
+}
+
+func (s *Scheduler) continueMergingWork() loop.Cmd {
+	// Check with the Squasher where we're at
+	// Check the Squasher's merging state for this Stage
+	// Check where it is at for each Stage, what's the next Segment
+	// Check with the `Stages` if that segment is in PartialPresent
+	// If so, start the merging operation
+	// Change the stages.MarkSegmentMerging(segment, stage)
 }
 
 func (s *Scheduler) FinalStoreMap() store.Map {

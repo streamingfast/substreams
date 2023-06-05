@@ -7,22 +7,25 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/bstream"
+	"go.uber.org/zap"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
-	"go.uber.org/zap"
 )
 
-// TODO(abourget): this is now something like an execout.LifecycleWriter ?
+// Engine manages the reversible segments and keeps track of
+// the execution output between each module's.
 //
-//	pipeline.Lifecycle ? to hold also the *pbsubstreams.ModuleOutput
-//	so that `ForkHandler` disappears in the end?
+// Upon Finality, it writes it to some output cache files.
 type Engine struct {
+	// FIXME: Rename to pipeline.Lifecycle ? to hold also the *pbsubstreams.ModuleOutput
+	//  so that `ForkHandler` disappears in the end?
 	ctx               context.Context
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
 	writableFiles     *execout.Writer            // moduleName => irreversible File
-	runtimeConfig     config.RuntimeConfig
+	runtimeConfig     config.RuntimeConfig       // TODO(abourget): Deprecated: remove this as it's not used
 	logger            *zap.Logger
 }
 

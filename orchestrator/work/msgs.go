@@ -8,6 +8,8 @@ type MsgJobFailed struct {
 	JobID   string
 	Stage   int
 	Segment int
+
+	Error error
 }
 
 type MsgJobSucceeded struct {

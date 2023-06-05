@@ -201,6 +201,11 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
+	// TODO(abourget): send `pendingUndoMessage` straight up here
+	if reqDetails.ShouldStreamCachedOutputs() {
+		p.respFunc(p.pendingUndoMessage)
+	}
+
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		p.ctx,
 		reqDetails,
@@ -209,7 +214,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		p.pendingUndoMessage,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

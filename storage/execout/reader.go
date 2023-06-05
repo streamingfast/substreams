@@ -3,9 +3,10 @@ package execout
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/dstore"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/dstore"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
@@ -19,15 +20,18 @@ import (
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
 
+// New LinearReader, to fit with the new Scheduler model
+// should have its state of which segment has been sent over
+// be polling for the next segment
+
 type LinearReader struct {
 	*shutter.Shutter
-	requestStartBlock  uint64
-	exclusiveEndBlock  uint64
-	responseFunc       substreams.ResponseFunc
-	pendingUndoMessage *pbsubstreamsrpc.Response
-	module             *pbsubstreams.Module
-	firstFile          *File
-	cacheItems         chan *pboutput.Item
+	requestStartBlock uint64
+	exclusiveEndBlock uint64
+	responseFunc      substreams.ResponseFunc
+	module            *pbsubstreams.Module
+	firstFile         *File
+	cacheItems        chan *pboutput.Item
 }
 
 func NewLinearReader(
@@ -37,17 +41,15 @@ func NewLinearReader(
 	firstFile *File,
 	responseFunc substreams.ResponseFunc,
 	execOutputSaveInterval uint64,
-	pendingUndoMessage *pbsubstreamsrpc.Response,
 ) *LinearReader {
 	return &LinearReader{
-		Shutter:            shutter.New(),
-		requestStartBlock:  startBlock,
-		exclusiveEndBlock:  exclusiveEndBlock,
-		module:             module,
-		firstFile:          firstFile,
-		responseFunc:       responseFunc,
-		pendingUndoMessage: pendingUndoMessage,
-		cacheItems:         make(chan *pboutput.Item, execOutputSaveInterval*2),
+		Shutter:           shutter.New(),
+		requestStartBlock: startBlock,
+		exclusiveEndBlock: exclusiveEndBlock,
+		module:            module,
+		firstFile:         firstFile,
+		responseFunc:      responseFunc,
+		cacheItems:        make(chan *pboutput.Item, execOutputSaveInterval*2),
 	}
 }
 
@@ -85,13 +87,6 @@ func (r *LinearReader) run(ctx context.Context) error {
 			}
 			if item.BlockNum < r.requestStartBlock {
 				continue
-			}
-
-			if r.pendingUndoMessage != nil {
-				if err := r.responseFunc(r.pendingUndoMessage); err != nil {
-					return fmt.Errorf("sending undo message: %w", err)
-				}
-				r.pendingUndoMessage = nil
 			}
 
 			blockScopedData, err := toBlockScopedData(r.module, item)

@@ -4,9 +4,10 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
+	"google.golang.org/protobuf/proto"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/wasm"
-	"google.golang.org/protobuf/proto"
 )
 
 // Buffer holds the values produced by modules and exchanged between them
@@ -14,7 +15,7 @@ import (
 type Buffer struct {
 	values map[string][]byte
 	clock  *pbsubstreams.Clock
-} // TODO(abourget): rename to `Buffer`
+}
 
 func NewBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
 	blkBytes, err := block.Payload.Get()

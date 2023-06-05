@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
@@ -34,7 +33,6 @@ func BuildParallelProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
-	pendingUndoMessage *pbsubstreamsrpc.Response,
 ) (*ParallelProcessor, error) {
 	var execOutputReader *execout.LinearReader
 
@@ -53,7 +51,6 @@ func BuildParallelProcessor(
 			requestedModuleCache,
 			respFunc,
 			runtimeConfig.CacheSaveInterval,
-			pendingUndoMessage,
 		)
 	}
 
@@ -102,6 +99,19 @@ func BuildParallelProcessor(
 	sched.Planner = plan
 
 	stream.InitialProgressMessages(plan.InitialProgressMessages())
+
+	// TODO(abourget): take all of the ExecOut files that exist
+	//  and use that to PUSH back what the Stages need to do.
+	//  So the first Segment to process will not necessarily be
+	//  segment == 0.  We'll need the segment JUST prior to be
+	//  processed though, because we need to continue working on
+	//  the future segments.  This interplays with the segment
+	//  just before.
+	//  -
+	//  If we can stream out the ExecOut directly, we don't need
+	//  to schedule work to process them at all.
+	//  -
+	//  This is unsolved
 
 	sched.Stages = stage.NewStages(outputGraph, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum)
 

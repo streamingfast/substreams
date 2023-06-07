@@ -17,9 +17,10 @@ import (
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
 )
 
 // A File in `execout` stores, for a given module (with a given hash), the outputs of module execution

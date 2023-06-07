@@ -33,6 +33,9 @@ func (s *Segmenter) computeCount() int {
 }
 
 func (s *Segmenter) Range(idx int) *Range {
+	if idx < 0 {
+		return nil
+	}
 	if idx == 0 {
 		return s.firstRange()
 	}
@@ -40,6 +43,9 @@ func (s *Segmenter) Range(idx int) *Range {
 }
 
 func (s *Segmenter) firstRange() *Range {
+	if s.linearHandoffBlock < s.initialBlock {
+		return nil
+	}
 	floorLowerBound := s.initialBlock - s.initialBlock%s.interval
 	upperBound := floorLowerBound + s.interval
 	return NewRange(s.initialBlock, utils.MinOf(upperBound, s.linearHandoffBlock))
@@ -47,7 +53,7 @@ func (s *Segmenter) firstRange() *Range {
 
 func (s *Segmenter) rangeFromBegin(idx int) *Range {
 	if idx >= s.count {
-		panic("segment index out of range")
+		return nil
 	}
 	baseBlock := s.initialBlock - s.initialBlock%s.interval
 	baseBlock += uint64(idx) * s.interval
@@ -56,9 +62,6 @@ func (s *Segmenter) rangeFromBegin(idx int) *Range {
 }
 
 func (s *Segmenter) IndexForBlock(blockNum uint64) int {
-	if blockNum > s.linearHandoffBlock {
-		panic("block number out of range")
-	}
 	blockSegment := blockNum / s.interval
 	initSegment := s.initialBlock / s.interval
 	return int(blockSegment - initSegment)

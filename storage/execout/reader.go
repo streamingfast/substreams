@@ -23,6 +23,18 @@ import (
 // New LinearReader, to fit with the new Scheduler model
 // should have its state of which segment has been sent over
 // be polling for the next segment
+//
+// one method: reader.DownloadNextFile() loop.Cmd
+//  this method will check the next file, poll it until it exists,
+//  then download it and call the `responseFunc` with its contents,
+//  once that's done, it will return a loop.Msg saying:
+//  MsgFileDownloaded{file}
+//  The Scheduler loop will then call `reader.DownloadNextFile()`
+// again. And that's it
+// Once it has downloaded everything, it will return a MsgReaderCompleted
+//  The Scheduler can then check against other bits of state, and make sure
+//  everything has completed (the stores have been sync'd and merged, and all)
+//  before returning its loop.Quit.
 
 type LinearReader struct {
 	*shutter.Shutter

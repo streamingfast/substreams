@@ -51,8 +51,8 @@ func TestSegmenter_IndexWithBlock(t *testing.T) {
 		interval:     10,
 		initialBlock: 121,
 	}
-	assert.Panics(t, func() { s.IndexForBlock(119) })
-	assert.Panics(t, func() { s.IndexForBlock(120) })
+	assert.Equal(t, -1, s.IndexForBlock(119))
+	assert.Equal(t, 0, s.IndexForBlock(120)) // even though the Range() call will yield `nil`
 	assert.Equal(t, 0, s.IndexForBlock(121))
 	assert.Equal(t, 0, s.IndexForBlock(122))
 	assert.Equal(t, 0, s.IndexForBlock(129))
@@ -75,19 +75,33 @@ func TestSegmenter_firstRange(t *testing.T) {
 	assert.Equal(t, NewRange(11, 20), s.firstRange())
 	s = &Segmenter{interval: 10, initialBlock: 11, linearHandoffBlock: 15}
 	assert.Equal(t, NewRange(11, 15), s.firstRange())
+
+	s = &Segmenter{interval: 10, initialBlock: 11, linearHandoffBlock: 10}
+	assert.Nil(t, s.firstRange())
 }
 
 func TestSegmenter_rangeFromBegin(t *testing.T) {
-	s := &Segmenter{interval: 10, initialBlock: 1, linearHandoffBlock: 100}
+	s := NewSegmenter(10, 1, 100)
 	assert.Equal(t, NewRange(0, 10), s.rangeFromBegin(0))
-	s = &Segmenter{interval: 10, initialBlock: 1, linearHandoffBlock: 100}
+	s = NewSegmenter(10, 1, 100)
 	assert.Equal(t, NewRange(10, 20), s.rangeFromBegin(1))
-	s = &Segmenter{interval: 10, initialBlock: 1, linearHandoffBlock: 15}
+	s = NewSegmenter(10, 1, 15)
 	assert.Equal(t, NewRange(10, 15), s.rangeFromBegin(1))
-	s = &Segmenter{interval: 10, initialBlock: 1, linearHandoffBlock: 25}
+	s = NewSegmenter(10, 1, 25)
 	assert.Equal(t, NewRange(20, 25), s.rangeFromBegin(2))
-	s = &Segmenter{interval: 10, initialBlock: 15, linearHandoffBlock: 25}
+	s = NewSegmenter(10, 15, 25)
 	assert.Equal(t, NewRange(20, 25), s.rangeFromBegin(1))
-	s = &Segmenter{interval: 10, initialBlock: 15, linearHandoffBlock: 25}
+	s = NewSegmenter(10, 15, 25)
 	assert.Equal(t, NewRange(10, 20), s.rangeFromBegin(0))
+}
+
+func TestSegmenter_Range(t *testing.T) {
+	s := NewSegmenter(10, 1, 100)
+	assert.Nil(t, s.Range(-1))
+
+	s = NewSegmenter(10, 1, 100)
+	assert.Equal(t, NewRange(1, 10), s.Range(0))
+
+	s = NewSegmenter(10, 1, 15)
+	assert.Equal(t, NewRange(10, 15), s.Range(1))
 }

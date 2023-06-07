@@ -1,76 +1,62 @@
 package block
 
-import "github.com/streamingfast/substreams/utils"
-
 // BoundedRange is used to track corresponding ranges in chunks, respecting
 // the boundaries
 type BoundedRange struct {
-	moduleInitBlock          uint64
-	interval                 uint64
-	requestStartBlock        uint64
-	requestExclusiveEndBlock uint64
-
+	segmenter *Segmenter
+	segment   int
 	*Range
 }
 
 func NewBoundedRange(moduleInitBlock, boundInterval, requestStartBlock, requestExclusiveEndBlock uint64) *BoundedRange {
+	seg := NewSegmenter(boundInterval, moduleInitBlock, requestExclusiveEndBlock)
+	firstSegment := seg.IndexForBlock(requestStartBlock)
 	r := &BoundedRange{
-		moduleInitBlock:          moduleInitBlock,
-		interval:                 boundInterval,
-		requestStartBlock:        requestStartBlock,
-		requestExclusiveEndBlock: requestExclusiveEndBlock,
+		segmenter: seg,
+		segment:   firstSegment,
+		Range:     seg.Range(firstSegment),
 	}
-	r.Range = r.computeInitialBounds()
 	return r
 }
 
 func (r *BoundedRange) NextBoundary() *BoundedRange {
+	// FIXME: no need to clone this when we use a Segmenter everywhere
+	// and the caller manages the Index
 	newBoundedRange := *r
-	newBoundedRange.Range = r.computeNextBounds()
+	newBoundedRange.segment++
+	newBoundedRange.Range = r.segmenter.Range(r.segment)
 	return &newBoundedRange
 }
 
-// Whether both sides of the range are aligned with interval boundaries.
-func (r *BoundedRange) AlignsWithBoundaries() bool {
-	return r.AlignsWithLowerBound() && r.AlignsWithUpperBound()
-}
-
 func (r *BoundedRange) IsPartial() bool {
-	return !r.AlignsWithUpperBound()
+	return r.segmenter.IsPartial(r.segment)
 }
 
-func (r *BoundedRange) AlignsWithUpperBound() bool {
-	return r.Range.ExclusiveEndBlock%r.interval == 0
-}
-
-func (r *BoundedRange) AlignsWithLowerBound() bool {
-	return r.Range.StartBlock%r.interval == 0
-}
-
-func (r *BoundedRange) computeInitialBounds() *Range {
-	if r.requestExclusiveEndBlock < r.moduleInitBlock {
-		return nil
-	}
-
-	floorRequestStartBlock := r.requestStartBlock - r.requestStartBlock%r.interval
-
-	lowerBound := utils.MaxOf(
-		floorRequestStartBlock,
-		r.moduleInitBlock,
-	)
-	upperBound := utils.MinOf(
-		r.requestStartBlock-r.requestStartBlock%r.interval+r.interval,
-		r.requestExclusiveEndBlock,
-	)
-
-	return NewRange(lowerBound, upperBound)
-}
-
-func (r *BoundedRange) computeNextBounds() *Range {
-	lowerBound := r.Range.ExclusiveEndBlock
-	upperBound := utils.MinOf(
-		r.Range.ExclusiveEndBlock+r.interval,
-		r.requestExclusiveEndBlock,
-	)
-	return NewRange(lowerBound, upperBound)
-}
+//
+//func (r *BoundedRange) computeInitialBounds() *Range {
+//	if r.requestExclusiveEndBlock < r.moduleInitBlock {
+//		return nil
+//	}
+//
+//	floorRequestStartBlock := r.requestStartBlock - r.requestStartBlock%r.interval
+//
+//	lowerBound := utils.MaxOf(
+//		floorRequestStartBlock,
+//		r.moduleInitBlock,
+//	)
+//	upperBound := utils.MinOf(
+//		r.requestStartBlock-r.requestStartBlock%r.interval+r.interval,
+//		r.requestExclusiveEndBlock,
+//	)
+//
+//	return NewRange(lowerBound, upperBound)
+//}
+//
+//func (r *BoundedRange) computeNextBounds() *Range {
+//	lowerBound := r.Range.ExclusiveEndBlock
+//	upperBound := utils.MinOf(
+//		r.Range.ExclusiveEndBlock+r.interval,
+//		r.requestExclusiveEndBlock,
+//	)
+//	return NewRange(lowerBound, upperBound)
+//}

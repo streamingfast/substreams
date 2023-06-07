@@ -11,13 +11,6 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
-	"go.opentelemetry.io/otel/attribute"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -28,8 +21,13 @@ import (
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
-	"github.com/streamingfast/substreams/tracking"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel/attribute"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Tier2Service struct {
@@ -126,10 +124,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
 
-	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
-		s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
-	}
-
 	if request.Modules == nil {
 		return status.Error(codes.InvalidArgument, "missing modules in request")
 	}
@@ -146,7 +140,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	}
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
-	respFunc := tier2ResponseHandler(logger, streamSrv)
+	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
 	grpcError = toGRPCError(err)
 
@@ -170,10 +164,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, true)
-
-	// bytesMeter := tracking.NewBytesMeter(ctx)
-	// bytesMeter.Launch(ctx, respFunc)
-	// ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
@@ -282,13 +272,15 @@ func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssin
 	return
 }
 
-func tier2ResponseHandler(logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) func(substreams.ResponseFromAnyTier) error {
+func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
 			return status.Error(codes.Unavailable, err.Error())
 		}
+
+		sendMetering(ctx, logger, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

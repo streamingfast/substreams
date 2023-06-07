@@ -11,7 +11,7 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20230510131449-6b591d74130d
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20230417152409-2ee737f143dd
+	github.com/streamingfast/dgrpc v0.0.0-20230616153353-6bbf5534a79a
 	github.com/streamingfast/dstore v0.1.1-0.20230511202333-4f4ccf11a05f
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
@@ -41,6 +41,7 @@ require (
 	github.com/iancoleman/strcase v0.2.0
 	github.com/ipfs/go-ipfs-api v0.6.0
 	github.com/itchyny/gojq v0.12.12
+	github.com/lithammer/dedent v1.1.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-isatty v0.0.17
 	github.com/mitchellh/go-testing-interface v1.14.1
@@ -50,9 +51,10 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
-	github.com/streamingfast/dauth v0.0.0-20230609021534-e6a5970f5210
+	github.com/streamingfast/dauth v0.0.0-20230616153507-cb13d4ba0ea1
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
+	github.com/streamingfast/dmetering v0.0.0-20230616153558-2b1c710b945f
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230519113358-f3dc5e582d12
@@ -133,7 +135,6 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.26.3 // indirect
-	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect

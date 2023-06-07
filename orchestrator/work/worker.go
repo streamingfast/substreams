@@ -99,6 +99,9 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
 
+	userId, apiKeyId, ip := getAuthDetails(ctx)
+	ctx = metadata.AppendToOutgoingContext(ctx, "user-id", userId, "api-key-id", apiKeyId, "ip", ip)
+
 	w.logger.Info("launching remote worker",
 		zap.Int64("start_block_num", int64(request.StartBlockNum)),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
@@ -171,11 +174,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				}
 
 			case *pbssinternal.ProcessRangeResponse_ProcessedBytes:
-				// commented out while these message are causing issues
-				//bm := tracking.GetBytesMeter(ctx)
-				//bm.AddBytesWritten(int(r.ProcessedBytes.BytesWrittenDelta))
-				//bm.AddBytesRead(int(r.ProcessedBytes.BytesReadDelta))
-				//respFunc(toRPCProcessedBytes(resp.ModuleName, bm.BytesReadDelta(), bm.BytesWrittenDelta(), bm.BytesRead(), bm.BytesWritten(), 0))
+				/// ignore
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow

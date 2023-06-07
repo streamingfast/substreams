@@ -6,6 +6,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -49,14 +50,6 @@ func (sf *StreamFactory) New(
 		}
 	}
 
-	// FIXME: disabled for now
-	//if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
-	//	sf.mergedBlocksStore.SetMeter(bytesMeter)
-	//	if sf.forkedBlocksStore != nil {
-	//		sf.forkedBlocksStore.SetMeter(bytesMeter)
-	//	}
-	//}
-
 	forkedBlocksStore := sf.forkedBlocksStore
 	if clonable, ok := forkedBlocksStore.(dstore.Clonable); ok {
 		var err error
@@ -64,6 +57,9 @@ func (sf *StreamFactory) New(
 		if err != nil {
 			return nil, err
 		}
+		forkedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
+	} else {
+		logger.Debug("forkedBlocksStore cannot be cloned, will not be metered")
 	}
 
 	mergedBlocksStore := sf.mergedBlocksStore
@@ -73,6 +69,9 @@ func (sf *StreamFactory) New(
 		if err != nil {
 			return nil, err
 		}
+		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
+	} else {
+		logger.Debug("mergedBlocksStore cannot be cloned, will not be metered")
 	}
 
 	return stream.New(

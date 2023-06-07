@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/tracking"
 )
 
 const progressMessageInterval = time.Millisecond * 200
@@ -23,7 +22,6 @@ const progressMessageInterval = time.Millisecond * 200
 func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
-	bytesMeter := tracking.GetBytesMeter(ctx)
 
 	for _, stage := range p.moduleExecutors {
 		for _, executor := range stage {
@@ -68,10 +66,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	}
 
 	p.execOutputCache.Close()
-
-	if err := bytesMeter.Send(ctx, p.respFunc); err != nil {
-		return fmt.Errorf("sending bytes meter %w", err)
-	}
 
 	if p.stores.partialsWritten != nil {
 		p.respFunc(&pbssinternal.ProcessRangeResponse{

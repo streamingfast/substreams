@@ -187,7 +187,6 @@ func (s *Scheduler) runSingleJob(ctx context.Context, worker work.Worker, job *w
 	var workResult *work.Result
 
 	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-
 		workResult = worker.Work(ctx, request, s.respFunc)
 		err := workResult.Error
 

@@ -11,21 +11,12 @@ import (
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
-	"github.com/streamingfast/dauth/authenticator"
 	"github.com/streamingfast/dgrpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
-	"go.opentelemetry.io/otel/attribute"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/atomic"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
@@ -39,8 +30,15 @@ import (
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
-	"github.com/streamingfast/substreams/tracking"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel/attribute"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/atomic"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type Tier1Service struct {
@@ -139,10 +137,11 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	ctx := streamSrv.Context()
 
 	logger := reqctx.Logger(ctx).Named("tier1")
-	respFunc := responseHandler(logger, streamSrv)
+	respFunc := tier1ResponseHandler(ctx, logger, streamSrv)
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
+	ctx = dmetering.WithBytesMeter(ctx)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
@@ -151,15 +150,6 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 
 	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
 	span.SetAttributes(attribute.String("hostname", hostname))
-
-	if bytesMeter := tracking.GetBytesMeter(ctx); bytesMeter != nil {
-		// WARN: we shouldn't mutate this object. It's globally shared.
-		// If we need to pass down a custom runtimeConfig (RuntimeConfig
-		// is by definition a global), we should refactor things around
-		// and perhaps clone it.
-		//
-		//s.runtimeConfig.BaseObjectStore.SetMeter(bytesMeter)
-	}
 
 	if request.Modules == nil {
 		return status.Error(codes.InvalidArgument, "missing modules in request")
@@ -176,10 +166,11 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 		zap.String("output_module", request.OutputModule),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
-	auth := authenticator.GetCredentials(ctx)
-	if id := auth.Identification(); id != nil {
-		fields = append(fields, zap.String("user_id", id.UserId))
-	}
+
+	//if id := dauth.GetAuthInfoFromIncomingContext(ctx); id.UserID != "" {
+	//	fields = append(fields, zap.String("user_id", id.UserID))
+	//}
+
 	logger.Info("incoming Substreams Blocks request", fields...)
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
@@ -227,10 +218,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	logger := reqctx.Logger(ctx)
 
 	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, false)
-
-	//bytesMeter := tracking.NewBytesMeter(ctx)
-	//bytesMeter.Launch(ctx, respFunc)
-	//ctx = tracking.WithBytesMeter(ctx, bytesMeter)
 
 	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock)
 	if err != nil {
@@ -371,13 +358,15 @@ func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipelin
 	return
 }
 
-func responseHandler(logger *zap.Logger, streamSrv pbsubstreamsrpc.Stream_BlocksServer) func(substreams.ResponseFromAnyTier) error {
-	return func(anyResp substreams.ResponseFromAnyTier) error {
-		resp := anyResp.(*pbsubstreamsrpc.Response)
+func tier1ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbsubstreamsrpc.Stream_BlocksServer) substreams.ResponseFunc {
+	return func(respAny substreams.ResponseFromAnyTier) error {
+		resp := respAny.(*pbsubstreamsrpc.Response)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
 			return status.Error(codes.Unavailable, err.Error())
 		}
+
+		sendMetering(ctx, logger, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

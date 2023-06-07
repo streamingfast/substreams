@@ -50,7 +50,7 @@ type Pipeline struct {
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 
-	respFunc         func(substreams.ResponseFromAnyTier) error
+	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
 
 	stores         *Stores
@@ -82,7 +82,7 @@ func New(
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
-	respFunc func(substreams.ResponseFromAnyTier) error,
+	respFunc substreams.ResponseFunc,
 	tier string,
 	traceID string,
 	opts ...Option,
@@ -450,7 +450,7 @@ func returnModuleDataOutputs(
 	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
 	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
-	respFunc func(substreams.ResponseFromAnyTier) error,
+	respFunc substreams.ResponseFunc,
 ) error {
 	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:             clock,

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/cli"
@@ -109,18 +110,26 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func markSuccess(endpoint string, begin time.Time) {
+func markSuccess(endpoint string, begin time.Time, counter *failCounter) {
+	counter.Reset()
+
 	status.With(prometheus.Labels{"endpoint": endpoint}).Set(1)
 	requestDurationMs.With(prometheus.Labels{"endpoint": endpoint}).Set(float64(time.Since(begin).Milliseconds()))
 }
 
-func markFailure(endpoint string, begin time.Time) {
+func maybeMarkFailure(endpoint string, begin time.Time, counter *failCounter) {
+	counter.Inc()
+	if counter.Get() < 3 {
+		return
+	}
+
 	status.With(prometheus.Labels{"endpoint": endpoint}).Set(0)
 	requestDurationMs.With(prometheus.Labels{"endpoint": endpoint}).Set(float64(time.Since(begin).Milliseconds()))
 }
 
 func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration) {
 	sleep := time.Duration(0)
+	counter := newFailCounter()
 	for {
 		time.Sleep(sleep)
 		sleep = pollingInterval
@@ -130,7 +139,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
 		if err != nil {
 			zlog.Error("substreams client setup", zap.Error(err))
-			markFailure(endpoint, begin)
+			maybeMarkFailure(endpoint, begin, counter)
 			cancel()
 			continue
 		}
@@ -145,7 +154,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		if err := subReq.Validate(); err != nil {
 			zlog.Error("validate request", zap.Error(err))
-			markFailure(endpoint, begin)
+			maybeMarkFailure(endpoint, begin, counter)
 			connClose()
 			cancel()
 			continue
@@ -154,7 +163,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		cli, err := ssClient.Blocks(ctx, subReq, callOpts...)
 		if err != nil {
 			zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.Error(err))
-			markFailure(endpoint, begin)
+			maybeMarkFailure(endpoint, begin, counter)
 			connClose()
 			cancel()
 			continue
@@ -172,10 +181,10 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 			}
 			if err != nil {
 				if err == io.EOF && gotResp {
-					markSuccess(endpoint, begin)
+					markSuccess(endpoint, begin, counter)
 				} else {
 					zlog.Error("received error from substreams", zap.Error(err))
-					markFailure(endpoint, begin)
+					maybeMarkFailure(endpoint, begin, counter)
 				}
 				break
 			}
@@ -183,6 +192,35 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		connClose()
 		cancel()
-
 	}
+}
+
+type failCounter struct {
+	failCount int
+	mu        sync.Mutex
+}
+
+func newFailCounter() *failCounter {
+	return &failCounter{}
+}
+
+func (f *failCounter) Inc() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.failCount++
+}
+
+func (f *failCounter) Get() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.failCount
+}
+
+func (f *failCounter) Reset() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.failCount = 0
 }

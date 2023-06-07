@@ -74,6 +74,9 @@ func (p *WorkerPool) Borrow() Worker {
 func (p *WorkerPool) Return(worker Worker) {
 	for _, status := range p.workers {
 		if status.Worker == worker {
+			if status.State != WorkerWorking {
+				panic("returned worker was already free")
+			}
 			status.State = WorkerFree
 			return
 		}

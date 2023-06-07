@@ -20,37 +20,22 @@ import (
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
 
-// New LinearReader, to fit with the new Scheduler model
-// should have its state of which segment has been sent over
-// be polling for the next segment
-//
-// one method: reader.DownloadNextFile() loop.Cmd
-//  this method will check the next file, poll it until it exists,
-//  then download it and call the `responseFunc` with its contents,
-//  once that's done, it will return a loop.Msg saying:
-//  MsgFileDownloaded{file}
-//  The Scheduler loop will then call `reader.DownloadNextFile()`
-// again. And that's it
-// Once it has downloaded everything, it will return a MsgReaderCompleted
-//  The Scheduler can then check against other bits of state, and make sure
-//  everything has completed (the stores have been sync'd and merged, and all)
-//  before returning its loop.Quit.
-
 type LinearReader struct {
 	*shutter.Shutter
 	requestStartBlock uint64
 	exclusiveEndBlock uint64
 	responseFunc      substreams.ResponseFunc
 	module            *pbsubstreams.Module
-	firstFile         *File
+	fileWalker        *FileWalker
 	cacheItems        chan *pboutput.Item
 }
 
+// Deprecated: use reader.NewLinearExecOutReader
 func NewLinearReader(
 	startBlock uint64,
 	exclusiveEndBlock uint64,
 	module *pbsubstreams.Module,
-	firstFile *File,
+	fileWalker *FileWalker,
 	responseFunc substreams.ResponseFunc,
 	execOutputSaveInterval uint64,
 ) *LinearReader {
@@ -59,7 +44,7 @@ func NewLinearReader(
 		requestStartBlock: startBlock,
 		exclusiveEndBlock: exclusiveEndBlock,
 		module:            module,
-		firstFile:         firstFile,
+		fileWalker:        fileWalker,
 		responseFunc:      responseFunc,
 		cacheItems:        make(chan *pboutput.Item, execOutputSaveInterval*2),
 	}
@@ -81,7 +66,7 @@ func (r *LinearReader) run(ctx context.Context) error {
 	logger := reqctx.Logger(ctx)
 
 	go func() {
-		if err := r.download(ctx, r.firstFile); err != nil {
+		if err := r.download(ctx, r.fileWalker); err != nil {
 			r.Shutdown(err)
 		}
 		close(r.cacheItems)
@@ -118,9 +103,9 @@ func (r *LinearReader) run(ctx context.Context) error {
 	}
 }
 
-func (r *LinearReader) download(ctx context.Context, file *File) error {
+func (r *LinearReader) download(ctx context.Context, fileWalker *FileWalker) error {
 	for {
-		sortedCachedItems, err := r.downloadFile(ctx, file)
+		sortedCachedItems, err := r.downloadFile(ctx, fileWalker)
 		if err != nil {
 			return fmt.Errorf("getting sorted cache items: %w", err)
 		}
@@ -135,18 +120,17 @@ func (r *LinearReader) download(ctx context.Context, file *File) error {
 			}
 		}
 
-		file = file.NextFile()
-		if file == nil {
+		if fileWalker.IsDone() {
 			return nil
 		}
 	}
 }
 
-func (r *LinearReader) downloadFile(ctx context.Context, file *File) ([]*pboutput.Item, error) {
+func (r *LinearReader) downloadFile(ctx context.Context, fileWalker *FileWalker) ([]*pboutput.Item, error) {
 	logger := reqctx.Logger(ctx)
 	for {
+		file := fileWalker.File()
 		logger.Debug("loading next cache", zap.Object("file", file))
-
 		err := file.Load(ctx)
 		if err != nil && err != dstore.ErrNotFound {
 			return nil, fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err)

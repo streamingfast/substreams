@@ -2,13 +2,18 @@ package scheduler
 
 import (
 	"context"
+	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/responses"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -19,29 +24,37 @@ type Scheduler struct {
 	stream      *responses.Stream
 	outputGraph *outputmodules.Graph
 
-	Planner    *work.Plan
-	Squasher   *squasher.Multi
-	WorkerPool *work.WorkerPool
+	Planner       *work.Plan
+	Squasher      *squasher.Multi
+	WorkerPool    *work.WorkerPool
+	ExecOutWalker *execout.Walker
 
 	// Status:
 	JobStatus    []*work.Job
 	WorkerStatus map[string]string
 
-	Stages stage.Stages
+	Stages *stage.Stages
+
+	logger *zap.Logger
+
+	// Final state:
+	outputStreamCompleted bool
+	storesSyncCompleted   bool
 }
 
 func New(ctx context.Context, stream *responses.Stream, outputGraph *outputmodules.Graph) *Scheduler {
+	logger := reqctx.Logger(ctx)
 	s := &Scheduler{
 		ctx:         ctx,
 		stream:      stream,
 		outputGraph: outputGraph, // upstreamRequestModules is replaced by outputGraph.UsedModules(), UNLESS the consumer wanted ALL the Requested modules.. even those who are not necessary to satisfy this request (that would be.. waste)
+		logger:      logger,
 	}
 	s.EventLoop = loop.NewEventLoop(s.Update)
-	s.init()
 	return s
 }
 
-func (s *Scheduler) init() {
+func (s *Scheduler) Init() {
 	// create the `stagedModules` based on the `Modules`
 	// and the desired output module.
 	// Launch the command to fetch the first state on disk
@@ -49,6 +62,9 @@ func (s *Scheduler) init() {
 	//   ready.
 	// Initialize the store.Map
 	// Kickstart the Jobs processing
+	if s.ExecOutWalker != nil {
+		s.Send(execout.MsgStartDownload{})
+	}
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
@@ -110,18 +126,35 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case squasher.MsgMergeStarted:
 	case squasher.MsgMergeFinished:
+		if allStoresAreCompletedUpToTargetBlock() {
+			s.storesSyncCompleted = true
+			return s.cmdShutdownWhenComplete()
+		}
+
 	case squasher.MsgMergeFailed:
 
 	case squasher.MsgMergeStage:
 		for _, mod := range s.outputGraph.StagedUsedModules()[msg.Stage] {
 			cmds = append(cmds, s.Squasher.MergeNextRange(mod.Name)) //Modules[mod.Name].MergeNextRange())
 		}
-		//sq := s.squashers[msg.Stage]
-		//for _, storeSquasher := range sq.Stores {
-		//	if mergeRange := storeSquasher.NextRangeToMerge(); mergeRange != nil {
-		//		cmds = append(cmds, storeSquasher.MergeRange(mergeRange))
-		//	}
-		//}
+	//sq := s.squashers[msg.Stage]
+	//for _, storeSquasher := range sq.Stores {
+	//	if mergeRange := storeSquasher.NextRangeToMerge(); mergeRange != nil {
+	//		cmds = append(cmds, storeSquasher.MergeRange(mergeRange))
+	//	}
+	//}
+
+	case execout.MsgStartDownload:
+		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(0))
+	case execout.MsgFileNotPresent:
+		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(2*time.Second))
+	case execout.MsgFileDownloaded:
+		if s.ExecOutWalker.IsCompleted() {
+			s.outputStreamCompleted = true
+			return s.cmdShutdownWhenComplete()
+		}
+		s.ExecOutWalker.NextSegment()
+		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(0))
 	}
 
 	return loop.Batch(cmds...)
@@ -134,6 +167,28 @@ func (s *Scheduler) continueMergingWork() loop.Cmd {
 	// Check with the `Stages` if that segment is in PartialPresent
 	// If so, start the merging operation
 	// Change the stages.MarkSegmentMerging(segment, stage)
+}
+
+func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
+	// TODO: ensure everything else is completed properly,
+	// like the setting of the stores and all, only then do you
+	// Quit.
+	// Anything that could cause the thing to complete should call
+	// cmdShutdownWhenComplete()
+	if s.outputStreamCompleted && s.storesSyncCompleted {
+		return loop.Quit(nil)
+	}
+	if !s.outputStreamCompleted && !s.storesSyncCompleted {
+		s.logger.Info("scheduler: waiting for output stream and stores to complete")
+	}
+	if !s.outputStreamCompleted && s.storesSyncCompleted {
+		s.logger.Info("scheduler: waiting for output stream to complete, stores ready")
+	}
+	if s.outputStreamCompleted && !s.storesSyncCompleted {
+		s.logger.Info("scheduler: waiting for stores to complete, output stream completed")
+	}
+	return nil
+
 }
 
 func (s *Scheduler) FinalStoreMap() store.Map {

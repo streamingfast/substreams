@@ -19,16 +19,16 @@ import (
 type Writer struct {
 	wg *sync.WaitGroup
 
+	fileWalker   *FileWalker
+	currentFile  *File
 	files        map[string]*File // moduleName => file
 	outputModule string
-	configs      *Configs
 }
 
 func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isSubRequest bool) *Writer {
 	w := &Writer{
 		wg:           &sync.WaitGroup{},
 		files:        make(map[string]*File),
-		configs:      configs,
 		outputModule: outputModule,
 	}
 
@@ -40,31 +40,28 @@ func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule stri
 		// Push to the next boundary, so nothing would get flushed at the requested stop block boundary.
 		upperBound = exclusiveEndBlock - exclusiveEndBlock%configs.execOutputSaveInterval + configs.execOutputSaveInterval
 	}
-	targetRange := block.NewBoundedRange(modInitBlock, configs.execOutputSaveInterval, initialBlockBoundary, upperBound)
-	newFile := configs.NewFile(outputModule, targetRange)
-	w.files[outputModule] = newFile
+
+	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, modInitBlock, upperBound)
+	walker := configs.NewFileWalker(outputModule, segmenter, initialBlockBoundary)
+	w.fileWalker = walker
+	w.currentFile = walker.File()
 
 	return w
 }
 
 func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 	if val, found := buffer.values[w.outputModule]; found {
-		// TODO(abourget): triple check that we don't want to write
-		// if not found?
-		curFile, found := w.files[w.outputModule]
-		if found {
-			curFile.SetItem(clock, val)
-		}
+		w.currentFile.SetItem(clock, val)
 	}
 }
 
 func (w *Writer) MaybeRotate(ctx context.Context, clockNumber uint64) error {
-	curFile := w.files[w.outputModule]
-	if curFile == nil {
+	if w.currentFile == nil {
 		return nil
 	}
-	if curFile.IsOutOfBounds(clockNumber) { // bounds are per file, because module init are per module
-		doSave, err := curFile.Save(ctx)
+
+	if w.currentFile.IsOutOfBounds(clockNumber) { // bounds are per file, because module init are per module
+		doSave, err := w.currentFile.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing exec output writer: %w", err)
 		}
@@ -76,12 +73,15 @@ func (w *Writer) MaybeRotate(ctx context.Context, clockNumber uint64) error {
 
 		for {
 			// Support skipped blocks, if we jump 500 blocks here, we're still going to be in the right file.
-			curFile = curFile.NextFile()
-			if curFile == nil {
+			w.fileWalker.Next()
+			if w.fileWalker.IsDone() {
 				break
 			}
-			if !curFile.Contains(clockNumber) {
-				doSave, err := curFile.Save(ctx)
+
+			w.currentFile = w.fileWalker.File()
+
+			if !w.currentFile.Contains(clockNumber) {
+				doSave, err := w.currentFile.Save(ctx)
 				if err != nil {
 					return fmt.Errorf("saving skipped file: %w", err)
 				}
@@ -89,12 +89,6 @@ func (w *Writer) MaybeRotate(ctx context.Context, clockNumber uint64) error {
 				continue
 			}
 			break
-		}
-
-		if curFile == nil {
-			delete(w.files, w.outputModule)
-		} else {
-			w.files[w.outputModule] = curFile
 		}
 	}
 	return nil

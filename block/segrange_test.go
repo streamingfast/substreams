@@ -60,7 +60,7 @@ func TestBoundedRange_computeInitialBounds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewBoundedRange(tt.fields.moduleInitBlock, 10, tt.fields.requestStartBlock, tt.fields.requestExclusiveEndBlock)
+			r := NewRawBoundedRange(tt.fields.moduleInitBlock, 10, tt.fields.requestStartBlock, tt.fields.requestExclusiveEndBlock)
 
 			res := r.Range
 			if tt.want == "nil" {

@@ -18,3 +18,14 @@ func New(respFunc substreams.ResponseFunc) *Stream {
 func (s *Stream) InitialProgressMessages(in []*pbsubstreamsrpc.ModuleProgress) {
 	s.respFunc(substreams.NewModulesProgressResponse(in))
 }
+
+/*
+outputstream.Walker
+orchestrator/execout/stream.go Stream
+orchestrator/execout/walker.go Walker
+orchestrator/linear/reader.go Reader
+orchestrator/execout/linearreader.go LinearReader
+orchestrator/execout/walker.go execout.Walker
+
+
+*/

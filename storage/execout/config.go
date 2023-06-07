@@ -6,10 +6,11 @@ import (
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -39,13 +40,13 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 	}, nil
 }
 
-func (c *Config) NewFile(targetRange *block.BoundedRange) *File {
+func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
-		kv:           make(map[string]*pboutput.Item),
-		ModuleName:   c.name,
-		store:        c.objStore,
-		BoundedRange: targetRange,
-		logger:       c.logger,
+		kv:         make(map[string]*pboutput.Item),
+		ModuleName: c.name,
+		store:      c.objStore,
+		Range:      targetRange,
+		logger:     c.logger,
 	}
 }
 

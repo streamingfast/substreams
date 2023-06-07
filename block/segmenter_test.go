@@ -63,20 +63,20 @@ func TestSegmenter_IndexWithBlock(t *testing.T) {
 }
 
 func TestSegmenter_firstRange(t *testing.T) {
-	s := &Segmenter{interval: 10, initialBlock: 1, linearHandoffBlock: 100}
+	s := &Segmenter{interval: 10, initialBlock: 1, exclusiveEndBlock: 100}
 	assert.Equal(t, NewRange(1, 10), s.firstRange())
-	s = &Segmenter{interval: 10, initialBlock: 0, linearHandoffBlock: 100}
+	s = &Segmenter{interval: 10, initialBlock: 0, exclusiveEndBlock: 100}
 	assert.Equal(t, NewRange(0, 10), s.firstRange())
-	s = &Segmenter{interval: 10, initialBlock: 9, linearHandoffBlock: 100}
+	s = &Segmenter{interval: 10, initialBlock: 9, exclusiveEndBlock: 100}
 	assert.Equal(t, NewRange(9, 10), s.firstRange())
-	s = &Segmenter{interval: 10, initialBlock: 10, linearHandoffBlock: 100}
+	s = &Segmenter{interval: 10, initialBlock: 10, exclusiveEndBlock: 100}
 	assert.Equal(t, NewRange(10, 20), s.firstRange())
-	s = &Segmenter{interval: 10, initialBlock: 11, linearHandoffBlock: 100}
+	s = &Segmenter{interval: 10, initialBlock: 11, exclusiveEndBlock: 100}
 	assert.Equal(t, NewRange(11, 20), s.firstRange())
-	s = &Segmenter{interval: 10, initialBlock: 11, linearHandoffBlock: 15}
+	s = &Segmenter{interval: 10, initialBlock: 11, exclusiveEndBlock: 15}
 	assert.Equal(t, NewRange(11, 15), s.firstRange())
 
-	s = &Segmenter{interval: 10, initialBlock: 11, linearHandoffBlock: 10}
+	s = &Segmenter{interval: 10, initialBlock: 11, exclusiveEndBlock: 10}
 	assert.Nil(t, s.firstRange())
 }
 

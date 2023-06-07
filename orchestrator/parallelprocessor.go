@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/responses"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
@@ -20,8 +21,7 @@ import (
 )
 
 type ParallelProcessor struct {
-	scheduler        *scheduler.Scheduler
-	execOutputReader *execout.LinearReader
+	scheduler *scheduler.Scheduler
 }
 
 // BuildParallelProcessor is only called on tier1
@@ -34,26 +34,6 @@ func BuildParallelProcessor(
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
-	var execOutputReader *execout.LinearReader
-
-	if reqDetails.ShouldStreamCachedOutputs() {
-		// note: since we are *NOT* in a sub-request and are setting up output module is a map
-		requestedModule := outputGraph.OutputModule()
-		if requestedModule.GetKindStore() != nil {
-			panic("logic error: should not get a store as outputModule on tier 1")
-		}
-		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.ResolvedStartBlockNum, reqDetails.LinearHandoffBlockNum)
-		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
-		execOutputReader = execout.NewLinearReader(
-			reqDetails.ResolvedStartBlockNum,
-			reqDetails.LinearHandoffBlockNum,
-			requestedModule,
-			requestedModuleCache,
-			respFunc,
-			runtimeConfig.CacheSaveInterval,
-		)
-	}
-
 	// In Dev mode
 	// * The linearHandoff will be set to the startblock (never equal to stopBlock, which is exclusive)
 	// * We will generate stores up to the linearHandoff, even if we end with an incomplete store
@@ -87,10 +67,8 @@ func BuildParallelProcessor(
 	}
 
 	stream := responses.New(respFunc)
-	sched, err := scheduler.New(ctx, stream, outputGraph)
-	if err != nil {
-		return nil, err
-	}
+
+	sched := scheduler.New(ctx, stream, outputGraph)
 
 	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
 	if err != nil {
@@ -99,6 +77,26 @@ func BuildParallelProcessor(
 	sched.Planner = plan
 
 	stream.InitialProgressMessages(plan.InitialProgressMessages())
+
+	if reqDetails.ShouldStreamCachedOutputs() {
+		// note: since we are *NOT* in a sub-request and are setting up output module is a map
+		requestedModule := outputGraph.OutputModule()
+		if requestedModule.GetKindStore() != nil {
+			panic("logic error: should not get a store as outputModule on tier 1")
+		}
+
+		segmenter := block.NewSegmenter(runtimeConfig.CacheSaveInterval, requestedModule.InitialBlock, reqDetails.LinearHandoffBlockNum)
+		walker := execoutStorage.NewFileWalker(requestedModule.Name, segmenter, reqDetails.ResolvedStartBlockNum)
+
+		sched.ExecOutWalker = orchestratorExecout.NewWalker(
+			ctx,
+			requestedModule,
+			walker,
+			reqDetails.ResolvedStartBlockNum,
+			reqDetails.LinearHandoffBlockNum,
+			respFunc, // TODO transform to use `responses` instead, and concentrate all those protobuf manipulations in that package.
+		)
+	}
 
 	// TODO(abourget): take all of the ExecOut files that exist
 	//  and use that to PUSH back what the Stages need to do.
@@ -109,35 +107,33 @@ func BuildParallelProcessor(
 	//  just before.
 	//  -
 	//  If we can stream out the ExecOut directly, we don't need
-	//  to schedule work to process them at all.
+	//  to dispatch work to process them at all.
 	//  -
 	//  This is unsolved
 
 	sched.Stages = stage.NewStages(outputGraph, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum)
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
-	squasher, err := squasher.NewMulti(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum)
+	// TODO: replace that last param, by the new squashing model in the Scheduler
+	squasher, err := squasher.NewMulti(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum, nil)
 	if err != nil {
 		return nil, err
 	}
 	sched.Squasher = squasher
 
+	// TODO: wrap up the tying up of the Scheduler with the Squasher.
 	//scheduler.OnStoreJobTerminated = squasher.Squash
 
 	workerPool := work.NewWorkerPool(ctx, int(runtimeConfig.ParallelSubrequests), runtimeConfig.WorkerFactory)
 	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{
-		scheduler:        sched,
-		execOutputReader: execOutputReader,
+		scheduler: sched,
 	}, nil
 }
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
-	if b.execOutputReader != nil {
-		b.execOutputReader.Launch(ctx)
-	}
-	//b.squasher.Launch(ctx)
+	b.scheduler.Init()
 
 	if err := b.scheduler.Run(ctx); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
@@ -145,15 +141,18 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 
 	storeMap = b.scheduler.FinalStoreMap()
 
-	if b.execOutputReader != nil {
-		select {
-		case <-b.execOutputReader.Terminated():
-			if err := b.execOutputReader.Err(); err != nil {
-				return nil, err
-			}
-		case <-ctx.Done():
-		}
-	}
+	// TODO: this needs to be handled by the completion Shutdown
+	// processes of the new Scheduler:
+	//
+	//if b.execOutputReader != nil {
+	//	select {
+	//	case <-b.execOutputReader.Terminated():
+	//		if err := b.execOutputReader.Err(); err != nil {
+	//			return nil, err
+	//		}
+	//	case <-ctx.Done():
+	//	}
+	//}
 
 	return storeMap, nil
 }

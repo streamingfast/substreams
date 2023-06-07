@@ -18,29 +18,16 @@ func Test_workerPoolPool_Borrow_Return(t *testing.T) {
 			return &Result{}
 		})
 	})
-	p := pi.(*WorkerPool)
 
-	assert.Len(t, p.workers, 2)
-	workerPool := p.Borrow()
-	assert.Len(t, p.workers, 1)
-	p.Return(workerPool)
-	assert.Len(t, p.workers, 2)
-}
-
-func Test_workerPoolPool_Borrow_Return_Canceled_Ctx(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	pi := NewWorkerPool(ctx, 1, func(logger *zap.Logger) Worker {
-		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
-			return &Result{}
-		})
-	})
-	p := pi.(*WorkerPool)
-
-	assert.Len(t, p.workers, 1)
-	<-p.workers
-	assert.Len(t, p.workers, 0)
-	workerPool := p.Borrow()
-	assert.Nil(t, workerPool)
-
+	assert.Len(t, pi.workers, 2)
+	assert.True(t, pi.WorkerAvailable())
+	worker1 := pi.Borrow()
+	assert.True(t, pi.WorkerAvailable())
+	worker2 := pi.Borrow()
+	assert.False(t, pi.WorkerAvailable())
+	assert.Panics(t, func() { pi.Borrow() })
+	pi.Return(worker2)
+	assert.True(t, pi.WorkerAvailable())
+	pi.Return(worker1)
+	assert.Panics(t, func() { pi.Return(worker1) })
 }

@@ -43,7 +43,7 @@ type Pipeline struct {
 	wasmRuntime     *wasm.Registry
 	outputGraph     *outputmodules.Graph
 	loadedModules   map[uint32]wasm.Module
-	moduleExecutors [][]exec.ModuleExecutor
+	moduleExecutors [][]exec.ModuleExecutor // Staged module executors
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput

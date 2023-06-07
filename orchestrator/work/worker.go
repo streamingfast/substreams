@@ -6,12 +6,6 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/client"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/storage/store"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -20,6 +14,13 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/orchestrator/responses"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 var lastWorkerID uint64
@@ -77,7 +78,7 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
+func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *responses.Stream) *Result {
 	var err error
 
 	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.StartBlockNum, request.StopBlockNum))
@@ -156,8 +157,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 		if resp != nil {
 			switch r := resp.Type.(type) {
 			case *pbssinternal.ProcessRangeResponse_ProcessedRange:
-				forwardResponse := toRPCRangeProgressResponse(resp.ModuleName, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
-				err := respFunc(forwardResponse)
+				err := upstream.RPCRangeProgressResponse(resp.ModuleName, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
 				if err != nil {
 					if ctx.Err() != nil {
 						return &Result{
@@ -181,8 +181,9 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow
 				// for that that would pick up the errors, and pack the remaining logs
 				// and reasons into a message. This is nowhere to be found now.
-				forwardResponse := toRPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
-				respFunc(forwardResponse)
+
+				upstream.RPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
+
 				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
 				span.SetStatus(codes.Error, err.Error())
 				return &Result{
@@ -219,82 +220,10 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 		}
 	}
 }
-func toRPCFailedProgressResponse(moduleName, reason string, logs []string, logsTruncated bool) *pbsubstreamsrpc.Response {
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{
-			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					{
-						Name: moduleName,
-						Type: &pbsubstreamsrpc.ModuleProgress_Failed_{
-							Failed: &pbsubstreamsrpc.ModuleProgress_Failed{
-								Reason:        reason,
-								Logs:          logs,
-								LogsTruncated: logsTruncated,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func toRPCProcessedBytes(
-	moduleName string,
-	bytesReadDelta uint64,
-	bytesWrittenDelta uint64,
-	totalBytesRead uint64,
-	totalBytesWritten uint64,
-	nanoSeconds uint64,
-) *pbsubstreamsrpc.Response {
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{
-			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					{
-						Name: moduleName,
-						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes_{
-							ProcessedBytes: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes{
-								BytesReadDelta:    bytesReadDelta,
-								BytesWrittenDelta: bytesWrittenDelta,
-								TotalBytesRead:    totalBytesRead,
-								TotalBytesWritten: totalBytesWritten,
-								NanoSecondsDelta:  nanoSeconds,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func toRPCRangeProgressResponse(moduleName string, start, end uint64) *pbsubstreamsrpc.Response {
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{
-			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					{
-						Name: moduleName,
-						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-							ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-								ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
-									{
-										StartBlock: start,
-										EndBlock:   end,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
 
 func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {
+	// TODO(abourget): Add the MODULE Name in there, so we know to which modules each of those things
+	// are attached in the tier1.
 	out = make(store.FileInfos, len(completed.AllProcessedRanges))
 	for i, b := range completed.AllProcessedRanges {
 		out[i] = store.NewPartialFileInfo(b.StartBlock, b.EndBlock, completed.TraceId)

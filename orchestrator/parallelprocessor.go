@@ -76,7 +76,9 @@ func BuildParallelProcessor(
 	}
 	sched.Planner = plan
 
-	stream.InitialProgressMessages(plan.InitialProgressMessages())
+	if err := stream.InitialProgressMessages(plan.InitialProgressMessages()); err != nil {
+		return nil, fmt.Errorf("initial progress: %w", err)
+	}
 
 	if reqDetails.ShouldStreamCachedOutputs() {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
@@ -134,6 +136,9 @@ func BuildParallelProcessor(
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
 	b.scheduler.Init()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	if err := b.scheduler.Run(ctx); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)

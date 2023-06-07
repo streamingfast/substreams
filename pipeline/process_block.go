@@ -264,6 +264,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	for _, stage := range p.moduleExecutors {
 		//t0 := time.Now()
 		//
+		// TODO: make sure rather DON'T INITIALIZE the module Executors
+		// that are after the requested stages.
+		if tier2limitistgae <= stage {
+			// WARN: CHECK if the `stages` are the SAME number
+			break
+		}
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))
 			for _, executor := range stage {

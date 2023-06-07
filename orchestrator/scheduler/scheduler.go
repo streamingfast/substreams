@@ -24,7 +24,8 @@ type Scheduler struct {
 	stream      *responses.Stream
 	outputGraph *outputmodules.Graph
 
-	Planner       *work.Plan
+	//Planner       *work.Plan
+	Stages        *stage.Stages
 	Squasher      *squasher.Multi
 	WorkerPool    *work.WorkerPool
 	ExecOutWalker *execout.Walker
@@ -32,8 +33,6 @@ type Scheduler struct {
 	// Status:
 	JobStatus    []*work.Job
 	WorkerStatus map[string]string
-
-	Stages *stage.Stages
 
 	logger *zap.Logger
 
@@ -55,15 +54,14 @@ func New(ctx context.Context, stream *responses.Stream, outputGraph *outputmodul
 }
 
 func (s *Scheduler) Init() {
-	// create the `stagedModules` based on the `Modules`
-	// and the desired output module.
-	// Launch the command to fetch the first state on disk
-	//   and a Message saying we have all the storage snapshots
-	//   ready.
-	// Initialize the store.Map
-	// Kickstart the Jobs processing
+	// TODO: Kickstart the Jobs processing
+
 	if s.ExecOutWalker != nil {
 		s.Send(execout.MsgStartDownload{})
+	} else {
+		// This hides the fact that there was _no_ Walker. Could cause
+		// confusing error messages in `cmdShutdownWhenComplete()`.
+		s.outputStreamCompleted = true
 	}
 }
 
@@ -95,15 +93,17 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		return work.CmdScheduleNextJob()
 
 	case work.MsgScheduleNextJob:
-		job := s.Planner.NextJob()
-		if job == nil {
+		jobSegment := s.Stages.NextJob()
+		if jobSegment == nil {
 			return nil
 		}
+
 		if !s.WorkerPool.WorkerAvailable() {
 			return nil
 		}
 		worker := s.WorkerPool.Borrow()
 		return loop.Batch(
+			worker.Work(s.ctx, )
 			s.runJob(worker, msg.job),
 			work.CmdScheduleNextJob(),
 		)
@@ -158,6 +158,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	}
 
 	return loop.Batch(cmds...)
+}
+
+func (s *Scheduler) runJob(job *work.Job, stage string) loop.Cmd {
+	return job.CmdRun()
 }
 
 func (s *Scheduler) continueMergingWork() loop.Cmd {

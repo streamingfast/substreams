@@ -58,6 +58,8 @@ func (l *EventLoop) Send(msg Msg) {
 func (l *EventLoop) update(msg Msg, cmds chan Cmd) (Cmd, error) {
 	switch msg := msg.(type) {
 	case quitMsg:
+		// TODO: make sure that the calling loop is broken
+		// when we got a quitMsg
 		return nil, msg.err
 	case batchMsg:
 		for _, cmd := range msg {

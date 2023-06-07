@@ -2,7 +2,6 @@ package work
 
 import (
 	"fmt"
-	"strings"
 
 	"go.uber.org/zap/zapcore"
 
@@ -14,23 +13,18 @@ import (
 // Job is a single unit of scheduling, meaning it is a request that goes to a
 // remote gRPC service for execution.
 type Job struct {
-	ModuleName   string // target
+	//ModuleName   string // target
 	RequestRange *block.Range
-	// the order of the job, as a unit of job scheduling, relative to the position in the chain.
-	requiredModules []string // modules that need to be sync'd before this one starts at RequestRange.StartBlockNum}
-	priority        int
+	Stage        int
+
+	OutputModule string // should be the same top-level module as the on in the request
 }
 
-func NewJob(storeName string, requestRange *block.Range, requiredModules []string, priority int) *Job {
-	// TODO(abourget): test that the priority calculations give us what we need
-	// The thing is that the priority wouldn't change.. the readiness is what would
-	// change really. That's handled in the Plan, but priority is constant.
-	// We'll schedule them when we can
+func NewJob(requestRange *block.Range, stage int, outputModule string) *Job {
 	j := &Job{
-		ModuleName:      storeName,
-		RequestRange:    requestRange,
-		requiredModules: requiredModules,
-		priority:        priority,
+		OutputModule: outputModule,
+		RequestRange: requestRange,
+		Stage:        stage,
 	}
 	return j
 }
@@ -40,18 +34,18 @@ func (j *Job) CreateRequest(originalModules *pbsubstreams.Modules) *pbssinternal
 		StartBlockNum: j.RequestRange.StartBlock,
 		StopBlockNum:  j.RequestRange.ExclusiveEndBlock,
 		Modules:       originalModules,
-		OutputModule:  j.ModuleName,
+		OutputModule:  j.OutputModule,
+		Stage:         uint32(j.Stage),
 	}
 }
 
 func (j *Job) String() string {
-	return fmt.Sprintf("job: module=%s range=%s deps=%s prio=%d", j.ModuleName, j.RequestRange, strings.Join(j.requiredModules, ","), j.priority)
+	return fmt.Sprintf("job: stage=%d range=%s", j.Stage, j.RequestRange)
 }
 
 func (j *Job) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddString("module_name", j.ModuleName)
+	enc.AddInt("stage", j.Stage)
 	enc.AddUint64("start_block", j.RequestRange.StartBlock)
 	enc.AddUint64("end_block", j.RequestRange.ExclusiveEndBlock)
-	//enc.AddArray("deps", j.deps)
 	return nil
 }

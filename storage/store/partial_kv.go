@@ -65,7 +65,7 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error
 		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
 	}
 
-	file := NewPartialFileInfo(p.initialBlock, endBoundaryBlock, p.traceID)
+	file := NewPartialFileInfo(p.name, p.initialBlock, endBoundaryBlock, p.traceID)
 	p.logger.Info("partial store save written", zap.String("file_name", file.Filename), zap.Stringer("block_range", file.Range))
 
 	fw := &fileWriter{

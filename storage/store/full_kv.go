@@ -73,7 +73,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 		return nil, nil, fmt.Errorf("marshal kv state: %w", err)
 	}
 
-	file := NewCompleteFileInfo(s.moduleInitialBlock, endBoundaryBlock)
+	file := NewCompleteFileInfo(s.name, s.moduleInitialBlock, endBoundaryBlock)
 
 	s.logger.Info("saving store",
 		zap.String("file_name", file.Filename),

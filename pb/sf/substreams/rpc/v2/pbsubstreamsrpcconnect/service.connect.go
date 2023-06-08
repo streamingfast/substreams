@@ -31,7 +31,7 @@ type StreamClient interface {
 }
 
 // NewStreamClient constructs a client for the sf.substreams.rpc.v2.Stream service. By default, it
-// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
+// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped response, and sends
 // uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
 // connect.WithGRPCWeb() options.
 //

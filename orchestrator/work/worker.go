@@ -15,9 +15,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/orchestrator/responses"
+	"github.com/streamingfast/substreams/orchestrator/response"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
@@ -32,10 +31,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result
+	Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -43,12 +42,12 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result
+	f  func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
-	return f.f(ctx, request, respFunc)
+func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result {
+	return f.f(ctx, request, upstream)
 }
 
 func (f SimpleWorkerFactory) ID() string {
@@ -78,7 +77,7 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *responses.Stream) *Result {
+func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result {
 	var err error
 
 	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.StartBlockNum, request.StopBlockNum))
@@ -175,7 +174,7 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 				//bm := tracking.GetBytesMeter(ctx)
 				//bm.AddBytesWritten(int(r.ProcessedBytes.BytesWrittenDelta))
 				//bm.AddBytesRead(int(r.ProcessedBytes.BytesReadDelta))
-				//respFunc(toRPCProcessedBytes(resp.ModuleName, bm.BytesReadDelta(), bm.BytesWrittenDelta(), bm.BytesRead(), bm.BytesWritten(), 0))
+				//upstream.RPCProcessedBytes(resp.ModuleName, bm.BytesReadDelta(), bm.BytesWrittenDelta(), bm.BytesRead(), bm.BytesWritten(), 0))
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow

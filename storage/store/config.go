@@ -7,9 +7,10 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -128,7 +129,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 		files = nil
 
 		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
-			fileInfo, ok := parseFileName(filename)
+			fileInfo, ok := parseFileName(c.Name(), filename)
 			if !ok {
 				logger.Warn("seen snapshot file that we don't know how to parse", zap.String("filename", filename))
 				return nil

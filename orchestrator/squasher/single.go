@@ -21,21 +21,12 @@ import (
 var SkipFile = errors.New("skip file")
 var PartialsChannelClosed = errors.New("partial chunks done")
 
-type squashable interface {
-	MergeNextRange() loop.Cmd
-	AddPartials(files ...*store.FileInfo) loop.Cmd
-
-	//launch(ctx context.Context)
-	waitForCompletion(ctx context.Context) error
-	squash(ctx context.Context, partialFiles store.FileInfos) error
-	moduleName() string
-}
-
 type SingleState int
 
 const (
 	SingleIdle SingleState = iota
 	SingleMerging
+	SingleCompleted // All merging operations were completed for the provided Segmenter
 )
 
 type Single struct {
@@ -43,50 +34,92 @@ type Single struct {
 
 	state SingleState
 
-	name                         string
-	logger                       *zap.Logger
-	store                        *store.FullKV
-	files                        store.FileInfos
-	targetExclusiveEndBlock      uint64 // The upper bound of this Squasher's responsibility
-	targetExclusiveEndBlockReach bool
-	nextExpectedStartBlock       uint64 // This goes from a lower number up to `targetExclusiveEndBlock`
-	storeSaveInterval            uint64
+	name   string
+	logger *zap.Logger
+	store  *store.FullKV
 
-	onStoreCompletedUntilBlock func(storeName string, blockNum uint64)
+	segmenter           *block.Segmenter
+	nextSegmentToSquash int
+	files               store.FileInfos
+
+	writerErrGroup *llerrgroup.Group
 }
 
 func NewSingle(
 	ctx context.Context,
 	initialStore *store.FullKV,
-	targetExclusiveBlock,
-	nextExpectedStartBlock uint64,
-	storeSaveInterval uint64,
-	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
+	segmenter *block.Segmenter,
+	nextSegmentToSquash int,
 ) *Single {
 	logger := reqctx.Logger(ctx).With(zap.String("store_name", initialStore.Name()), zap.String("module_hash", initialStore.ModuleHash()))
 	s := &Single{
-		Shutter:                    shutter.New(),
-		name:                       initialStore.Name(),
-		logger:                     logger,
-		store:                      initialStore,
-		targetExclusiveEndBlock:    targetExclusiveBlock,
-		nextExpectedStartBlock:     nextExpectedStartBlock,
-		onStoreCompletedUntilBlock: onStoreCompletedUntilBlock,
-		storeSaveInterval:          storeSaveInterval,
+		Shutter:             shutter.New(),
+		name:                initialStore.Name(),
+		logger:              logger,
+		store:               initialStore,
+		segmenter:           segmenter,
+		nextSegmentToSquash: nextSegmentToSquash,
+		writerErrGroup:      llerrgroup.New(250),
 	}
 	return s
 }
 
-func (s *Single) MergeNextRange() loop.Cmd {
-	if s.state != StateIdle {
+func (s *Single) AddPartial(file *store.FileInfo) loop.Cmd {
+	s.files = append(s.files, file)
+	s.sortRange()
+
+	if err := s.ensureNoOverlap(); err != nil {
+		return loop.Quit(err)
+	}
+	return s.CmdMergeRange()
+}
+
+func (s *Single) NextRange() {
+	switch s.state {
+	case SingleMerging:
+		s.state = SingleIdle
+	case SingleCompleted:
+		return
+	}
+	s.nextSegmentToSquash++
+}
+
+func (s *Single) CmdMergeRange() loop.Cmd {
+	if s.state != SingleIdle {
 		return nil
 	}
+
+	nextRange := s.segmenter.Range(s.nextSegmentToSquash)
+	if nextRange == nil {
+		s.state = SingleCompleted
+		return func() loop.Msg {
+			return MsgStoreCompleted{}
+		}
+	}
+
+	var nextFile *store.FileInfo
+	for _, file := range s.files {
+		if file.Range.Equals(nextRange) {
+			nextFile = file
+		}
+	}
+
+	if nextFile == nil {
+		// Nothing contiguous to merge at the moment.
+		return nil
+	}
+
 	// TODO: check whether we're in a state to actually merge anything
 	//  is there some contiguous stuff I can do?
 	//  If not, return nil
+	s.state = SingleMerging
+
 	return func() loop.Msg {
+		// FIXME: transform into a Staged oepration, with all the files
+		// for a given range would be done in parallel here with a simple `llerrgroup`
+		// .. all stores are merged in one swift, from the Squasher's perspective.
 		// TODO: Do the actual merging
-		return nil
+		return MsgMergeFinished{ModuleName: s.name}
 	}
 }
 
@@ -131,7 +164,6 @@ func (s *Single) processPartials(ctx context.Context) error {
 	defer metrics.SquashersEnded.Inc()
 
 	for {
-		// TODO: renamed to AddPartials
 		if err := s.accumulateMorePartials(ctx); err != nil {
 			if errors.Is(err, PartialsChannelClosed) {
 				return nil
@@ -191,16 +223,6 @@ func (s *Single) ensureNoOverlap() error {
 		}
 	}
 
-	return nil
-}
-
-func (s *Single) AddPartials(files ...*store.FileInfo) loop.Cmd {
-	s.files = append(s.files, files...)
-	s.sortRange()
-
-	if err := s.ensureNoOverlap(); err != nil {
-		return loop.Quit(err)
-	}
 	return nil
 }
 
@@ -326,7 +348,7 @@ func (s *Single) shouldSaveFullKV(storeInitialBlock uint64, squashableRange *blo
 	// we check if the squashableRange we just merged into our FullKV store, ends on a storeInterval boundary block
 	// If someone the storeSaveInterval
 
-	// squashable range must end on a store boundary block
+	// squasher range must end on a store boundary block
 	isSaveIntervalReached := squashableRange.ExclusiveEndBlock%s.storeSaveInterval == 0
 	// we expect the range to be equal to the store save interval, except if the range start block
 	// is the same as the store initial block

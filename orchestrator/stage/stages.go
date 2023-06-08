@@ -16,15 +16,12 @@ type Stages struct {
 
 func NewStages(
 	outputGraph *outputmodules.Graph,
-	interval uint64,
-	upToBlock uint64,
+	segmenter *block.Segmenter,
 ) (out *Stages) {
-	lowestGraphInitBlock := outputGraph.LowestInitBlock()
 	allStages := outputGraph.StagedUsedModules()
 	lastIndex := len(allStages) - 1
-	seg := block.NewSegmenter(interval, lowestGraphInitBlock, upToBlock)
 	out = &Stages{
-		Segmenter: seg,
+		Segmenter: segmenter,
 	}
 	for idx, stage := range allStages {
 		isLastStage := idx == lastIndex
@@ -45,7 +42,7 @@ func NewStages(
 			}
 		}
 
-		stageState.firstSegment = seg.IndexForBlock(lowestStageInitBlock)
+		stageState.firstSegment = segmenter.IndexForBlock(lowestStageInitBlock)
 
 		out.stages = append(out.stages, stageState)
 	}

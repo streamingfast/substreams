@@ -8,7 +8,7 @@ import (
 
 	"github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/loop"
-	"github.com/streamingfast/substreams/orchestrator/responses"
+	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -21,18 +21,17 @@ type Scheduler struct {
 	ctx context.Context
 	loop.EventLoop
 
-	stream      *responses.Stream
+	stream      *response.Stream
 	outputGraph *outputmodules.Graph
 
-	//Planner       *work.Plan
 	Stages        *stage.Stages
 	Squasher      *squasher.Multi
 	WorkerPool    *work.WorkerPool
 	ExecOutWalker *execout.Walker
 
 	// Status:
-	JobStatus    []*work.Job
-	WorkerStatus map[string]string
+	//JobStatus    []*work.Job
+	//WorkerStatus map[string]string
 
 	logger *zap.Logger
 
@@ -41,7 +40,7 @@ type Scheduler struct {
 	storesSyncCompleted   bool
 }
 
-func New(ctx context.Context, stream *responses.Stream, outputGraph *outputmodules.Graph) *Scheduler {
+func New(ctx context.Context, stream *response.Stream, outputGraph *outputmodules.Graph) *Scheduler {
 	logger := reqctx.Logger(ctx)
 	s := &Scheduler{
 		ctx:         ctx,
@@ -74,19 +73,13 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		cmds = append(cmds, loop.Quit(msg.Error))
 
 	case work.MsgJobSucceeded:
-		s.JobStatus.MarkFinished(msg.JobID)
+		//s.JobStatus.MarkFinished(msg.JobID)
 		s.Stages.MarkSegmentPartialPresent(msg.Stage, msg.Segment)
 		cmds = append(cmds,
-			s.continueMergingWork(),
+			s.Squasher.AddPartials(msg.Files...),
 			work.CmdScheduleNextJob(),
 		)
 
-	case MsgStoragePartialFound:
-		cmds = append(cmds, s.continueMergingWork())
-		job := s.killPotentiallyRunningJob(msg.JobID)
-		if job != nil {
-			cmds = append(cmds, work.CmdScheduleNextJob())
-		}
 
 	case work.MsgWorkerFreed:
 		s.WorkerPool.Return(msg.Worker)
@@ -102,11 +95,20 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			return nil
 		}
 		worker := s.WorkerPool.Borrow()
+
+		request := jobSegment.GenRequest()
 		return loop.Batch(
-			worker.Work(s.ctx, )
+			worker.Work(s.ctx, request, upstream)
 			s.runJob(worker, msg.job),
 			work.CmdScheduleNextJob(),
 		)
+
+	case MsgStoragePartialFound:
+		cmds = append(cmds, s.continueMergingWork())
+		job := s.killPotentiallyRunningJob(msg.JobID)
+		if job != nil {
+			cmds = append(cmds, work.CmdScheduleNextJob())
+		}
 
 	case FullStoresPresent:
 		stage := s.Stages[msg.Stage]
@@ -126,6 +128,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case squasher.MsgMergeStarted:
 	case squasher.MsgMergeFinished:
+		return s.Squasher.MarkSingleFinished(msg)
 		if allStoresAreCompletedUpToTargetBlock() {
 			s.storesSyncCompleted = true
 			return s.cmdShutdownWhenComplete()
@@ -135,12 +138,12 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case squasher.MsgMergeStage:
 		for _, mod := range s.outputGraph.StagedUsedModules()[msg.Stage] {
-			cmds = append(cmds, s.Squasher.MergeNextRange(mod.Name)) //Modules[mod.Name].MergeNextRange())
+			cmds = append(cmds, s.Squasher.MergeNextRange(mod.Name)) //Modules[mod.Name].CmdMergeRange())
 		}
 	//sq := s.squashers[msg.Stage]
 	//for _, storeSquasher := range sq.Stores {
 	//	if mergeRange := storeSquasher.NextRangeToMerge(); mergeRange != nil {
-	//		cmds = append(cmds, storeSquasher.MergeRange(mergeRange))
+	//		cmds = append(cmds, storeSquasher.CmdMergeRange(mergeRange))
 	//	}
 	//}
 

@@ -31,7 +31,7 @@ type SubstreamsClient interface {
 }
 
 // NewSubstreamsClient constructs a client for the sf.substreams.internal.v2.Substreams service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped response,
 // and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
 // connect.WithGRPC() or connect.WithGRPCWeb() options.
 //

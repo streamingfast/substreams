@@ -7,7 +7,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
-	"github.com/streamingfast/substreams/orchestrator/responses"
+	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
@@ -66,17 +66,24 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
 
-	stream := responses.New(respFunc)
+	stream := response.New(respFunc)
 
 	sched := scheduler.New(ctx, stream, outputGraph)
 
-	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
-	if err != nil {
-		return nil, fmt.Errorf("build work plan: %w", err)
-	}
-	sched.Planner = plan
+	//plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
+	//if err != nil {
+	//	return nil, fmt.Errorf("build work plan: %w", err)
+	//}
+	//sched.Planner = plan
 
-	if err := stream.InitialProgressMessages(plan.InitialProgressMessages()); err != nil {
+	// FIXME: Is the state map the final reference for the progress we've made?
+	// Shouldn't that be processed by the scheduler a little bit?
+	// What if we have discovered a bunch of ExecOut files and the scheduler
+	// would decide not to use the very first stores as a sign of what is complete?
+	// Well, perhaps those wouldn't hurt, because here we're _sure_ they're
+	// done and the Scheduler could send Progress messages when the above decision
+	// is taken.
+	if err := stream.InitialProgressMessages(modulesStateMap); err != nil {
 		return nil, fmt.Errorf("initial progress: %w", err)
 	}
 
@@ -96,7 +103,7 @@ func BuildParallelProcessor(
 			walker,
 			reqDetails.ResolvedStartBlockNum,
 			reqDetails.LinearHandoffBlockNum,
-			respFunc, // TODO transform to use `responses` instead, and concentrate all those protobuf manipulations in that package.
+			respFunc, // TODO transform to use `response` instead, and concentrate all those protobuf manipulations in that package.
 		)
 	}
 
@@ -112,12 +119,13 @@ func BuildParallelProcessor(
 	//  to dispatch work to process them at all.
 	//  -
 	//  This is unsolved
+	segmenter := block.NewSegmenter(runtimeConfig.SubrequestsSplitSize, outputGraph.LowestInitBlock(), reqDetails.LinearHandoffBlockNum)
 
-	sched.Stages = stage.NewStages(outputGraph, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum)
+	sched.Stages = stage.NewStages(outputGraph, segmenter)
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
 	// TODO: replace that last param, by the new squashing model in the Scheduler
-	squasher, err := squasher.NewMulti(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum, nil)
+	squasher, err := squasher.NewMulti(ctx, segmenter, runtimeConfig, modulesStateMap, storeConfigs, storeLinearHandoffBlockNum, nil)
 	if err != nil {
 		return nil, err
 	}

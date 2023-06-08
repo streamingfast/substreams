@@ -6,6 +6,7 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
+// TODO(abourget): kill this.. it does nothing, just never call it !
 type NoopMapSquasher struct {
 	name string
 }

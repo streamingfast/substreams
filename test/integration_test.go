@@ -155,7 +155,7 @@ func TestForkHandling(t *testing.T) {
 					i++
 					continue
 				}
-				require.Greater(t, len(test.expectedResponseNames), i, "too many responses")
+				require.Greater(t, len(test.expectedResponseNames), i, "too many response")
 
 				require.NotNil(t, test.expectedResponseNames[i])
 				require.False(t, test.expectedResponseNames[i].undo, "received undo where we shouldn't")

@@ -35,44 +35,48 @@ func (f FileInfos) String() string {
 }
 
 type FileInfo struct {
-	Filename string
-	Range    *block.Range
-	TraceID  string
-	Partial  bool
+	ModuleName string
+	Filename   string
+	Range      *block.Range
+	TraceID    string
+	Partial    bool
 }
 
-func NewCompleteFileInfo(moduleInitialBlock uint64, exlusiveEnd uint64) *FileInfo {
-	bRange := block.NewRange(moduleInitialBlock, exlusiveEnd)
+func NewCompleteFileInfo(moduleName string, moduleInitialBlock uint64, exclusiveEndBlock uint64) *FileInfo {
+	bRange := block.NewRange(moduleInitialBlock, exclusiveEndBlock)
 
 	return &FileInfo{
-		Filename: FullStateFileName(bRange),
-		Range:    block.NewRange(moduleInitialBlock, exlusiveEnd),
-		Partial:  false,
+		ModuleName: moduleName,
+		Filename:   FullStateFileName(bRange),
+		Range:      block.NewRange(moduleInitialBlock, exclusiveEndBlock),
+		Partial:    false,
 	}
 }
 
-func NewPartialFileInfo(start uint64, exlusiveEnd uint64, traceID string) *FileInfo {
-	bRange := block.NewRange(start, exlusiveEnd)
+func NewPartialFileInfo(moduleName string, start uint64, exclusiveEndBlock uint64, traceID string) *FileInfo {
+	bRange := block.NewRange(start, exclusiveEndBlock)
 
 	return &FileInfo{
-		Filename: PartialFileName(bRange, traceID),
-		Range:    bRange,
-		TraceID:  traceID,
-		Partial:  true,
+		ModuleName: moduleName,
+		Filename:   PartialFileName(bRange, traceID),
+		Range:      bRange,
+		TraceID:    traceID,
+		Partial:    true,
 	}
 }
 
-func parseFileName(filename string) (*FileInfo, bool) {
+func parseFileName(moduleName, filename string) (*FileInfo, bool) {
 	res := stateFileRegex.FindAllStringSubmatch(filename, 1)
 	if len(res) != 1 {
 		return nil, false
 	}
 
 	return &FileInfo{
-		Filename: filename,
-		Range:    block.NewRange(uint64(mustAtoi(res[0][2])), uint64(mustAtoi(res[0][1]))),
-		TraceID:  res[0][3],
-		Partial:  res[0][4] == "partial",
+		ModuleName: moduleName,
+		Filename:   filename,
+		Range:      block.NewRange(uint64(mustAtoi(res[0][2])), uint64(mustAtoi(res[0][1]))),
+		TraceID:    res[0][3],
+		Partial:    res[0][4] == "partial",
 	}, true
 }
 

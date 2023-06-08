@@ -14,8 +14,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 
 	"github.com/streamingfast/substreams/storage"
-
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type Plan struct {
@@ -256,28 +254,29 @@ func (p *Plan) hasMore() bool {
 	return len(p.readyJobs)+len(p.waitingJobs) > 0
 }
 
-func (p *Plan) InitialProgressMessages() (out []*pbsubstreamsrpc.ModuleProgress) {
-	for storeName, modState := range p.ModulesStateMap {
-		var more []*pbsubstreamsrpc.BlockRange
-		for _, rng := range modState.InitialProgressRanges() {
-			more = append(more, &pbsubstreamsrpc.BlockRange{
-				StartBlock: rng.StartBlock,
-				EndBlock:   rng.ExclusiveEndBlock,
-			})
-		}
-		if len(more) != 0 {
-			out = append(out, &pbsubstreamsrpc.ModuleProgress{
-				Name: storeName,
-				Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-					ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-						ProcessedRanges: more,
-					},
-				},
-			})
-		}
-	}
-	return
-}
+// Deprecated: replaced by response.Stream::InitialProgressMessages
+//func (p *Plan) InitialProgressMessages() (out []*pbsubstreamsrpc.ModuleProgress) {
+//	for storeName, modState := range p.ModulesStateMap {
+//		var more []*pbsubstreamsrpc.BlockRange
+//		for _, rng := range modState.InitialProgressRanges() {
+//			more = append(more, &pbsubstreamsrpc.BlockRange{
+//				StartBlock: rng.StartBlock,
+//				EndBlock:   rng.ExclusiveEndBlock,
+//			})
+//		}
+//		if len(more) != 0 {
+//			out = append(out, &pbsubstreamsrpc.ModuleProgress{
+//				Name: storeName,
+//				Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+//					ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+//						ProcessedRanges: more,
+//					},
+//				},
+//			})
+//		}
+//	}
+//	return
+//}
 
 func (p *Plan) String() string {
 	workingPlan := "working plan: \n"

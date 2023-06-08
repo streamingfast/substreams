@@ -1,6 +1,9 @@
 package work
 
-import "github.com/streamingfast/substreams/orchestrator/loop"
+import (
+	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/storage/store"
+)
 
 // Messages
 
@@ -16,6 +19,7 @@ type MsgJobSucceeded struct {
 	JobID   string
 	Stage   int
 	Segment int
+	Files   store.FileInfos
 }
 
 type MsgJobStarted struct {

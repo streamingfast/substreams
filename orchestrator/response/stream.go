@@ -1,8 +1,9 @@
-package responses
+package response
 
 import (
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/storage"
 )
 
 type Stream struct {
@@ -15,8 +16,28 @@ func New(respFunc substreams.ResponseFunc) *Stream {
 	}
 }
 
-func (s *Stream) InitialProgressMessages(in []*pbsubstreamsrpc.ModuleProgress) error {
-	return s.respFunc(substreams.NewModulesProgressResponse(in))
+func (s *Stream) InitialProgressMessages(in storage.ModuleStorageStateMap) error {
+	var out []*pbsubstreamsrpc.ModuleProgress
+	for storeName, modState := range in {
+		var more []*pbsubstreamsrpc.BlockRange
+		for _, rng := range modState.InitialProgressRanges() {
+			more = append(more, &pbsubstreamsrpc.BlockRange{
+				StartBlock: rng.StartBlock,
+				EndBlock:   rng.ExclusiveEndBlock,
+			})
+		}
+		if len(more) != 0 {
+			out = append(out, &pbsubstreamsrpc.ModuleProgress{
+				Name: storeName,
+				Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+					ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+						ProcessedRanges: more,
+					},
+				},
+			})
+		}
+	}
+	return s.respFunc(substreams.NewModulesProgressResponse(out))
 }
 
 func (s *Stream) RPCFailedProgressResponse(moduleName, reason string, logs []string, logsTruncated bool) error {
@@ -72,7 +93,7 @@ func (s *Stream) RPCProcessedBytes(
 	totalBytesWritten uint64,
 	nanoSeconds uint64,
 ) error {
-	s.respFunc(&pbsubstreamsrpc.Response{
+	return s.respFunc(&pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_Progress{
 			Progress: &pbsubstreamsrpc.ModulesProgress{
 				Modules: []*pbsubstreamsrpc.ModuleProgress{

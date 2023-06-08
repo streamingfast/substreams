@@ -8,11 +8,10 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage"
-	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"
 )
@@ -22,7 +21,7 @@ import (
 // It also produces complete store snapshots, which are dependencies
 // for the segment following the snapshot.
 type Multi struct {
-	Modules              map[string]squashable
+	Modules              map[string]*Single
 	targetExclusiveBlock uint64
 }
 
@@ -30,20 +29,16 @@ type Multi struct {
 // the existing storage. It prepares itself to receive Squash()
 // requests that should correspond to what is missing for those stores
 // to reach `targetExclusiveEndBlock`.  This is managed externally by the
-// Scheduler/Strategy. Eventually, ideally, all components are
-// synchronizes around the actual data: the state of storages
-// present, the requests needed to fill in those stores up to the
-// target block, etc..
+// Scheduler.
 func NewMulti(
 	ctx context.Context,
-	runtimeConfig config.RuntimeConfig,
+	segmenter *block.Segmenter,
 	modulesStorageStateMap storage.ModuleStorageStateMap,
 	storeConfigs store.ConfigMap,
 	upToBlock uint64,
-	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) (*Multi, error) {
 	logger := reqctx.Logger(ctx)
-	storeSquashers := map[string]squashable{}
+	storeSquashers := map[string]*Single{}
 
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
 		switch storageState := moduleStorageState.(type) {
@@ -53,7 +48,7 @@ func NewMulti(
 				return nil, fmt.Errorf("store %q not found", storeModuleName)
 			}
 
-			storeSquasher, err := buildStoreSquasher(ctx, runtimeConfig.CacheSaveInterval, storeConfig, logger, storageState, upToBlock, onStoreCompletedUntilBlock)
+			storeSquasher, err := buildStoreSquasher(ctx, storeConfig, segmenter, logger, storageState)
 			if err != nil {
 				return nil, err
 			}
@@ -61,9 +56,11 @@ func NewMulti(
 			storeSquashers[storeModuleName] = storeSquasher
 			logger.Debug("store squasher initialized", zap.String("module_name", storeModuleName))
 
-		case *execoutState.ExecOutputStorageState:
-			storeSquashers[storeModuleName] = &NoopMapSquasher{name: storeModuleName}
-			logger.Debug("noop squasher initialized", zap.String("module_name", storeModuleName))
+			// TODO(abourget): let's just NOT squash those files, there's nothing
+			// to squash, let's adapt the rest so it doesn't try to squash mappers!
+			//case *execoutState.ExecOutputStorageState:
+			//	storeSquashers[storeModuleName] = &NoopMapSquasher{name: storeModuleName}
+			//	logger.Debug("noop squasher initialized", zap.String("module_name", storeModuleName))
 		}
 	}
 
@@ -75,12 +72,10 @@ func NewMulti(
 
 func buildStoreSquasher(
 	ctx context.Context,
-	storeSnapshotsSaveInterval uint64,
 	storeConfig *store.Config,
+	segmenter *block.Segmenter,
 	logger *zap.Logger,
 	storeStorageState *storeState.StoreStorageState,
-	upToBlock uint64,
-	onStoreCompletedUntilBlock func(storeName string, blockNum uint64),
 ) (storeSquasher *Single, err error) {
 
 	storeModuleName := storeConfig.Name()
@@ -94,7 +89,9 @@ func buildStoreSquasher(
 			zap.String("store", storeModuleName),
 			zap.String("initial_store_range", "None"),
 		)
-		storeSquasher = NewSingle(startingStore, upToBlock, startingStore.InitialBlock(), storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+		// FIXME: what was the use of `startingStore.InitialBlock()` here? Can it be replaced
+		// by the segmenter and its first segment to squash?
+		storeSquasher = NewSingle(ctx, startingStore, segmenter, startingStore.InitialBlock())
 	} else {
 		initialRange := storeStorageState.InitialCompleteFile.Range
 		logger.Debug("loading initial store", zap.String("store", storeModuleName), zap.Stringer("initial_store_range", initialRange))
@@ -102,7 +99,9 @@ func buildStoreSquasher(
 			return nil, fmt.Errorf("load store %q with initial complete range %q: %w", storeModuleName, initialRange, err)
 		}
 
-		storeSquasher = NewSingle(startingStore, upToBlock, initialRange.ExclusiveEndBlock, storeSnapshotsSaveInterval, onStoreCompletedUntilBlock)
+		// Here, the exclusive end block is the place at which we have a completed range, so
+		// we should be squashing the very next segment.
+		storeSquasher = NewSingle(ctx, startingStore, segmenter, initialRange.ExclusiveEndBlock)
 
 		onStoreCompletedUntilBlock(storeModuleName, initialRange.ExclusiveEndBlock)
 	}
@@ -122,12 +121,16 @@ func buildStoreSquasher(
 
 func (s *Multi) MergeNextRange(modName string) loop.Cmd {
 	single := s.Modules[modName]
-	return single.MergeNextRange()
+	return single.CmdMergeRange()
 }
 
-func (s *Multi) AddPartials(modName string, files ...*store.File) loop.Cmd {
-	single := s.Modules[modName]
-	return single.AddPartials(files...)
+func (s *Multi) AddPartials(files ...*store.FileInfo) loop.Cmd {
+	var cmds []loop.Cmd
+	for _, file := range files {
+		single := s.Modules[file.ModuleName]
+		cmds = append(cmds, single.AddPartial(file))
+	}
+	return loop.Batch(cmds...)
 }
 
 //func (s *Multi) Squash(ctx context.Context, moduleName string, partialsFiles store.FileInfos) error {

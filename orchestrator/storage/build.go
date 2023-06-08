@@ -4,14 +4,39 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/execout/state"
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"
-	"go.uber.org/zap"
 )
+
+func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap, segmenter *block.Segmenter) ([]int, error) {
+	// we walk all the Complete stores we can find,
+	// so we can mark those stage.Unit as StageCompleted
+	//
+	// we walk all the Partial stores we can find,
+	//  bundle them in the proper Stage, and call AddPartial()
+	//  on that stage's Unit, and schedule them for merging
+	//  also set the stage's Unit as StageMerging
+
+	// This function needs to be aware of the stages, and the modules
+	// included in each stage.
+	// When we find files for a given module, we'll add it to a map
+	// associated with the stage, and when the length of the map is
+	// equal to the length of the modules array, we know we have a
+	// complete Stage, and we can emit the message.
+
+	// How to inject lots of messages initially? We spin this process
+	// in a loop.Cmd and have it do some `scheduler.Send()` like crazy?
+	// with a final message flipping a switch to kickstart job scheduling
+	// and all? We don't want to do some job scheduling until all of the
+	// File walkers here are done.
+}
 
 func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, cacheSaveInterval uint64, mapConfigs *execout.Configs, requestStartBlock, linearHandoffBlock, storeLinearHandoffBlock uint64) (ModuleStorageStateMap, error) {
 	out := make(ModuleStorageStateMap)

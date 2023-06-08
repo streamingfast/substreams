@@ -75,7 +75,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		//s.JobStatus.MarkFinished(msg.JobID)
 		s.Stages.MarkSegmentPartialPresent(msg.Stage, msg.Segment)
 		cmds = append(cmds,
-			s.Squasher.AddPartials(msg.Files...),
+			s.Squasher.AddPartials(msg.SegmentID...),
 			work.CmdScheduleNextJob(),
 		)
 

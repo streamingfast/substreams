@@ -11,11 +11,11 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
+	"github.com/streamingfast/substreams/orchestrator/storage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/storage"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -34,6 +34,9 @@ func BuildParallelProcessor(
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
 ) (*ParallelProcessor, error) {
+	stream := response.New(respFunc)
+	sched := scheduler.New(ctx, stream, outputGraph)
+
 	// In Dev mode
 	// * The linearHandoff will be set to the startblock (never equal to stopBlock, which is exclusive)
 	// * We will generate stores up to the linearHandoff, even if we end with an incomplete store
@@ -46,13 +49,14 @@ func BuildParallelProcessor(
 	// * On the contrary, if we need to keep going after the linearHandoff, we will need to save the last "incomplete" store.
 
 	stopAtHandoff := reqDetails.LinearHandoffBlockNum == reqDetails.StopBlockNum
-
 	storeLinearHandoffBlockNum := reqDetails.LinearHandoffBlockNum
 	if stopAtHandoff {
 		// we don't need to bring the stores up to handoff block if we stop there
 		storeLinearHandoffBlockNum = lowBoundary(reqDetails.LinearHandoffBlockNum, runtimeConfig.CacheSaveInterval)
 	}
-
+	// TODO(abourget): I want to transform this to use a Segmenter
+	// but I'm not sure I can use the exact same Segmenter as the
+	// scheduler. This one
 	modulesStateMap, err := storage.BuildModuleStorageStateMap( // ok, I will cut stores up to 800 not 842
 		ctx,
 		storeConfigs,
@@ -65,17 +69,6 @@ func BuildParallelProcessor(
 	if err != nil {
 		return nil, fmt.Errorf("build storage map: %w", err)
 	}
-
-	stream := response.New(respFunc)
-
-	sched := scheduler.New(ctx, stream, outputGraph)
-
-	//plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
-	//if err != nil {
-	//	return nil, fmt.Errorf("build work plan: %w", err)
-	//}
-	//sched.Planner = plan
-
 	// FIXME: Is the state map the final reference for the progress we've made?
 	// Shouldn't that be processed by the scheduler a little bit?
 	// What if we have discovered a bunch of ExecOut files and the scheduler
@@ -94,8 +87,8 @@ func BuildParallelProcessor(
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
 
-		segmenter := block.NewSegmenter(runtimeConfig.CacheSaveInterval, requestedModule.InitialBlock, reqDetails.LinearHandoffBlockNum)
-		walker := execoutStorage.NewFileWalker(requestedModule.Name, segmenter, reqDetails.ResolvedStartBlockNum)
+		execoutSegmenter := block.NewSegmenter(runtimeConfig.CacheSaveInterval, requestedModule.InitialBlock, reqDetails.LinearHandoffBlockNum)
+		walker := execoutStorage.NewFileWalker(requestedModule.Name, execoutSegmenter, reqDetails.ResolvedStartBlockNum)
 
 		sched.ExecOutWalker = orchestratorExecout.NewWalker(
 			ctx,
@@ -103,7 +96,7 @@ func BuildParallelProcessor(
 			walker,
 			reqDetails.ResolvedStartBlockNum,
 			reqDetails.LinearHandoffBlockNum,
-			respFunc, // TODO transform to use `response` instead, and concentrate all those protobuf manipulations in that package.
+			respFunc, // TODO: transform to use `stream` instead, and concentrate all those protobuf manipulations in that package.
 		)
 	}
 
@@ -116,9 +109,18 @@ func BuildParallelProcessor(
 	//  just before.
 	//  -
 	//  If we can stream out the ExecOut directly, we don't need
-	//  to dispatch work to process them at all.
+	//  to dispatch work to process them at all.  But we'll need
+	//  to have stores ready to continue segments work.
+	//  SO: we can move forward the processing pipeline, provided
+	//  all of the stages can be continued forward after the
+	//  last ExecOut segment: that we have complete stores for the
+	//  segment where ExecOut finishes.
 	//  -
 	//  This is unsolved
+
+	// TODO(abourget): validate here the last parameter used
+	// should it be `storeLinearHandoff` as defined above, or
+	// reqDetails.LinearHandoffBlockNum really?
 	segmenter := block.NewSegmenter(runtimeConfig.SubrequestsSplitSize, outputGraph.LowestInitBlock(), reqDetails.LinearHandoffBlockNum)
 
 	sched.Stages = stage.NewStages(outputGraph, segmenter)

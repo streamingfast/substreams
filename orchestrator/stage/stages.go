@@ -111,7 +111,7 @@ func (s *Stages) dependenciesCompleted(segmentIdx int, stageIdx int) bool {
 		return true
 	}
 	for i := stageIdx - 1; i >= 0; i-- {
-		if s.state[segmentIdx-1][i] != SegmentCompleted {
+		if s.statesPerSegment[segmentIdx-1][i] != SegmentCompleted {
 			return false
 		}
 	}

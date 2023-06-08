@@ -10,8 +10,8 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/orchestrator/storage"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/storage"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"
 )

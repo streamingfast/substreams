@@ -2,8 +2,8 @@ package response
 
 import (
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/orchestrator/storage"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/storage"
 )
 
 type Stream struct {

@@ -7,9 +7,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/orchestrator/storage"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/storage"
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"

@@ -114,10 +114,10 @@ func (s *Stages) MarkSegmentCompleted(segment SegmentID) {
 }
 
 func (s *Stages) transition(segment SegmentID, to SegmentState, allowedPreviousStates ...SegmentState) {
-	prev := s.state[segment.Segment][segment.Stage]
+	prev := s.statesPerSegment[segment.Segment][segment.Stage]
 	for _, from := range allowedPreviousStates {
 		if prev == from {
-			s.state[segment.Segment][segment.Stage] = to
+			s.statesPerSegment[segment.Segment][segment.Stage] = to
 			return
 		}
 	}
@@ -130,5 +130,5 @@ func invalidTransition(prev, next SegmentState) {
 
 func (s *Stages) forceTransition(segment int, stage int, to SegmentState) {
 	// For testing purposes:
-	s.state[segment][stage] = to
+	s.statesPerSegment[segment][stage] = to
 }

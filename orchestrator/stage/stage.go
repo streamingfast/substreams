@@ -9,11 +9,11 @@ type Stage struct {
 
 	firstSegment int
 
-	modules []*ModuleState
+	moduleStates []*ModuleState
 }
 
-func stageKind(stage []*pbsubstreams.Module) Kind {
-	if stage[0].GetKindStore() != nil {
+func stageKind(mods []*pbsubstreams.Module) Kind {
+	if mods[0].GetKindStore() != nil {
 		return KindStore
 	}
 	return KindMap

@@ -8,33 +8,32 @@ import (
 type Stages struct {
 	*block.Segmenter
 
-	stages []*Stage
-	state  [][]SegmentState // state[SegmentIndex][StageIndex]
+	stages           []*Stage
+	statesPerSegment [][]SegmentState // state[SegmentIndex][StageIndex]
 
-	completedSegments int
 }
 
 func NewStages(
 	outputGraph *outputmodules.Graph,
 	segmenter *block.Segmenter,
 ) (out *Stages) {
-	allStages := outputGraph.StagedUsedModules()
-	lastIndex := len(allStages) - 1
+	stagedModules := outputGraph.StagedUsedModules()
+	lastIndex := len(stagedModules) - 1
 	out = &Stages{
 		Segmenter: segmenter,
 	}
-	for idx, stage := range allStages {
+	for idx, mods := range stagedModules {
 		isLastStage := idx == lastIndex
-		kind := stageKind(stage)
+		kind := stageKind(mods)
 		if kind == KindMap && !isLastStage {
 			continue
 		}
-		stageState := &Stage{
+		stage := &Stage{
 			kind: kind,
 		}
-		lowestStageInitBlock := stage[0].InitialBlock
-		for _, mod := range stage {
-			stageState.modules = append(stageState.modules, &ModuleState{
+		lowestStageInitBlock := mods[0].InitialBlock
+		for _, mod := range mods {
+			stage.moduleStates = append(stage.moduleStates, &ModuleState{
 				name: mod.Name,
 			})
 			if lowestStageInitBlock > mod.InitialBlock {
@@ -42,9 +41,9 @@ func NewStages(
 			}
 		}
 
-		stageState.firstSegment = segmenter.IndexForBlock(lowestStageInitBlock)
+		stage.firstSegment = segmenter.IndexForBlock(lowestStageInitBlock)
 
-		out.stages = append(out.stages, stageState)
+		out.stages = append(out.stages, stage)
 	}
 	return out
 }
@@ -62,14 +61,14 @@ func (s *Stages) NextJob() *SegmentID {
 	// each time contiguous segments are completed for all stages.
 	segmentIdx := 0
 	for {
-		if len(s.state) <= segmentIdx {
+		if len(s.statesPerSegment) <= segmentIdx {
 			s.growSegments()
 		}
 		if segmentIdx >= s.Count() {
 			break
 		}
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
-			segmentState := s.state[segmentIdx][stageIdx]
+			segmentState := s.statesPerSegment[segmentIdx][stageIdx]
 			if segmentState != SegmentPending {
 				continue
 			}
@@ -95,12 +94,12 @@ func (s *Stages) NextJob() *SegmentID {
 }
 
 func (s *Stages) growSegments() {
-	by := len(s.state)
+	by := len(s.statesPerSegment)
 	if by == 0 {
 		by = 2
 	}
 	for i := 0; i < by; i++ {
-		s.state = append(s.state, make([]SegmentState, len(s.stages)))
+		s.statesPerSegment = append(s.statesPerSegment, make([]SegmentState, len(s.stages)))
 	}
 }
 

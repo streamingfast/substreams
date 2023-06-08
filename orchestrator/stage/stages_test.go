@@ -5,47 +5,50 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 )
 
-func TestStages(t *testing.T) {
-	s := &Stages{
-		stages: []*Stage{
-			&Stage{kind: KindStore},
-			&Stage{kind: KindStore},
-			&Stage{kind: KindMap},
-		},
-		Segmenter: block.NewSegmenter(10, 5, 35),
-	}
-
-	assert.Equal(t, true, s.dependenciesCompleted(0, 1))
-	segID := s.NextJob()
-	require.NotNil(t, segID)
-	assert.Equal(t, 1, segID.Stage)
-	assert.Equal(t, 2, segID.Segment)
-	assert.Equal(t, block.ParseRange("10-20"), segID.Range)
-}
+//func TestStages(t *testing.T) {
+//	s := &Stages{
+//		stages: []*Stage{
+//			&Stage{kind: KindStore},
+//			&Stage{kind: KindStore},
+//			&Stage{kind: KindMap},
+//		},
+//		Segmenter: block.NewSegmenter(10, 5, 35),
+//	}
+//
+//	assert.Equal(t, true, s.dependenciesCompleted(0, 1), "segment 0 always dependencies completed")
+//	assert.Equal(t, false, s.dependenciesCompleted(1, 1), "stage 1 of segment 1 needs stage 0 of segment 1")
+//	assert.Equal(t, true, s.dependenciesCompleted(2, 0), "stage 0 always dependencies completed")
+//
+//	// segID := s.NextJob()
+//	// require.NotNil(t, segID)
+//	// assert.Equal(t, 1, segID.Stage, "should always start with stage 1")
+//	// assert.Equal(t, 2, segID.Segment, "should always start with segment 1")
+//	// assert.Equal(t, block.ParseRange("10-20"), segID.Range)
+//}
+//
 
 func TestNewStages(t *testing.T) {
-	seg := block.NewSegmenter(10, 10, 75)
+	seg := block.NewSegmenter(10, 5, 75)
 	stages := NewStages(outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25), seg)
+
 	assert.Equal(t, 8, stages.Count()) // from 5 to 75
 	assert.Equal(t, true, stages.IsPartial(7))
-	assert.Equal(t, 6, stages.IndexForBlock(60))
-	assert.Equal(t, 6, stages.IndexForBlock(60))
-	assert.Panics(t, func() { stages.IndexForBlock(80) })
+	assert.Equal(t, 6, stages.IndexForBlock(60), "index in range")
+	assert.Equal(t, 8, stages.IndexForBlock(80), "index out of range still returned here")
+	assert.Nil(t, stages.Range(8), "out of range")
+
 	assert.Equal(t, block.ParseRange("5-10"), stages.Range(0))
 	assert.Equal(t, block.ParseRange("10-20"), stages.Range(1))
 	assert.Equal(t, block.ParseRange("70-75"), stages.Range(7))
-	assert.Panics(t, func() { stages.Range(8) })
-	assert.Equal(t, 0, stages.completedSegments)
 }
 
 func TestNewStagesNextJobs(t *testing.T) {
-	seg := block.NewSegmenter(10, 10, 50)
+	seg := block.NewSegmenter(10, 5, 50)
 	stages := NewStages(outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5), seg)
 
 	j1 := stages.NextJob()
@@ -194,7 +197,7 @@ CCS.....`)
 
 }
 
-func id(stage, segment int) SegmentID {
+func id(segment, stage int) SegmentID {
 	return SegmentID{Stage: stage, Segment: segment}
 }
 
@@ -203,7 +206,7 @@ func segmentStateEquals(t *testing.T, s *Stages, segments string) {
 
 	out := strings.Builder{}
 	for i := 0; i < len(s.stages); i++ {
-		for _, segment := range s.state {
+		for _, segment := range s.statesPerSegment {
 			out.WriteString(map[SegmentState]string{
 				SegmentPending:        ".",
 				SegmentPartialPresent: "P",

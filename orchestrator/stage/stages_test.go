@@ -30,7 +30,8 @@ func TestStages(t *testing.T) {
 }
 
 func TestNewStages(t *testing.T) {
-	stages := NewStages(outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25), 10, 75)
+	seg := block.NewSegmenter(10, 10, 75)
+	stages := NewStages(outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25), seg)
 	assert.Equal(t, 8, stages.Count()) // from 5 to 75
 	assert.Equal(t, true, stages.IsPartial(7))
 	assert.Equal(t, 6, stages.IndexForBlock(60))
@@ -44,7 +45,8 @@ func TestNewStages(t *testing.T) {
 }
 
 func TestNewStagesNextJobs(t *testing.T) {
-	stages := NewStages(outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5), 10, 50)
+	seg := block.NewSegmenter(10, 10, 50)
+	stages := NewStages(outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5), seg)
 
 	j1 := stages.NextJob()
 	assert.Equal(t, 2, j1.Stage)
@@ -108,21 +110,21 @@ CC..
 CSS.
 CS..`)
 
-	stages.MarkSegmentPartialPresent(1, 2)
+	stages.MarkSegmentPartialPresent(id(1, 2))
 
 	segmentStateEquals(t, stages, `
 CC..
 CSS.
 CP..`)
 
-	stages.MarkSegmentMerging(1, 2)
+	stages.MarkSegmentMerging(id(1, 2))
 
 	segmentStateEquals(t, stages, `
 CC..
 CSS.
 CM..`)
 
-	stages.MarkSegmentCompleted(1, 2)
+	stages.MarkSegmentCompleted(id(1, 2))
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
@@ -152,7 +154,7 @@ CSS.....
 CC......`)
 
 	assert.Nil(t, stages.NextJob())
-	stages.MarkSegmentPartialPresent(2, 0)
+	stages.MarkSegmentPartialPresent(id(2, 0))
 
 	segmentStateEquals(t, stages, `
 CCPSSS..
@@ -160,7 +162,7 @@ CSS.....
 CC......`)
 
 	assert.Nil(t, stages.NextJob())
-	stages.MarkSegmentMerging(2, 0)
+	stages.MarkSegmentMerging(id(2, 0))
 
 	segmentStateEquals(t, stages, `
 CCMSSS..
@@ -168,7 +170,7 @@ CSS.....
 CC......`)
 
 	assert.Nil(t, stages.NextJob())
-	stages.MarkSegmentCompleted(2, 0)
+	stages.MarkSegmentCompleted(id(2, 0))
 
 	segmentStateEquals(t, stages, `
 CCCSSS..
@@ -190,6 +192,10 @@ CCCSSS..
 CCSS....
 CCS.....`)
 
+}
+
+func id(stage, segment int) SegmentID {
+	return SegmentID{Stage: stage, Segment: segment}
 }
 
 func segmentStateEquals(t *testing.T, s *Stages, segments string) {

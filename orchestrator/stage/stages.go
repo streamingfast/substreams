@@ -81,12 +81,13 @@ func (s *Stages) NextJob() *SegmentID {
 				continue
 			}
 
-			s.markSegmentScheduled(segmentIdx, stageIdx)
-			return &SegmentID{
+			id := &SegmentID{
 				Stage:   stageIdx,
 				Segment: segmentIdx,
 				Range:   s.Range(segmentIdx),
 			}
+			s.markSegmentScheduled(*id)
+			return id
 		}
 		segmentIdx++
 	}

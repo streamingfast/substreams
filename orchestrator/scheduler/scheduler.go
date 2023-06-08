@@ -68,7 +68,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
-	case work.MsgJobStarted:
 	case work.MsgJobFailed:
 		cmds = append(cmds, loop.Quit(msg.Error))
 
@@ -79,7 +78,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			s.Squasher.AddPartials(msg.Files...),
 			work.CmdScheduleNextJob(),
 		)
-
 
 	case work.MsgWorkerFreed:
 		s.WorkerPool.Return(msg.Worker)
@@ -96,9 +94,8 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 		worker := s.WorkerPool.Borrow()
 
-		request := jobSegment.GenRequest(reqctx.Details(s.ctx))
 		return loop.Batch(
-			worker.Work(s.ctx, request, s.stream)
+			worker.Work(s.ctx, jobSegment, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 

@@ -81,43 +81,43 @@ stateDiagram-v2
 
 */
 
-func (s *Stages) MarkSegmentMerging(segment int, stage int) {
-	s.transition(segment, stage, SegmentMerging,
+func (s *Stages) MarkSegmentMerging(segment SegmentID) {
+	s.transition(segment, SegmentMerging,
 		SegmentPartialPresent, // was next in line for Squasher to process
 	)
 }
 
-func (s *Stages) MarkSegmentPending(segment int, stage int) {
-	s.transition(segment, stage, SegmentPending,
+func (s *Stages) MarkSegmentPending(segment SegmentID) {
+	s.transition(segment, SegmentPending,
 		SegmentMerging, // Squasher didn't find the partials, so asking for the job to re-run
 	)
 }
 
-func (s *Stages) MarkSegmentPartialPresent(segment int, stage int) {
-	s.transition(segment, stage, SegmentPartialPresent,
+func (s *Stages) MarkSegmentPartialPresent(segment SegmentID) {
+	s.transition(segment, SegmentPartialPresent,
 		SegmentScheduled, // reported by working completing its generation of a partial
 		SegmentPending,   // from initial storage state snapshot
 	)
 }
 
-func (s *Stages) markSegmentScheduled(segment int, stage int) {
-	s.transition(segment, stage, SegmentScheduled,
+func (s *Stages) markSegmentScheduled(segment SegmentID) {
+	s.transition(segment, SegmentScheduled,
 		SegmentPending, // after scheduling some work (NextJob())
 	)
 }
 
-func (s *Stages) MarkSegmentCompleted(segment int, stage int) {
-	s.transition(segment, stage, SegmentCompleted,
+func (s *Stages) MarkSegmentCompleted(segment SegmentID) {
+	s.transition(segment, SegmentCompleted,
 		SegmentPending, // from an initial storage state snapshot
 		SegmentMerging, // from the Squasher's merge operations completing
 	)
 }
 
-func (s *Stages) transition(segment int, stage int, to SegmentState, allowedPreviousStates ...SegmentState) {
-	prev := s.state[segment][stage]
+func (s *Stages) transition(segment SegmentID, to SegmentState, allowedPreviousStates ...SegmentState) {
+	prev := s.state[segment.Segment][segment.Stage]
 	for _, from := range allowedPreviousStates {
 		if prev == from {
-			s.state[segment][stage] = to
+			s.state[segment.Segment][segment.Stage] = to
 			return
 		}
 	}

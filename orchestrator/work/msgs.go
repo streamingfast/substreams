@@ -2,30 +2,22 @@ package work
 
 import (
 	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
 // Messages
 
 type MsgJobFailed struct {
-	JobID   string
-	Stage   int
-	Segment int
+	SegmentID *stage.SegmentID
 
 	Error error
 }
 
 type MsgJobSucceeded struct {
-	JobID   string
-	Stage   int
-	Segment int
-	Files   store.FileInfos
-}
+	SegmentID *stage.SegmentID
 
-type MsgJobStarted struct {
-	JobID   string
-	Stage   int
-	Segment int
+	Files store.FileInfos
 }
 
 type MsgScheduleNextJob struct{}

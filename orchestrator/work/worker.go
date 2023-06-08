@@ -18,6 +18,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
@@ -78,7 +79,25 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result {
+func (w *RemoteWorker) Work(ctx context.Context, jobSegment *stage.SegmentID, upstream *response.Stream) loop.Cmd {
+	request := jobSegment.GenRequest(reqctx.Details(ctx))
+	return func() loop.Msg {
+		res := w.work(ctx, request, upstream)
+		if res.Error != nil {
+			return MsgJobFailed{
+				SegmentID: jobSegment,
+				Error:     res.Error,
+			}
+		} else {
+			return MsgJobSucceeded{
+				SegmentID: jobSegment,
+				Files:     res.PartialFilesWritten,
+			}
+		}
+	}
+}
+
+func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result {
 	var err error
 
 	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.StartBlockNum, request.StopBlockNum))

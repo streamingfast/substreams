@@ -95,7 +95,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		worker := s.WorkerPool.Borrow()
 
 		return loop.Batch(
-			worker.Work(s.ctx, jobSegment, s.stream),
+			worker.Work(s.ctx, *jobSegment, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 

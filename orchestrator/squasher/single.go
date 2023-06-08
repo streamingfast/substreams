@@ -115,7 +115,7 @@ func (s *Single) CmdMergeRange() loop.Cmd {
 	s.state = SingleMerging
 
 	return func() loop.Msg {
-		// FIXME: transform into a Staged oepration, with all the files
+		// FIXME: transform into a Staged operation, with all the files
 		// for a given range would be done in parallel here with a simple `llerrgroup`
 		// .. all stores are merged in one swift, from the Squasher's perspective.
 		// TODO: Do the actual merging

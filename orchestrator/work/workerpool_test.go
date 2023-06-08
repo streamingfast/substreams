@@ -8,14 +8,17 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/orchestrator/loop"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
 func Test_workerPoolPool_Borrow_Return(t *testing.T) {
 	ctx := context.Background()
 	pi := NewWorkerPool(ctx, 2, func(logger *zap.Logger) Worker {
-		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) *Result {
-			return &Result{}
+		return NewWorkerFactoryFromFunc(func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) loop.Cmd {
+			return func() loop.Msg {
+				return &Result{}
+			}
 		})
 	})
 

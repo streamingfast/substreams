@@ -1,6 +1,10 @@
 package stage
 
-import "github.com/streamingfast/substreams/block"
+import (
+	"github.com/streamingfast/substreams/block"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	"github.com/streamingfast/substreams/reqctx"
+)
 
 type SegmentState int
 
@@ -18,6 +22,16 @@ type SegmentID struct {
 	Segment int
 	Stage   int
 	Range   *block.Range
+}
+
+func (i SegmentID) GenRequest(req *reqctx.RequestDetails) *pbssinternal.ProcessRangeRequest {
+	return &pbssinternal.ProcessRangeRequest{
+		StartBlockNum: i.Range.StartBlock,
+		StopBlockNum:  i.Range.ExclusiveEndBlock,
+		Modules:       req.Modules,
+		OutputModule:  req.OutputModule,
+		Stage:         uint32(i.Stage),
+	}
 }
 
 func (s SegmentState) String() string {

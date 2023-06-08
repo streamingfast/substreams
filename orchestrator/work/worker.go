@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
@@ -31,10 +32,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result
+	Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Cmd // *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -42,11 +43,11 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result
+	f  func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Cmd
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result {
+func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Msg {
 	return f.f(ctx, request, upstream)
 }
 

@@ -218,6 +218,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	opts := s.buildPipelineOptions(ctx, request)
 	opts = append(opts, pipeline.WithFinalBlocksOnly())
+	opts = append(opts, pipeline.WithHighestStage(request.Stage))
 
 	pipe := pipeline.New(
 		ctx,

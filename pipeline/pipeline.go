@@ -59,6 +59,7 @@ type Pipeline struct {
 
 	gate            *gate
 	finalBlocksOnly bool
+	highestStage    *int
 
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef
@@ -140,7 +141,17 @@ func (p *Pipeline) InitWASM(ctx context.Context) (err error) {
 	//  and cache the latest if all block boundaries
 	//  are still clear.
 
-	return p.buildWASM(ctx, p.outputGraph.StagedUsedModules())
+	stagedModules := p.outputGraph.StagedUsedModules()
+
+	// truncate stages to highest
+	if highest := p.highestStage; highest != nil {
+		if len(stagedModules) < *highest+1 {
+			return fmt.Errorf("invalid stage %d, there aren't that many", highest)
+		}
+		stagedModules = stagedModules[0 : *highest+1]
+	}
+
+	return p.buildWASM(ctx, stagedModules)
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {

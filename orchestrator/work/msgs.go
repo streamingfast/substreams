@@ -9,37 +9,17 @@ import (
 // Messages
 
 type MsgJobFailed struct {
-	SegmentID *stage.SegmentID
-
+	Unit  stage.Unit
 	Error error
 }
 
 type MsgJobSucceeded struct {
-	SegmentID *stage.SegmentID
-
-	Files store.FileInfos
-}
-
-type MsgScheduleNextJob struct{}
-
-type MsgWorkerFreed struct {
+	Unit   stage.Unit
+	Files  store.FileInfos
 	Worker Worker
 }
 
-//
-//// Other types
-//
-//type JobID string
-//
-//func (j JobID) JobID() string {
-//	return string(j)
-//}
-//
-//type JobIDer interface {
-//	JobID() string
-//}
-
-// Commands
+type MsgScheduleNextJob struct{}
 
 func CmdScheduleNextJob() loop.Cmd {
 	return func() loop.Msg {

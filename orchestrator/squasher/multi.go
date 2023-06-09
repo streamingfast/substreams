@@ -40,6 +40,11 @@ func NewMulti(
 	logger := reqctx.Logger(ctx)
 	storeSquashers := map[string]*Single{}
 
+	// TODO: loop through _stages_,
+	// and add all modules of the stage to this Single
+	// a Single should be a single Stage squasher.. and abstract away
+	// all of its stores, and not return unless all of its stores
+	// are squashed.
 	for storeModuleName, moduleStorageState := range modulesStorageStateMap {
 		switch storageState := moduleStorageState.(type) {
 		case *storeState.StoreStorageState:

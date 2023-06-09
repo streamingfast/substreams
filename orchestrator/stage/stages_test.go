@@ -61,7 +61,7 @@ func TestNewStagesNextJobs(t *testing.T) {
 ..
 S.`)
 
-	stages.forceTransition(0, 2, SegmentCompleted)
+	stages.forceTransition(0, 2, UnitCompleted)
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
@@ -69,7 +69,7 @@ S.`)
 S.
 C.`)
 
-	stages.forceTransition(0, 1, SegmentCompleted)
+	stages.forceTransition(0, 1, UnitCompleted)
 
 	segmentStateEquals(t, stages, `
 ..
@@ -90,7 +90,7 @@ SS
 C.
 C.`)
 
-	stages.forceTransition(0, 0, SegmentCompleted)
+	stages.forceTransition(0, 0, UnitCompleted)
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
@@ -98,7 +98,7 @@ CS
 C.
 CS`)
 
-	stages.forceTransition(1, 0, SegmentCompleted)
+	stages.forceTransition(1, 0, UnitCompleted)
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
@@ -187,7 +187,7 @@ CCCSSS..
 CSSS....
 CC......`)
 
-	stages.forceTransition(1, 1, SegmentCompleted)
+	stages.forceTransition(1, 1, UnitCompleted)
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
@@ -197,8 +197,8 @@ CCS.....`)
 
 }
 
-func id(segment, stage int) SegmentID {
-	return SegmentID{Stage: stage, Segment: segment}
+func id(segment, stage int) Unit {
+	return Unit{Stage: stage, Segment: segment}
 }
 
 func segmentStateEquals(t *testing.T, s *Stages, segments string) {
@@ -206,13 +206,13 @@ func segmentStateEquals(t *testing.T, s *Stages, segments string) {
 
 	out := strings.Builder{}
 	for i := 0; i < len(s.stages); i++ {
-		for _, segment := range s.statesPerSegment {
-			out.WriteString(map[SegmentState]string{
-				SegmentPending:        ".",
-				SegmentPartialPresent: "P",
-				SegmentScheduled:      "S",
-				SegmentMerging:        "M",
-				SegmentCompleted:      "C",
+		for _, segment := range s.segmentStates {
+			out.WriteString(map[UnitState]string{
+				UnitPending:        ".",
+				UnitPartialPresent: "P",
+				UnitScheduled:      "S",
+				UnitMerging:        "M",
+				UnitCompleted:      "C",
 			}[segment[i]])
 		}
 		out.WriteString("\n")

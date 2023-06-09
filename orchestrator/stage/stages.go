@@ -8,10 +8,12 @@ import (
 type Stages struct {
 	*block.Segmenter
 
-	stages           []*Stage
-	statesPerSegment [][]SegmentState // state[SegmentIndex][StageIndex]
+	stages []*Stage
 
+	// segmentStates is a matrix of segment and stages
+	segmentStates []stageStates // segmentStates[SegmentIndex][StageIndex]
 }
+type stageStates []UnitState
 
 func NewStages(
 	outputGraph *outputmodules.Graph,
@@ -48,7 +50,7 @@ func NewStages(
 	return out
 }
 
-func (s *Stages) NextJob() *SegmentID {
+func (s *Stages) NextJob() *Unit {
 	// TODO: before calling NextJob, keep a small reserve (10% ?) of workers
 	//  so that when a job finishes, it can start immediately a potentially
 	//  higher priority one (we'll go do all those first-level jobs
@@ -61,15 +63,15 @@ func (s *Stages) NextJob() *SegmentID {
 	// each time contiguous segments are completed for all stages.
 	segmentIdx := 0
 	for {
-		if len(s.statesPerSegment) <= segmentIdx {
+		if len(s.segmentStates) <= segmentIdx {
 			s.growSegments()
 		}
 		if segmentIdx >= s.Count() {
 			break
 		}
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
-			segmentState := s.statesPerSegment[segmentIdx][stageIdx]
-			if segmentState != SegmentPending {
+			segmentState := s.segmentStates[segmentIdx][stageIdx]
+			if segmentState != UnitPending {
 				continue
 			}
 			if segmentIdx < s.stages[stageIdx].firstSegment {
@@ -80,7 +82,7 @@ func (s *Stages) NextJob() *SegmentID {
 				continue
 			}
 
-			id := &SegmentID{
+			id := &Unit{
 				Stage:   stageIdx,
 				Segment: segmentIdx,
 				Range:   s.Range(segmentIdx),
@@ -94,12 +96,12 @@ func (s *Stages) NextJob() *SegmentID {
 }
 
 func (s *Stages) growSegments() {
-	by := len(s.statesPerSegment)
+	by := len(s.segmentStates)
 	if by == 0 {
 		by = 2
 	}
 	for i := 0; i < by; i++ {
-		s.statesPerSegment = append(s.statesPerSegment, make([]SegmentState, len(s.stages)))
+		s.segmentStates = append(s.segmentStates, make([]UnitState, len(s.stages)))
 	}
 }
 
@@ -111,7 +113,7 @@ func (s *Stages) dependenciesCompleted(segmentIdx int, stageIdx int) bool {
 		return true
 	}
 	for i := stageIdx - 1; i >= 0; i-- {
-		if s.statesPerSegment[segmentIdx-1][i] != SegmentCompleted {
+		if s.segmentStates[segmentIdx-1][i] != UnitCompleted {
 			return false
 		}
 	}

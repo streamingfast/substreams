@@ -6,25 +6,25 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 )
 
-type SegmentState int
+type UnitState int
 
 const (
-	SegmentPending SegmentState = iota // The job needs to be scheduled, no complete store exists at the end of its Range, nor any partial store for the end of this segment.
-	SegmentPartialPresent
-	SegmentScheduled // Means the job was scheduled for execution
-	SegmentMerging   // A partial is being merged
-	SegmentCompleted // End state. A store has been snapshot for this segment, and we have gone over in the per-request squasher
+	UnitPending UnitState = iota // The job needs to be scheduled, no complete store exists at the end of its Range, nor any partial store for the end of this segment.
+	UnitPartialPresent
+	UnitScheduled // Means the job was scheduled for execution
+	UnitMerging   // A partial is being merged
+	UnitCompleted // End state. A store has been snapshot for this segment, and we have gone over in the per-request squasher
 )
 
-// SegmentID can be used as a key, and points to the respective indexes of
-// Stages::segments[SegmentID.Segment][SegmentID.Stage]
-type SegmentID struct {
+// Unit can be used as a key, and points to the respective indexes of
+// Stages::unitStates[Unit.Segment][Unit.Stage]
+type Unit struct {
 	Segment int
 	Stage   int
 	Range   *block.Range
 }
 
-func (i SegmentID) GenRequest(req *reqctx.RequestDetails) *pbssinternal.ProcessRangeRequest {
+func (i Unit) NewRequest(req *reqctx.RequestDetails) *pbssinternal.ProcessRangeRequest {
 	return &pbssinternal.ProcessRangeRequest{
 		StartBlockNum: i.Range.StartBlock,
 		StopBlockNum:  i.Range.ExclusiveEndBlock,
@@ -34,17 +34,17 @@ func (i SegmentID) GenRequest(req *reqctx.RequestDetails) *pbssinternal.ProcessR
 	}
 }
 
-func (s SegmentState) String() string {
+func (s UnitState) String() string {
 	switch s {
-	case SegmentPending:
+	case UnitPending:
 		return "Pending"
-	case SegmentPartialPresent:
+	case UnitPartialPresent:
 		return "PartialPresent"
-	case SegmentScheduled:
+	case UnitScheduled:
 		return "Scheduled"
-	case SegmentMerging:
+	case UnitMerging:
 		return "Merging"
-	case SegmentCompleted:
+	case UnitCompleted:
 		return "Completed"
 	default:
 		return "Unknown"

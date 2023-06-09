@@ -7,15 +7,20 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
-	"github.com/streamingfast/substreams/storage/execout/state"
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"
 )
 
-func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap, segmenter *block.Segmenter) ([]int, error) {
+type state struct {
+	stage.Unit
+	state stage.UnitState
+}
+
+func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap, segmenter *block.Segmenter) ([]state, error) {
 	// we walk all the Complete stores we can find,
 	// so we can mark those stage.Unit as StageCompleted
 	//

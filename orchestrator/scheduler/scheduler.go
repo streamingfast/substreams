@@ -73,19 +73,16 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case work.MsgJobSucceeded:
 		//s.JobStatus.MarkFinished(msg.JobID)
-		s.Stages.MarkSegmentPartialPresent(msg.Stage, msg.Segment)
+		s.Stages.MarkSegmentPartialPresent(msg.Unit)
+		s.WorkerPool.Return(msg.Worker)
 		cmds = append(cmds,
-			s.Squasher.AddPartials(msg.SegmentID...),
+			s.Squasher.AddPartials(msg.Unit...),
 			work.CmdScheduleNextJob(),
 		)
 
-	case work.MsgWorkerFreed:
-		s.WorkerPool.Return(msg.Worker)
-		return work.CmdScheduleNextJob()
-
 	case work.MsgScheduleNextJob:
-		jobSegment := s.Stages.NextJob()
-		if jobSegment == nil {
+		workUnit := s.Stages.NextJob()
+		if workUnit == nil {
 			return nil
 		}
 
@@ -95,7 +92,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		worker := s.WorkerPool.Borrow()
 
 		return loop.Batch(
-			worker.Work(s.ctx, *jobSegment, s.stream),
+			worker.Work(s.ctx, *workUnit, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 
@@ -122,7 +119,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			),
 		)
 
-	case squasher.MsgMergeStarted:
 	case squasher.MsgMergeFinished:
 		return s.Squasher.MarkSingleFinished(msg)
 		if allStoresAreCompletedUpToTargetBlock() {

@@ -81,54 +81,54 @@ stateDiagram-v2
 
 */
 
-func (s *Stages) MarkSegmentMerging(segment SegmentID) {
-	s.transition(segment, SegmentMerging,
-		SegmentPartialPresent, // was next in line for Squasher to process
+func (s *Stages) MarkSegmentMerging(segment Unit) {
+	s.transition(segment, UnitMerging,
+		UnitPartialPresent, // was next in line for Squasher to process
 	)
 }
 
-func (s *Stages) MarkSegmentPending(segment SegmentID) {
-	s.transition(segment, SegmentPending,
-		SegmentMerging, // Squasher didn't find the partials, so asking for the job to re-run
+func (s *Stages) MarkSegmentPending(segment Unit) {
+	s.transition(segment, UnitPending,
+		UnitMerging, // Squasher didn't find the partials, so asking for the job to re-run
 	)
 }
 
-func (s *Stages) MarkSegmentPartialPresent(segment SegmentID) {
-	s.transition(segment, SegmentPartialPresent,
-		SegmentScheduled, // reported by working completing its generation of a partial
-		SegmentPending,   // from initial storage state snapshot
+func (s *Stages) MarkSegmentPartialPresent(segment Unit) {
+	s.transition(segment, UnitPartialPresent,
+		UnitScheduled, // reported by working completing its generation of a partial
+		UnitPending,   // from initial storage state snapshot
 	)
 }
 
-func (s *Stages) markSegmentScheduled(segment SegmentID) {
-	s.transition(segment, SegmentScheduled,
-		SegmentPending, // after scheduling some work (NextJob())
+func (s *Stages) markSegmentScheduled(segment Unit) {
+	s.transition(segment, UnitScheduled,
+		UnitPending, // after scheduling some work (NextJob())
 	)
 }
 
-func (s *Stages) MarkSegmentCompleted(segment SegmentID) {
-	s.transition(segment, SegmentCompleted,
-		SegmentPending, // from an initial storage state snapshot
-		SegmentMerging, // from the Squasher's merge operations completing
+func (s *Stages) MarkSegmentCompleted(segment Unit) {
+	s.transition(segment, UnitCompleted,
+		UnitPending, // from an initial storage state snapshot
+		UnitMerging, // from the Squasher's merge operations completing
 	)
 }
 
-func (s *Stages) transition(segment SegmentID, to SegmentState, allowedPreviousStates ...SegmentState) {
-	prev := s.statesPerSegment[segment.Segment][segment.Stage]
+func (s *Stages) transition(segment Unit, to UnitState, allowedPreviousStates ...UnitState) {
+	prev := s.segmentStates[segment.Segment][segment.Stage]
 	for _, from := range allowedPreviousStates {
 		if prev == from {
-			s.statesPerSegment[segment.Segment][segment.Stage] = to
+			s.segmentStates[segment.Segment][segment.Stage] = to
 			return
 		}
 	}
 	invalidTransition(prev, to)
 }
 
-func invalidTransition(prev, next SegmentState) {
+func invalidTransition(prev, next UnitState) {
 	panic("invalid transition from " + prev.String() + " to " + next.String())
 }
 
-func (s *Stages) forceTransition(segment int, stage int, to SegmentState) {
+func (s *Stages) forceTransition(segment int, stage int, to UnitState) {
 	// For testing purposes:
-	s.statesPerSegment[segment][stage] = to
+	s.segmentStates[segment][stage] = to
 }

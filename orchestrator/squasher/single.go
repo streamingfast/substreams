@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -40,7 +41,7 @@ type Single struct {
 
 	segmenter           *block.Segmenter
 	nextSegmentToSquash int
-	files               store.FileInfos
+	partialsPresent     map[int]bool // by segment index
 
 	writerErrGroup *llerrgroup.Group
 }
@@ -59,13 +60,14 @@ func NewSingle(
 		store:               initialStore,
 		segmenter:           segmenter,
 		nextSegmentToSquash: nextSegmentToSquash,
+		partialsPresent:     make(map[int]bool),
 		writerErrGroup:      llerrgroup.New(250),
 	}
 	return s
 }
 
-func (s *Single) AddPartial(file *store.FileInfo) loop.Cmd {
-	s.files = append(s.files, file)
+func (s *Single) AddPartial(unit stage.Unit) loop.Cmd {
+	s.partialsPresent[unit.Segment] = true
 	s.sortRange()
 
 	if err := s.ensureNoOverlap(); err != nil {

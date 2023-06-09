@@ -2,10 +2,12 @@ package work
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync/atomic"
 
+	"github.com/streamingfast/derr"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -33,10 +35,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Cmd // *Result
+	Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd // *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -44,12 +46,12 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, request *pbssinternal.
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Cmd
+	f  func(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) loop.Msg {
-	return f.f(ctx, request, upstream)
+func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Msg {
+	return f.f(ctx, unit, upstream)
 }
 
 func (f SimpleWorkerFactory) ID() string {
@@ -79,20 +81,46 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, jobSegment *stage.SegmentID, upstream *response.Stream) loop.Cmd {
-	request := jobSegment.GenRequest(reqctx.Details(ctx))
+func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd {
+	request := unit.NewRequest(reqctx.Details(ctx))
+	logger := reqctx.Logger(ctx)
+
 	return func() loop.Msg {
-		res := w.work(ctx, request, upstream)
-		if res.Error != nil {
-			return MsgJobFailed{
-				SegmentID: jobSegment,
-				Error:     res.Error,
+		var res *Result
+		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+			res = w.work(ctx, request, upstream)
+			err := res.Error
+			switch err.(type) {
+			case *RetryableErr:
+				logger.Debug("worker failed with retryable error", zap.Error(err))
+				return err
+			default:
+				if err != nil {
+					return derr.NewFatalError(err)
+				}
+				return nil
 			}
-		} else {
-			return MsgJobSucceeded{
-				SegmentID: jobSegment,
-				Files:     res.PartialFilesWritten,
+		})
+
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				logger.Debug("job canceled", zap.Object("unit", unit), zap.Error(err))
+			} else {
+				logger.Info("job failed", zap.Object("unit", unit), zap.Error(err))
 			}
+			return MsgJobFailed{Unit: unit, Error: err}
+		}
+
+		if err := ctx.Err(); err != nil {
+			logger.Info("job not completed", zap.Object("unit", unit), zap.Error(err))
+			return MsgJobFailed{Unit: unit, Error: err}
+		}
+
+		logger.Info("job completed", zap.Object("unit", unit))
+		return MsgJobSucceeded{
+			Unit:   unit,
+			Worker: w,
+			Files:  res.PartialFilesWritten,
 		}
 	}
 }
@@ -112,9 +140,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
 	if err != nil {
-		return &Result{
-			Error: fmt.Errorf("unable to create grpc client: %w", err),
-		}
+		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
@@ -128,9 +154,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
-			return &Result{
-				Error: ctx.Err(),
-			}
+			return &Result{Error: ctx.Err()}
 		}
 		return &Result{
 			Error: NewRetryableErr(fmt.Errorf("getting block stream: %w", err)),
@@ -149,9 +173,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	meta, err := stream.Header()
 	if err != nil {
 		if ctx.Err() != nil {
-			return &Result{
-				Error: ctx.Err(),
-			}
+			return &Result{Error: ctx.Err()}
 		}
 		logger.Warn("error getting stream header", zap.Error(err))
 	}
@@ -166,9 +188,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	for {
 		select {
 		case <-ctx.Done():
-			return &Result{
-				Error: ctx.Err(),
-			}
+			return &Result{Error: ctx.Err()}
 		default:
 		}
 
@@ -179,9 +199,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				err := upstream.RPCRangeProgressResponse(resp.ModuleName, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
 				if err != nil {
 					if ctx.Err() != nil {
-						return &Result{
-							Error: ctx.Err(),
-						}
+						return &Result{Error: ctx.Err()}
 					}
 					span.SetStatus(codes.Error, err.Error())
 					return &Result{
@@ -205,9 +223,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
 				span.SetStatus(codes.Error, err.Error())
-				return &Result{
-					Error: err,
-				}
+				return &Result{Error: err}
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Info("worker done")
@@ -222,15 +238,11 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				return &Result{}
 			}
 			if ctx.Err() != nil {
-				return &Result{
-					Error: ctx.Err(),
-				}
+				return &Result{Error: ctx.Err()}
 			}
 			if s, ok := status.FromError(err); ok {
 				if s.Code() == grpcCodes.InvalidArgument {
-					return &Result{
-						Error: err,
-					}
+					return &Result{Error: err}
 				}
 			}
 			return &Result{

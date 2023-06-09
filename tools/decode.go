@@ -300,7 +300,7 @@ func searchStateModule(
 	}
 	moduleStore := config.NewFullKV(zlog)
 
-	file := store.NewCompleteFileInfo(module.InitialBlock, startBlock)
+	file := store.NewCompleteFileInfo(module.Name, module.InitialBlock, startBlock)
 	if err = moduleStore.Load(ctx, file); err != nil {
 		return fmt.Errorf("unable to load file: %w", err)
 	}

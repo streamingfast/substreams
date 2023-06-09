@@ -177,8 +177,8 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 	auth := authenticator.GetCredentials(ctx)
-	if id := auth.GetUserID(); id != "" {
-		fields = append(fields, zap.String("user_id", id))
+	if id := auth.Identification(); id != nil {
+		fields = append(fields, zap.String("user_id", id.UserId))
 	}
 	logger.Info("incoming Substreams Blocks request", fields...)
 

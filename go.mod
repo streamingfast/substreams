@@ -50,7 +50,7 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
-	github.com/streamingfast/dauth v0.0.0-20221027185237-b209f25fa3ff
+	github.com/streamingfast/dauth v0.0.0-20230609021534-e6a5970f5210
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d

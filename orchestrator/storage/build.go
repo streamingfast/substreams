@@ -41,6 +41,7 @@ func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap, segme
 	// with a final message flipping a switch to kickstart job scheduling
 	// and all? We don't want to do some job scheduling until all of the
 	// File walkers here are done.
+	return nil, fmt.Errorf("not implemented")
 }
 
 func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, cacheSaveInterval uint64, mapConfigs *execout.Configs, requestStartBlock, linearHandoffBlock, storeLinearHandoffBlock uint64) (ModuleStorageStateMap, error) {
@@ -96,7 +97,7 @@ func buildMappersStorageState(ctx context.Context, execoutConfigs *execout.Confi
 			return fmt.Errorf("attempting to overwrite storage state for module %q", modName)
 		}
 		config := execoutConfigs.ConfigMap[modName]
-		storageState, err := state.NewExecOutputStorageState(config, execOutputSaveInterval, requestStartBlock, linearHandoffBlock, ranges)
+		storageState, err := execoutState.NewExecOutputStorageState(config, execOutputSaveInterval, requestStartBlock, linearHandoffBlock, ranges)
 		if err != nil {
 			return fmt.Errorf("new map storageState: %w", err)
 		}

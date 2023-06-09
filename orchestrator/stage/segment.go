@@ -4,6 +4,7 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	"go.uber.org/zap/zapcore"
 )
 
 type UnitState int
@@ -49,4 +50,11 @@ func (s UnitState) String() string {
 	default:
 		return "Unknown"
 	}
+}
+
+func (i Unit) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddInt("segment", i.Segment)
+	enc.AddInt("stage", i.Stage)
+	enc.AddString("range", i.Range.String())
+	return nil
 }

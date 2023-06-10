@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lithammer/dedent"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"google.golang.org/protobuf/proto"
@@ -28,54 +29,65 @@ func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bo
 	}
 }
 
-func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
-
-	defaultFilename := filepath.Join(os.TempDir(), "tmp.spkg")
+func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent bool) error {
+	spkgTemporaryFilePath := filepath.Join(os.TempDir(), pkg.PackageMeta[0].Name+".tmp.spkg")
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	if err := os.WriteFile(defaultFilename, cnt, 0644); err != nil {
+	if err := os.WriteFile(spkgTemporaryFilePath, cnt, 0644); err != nil {
 		fmt.Println("")
-		return fmt.Errorf("writing %q: %w", defaultFilename, err)
+		return fmt.Errorf("writing %q: %w", spkgTemporaryFilePath, err)
 	}
 
 	_, err = os.Stat("buf.gen.yaml")
 	bufFileNotFound := errors.Is(err, os.ErrNotExist)
 
 	if bufFileNotFound {
-		content := `
-version: v1
-plugins:
-  - remote: buf.build/prost/plugins/prost:v0.1.3-2
-    out: ` + g.outputPath + `
-    opt:
-`
+		// Beware, the indentation after initial column is important, it's 2 spaces!
+		content := dedent.Dedent(`
+		    version: v1
+		    plugins:
+		    - plugin: buf.build/community/neoeinstein-prost:v0.2.2
+		      out: ` + g.outputPath + `
+		      opt:
+		        - file_descriptor_set=false
+		`)
+
 		if g.generateMod {
-			content += `
-  - remote: buf.build/prost/plugins/crate:v0.3.1-1
-    out: ` + g.outputPath + `
-    opt:
-    - no_features
-`
+			// Beware, the indentation after initial column is important, it's 2 spaces!
+			content += dedent.Dedent(`
+				- remote: buf.build/prost/plugins/crate:v0.3.1-1
+				  out: ` + g.outputPath + `
+				  opt:
+				    - no_features
+			`)
 		}
-		fmt.Println(`Writing to temporary 'buf.gen.yaml':
----
-` + content + `
----`)
+
+		if showBufContent {
+			fmt.Println("Writing to temporary 'buf.gen.yaml'")
+			fmt.Println("---")
+			fmt.Println(content)
+			fmt.Println("---")
+		}
+
 		if err := ioutil.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
 		}
+		defer func() {
+			// Too bad if there is an error, nothing we can do
+			_ = os.Remove("buf.gen.yaml")
+		}()
 	}
 
-	spkgFilepath := filepath.Join(os.TempDir(), "tmp.spkg#format=bin")
 	cmdArgs := []string{
-		"generate", spkgFilepath,
+		"generate", spkgTemporaryFilePath + "#format=bin",
 	}
 	for _, excludePath := range g.excludedPaths {
 		cmdArgs = append(cmdArgs, "--exclude-path", excludePath)
 	}
+
 	fmt.Printf("Running: buf %s\n", strings.Join(cmdArgs, " "))
 	c := exec.Command("buf", cmdArgs...)
 	c.Stdin = os.Stdin
@@ -85,11 +97,5 @@ plugins:
 		return fmt.Errorf("error executing 'buf':: %w", err)
 	}
 
-	if bufFileNotFound {
-		fmt.Println("Removing temporary 'buf.gen.yaml'")
-		if err := os.Remove("buf.gen.yaml"); err != nil {
-			return fmt.Errorf("error deleting buf.gen.yaml: %w", err)
-		}
-	}
 	return nil
 }

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+* The `substreams protogen` command now uses this Buf plugin https://buf.build/community/neoeinstein-prost to generate the Rust code for your Substreams definitions.
+
+* The `substreams protogen` command no longer generate the `FILE_DESCRIPTOR_SET` constant which generates an unsued warning in Rust. We don't think nobody relied on having the `FILE_DESCRIPTOR_SET` constant generated, but if it's the case, you can provide your own `buf.gen.yaml` that will be used instead of the generated one when doing `substreams protogen`.
+
+### Fixed
+
+* Fixed generated `buf.gen.yaml` not being deleted when an error occurs while generating the Rust code.
+
 ## [v1.1.5](https://github.com/streamingfast/substreams/releases/tag/v1.1.5)
 
 ### Highlights
@@ -14,7 +26,7 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 
 * When upgrading a substreams server to this version, you should delete all existing module caches to benefit from deterministic output
 
-### Added 
+### Added
 
 * Tier1 now records deterministic failures in wasm, "blacklists" identical requests for 10 minutes (by serving them the same InvalidArgument error) with a forced incremental backoff. This prevents accidental bad actors from hogging tier2 resources when their substreams cannot go passed a certain block.
 * Tier1 now sends the ResolvedStartBlock, LinearHandoffBlock and MaxJobWorkers in SessionInit message for the client and gui to show

@@ -105,15 +105,18 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	var err error
 	ctx := streamSrv.Context()
 
-	parentTraceID := tracing.GetTraceID(ctx)
-	newTraceID := tracing.NewRandomTraceID()
+	// TODO: use stage and segment numbers when implemented
+	stage := request.OutputModule
+	segment := fmt.Sprintf("%d:%d",
+		request.StartBlockNum,
+		request.StopBlockNum)
 
-	// Note: we are removing the logger from the context completely, because we want to override the trace_id given by the middleware
-	//ctx = tracing.WithTraceID(ctx, newTraceID)
-	logger := s.logger.Named("tier2").With(zap.String("parent_trace_id", parentTraceID.String())).With(zap.Stringer("trace_id", newTraceID))
+	logger := reqctx.Logger(ctx).Named("tier2").With(
+		zap.String("stage", stage),
+		zap.String("segment", segment),
+	)
 
 	ctx = logging.WithLogger(ctx, logger)
-
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
@@ -144,7 +147,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(logger, streamSrv)
-	err = s.processRange(ctx, request, respFunc, parentTraceID.String())
+	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
 	grpcError = toGRPCError(err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
@@ -154,7 +157,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	return grpcError
 }
 
-func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, parentTraceID string) error {
+func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, traceID string) error {
 	logger := reqctx.Logger(ctx)
 
 	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
@@ -189,7 +192,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), parentTraceID)
+	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), traceID)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -226,9 +229,9 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		// This must always be the parent/global trace id, the one that comes from tier1
 		"tier2",
-		parentTraceID,
+		// This must always be the parent/global trace id, the one that comes from tier1
+		traceID,
 		opts...,
 	)
 

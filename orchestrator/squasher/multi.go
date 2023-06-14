@@ -21,6 +21,8 @@ import (
 // It also produces complete store snapshots, which are dependencies
 // for the segment following the snapshot.
 type Multi struct {
+	// TODO: rename this to Stages, the Single will be merging a full Stage,
+	// not a single store.
 	Modules              map[string]*Single
 	targetExclusiveBlock uint64
 }

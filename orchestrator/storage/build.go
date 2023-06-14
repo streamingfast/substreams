@@ -10,17 +10,22 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/execout/state"
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"
 )
 
-type state struct {
+type state2 struct {
 	stage.Unit
 	state stage.UnitState
 }
 
-func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap, segmenter *block.Segmenter) ([]state, error) {
+func FetchStoresState(
+	ctx context.Context,
+	storeConfigMap store.ConfigMap,
+	segmenter *block.Segmenter,
+) ([]state2, error) {
 	// we walk all the Complete stores we can find,
 	// so we can mark those stage.Unit as StageCompleted
 	//
@@ -35,6 +40,9 @@ func FetchStoresState(ctx context.Context, storeConfigMap store.ConfigMap, segme
 	// associated with the stage, and when the length of the map is
 	// equal to the length of the modules array, we know we have a
 	// complete Stage, and we can emit the message.
+
+	// We need a segmenter for each module's, because the lower boundary
+	// of the Store is specific to the module's initial block.
 
 	// How to inject lots of messages initially? We spin this process
 	// in a loop.Cmd and have it do some `scheduler.Send()` like crazy?

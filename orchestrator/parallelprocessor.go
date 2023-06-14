@@ -38,7 +38,11 @@ func BuildParallelProcessor(
 	sched := scheduler.New(ctx, stream, outputGraph)
 
 	// In Dev mode
-	// * The linearHandoff will be set to the startblock (never equal to stopBlock, which is exclusive)
+	// * The goal of running the parallel processor is to bring the stores up
+	//   to date with the linearHandoff block. We are not interested in
+	//   past payloads, only the executions that will happen after the linearHandoff,
+	//   back in the pipeline.
+	// * The linearHandoff will be set to the startBlock (never equal to stopBlock, which is exclusive)
 	// * We will generate stores up to the linearHandoff, even if we end with an incomplete store
 	//
 	// In Prod mode
@@ -47,6 +51,10 @@ func BuildParallelProcessor(
 	// * If there is no stop block (== 0), the linearHandoff will be at the end of the irreversible segment, we don't stop there
 	// * If we stop at the linearHandoff, we will only save the stores up to the boundary of the latest complete store.
 	// * On the contrary, if we need to keep going after the linearHandoff, we will need to save the last "incomplete" store.
+
+	// TODO: in dev mode, the backprocessing run is solely to prepare stores,
+	//  we should NOT run the ExecOutWalker _and_ not schedule
+	//  the last stage.
 
 	stopAtHandoff := reqDetails.LinearHandoffBlockNum == reqDetails.StopBlockNum
 	storeLinearHandoffBlockNum := reqDetails.LinearHandoffBlockNum

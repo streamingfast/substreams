@@ -255,9 +255,13 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {
 	// TODO(abourget): Add the MODULE Name in there, so we know to which modules each of those things
 	// are attached in the tier1.
+	// TODO(abourget): actually, here generate all the partial file infos
+	// based on the request, segment and stage, and disregard what was
+	// sent over the Complete message.. we will simply wait for the
+	// stores to all having been processed.
 	out = make(store.FileInfos, len(completed.AllProcessedRanges))
 	for i, b := range completed.AllProcessedRanges {
-		out[i] = store.NewPartialFileInfo(b.StartBlock, b.EndBlock, completed.TraceId)
+		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock, completed.TraceId)
 	}
 	return
 }

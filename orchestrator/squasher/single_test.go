@@ -227,15 +227,17 @@ func TestStoreSquasher_processRange(t *testing.T) {
 				}
 				return nil
 			}
-			squasher := &Single{
-				store:                  newTestStore(t, testStore, test.storeInitialBlock),
-				nextExpectedStartBlock: test.nextExpectedStartBlock,
-				storeSaveInterval:      test.storeSaveInterval,
-			}
 			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{
 				ProductionMode: false,
 			})
-			err := squasher.processSquashableFile(ctx, eg, test.squashableFile)
+			squasher := &Single{
+				ctx:                    ctx,
+				store:                  newTestStore(t, testStore, test.storeInitialBlock),
+				nextExpectedStartBlock: test.nextExpectedStartBlock,
+				storeSaveInterval:      test.storeSaveInterval,
+				writerErrGroup:         llerrgroup.New(250),
+			}
+			err := squasher.processSquashableFile(test.squashableFile)
 			require.NoError(t, eg.Wait())
 
 			if test.expectError != nil {

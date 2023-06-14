@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/abourget/llerrgroup"
@@ -30,10 +29,13 @@ const (
 	SingleCompleted // All merging operations were completed for the provided Segmenter
 )
 
+// Single represents a single stage's stores squasher.
 type Single struct {
 	*shutter.Shutter
+	ctx context.Context
 
 	state SingleState
+	stage int
 
 	name   string
 	logger *zap.Logger
@@ -54,6 +56,7 @@ func NewSingle(
 ) *Single {
 	logger := reqctx.Logger(ctx).With(zap.String("store_name", initialStore.Name()), zap.String("module_hash", initialStore.ModuleHash()))
 	s := &Single{
+		ctx:                 ctx,
 		Shutter:             shutter.New(),
 		name:                initialStore.Name(),
 		logger:              logger,
@@ -68,11 +71,9 @@ func NewSingle(
 
 func (s *Single) AddPartial(unit stage.Unit) loop.Cmd {
 	s.partialsPresent[unit.Segment] = true
-	s.sortRange()
+	// don't bring me stuff that doesn't align with the Unit,
+	// so no need for sorting, no need for overlap checking.s
 
-	if err := s.ensureNoOverlap(); err != nil {
-		return loop.Quit(err)
-	}
 	return s.CmdMergeRange()
 }
 
@@ -99,133 +100,63 @@ func (s *Single) CmdMergeRange() loop.Cmd {
 		}
 	}
 
-	var nextFile *store.FileInfo
-	for _, file := range s.files {
-		if file.Range.Equals(nextRange) {
-			nextFile = file
-		}
-	}
-
-	if nextFile == nil {
-		// Nothing contiguous to merge at the moment.
+	nextSegmentReady := s.partialsPresent[s.nextSegmentToSquash]
+	if !nextSegmentReady {
 		return nil
 	}
 
-	// TODO: check whether we're in a state to actually merge anything
-	//  is there some contiguous stuff I can do?
-	//  If not, return nil
 	s.state = SingleMerging
 
 	return func() loop.Msg {
-		// FIXME: transform into a Staged operation, with all the files
-		// for a given range would be done in parallel here with a simple `llerrgroup`
-		// .. all stores are merged in one swift, from the Squasher's perspective.
-		// TODO: Do the actual merging
-		return MsgMergeFinished{ModuleName: s.name}
+		return s.process(nextRange, s.nextSegmentToSquash)
 	}
 }
 
 func (s *Single) moduleName() string { return s.name }
 
-//func (s *Single) squash(ctx context.Context, partialsChunks store.FileInfos) error {
-//	if len(partialsChunks) == 0 {
-//		return fmt.Errorf("partialsChunks is empty for module %q", s.name)
-//	}
-//
-//	select {
-//	case s.partialsChunks <- partialsChunks:
-//	case <-ctx.Done():
-//		return ctx.Err()
-//	case <-s.Terminated():
-//		return s.Err()
-//	}
-//	return nil
-//}
-//
-//func (s *Single) logger(ctx context.Context) *zap.Logger {
-//	return
-//}
+// TODO(abourget): Move to the right place:
+// 	metrics.SquashersStarted.Inc()
+//	defer metrics.SquashersEnded.Inc()
 
-//func (s *Single) launch(ctx context.Context) {
-//	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/pipeline/store_squasher/%s/squashing", s.name))
-//	span.SetAttributes(
-//		attribute.Int64("target_exclusive_end_block", int64(s.targetExclusiveEndBlock)),
-//		attribute.Int64("next_expected_start_block", int64(s.nextExpectedStartBlock)),
-//	)
-//	err := s.processPartials(ctx)
-//	span.EndWithErr(&err)
-//	s.Shutdown(err)
-//}
+func (s *Single) process(rng *block.Range, segment int) loop.Msg {
+	start := time.Now()
 
-// TODO: this function needs to be turned into a message
-func (s *Single) processPartials(ctx context.Context) error {
-	reqStats := reqctx.ReqStats(ctx)
+	// FIXME: transform into a Staged operation, with all the files
+	// for a given range would be done in parallel here with a simple `llerrgroup`
+	// .. all stores are merged in one swift, from the Squasher's perspective.
+	// TODO: Do the actual merging, of all stores in the stage, in parallel
+	//  with an llerrgroup in here.
+	//  interrupt on `ctx.Done()`, and early exit when one of the store merge
+	//  operation fails.
 
-	s.logger.Info("launching store squasher")
-	metrics.SquashersStarted.Inc()
-	defer metrics.SquashersEnded.Inc()
-
-	for {
-		if err := s.accumulateMorePartials(ctx); err != nil {
-			if errors.Is(err, PartialsChannelClosed) {
-				return nil
-			}
-			return err
-		}
-
-		eg := llerrgroup.New(250)
-		start := time.Now()
-
-		out, err := s.processRanges(ctx, eg)
-		if err != nil {
-			return err
-		}
-
-		if err := eg.Wait(); err != nil {
-			return fmt.Errorf("waiting: %w", err)
-		}
-
-		if out.lastExclusiveEndBlock != 0 {
-			reqStats.RecordStoreSquasherProgress(s.name, out.lastExclusiveEndBlock)
-		}
-
-		totalDuration := time.Since(start)
-		avgDuration := time.Duration(0)
-		if out.squashCount > 0 {
-			metrics.SquashesLaunched.AddInt(int(out.squashCount))
-			avgDuration = totalDuration / time.Duration(out.squashCount)
-		}
-		s.logger.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
+	// TODO do merging of all stores in parallel here, with an llerrgroup
+	out, err := s.processRanges()
+	if err != nil {
+		return loop.Quit(err)()
 	}
+
+	if err := s.writerErrGroup.Wait(); err != nil {
+		return fmt.Errorf("waiting: %w", err)
+	}
+
+	if out.lastExclusiveEndBlock != 0 {
+		// TODO: What's that clause?
+	}
+
+	totalDuration := time.Since(start)
+	avgDuration := time.Duration(0)
+	if out.squashCount > 0 {
+		metrics.SquashesLaunched.AddInt(int(out.squashCount))
+		avgDuration = totalDuration / time.Duration(out.squashCount)
+	}
+	s.logger.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
+
+	return MsgMergeFinished{ModuleName: s.name}
 }
 
 type rangeProgress struct {
 	squashCount           uint64
 	lastExclusiveEndBlock uint64
-}
-
-func (s *Single) sortRange() {
-	sort.Slice(s.files, func(i, j int) bool {
-		return s.files[i].Range.StartBlock < s.files[j].Range.ExclusiveEndBlock
-	})
-}
-
-func (s *Single) ensureNoOverlap() error {
-	if len(s.files) < 2 {
-		return nil
-	}
-
-	end := len(s.files) - 1
-	for i := 0; i < end; i++ {
-		left := s.files[i]
-		right := s.files[i+1]
-
-		if right.Range.StartBlock < left.Range.ExclusiveEndBlock {
-			return fmt.Errorf("sorted ranges overlapping, left: %s, right: %s", left.Range, right.Range)
-		}
-	}
-
-	return nil
 }
 
 // store_save_interval = 1K
@@ -237,22 +168,22 @@ func (s *Single) ensureNoOverlap() error {
 //j5 6 -> 8
 //j6 8 -> 10
 
-func (s *Single) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rangeProgress, error) {
-	logger := s.logger(ctx)
-	logger.Info("processing range", zap.Int("range_count", len(s.files)))
+func (s *Single) processRanges() (*rangeProgress, error) {
+	logger := s.logger
+	logger.Info("processing range", zap.Int("range_count", len(s.partialsPresent)))
 	out := &rangeProgress{}
 	for {
-		if eg.Stop() {
+		if s.writerErrGroup.Stop() {
 			break
 		}
 
-		if len(s.files) == 0 {
+		if len(s.partialsPresent) == 0 {
 			logger.Info("no more ranges to squash")
 			return out, nil
 		}
 
-		squashableFile := s.files[0]
-		err := s.processSquashableFile(ctx, eg, squashableFile)
+		squashableFile := s.partialsPresent[0]
+		err := s.processSquashableFile(squashableFile)
 		if err == SkipFile {
 			break
 		}
@@ -275,8 +206,8 @@ func (s *Single) processRanges(ctx context.Context, eg *llerrgroup.Group) (*rang
 	return out, nil
 }
 
-func (s *Single) processSquashableFile(ctx context.Context, eg *llerrgroup.Group, squashableFile *store.FileInfo) error {
-	logger := s.logger(ctx)
+func (s *Single) processSquashableFile(squashableFile *store.FileInfo) error {
+	logger := s.logger
 
 	startTime := time.Now()
 	logger.Info("testing squashable range",
@@ -316,7 +247,7 @@ func (s *Single) processSquashableFile(ctx context.Context, eg *llerrgroup.Group
 
 	if reqctx.Details(ctx).ProductionMode || squashableFile.Range.ExclusiveEndBlock%s.storeSaveInterval == 0 {
 		logger.Info("deleting store", zap.Stringer("store", nextStore))
-		eg.Go(func() error {
+		s.writerErrGroup.Go(func() error {
 			return nextStore.DeleteStore(ctx, squashableFile)
 		})
 	}
@@ -329,7 +260,7 @@ func (s *Single) processSquashableFile(ctx context.Context, eg *llerrgroup.Group
 			return fmt.Errorf("save full store: %w", err)
 		}
 
-		eg.Go(func() error {
+		s.writerErrGroup.Go(func() error {
 			// TODO: could this cause an issue if the writing takes more time than when trying to opening the file??
 			return writer.Write(ctx)
 		})

@@ -1,6 +1,8 @@
 package stage
 
 import (
+	"go.uber.org/zap/zapcore"
+
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
@@ -52,9 +54,9 @@ func (s UnitState) String() string {
 	}
 }
 
-func (i Unit) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	enc.AddInt("segment", i.Segment)
-	enc.AddInt("stage", i.Stage)
-	enc.AddString("range", i.Range.String())
+func (u Unit) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddInt("segment", u.Segment)
+	enc.AddInt("stage", u.Stage)
+	enc.AddString("range", u.Range.String())
 	return nil
 }

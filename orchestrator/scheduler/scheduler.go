@@ -114,6 +114,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		return loop.Batch(
 			s.killPotentiallyRunningJob(msg.Stage, msg.Segment),
 			loop.Sequence(
+				// TODO: tell the squasher these partials are on disk
+				// per Segment + Stage. Meaning all of the stores
+				// for a given Unit are present.
 				s.Squasher.AddPartials(msg.StoreName, msg.Files...),
 				s.mergeStage(msg.Stage),
 			),

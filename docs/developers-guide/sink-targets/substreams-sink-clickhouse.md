@@ -1,11 +1,11 @@
 ---
-description: Aleno Substreams Clickhouse sink
+description: Aleno Substreams ClickHouse sink
 ---
 
 # [`Substreams`](https://substreams.streamingfast.io/) [Clickhouse](https://clickhouse.com/) sink module
 
 
-> [`substreams-sink-clickhouse`](https://github.com/Aleno1/substreams-sink-clickhouse) is a tool that allows developers to pipe data extracted metrics from a blockchain into a Clickhouse DBMS for warehousing purposes.
+> [`substreams-sink-clickhouse`](https://github.com/Aleno1/substreams-sink-clickhouse) is a tool that allows developers to pipe data extracted metrics from a blockchain into a ClickHouse DBMS for warehousing purposes.
 
 > This sink is very similar to the [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres) and one could refer to its [docs](./substreams-sink-postgres.md) to understand its concepts.
 
@@ -22,11 +22,11 @@ description: Aleno Substreams Clickhouse sink
     docker compose up
     ```
 
-    > **Note** Feel free to skip this step if you already have a running Clickhouse instance accessible, don't forget to update the connection string in the command below.
+    > **Note** Feel free to skip this step if you already have a running ClickHouse instance accessible, don't forget to update the connection string in the command below.
 
-2. Setup Clickhouse
+2. Setup ClickHouse
 
-    Connect to Clickhouse
+    Connect to ClickHouse
 
     ```bash
     docker compose exec ch_server clickhouse-client -u dev-node --password insecure-change-me-in-prod -h localhost
@@ -59,7 +59,7 @@ description: Aleno Substreams Clickhouse sink
     ORDER BY id;
     ```
 
-    > **Note** Each create table query must be run independently as clickhouse doesn't support multiple create table queries at once.
+    > **Note** Each create table query must be run independently as ClickHouse doesn't support multiple create table queries at once.
 
 3. Run the sink
 
@@ -82,7 +82,7 @@ To be accepted by `substreams-sink-clickhouse`, your module output's type must b
 
 By convention, we name the `map` module that emits [sf.substreams.sink.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/substreams/sink/database/v1/database.proto#L7) output `db_out`.
 
-### Clickhouse DSN
+### ClickHouse DSN
 
 The connection string is provided using a simple string format respecting the URL specification. The DSN format is:
 

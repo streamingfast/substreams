@@ -33,7 +33,7 @@
   * [PostgreSQL](developers-guide/sink-targets/substreams-sink-postgres.md)
   * [Prometheus](developers-guide/sink-targets/substreams-sink-prometheus.md)
   * [MongoDB](developers-guide/sink-targets/substreams-sink-mongodb.md)
-  * [Clickhouse](developers-guide/sink-targets/substreams-sink-clickhouse.md)
+  * [ClickHouse](developers-guide/sink-targets/substreams-sink-clickhouse.md)
 
 ## Reference & Specs
 

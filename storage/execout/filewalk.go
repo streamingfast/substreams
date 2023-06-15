@@ -33,5 +33,5 @@ func (fw *FileWalker) Next() {
 }
 
 func (fw *FileWalker) IsDone() bool {
-	return fw.segment >= fw.segmenter.Count()
+	return fw.segment > fw.segmenter.LastIndex()
 }

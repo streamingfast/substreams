@@ -10,8 +10,6 @@ type Segmenter struct {
 	interval          uint64
 	initialBlock      uint64
 	exclusiveEndBlock uint64
-
-	count int
 }
 
 func NewSegmenter(interval uint64, initialBlock uint64, exclusiveEndBlock uint64) *Segmenter {
@@ -20,26 +18,44 @@ func NewSegmenter(interval uint64, initialBlock uint64, exclusiveEndBlock uint64
 		initialBlock:      initialBlock,
 		exclusiveEndBlock: exclusiveEndBlock,
 	}
-	s.count = s.computeCount()
 	return s
 }
 
-func (s *Segmenter) Count() int { return s.count }
+func (s *Segmenter) WithInitialBlock(newInitialBlock uint64) *Segmenter {
+	return NewSegmenter(s.interval, newInitialBlock, s.exclusiveEndBlock)
+}
 
-func (s *Segmenter) computeCount() int {
+func (s *Segmenter) WithExclusiveEndBlock(newExclusiveEndBlock uint64) *Segmenter {
+	return NewSegmenter(s.interval, s.initialBlock, newExclusiveEndBlock)
+}
+
+// Count returns the number of valid segments for the internal range.
+// Use LastIndex to know about the highest index.
+func (s *Segmenter) Count() int {
 	initSegment := s.initialBlock / s.interval
 	lastSegment := s.exclusiveEndBlock / s.interval
 	return int(lastSegment - initSegment + 1)
 }
 
+func (s *Segmenter) FirstIndex() int {
+	initSegment := s.initialBlock / s.interval
+	return int(initSegment)
+}
+
+func (s *Segmenter) LastIndex() int {
+	lastSegment := s.exclusiveEndBlock / s.interval
+	return int(lastSegment)
+}
+
 func (s *Segmenter) Range(idx int) *Range {
-	if idx < 0 {
+	first := s.FirstIndex()
+	if idx < first {
 		return nil
 	}
-	if idx == 0 {
+	if idx == first {
 		return s.firstRange()
 	}
-	return s.rangeFromBegin(idx)
+	return s.followingRange(idx)
 }
 
 func (s *Segmenter) firstRange() *Range {
@@ -51,24 +67,21 @@ func (s *Segmenter) firstRange() *Range {
 	return NewRange(s.initialBlock, utils.MinOf(upperBound, s.exclusiveEndBlock))
 }
 
-func (s *Segmenter) rangeFromBegin(idx int) *Range {
-	if idx >= s.count {
+func (s *Segmenter) followingRange(idx int) *Range {
+	if idx > s.LastIndex() {
 		return nil
 	}
-	baseBlock := s.initialBlock - s.initialBlock%s.interval
-	baseBlock += uint64(idx) * s.interval
+	baseBlock := uint64(idx) * s.interval
 	upperBound := baseBlock + s.interval
 	return NewRange(baseBlock, utils.MinOf(upperBound, s.exclusiveEndBlock))
 }
 
 func (s *Segmenter) IndexForBlock(blockNum uint64) int {
-	blockSegment := blockNum / s.interval
-	initSegment := s.initialBlock / s.interval
-	return int(blockSegment - initSegment)
+	return int(blockNum / s.interval)
 }
 
 func (s *Segmenter) IsPartial(segmentIndex int) bool {
-	if segmentIndex >= s.count {
+	if segmentIndex > s.LastIndex() {
 		panic("segment index out of range")
 	}
 	return s.Range(segmentIndex).ExclusiveEndBlock%s.interval != 0

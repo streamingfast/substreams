@@ -66,7 +66,7 @@ func (s *Stages) NextJob() *Unit {
 		if len(s.segmentStates) <= segmentIdx {
 			s.growSegments()
 		}
-		if segmentIdx >= s.Count() {
+		if segmentIdx > s.LastIndex() {
 			break
 		}
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {

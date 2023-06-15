@@ -48,18 +48,16 @@ func TestSegmenter_Count(t *testing.T) {
 
 func TestSegmenter_IndexWithBlock(t *testing.T) {
 	s := Segmenter{
-		interval:     10,
-		initialBlock: 121,
+		interval: 10,
 	}
-	assert.Equal(t, -1, s.IndexForBlock(119))
-	assert.Equal(t, 0, s.IndexForBlock(120)) // even though the Range() call will yield `nil`
-	assert.Equal(t, 0, s.IndexForBlock(121))
-	assert.Equal(t, 0, s.IndexForBlock(122))
-	assert.Equal(t, 0, s.IndexForBlock(129))
-	assert.Equal(t, 1, s.IndexForBlock(130))
-	assert.Equal(t, 1, s.IndexForBlock(131))
-	assert.Equal(t, 1, s.IndexForBlock(139))
-	assert.Equal(t, 2, s.IndexForBlock(140))
+	assert.Equal(t, 0, s.IndexForBlock(5))
+	assert.Equal(t, 0, s.IndexForBlock(9))
+	assert.Equal(t, 1, s.IndexForBlock(10))
+	assert.Equal(t, 1, s.IndexForBlock(11))
+	assert.Equal(t, 1, s.IndexForBlock(19))
+	assert.Equal(t, 2, s.IndexForBlock(20))
+	assert.Equal(t, 2, s.IndexForBlock(21))
+	assert.Equal(t, 4, s.IndexForBlock(45))
 }
 
 func TestSegmenter_firstRange(t *testing.T) {
@@ -80,28 +78,40 @@ func TestSegmenter_firstRange(t *testing.T) {
 	assert.Nil(t, s.firstRange())
 }
 
-func TestSegmenter_rangeFromBegin(t *testing.T) {
+func TestSegmenter_followingRange(t *testing.T) {
 	s := NewSegmenter(10, 1, 100)
-	assert.Equal(t, NewRange(0, 10), s.rangeFromBegin(0))
+	assert.Equal(t, ParseRange("0-10"), s.followingRange(0))
 	s = NewSegmenter(10, 1, 100)
-	assert.Equal(t, NewRange(10, 20), s.rangeFromBegin(1))
+	assert.Equal(t, ParseRange("10-20"), s.followingRange(1))
 	s = NewSegmenter(10, 1, 15)
-	assert.Equal(t, NewRange(10, 15), s.rangeFromBegin(1))
+	assert.Equal(t, ParseRange("10-15"), s.followingRange(1))
 	s = NewSegmenter(10, 1, 25)
-	assert.Equal(t, NewRange(20, 25), s.rangeFromBegin(2))
+	assert.Equal(t, ParseRange("20-25"), s.followingRange(2))
 	s = NewSegmenter(10, 15, 25)
-	assert.Equal(t, NewRange(20, 25), s.rangeFromBegin(1))
+	assert.Equal(t, ParseRange("20-25"), s.followingRange(2))
 	s = NewSegmenter(10, 15, 25)
-	assert.Equal(t, NewRange(10, 20), s.rangeFromBegin(0))
+	assert.Equal(t, ParseRange("10-20"), s.followingRange(1))
 }
 
 func TestSegmenter_Range(t *testing.T) {
 	s := NewSegmenter(10, 1, 100)
 	assert.Nil(t, s.Range(-1))
 
-	s = NewSegmenter(10, 1, 100)
-	assert.Equal(t, NewRange(1, 10), s.Range(0))
+	s = NewSegmenter(10, 15, 25)
+	assert.Nil(t, s.Range(0))
+	assert.Equal(t, 1, s.FirstIndex())
+	assert.Equal(t, 2, s.LastIndex())
+	assert.Equal(t, ParseRange("15-20"), s.Range(1))
+	assert.Equal(t, ParseRange("20-25"), s.Range(2))
+	assert.Nil(t, s.Range(3))
+
+	s = NewSegmenter(10, 1, 99)
+	assert.Equal(t, 10, s.Count())
+	assert.Equal(t, 0, s.FirstIndex())
+	assert.Equal(t, 9, s.LastIndex())
+	assert.Equal(t, ParseRange("90-99"), s.Range(9))
 
 	s = NewSegmenter(10, 1, 15)
 	assert.Equal(t, NewRange(10, 15), s.Range(1))
+
 }

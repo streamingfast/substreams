@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
-	"github.com/streamingfast/substreams/storage/execout/state"
 	execoutState "github.com/streamingfast/substreams/storage/execout/state"
 	"github.com/streamingfast/substreams/storage/store"
 	storeState "github.com/streamingfast/substreams/storage/store/state"

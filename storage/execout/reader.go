@@ -120,6 +120,8 @@ func (r *LinearReader) download(ctx context.Context, fileWalker *FileWalker) err
 			}
 		}
 
+		// TODO: not sure IsDone has the appropriate comparison for this case.
+		//  But this all goes away doesn't it ?
 		if fileWalker.IsDone() {
 			return nil
 		}

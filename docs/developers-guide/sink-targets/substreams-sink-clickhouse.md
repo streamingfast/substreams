@@ -63,7 +63,7 @@ description: Aleno Substreams ClickHouse sink
 
 3. Run the sink
 
-    Use the precompiled Ethereum Block Meta [substreams](https://github.com/streamingfast/substreams-eth-block-meta/releases/download/v0.4.1/substreams-eth-block-meta-v0.4.1.spkg)
+    Use the precompiled Ethereum Block Meta [substreams](https://github.com/streamingfast/substreams-eth-block-meta/releases/latest)
 
     > **Note** To connect to Substreams you will need an authentication token, follow this [guide](https://substreams.streamingfast.io/reference-and-specs/authentication) to obtain one.
 
@@ -71,7 +71,7 @@ description: Aleno Substreams ClickHouse sink
     substreams-sink-clickhouse run \
         "clickhouse://dev-node:insecure-change-me-in-prod@localhost:8123" \
         "mainnet.eth.streamingfast.io:443" \
-        https://github.com/streamingfast/substreams-eth-block-meta/releases/download/v0.4.1/substreams-eth-block-meta-v0.4.1.spkg \
+        https://github.com/streamingfast/substreams-eth-block-meta/releases/download/v0.4.3/substreams-eth-block-meta-v0.4.3.spkg \
         db_out
     ```
 
@@ -91,3 +91,4 @@ The connection string is provided using a simple string format respecting the UR
 ```
 
 Where <options> is URL query parameters in <key>=<value> format, multiple options are separated by & signs. Supported options can be seen on libpq official documentation. The options <user>, <password>, <host>, <port> and <dbname> should not be passed in <options> as they are automatically extracted from the DSN URL.
+

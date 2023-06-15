@@ -98,7 +98,8 @@ func buildStoreSquasher(
 		)
 		// FIXME: what was the use of `startingStore.InitialBlock()` here? Can it be replaced
 		// by the segmenter and its first segment to squash?
-		storeSquasher = NewSingle(ctx, startingStore, segmenter, startingStore.InitialBlock())
+		segmenter := segmenter.WithInitialBlock(startingStore.InitialBlock())
+		storeSquasher = NewSingle(ctx, startingStore, segmenter)
 	} else {
 		initialRange := storeStorageState.InitialCompleteFile.Range
 		logger.Debug("loading initial store", zap.String("store", storeModuleName), zap.Stringer("initial_store_range", initialRange))
@@ -108,7 +109,8 @@ func buildStoreSquasher(
 
 		// Here, the exclusive end block is the place at which we have a completed range, so
 		// we should be squashing the very next segment.
-		storeSquasher = NewSingle(ctx, startingStore, segmenter, initialRange.ExclusiveEndBlock)
+		segmenter := segmenter.WithInitialBlock(initialRange.ExclusiveEndBlock)
+		storeSquasher = NewSingle(ctx, startingStore, segmenter)
 
 		onStoreCompletedUntilBlock(storeModuleName, initialRange.ExclusiveEndBlock)
 	}

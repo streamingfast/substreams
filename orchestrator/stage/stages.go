@@ -36,14 +36,15 @@ func NewStages(
 		lowestStageInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
 			stage.moduleStates = append(stage.moduleStates, &ModuleState{
-				name: mod.Name,
+				segmenter: segmenter.WithInitialBlock(mod.InitialBlock),
+				name:      mod.Name,
 			})
 			if lowestStageInitBlock > mod.InitialBlock {
 				lowestStageInitBlock = mod.InitialBlock
 			}
 		}
 
-		stage.firstSegment = segmenter.IndexForBlock(lowestStageInitBlock)
+		stage.segmenter = segmenter.WithInitialBlock(lowestStageInitBlock)
 
 		out.stages = append(out.stages, stage)
 	}

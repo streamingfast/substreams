@@ -52,7 +52,6 @@ func NewSingle(
 	ctx context.Context,
 	initialStore *store.FullKV,
 	segmenter *block.Segmenter,
-	nextSegmentToSquash int,
 ) *Single {
 	logger := reqctx.Logger(ctx).With(zap.String("store_name", initialStore.Name()), zap.String("module_hash", initialStore.ModuleHash()))
 	s := &Single{
@@ -62,7 +61,7 @@ func NewSingle(
 		logger:              logger,
 		store:               initialStore,
 		segmenter:           segmenter,
-		nextSegmentToSquash: nextSegmentToSquash,
+		nextSegmentToSquash: segmenter.FirstIndex(),
 		partialsPresent:     make(map[int]bool),
 		writerErrGroup:      llerrgroup.New(250),
 	}

@@ -5,16 +5,16 @@ description: Aleno Substreams ClickHouse sink
 # [`Substreams`](https://substreams.streamingfast.io/) [Clickhouse](https://clickhouse.com/) sink module
 
 
-> [`substreams-sink-clickhouse`](https://github.com/Aleno1/substreams-sink-clickhouse) is a tool that allows developers to pipe data extracted metrics from a blockchain into a ClickHouse DBMS for warehousing purposes.
+> [`substreams-sink-clickhouse`](https://github.com/aleno-ai/substreams-sink-clickhouse) is a tool that allows developers to pipe data extracted metrics from a blockchain into a ClickHouse DBMS for warehousing purposes.
 
 > This sink is very similar to the [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres) and one could refer to its [docs](./substreams-sink-postgres.md) to understand its concepts.
 
 
 ### Quickstart
 
-1. Install `substreams-sink-clickhouse` by using the pre-built binary release [available in the releases page](https://github.com/Aleno1/substreams-sink-clickhouse/releases). Extract `substreams-sink-clickhouse` binary into a folder and ensure this folder is referenced globally via your `PATH` environment variable.
+1. Install `substreams-sink-clickhouse` by using the pre-built binary release [available in the releases page](https://github.com/aleno-ai/substreams-sink-clickhouse/releases). Extract `substreams-sink-clickhouse` binary into a folder and ensure this folder is referenced globally via your `PATH` environment variable.
 
-    > **Note** Or install from source directly `go install github.com/Aleno1/substreams-sink-clickhouse/cmd/substreams-sink-clickhouse@latest`.
+    > **Note** Or install from source directly `go install github.com/aleno-ai/substreams-sink-clickhouse/cmd/substreams-sink-clickhouse@latest`.
 
 1. Start Docker Compose:
 

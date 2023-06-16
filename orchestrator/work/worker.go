@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
@@ -35,10 +36,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd // *Result
+	Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd // *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -46,12 +47,12 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, upstr
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd
+	f  func(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Msg {
-	return f.f(ctx, unit, upstream)
+func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Msg {
+	return f.f(ctx, unit, workRange, upstream)
 }
 
 func (f SimpleWorkerFactory) ID() string {
@@ -81,11 +82,18 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd {
-	// TODO: use the segmente adapted to the request, we'll want to stop according
-	//  to the orchestrator Config
-	rng := segmenter.Range(unit.Segment)
-	request := unit.NewRequest(reqctx.Details(ctx), rng)
+func newRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+	return &pbssinternal.ProcessRangeRequest{
+		StartBlockNum: workRange.StartBlock,
+		StopBlockNum:  workRange.ExclusiveEndBlock,
+		Modules:       req.Modules,
+		OutputModule:  req.OutputModule,
+		Stage:         uint32(stageIndex),
+	}
+}
+
+func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
+	request := newRequest(reqctx.Details(ctx), unit.Stage, workRange)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {

@@ -51,7 +51,7 @@ func TestNewStagesNextJobs(t *testing.T) {
 	seg := block.NewSegmenter(10, 5, 50)
 	stages := NewStages(outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5), seg)
 
-	j1 := stages.NextJob()
+	j1, _ := stages.NextJob()
 	assert.Equal(t, 2, j1.Stage)
 	assert.Equal(t, 0, j1.Segment)
 
@@ -155,7 +155,8 @@ CCSSSS..
 CSS.....
 CC......`)
 
-	assert.Nil(t, stages.NextJob())
+	_, r := stages.NextJob()
+	assert.Nil(t, r)
 	stages.MarkSegmentPartialPresent(id(2, 0))
 
 	segmentStateEquals(t, stages, `
@@ -163,7 +164,8 @@ CCPSSS..
 CSS.....
 CC......`)
 
-	assert.Nil(t, stages.NextJob())
+	_, r = stages.NextJob()
+	assert.Nil(t, r)
 	stages.MarkSegmentMerging(id(2, 0))
 
 	segmentStateEquals(t, stages, `
@@ -171,7 +173,8 @@ CCMSSS..
 CSS.....
 CC......`)
 
-	assert.Nil(t, stages.NextJob())
+	_, r = stages.NextJob()
+	assert.Nil(t, r)
 	stages.MarkSegmentCompleted(id(2, 0))
 
 	segmentStateEquals(t, stages, `

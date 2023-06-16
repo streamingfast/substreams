@@ -65,7 +65,7 @@ func (s *Stages) setState(u Unit, state UnitState) {
 	s.segmentStates[u.Segment-s.segmentOffset][u.Stage] = state
 }
 
-func (s *Stages) NextJob() *Unit {
+func (s *Stages) NextJob() (Unit, *block.Range) {
 	// TODO: before calling NextJob, keep a small reserve (10% ?) of workers
 	//  so that when a job finishes, it can start immediately a potentially
 	//  higher priority one (we'll go do all those first-level jobs
@@ -99,11 +99,11 @@ func (s *Stages) NextJob() *Unit {
 			}
 
 			s.markSegmentScheduled(unit)
-			return &unit
+			return unit, s.segmenter.Range(unit.Segment)
 		}
 		segmentIdx++
 	}
-	return nil
+	return Unit{}, nil
 }
 
 func (s *Stages) growSegments() {

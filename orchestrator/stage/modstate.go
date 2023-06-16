@@ -1,16 +1,17 @@
 package stage
 
-import "github.com/streamingfast/substreams/block"
+import (
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage/store"
+)
 
 type ModuleState struct {
 	name string
 
 	segmenter *block.Segmenter
 
-	completedSegments int
-	scheduledSegments map[int]bool
+	store *store.FullKV
 
-	readyUpToBlock     uint64
-	mergedUpToBlock    uint64
-	scheduledUpToBlock uint64
+	// The corresponding store has been sync'd up to this segment, and is complete
+	segmentCompleted int
 }

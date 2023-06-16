@@ -81,8 +81,8 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case work.MsgScheduleNextJob:
-		workUnit := s.Stages.NextJob()
-		if workUnit == nil {
+		workUnit, workRange := s.Stages.NextJob()
+		if workRange == nil {
 			return nil
 		}
 
@@ -92,7 +92,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		worker := s.WorkerPool.Borrow()
 
 		return loop.Batch(
-			worker.Work(s.ctx, *workUnit, s.stream),
+			worker.Work(s.ctx, workUnit, workRange, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 

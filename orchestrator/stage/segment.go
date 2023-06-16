@@ -2,10 +2,6 @@ package stage
 
 import (
 	"go.uber.org/zap/zapcore"
-
-	"github.com/streamingfast/substreams/block"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	"github.com/streamingfast/substreams/reqctx"
 )
 
 type UnitState int
@@ -23,16 +19,6 @@ const (
 type Unit struct {
 	Segment int
 	Stage   int
-}
-
-func (i Unit) NewRequest(req *reqctx.RequestDetails, rng *block.Range) *pbssinternal.ProcessRangeRequest {
-	return &pbssinternal.ProcessRangeRequest{
-		StartBlockNum: rng.StartBlock,
-		StopBlockNum:  rng.ExclusiveEndBlock,
-		Modules:       req.Modules,
-		OutputModule:  req.OutputModule,
-		Stage:         uint32(i.Stage),
-	}
 }
 
 func (s UnitState) String() string {

@@ -59,7 +59,7 @@ func (s *Segmenter) Range(idx int) *Range {
 }
 
 func (s *Segmenter) firstRange() *Range {
-	if s.exclusiveEndBlock < s.initialBlock {
+	if s.exclusiveEndBlock != 0 && s.exclusiveEndBlock < s.initialBlock {
 		return nil
 	}
 	floorLowerBound := s.initialBlock - s.initialBlock%s.interval

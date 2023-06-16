@@ -6,7 +6,6 @@ import (
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
-	"go.uber.org/zap/zapcore"
 )
 
 type UnitState int
@@ -20,17 +19,16 @@ const (
 )
 
 // Unit can be used as a key, and points to the respective indexes of
-// Stages::unitStates[Unit.Segment][Unit.Stage]
+// Stages.GetState(unit)
 type Unit struct {
 	Segment int
 	Stage   int
-	Range   *block.Range
 }
 
-func (i Unit) NewRequest(req *reqctx.RequestDetails) *pbssinternal.ProcessRangeRequest {
+func (i Unit) NewRequest(req *reqctx.RequestDetails, rng *block.Range) *pbssinternal.ProcessRangeRequest {
 	return &pbssinternal.ProcessRangeRequest{
-		StartBlockNum: i.Range.StartBlock,
-		StopBlockNum:  i.Range.ExclusiveEndBlock,
+		StartBlockNum: rng.StartBlock,
+		StopBlockNum:  rng.ExclusiveEndBlock,
 		Modules:       req.Modules,
 		OutputModule:  req.OutputModule,
 		Stage:         uint32(i.Stage),
@@ -57,6 +55,5 @@ func (s UnitState) String() string {
 func (u Unit) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddInt("segment", u.Segment)
 	enc.AddInt("stage", u.Stage)
-	enc.AddString("range", u.Range.String())
 	return nil
 }

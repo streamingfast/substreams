@@ -6,12 +6,17 @@ import (
 )
 
 type Stages struct {
-	*block.Segmenter
+	segmenter *block.Segmenter
 
 	stages []*Stage
 
 	// segmentStates is a matrix of segment and stages
-	segmentStates []stageStates // segmentStates[SegmentIndex][StageIndex]
+	segmentStates []stageStates // segmentStates[offsetSegment][StageIndex]
+
+	// If you're processing at 12M blocks, offset 12,000 segments so you don't need to allocate 12k empty elements.
+	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
+	// are assumed to have been either fully loaded, or merged up until this offset.
+	segmentOffset int
 }
 type stageStates []UnitState
 
@@ -22,7 +27,8 @@ func NewStages(
 	stagedModules := outputGraph.StagedUsedModules()
 	lastIndex := len(stagedModules) - 1
 	out = &Stages{
-		Segmenter: segmenter,
+		segmenter:     segmenter,
+		segmentOffset: segmenter.IndexForBlock(outputGraph.LowestInitBlock()),
 	}
 	for idx, mods := range stagedModules {
 		isLastStage := idx == lastIndex
@@ -51,6 +57,14 @@ func NewStages(
 	return out
 }
 
+func (s *Stages) GetState(u Unit) UnitState {
+	return s.segmentStates[u.Segment-s.segmentOffset][u.Stage]
+}
+
+func (s *Stages) setState(u Unit, state UnitState) {
+	s.segmentStates[u.Segment-s.segmentOffset][u.Stage] = state
+}
+
 func (s *Stages) NextJob() *Unit {
 	// TODO: before calling NextJob, keep a small reserve (10% ?) of workers
 	//  so that when a job finishes, it can start immediately a potentially
@@ -60,36 +74,32 @@ func (s *Stages) NextJob() *Unit {
 	//  right away when there are too much jobs scheduled before others
 	//  in a given stage.
 
-	// FIXME: eventually, we can start from s.completedSegments, and push `completedSegments`
-	// each time contiguous segments are completed for all stages.
-	segmentIdx := 0
+	// FIXME: eventually, we can start from s.segmentsOffset, and push `segmentsOffset`
+	//  each time contiguous segments are completed for all stages.
+	segmentIdx := s.segmenter.FirstIndex()
 	for {
-		if len(s.segmentStates) <= segmentIdx {
+		if len(s.segmentStates) <= segmentIdx-s.segmentOffset {
 			s.growSegments()
 		}
-		if segmentIdx > s.LastIndex() {
+		if segmentIdx > s.segmenter.LastIndex() {
 			break
 		}
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
-			segmentState := s.segmentStates[segmentIdx][stageIdx]
+			unit := Unit{Segment: segmentIdx, Stage: stageIdx}
+			segmentState := s.GetState(unit)
 			if segmentState != UnitPending {
 				continue
 			}
-			if segmentIdx < s.stages[stageIdx].firstSegment {
+			if segmentIdx < s.stages[stageIdx].segmenter.FirstIndex() {
 				// Don't process stages where all modules's initial blocks are only later
 				continue
 			}
-			if !s.dependenciesCompleted(segmentIdx, stageIdx) {
+			if !s.dependenciesCompleted(unit) {
 				continue
 			}
 
-			id := &Unit{
-				Stage:   stageIdx,
-				Segment: segmentIdx,
-				Range:   s.Range(segmentIdx),
-			}
-			s.markSegmentScheduled(*id)
-			return id
+			s.markSegmentScheduled(unit)
+			return &unit
 		}
 		segmentIdx++
 	}
@@ -106,17 +116,24 @@ func (s *Stages) growSegments() {
 	}
 }
 
-func (s *Stages) dependenciesCompleted(segmentIdx int, stageIdx int) bool {
-	if segmentIdx == 0 {
+func (s *Stages) dependenciesCompleted(u Unit) bool {
+	if u.Segment <= s.stages[u.Stage].segmenter.FirstIndex() {
 		return true
 	}
-	if stageIdx == 0 {
+	if u.Stage == 0 {
 		return true
 	}
-	for i := stageIdx - 1; i >= 0; i-- {
-		if s.segmentStates[segmentIdx-1][i] != UnitCompleted {
+	for i := u.Stage - 1; i >= 0; i-- {
+		if s.GetState(Unit{Segment: u.Segment - 1, Stage: i}) != UnitCompleted {
 			return false
 		}
 	}
 	return true
+}
+
+func (s *Stages) previousUnitComplete(u Unit) bool {
+	if u.Segment-s.segmentOffset <= 0 {
+		return true
+	}
+	return s.GetState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
 }

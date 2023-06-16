@@ -82,7 +82,10 @@ func (w *RemoteWorker) ID() string {
 }
 
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, upstream *response.Stream) loop.Cmd {
-	request := unit.NewRequest(reqctx.Details(ctx))
+	// TODO: use the segmente adapted to the request, we'll want to stop according
+	//  to the orchestrator Config
+	rng := segmenter.Range(unit.Segment)
+	request := unit.NewRequest(reqctx.Details(ctx), rng)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {

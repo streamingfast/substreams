@@ -23,6 +23,7 @@ import (
 type Multi struct {
 	// TODO: rename this to Stages, the Single will be merging a full Stage,
 	// not a single store.
+	Stages               []*Stage
 	Modules              map[string]*Single
 	targetExclusiveBlock uint64
 }

@@ -22,6 +22,7 @@ type state2 struct {
 
 func FetchStoresState(
 	ctx context.Context,
+	stages *stage.Stages,
 	storeConfigMap store.ConfigMap,
 	segmenter *block.Segmenter,
 ) ([]state2, error) {

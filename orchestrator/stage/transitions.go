@@ -81,43 +81,46 @@ stateDiagram-v2
 
 */
 
-func (s *Stages) MarkSegmentMerging(segment Unit) {
-	s.transition(segment, UnitMerging,
+func (s *Stages) MarkSegmentMerging(u Unit) {
+	if !s.previousUnitComplete(u) {
+		panic("can only merge segments if previous is complete")
+	}
+	s.transition(u, UnitMerging,
 		UnitPartialPresent, // was next in line for Squasher to process
 	)
 }
 
-func (s *Stages) MarkSegmentPending(segment Unit) {
-	s.transition(segment, UnitPending,
+func (s *Stages) MarkSegmentPending(u Unit) {
+	s.transition(u, UnitPending,
 		UnitMerging, // Squasher didn't find the partials, so asking for the job to re-run
 	)
 }
 
-func (s *Stages) MarkSegmentPartialPresent(segment Unit) {
-	s.transition(segment, UnitPartialPresent,
+func (s *Stages) MarkSegmentPartialPresent(u Unit) {
+	s.transition(u, UnitPartialPresent,
 		UnitScheduled, // reported by working completing its generation of a partial
 		UnitPending,   // from initial storage state snapshot
 	)
 }
 
-func (s *Stages) markSegmentScheduled(segment Unit) {
-	s.transition(segment, UnitScheduled,
+func (s *Stages) markSegmentScheduled(u Unit) {
+	s.transition(u, UnitScheduled,
 		UnitPending, // after scheduling some work (NextJob())
 	)
 }
 
-func (s *Stages) MarkSegmentCompleted(segment Unit) {
-	s.transition(segment, UnitCompleted,
+func (s *Stages) MarkSegmentCompleted(u Unit) {
+	s.transition(u, UnitCompleted,
 		UnitPending, // from an initial storage state snapshot
 		UnitMerging, // from the Squasher's merge operations completing
 	)
 }
 
-func (s *Stages) transition(segment Unit, to UnitState, allowedPreviousStates ...UnitState) {
-	prev := s.segmentStates[segment.Segment][segment.Stage]
+func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitState) {
+	prev := s.GetState(u)
 	for _, from := range allowedPreviousStates {
 		if prev == from {
-			s.segmentStates[segment.Segment][segment.Stage] = to
+			s.setState(u, to)
 			return
 		}
 	}

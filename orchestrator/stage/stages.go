@@ -7,6 +7,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
+	"github.com/streamingfast/substreams/utils"
 )
 
 type Stages struct {
@@ -49,10 +50,7 @@ func NewStages(
 		}
 		lowestStageInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
-			modState := &ModuleState{
-				name:      mod.Name,
-				segmenter: segmenter.WithInitialBlock(mod.InitialBlock),
-			}
+			modState := NewModuleState(mod.Name, segmenter.WithInitialBlock(mod.InitialBlock))
 
 			if storeConfigs != nil {
 				storeConf, found := storeConfigs[mod.Name]
@@ -63,9 +61,7 @@ func NewStages(
 			}
 
 			stage.moduleStates = append(stage.moduleStates, modState)
-			if lowestStageInitBlock > mod.InitialBlock {
-				lowestStageInitBlock = mod.InitialBlock
-			}
+			lowestStageInitBlock = utils.MinOf(lowestStageInitBlock, mod.InitialBlock)
 		}
 
 		stage.segmenter = segmenter.WithInitialBlock(lowestStageInitBlock)

@@ -18,6 +18,15 @@ type ModuleState struct {
 	segmentCompleted int
 }
 
+func NewModuleState(name string, segmenter *block.Segmenter) *ModuleState {
+	return &ModuleState{
+		name:             name,
+		segmenter:        segmenter,
+		segmentCompleted: segmenter.FirstIndex() - 1,
+		state:            MergeIdle,
+	}
+}
+
 type MergeState int
 
 const (

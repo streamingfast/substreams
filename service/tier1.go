@@ -167,10 +167,6 @@ func (s *Tier1Service) Blocks(request *pbsubstreamsrpc.Request, streamSrv pbsubs
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 
-	//if id := dauth.GetAuthInfoFromIncomingContext(ctx); id.UserID != "" {
-	//	fields = append(fields, zap.String("user_id", id.UserID))
-	//}
-
 	logger.Info("incoming Substreams Blocks request", fields...)
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {

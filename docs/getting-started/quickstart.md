@@ -73,7 +73,7 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:sf.ethereum.block_meta.v1.BlockMeta
+      type: proto:acme.block_meta.v1.BlockMeta
 ```
 
 ### Create Rust manifest file
@@ -95,8 +95,8 @@ name = "substreams"
 crate-type = ["cdylib"]
 
 [dependencies]
-substreams = "0.5.0"
-substreams-ethereum = "0.9.0"
+substreams = "0.5"
+substreams-ethereum = "0.9"
 prost = "0.11"
 
 [profile.release]
@@ -113,12 +113,12 @@ strip = "debuginfo"
 
 Substreams modules are required to output protobuf encoded messages. The example protobuf definition from the [`substreams-ethereum-quickstart`](https://github.com/streamingfast/substreams-ethereum-quickstart) defines a simple `BlockMeta` message that contains that block's hash, number, parent hash and timestamp all in human readable form.
 
-Copy and paste the content for the example protobuf definition into a new file named [`block_meta.proto`](https://github.com/streamingfast/substreams-ethereum-quickstart/blob/main/proto/block\_meta.proto) and save it to a `proto` directory in the root directory of your Substreams module.
+Copy and paste the content for the example protobuf definition into a new file named [`block_meta.proto`](https://github.com/streamingfast/substreams-ethereum-quickstart/blob/main/proto/block_meta.proto) and save it to a `proto` directory in the root directory of your Substreams module.
 
 ```
 syntax = "proto3";
 
-package sf.ethereum.block_meta.v1;
+package acme.block_meta.v1;
 
 message BlockMeta {
   string hash = 1;
@@ -128,25 +128,15 @@ message BlockMeta {
 }
 ```
 
-Use the `substreams protogen` command to generate the Rust code to communicate with the protobuf.
+Use the `substreams protogen` command to generate the Rust code to communicate with the protobuf:
 
 ```bash
-substreams protogen substreams.yaml --exclude-paths="sf/substreams,google
+substreams protogen substreams.yaml --exclude-paths="sf/substreams,google"
 ```
 
 {% hint style="info" %}
-**Note**: The flag `--exclude-paths="sf/substreams,google` avoids generating files which are already provided implicitly.
+**Note**: The flag `--exclude-paths="sf/substreams,google"` avoids generating files which are already provided implicitly.
 {% endhint %}
-
-The protobufs generate model must be referenced by a Rust module, to do so, create a file named `mod.rs` within the `src/pb` directory with the following content:
-
-{% code overflow="wrap" %}
-```rust
-#[path = "sf.ethereum.block_meta.v1.rs"]
-#[allow(dead_code)]
-pub mod block_meta;
-```
-{% endcode %}
 
 ### Create Substreams module handlers
 
@@ -158,7 +148,7 @@ To include this example module handler in your module, copy it into a new Rust s
 ```rust
 mod pb;
 
-use pb::block_meta::BlockMeta;
+use pb::acme::block_meta::v1::BlockMeta;
 use substreams::Hex;
 use substreams_ethereum::pb::eth;
 
@@ -183,12 +173,12 @@ cargo build --release --target wasm32-unknown-unknown
 ```
 
 {% hint style="info" %}
-**Note**: If you have a lots of weird compilation errors like `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, see [Rust installation](../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) for instructions how to install it.
+**Note**: If you have a lots of weird compilation errors like `cannot find function, tuple struct or tuple variant `Ok` in this scope`, `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, etc. you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, install it with `rustup target add wasm32-unknown-unknown`, see [Rust installation](../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) extra details.
 {% endhint %}
 
 ### Execute
 
-To execute, or run, the example use the `substreams` [`run`](../reference-and-specs/command-line-interface.md#run) command:
+To execute, or run, the example use the [`substreams run`](../reference-and-specs/command-line-interface.md#run) command:
 
 {% code overflow="wrap" %}
 ```bash

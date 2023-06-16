@@ -131,7 +131,7 @@ func BuildParallelProcessor(
 	// reqDetails.LinearHandoffBlockNum really?
 	segmenter := block.NewSegmenter(runtimeConfig.SubrequestsSplitSize, outputGraph.LowestInitBlock(), reqDetails.LinearHandoffBlockNum)
 
-	sched.Stages = stage.NewStages(outputGraph, segmenter)
+	sched.Stages = stage.NewStages(ctx, outputGraph, segmenter, storeConfigs)
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
 	// TODO: replace that last param, by the new squashing model in the Scheduler

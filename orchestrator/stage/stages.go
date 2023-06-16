@@ -1,8 +1,12 @@
 package stage
 
 import (
+	"context"
+
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 type Stages struct {
@@ -21,9 +25,13 @@ type Stages struct {
 type stageStates []UnitState
 
 func NewStages(
+	ctx context.Context,
 	outputGraph *outputmodules.Graph,
 	segmenter *block.Segmenter,
+	storeConfigs store.ConfigMap,
 ) (out *Stages) {
+	logger := reqctx.Logger(ctx)
+
 	stagedModules := outputGraph.StagedUsedModules()
 	lastIndex := len(stagedModules) - 1
 	out = &Stages{
@@ -41,10 +49,20 @@ func NewStages(
 		}
 		lowestStageInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
-			stage.moduleStates = append(stage.moduleStates, &ModuleState{
-				segmenter: segmenter.WithInitialBlock(mod.InitialBlock),
+			modState := &ModuleState{
 				name:      mod.Name,
-			})
+				segmenter: segmenter.WithInitialBlock(mod.InitialBlock),
+			}
+
+			if storeConfigs != nil {
+				storeConf, found := storeConfigs[mod.Name]
+				if !found {
+					panic("store config not found: " + mod.Name)
+				}
+				modState.store = storeConf.NewFullKV(logger)
+			}
+
+			stage.moduleStates = append(stage.moduleStates, modState)
 			if lowestStageInitBlock > mod.InitialBlock {
 				lowestStageInitBlock = mod.InitialBlock
 			}

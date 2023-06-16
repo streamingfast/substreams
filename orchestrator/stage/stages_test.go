@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -10,31 +11,14 @@ import (
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 )
 
-//func TestStages(t *testing.T) {
-//	s := &Stages{
-//		stages: []*Stage{
-//			&Stage{kind: KindStore},
-//			&Stage{kind: KindStore},
-//			&Stage{kind: KindMap},
-//		},
-//		Segmenter: block.NewSegmenter(10, 5, 35),
-//	}
-//
-//	assert.Equal(t, true, s.dependenciesCompleted(0, 1), "segment 0 always dependencies completed")
-//	assert.Equal(t, false, s.dependenciesCompleted(1, 1), "stage 1 of segment 1 needs stage 0 of segment 1")
-//	assert.Equal(t, true, s.dependenciesCompleted(2, 0), "stage 0 always dependencies completed")
-//
-//	// segID := s.NextJob()
-//	// require.NotNil(t, segID)
-//	// assert.Equal(t, 1, segID.Stage, "should always start with stage 1")
-//	// assert.Equal(t, 2, segID.Segment, "should always start with segment 1")
-//	// assert.Equal(t, block.ParseRange("10-20"), segID.Range)
-//}
-//
-
 func TestNewStages(t *testing.T) {
 	seg := block.NewSegmenter(10, 5, 75)
-	stages := NewStages(outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25), seg)
+	stages := NewStages(
+		context.Background(),
+		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
+		seg,
+		nil,
+	)
 
 	assert.Equal(t, 8, stages.segmenter.Count()) // from 5 to 75
 	assert.Equal(t, true, stages.segmenter.IsPartial(7))
@@ -49,7 +33,12 @@ func TestNewStages(t *testing.T) {
 
 func TestNewStagesNextJobs(t *testing.T) {
 	seg := block.NewSegmenter(10, 5, 50)
-	stages := NewStages(outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5), seg)
+	stages := NewStages(
+		context.Background(),
+		outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5),
+		seg,
+		nil,
+	)
 
 	j1, _ := stages.NextJob()
 	assert.Equal(t, 2, j1.Stage)

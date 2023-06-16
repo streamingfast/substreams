@@ -355,8 +355,11 @@ func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipelin
 }
 
 func tier1ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbsubstreamsrpc.Stream_BlocksServer) substreams.ResponseFunc {
+	mut := sync.Mutex{}
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
+		mut.Lock()
+		defer mut.Unlock()
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
 			return status.Error(codes.Unavailable, err.Error())

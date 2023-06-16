@@ -37,7 +37,7 @@ description: Aleno Substreams ClickHouse sink
     ```sql
         CREATE TABLE block_meta
     (
-        id          String, 
+        id          String,
         at          String,
         number      Int32,
         hash        String,
@@ -77,10 +77,10 @@ description: Aleno Substreams ClickHouse sink
 
 ### Output Module
 
-To be accepted by `substreams-sink-clickhouse`, your module output's type must be a [sf.substreams.sink.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-sink-database-changes/blob/develop/proto/sf/substreams/sink/database/v1/database.proto#L7) message. The Rust crate [substreams-database-change](https://github.com/streamingfast/substreams-sink-database-changes) contains bindings and helpers to implement it easily. Some project implementing `db_out` module for reference:
+To be accepted by `substreams-sink-clickhouse`, your module output's type must be a [sf.substreams.sink.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-sink-database-changes/blob/develop/proto/sf/substreams/sink/database/v1/database.proto#L7) message. The Rust crate [substreams-database-change](https://docs.rs/substreams-database-change/latest/substreams_database_change) contains bindings and helpers to implement it easily. Some project implementing `db_out` module for reference:
 - [substreams-eth-block-meta](https://github.com/streamingfast/substreams-eth-block-meta/blob/master/src/lib.rs#L35) (some helpers found in [db_out.rs](https://github.com/streamingfast/substreams-eth-block-meta/blob/master/src/db_out.rs#L6))
 
-By convention, we name the `map` module that emits [sf.substreams.sink.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/substreams/sink/database/v1/database.proto#L7) output `db_out`.
+By convention, we name the `map` module that emits [sf.substreams.sink.database.v1.DatabaseChanges](https://github.com/streamingfast/substreams-sink-database-changes/blob/develop/proto/sf/substreams/sink/database/v1/database.proto#L7) output `db_out`.
 
 ### ClickHouse DSN
 

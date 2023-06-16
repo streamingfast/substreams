@@ -18,9 +18,9 @@ Extract `substreams-sink-postgres` into a folder and ensure this folder is refer
 
 ### 2. Set up accompanying code example
 
-Access the accompanying code example for this tutorial in the official `substreams-sink-postgres` repository. You will find the Substreams project for the tutorial in the `docs/tutorial/` directory.
+Access the accompanying code example for this tutorial in the official `substreams-sink-postgres` repository. You will find the Substreams project for the tutorial in the [docs/tutorial](https://github.com/streamingfast/substreams-sink-postgres/tree/develop/docs/tutorial) directory.
 
-To create the required protobuf files, run the included make codegen command.
+To create the required Protobuf files, run the included `make protogen` command.
 
 ```bash
 make codegen
@@ -57,7 +57,7 @@ all done
 
 ### Module handler for sink
 
-The Rust source code file [`lib.rs`](#) contains an example code, the `db_out` module handler, which prepares and returns the module's [`DatabaseChanges`](https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html) output. The `substreams-sink-postgres` tool captures the data sent out of the Substreams module and routes it into the appropriate columns and tables in the PostgreSQL database.
+The Rust source code file [`lib.rs`]() contains an example code, the `db_out` module handler, which prepares and returns the module's [`DatabaseChanges`](https://docs.rs/substreams-database-change/latest/substreams_database_change/index.html) output. The `substreams-sink-postgres` tool captures the data sent out of the Substreams module and routes it into the appropriate columns and tables in the PostgreSQL database.
 
 ```rust
 #[substreams::handlers::map]
@@ -72,23 +72,17 @@ To gain a full understanding of the procedures and steps required for a database
 
 **DatabaseChanges**
 
-The [`DatabaseChanges`](https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto) protobuf definition can be viewed at the following link for a peek into the crates implementation.
+The [`DatabaseChanges`](https://github.com/streamingfast/substreams-sink-database-changes/blob/develop/proto/sf/substreams/sink/database/v1/database.proto#L7) protobuf definition can be viewed at the following link for a peek into the crates implementation.
 
-https://github.com/streamingfast/substreams-database-change/blob/develop/proto/database/v1/database.proto
+When developing your Substreams, the Rust crate [substreams-database-change](https://docs.rs/substreams-database-change/latest/substreams_database_change) can be used to create the required `DatabaseChanges` output type.
 
-Full source code is provided by StreamingFast for the [`DatabaseChanges`](https://github.com/streamingfast/substreams-database-change) crate found in its official GitHub repository.
-
-https://github.com/streamingfast/substreams-database-change
-
-**Note**: An output type of `proto:substreams.database.v1.DatabaseChanges` is required by the map module in the Substreams manifest when working with a sink.
+**Note**: An output type of `proto:substreams.database.v1.DatabaseChanges` is required by the map module in the Substreams manifest when working with this sink.
 
 ## 3. Install PostgreSQL
 
 To proceed with this tutorial, you must have a working PostgreSQL installation. Obtain the software by [downloading it from the vendor](https://www.postgresql.org/download/) and [install it by following the instructions](https://www.postgresql.org/docs/current/tutorial-install.html) for your operating system and platform.
 
 If you encounter any issues, [refer to the Troubleshooting Installation page](https://wiki.postgresql.org/wiki/Troubleshooting_Installation) on the official PostgreSQL Wiki for assistance.
-
-**DEV NOTE**: Explain Docker install too?
 
 ## 4. Create example database
 
@@ -111,7 +105,7 @@ Use the following `SQL` command to create the example database:
 CREATE DATABASE "substreams_example";
 ```
 
-## 5. Run command for tool and schema
+## 5. Run setup command
 
 After creating the database in step four, you must set it up using the schema provided in the tutorial.
 
@@ -142,7 +136,7 @@ The manifest needs to match the filename used in the Substreams module. As seen 
 The name of the example module passed in the command to the `substreams-sink-postgres` tool is `db_out`.
 
 ```bash
-substreams-sink-postgres run \ "psql://<username>:<password>@<database_ip_address>/substreams_example?sslmode=disable" \ "mainnet.eth.streamingfast.io:443" \ "substreams.yaml" \ db_out
+substreams-sink-postgres run "psql://<username>:<password>@<database_ip_address>/substreams_example?sslmode=disable" "mainnet.eth.streamingfast.io:443" "substreams.yaml" db_out
 ```
 
 Successful output from the `substreams-sink-postgres` tool will resemble the following:
@@ -208,22 +202,14 @@ Output similar to the following is displayed in the terminal:
 
 When you use Substreams, it sends back a block to a consumer using an opaque cursor. This cursor points to the exact location within the blockchain where the block is. In case your connection terminates or the process restarts, upon re-connection, Substreams sends back the cursor of the last written bundle in the request so that the stream of data can be resumed exactly where it left off and data integrity is maintained.
 
-You will find that the cursor is saved in the cursors table of the `substreams_example` database.
-
-**TODO**: Discussion about where Substreams cursor is saved (in a table) -- I need additional input here on what exactly we want to convey to the reader. I understand there's another table named cursors, but how is this used and what exactly does the dev/reader need to know?
+You will find that the cursor is saved in the `cursors` table of the `substreams_example` database.
 
 ### Batching
 
-- Discussion about batching of writes (each 1000 blocks when not live, still need to be determined when we will be live) -- I need additional input here. Is this something that's functional enough to include in this documentation at this time?
+Insertion for historical blocks is performed in batched to increase ingestion speed. The `--flush-interval` flag can be used to change the default value of 1000 blocks. Also, the flag `--live-block-time-delta <duration>` can be used to change the delta at which we start considering blocks to be live, the logic is `isLive = (now() - block.timestamp) < valueOfFlag(live-block-time-delta)`.
 
 ## Conclusion and review
 
 Routing data extracted from the blockchain using Substreams is a powerful and useful feature. With Substreams, you can route data to various types of sinks, including files and databases such as PostgreSQL. For more information on other types of sinks and sinking strategies, consult the core Substreams sinks documentation at https://substreams.streamingfast.io/developers-guide/substreams-sinks.
 
 The StreamingFast `substreams-sink-postgres` tool allows developers to route data extracted from a blockchain to a PostgreSQL database. To route data to PostgreSQL using Substreams, you must install the `substreams-sink-postgres` tool, create or clone the example Substreams module, install PostgreSQL, create the example database, import the schema through the `substreams-sink-postgres` tool, and then begin the sinking process by running the `run` command. Once the data is in the `substreams_example` database, you can use standard PostgreSQL tooling and SQL language to view it.
-
----
-
-<b>DEV NOTES</b>
-
-- Do we want to move the code creating the queries into a db.rs file similar to how it is in the eth-meta example? It's a bit of a tough call. Ideally, we want to show them it in this same file because they'll need to edit it to work with the data they want to extract and persist to the db. Having it in another file contributes to context switching and additional abstraction and cognitive load.

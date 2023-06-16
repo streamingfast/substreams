@@ -22,7 +22,7 @@ You could use `substreams-sink-files` to sink data in `JSONL` format to a [Googl
 
 The accompanying Substreams module associated with this documentation is responsible for extracting a handful of data fields from the Block object injected into the Rust-based map module. The sink tool processes the extracted blockchain data line-by-line and outputs the data to the files-based persistence mechanism you've chosen.
 
-The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` protobuf's data model. The data is passed to the protobuf as a single line of plain text.
+The accompanying code example extracts four data points from the Block object and packs them into the `substreams.sink.files.v1` Protobuf's data model. The data is passed to the Protobuf as a single line of plain text.
 
 Binary formats such as [Avro](https://avro.apache.org/) or [Parquet](https://parquet.apache.org/) is possible, however, support is not available. Contributions are welcome to help with support of binary data formats. [Contact the StreamingFast team on Discord](https://discord.gg/mYPcRAzeVN) to learn more and discuss specifics.
 
@@ -36,12 +36,12 @@ Extract `substreams-sink-files` into a folder and ensure this folder is referenc
 
 ### Accompanying code example
 
-The accompanying code example for this tutorial is available in the `substreams-sink-files` respository. The Substreams project for the tutorial is located in the `docs/tutorial/` directory.
+The accompanying code example for this tutorial is available in the `substreams-sink-files` repository. The Substreams project for the tutorial is located in the [docs/tutorial](https://github.com/streamingfast/substreams-sink-files/blob/develop/docs/tutorial) directory.
 
-Run the included `make codegen` command to create the required protobuf files.
+Run the included `make protogen` command to create the required Protobuf files.
 
 ```bash
-make codegen
+make protogen
 ```
 
 It's a good idea to run the example code using your installation of the `substreams` CLI to make sure everything is set up and working properly.
@@ -80,7 +80,7 @@ The `substreams run` command will result in output resembling the following:
 
 ### Module handler changes for sink
 
-The example code in the [`lib.rs`](https://github.com/streamingfast/substreams-sink-files/blob/master/docs/tutorial/src/lib.rs) Rust source code file contains the `jsonl_out` module handler responsible for extracting the blockchain data. The module handler is responsible for passing the data to the `sf.substreams.sink.files.v1` protobuf for the sink tool and its processes.
+The example code in the [`lib.rs`](https://github.com/streamingfast/substreams-sink-files/blob/master/docs/tutorial/src/lib.rs) Rust source code file contains the `jsonl_out` module handler responsible for extracting the blockchain data. The module handler is responsible for passing the data to the `sf.substreams.sink.files.v1` Protobuf for the sink tool and its processes.
 
 ```rust
 #[substreams::handlers::map]
@@ -102,13 +102,13 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 
 This module handler uses `JSONL` for the output type, any other plain-text line-based format can be supported, `CSV` for example. The [`json!`](https://docs.rs/serde\_json/latest/serde\_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
-The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based protobuf you're responsible for designing for your sink.
+The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based Protobuf you're responsible for designing for your sink.
 
 The output type for sink is a list of lines. The line content can be any type anything that is formatted as plain text, and line based. For example, a basic string like the transaction's hash, would result in files containing all the hashes for the transactions, one per line.
 
 ### Core steps for Substreams sink modules
 
-* Import sink `.spkg` files, re-generate protobufs and create and add a mod.rs file.
+* Import sink `.spkg` files, re-generate Protobufs and create and add a mod.rs file.
 * Create a map module outputting sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the [`serde_json`](https://docs.rs/serde\_json/latest/serde\_json) crate to assist creating your structure, one per line.
 * Add the correct module definition to the Substreams manifest `substreams.yaml`.
 
@@ -186,9 +186,15 @@ The block range spanned by the example is from block 0000000000 to block 0000260
 
 When you use Substreams, it sends back a block to a consumer using an opaque cursor. This cursor points to the exact location within the blockchain where the block is. In case your connection terminates or the process restarts, upon re-connection, Substreams sends back the cursor of the last written bundle in the request so that the stream of data can be resumed exactly where it left off and data integrity is maintained.
 
-You will find that the cursor is saved in a file on disk. The location of this file is specified by the flag `--state-store` which points to a local folder. It is important that you ensure that this file is properly saved to a persistent location. If the file is lost, the `substreams-sink-files` tool will restart from the beginning of the chain, redoing all the previous processing.
+You will find that the cursor is saved in a file on disk. The location of this file is specified by the flag `--state-store` which points to a local folder. You must ensure that this file is properly saved to a persistent location. If the file is lost, the `substreams-sink-files` tool will restart from the beginning of the chain, redoing all the previous processing.
 
 Therefore, It is crucial that this file is properly persisted and follows your deployment of `substreams-sink-files` to avoid any data loss.
+
+### High Performance
+
+If you are looking for the fastest performance possible, we suggest that your destination source is able to handle heavy traffic. Also, to speed up things, you can allocate a lot of RAM to the process and increase the flag `--buffer-max-size` to a point where you are able to hold a full batch of N blocks in memory (checking the size of the final file is a good indicator of the size to keep stuff in memory).
+
+A lot of I/O operations is avoid if the buffer can hold everything in memory greatly speeding up the process of writing blocks bundle to its final destination.
 
 ### Cloud-based storage
 
@@ -196,7 +202,7 @@ You can use the `substreams-sink-files` tool to route data to files on your loca
 
 ### Limitations
 
-When you use the `substreams-sink-files` tool, you will find that it syncs up to the most recent "final" block of the chain. This means it is not real-time. Additionally, the tool writes bundles to disk when it has seen 10,000 blocks. As a result, the latency of the last available bundle can be delayed by around 10,000 blocks.
+When you use the `substreams-sink-files` tool, you will find that it syncs up to the most recent "final" block of the chain. This means it is not real-time. Additionally, the tool writes bundles to disk when it has seen 10,000 blocks. As a result, the latency of the last available bundle can be delayed by around 10,000 blocks. How many blocks per batch can be controlled by changing the flag `--file-block-count`
 
 ## Conclusion and review
 

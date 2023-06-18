@@ -42,6 +42,12 @@ func TestBuildConfig(t *testing.T) {
 			"621-700", "700-742", "nil",
 		},
 		{
+			"similar to g3. production with handoff on boundary",
+			100, 100,
+			true, 621, 738, 800, 800,
+			"621-700", "700-800", "nil",
+		},
+		{
 			"production, handoff 10k and start/init is 0, stop infinity (0)",
 			100, 100,
 			true, 0, 0, 10000, 0,

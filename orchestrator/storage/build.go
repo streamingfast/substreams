@@ -20,11 +20,21 @@ type state2 struct {
 	state stage.UnitState
 }
 
+// TODO: another method on `Stages`, upon receiving the end of FetchStoresState()
+// piping messages in the `loop`... when all of the
+// completes units and partials present units are updated in the
+// states matrix, we can look for the earliest store to load.
+func (s *Stages) LoadInitialStores() error {
+
+}
+
 func FetchStoresState(
 	ctx context.Context,
+	// TODO: Make this a method of `Stages` so we have access to all those internal methods.
 	stages *stage.Stages,
 	storeConfigMap store.ConfigMap,
 	segmenter *block.Segmenter,
+	storeLinearHandoff uint64,
 ) ([]state2, error) {
 	// we walk all the Complete stores we can find,
 	// so we can mark those stage.Unit as StageCompleted
@@ -49,7 +59,68 @@ func FetchStoresState(
 	// with a final message flipping a switch to kickstart job scheduling
 	// and all? We don't want to do some job scheduling until all of the
 	// File walkers here are done.
+
+	completes := make(map[stage.Unit]map[string]struct{})
+	partials := make(map[stage.Unit]map[string]struct{})
+
+	state, err := storeState.FetchState(ctx, storeConfigMap, storeLinearHandoff)
+	if err != nil {
+		return nil, fmt.Errorf("fetching stores storage state: %w", err)
+	}
+	for stageIdx, stage := range stages.stages {
+		for _, mod := range stage.Modules {
+			files := state.Snapshots[mod.Name]
+			modSegmenter := mod.segmenter
+
+			for _, complete := range files.Completes {
+				segmentIdx := modSegmenter.IndexForEndBlock(complete.Range.ExclusiveEndBlock)
+				rng := segmenter.Range(segmentIdx)
+				if rng == nil {
+					continue
+				}
+				if rng.ExclusiveEndBlock != complete.Range.ExclusiveEndBlock {
+					continue
+				}
+				unit := stage.Unit{Stage: stageIdx, Segment: segmentIdx}
+				if allDone := markFound(completes, unit, mod.Name, modules); allDone {
+					stages.MarkSegmentCompleted(unit)
+				}
+			}
+
+			for _, partial := range files.Partials {
+				segmentIdx := modSegmenter.IndexForStartBlock(partial.Range.StartBlock)
+				rng := segmenter.Range(segmentIdx)
+				if rng == nil {
+					continue
+				}
+				if !rng.Equals(partial.Range) {
+					continue
+				}
+				unit := stage.Unit{Stage: stageIdx, Segment: segmentIdx}
+
+				if allDone := markFound(partials, unit, mod.Name, modules); allDone {
+					stages.MarkSegmentPartialPresent(unit)
+				}
+			}
+		}
+	}
+
 	return nil, fmt.Errorf("not implemented")
+}
+
+func markFound(
+	unitMap map[stage.Unit]map[string]struct{},
+	unit stage.Unit,
+	name string,
+	allModules []string,
+) bool {
+	mods := unitMap[unit]
+	if mods == nil {
+		mods = make(map[string]struct{})
+		unitMap[unit] = mods
+	}
+	mods[name] = struct{}{}
+	return len(mods) == len(allModules)
 }
 
 func BuildModuleStorageStateMap(ctx context.Context, storeConfigMap store.ConfigMap, cacheSaveInterval uint64, mapConfigs *execout.Configs, requestStartBlock, linearHandoffBlock, storeLinearHandoffBlock uint64) (ModuleStorageStateMap, error) {

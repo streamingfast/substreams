@@ -122,16 +122,19 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			),
 		)
 
-	case squasher.MsgMergeFinished:
+	case stage.MsgMergeFinished:
+		s.Stages.Stage(msg.Stage).MarkMergeFinished(msg.Unit)
 		return s.Squasher.MarkSingleFinished(msg)
 		if allStoresAreCompletedUpToTargetBlock() {
 			s.storesSyncCompleted = true
 			return s.cmdShutdownWhenComplete()
 		}
 
-	case squasher.MsgMergeFailed:
+	case stage.MsgMergeFailed:
+		cmds = append(cmds, loop.Quit(msg.Error))
 
-	case squasher.MsgMergeStage:
+	case stage.MsgMergeStage:
+		cmds = append(cmds, s.Stages.Stage(msg.Stage).DoMerge())
 		for _, mod := range s.outputGraph.StagedUsedModules()[msg.Stage] {
 			cmds = append(cmds, s.Squasher.MergeNextRange(mod.Name)) //Modules[mod.Name].CmdMergeRange())
 		}

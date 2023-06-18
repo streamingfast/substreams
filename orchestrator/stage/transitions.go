@@ -114,6 +114,7 @@ func (s *Stages) MarkSegmentCompleted(u Unit) {
 		UnitPending, // from an initial storage state snapshot
 		UnitMerging, // from the Squasher's merge operations completing
 	)
+	s.stages[u.Stage].segmentCompleted = u.Segment
 }
 
 func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitState) {

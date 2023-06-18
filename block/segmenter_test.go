@@ -46,18 +46,32 @@ func TestSegmenter_Count(t *testing.T) {
 	}
 }
 
-func TestSegmenter_IndexWithBlock(t *testing.T) {
+func TestSegmenter_IndexForStartBlock(t *testing.T) {
 	s := Segmenter{
 		interval: 10,
 	}
-	assert.Equal(t, 0, s.IndexForBlock(5))
-	assert.Equal(t, 0, s.IndexForBlock(9))
-	assert.Equal(t, 1, s.IndexForBlock(10))
-	assert.Equal(t, 1, s.IndexForBlock(11))
-	assert.Equal(t, 1, s.IndexForBlock(19))
-	assert.Equal(t, 2, s.IndexForBlock(20))
-	assert.Equal(t, 2, s.IndexForBlock(21))
-	assert.Equal(t, 4, s.IndexForBlock(45))
+	assert.Equal(t, 0, s.IndexForStartBlock(5))
+	assert.Equal(t, 0, s.IndexForStartBlock(9))
+	assert.Equal(t, 1, s.IndexForStartBlock(10))
+	assert.Equal(t, 1, s.IndexForStartBlock(11))
+	assert.Equal(t, 1, s.IndexForStartBlock(19))
+	assert.Equal(t, 2, s.IndexForStartBlock(20))
+	assert.Equal(t, 2, s.IndexForStartBlock(21))
+	assert.Equal(t, 4, s.IndexForStartBlock(45))
+}
+
+func TestSegmenter_IndexForEndBlock(t *testing.T) {
+	s := Segmenter{
+		interval: 10,
+	}
+	assert.Equal(t, 0, s.IndexForEndBlock(5))
+	assert.Equal(t, 0, s.IndexForEndBlock(9))
+	assert.Equal(t, 0, s.IndexForEndBlock(10))
+	assert.Equal(t, 1, s.IndexForEndBlock(11))
+	assert.Equal(t, 1, s.IndexForEndBlock(19))
+	assert.Equal(t, 1, s.IndexForEndBlock(20))
+	assert.Equal(t, 2, s.IndexForEndBlock(21))
+	assert.Equal(t, 4, s.IndexForEndBlock(45))
 }
 
 func TestSegmenter_firstRange(t *testing.T) {

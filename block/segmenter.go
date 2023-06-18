@@ -76,8 +76,12 @@ func (s *Segmenter) followingRange(idx int) *Range {
 	return NewRange(baseBlock, utils.MinOf(upperBound, s.exclusiveEndBlock))
 }
 
-func (s *Segmenter) IndexForBlock(blockNum uint64) int {
+func (s *Segmenter) IndexForStartBlock(blockNum uint64) int {
 	return int(blockNum / s.interval)
+}
+
+func (s *Segmenter) IndexForEndBlock(blockNum uint64) int {
+	return int((blockNum - 1) / s.interval) /* exclusive of the given blockNum */
 }
 
 func (s *Segmenter) IsPartial(segmentIndex int) bool {

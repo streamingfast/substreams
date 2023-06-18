@@ -63,13 +63,13 @@ func BuildRequestPlan(productionMode bool, segmenter *block.Segmenter, graphInit
 		storesStopOnBound := plan.LinearPipeline == nil
 		endStoreBound := linearHandoffBlock
 		if storesStopOnBound {
-			segmentIdx := segmenter.IndexForBlock(linearHandoffBlock)
+			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
 			endStoreBound = segmenter.Range(segmentIdx).StartBlock
 		}
 		plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
 
 		startExecOutAtBlock := utils.MaxOf(resolvedStartBlock, graphInitBlock)
-		startExecOutAtSegment := segmenter.IndexForBlock(startExecOutAtBlock)
+		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
 		execOutStartBlock := segmenter.Range(startExecOutAtSegment).StartBlock
 		plan.WriteExecOut = block.NewRange(execOutStartBlock, linearHandoffBlock)
 	} else { /* dev mode */

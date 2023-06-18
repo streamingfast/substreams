@@ -13,7 +13,7 @@ func (c *Config) NewFileWalker(segmenter *block.Segmenter, initialBlock uint64) 
 	return &FileWalker{
 		config:    c,
 		segmenter: segmenter,
-		segment:   segmenter.IndexForBlock(initialBlock),
+		segment:   segmenter.IndexForStartBlock(initialBlock),
 	}
 }
 

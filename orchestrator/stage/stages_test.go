@@ -22,8 +22,8 @@ func TestNewStages(t *testing.T) {
 
 	assert.Equal(t, 8, stages.segmenter.Count()) // from 5 to 75
 	assert.Equal(t, true, stages.segmenter.IsPartial(7))
-	assert.Equal(t, 6, stages.segmenter.IndexForBlock(60), "index in range")
-	assert.Equal(t, 8, stages.segmenter.IndexForBlock(80), "index out of range still returned here")
+	assert.Equal(t, 6, stages.segmenter.IndexForStartBlock(60), "index in range")
+	assert.Equal(t, 8, stages.segmenter.IndexForStartBlock(80), "index out of range still returned here")
 	assert.Nil(t, stages.segmenter.Range(8), "out of range")
 
 	assert.Equal(t, block.ParseRange("5-10"), stages.segmenter.Range(0))

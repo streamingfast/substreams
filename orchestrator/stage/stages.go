@@ -10,6 +10,20 @@ import (
 	"github.com/streamingfast/substreams/utils"
 )
 
+// NOTE:
+// Would we have an internal StoreMap here where there's an
+// store.FullKV _and_ a State, so this thing would be top-level
+// here in the `Stages`, it would keep track of what's happening with
+// its internal `store.FullKV`, and the merging state.
+// The `ModuleState` would be merely pointing to that Map,
+// or a Map of "MergeableStore" ? with a completedSegments, etc, etc..
+// most of the things in the `modstate` ?
+// and they'd live here: Stages::storeMap: map[storeName]*MergeableStore
+// any incoming message that a merged store finished, would funnel
+// to its Stage, and would keep track of all those MergeableStore, see if
+// all of its modules are completed for that stage, and then send the signal
+// that the Stage is completed, kicking off the next layer of jobs.
+
 type Stages struct {
 	segmenter *block.Segmenter
 
@@ -37,7 +51,7 @@ func NewStages(
 	lastIndex := len(stagedModules) - 1
 	out = &Stages{
 		segmenter:     segmenter,
-		segmentOffset: segmenter.IndexForBlock(outputGraph.LowestInitBlock()),
+		segmentOffset: segmenter.IndexForStartBlock(outputGraph.LowestInitBlock()),
 	}
 	for idx, mods := range stagedModules {
 		isLastStage := idx == lastIndex
@@ -45,12 +59,12 @@ func NewStages(
 		if kind == KindMap && !isLastStage {
 			continue
 		}
-		stage := &Stage{
-			kind: kind,
-		}
+
+		var moduleStates []*ModuleState
 		lowestStageInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
-			modState := NewModuleState(mod.Name, segmenter.WithInitialBlock(mod.InitialBlock))
+			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
+			modState := NewModuleState(mod.Name, modSegmenter)
 
 			if storeConfigs != nil {
 				storeConf, found := storeConfigs[mod.Name]
@@ -60,15 +74,19 @@ func NewStages(
 				modState.store = storeConf.NewFullKV(logger)
 			}
 
-			stage.moduleStates = append(stage.moduleStates, modState)
 			lowestStageInitBlock = utils.MinOf(lowestStageInitBlock, mod.InitialBlock)
+			moduleStates = append(moduleStates, modState)
 		}
 
-		stage.segmenter = segmenter.WithInitialBlock(lowestStageInitBlock)
-
+		stageSegmenter := segmenter.WithInitialBlock(lowestStageInitBlock)
+		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
 		out.stages = append(out.stages, stage)
 	}
 	return out
+}
+
+func (s *Stages) Stage(idx int) *Stage {
+	return s.stages[idx]
 }
 
 func (s *Stages) GetState(u Unit) UnitState {

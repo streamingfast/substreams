@@ -95,7 +95,7 @@ func (s *Single) CmdMergeRange() loop.Cmd {
 	if nextRange == nil {
 		s.state = SingleCompleted
 		return func() loop.Msg {
-			return MsgStoreCompleted{}
+			return stage.MsgStoresCompleted{}
 		}
 	}
 
@@ -150,7 +150,7 @@ func (s *Single) process(rng *block.Range, segment int) loop.Msg {
 	}
 	s.logger.Info("squashing done", zap.Duration("duration", totalDuration), zap.Duration("squash_avg", avgDuration))
 
-	return MsgMergeFinished{ModuleName: s.name}
+	return stage.MsgMergeFinished{ModuleName: s.name}
 }
 
 type rangeProgress struct {

@@ -208,7 +208,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		requestDetails.StopBlockNum,
 		outputModule.Name,
 		execOutputConfigs,
-		true,
 	)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)

@@ -115,7 +115,7 @@ CC..
 CSS.
 CM..`)
 
-	stages.MarkSegmentCompleted(id(1, 2))
+	stages.markSegmentCompleted(id(1, 2))
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
@@ -164,7 +164,7 @@ CC......`)
 
 	_, r = stages.NextJob()
 	assert.Nil(t, r)
-	stages.MarkSegmentCompleted(id(2, 0))
+	stages.markSegmentCompleted(id(2, 0))
 
 	segmentStateEquals(t, stages, `
 CCCSSS..

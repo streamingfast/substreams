@@ -32,9 +32,8 @@ func FetchStoresState(
 	ctx context.Context,
 	// TODO: Make this a method of `Stages` so we have access to all those internal methods.
 	stages *stage.Stages,
-	storeConfigMap store.ConfigMap,
 	segmenter *block.Segmenter,
-	storeLinearHandoff uint64,
+	storeConfigMap store.ConfigMap,
 ) ([]state2, error) {
 	// we walk all the Complete stores we can find,
 	// so we can mark those stage.Unit as StageCompleted
@@ -63,7 +62,9 @@ func FetchStoresState(
 	completes := make(map[stage.Unit]map[string]struct{})
 	partials := make(map[stage.Unit]map[string]struct{})
 
-	state, err := storeState.FetchState(ctx, storeConfigMap, storeLinearHandoff)
+	upToBlock := segmenter.Range(segmenter.LastIndex()).ExclusiveEndBlock
+
+	state, err := storeState.FetchState(ctx, storeConfigMap, upToBlock)
 	if err != nil {
 		return nil, fmt.Errorf("fetching stores storage state: %w", err)
 	}
@@ -83,7 +84,7 @@ func FetchStoresState(
 				}
 				unit := stage.Unit{Stage: stageIdx, Segment: segmentIdx}
 				if allDone := markFound(completes, unit, mod.Name, modules); allDone {
-					stages.MarkSegmentCompleted(unit)
+					stages.markSegmentCompleted(unit)
 				}
 			}
 

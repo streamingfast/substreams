@@ -4,7 +4,6 @@ import (
 	"github.com/abourget/llerrgroup"
 
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/orchestrator/loop"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -35,18 +34,15 @@ func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*Mo
 	}
 }
 
-func (s *Stage) DoMerge() loop.Cmd {
-	mergeUnit := Unit{}
-	return func() loop.Msg {
-		if err := s.multiSquash(moduleStates); err != nil {
-			return MsgMergeFailed{}
-		}
-		return MsgMerge{}
+func (s *Stage) nextUnit() Unit {
+	return Unit{
+		Stage:   s.idx,
+		Segment: s.segmentCompleted + 1,
 	}
 }
 
-func (s *Stage) MarkMergeFinished(u Unit) {
-
+func (s *Stage) markSegmentCompleted(segment int) {
+	s.segmentCompleted = segment
 }
 
 func stageKind(mods []*pbsubstreams.Module) Kind {

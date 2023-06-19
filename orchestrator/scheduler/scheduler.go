@@ -123,7 +123,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case stage.MsgMergeFinished:
-		s.Stages.Stage(msg.Stage).MarkMergeFinished(msg.Unit)
+		s.Stages.MergeCompleted(msg.Unit)
+
+		cmds = append(cmds, s.Stages.CmdMerge(msg.Stage))
+
 		return s.Squasher.MarkSingleFinished(msg)
 		if allStoresAreCompletedUpToTargetBlock() {
 			s.storesSyncCompleted = true

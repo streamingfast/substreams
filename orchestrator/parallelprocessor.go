@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
 	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/squasher"
@@ -33,50 +33,55 @@ func BuildParallelProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
+	traceID string,
 ) (*ParallelProcessor, error) {
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream, outputGraph)
 
-	// In Dev mode
-	// * The goal of running the parallel processor is to bring the stores up
-	//   to date with the linearHandoff block. We are not interested in
-	//   past payloads, only the executions that will happen after the linearHandoff,
-	//   back in the pipeline.
-	// * The linearHandoff will be set to the startBlock (never equal to stopBlock, which is exclusive)
-	// * We will generate stores up to the linearHandoff, even if we end with an incomplete store
-	//
-	// In Prod mode
-	// * If the stop block is in the irreversible segment (far from chain head), it will be equal to linearHandoff, we stop there.
-	// * If the stop block is in the reversible segment (close to chain head), it will higher than linearHandoff, we don't stop there.
-	// * If there is no stop block (== 0), the linearHandoff will be at the end of the irreversible segment, we don't stop there
-	// * If we stop at the linearHandoff, we will only save the stores up to the boundary of the latest complete store.
-	// * On the contrary, if we need to keep going after the linearHandoff, we will need to save the last "incomplete" store.
+	// Job segmenter really.. stores should just match this
+	plan := plan.BuildRequestPlan(
+		reqDetails.ProductionMode,
+		runtimeConfig.SubrequestsSplitSize,
+		outputGraph.LowestInitBlock(),
+		reqDetails.ResolvedStartBlockNum,
+		reqDetails.LinearHandoffBlockNum,
+		reqDetails.StopBlockNum,
+	)
 
-	// TODO: in dev mode, the backprocessing run is solely to prepare stores,
-	//  we should NOT run the ExecOutWalker _and_ not schedule
-	//  the last stage.
+	storesSegmenter := plan.StoresSegmenter()
+	sched.Stages = stage.NewStages(ctx, outputGraph, storesSegmenter, storeConfigs, traceID)
 
-	stopAtHandoff := reqDetails.LinearHandoffBlockNum == reqDetails.StopBlockNum
-	storeLinearHandoffBlockNum := reqDetails.LinearHandoffBlockNum
-	if stopAtHandoff {
-		// we don't need to bring the stores up to handoff block if we stop there
-		storeLinearHandoffBlockNum = lowBoundary(reqDetails.LinearHandoffBlockNum, runtimeConfig.CacheSaveInterval)
+	storageState, err := storage.FetchStoresState(
+		ctx,
+		sched.Stages,
+		storesSegmenter,
+		storeConfigs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetch stores storage state: %w", err)
 	}
+	if err := stream.InitialProgressMessages(storageState); err != nil {
+		return nil, fmt.Errorf("initial progress: %w", err)
+	}
+
+	// TODO: inject the `storageState` into the Scheduler with a bunch of messages
+	// or pass it through some sort of `Init()` mechanism.
+
 	// TODO(abourget): I want to transform this to use a Segmenter
 	// but I'm not sure I can use the exact same Segmenter as the
 	// scheduler. This one
-	modulesStateMap, err := storage.BuildModuleStorageStateMap( // ok, I will cut stores up to 800 not 842
-		ctx,
-		storeConfigs,
-		runtimeConfig.CacheSaveInterval,
-		execoutStorage,
-		reqDetails.ResolvedStartBlockNum,
-		reqDetails.LinearHandoffBlockNum,
-		storeLinearHandoffBlockNum,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("build storage map: %w", err)
-	}
+	//modulesStateMap, err := storage.BuildModuleStorageStateMap( // ok, I will cut stores up to 800 not 842
+	//	ctx,
+	//	storeConfigs,
+	//	runtimeConfig.CacheSaveInterval,
+	//	execoutStorage,
+	//	reqDetails.ResolvedStartBlockNum,
+	//	reqDetails.LinearHandoffBlockNum,
+	//	storeLinearHandoffBlockNum,
+	//)
+	//if err != nil {
+	//	return nil, fmt.Errorf("build storage map: %w", err)
+	//}
 	// FIXME: Is the state map the final reference for the progress we've made?
 	// Shouldn't that be processed by the scheduler a little bit?
 	// What if we have discovered a bunch of ExecOut files and the scheduler
@@ -84,19 +89,16 @@ func BuildParallelProcessor(
 	// Well, perhaps those wouldn't hurt, because here we're _sure_ they're
 	// done and the Scheduler could send Progress messages when the above decision
 	// is taken.
-	if err := stream.InitialProgressMessages(modulesStateMap); err != nil {
-		return nil, fmt.Errorf("initial progress: %w", err)
-	}
 
-	if reqDetails.ShouldStreamCachedOutputs() {
+	execOutSegmenter := plan.WriteOutSegmenter()
+	if execOutSegmenter != nil {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := outputGraph.OutputModule()
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
 
-		execoutSegmenter := block.NewSegmenter(runtimeConfig.CacheSaveInterval, requestedModule.InitialBlock, reqDetails.LinearHandoffBlockNum)
-		walker := execoutStorage.NewFileWalker(requestedModule.Name, execoutSegmenter, reqDetails.ResolvedStartBlockNum)
+		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
 		sched.ExecOutWalker = orchestratorExecout.NewWalker(
 			ctx,
@@ -129,9 +131,6 @@ func BuildParallelProcessor(
 	// TODO(abourget): validate here the last parameter used
 	// should it be `storeLinearHandoff` as defined above, or
 	// reqDetails.LinearHandoffBlockNum really?
-	segmenter := block.NewSegmenter(runtimeConfig.SubrequestsSplitSize, outputGraph.LowestInitBlock(), reqDetails.LinearHandoffBlockNum)
-
-	sched.Stages = stage.NewStages(ctx, outputGraph, segmenter, storeConfigs)
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
 	// TODO: replace that last param, by the new squashing model in the Scheduler

@@ -47,6 +47,6 @@ func (c *Configs) NewFile(moduleName string, targetRange *block.Range) *File {
 	return c.ConfigMap[moduleName].NewFile(targetRange)
 }
 
-func (c *Configs) NewFileWalker(moduleName string, segmenter *block.Segmenter, initialBlock uint64) *FileWalker {
-	return c.ConfigMap[moduleName].NewFileWalker(segmenter, initialBlock)
+func (c *Configs) NewFileWalker(moduleName string, segmenter *block.Segmenter) *FileWalker {
+	return c.ConfigMap[moduleName].NewFileWalker(segmenter)
 }

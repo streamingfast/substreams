@@ -85,12 +85,10 @@ func TestBuildConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segmenter := block.NewSegmenter(uint64(tt.storeInterval), tt.graphInitBlock, tt.exclusiveEndBlock)
-			res := BuildRequestPlan(tt.productionMode, segmenter, tt.graphInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock)
+			res := BuildRequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock)
 			assert.Equal(t, tt.expectStoresRange, tostr(res.BuildStores), "buildStores")
 			assert.Equal(t, tt.expectExecOutRange, tostr(res.WriteExecOut), "writeExecOut")
 			assert.Equal(t, tt.expectLinearPipelineRange, tostr(res.LinearPipeline), "linearPipeline")
-			assert.Equal(t, !tt.productionMode, res.SnapshotFullStoresAtHandoff)
 		})
 	}
 }

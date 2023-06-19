@@ -225,7 +225,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		nil,
+		p.traceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

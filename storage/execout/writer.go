@@ -25,24 +25,15 @@ type Writer struct {
 	outputModule string
 }
 
-func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isSubRequest bool) *Writer {
+func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs) *Writer {
 	w := &Writer{
 		wg:           &sync.WaitGroup{},
 		files:        make(map[string]*File),
 		outputModule: outputModule,
 	}
 
-	modInitBlock := configs.ConfigMap[outputModule].ModuleInitialBlock()
-	var upperBound uint64
-	if isSubRequest {
-		upperBound = exclusiveEndBlock
-	} else {
-		// Push to the next boundary, so nothing would get flushed at the requested stop block boundary.
-		upperBound = exclusiveEndBlock - exclusiveEndBlock%configs.execOutputSaveInterval + configs.execOutputSaveInterval
-	}
-
-	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, modInitBlock, upperBound)
-	walker := configs.NewFileWalker(outputModule, segmenter, initialBlockBoundary)
+	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
+	walker := configs.NewFileWalker(outputModule, segmenter)
 	w.fileWalker = walker
 	w.currentFile = walker.File()
 

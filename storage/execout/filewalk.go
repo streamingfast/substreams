@@ -9,11 +9,11 @@ type FileWalker struct {
 	segment   int
 }
 
-func (c *Config) NewFileWalker(segmenter *block.Segmenter, initialBlock uint64) *FileWalker {
+func (c *Config) NewFileWalker(segmenter *block.Segmenter) *FileWalker {
 	return &FileWalker{
 		config:    c,
 		segmenter: segmenter,
-		segment:   segmenter.IndexForStartBlock(initialBlock),
+		segment:   segmenter.FirstIndex(),
 	}
 }
 

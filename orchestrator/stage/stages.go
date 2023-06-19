@@ -3,7 +3,10 @@ package stage
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
@@ -25,6 +28,10 @@ import (
 // that the Stage is completed, kicking off the next layer of jobs.
 
 type Stages struct {
+	ctx     context.Context
+	logger  *zap.Logger
+	traceID string
+
 	segmenter *block.Segmenter
 
 	stages []*Stage
@@ -44,12 +51,15 @@ func NewStages(
 	outputGraph *outputmodules.Graph,
 	segmenter *block.Segmenter,
 	storeConfigs store.ConfigMap,
+	traceID string,
 ) (out *Stages) {
 	logger := reqctx.Logger(ctx)
 
 	stagedModules := outputGraph.StagedUsedModules()
 	lastIndex := len(stagedModules) - 1
 	out = &Stages{
+		ctx:           ctx,
+		traceID:       traceID,
 		segmenter:     segmenter,
 		segmentOffset: segmenter.IndexForStartBlock(outputGraph.LowestInitBlock()),
 	}
@@ -87,6 +97,32 @@ func NewStages(
 
 func (s *Stages) Stage(idx int) *Stage {
 	return s.stages[idx]
+}
+
+func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
+	// FIXME: bound checks are necessary here, or in the caller
+	// to make sure the previous segment is completed (see MarkSegmentMerging's
+	// internal check).
+	stage := s.stages[stageIdx]
+	mergeUnit := stage.nextUnit()
+
+	if !s.previousUnitComplete(mergeUnit) {
+		return nil
+	}
+
+	s.MarkSegmentMerging(mergeUnit)
+
+	return func() loop.Msg {
+		if err := s.multiSquash(stage, mergeUnit); err != nil {
+			return MsgMergeFailed{Unit: mergeUnit, Error: err}
+		}
+		return MsgMergeFinished{Unit: mergeUnit}
+	}
+}
+
+func (s *Stages) MergeCompleted(mergeUnit Unit) {
+	s.Stage(mergeUnit.Stage).markSegmentCompleted(mergeUnit.Segment)
+	s.markSegmentCompleted(mergeUnit)
 }
 
 func (s *Stages) GetState(u Unit) UnitState {

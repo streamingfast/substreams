@@ -109,7 +109,7 @@ func (s *Stages) markSegmentScheduled(u Unit) {
 	)
 }
 
-func (s *Stages) MarkSegmentCompleted(u Unit) {
+func (s *Stages) markSegmentCompleted(u Unit) {
 	s.transition(u, UnitCompleted,
 		UnitPending, // from an initial storage state snapshot
 		UnitMerging, // from the Squasher's merge operations completing

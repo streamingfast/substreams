@@ -38,22 +38,16 @@ type RequestPlan struct {
 	LinearPipeline *block.Range
 	// ref: /docs/assets/range_planning.png
 
-	// Whether to save a Full Store snapshot to the storage when the
-	// last segment is not on standard boundaries.
-	//
-	// This will be useful in development mode, where the user wants
-	// to iterate multiple times at the same start block, without
-	// needing to sync from say 1000 to 1565, wasting 565 blocks
-	// of processing each time.
-	// We would not save those in production mode, because the chances
-	// of being reused are very low. You don't iterate in production mode.
-	SnapshotFullStoresAtHandoff bool // to speed up iterations in dev mode
+	segmentInterval uint64
 }
 
-func BuildRequestPlan(productionMode bool, segmenter *block.Segmenter, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64) *RequestPlan {
-	plan := &RequestPlan{}
-	plan.SnapshotFullStoresAtHandoff = !productionMode
+func BuildRequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64) *RequestPlan {
+	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
+	plan := &RequestPlan{
+		segmentInterval: segmentInterval,
+	}
 	if linearHandoffBlock != exclusiveEndBlock {
+		// assumes exclusiveEndBlock isn't 0, because linearHandoffBlock cannot be 0
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
 	if resolvedStartBlock < graphInitBlock {
@@ -75,7 +69,18 @@ func BuildRequestPlan(productionMode bool, segmenter *block.Segmenter, graphInit
 	} else { /* dev mode */
 		plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
 		plan.WriteExecOut = nil
-		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
 	return plan
+}
+
+func (p *RequestPlan) StoresSegmenter() *block.Segmenter {
+	return block.NewSegmenter(p.segmentInterval, p.BuildStores.StartBlock, p.BuildStores.ExclusiveEndBlock)
+}
+
+func (p *RequestPlan) ModuleSegmenter(modInitBlock uint64) *block.Segmenter {
+	return block.NewSegmenter(p.segmentInterval, modInitBlock, p.BuildStores.ExclusiveEndBlock)
+}
+
+func (p *RequestPlan) WriteOutSegmenter() *block.Segmenter {
+	return block.NewSegmenter(p.segmentInterval, p.WriteExecOut.StartBlock, p.WriteExecOut.ExclusiveEndBlock)
 }

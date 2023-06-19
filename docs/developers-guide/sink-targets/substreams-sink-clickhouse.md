@@ -59,13 +59,13 @@ description: Aleno Substreams ClickHouse sink
     ORDER BY id;
     ```
 
-    > **Note** Each create table query must be run independently as ClickHouse doesn't support multiple create table queries at once.
+    > **Note**: Each create table query must be run independently as ClickHouse doesn't support multiple create table queries at once.
 
 3. Run the sink
 
     Use the precompiled Ethereum Block Meta [substreams](https://github.com/streamingfast/substreams-eth-block-meta/releases/latest)
 
-    > **Note** To connect to Substreams you will need an authentication token, follow this [guide](https://substreams.streamingfast.io/reference-and-specs/authentication) to obtain one.
+    > **Note**: To connect to Substreams you will need an authentication token, follow this [guide](https://substreams.streamingfast.io/reference-and-specs/authentication) to obtain one.
 
     ```shell
     substreams-sink-clickhouse run \
@@ -86,9 +86,9 @@ By convention, we name the `map` module that emits [sf.substreams.sink.database.
 
 The connection string is provided using a simple string format respecting the URL specification. The DSN format is:
 
-```
-    clickhouse://<user>:<password>@<host>:<port>/<dbname>[?<options>]
+```sh
+clickhouse://<user>:<password>@<host>:<port>/<dbname>[?<options>]
 ```
 
-Where <options> is URL query parameters in <key>=<value> format, multiple options are separated by & signs. Supported options can be seen on libpq official documentation. The options <user>, <password>, <host>, <port> and <dbname> should not be passed in <options> as they are automatically extracted from the DSN URL.
+Where `<options>` is URL query parameters in `<key>=<value>` format, multiple options are separated by & signs. Supported options can be seen on libpq official documentation. The options `<user>`, `<password>`, `<host>`, `<port>` and `<dbname>` should not be passed in `<options>` as they are automatically extracted from the DSN URL.
 

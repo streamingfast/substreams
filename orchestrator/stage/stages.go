@@ -99,7 +99,31 @@ func (s *Stages) Stage(idx int) *Stage {
 	return s.stages[idx]
 }
 
+func (s *Stages) AllStagesFinished() bool {
+	lastSegment := s.segmenter.LastIndex()
+	lastSegmentIndex := lastSegment - s.segmentOffset
+	if len(s.segmentStates) < lastSegmentIndex {
+		return false
+	}
+
+	for idx, stage := range s.stages {
+		if stage.kind == KindMap {
+			continue
+		}
+		if s.getState(Unit{Segment: lastSegment, Stage: idx}) != UnitCompleted {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
+
+	if s.AllStagesFinished() {
+		return func() loop.Msg {
+			return MsgStoresCompleted{}
+		}
+	}
 	// FIXME: bound checks are necessary here, or in the caller
 	// to make sure the previous segment is completed (see MarkSegmentMerging's
 	// internal check).
@@ -125,7 +149,7 @@ func (s *Stages) MergeCompleted(mergeUnit Unit) {
 	s.markSegmentCompleted(mergeUnit)
 }
 
-func (s *Stages) GetState(u Unit) UnitState {
+func (s *Stages) getState(u Unit) UnitState {
 	return s.segmentStates[u.Segment-s.segmentOffset][u.Stage]
 }
 
@@ -154,7 +178,7 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 		}
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
 			unit := Unit{Segment: segmentIdx, Stage: stageIdx}
-			segmentState := s.GetState(unit)
+			segmentState := s.getState(unit)
 			if segmentState != UnitPending {
 				continue
 			}
@@ -192,7 +216,7 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 		return true
 	}
 	for i := u.Stage - 1; i >= 0; i-- {
-		if s.GetState(Unit{Segment: u.Segment - 1, Stage: i}) != UnitCompleted {
+		if s.getState(Unit{Segment: u.Segment - 1, Stage: i}) != UnitCompleted {
 			return false
 		}
 	}
@@ -203,5 +227,14 @@ func (s *Stages) previousUnitComplete(u Unit) bool {
 	if u.Segment-s.segmentOffset <= 0 {
 		return true
 	}
-	return s.GetState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
+	return s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
+}
+func (s *Stages) FinalStoreMap() store.Map {
+	out := store.NewMap()
+	for _, stage := range s.stages {
+		for _, modState := range stage.moduleStates {
+			out[modState.name] = modState.store
+		}
+	}
+	return out
 }

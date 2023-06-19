@@ -118,7 +118,7 @@ func (s *Stages) markSegmentCompleted(u Unit) {
 }
 
 func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitState) {
-	prev := s.GetState(u)
+	prev := s.getState(u)
 	for _, from := range allowedPreviousStates {
 		if prev == from {
 			s.setState(u, to)

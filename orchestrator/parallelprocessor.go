@@ -9,7 +9,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
-	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/storage"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -134,11 +133,11 @@ func BuildParallelProcessor(
 
 	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
 	// TODO: replace that last param, by the new squashing model in the Scheduler
-	squasher, err := squasher.NewMulti(ctx, segmenter, runtimeConfig, modulesStateMap, storeConfigs, storeLinearHandoffBlockNum, nil)
-	if err != nil {
-		return nil, err
-	}
-	sched.Squasher = squasher
+	//squasher, err := squasher.NewMulti(ctx, segmenter, runtimeConfig, modulesStateMap, storeConfigs, storeLinearHandoffBlockNum, nil)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//sched.Squasher = squasher
 
 	// TODO: wrap up the tying up of the Scheduler with the Squasher.
 	//scheduler.OnStoreJobTerminated = squasher.Squash

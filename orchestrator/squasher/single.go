@@ -95,7 +95,7 @@ func (s *Single) CmdMergeRange() loop.Cmd {
 	if nextRange == nil {
 		s.state = SingleCompleted
 		return func() loop.Msg {
-			return stage.MsgStoresCompleted{}
+			return stage.MsgasdfasdfStoresCompleted{}
 		}
 	}
 

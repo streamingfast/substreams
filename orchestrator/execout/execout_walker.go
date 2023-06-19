@@ -52,6 +52,12 @@ func NewWalker(
 }
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
+	if r.IsCompleted() {
+		return func() loop.Msg {
+			return MsgWalkerCompleted{}
+		}
+	}
+
 	file := r.fileWalker.File()
 	return func() loop.Msg {
 		time.Sleep(waitBefore)

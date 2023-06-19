@@ -15,7 +15,7 @@ const (
 )
 
 // Unit can be used as a key, and points to the respective indexes of
-// Stages.GetState(unit)
+// Stages.getState(unit)
 type Unit struct {
 	Segment int
 	Stage   int

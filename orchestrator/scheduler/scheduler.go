@@ -9,7 +9,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
-	"github.com/streamingfast/substreams/orchestrator/squasher"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
@@ -25,13 +24,8 @@ type Scheduler struct {
 	outputGraph *outputmodules.Graph
 
 	Stages        *stage.Stages
-	Squasher      *squasher.Multi
 	WorkerPool    *work.WorkerPool
 	ExecOutWalker *execout.Walker
-
-	// Status:
-	//JobStatus    []*work.Job
-	//WorkerStatus map[string]string
 
 	logger *zap.Logger
 
@@ -72,11 +66,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		cmds = append(cmds, loop.Quit(msg.Error))
 
 	case work.MsgJobSucceeded:
-		//s.JobStatus.MarkFinished(msg.JobID)
 		s.Stages.MarkSegmentPartialPresent(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 		cmds = append(cmds,
-			s.Squasher.AddPartials(msg.Unit...),
+			s.Stages.CmdMerge(msg.Unit.Stage),
 			work.CmdScheduleNextJob(),
 		)
 
@@ -96,85 +89,60 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			work.CmdScheduleNextJob(),
 		)
 
-	case MsgStoragePartialFound:
-		cmds = append(cmds, s.continueMergingWork())
-		job := s.killPotentiallyRunningJob(msg.JobID)
-		if job != nil {
-			cmds = append(cmds, work.CmdScheduleNextJob())
-		}
-
-	case FullStoresPresent:
-		stage := s.Stages[msg.Stage]
-		sq := s.Squasher[msg.Stage]
-
-		if len(msg.Stores) != len(stage.Stores) {
-			return nil
-		}
-
-		return loop.Batch(
-			s.killPotentiallyRunningJob(msg.Stage, msg.Segment),
-			loop.Sequence(
-				// TODO: tell the squasher these partials are on disk
-				// per Segment + Stage. Meaning all of the stores
-				// for a given Unit are present.
-				s.Squasher.AddPartials(msg.StoreName, msg.Files...),
-				s.mergeStage(msg.Stage),
-			),
-		)
+	//case MsgStoragePartialFound:
+	//	cmds = append(cmds, s.continueMergingWork())
+	//	job := s.killPotentiallyRunningJob(msg.JobID)
+	//	if job != nil {
+	//		cmds = append(cmds, work.CmdScheduleNextJob())
+	//	}
+	//
+	//case FullStoresPresent:
+	//	stage := s.Stages[msg.Stage]
+	//	sq := s.Squasher[msg.Stage]
+	//
+	//	if len(msg.Stores) != len(stage.Stores) {
+	//		return nil
+	//	}
+	//
+	//	return loop.Batch(
+	//		s.killPotentiallyRunningJob(msg.Stage, msg.Segment),
+	//		loop.Sequence(
+	//			// TODO: tell the squasher these partials are on disk
+	//			// per Segment + Stage. Meaning all of the stores
+	//			// for a given Unit are present.
+	//			s.Squasher.AddPartials(msg.StoreName, msg.Files...),
+	//			s.mergeStage(msg.Stage),
+	//		),
+	//	)
 
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
-
 		cmds = append(cmds, s.Stages.CmdMerge(msg.Stage))
 
-		return s.Squasher.MarkSingleFinished(msg)
-		if allStoresAreCompletedUpToTargetBlock() {
-			s.storesSyncCompleted = true
-			return s.cmdShutdownWhenComplete()
-		}
+	case stage.MsgStoresCompleted:
+		s.storesSyncCompleted = true
+		return s.cmdShutdownWhenComplete()
 
 	case stage.MsgMergeFailed:
 		cmds = append(cmds, loop.Quit(msg.Error))
 
-	case stage.MsgMergeStage:
-		cmds = append(cmds, s.Stages.Stage(msg.Stage).DoMerge())
-		for _, mod := range s.outputGraph.StagedUsedModules()[msg.Stage] {
-			cmds = append(cmds, s.Squasher.MergeNextRange(mod.Name)) //Modules[mod.Name].CmdMergeRange())
-		}
-	//sq := s.squashers[msg.Stage]
-	//for _, storeSquasher := range sq.Stores {
-	//	if mergeRange := storeSquasher.NextRangeToMerge(); mergeRange != nil {
-	//		cmds = append(cmds, storeSquasher.CmdMergeRange(mergeRange))
-	//	}
-	//}
-
 	case execout.MsgStartDownload:
 		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(0))
+
 	case execout.MsgFileNotPresent:
 		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(2*time.Second))
+
 	case execout.MsgFileDownloaded:
-		if s.ExecOutWalker.IsCompleted() {
-			s.outputStreamCompleted = true
-			return s.cmdShutdownWhenComplete()
-		}
 		s.ExecOutWalker.NextSegment()
 		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(0))
+
+	case execout.MsgWalkerCompleted:
+		s.outputStreamCompleted = true
+		return s.cmdShutdownWhenComplete()
+
 	}
 
 	return loop.Batch(cmds...)
-}
-
-func (s *Scheduler) runJob(job *work.Job, stage string) loop.Cmd {
-	return job.CmdRun()
-}
-
-func (s *Scheduler) continueMergingWork() loop.Cmd {
-	// Check with the Squasher where we're at
-	// Check the Squasher's merging state for this Stage
-	// Check where it is at for each Stage, what's the next Segment
-	// Check with the `Stages` if that segment is in PartialPresent
-	// If so, start the merging operation
-	// Change the stages.MarkSegmentMerging(segment, stage)
 }
 
 func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
@@ -200,5 +168,5 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 }
 
 func (s *Scheduler) FinalStoreMap() store.Map {
-	return s.Squasher.FinalStoreMap()
+	return s.Stages.FinalStoreMap()
 }

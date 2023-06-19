@@ -59,7 +59,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 	metrics.mergeEnd = time.Now()
 
 	// Delete partial store
-	if reqctx.Details(s.ctx).ProductionMode || !partialSegment { /* FIXME: compute this elsewhere */
+	if reqctx.Details(s.ctx).ProductionMode || !partialSegment { /* FIXME: compute this elsewhere? */
 		s.logger.Info("deleting store", zap.Stringer("store", nextStore))
 		stage.writerErrGroup.Go(func() error {
 			return nextStore.DeleteStore(s.ctx, partialFile)
@@ -84,16 +84,4 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 	s.logger.Info("squashing time metrics", metrics.logFields()...)
 
 	return nil
-}
-
-func deletePartial() bool {
-	if "in production mode" {
-		return true
-	}
-	if "squashableFile.Range.ExclusiveEndBlock%s.storeSaveInterval == 0" {
-		return true
-	}
-	// only leave it in dev mode, when we won't have a correspopnding
-	// full store.
-	return false
 }

@@ -21,6 +21,14 @@ func NewSegmenter(interval uint64, initialBlock uint64, exclusiveEndBlock uint64
 	return s
 }
 
+func (s *Segmenter) InitialBlock() uint64 {
+	return s.initialBlock
+}
+
+func (s *Segmenter) ExclusiveEndBlock() uint64 {
+	return s.exclusiveEndBlock
+}
+
 func (s *Segmenter) WithInitialBlock(newInitialBlock uint64) *Segmenter {
 	return NewSegmenter(s.interval, newInitialBlock, s.exclusiveEndBlock)
 }

@@ -17,10 +17,14 @@ type Stage struct {
 
 	moduleStates []*ModuleState
 
-	// writerErrGroup keeps tab of the goroutines that are writing the stores
-	// and deleting the partials, so that we can properly wait for them to
-	// shutdown before exiting the Scheduler.
-	writerErrGroup *llerrgroup.Group
+	// syncWork keeps tab of the parallel goroutines that do the merge work,
+	// and need to be waited on before marking the Unit as properly merged.
+	syncWork *llerrgroup.Group
+
+	// asyncWork keeps tab of goroutines that were spun out and need to be
+	// waited on only when the Scheduler is shutting down and everything
+	// was completed.
+	asyncWork *llerrgroup.Group
 }
 
 func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*ModuleState) *Stage {
@@ -30,7 +34,8 @@ func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*Mo
 		segmenter:        segmenter,
 		segmentCompleted: segmenter.FirstIndex() - 1,
 		moduleStates:     moduleStates,
-		writerErrGroup:   llerrgroup.New(250),
+		syncWork:         llerrgroup.New(250),
+		asyncWork:        llerrgroup.New(250),
 	}
 }
 

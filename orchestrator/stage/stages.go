@@ -95,11 +95,16 @@ func NewStages(
 	return out
 }
 
-func (s *Stages) Stage(idx int) *Stage {
-	return s.stages[idx]
-}
-
 func (s *Stages) AllStagesFinished() bool {
+	// AllStagesFinished should rather look to the
+	// Stages and confirm that all the Stores in the `moduleState`
+	// have been properly merged and that we're ready to continue
+	// to the Linear stage.
+	//
+	// FIXME: The simple fact that the unit is marked Completed
+	// will not work when we move it to FullKV exists.
+	// It's not the same thing
+
 	lastSegment := s.segmenter.LastIndex()
 	lastSegmentIndex := lastSegment - s.segmentOffset
 	if len(s.segmentStates) < lastSegmentIndex {
@@ -117,11 +122,36 @@ func (s *Stages) AllStagesFinished() bool {
 	return true
 }
 
-func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
+func (s *Stages) InitialProgressMessages() map[string]block.Ranges {
+	out := make(map[string]block.Ranges)
+	for _, stage := range s.stages {
+		// TODO: pluck initial messages from segmentCompleted
+		// and all of the PartialPresent or Complete stages, if that's
+		// possible
+		for _, mod := range stage.moduleStates {
+			out[mod.name] = append(out[mod.name], mod.InitialRange())
+		}
+	}
+	return out
+}
 
+func (s *Stages) CmdStartMerge() loop.Cmd {
+	var cmds []loop.Cmd
+	for idx := range s.stages {
+		cmds = append(cmds, s.CmdMerge(idx))
+	}
+
+}
+
+func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
 	if s.AllStagesFinished() {
+		// FIXME: if we have multiple stages that signal
+		// StoresCompleted because let's say they were all initialized
+		// and were ready from the get go, would produce multiple
+		// such messages. But the only downside would be that we schedule
+		// multiple Quit messages.. but then the further ones are ignored.
 		return func() loop.Msg {
-			return MsgStoresCompleted{}
+			return MsgMergeStoresCompleted{}
 		}
 	}
 	// FIXME: bound checks are necessary here, or in the caller
@@ -129,6 +159,14 @@ func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
 	// internal check).
 	stage := s.stages[stageIdx]
 	mergeUnit := stage.nextUnit()
+
+	if mergeUnit.Segment > s.segmenter.LastIndex() {
+		// TODO: we could affect a state for the whole Stage here
+		// and the AllStagesFinished() could be a quick
+		// check of that state instead of plucking through the
+		// Unit matrix.
+		return nil // We're done here.
+	}
 
 	if !s.previousUnitComplete(mergeUnit) {
 		return nil
@@ -145,7 +183,7 @@ func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
 }
 
 func (s *Stages) MergeCompleted(mergeUnit Unit) {
-	s.Stage(mergeUnit.Stage).markSegmentCompleted(mergeUnit.Segment)
+	s.stages[mergeUnit.Stage].markSegmentCompleted(mergeUnit.Segment)
 	s.markSegmentCompleted(mergeUnit)
 }
 
@@ -155,6 +193,15 @@ func (s *Stages) getState(u Unit) UnitState {
 
 func (s *Stages) setState(u Unit, state UnitState) {
 	s.segmentStates[u.Segment-s.segmentOffset][u.Stage] = state
+}
+
+func (s *Stages) WaitAsyncWork() error {
+	for _, stage := range s.stages {
+		if err := stage.asyncWork.Wait(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Stages) NextJob() (Unit, *block.Range) {

@@ -46,25 +46,30 @@ func New(ctx context.Context, stream *response.Stream, outputGraph *outputmodule
 	return s
 }
 
-func (s *Scheduler) Init() {
-	// TODO: Kickstart the Jobs processing
+func (s *Scheduler) Init() loop.Cmd {
+	var cmds []loop.Cmd
 
 	if s.ExecOutWalker != nil {
-		s.Send(execout.MsgStartDownload{})
+		cmds = append(cmds, execout.CmdMsgStartDownload())
 	} else {
 		// This hides the fact that there was _no_ Walker. Could cause
 		// confusing error messages in `cmdShutdownWhenComplete()`.
 		s.outputStreamCompleted = true
 	}
+	cmds = append(cmds, work.CmdScheduleNextJob())
+
+	cmds = append(cmds, s.Stages.CmdStartMerge())
+
+	// TODO: Schedule CmdMerge() comands for each stage available
+	// Ideally, we can push some `Cmd` directly into the `cmds`
+	// pipe in the Init() phase..
+	return loop.Batch(cmds...)
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
-	case work.MsgJobFailed:
-		cmds = append(cmds, loop.Quit(msg.Error))
-
 	case work.MsgJobSucceeded:
 		s.Stages.MarkSegmentPartialPresent(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
@@ -89,37 +94,28 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			work.CmdScheduleNextJob(),
 		)
 
-	//case MsgStoragePartialFound:
-	//	cmds = append(cmds, s.continueMergingWork())
-	//	job := s.killPotentiallyRunningJob(msg.JobID)
-	//	if job != nil {
-	//		cmds = append(cmds, work.CmdScheduleNextJob())
+	case work.MsgJobFailed:
+		cmds = append(cmds, loop.Quit(msg.Error))
+
+	//case stage.MsgDetectedNewPartial:
+	//	// When we have a polling thing for partials (or etcd instructions
+	//	// to the effect that some partial jobs were produced elsewhere)
+	//	// Again, that other place would need to detect _all stores_ for the
+	//	// given Unit.
+	//	if s.Stages.DetectedPartial(msg.Unit) {
+	//		// cancel running job,
+	//		// if the Unit was Scheduled,
+	//		// then _cancel the job_ somehow
+	//		// and mark it PartialPresent.
+	//		// if it was Pending, then simply schedule the next job
+	//		// and some merging work.
 	//	}
-	//
-	//case FullStoresPresent:
-	//	stage := s.Stages[msg.Stage]
-	//	sq := s.Squasher[msg.Stage]
-	//
-	//	if len(msg.Stores) != len(stage.Stores) {
-	//		return nil
-	//	}
-	//
-	//	return loop.Batch(
-	//		s.killPotentiallyRunningJob(msg.Stage, msg.Segment),
-	//		loop.Sequence(
-	//			// TODO: tell the squasher these partials are on disk
-	//			// per Segment + Stage. Meaning all of the stores
-	//			// for a given Unit are present.
-	//			s.Squasher.AddPartials(msg.StoreName, msg.Files...),
-	//			s.mergeStage(msg.Stage),
-	//		),
-	//	)
 
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
 		cmds = append(cmds, s.Stages.CmdMerge(msg.Stage))
 
-	case stage.MsgStoresCompleted:
+	case stage.MsgMergeStoresCompleted:
 		s.storesSyncCompleted = true
 		return s.cmdShutdownWhenComplete()
 
@@ -146,13 +142,11 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 }
 
 func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
-	// TODO: ensure everything else is completed properly,
-	// like the setting of the stores and all, only then do you
-	// Quit.
-	// Anything that could cause the thing to complete should call
-	// cmdShutdownWhenComplete()
 	if s.outputStreamCompleted && s.storesSyncCompleted {
-		return loop.Quit(nil)
+		return func() loop.Msg {
+			err := s.Stages.WaitAsyncWork()
+			return loop.Quit(err)()
+		}
 	}
 	if !s.outputStreamCompleted && !s.storesSyncCompleted {
 		s.logger.Info("scheduler: waiting for output stream and stores to complete")

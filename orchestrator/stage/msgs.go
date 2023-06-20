@@ -1,7 +1,7 @@
 package stage
 
 // This means that this single Store has completed its full sync, up to the target block
-type MsgStoresCompleted struct {
+type MsgMergeStoresCompleted struct {
 	Unit
 }
 

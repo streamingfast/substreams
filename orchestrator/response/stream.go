@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/orchestrator/storage"
+	"github.com/streamingfast/substreams/block"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
@@ -16,11 +16,11 @@ func New(respFunc substreams.ResponseFunc) *Stream {
 	}
 }
 
-func (s *Stream) InitialProgressMessages(in storage.ModuleStorageStateMap) error {
+func (s *Stream) InitialProgressMessages(in map[string]block.Ranges) error {
 	var out []*pbsubstreamsrpc.ModuleProgress
-	for storeName, modState := range in {
+	for storeName, rngs := range in {
 		var more []*pbsubstreamsrpc.BlockRange
-		for _, rng := range modState.InitialProgressRanges() {
+		for _, rng := range rngs {
 			more = append(more, &pbsubstreamsrpc.BlockRange{
 				StartBlock: rng.StartBlock,
 				EndBlock:   rng.ExclusiveEndBlock,

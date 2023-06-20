@@ -9,6 +9,25 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
+func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64) (*storeSnapshots, error) {
+	out := &storeSnapshots{}
+
+	files, err := storeConfig.ListSnapshotFiles(ctx, below)
+	if err != nil {
+		return nil, fmt.Errorf("list snapshots: %w", err)
+	}
+
+	for _, file := range files {
+		if file.Partial {
+			out.Partials = append(out.Partials, file)
+		} else {
+			out.Completes = append(out.Completes, file)
+		}
+	}
+	out.Sort()
+	return out, nil
+}
+
 type storeSnapshots struct {
 	Completes store.FileInfos // Shortest completes first, largest last.
 	Partials  store.FileInfos // First partials first, last
@@ -62,28 +81,4 @@ func (s *storeSnapshots) findPartial(r *block.Range) *store.FileInfo {
 		}
 	}
 	return nil
-}
-
-type Snapshot struct {
-	block.Range
-	Path string
-}
-
-func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64) (*storeSnapshots, error) {
-	out := &storeSnapshots{}
-
-	files, err := storeConfig.ListSnapshotFiles(ctx, below)
-	if err != nil {
-		return nil, fmt.Errorf("list snapshots: %w", err)
-	}
-
-	for _, file := range files {
-		if file.Partial {
-			out.Partials = append(out.Partials, file)
-		} else {
-			out.Completes = append(out.Completes, file)
-		}
-	}
-	out.Sort()
-	return out, nil
 }

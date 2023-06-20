@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/stage"
-	"github.com/streamingfast/substreams/orchestrator/storage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
@@ -34,10 +33,9 @@ func BuildParallelProcessor(
 	storeConfigs store.ConfigMap,
 	traceID string,
 ) (*ParallelProcessor, error) {
-	stream := response.New(respFunc)
-	sched := scheduler.New(ctx, stream, outputGraph)
-
-	// Job segmenter really.. stores should just match this
+	// TODO: plan should be defined in the Pipeline, and passed here
+	// as a parameter. Because it has instructions for the Linear Range too,
+	// which the Pipeline ought to use.
 	plan := plan.BuildRequestPlan(
 		reqDetails.ProductionMode,
 		runtimeConfig.SubrequestsSplitSize,
@@ -47,40 +45,39 @@ func BuildParallelProcessor(
 		reqDetails.StopBlockNum,
 	)
 
-	storesSegmenter := plan.StoresSegmenter()
-	sched.Stages = stage.NewStages(ctx, outputGraph, storesSegmenter, storeConfigs, traceID)
+	stream := response.New(respFunc)
+	sched := scheduler.New(ctx, stream, outputGraph)
 
-	storageState, err := storage.FetchStoresState(
+	storesSegmenter := plan.StoresSegmenter()
+
+	stages := stage.NewStages(ctx, outputGraph, storesSegmenter, storeConfigs, traceID)
+	sched.Stages = stages
+
+	err := stages.FetchStoresState(
 		ctx,
-		sched.Stages,
 		storesSegmenter,
 		storeConfigs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("fetch stores storage state: %w", err)
 	}
-	if err := stream.InitialProgressMessages(storageState); err != nil {
+	// TODO: craft an initial ProgressMessage from the `Stages` stateb
+	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
 		return nil, fmt.Errorf("initial progress: %w", err)
 	}
 
-	// TODO: inject the `storageState` into the Scheduler with a bunch of messages
-	// or pass it through some sort of `Init()` mechanism.
+	// TODO: We should fetch the ExecOut files too, and see if they
+	// cover some of the ranges that we're after.
+	// We don't need to plan work for ranges where we have ExecOut
+	// already.
+	// BUT we'll need to have stores to be able to schedule work after
+	// so there's a mix of Complete stores and ExecOut files we need
+	// to check.  We can push the `segmentCompleted` based on the
+	// execout files.
 
-	// TODO(abourget): I want to transform this to use a Segmenter
-	// but I'm not sure I can use the exact same Segmenter as the
-	// scheduler. This one
-	//modulesStateMap, err := storage.BuildModuleStorageStateMap( // ok, I will cut stores up to 800 not 842
-	//	ctx,
-	//	storeConfigs,
-	//	runtimeConfig.CacheSaveInterval,
-	//	execoutStorage,
-	//	reqDetails.ResolvedStartBlockNum,
-	//	reqDetails.LinearHandoffBlockNum,
-	//	storeLinearHandoffBlockNum,
-	//)
-	//if err != nil {
-	//	return nil, fmt.Errorf("build storage map: %w", err)
-	//}
+	// The previous code did what? Just assumed there was ExecOut files
+	// prior to the latest Complete snapshot?
+
 	// FIXME: Is the state map the final reference for the progress we've made?
 	// Shouldn't that be processed by the scheduler a little bit?
 	// What if we have discovered a bunch of ExecOut files and the scheduler
@@ -127,21 +124,6 @@ func BuildParallelProcessor(
 	//  -
 	//  This is unsolved
 
-	// TODO(abourget): validate here the last parameter used
-	// should it be `storeLinearHandoff` as defined above, or
-	// reqDetails.LinearHandoffBlockNum really?
-
-	// Used to have this param at the end: scheduler.OnStoreCompletedUntilBlock
-	// TODO: replace that last param, by the new squashing model in the Scheduler
-	//squasher, err := squasher.NewMulti(ctx, segmenter, runtimeConfig, modulesStateMap, storeConfigs, storeLinearHandoffBlockNum, nil)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//sched.Squasher = squasher
-
-	// TODO: wrap up the tying up of the Scheduler with the Squasher.
-	//scheduler.OnStoreJobTerminated = squasher.Squash
-
 	workerPool := work.NewWorkerPool(ctx, int(runtimeConfig.ParallelSubrequests), runtimeConfig.WorkerFactory)
 	sched.WorkerPool = workerPool
 
@@ -151,12 +133,12 @@ func BuildParallelProcessor(
 }
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
-	b.scheduler.Init()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := b.scheduler.Run(ctx); err != nil {
+	initCmd := b.scheduler.Init()
+	if err := b.scheduler.Run(ctx, initCmd); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 

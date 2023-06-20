@@ -18,9 +18,12 @@ func NewEventLoop(updateFunc func(msg Msg) Cmd) EventLoop {
 	}
 }
 
-func (l *EventLoop) Run(ctx context.Context) (err error) {
+func (l *EventLoop) Run(ctx context.Context, initCmd Cmd) (err error) {
 	l.ctx = ctx
 	cmds := make(chan Cmd, 1000)
+	if initCmd != nil {
+		cmds <- initCmd
+	}
 	// main execution loop
 	done := l.handleCommands(cmds)
 loop:
@@ -30,11 +33,12 @@ loop:
 			err = l.ctx.Err()
 			break loop
 		case msg := <-l.msgs:
-			var cmd Cmd
-			cmd, err = l.update(msg, cmds)
-			if err != nil {
+			if quit, ok := msg.(quitMsg); ok {
+				err = quit.err
 				break loop
 			}
+
+			cmd := l.update(msg, cmds)
 			if cmd == nil {
 				continue
 			}
@@ -55,17 +59,13 @@ func (l *EventLoop) Send(msg Msg) {
 	}
 }
 
-func (l *EventLoop) update(msg Msg, cmds chan Cmd) (Cmd, error) {
+func (l *EventLoop) update(msg Msg, cmds chan Cmd) (out Cmd) {
 	switch msg := msg.(type) {
-	case quitMsg:
-		// TODO: make sure that the calling loop is broken
-		// when we got a quitMsg
-		return nil, msg.err
 	case batchMsg:
 		for _, cmd := range msg {
 			cmds <- cmd
 		}
-		return nil, nil
+		return nil
 
 	case sequenceMsg:
 		go func() {
@@ -76,7 +76,7 @@ func (l *EventLoop) update(msg Msg, cmds chan Cmd) (Cmd, error) {
 		}()
 	}
 
-	return l.updateFunc(msg), nil
+	return l.updateFunc(msg)
 }
 
 func (l *EventLoop) handleCommands(cmds chan Cmd) chan struct{} {

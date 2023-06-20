@@ -21,8 +21,8 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 			continue
 		}
 
-		modState := modState
-		stage.writerErrGroup.Go(func() error {
+		modState := modState // capture in loop
+		stage.syncWork.Go(func() error {
 			err := s.singleSquash(stage, modState, mergeUnit)
 			if err != nil {
 				return fmt.Errorf("squash stage %d module %q: %w", stage.idx, modState.name, err)
@@ -31,7 +31,7 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 		})
 	}
 
-	return stage.writerErrGroup.Wait()
+	return stage.syncWork.Wait()
 }
 
 func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Unit) error {
@@ -39,10 +39,9 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 	metrics.start = time.Now()
 
 	rng := modState.segmenter.Range(mergeUnit.Segment)
-	partialSegment := modState.segmenter.IsPartial(mergeUnit.Segment)
-	nextStore := modState.store.DerivePartialStore(rng.StartBlock)
-
 	partialFile := store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock, s.traceID)
+	nextStore := modState.store.DerivePartialStore(rng.StartBlock)
+	partialSegment := modState.segmenter.IsPartial(mergeUnit.Segment)
 
 	// Load
 	metrics.loadStart = time.Now()
@@ -61,7 +60,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 	// Delete partial store
 	if reqctx.Details(s.ctx).ProductionMode || !partialSegment { /* FIXME: compute this elsewhere? */
 		s.logger.Info("deleting store", zap.Stringer("store", nextStore))
-		stage.writerErrGroup.Go(func() error {
+		stage.asyncWork.Go(func() error {
 			return nextStore.DeleteStore(s.ctx, partialFile)
 		})
 	}
@@ -75,7 +74,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 		}
 		metrics.saveEnd = time.Now()
 
-		stage.writerErrGroup.Go(func() error {
+		stage.asyncWork.Go(func() error {
 			// TODO: could this cause an issue if the writing takes more time than when trying to opening the file??
 			return writer.Write(s.ctx)
 		})

@@ -139,17 +139,6 @@ func (s *Tier1Service) Blocks(
 	var err error
 
 	logger := reqctx.Logger(ctx).Named("tier1")
-	mut := sync.Mutex{}
-	respFunc := func(anyResp substreams.ResponseFromAnyTier) error {
-		resp := anyResp.(*pbsubstreamsrpc.Response)
-		mut.Lock()
-		defer mut.Unlock()
-		if err := stream.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
-			return status.Error(codes.Unavailable, err.Error())
-		}
-		return nil
-	}
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
@@ -157,6 +146,11 @@ func (s *Tier1Service) Blocks(
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
+
+	// context bound to that request, to prevent sending data after Blocks handler is done
+	respContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	respFunc := tier1ResponseHandler(respContext, logger, stream)
 
 	span.SetAttributes(attribute.Int64("substreams.tier", 1))
 
@@ -368,18 +362,29 @@ func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipelin
 	return
 }
 
-func tier1ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbsubstreamsrpc.Stream_BlocksServer) substreams.ResponseFunc {
+func tier1ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response]) substreams.ResponseFunc {
 	mut := sync.Mutex{}
+	auth := dauth.FromContext(ctx)
+	userID := auth.UserID()
+	apiKeyID := auth.APIKeyID()
+	ip := auth.RealIP()
+	meter := dmetering.GetBytesMeter(ctx)
+
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
 		mut.Lock()
 		defer mut.Unlock()
+
+		// this reponse handler is used in goroutines, sending to streamSrv on closed ctx would panic
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
 			return status.Error(codes.Unavailable, err.Error())
 		}
 
-		sendMetering(ctx, logger, "sf.substreams.rpc.v2/Blocks", resp)
+		sendMetering(meter, userID, apiKeyID, ip, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

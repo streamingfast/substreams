@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream/stream"
+	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
@@ -109,6 +111,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	)
 
 	ctx = logging.WithLogger(ctx, logger)
+	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
@@ -267,6 +270,12 @@ func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssin
 }
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
+	meter := dmetering.GetBytesMeter(ctx)
+	auth := dauth.FromContext(ctx)
+	userID := auth.UserID()
+	apiKeyID := auth.APIKeyID()
+	ip := auth.RealIP()
+
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
@@ -274,7 +283,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return status.Error(codes.Unavailable, err.Error())
 		}
 
-		sendMetering(ctx, logger, "sf.substreams.internal.v2/ProcessRange", resp)
+		sendMetering(meter, userID, apiKeyID, ip, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

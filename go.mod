@@ -12,7 +12,7 @@ require (
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20230616195911-1a7e8a5c5ca4
-	github.com/streamingfast/dstore v0.1.1-0.20230511202333-4f4ccf11a05f
+	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
 	github.com/stretchr/testify v1.8.3
@@ -51,10 +51,10 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
-	github.com/streamingfast/dauth v0.0.0-20230616203650-2cb108b40603
+	github.com/streamingfast/dauth v0.0.0-20230620150800-dfc654175331
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
-	github.com/streamingfast/dmetering v0.0.0-20230616153558-2b1c710b945f
+	github.com/streamingfast/dmetering v0.0.0-20230620155208-31b97a817964
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9

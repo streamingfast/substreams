@@ -2,22 +2,19 @@ package service
 
 import (
 	"context"
-	"github.com/streamingfast/dmetering"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"time"
+
+	"github.com/streamingfast/dmetering"
+	"google.golang.org/protobuf/proto"
 )
 
-func sendMetering(ctx context.Context, logger *zap.Logger, endpoint string, resp proto.Message) {
-	meter := dmetering.GetBytesMeter(ctx)
+func sendMetering(meter dmetering.Meter, userID, apiKeyID, ip, endpoint string, resp proto.Message) {
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
 
-	userId, apiKeyId, ip := getAuthDetails(ctx)
-
 	event := dmetering.Event{
-		UserID:    userId,
-		ApiKeyID:  apiKeyId,
+		UserID:    userID,
+		ApiKeyID:  apiKeyID,
 		IpAddress: ip,
 
 		Endpoint: endpoint,
@@ -29,5 +26,6 @@ func sendMetering(ctx context.Context, logger *zap.Logger, endpoint string, resp
 		Timestamp: time.Now(),
 	}
 
-	dmetering.Emit(ctx, event)
+	// we send metering even if context is canceled
+	dmetering.Emit(context.Background(), event)
 }

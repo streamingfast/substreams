@@ -7,7 +7,9 @@ import (
 
 	connect_go "github.com/bufbuild/connect-go"
 	"github.com/streamingfast/dauth"
-	dauthserver "github.com/streamingfast/dauth/middleware/connect"
+	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
+	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
+
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	connectweb "github.com/streamingfast/dgrpc/server/connect-web"
 	"github.com/streamingfast/dgrpc/server/factory"
@@ -47,7 +49,7 @@ func ListenTier1(
 	// note: some of these common options don't work with connectWeb
 	options := GetCommonServerOptions(addr, logger, healthcheck)
 
-	options = append(options, dgrpcserver.WithConnectInterceptor(dauthserver.NewAuthInterceptor(auth)))
+	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth)))
 
 	streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
 		return ssconnect.NewStreamHandler(svc, opts...)
@@ -65,6 +67,7 @@ func ListenTier2(
 	addr string,
 	serviceDiscoveryURL *url.URL,
 	svc *Tier2Service,
+	auth dauth.Authenticator,
 	logger *zap.Logger,
 	healthcheck dgrpcserver.HealthCheck,
 ) (err error) {
@@ -72,6 +75,10 @@ func ListenTier2(
 	if serviceDiscoveryURL != nil {
 		options = append(options, dgrpcserver.WithServiceDiscoveryURL(serviceDiscoveryURL))
 	}
+	options = append(options,
+		dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth)),
+		dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth)),
+	)
 
 	grpcServer := factory.ServerFromOptions(options...)
 	pbssinternal.RegisterSubstreamsServer(grpcServer.ServiceRegistrar(), svc)

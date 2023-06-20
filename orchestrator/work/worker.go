@@ -18,7 +18,6 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -97,11 +96,6 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 		}
 	}
 
-	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
-
-	userId, apiKeyId, ip := getAuthDetails(ctx)
-	ctx = metadata.AppendToOutgoingContext(ctx, "user-id", userId, "api-key-id", apiKeyId, "ip", ip)
-
 	w.logger.Info("launching remote worker",
 		zap.Int64("start_block_num", int64(request.StartBlockNum)),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
@@ -147,15 +141,15 @@ func (w *RemoteWorker) Work(ctx context.Context, request *pbssinternal.ProcessRa
 	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
 	for {
-		select {
-		case <-ctx.Done():
-			return &Result{
-				Error: ctx.Err(),
+		resp, err := stream.Recv()
+
+		if err := ctx.Err(); err != nil {
+			if err == context.Canceled {
+				return &Result{}
 			}
-		default:
+			return &Result{Error: err}
 		}
 
-		resp, err := stream.Recv()
 		if resp != nil {
 			switch r := resp.Type.(type) {
 			case *pbssinternal.ProcessRangeResponse_ProcessedRange:

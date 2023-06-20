@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/streamingfast/dmetering"
 	"io"
+
+	"github.com/streamingfast/dmetering"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 )
 
-func saveStore(ctx context.Context, store dstore.Store, filename string, content []byte) error {
+func saveStore(ctx context.Context, store dstore.Store, filename string, content []byte) (err error) {
 	if cloned, ok := store.(dstore.Clonable); ok {
-		store, err := cloned.Clone(ctx)
+		store, err = cloned.Clone(ctx)
 		if err != nil {
 			return fmt.Errorf("cloning store: %w", err)
 		}
@@ -27,7 +28,7 @@ func saveStore(ctx context.Context, store dstore.Store, filename string, content
 
 func loadStore(ctx context.Context, store dstore.Store, filename string) (out []byte, err error) {
 	if cloned, ok := store.(dstore.Clonable); ok {
-		store, err := cloned.Clone(ctx)
+		store, err = cloned.Clone(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("cloning store: %w", err)
 		}

@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dauth"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -194,14 +195,14 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 // runParallelProcess
 func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(p.ctx, fmt.Sprintf("substreams/%s/pipeline/parallel_process", p.tier))
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/pipeline/parallel_process", p.tier))
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
-		p.ctx,
+		ctx,
 		reqDetails,
 		p.runtimeConfig,
 		p.outputGraph,
@@ -217,7 +218,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 	logger.Info("starting parallel processing")
 
 	reqStats.StartParallelProcessing()
-	storeMap, err = parallelProcessor.Run(ctx)
+	storeMap, err = parallelProcessor.Run(dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}

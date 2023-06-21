@@ -11,7 +11,7 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20230510131449-6b591d74130d
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20230616195911-1a7e8a5c5ca4
+	github.com/streamingfast/dgrpc v0.0.0-20230621153617-bc715cdb9fd1
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect

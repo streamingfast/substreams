@@ -133,7 +133,7 @@ func (s *Tier1Service) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) (grpcError error) {
+) error {
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -203,19 +203,23 @@ func (s *Tier1Service) Blocks(
 	}
 
 	err = s.blocks(ctx, request, outputGraph, respFunc)
-	grpcError = toGRPCError(err)
-
-	if grpcError != nil {
+	if grpcError := toGRPCError(err); grpcError != nil {
 		switch status.Code(grpcError) {
 		case codes.Internal:
 			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
 		case codes.InvalidArgument:
 			logger.Debug("recording failure on request", zap.String("request_id", requestID))
 			s.recordFailure(requestID, grpcError)
+		case codes.Canceled:
+			logger.Info("Blocks request canceled by user", zap.Error(grpcError))
+		default:
+			logger.Info("Blocks request completed with error", zap.Error(grpcError))
 		}
+		return grpcError
 	}
 
-	return grpcError
+	logger.Info("Blocks request completed witout error")
+	return nil
 }
 
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {

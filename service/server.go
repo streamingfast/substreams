@@ -50,6 +50,7 @@ func ListenTier1(
 	options := GetCommonServerOptions(addr, logger, healthcheck)
 
 	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth)))
+	options = append(options, dgrpcserver.WithConnectStrictContentType(false))
 
 	streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
 		return ssconnect.NewStreamHandler(svc, opts...)

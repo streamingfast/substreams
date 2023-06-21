@@ -140,7 +140,7 @@ func (s *Stages) CmdStartMerge() loop.Cmd {
 	for idx := range s.stages {
 		cmds = append(cmds, s.CmdMerge(idx))
 	}
-
+	return loop.Batch(cmds...)
 }
 
 func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
@@ -243,6 +243,15 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 		segmentIdx++
 	}
 	return Unit{}, nil
+}
+
+func (s *Stages) StoreStagesCount() int {
+	for idx, stage := range s.stages {
+		if stage.kind == KindMap {
+			return idx
+		}
+	}
+	return len(s.stages)
 }
 
 func (s *Stages) growSegments() {

@@ -228,3 +228,14 @@ func TestStages_previousUnitComplete(t *testing.T) {
 	s.setState(u00, UnitCompleted)
 	assert.True(t, s.previousUnitComplete(u01)) // u00 is now complete
 }
+
+func TestStages_StoreStagesCount(t *testing.T) {
+	s := &Stages{stages: []*Stage{
+		{kind: KindStore},
+		{kind: KindStore},
+		{kind: KindMap},
+	}}
+	assert.Equal(t, 2, s.StoreStagesCount())
+	s.stages[2].kind = KindStore
+	assert.Equal(t, 3, s.StoreStagesCount())
+}

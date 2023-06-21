@@ -9,11 +9,6 @@ import (
 	"github.com/streamingfast/substreams/storage/store/state"
 )
 
-type storageState struct {
-	Unit
-	state UnitState
-}
-
 func (s *Stages) FetchStoresState(
 	ctx context.Context,
 	segmenter *block.Segmenter,
@@ -21,8 +16,31 @@ func (s *Stages) FetchStoresState(
 ) error {
 	completes := make(unitMap)
 	partials := make(unitMap)
+	highestCompleteStorePerStage := initCompleteStageList(s.StoreStagesCount())
 
 	upToBlock := segmenter.ExclusiveEndBlock()
+
+	// TODO: this method has two goals:
+	// load the matrix with complete stores and partials present
+	// load the initial blocks, but why not just use the stores
+	// at the VERY END? instead of merging all the time?
+	// let the stages produce the complete snapshots
+	// and don't try to merge them..
+	// only when we're near the LinearHandoff should we
+	// start loading those stores in preparation for the
+	// linear handoff.
+
+	// TODO: make sure the Tier2 jobs write the FULL stores
+	// but NO, the tier2 produce partials jobs.. that need to be
+	// merged, but right now we have TWO needs for merging:
+	// 1) preparing the storeMap for the end
+	// 2) taking the previous full and fuse it with a partial
+	// in order to produce a new complete store, so that the
+	// next job can start.
+	//  In this case, we mustn't start a job until the full store
+	//  has been properly written to storage.. right now we
+	//  ship that in a go routine..
+	//  with that `writerErrGroup`.. what's the use of that?
 
 	// FIXME: why load stores if there could be ExecOut data present
 	// on disk already, which avoid the need to do _any_ processing whatsoever?
@@ -33,9 +51,17 @@ func (s *Stages) FetchStoresState(
 	for stageIdx, stage := range s.stages {
 		moduleCount := len(stage.moduleStates)
 
+		if stage.kind == KindMap {
+			continue
+		}
+
 		for _, mod := range stage.moduleStates {
 			files := state.Snapshots[mod.name]
 			modSegmenter := mod.segmenter
+
+			// TODO: Initialize the store FullKV for this module
+			// like in multi.go
+			startingStore
 
 			// TODO: what happens to the Unit's state if we don't have
 			// compelte sores for all modules within?
@@ -51,12 +77,15 @@ func (s *Stages) FetchStoresState(
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
 				if allDone := markFound(completes, unit, mod.name, moduleCount); allDone {
+					if segmentIdx > highestCompleteStorePerStage[stageIdx] {
+						highestCompleteStorePerStage[stageIdx] = segmentIdx
+					}
 					// TODO: we should push the `segmentComplete` and LOAD all the stores
 					// aligned at this block, but only for the _highest_ of the
 					// completed bundles.
 
 					// TODO: do we need another state, for when a CompleteStore is
-					// present? or FullKV is present, in which ase we can load it
+					// present? or FullKV is present, in which case we can load it
 					// altogether instead of merging it. a Full followed by a PartialPresent
 					// could do with a `Load()` of the previous `Full`, and then a merge
 					// of the partial.
@@ -94,11 +123,17 @@ func (s *Stages) FetchStoresState(
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
 
 				if allDone := markFound(partials, unit, mod.name, moduleCount); allDone {
+					// TODO: if we discover both a Partial and a Complete, we need to make
+					// sure that the Complete is the thing that wins in the state, because
+					// we don't want to lose time merging a partial
 					s.MarkSegmentPartialPresent(unit)
 				}
 			}
 		}
 	}
+
+	// loop all stages
+	// loop all segments, check whether they are complete
 
 	return nil
 }
@@ -113,4 +148,11 @@ func markFound(unitMap unitMap, unit Unit, name string, moduleCount int) bool {
 	}
 	mods[name] = struct{}{}
 	return len(mods) == moduleCount
+}
+
+func initCompleteStageList(l int) []int {
+	var highestCompleteStorePerStage []int
+	for i := 0; i < l; i++ {
+		highestCompleteStorePerStage[i] = -1
+	}
 }

@@ -26,6 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Added `-H` flag on the `substreams run` command, to set HTTP Headers in the Substreams request.
 
+### Changed
+
+* Now using `plugin: buf.build/community/neoeinstein-prost-crate:v0.3.1` when generating the Protobuf Rust `mod.rs` which fixes the warning that remote plugins are deprecated.
+
 ### Fixed
 
 * Fixed generated `buf.gen.yaml` not being deleted when an error occurs while generating the Rust code.

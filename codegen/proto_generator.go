@@ -58,7 +58,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 		if g.generateMod {
 			// Beware, the indentation after initial column is important, it's 2 spaces!
 			content += dedent.Dedent(`
-				- remote: buf.build/prost/plugins/crate:v0.3.1-1
+				- plugin: buf.build/community/neoeinstein-prost-crate:v0.3.1
 				  out: ` + g.outputPath + `
 				  opt:
 				    - no_features

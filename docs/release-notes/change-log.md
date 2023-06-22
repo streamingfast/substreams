@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.1.7 (https://github.com/streamingfast/substreams/releases/tag/v1.1.7)
+
+### Highlights
+
+Now using `plugin: buf.build/community/neoeinstein-prost-crate:v0.3.1` when generating the Protobuf Rust `mod.rs` which fixes the warning that remote plugins are deprecated.
+
+Previously we were using `remote: buf.build/prost/plugins/crate:v0.3.1-1`. But remote plugins when using https://buf.build (which we use to generate the Protobuf) are now deprecated and will cease to function on July 10th, 2023.
+
+The net effect of this is that if you don't update your Substreams CLI to `1.1.7`, on July 10th 2023 and after, the `substreams protogen` will not work anymore.
+
 ## v1.1.6 (https://github.com/streamingfast/substreams/releases/tag/v1.1.6)
 
 ### Backend changes
@@ -25,10 +35,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The `substreams protogen` command no longer generate the `FILE_DESCRIPTOR_SET` constant which generates an unsued warning in Rust. We don't think nobody relied on having the `FILE_DESCRIPTOR_SET` constant generated, but if it's the case, you can provide your own `buf.gen.yaml` that will be used instead of the generated one when doing `substreams protogen`.
 
 * Added `-H` flag on the `substreams run` command, to set HTTP Headers in the Substreams request.
-
-### Changed
-
-* Now using `plugin: buf.build/community/neoeinstein-prost-crate:v0.3.1` when generating the Protobuf Rust `mod.rs` which fixes the warning that remote plugins are deprecated.
 
 ### Fixed
 

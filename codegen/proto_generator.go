@@ -11,7 +11,6 @@ import (
 
 	"github.com/lithammer/dedent"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-
 	"google.golang.org/protobuf/proto"
 )
 

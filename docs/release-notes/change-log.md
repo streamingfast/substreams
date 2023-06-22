@@ -12,9 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * `substreams-tier1` now listens to [Connect](https://buf.build/blog/connect-a-better-grpc) protocol, enabling browser-based substreams clients
 
-* **Authentication** has been overhauled to take advantage of github.com/streamingfast/dauth, allowing the use of a GRPC-based sidecar or reverse-proxy to provide authentication.
+* **Authentication** has been overhauled to take advantage of https://github.com/streamingfast/dauth, allowing the use of a GRPC-based sidecar or reverse-proxy to provide authentication.
 
-* **Metering** has been overhauled to take advantage of github.com/streamingfast/dmetering plugins, allowing the the use of a GRPC sidecar or logs to expose usage metrics.
+* **Metering** has been overhauled to take advantage of https://github.com/streamingfast/dmetering plugins, allowing the use of a GRPC sidecar or logs to expose usage metrics.
 
 * The **tier2 logs** no longer show a `parent_trace_id`: the `trace_id` is now the same as tier1 jobs. Unique tier2 jobs can be distinguished by their `stage` and `segment`, corresponding to the `output_module_name` and `startblock:stopblock`
 
@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The `substreams protogen` command now uses this Buf plugin https://buf.build/community/neoeinstein-prost to generate the Rust code for your Substreams definitions.
 
 * The `substreams protogen` command no longer generate the `FILE_DESCRIPTOR_SET` constant which generates an unsued warning in Rust. We don't think nobody relied on having the `FILE_DESCRIPTOR_SET` constant generated, but if it's the case, you can provide your own `buf.gen.yaml` that will be used instead of the generated one when doing `substreams protogen`.
+
+* Added `-H` flag on the `substreams run` command, to set HTTP Headers in the Substreams request.
 
 ### Fixed
 

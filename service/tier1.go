@@ -147,10 +147,17 @@ func (s *Tier1Service) Blocks(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
-	// context bound to that request, to prevent sending data after Blocks handler is done
+	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
+	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
+	mut := sync.Mutex{}
 	respContext, cancel := context.WithCancel(ctx)
-	defer cancel()
-	respFunc := tier1ResponseHandler(respContext, logger, stream)
+	defer func() {
+		mut.Lock()
+		cancel()
+		mut.Unlock()
+	}()
+
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream)
 
 	span.SetAttributes(attribute.Int64("substreams.tier", 1))
 
@@ -366,8 +373,7 @@ func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipelin
 	return
 }
 
-func tier1ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response]) substreams.ResponseFunc {
-	mut := sync.Mutex{}
+func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response]) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()

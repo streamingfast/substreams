@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -14,15 +15,18 @@ type ModuleState struct {
 	name   string
 	logger *zap.Logger
 
+	segmenter *block.Segmenter
+
 	storeConfig *store.Config
 
 	cachedStore      *store.FullKV
 	lastBlockInStore uint64
 }
 
-func NewModuleState(logger *zap.Logger, name string, storeConfig *store.Config) *ModuleState {
+func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter, storeConfig *store.Config) *ModuleState {
 	return &ModuleState{
 		name:        name,
+		segmenter:   segmenter,
 		logger:      logger,
 		storeConfig: storeConfig,
 	}

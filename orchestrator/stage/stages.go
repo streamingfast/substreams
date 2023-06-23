@@ -74,7 +74,8 @@ func NewStages(
 		var moduleStates []*ModuleState
 		lowestStageInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
-			modState := NewModuleState(logger, mod.Name, storeConfigs[mod.Name])
+			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
+			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
 
 			lowestStageInitBlock = utils.MinOf(lowestStageInitBlock, mod.InitialBlock)

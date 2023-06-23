@@ -21,7 +21,7 @@ func TestNewStages(t *testing.T) {
 	)
 
 	assert.Equal(t, 8, stages.segmenter.Count()) // from 5 to 75
-	assert.Equal(t, true, stages.segmenter.IsPartial(7))
+	assert.Equal(t, false, stages.segmenter.EndsOnInterval(7))
 	assert.Equal(t, 6, stages.segmenter.IndexForStartBlock(60), "index in range")
 	assert.Equal(t, 8, stages.segmenter.IndexForStartBlock(80), "index out of range still returned here")
 	assert.Nil(t, stages.segmenter.Range(8), "out of range")
@@ -227,15 +227,4 @@ func TestStages_previousUnitComplete(t *testing.T) {
 	assert.False(t, s.previousUnitComplete(u01)) // u00 not complete
 	s.setState(u00, UnitCompleted)
 	assert.True(t, s.previousUnitComplete(u01)) // u00 is now complete
-}
-
-func TestStages_StoreStagesCount(t *testing.T) {
-	s := &Stages{stages: []*Stage{
-		{kind: KindStore},
-		{kind: KindStore},
-		{kind: KindMap},
-	}}
-	assert.Equal(t, 2, s.StoreStagesCount())
-	s.stages[2].kind = KindStore
-	assert.Equal(t, 3, s.StoreStagesCount())
 }

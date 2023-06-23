@@ -1,26 +1,53 @@
 package stage
 
 import (
-	"github.com/streamingfast/substreams/block"
+	"context"
+	"fmt"
+
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/storage/store"
 )
 
 // An individual module's progress towards synchronizing its `store`
 type ModuleState struct {
-	name string
-	//state MergeState
+	name   string
+	logger *zap.Logger
 
-	segmenter *block.Segmenter
+	storeConfig *store.Config
 
-	store *store.FullKV
+	cachedStore      *store.FullKV
+	lastBlockInStore uint64
 }
 
-func NewModuleState(name string, segmenter *block.Segmenter) *ModuleState {
+func NewModuleState(logger *zap.Logger, name string, storeConfig *store.Config) *ModuleState {
 	return &ModuleState{
-		name:      name,
-		segmenter: segmenter,
-		//state:     MergeIdle,
+		name:        name,
+		logger:      logger,
+		storeConfig: storeConfig,
 	}
+}
+
+func (s *ModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
+	if s.lastBlockInStore == exclusiveEndBlock {
+		return s.cachedStore, nil
+	}
+	loadStore := s.storeConfig.NewFullKV(s.logger)
+	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
+	if moduleInitBlock != exclusiveEndBlock {
+		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
+		err := loadStore.Load(ctx, fullKVFile)
+		if err != nil {
+			return nil, fmt.Errorf("load store %q: %w", s.name, err)
+		}
+	}
+	s.cachedStore = loadStore
+	s.lastBlockInStore = exclusiveEndBlock
+	return loadStore, nil
+}
+
+func (s *ModuleState) derivePartialKV(initialBlock uint64) *store.PartialKV {
+	return s.storeConfig.NewPartialKV(initialBlock, s.logger)
 }
 
 //type MergeState int

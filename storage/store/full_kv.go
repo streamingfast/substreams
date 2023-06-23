@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
 var _ Store = (*FullKV)(nil)
@@ -98,5 +99,5 @@ func (s *FullKV) Reset() {
 }
 
 func (s *FullKV) String() string {
-	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d  keyCount %d loadFrom %s deltasCount %d", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas))
+	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d keyCount %d loadedFrom %s deltasCount %d", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas))
 }

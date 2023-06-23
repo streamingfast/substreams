@@ -29,7 +29,7 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64)
 }
 
 type storeSnapshots struct {
-	Completes store.FileInfos // Shortest completes first, largest last.
+	Completes store.FileInfos // Shortest FullKVs first, largest last.
 	Partials  store.FileInfos // First partials first, last
 }
 

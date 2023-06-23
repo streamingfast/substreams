@@ -16,7 +16,6 @@ func (s *Stages) FetchStoresState(
 ) error {
 	completes := make(unitMap)
 	partials := make(unitMap)
-	highestCompleteStorePerStage := initCompleteStageList(s.StoreStagesCount())
 
 	upToBlock := segmenter.ExclusiveEndBlock()
 
@@ -59,10 +58,6 @@ func (s *Stages) FetchStoresState(
 			files := state.Snapshots[mod.name]
 			modSegmenter := mod.segmenter
 
-			// TODO: Initialize the store FullKV for this module
-			// like in multi.go
-			startingStore
-
 			// TODO: what happens to the Unit's state if we don't have
 			// compelte sores for all modules within?
 			// We'll need to do the same alignment of Complete stores
@@ -77,9 +72,6 @@ func (s *Stages) FetchStoresState(
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
 				if allDone := markFound(completes, unit, mod.name, moduleCount); allDone {
-					if segmentIdx > highestCompleteStorePerStage[stageIdx] {
-						highestCompleteStorePerStage[stageIdx] = segmentIdx
-					}
 					// TODO: we should push the `segmentComplete` and LOAD all the stores
 					// aligned at this block, but only for the _highest_ of the
 					// completed bundles.
@@ -148,11 +140,4 @@ func markFound(unitMap unitMap, unit Unit, name string, moduleCount int) bool {
 	}
 	mods[name] = struct{}{}
 	return len(mods) == moduleCount
-}
-
-func initCompleteStageList(l int) []int {
-	var highestCompleteStorePerStage []int
-	for i := 0; i < l; i++ {
-		highestCompleteStorePerStage[i] = -1
-	}
 }

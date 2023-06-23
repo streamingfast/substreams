@@ -92,9 +92,9 @@ func (s *Segmenter) IndexForEndBlock(blockNum uint64) int {
 	return int((blockNum - 1) / s.interval) /* exclusive of the given blockNum */
 }
 
-func (s *Segmenter) IsPartial(segmentIndex int) bool {
+func (s *Segmenter) EndsOnInterval(segmentIndex int) bool {
 	if segmentIndex > s.LastIndex() {
 		panic("segment index out of range")
 	}
-	return s.Range(segmentIndex).ExclusiveEndBlock%s.interval != 0
+	return s.Range(segmentIndex).ExclusiveEndBlock%s.interval == 0
 }

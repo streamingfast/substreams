@@ -2,6 +2,7 @@ package stage
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 
@@ -73,19 +74,10 @@ func NewStages(
 		var moduleStates []*ModuleState
 		lowestStageInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
-			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
-			modState := NewModuleState(mod.Name, modSegmenter)
-
-			if storeConfigs != nil {
-				storeConf, found := storeConfigs[mod.Name]
-				if !found {
-					panic("store config not found: " + mod.Name)
-				}
-				modState.store = storeConf.NewFullKV(logger)
-			}
+			modState := NewModuleState(logger, mod.Name, storeConfigs[mod.Name])
+			moduleStates = append(moduleStates, modState)
 
 			lowestStageInitBlock = utils.MinOf(lowestStageInitBlock, mod.InitialBlock)
-			moduleStates = append(moduleStates, modState)
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(lowestStageInitBlock)
@@ -245,15 +237,6 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	return Unit{}, nil
 }
 
-func (s *Stages) StoreStagesCount() int {
-	for idx, stage := range s.stages {
-		if stage.kind == KindMap {
-			return idx
-		}
-	}
-	return len(s.stages)
-}
-
 func (s *Stages) growSegments() {
 	by := len(s.segmentStates)
 	if by == 0 {
@@ -285,11 +268,17 @@ func (s *Stages) previousUnitComplete(u Unit) bool {
 	}
 	return s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
 }
-func (s *Stages) FinalStoreMap() store.Map {
+
+func (s *Stages) FinalStoreMap(atBlock uint64) store.Map {
 	out := store.NewMap()
 	for _, stage := range s.stages {
 		for _, modState := range stage.moduleStates {
-			out[modState.name] = modState.store
+			fullKV, err := modState.getStore(s.ctx, atBlock)
+			if err != nil {
+				// TODO: do proper error propagation
+				panic(fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, atBlock, modState.lastBlockInStore, err))
+			}
+			out[modState.name] = fullKV
 		}
 	}
 	return out

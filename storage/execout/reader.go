@@ -143,7 +143,7 @@ func (r *LinearReader) downloadFile(ctx context.Context, fileWalker *FileWalker)
 			return file.SortedItems(), nil
 		}
 
-		// TODO(abourget): if file.IsPartial(), we should delete it, it would mean it'd be left
+		// TODO(abourget): if file.EndsOnInterval(), we should delete it, it would mean it'd be left
 		// over, and never reused, unless an EXACT request would come and use it.
 
 		logger.Debug("cache not found, waiting 2s", zap.Object("file", file))

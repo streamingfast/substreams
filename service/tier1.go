@@ -17,6 +17,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/shutter"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/streamingfast/substreams"
@@ -43,6 +44,7 @@ import (
 )
 
 type Tier1Service struct {
+	*shutter.Shutter
 	ssconnect.UnimplementedStreamHandler
 
 	blockType          string
@@ -95,6 +97,7 @@ func NewTier1(
 		},
 	)
 	s := &Tier1Service{
+		Shutter:        shutter.New(),
 		runtimeConfig:  runtimeConfig,
 		blockType:      blockType,
 		tracer:         tracing.GetTracer(),
@@ -134,6 +137,7 @@ func (s *Tier1Service) Blocks(
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) error {
+
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -209,7 +213,23 @@ func (s *Tier1Service) Blocks(
 		return err
 	}
 
-	err = s.blocks(ctx, request, outputGraph, respFunc)
+	// On app shutdown, we cancel the running '.blocks()' command,
+	// we catch this situation via IsTerminating() to return a special error.
+	runningContext, cancelRunning := context.WithCancel(ctx)
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.Terminating():
+			cancelRunning()
+		}
+	}()
+
+	err = s.blocks(runningContext, request, outputGraph, respFunc)
+	if s.IsTerminating() {
+		return status.Error(codes.Canceled, "endpoint is shutting down, please reconnect")
+	}
+
 	if grpcError := toGRPCError(err); grpcError != nil {
 		switch status.Code(grpcError) {
 		case codes.Internal:

@@ -167,6 +167,11 @@ func (a *Tier1App) Run() error {
 		opts...,
 	)
 
+	a.OnTerminating(func(err error) {
+		svc.Shutdown(err)
+		time.Sleep(2 * time.Second) // enough time to send termination grpc responses
+	})
+
 	go func() {
 		if withLive {
 			a.logger.Info("waiting until hub is real-time synced")

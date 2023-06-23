@@ -18,6 +18,7 @@ func TestNewStages(t *testing.T) {
 		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
 		seg,
 		nil,
+		"trace",
 	)
 
 	assert.Equal(t, 8, stages.segmenter.Count()) // from 5 to 75
@@ -38,6 +39,7 @@ func TestNewStagesNextJobs(t *testing.T) {
 		outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5),
 		seg,
 		nil,
+		"trace",
 	)
 
 	j1, _ := stages.NextJob()

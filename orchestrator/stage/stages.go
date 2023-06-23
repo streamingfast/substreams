@@ -15,7 +15,7 @@ import (
 )
 
 // NOTE:
-// Would we have an internal StoreMap here where there's an
+// Would we have an internal StoreMap here where there's a
 // store.FullKV _and_ a State, so this thing would be top-level
 // here in the `Stages`, it would keep track of what's happening with
 // its internal `store.FullKV`, and the merging state.
@@ -40,7 +40,7 @@ type Stages struct {
 	// segmentStates is a matrix of segment and stages
 	segmentStates []stageStates // segmentStates[offsetSegment][StageIndex]
 
-	// If you're processing at 12M blocks, offset 12,000 segments so you don't need to allocate 12k empty elements.
+	// If you're processing at 12M blocks, offset 12,000 segments, so you don't need to allocate 12k empty elements.
 	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
 	// are assumed to have been either fully loaded, or merged up until this offset.
 	segmentOffset int
@@ -117,16 +117,24 @@ func (s *Stages) AllStagesFinished() bool {
 
 func (s *Stages) InitialProgressMessages() map[string]block.Ranges {
 	out := make(map[string]block.Ranges)
-	for _, stage := range s.stages {
-		// TODO: pluck initial messages from segmentCompleted
-		// and all of the PartialPresent or Complete stages, if that's
-		// possible
-		for _, mod := range stage.moduleStates {
-			out[mod.name] = append(out[mod.name], mod.InitialRange())
+	for segmentIdx, segment := range s.segmentStates {
+		for stageIdx, state := range segment {
+			if state == UnitCompleted {
+				for _, mod := range s.stages[stageIdx].moduleStates {
+					rng := mod.segmenter.Range(segmentIdx + s.segmentOffset)
+					if rng != nil {
+						out[mod.name] = append(out[mod.name], rng)
+					}
+				}
+			}
 		}
 	}
 	return out
 }
+
+// TODO: implement the `merged` Progress messages, which will provide
+// the progress of the linearly merged stores, so we know if the merger
+// is the thing having a hard time moving forward.
 
 func (s *Stages) CmdStartMerge() loop.Cmd {
 	var cmds []loop.Cmd
@@ -223,7 +231,7 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 				continue
 			}
 			if segmentIdx < s.stages[stageIdx].segmenter.FirstIndex() {
-				// Don't process stages where all modules's initial blocks are only later
+				// Don't process stages where all modules' initial blocks are only later
 				continue
 			}
 			if !s.dependenciesCompleted(unit) {

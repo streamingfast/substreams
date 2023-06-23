@@ -68,7 +68,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 	// Load
 	metrics.loadStart = time.Now()
 	if err := partialKV.Load(s.ctx, partialFile); err != nil {
-		return fmt.Errorf("loading partial: %w: %w", err)
+		return fmt.Errorf("loading partial: %q: %w", partialFile.Filename, err)
 	}
 	metrics.loadEnd = time.Now()
 

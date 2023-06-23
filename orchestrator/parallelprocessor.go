@@ -142,7 +142,7 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	storeMap = b.scheduler.FinalStoreMap()
+	storeMap = b.scheduler.FinalStoreMap(reqctx.Details(ctx).LinearHandoffBlockNum)
 
 	// TODO: this needs to be handled by the completion Shutdown
 	// processes of the new Scheduler:

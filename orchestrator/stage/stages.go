@@ -278,14 +278,14 @@ func (s *Stages) previousUnitComplete(u Unit) bool {
 	return s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
 }
 
-func (s *Stages) FinalStoreMap(atBlock uint64) store.Map {
+func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) store.Map {
 	out := store.NewMap()
 	for _, stage := range s.stages {
 		for _, modState := range stage.moduleStates {
-			fullKV, err := modState.getStore(s.ctx, atBlock)
+			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			if err != nil {
 				// TODO: do proper error propagation
-				panic(fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, atBlock, modState.lastBlockInStore, err))
+				panic(fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err))
 			}
 			out[modState.name] = fullKV
 		}

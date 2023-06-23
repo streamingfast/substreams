@@ -181,6 +181,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	ttrace.SpanContextFromContext(context.Background())
 	storeMap = store.NewMap()
 
+	// TODO: loop through stages here, and setup Full stores for all stages
+	// prior to the one we're running, and prep only PartialKVs
+	// for the requested stage.
 	for name, storeConfig := range p.stores.configs {
 		if name == outputModuleName {
 			// FIXME: in the new scheduler, we can set multiple partial stores, because
@@ -191,7 +194,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			fullStore := storeConfig.NewFullKV(logger)
 
 			if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
-				file := store.NewCompleteFileInfo(fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
+				file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
 				if err := fullStore.Load(ctx, file); err != nil {
 					return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
 				}

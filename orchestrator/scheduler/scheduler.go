@@ -161,6 +161,6 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 
 }
 
-func (s *Scheduler) FinalStoreMap() store.Map {
-	return s.Stages.FinalStoreMap()
+func (s *Scheduler) FinalStoreMap(exclusiveEndBlock uint64) store.Map {
+	return s.Stages.FinalStoreMap(exclusiveEndBlock)
 }

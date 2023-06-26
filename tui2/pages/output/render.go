@@ -11,6 +11,7 @@ import (
 	"github.com/itchyny/gojq"
 	"github.com/jhump/protoreflect/dynamic"
 
+	"github.com/golang/protobuf/jsonpb"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 
 	"github.com/muesli/termenv"
@@ -153,7 +154,7 @@ func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin 
 		//)
 	}
 
-	cnt, err := dynMsg.MarshalJSONIndent()
+	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  ", EmitDefaults: true})
 	if err != nil {
 		return "", fmt.Errorf("failed marshalling into JSON: %s\nString representation: %s", err.Error(), decodeAsString(in))
 		//return Styles.ErrorLine.Render(

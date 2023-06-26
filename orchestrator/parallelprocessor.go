@@ -142,6 +142,9 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 				return nil, err
 			}
 		case <-ctx.Done():
+			// We must return an error here, otherwise the caller will think that the
+			// execOutputReader is done, and will try to continue with live block!
+			return nil, ctx.Err()
 		}
 	}
 

@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Fixed
+### Backend changes
+
+#### Fixed
+
+* Fixed a bug which caused "live" blocks to be sent while the stream previously received block(s) were historic.
+
+### CLI changes
+
+#### Fixed
 
 * In GUI, module output now shows fields with default values, i.e. `0`, `""`, `false`
 

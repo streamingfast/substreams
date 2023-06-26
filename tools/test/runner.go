@@ -151,8 +151,8 @@ type StorageDelta struct {
 	Operation string           `json:"op"`
 	Ordinal   uint64           `json:"ordinal"`
 	Key       string           `json:"key"`
-	OldValue  *json.RawMessage `json:"old,ommitempty"`
-	NewValue  *json.RawMessage `json:"new,ommitempty"`
+	OldValue  *json.RawMessage `json:"old,omitempty"`
+	NewValue  *json.RawMessage `json:"new,omitempty"`
 }
 
 func (r *Runner) testStoreModule(ctx context.Context, module *pbsubstreamsrpc.StoreModuleOutput, tests []*Test, logger *zap.Logger) error {

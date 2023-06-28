@@ -4,11 +4,9 @@ description: Aleno Substreams ClickHouse sink
 
 # [`Substreams`](https://substreams.streamingfast.io/) [Clickhouse](https://clickhouse.com/) sink module
 
+[`substreams-sink-clickhouse`](https://github.com/aleno-ai/substreams-sink-clickhouse) is a tool that allows developers to pipe data extracted metrics from a blockchain into a ClickHouse DBMS for warehousing purposes. This sink is very similar to the [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres) and one could refer to its [docs](./substreams-sink-postgres.md) to understand its concepts.
 
-> [`substreams-sink-clickhouse`](https://github.com/aleno-ai/substreams-sink-clickhouse) is a tool that allows developers to pipe data extracted metrics from a blockchain into a ClickHouse DBMS for warehousing purposes.
-
-> This sink is very similar to the [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres) and one could refer to its [docs](./substreams-sink-postgres.md) to understand its concepts.
-
+> This sink is a community maintained project promoted by StreamingFast, the current maintainer is [Aleno](https://www.aleno.ai/).
 
 ### Quickstart
 

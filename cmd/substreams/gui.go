@@ -23,7 +23,7 @@ func init() {
 	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
-
+	guiCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 	guiCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	guiCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	guiCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, inclusively.")
@@ -130,6 +130,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		SubstreamsClientConfig:      substreamsClientConfig,
 		HomeDir:                     homeDir,
 		Vcr:                         mustGetBool(cmd, "replay"),
+		Headers:                     parseHeaders(mustGetStringSlice(cmd, "header")),
 		Cursor:                      cursor,
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,

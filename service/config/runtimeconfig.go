@@ -11,10 +11,10 @@ import (
 type RuntimeConfig struct {
 	CacheSaveInterval uint64
 
-	MaxWasmFuel          uint64 // if not 0, enable fuel consumption monitoring to stop runaway wasm module processing forever
-	SubrequestsSplitSize uint64 // in multiple of the SaveIntervals above
-	MaxJobsAhead         uint64 // limit execution of depencency jobs so they don't go too far ahead of the modules that depend on them (ex: module X is 2 million blocks ahead of module Y that depends on it, we don't want to schedule more module X jobs until Y caught up a little bit)
-	ParallelSubrequests  uint64 // how many sub-jobs to launch for a given user
+	MaxWasmFuel                uint64 // if not 0, enable fuel consumption monitoring to stop runaway wasm module processing forever
+	SubrequestsSplitSize       uint64 // in multiple of the SaveIntervals above
+	MaxJobsAhead               uint64 // limit execution of depencency jobs so they don't go too far ahead of the modules that depend on them (ex: module X is 2 million blocks ahead of module Y that depends on it, we don't want to schedule more module X jobs until Y caught up a little bit)
+	DefaultParallelSubrequests uint64 // how many sub-jobs to launch for a given user
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
 	BaseObjectStore dstore.Store
@@ -34,13 +34,13 @@ func NewRuntimeConfig(
 	workerFactory work.WorkerFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
-		CacheSaveInterval:    cacheSaveInterval,
-		SubrequestsSplitSize: subrequestsSplitSize,
-		ParallelSubrequests:  parallelSubrequests,
-		MaxJobsAhead:         maxJobsAhead,
-		MaxWasmFuel:          maxWasmFuel,
-		BaseObjectStore:      baseObjectStore,
-		WorkerFactory:        workerFactory,
+		CacheSaveInterval:          cacheSaveInterval,
+		SubrequestsSplitSize:       subrequestsSplitSize,
+		DefaultParallelSubrequests: parallelSubrequests,
+		MaxJobsAhead:               maxJobsAhead,
+		MaxWasmFuel:                maxWasmFuel,
+		BaseObjectStore:            baseObjectStore,
+		WorkerFactory:              workerFactory,
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}

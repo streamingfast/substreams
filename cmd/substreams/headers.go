@@ -7,6 +7,9 @@ import (
 
 // util to parse headers flags
 func parseHeaders(headers []string) map[string]string {
+	if headers == nil {
+		return nil
+	}
 	result := make(map[string]string)
 	for _, header := range headers {
 		parts := strings.Split(header, ":")

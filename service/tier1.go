@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -182,8 +183,8 @@ func (s *Tier1Service) Blocks(
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 
-	if user_id := req.Header().Get(dauth.SFHeaderUserID); user_id != "" {
-		fields = append(fields, zap.String("user_id", user_id))
+	if auth := dauth.FromContext(ctx); auth != nil {
+		fields = append(fields, zap.String("user_id", auth.UserID()))
 	}
 
 	logger.Info("incoming Substreams Blocks request", fields...)
@@ -258,8 +259,15 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
-	// this will eventually be controlled by the request, probably from the JWT
-	requestDetails.MaxParallelJobs = s.runtimeConfig.ParallelSubrequests
+
+	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
+	if auth := dauth.FromContext(ctx); auth != nil {
+		if parallelJobs := auth.Get("X-Sf-Substreams-Parallel-Jobs"); parallelJobs != "" {
+			if ll, err := strconv.ParseUint(parallelJobs, 10, 64); err == nil {
+				requestDetails.MaxParallelJobs = ll
+			}
+		}
+	}
 
 	traceId := tracing.GetTraceID(ctx).String()
 	respFunc(&pbsubstreamsrpc.Response{

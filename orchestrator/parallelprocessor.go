@@ -109,7 +109,7 @@ func BuildParallelProcessor(
 
 	scheduler.OnStoreJobTerminated = squasher.Squash
 
-	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.ParallelSubrequests, runtimeConfig.WorkerFactory)
+	runnerPool := work.NewWorkerPool(ctx, runtimeConfig.DefaultParallelSubrequests, runtimeConfig.WorkerFactory)
 
 	return &ParallelProcessor{
 		plan:             plan,

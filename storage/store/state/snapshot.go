@@ -21,7 +21,7 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64)
 		if file.Partial {
 			out.Partials = append(out.Partials, file)
 		} else {
-			out.Completes = append(out.Completes, file)
+			out.FullKVFiles = append(out.FullKVFiles, file)
 		}
 	}
 	out.Sort()
@@ -29,13 +29,13 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64)
 }
 
 type storeSnapshots struct {
-	Completes store.FileInfos // Shortest FullKVs first, largest last.
-	Partials  store.FileInfos // First partials first, last
+	FullKVFiles store.FileInfos // Shortest FullKVs first, largest last.
+	Partials    store.FileInfos // First partials first, last
 }
 
 func (s *storeSnapshots) Sort() {
-	sort.SliceStable(s.Completes, func(i, j int) bool {
-		return s.Completes[i].Range.ExclusiveEndBlock < s.Completes[j].Range.ExclusiveEndBlock
+	sort.SliceStable(s.FullKVFiles, func(i, j int) bool {
+		return s.FullKVFiles[i].Range.ExclusiveEndBlock < s.FullKVFiles[j].Range.ExclusiveEndBlock
 	})
 	sort.SliceStable(s.Partials, func(i, j int) bool {
 		left := s.Partials[i]
@@ -52,19 +52,19 @@ func (s *storeSnapshots) Sort() {
 }
 
 func (s *storeSnapshots) String() string {
-	return fmt.Sprintf("completes=%s, partials=%s", s.Completes, s.Partials)
+	return fmt.Sprintf("completes=%s, partials=%s", s.FullKVFiles, s.Partials)
 }
 
-func (s *storeSnapshots) LastCompletedBlock() uint64 {
-	if len(s.Completes) == 0 {
+func (s *storeSnapshots) LastFullKVBlock() uint64 {
+	if len(s.FullKVFiles) == 0 {
 		return 0
 	}
-	return s.Completes[len(s.Completes)-1].Range.ExclusiveEndBlock
+	return s.FullKVFiles[len(s.FullKVFiles)-1].Range.ExclusiveEndBlock
 }
 
-func (s *storeSnapshots) LastCompleteSnapshotBefore(blockNum uint64) *store.FileInfo {
-	for i := len(s.Completes); i > 0; i-- {
-		comp := s.Completes[i-1]
+func (s *storeSnapshots) LastFullKVSnapshotBefore(blockNum uint64) *store.FileInfo {
+	for i := len(s.FullKVFiles); i > 0; i-- {
+		comp := s.FullKVFiles[i-1]
 		if comp.Range.ExclusiveEndBlock > blockNum {
 			continue
 		}

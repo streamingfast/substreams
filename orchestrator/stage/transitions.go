@@ -81,6 +81,15 @@ stateDiagram-v2
 
 */
 
+// TODO: UnitCompleted might mean two things: the fact a FullKV is on disk,
+//  or the fact that we've merged a partial and we're done. It might be
+//  that we sent a goroutine to write to storage, but it hasn't reached the Bucket
+//  yet.
+//  We want to distinguish those to make sure merging happens as _quickly_ as
+//  possible when there are many partials to merge, but we also want to know
+//  when the files are indeed present on disk (being detected, or after the _write_
+//  operation of the merging operation successfully finished).
+
 func (s *Stages) MarkSegmentMerging(u Unit) {
 	if !s.previousUnitComplete(u) {
 		panic("can only merge segments if previous is complete")
@@ -118,6 +127,7 @@ func (s *Stages) markSegmentCompleted(u Unit) {
 }
 
 func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitState) {
+	s.allocSegments(u.Segment)
 	prev := s.getState(u)
 	for _, from := range allowedPreviousStates {
 		if prev == from {

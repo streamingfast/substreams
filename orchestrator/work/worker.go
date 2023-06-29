@@ -82,7 +82,7 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func newRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+func NewRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
 	return &pbssinternal.ProcessRangeRequest{
 		StartBlockNum: workRange.StartBlock,
 		StopBlockNum:  workRange.ExclusiveEndBlock,
@@ -93,7 +93,7 @@ func newRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Ran
 }
 
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
-	request := newRequest(reqctx.Details(ctx), unit.Stage, workRange)
+	request := NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {
@@ -131,7 +131,8 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		return MsgJobSucceeded{
 			Unit:   unit,
 			Worker: w,
-			Files:  res.PartialFilesWritten,
+			// TODO: Clean the PartialFilesWritten from the res because it's not needed anymore.
+			//Files:  res.PartialFilesWritten,
 		}
 	}
 }

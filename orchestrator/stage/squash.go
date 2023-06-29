@@ -42,12 +42,12 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 	return stage.syncWork.Wait()
 }
 
-// The singleSquash oepration's goal is to take the up-most contiguous unit
-// tha is compete, and take the very next partial, squash it and produce a complete
+// The singleSquash operation's goal is to take the up-most contiguous unit
+// tha is compete, and take the very next partial, squash it and produce a FullKV
 // store.
-// If we happen to have some complete stores in the middle, then our goal is
+// If we happen to have some FullKV stores in the middle, then our goal is
 // to load that compete store, and squash the next partial segment.
-// We keep the cache of the latest complete store, to speed up things
+// We keep the cache of the latest FullKV store, to speed up things
 // if they are linear
 func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Unit) error {
 	metrics := mergeMetrics{}

@@ -68,7 +68,7 @@ func BuildParallelProcessor(
 	// We don't need to plan work for ranges where we have ExecOut
 	// already.
 	// BUT we'll need to have stores to be able to schedule work after
-	// so there's a mix of Complete stores and ExecOut files we need
+	// so there's a mix of FullKV stores and ExecOut files we need
 	// to check.  We can push the `segmentCompleted` based on the
 	// execout files.
 
@@ -141,7 +141,5 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	storeMap = b.scheduler.FinalStoreMap(reqctx.Details(ctx).LinearHandoffBlockNum)
-
-	return storeMap, nil
+	return b.scheduler.FinalStoreMap(reqctx.Details(ctx).LinearHandoffBlockNum)
 }

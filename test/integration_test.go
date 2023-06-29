@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -14,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	"github.com/streamingfast/substreams/storage/store"
 
 	//_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
@@ -468,14 +467,12 @@ func partialPreWork(t *testing.T, start, end uint64, module string, run *testRun
 
 	// FIXME: use the new `Work` interface here, and validate that the
 	// caller to `partialPreWork` doesn't need to be changed too much? :)
-	cmd := worker.Work(run.Context, &pbssinternal.ProcessRangeRequest{
-		StartBlockNum: start,
-		StopBlockNum:  end,
-		OutputModule:  module,
-		Modules:       run.Package.Modules,
-	}, nil)
+	segmenter := block.NewSegmenter(10, 0, 0)
+	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: 1}
+	cmd := worker.Work(run.Context, unit, block.NewRange(start, end), nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)
-	requie.True(t, ok)
-	require.Equal(t, store.PartialFiles(fmt.Sprintf("%d-%d", start, end), store.TraceIDParam(traceID)), result.PartialFilesWritten)
+	require.True(t, ok)
+	assert.Equal(t, msg.Unit, unit)
+	//require.Equal(t, store.PartialFiles(fmt.Sprintf("%d-%d", start, end), store.TraceIDParam(traceID)), result.PartialFilesWritten)
 }

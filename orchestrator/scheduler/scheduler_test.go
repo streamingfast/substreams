@@ -10,9 +10,7 @@ import (
 )
 
 func TestSched2_JobFinished(t *testing.T) {
-	s := &Scheduler{
-		ExecOutWalker: newTestWalker(),
-	}
+	s := &Scheduler{}
 	cmd := s.Update(execout.MsgFileDownloaded{})
 	msg := cmd()
 	assert.Equal(t, 1, len(msg.(loop.BatchMsg)))
@@ -34,9 +32,5 @@ func TestSched2_JobFinished(t *testing.T) {
 	// ExecOutWalker:
 	//  * CmdDownloadCurrentSegment()
 	//  * NextSegment()
-
-}
-
-func newTestWalker() Walker {
 
 }

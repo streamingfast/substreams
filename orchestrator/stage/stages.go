@@ -91,7 +91,7 @@ func NewStages(
 func (s *Stages) AllStagesFinished() bool {
 	lastSegment := s.segmenter.LastIndex()
 	lastSegmentIndex := lastSegment - s.segmentOffset
-	if len(s.segmentStates) < lastSegmentIndex {
+	if lastSegmentIndex >= len(s.segmentStates) {
 		return false
 	}
 
@@ -154,11 +154,11 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	mergeUnit := stage.nextUnit()
 
 	if mergeUnit.Segment > s.segmenter.LastIndex() {
-		// TODO: we could affect a state for the whole Stage here
-		// and the AllStagesFinished() could be a quick
-		// check of that state instead of plucking through the
-		// Unit matrix.
 		return nil // We're done here.
+	}
+
+	if s.getState(mergeUnit) != UnitPartialPresent {
+		return nil
 	}
 
 	if !s.previousUnitComplete(mergeUnit) {
@@ -181,7 +181,11 @@ func (s *Stages) MergeCompleted(mergeUnit Unit) {
 }
 
 func (s *Stages) getState(u Unit) UnitState {
-	return s.segmentStates[u.Segment-s.segmentOffset][u.Stage]
+	index := u.Segment - s.segmentOffset
+	if index >= len(s.segmentStates) {
+		return UnitPending
+	}
+	return s.segmentStates[index][u.Stage]
 }
 
 func (s *Stages) setState(u Unit, state UnitState) {
@@ -211,9 +215,6 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	//  each time contiguous segments are completed for all stages.
 	segmentIdx := s.segmenter.FirstIndex()
 	for {
-		if len(s.segmentStates) <= segmentIdx-s.segmentOffset {
-			s.growSegments()
-		}
 		if segmentIdx > s.segmenter.LastIndex() {
 			break
 		}
@@ -239,7 +240,10 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	return Unit{}, nil
 }
 
-func (s *Stages) growSegments() {
+func (s *Stages) allocSegments(segmentIdx int) {
+	if len(s.segmentStates) > segmentIdx-s.segmentOffset {
+		return
+	}
 	by := len(s.segmentStates)
 	if by == 0 {
 		by = 2
@@ -271,17 +275,16 @@ func (s *Stages) previousUnitComplete(u Unit) bool {
 	return s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
 }
 
-func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) store.Map {
+func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	out := store.NewMap()
 	for _, stage := range s.stages {
 		for _, modState := range stage.moduleStates {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			if err != nil {
-				// TODO: do proper error propagation
-				panic(fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err))
+				return nil, fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err)
 			}
 			out[modState.name] = fullKV
 		}
 	}
-	return out
+	return out, nil
 }

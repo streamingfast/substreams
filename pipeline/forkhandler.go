@@ -50,6 +50,5 @@ func (f *ForkHandler) removeReversibleOutput(blockID string) {
 }
 
 func (f *ForkHandler) addReversibleOutput(moduleOutput *pbssinternal.ModuleOutput, blockID string) {
-	// TODO: ADD MUTEX
 	f.reversibleOutputs[blockID] = append(f.reversibleOutputs[blockID], moduleOutput)
 }

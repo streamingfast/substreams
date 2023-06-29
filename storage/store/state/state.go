@@ -30,7 +30,7 @@ func NewStoreStorageState(modName string, storeSaveInterval, modInitBlock, workU
 		return
 	}
 
-	completeSnapshot := snapshots.LastCompleteSnapshotBefore(workUpToBlockNum)
+	completeSnapshot := snapshots.LastFullKVSnapshotBefore(workUpToBlockNum)
 	if completeSnapshot != nil && completeSnapshot.Range.ExclusiveEndBlock <= modInitBlock {
 		return nil, fmt.Errorf("cannot have saved last store before module's init block")
 	}

@@ -4,10 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/storage/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 func TestWorkUnits_init(t *testing.T) {
@@ -133,7 +134,7 @@ func parseSnapshotSpec(in string) *storeSnapshots {
 		if partial {
 			out.Partials = append(out.Partials, store.PartialFile(partRange))
 		} else {
-			out.Completes = append(out.Completes, store.CompleteFile(partRange))
+			out.FullKVFiles = append(out.FullKVFiles, store.CompleteFile(partRange))
 		}
 	}
 	out.Sort()

@@ -33,7 +33,7 @@ loop:
 			err = l.ctx.Err()
 			break loop
 		case msg := <-l.msgs:
-			if quit, ok := msg.(quitMsg); ok {
+			if quit, ok := msg.(QuitMsg); ok {
 				err = quit.err
 				break loop
 			}
@@ -61,13 +61,13 @@ func (l *EventLoop) Send(msg Msg) {
 
 func (l *EventLoop) update(msg Msg, cmds chan Cmd) (out Cmd) {
 	switch msg := msg.(type) {
-	case batchMsg:
+	case BatchMsg:
 		for _, cmd := range msg {
 			cmds <- cmd
 		}
 		return nil
 
-	case sequenceMsg:
+	case SequenceMsg:
 		go func() {
 			// Execute commands one at a time, in order.
 			for _, cmd := range msg {

@@ -318,6 +318,11 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("output_module", request.OutputModule),
 	)
 
+	// FIXME: eventually, we could use the `orchestrator/plan.RequestPlan` object to
+	// tackle the `LinearHandoffBlockNum == StopBlockNum`, and the linear segment that
+	// needs to be produced.
+	// But it seems a bit more involved in here.
+
 	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}

@@ -197,11 +197,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true, "tier2")
 
-	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
-	//  * in direct mode, this would mean we start writing files after the handoff,
-	//    but it's not so useful to write those files, as they're partials
-	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
-	//  *
 	outputModule := outputGraph.OutputModule()
 	execOutWriter := execout.NewWriter(
 		requestDetails.ResolvedStartBlockNum,

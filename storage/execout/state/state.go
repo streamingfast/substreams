@@ -6,6 +6,9 @@ import (
 	"github.com/streamingfast/substreams/utils"
 )
 
+// WARN: this was never used? We didn't do anything with it, and the new scheduler
+// will simply walk the files. In the future, we might pluck those files
+// and move on.. but we'll see them. It won't look like this at all.
 type ExecOutputStorageState struct {
 	ModuleName         string
 	ModuleInitialBlock uint64

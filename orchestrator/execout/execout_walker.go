@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/orchestrator/response"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
@@ -25,7 +25,7 @@ type Walker struct {
 	requestStartBlock uint64
 	exclusiveEndBlock uint64
 	fileWalker        *execout.FileWalker
-	responseFunc      substreams.ResponseFunc
+	streamOut         *response.Stream
 	module            *pbsubstreams.Module
 	logger            *zap.Logger
 }
@@ -36,7 +36,7 @@ func NewWalker(
 	fileWalker *execout.FileWalker,
 	startBlock uint64,
 	exclusiveEndBlock uint64,
-	responseFunc substreams.ResponseFunc,
+	stream *response.Stream,
 
 ) *Walker {
 	logger := reqctx.Logger(ctx)
@@ -46,7 +46,7 @@ func NewWalker(
 		fileWalker:        fileWalker,
 		requestStartBlock: startBlock,
 		exclusiveEndBlock: exclusiveEndBlock,
-		responseFunc:      responseFunc,
+		streamOut:         stream,
 		logger:            logger,
 	}
 }
@@ -87,8 +87,11 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 		}
 
 		blockScopedData, err := toBlockScopedData(r.module, item)
-		err = r.responseFunc(substreams.NewBlockScopedDataResponse(blockScopedData))
 		if err != nil {
+			return fmt.Errorf("converting to block scoped data: %w", err)
+		}
+
+		if err = r.streamOut.BlockScopedData(blockScopedData); err != nil {
 			return fmt.Errorf("calling response func: %w", err)
 		}
 

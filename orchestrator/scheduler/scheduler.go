@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -20,8 +19,7 @@ type Scheduler struct {
 	ctx context.Context
 	loop.EventLoop
 
-	stream      *response.Stream
-	outputGraph *outputmodules.Graph
+	stream *response.Stream
 
 	Stages        *stage.Stages
 	WorkerPool    *work.WorkerPool
@@ -34,13 +32,12 @@ type Scheduler struct {
 	storesSyncCompleted   bool
 }
 
-func New(ctx context.Context, stream *response.Stream, outputGraph *outputmodules.Graph) *Scheduler {
+func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx)
 	s := &Scheduler{
-		ctx:         ctx,
-		stream:      stream,
-		outputGraph: outputGraph, // upstreamRequestModules is replaced by outputGraph.UsedModules(), UNLESS the consumer wanted ALL the Requested modules.. even those who are not necessary to satisfy this request (that would be.. waste)
-		logger:      logger,
+		ctx:    ctx,
+		stream: stream,
+		logger: logger,
 	}
 	s.EventLoop = loop.NewEventLoop(s.Update)
 	return s
@@ -52,7 +49,7 @@ func (s *Scheduler) Init() loop.Cmd {
 	if s.ExecOutWalker != nil {
 		cmds = append(cmds, execout.CmdMsgStartDownload())
 	} else {
-		// This hides the fact that there was _no_ Walker. Could cause
+		// This hides the fact that there _was no_ Walker. Could cause
 		// confusing error messages in `cmdShutdownWhenComplete()`.
 		s.outputStreamCompleted = true
 	}
@@ -60,9 +57,6 @@ func (s *Scheduler) Init() loop.Cmd {
 
 	cmds = append(cmds, s.Stages.CmdStartMerge())
 
-	// TODO: Schedule CmdMerge() comands for each stage available
-	// Ideally, we can push some `Cmd` directly into the `cmds`
-	// pipe in the Init() phase..
 	return loop.Batch(cmds...)
 }
 
@@ -74,7 +68,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.Stages.MarkSegmentPartialPresent(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 		cmds = append(cmds,
-			s.Stages.CmdMerge(msg.Unit.Stage),
+			s.Stages.CmdTryMerge(msg.Unit.Stage),
 			work.CmdScheduleNextJob(),
 		)
 
@@ -113,7 +107,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
-		cmds = append(cmds, s.Stages.CmdMerge(msg.Stage))
+		cmds = append(cmds, s.Stages.CmdTryMerge(msg.Stage))
 
 	case stage.MsgMergeStoresCompleted:
 		s.storesSyncCompleted = true

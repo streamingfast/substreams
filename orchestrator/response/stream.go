@@ -16,6 +16,10 @@ func New(respFunc substreams.ResponseFunc) *Stream {
 	}
 }
 
+func (s *Stream) BlockScopedData(in *pbsubstreamsrpc.BlockScopedData) error {
+	return s.respFunc(substreams.NewBlockScopedDataResponse(in))
+}
+
 func (s *Stream) InitialProgressMessages(in map[string]block.Ranges) error {
 	var out []*pbsubstreamsrpc.ModuleProgress
 	for storeName, rngs := range in {
@@ -37,7 +41,10 @@ func (s *Stream) InitialProgressMessages(in map[string]block.Ranges) error {
 			})
 		}
 	}
-	return s.respFunc(substreams.NewModulesProgressResponse(out))
+
+	return s.respFunc(&pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Progress{Progress: &pbsubstreamsrpc.ModulesProgress{Modules: out}},
+	})
 }
 
 func (s *Stream) RPCFailedProgressResponse(moduleName, reason string, logs []string, logsTruncated bool) error {

@@ -41,7 +41,7 @@ type RequestPlan struct {
 	segmentInterval uint64
 }
 
-func BuildRequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64) *RequestPlan {
+func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64) *RequestPlan {
 	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,

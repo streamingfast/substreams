@@ -33,10 +33,7 @@ func BuildParallelProcessor(
 	storeConfigs store.ConfigMap,
 	traceID string,
 ) (*ParallelProcessor, error) {
-	// TODO: plan should be defined in the Pipeline, and passed here
-	// as a parameter. Because it has instructions for the Linear Range too,
-	// which the Pipeline ought to use.
-	plan := plan.BuildRequestPlan(
+	reqPlan := plan.BuildTier1RequestPlan(
 		reqDetails.ProductionMode,
 		runtimeConfig.SubrequestsSplitSize,
 		outputGraph.LowestInitBlock(),
@@ -46,9 +43,9 @@ func BuildParallelProcessor(
 	)
 
 	stream := response.New(respFunc)
-	sched := scheduler.New(ctx, stream, outputGraph)
+	sched := scheduler.New(ctx, stream)
 
-	storesSegmenter := plan.StoresSegmenter()
+	storesSegmenter := reqPlan.StoresSegmenter()
 
 	stages := stage.NewStages(ctx, outputGraph, storesSegmenter, storeConfigs, traceID)
 	sched.Stages = stages
@@ -61,12 +58,12 @@ func BuildParallelProcessor(
 	if err != nil {
 		return nil, fmt.Errorf("fetch stores storage state: %w", err)
 	}
-	// TODO: craft an initial ProgressMessage from the `Stages` stateb
+
 	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
 		return nil, fmt.Errorf("initial progress: %w", err)
 	}
 
-	// TODO: We should fetch the ExecOut files too, and see if they
+	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
 	// cover some of the ranges that we're after.
 	// We don't need to plan work for ranges where we have ExecOut
 	// already.
@@ -86,7 +83,10 @@ func BuildParallelProcessor(
 	// done and the Scheduler could send Progress messages when the above decision
 	// is taken.
 
-	execOutSegmenter := plan.WriteOutSegmenter()
+	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
+	// for whatever reason,
+
+	execOutSegmenter := reqPlan.WriteOutSegmenter()
 	if execOutSegmenter != nil {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := outputGraph.OutputModule()
@@ -102,11 +102,11 @@ func BuildParallelProcessor(
 			walker,
 			reqDetails.ResolvedStartBlockNum,
 			reqDetails.LinearHandoffBlockNum,
-			respFunc, // TODO: transform to use `stream` instead, and concentrate all those protobuf manipulations in that package.
+			stream,
 		)
 	}
 
-	// TODO(abourget): take all of the ExecOut files that exist
+	// OPTIMIZE(abourget): take all of the ExecOut files that exist
 	//  and use that to PUSH back what the Stages need to do.
 	//  So the first Segment to process will not necessarily be
 	//  segment == 0.  We'll need the segment JUST prior to be
@@ -114,7 +114,7 @@ func BuildParallelProcessor(
 	//  the future segments.  This interplays with the segment
 	//  just before.
 	//  -
-	//  If we can stream out the ExecOut directly, we don't need
+	//  In other words, if we can stream out the ExecOut directly, we don't need
 	//  to dispatch work to process them at all.  But we'll need
 	//  to have stores ready to continue segments work.
 	//  SO: we can move forward the processing pipeline, provided
@@ -122,7 +122,7 @@ func BuildParallelProcessor(
 	//  last ExecOut segment: that we have complete stores for the
 	//  segment where ExecOut finishes.
 	//  -
-	//  This is unsolved
+	//  This is an optimization and is not solved herein.
 
 	workerPool := work.NewWorkerPool(ctx, int(runtimeConfig.ParallelSubrequests), runtimeConfig.WorkerFactory)
 	sched.WorkerPool = workerPool
@@ -133,7 +133,6 @@ func BuildParallelProcessor(
 }
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -144,22 +143,5 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 
 	storeMap = b.scheduler.FinalStoreMap(reqctx.Details(ctx).LinearHandoffBlockNum)
 
-	// TODO: this needs to be handled by the completion Shutdown
-	// processes of the new Scheduler:
-	//
-	//if b.execOutputReader != nil {
-	//	select {
-	//	case <-b.execOutputReader.Terminated():
-	//		if err := b.execOutputReader.Err(); err != nil {
-	//			return nil, err
-	//		}
-	//	case <-ctx.Done():
-	//	}
-	//}
-
 	return storeMap, nil
-}
-
-func lowBoundary(blk uint64, bundleSize uint64) uint64 {
-	return blk - (blk % bundleSize)
 }

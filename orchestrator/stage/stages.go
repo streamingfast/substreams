@@ -89,15 +89,6 @@ func NewStages(
 }
 
 func (s *Stages) AllStagesFinished() bool {
-	// AllStagesFinished should rather look to the
-	// Stages and confirm that all the Stores in the `moduleState`
-	// have been properly merged and that we're ready to continue
-	// to the Linear stage.
-	//
-	// FIXME: The simple fact that the unit is marked Completed
-	// will not work when we move it to FullKV exists.
-	// It's not the same thing
-
 	lastSegment := s.segmenter.LastIndex()
 	lastSegmentIndex := lastSegment - s.segmentOffset
 	if len(s.segmentStates) < lastSegmentIndex {
@@ -139,25 +130,26 @@ func (s *Stages) InitialProgressMessages() map[string]block.Ranges {
 func (s *Stages) CmdStartMerge() loop.Cmd {
 	var cmds []loop.Cmd
 	for idx := range s.stages {
-		cmds = append(cmds, s.CmdMerge(idx))
+		cmds = append(cmds, s.CmdTryMerge(idx))
 	}
 	return loop.Batch(cmds...)
 }
 
-func (s *Stages) CmdMerge(stageIdx int) loop.Cmd {
+func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	if s.AllStagesFinished() {
-		// FIXME: if we have multiple stages that signal
-		// StoresCompleted because let's say they were all initialized
-		// and were ready from the get go, would produce multiple
-		// such messages. But the only downside would be that we schedule
-		// multiple Quit messages.. but then the further ones are ignored.
+		// FIXME: this CmdTryMerge function is called once for each stage,
+		// so we could receive multiple such calls, and thus
+		// issue multiple MsgMergeStoresCompleted. But this signal
+		// should be unique, once and for all (it is an indicator that the
+		// full job of the Scheduler is done in a way).
+		// Here we risk putting out multiple messages of that kind,
+		// However, it's probably all right, because it produces a QuitMsg
+		// and duplicates of that might just be piled and not read.
 		return func() loop.Msg {
 			return MsgMergeStoresCompleted{}
 		}
 	}
-	// FIXME: bound checks are necessary here, or in the caller
-	// to make sure the previous segment is completed (see MarkSegmentMerging's
-	// internal check).
+
 	stage := s.stages[stageIdx]
 	mergeUnit := stage.nextUnit()
 
@@ -206,15 +198,16 @@ func (s *Stages) WaitAsyncWork() error {
 }
 
 func (s *Stages) NextJob() (Unit, *block.Range) {
-	// TODO: before calling NextJob, keep a small reserve (10% ?) of workers
+	// OPTIMIZATION: before calling NextJob, keep a small reserve (10% ?) of workers
 	//  so that when a job finishes, it can start immediately a potentially
 	//  higher priority one (we'll go do all those first-level jobs
 	//  but we want to keep the diagonal balanced).
-	// TODO: Another option is to have an algorithm that doesn't return a job
+	//
+	// OPTIMIZATION: Another option is to have an algorithm that doesn't return a job
 	//  right away when there are too much jobs scheduled before others
 	//  in a given stage.
-
-	// FIXME: eventually, we can start from s.segmentsOffset, and push `segmentsOffset`
+	//
+	// OPTIMIZATION: eventually, we can push `segmentsOffset`
 	//  each time contiguous segments are completed for all stages.
 	segmentIdx := s.segmenter.FirstIndex()
 	for {

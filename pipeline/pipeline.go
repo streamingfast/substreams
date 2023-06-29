@@ -13,6 +13,7 @@ import (
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -104,12 +105,12 @@ func New(
 	for _, opt := range opts {
 		opt(pipe)
 	}
+	pipe.registerHandlers(ctx)
 	return pipe
 }
 
-func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
+func (p *Pipeline) registerHandlers(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
-	logger := reqctx.Logger(ctx)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
 		for _, modOut := range moduleOutputs {
@@ -118,20 +119,32 @@ func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 	})
 
 	p.setupProcessingModule(reqDetails)
+	return nil
+}
+
+func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
+	logger := reqctx.Logger(ctx)
 
 	var storeMap store.Map
-	if reqDetails.IsSubRequest {
-		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
-		if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
-			return fmt.Errorf("subrequest stores setup failed: %w", err)
-		}
-	} else {
-		if storeMap, err = p.runParallelProcess(ctx); err != nil {
-			return fmt.Errorf("run_parallel_process failed: %w", err)
-		}
+	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
+	if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
+		return fmt.Errorf("subrequest stores setup failed: %w", err)
 	}
 	p.stores.SetStoreMap(storeMap)
 
+	return nil
+}
+
+func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
+	var storeMap store.Map
+	if reqPlan.BuildStores != nil {
+		if storeMap, err = p.runParallelProcess(ctx, reqPlan); err != nil {
+			return fmt.Errorf("run_parallel_process failed: %w", err)
+		}
+	} else {
+		storeMap = p.setupEmptyStores(ctx)
+	}
+	p.stores.SetStoreMap(storeMap)
 	return nil
 }
 
@@ -207,8 +220,18 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	return storeMap, nil
 }
 
+func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
+	logger := reqctx.Logger(ctx)
+	storeMap := store.NewMap()
+	for _, storeConfig := range p.stores.configs {
+		fullStore := storeConfig.NewFullKV(logger)
+		storeMap.Set(fullStore)
+	}
+	return storeMap
+}
+
 // runParallelProcess
-func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, err error) {
+func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(p.ctx, fmt.Sprintf("substreams/%s/pipeline/parallel_process", p.tier))
 	defer span.EndWithErr(&err)
 	reqDetails := reqctx.Details(ctx)
@@ -222,7 +245,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		p.ctx,
-		reqDetails,
+		reqPlan,
 		p.runtimeConfig,
 		p.outputGraph,
 		p.execoutStorage,

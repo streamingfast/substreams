@@ -5,33 +5,40 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
-	"go.opentelemetry.io/otel/attribute"
-	"go.uber.org/zap"
 )
 
 type Stores struct {
-	isSubRequest    bool
-	bounder         *storeBoundary
-	configs         store.ConfigMap
-	StoreMap        store.Map
+	isTier2Request bool // means we're processing a tier2 request
+	bounder        *storeBoundary
+	configs        store.ConfigMap
+	StoreMap       store.Map
+	// DEPRECATED: we don't need to report back, these file names are now implicitly conveyed from
+	// tier1 to tier2.
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 	tier            string
 }
 
-func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isSubRequest bool, tier string) *Stores {
+func NewStores(storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isTier2Request bool) *Stores {
 	// FIXME(abourget): a StoreBoundary should exist for EACH Store
 	//  because the module's Initial Block could change the range of each
 	//  store.
+	tier := "tier1"
+	if isTier2Request {
+		tier = "tier2"
+	}
 	bounder := NewStoreBoundary(storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum)
 	return &Stores{
-		configs:      storeConfigs,
-		isSubRequest: isSubRequest,
-		bounder:      bounder,
-		tier:         tier,
+		configs:        storeConfigs,
+		isTier2Request: isTier2Request,
+		bounder:        bounder,
+		tier:           tier,
 	}
 }
 
@@ -50,7 +57,8 @@ func (s *Stores) resetStores() {
 func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	logger := reqctx.Logger(ctx)
 	reqStats := reqctx.ReqStats(ctx)
-	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isSubRequest, s.bounder.requestStopBlock, blockNum)
+	// FIXME: use Segmenters here, pleaseeee no bounder intervals gna gna gna.
+	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isTier2Request, s.bounder.requestStopBlock, blockNum)
 	if len(boundaryIntervals) > 0 {
 		logger.Info("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
 	}

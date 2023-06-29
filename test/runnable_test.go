@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,10 +12,17 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -26,10 +32,6 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
 )
 
 type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerFactory)
@@ -236,12 +238,8 @@ func processInternalRequest(
 	workerFactory work.WorkerFactory,
 	newGenerator BlockGeneratorFactory,
 	responseCollector *responseCollector,
-	isSubRequest bool,
 	blockProcessedCallBack blockProcessedCallBack,
 	testTempDir string,
-	subrequestsSplitSize uint64,
-	parallelSubrequests uint64,
-	linearHandoffBlockNum uint64,
 	traceID *string,
 ) error {
 	t.Helper()
@@ -257,16 +255,16 @@ func processInternalRequest(
 	}
 	runtimeConfig := config.NewRuntimeConfig(
 		10,
-		subrequestsSplitSize,
-		parallelSubrequests,
-		10,
+		0,
+		0,
+		0,
 		0,
 		baseStoreStore,
 		workerFactory,
 	)
 	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
 
-	return svc.TestBlocks(ctx, request, responseCollector.Collect, traceID)
+	return svc.TestProcessRange(ctx, request, responseCollector.Collect, traceID)
 }
 
 func processRequest(

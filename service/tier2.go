@@ -195,7 +195,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true, "tier2")
+	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 
 	outputModule := outputGraph.OutputModule()
 	execOutWriter := execout.NewWriter(
@@ -238,7 +238,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("output_module", request.OutputModule),
 	)
-	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
+	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 

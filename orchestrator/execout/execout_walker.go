@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -21,33 +22,29 @@ import (
 )
 
 type Walker struct {
-	ctx               context.Context
-	requestStartBlock uint64
-	exclusiveEndBlock uint64
-	fileWalker        *execout.FileWalker
-	streamOut         *response.Stream
-	module            *pbsubstreams.Module
-	logger            *zap.Logger
+	ctx context.Context
+	*block.Range
+	fileWalker *execout.FileWalker
+	streamOut  *response.Stream
+	module     *pbsubstreams.Module
+	logger     *zap.Logger
 }
 
 func NewWalker(
 	ctx context.Context,
 	module *pbsubstreams.Module,
 	fileWalker *execout.FileWalker,
-	startBlock uint64,
-	exclusiveEndBlock uint64,
+	walkRange *block.Range,
 	stream *response.Stream,
-
 ) *Walker {
 	logger := reqctx.Logger(ctx)
 	return &Walker{
-		ctx:               ctx,
-		module:            module,
-		fileWalker:        fileWalker,
-		requestStartBlock: startBlock,
-		exclusiveEndBlock: exclusiveEndBlock,
-		streamOut:         stream,
-		logger:            logger,
+		ctx:        ctx,
+		module:     module,
+		fileWalker: fileWalker,
+		Range:      walkRange,
+		streamOut:  stream,
+		logger:     logger,
 	}
 }
 
@@ -82,7 +79,7 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 		if item == nil {
 			continue // why would that happen?!
 		}
-		if item.BlockNum < r.requestStartBlock {
+		if item.BlockNum < r.StartBlock {
 			continue
 		}
 
@@ -95,9 +92,9 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 			return fmt.Errorf("calling response func: %w", err)
 		}
 
-		if blockScopedData.Clock.Number >= r.exclusiveEndBlock {
+		if blockScopedData.Clock.Number >= r.ExclusiveEndBlock {
 			r.logger.Info("stop pulling block scoped data, end block reach",
-				zap.Uint64("exclusive_end_block_num", r.exclusiveEndBlock),
+				zap.Uint64("exclusive_end_block_num", r.ExclusiveEndBlock),
 				zap.Uint64("cache_item_block_num", blockScopedData.Clock.Number),
 			)
 			return nil

@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -61,6 +62,7 @@ func (s *Scheduler) Init() loop.Cmd {
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
+	fmt.Printf("UPDATE: %T %v\n", msg, msg)
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
@@ -132,6 +134,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	}
 
+	if len(cmds) != 0 {
+		fmt.Printf("Schedule: %T %v\n", cmds, cmds)
+	}
 	return loop.Batch(cmds...)
 }
 

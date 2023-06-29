@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream/stream"
+
 	"github.com/streamingfast/substreams"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -57,7 +58,7 @@ func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc S
 	}
 }
 
-func (s *Tier2Service) TestBlocks(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, traceID *string) error {
+func (s *Tier2Service) TestProcessRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, traceID *string) error {
 	if traceID == nil {
 		traceID = &TestTraceID
 	}

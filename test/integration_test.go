@@ -286,7 +286,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			stopBlock:   29,
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "11111111111111111111")
+				partialPreWork(t, 1, 10, 0, run, workerFactory, "11111111111111111111")
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
@@ -307,8 +307,8 @@ func TestOneStoreOneMap(t *testing.T) {
 			stopBlock:   29,
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "11111111111111111111")
-				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "22222222222222222222")
+				partialPreWork(t, 1, 10, 0, run, workerFactory, "11111111111111111111")
+				partialPreWork(t, 1, 10, 0, run, workerFactory, "22222222222222222222")
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
@@ -331,7 +331,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
 				// Using an empty trace id brings up the old behavior where files are not suffixed with a trace id
-				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "")
+				partialPreWork(t, 1, 10, 0, run, workerFactory, "")
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
@@ -353,8 +353,8 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
 				// Using an empty trace id brings up the old behavior where files are not suffixed with a trace id
-				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "")
-				partialPreWork(t, 1, 10, "setup_test_store_add_i64", run, workerFactory, "11111111111111111111")
+				partialPreWork(t, 1, 10, 0, run, workerFactory, "")
+				partialPreWork(t, 1, 10, 0, run, workerFactory, "11111111111111111111")
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
@@ -461,14 +461,14 @@ func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 
-func partialPreWork(t *testing.T, start, end uint64, module string, run *testRun, workerFactory work.WorkerFactory, traceID string) {
+func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory, traceID string) {
 	worker := workerFactory(zlog)
 	worker.(*TestWorker).traceID = &traceID
 
 	// FIXME: use the new `Work` interface here, and validate that the
 	// caller to `partialPreWork` doesn't need to be changed too much? :)
 	segmenter := block.NewSegmenter(10, 0, 0)
-	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: 1}
+	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
 	cmd := worker.Work(run.Context, unit, block.NewRange(start, end), nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)

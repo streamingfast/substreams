@@ -53,6 +53,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 	if resolvedStartBlock < graphInitBlock {
 		panic(fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock))
 	}
+	if resolvedStartBlock == linearHandoffBlock && graphInitBlock == resolvedStartBlock {
+		return plan
+	}
 	if productionMode {
 		storesStopOnBound := plan.LinearPipeline == nil
 		endStoreBound := linearHandoffBlock

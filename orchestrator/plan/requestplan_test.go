@@ -24,6 +24,18 @@ func TestBuildConfig(t *testing.T) {
 		expectLinearPipelineRange string
 	}{
 		{
+			"no parallel work to do prod mode",
+			100, 100,
+			false, 621, 621, 621, 742,
+			"nil", "nil", "621-742",
+		},
+		{
+			"no parallel work to do dev mode",
+			100, 100,
+			true, 621, 621, 621, 742,
+			"nil", "nil", "621-742",
+		},
+		{
 			"g1. dev mode with stop within same segment as start block",
 			100, 100,
 			false, 621, 738, 738, 742,

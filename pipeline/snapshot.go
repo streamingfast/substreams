@@ -12,7 +12,7 @@ import (
 )
 
 func (p *Pipeline) sendSnapshots(ctx context.Context, storeMap store.Map) error {
-	if reqctx.Details(ctx).IsSubRequest {
+	if reqctx.Details(ctx).IsTier2Request {
 		return nil
 	}
 	snapshotModules := reqctx.Details(ctx).DebugInitialStoreSnapshotForModules

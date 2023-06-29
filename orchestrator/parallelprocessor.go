@@ -25,7 +25,7 @@ type ParallelProcessor struct {
 // BuildParallelProcessor is only called on tier1
 func BuildParallelProcessor(
 	ctx context.Context,
-	reqDetails *reqctx.RequestDetails,
+	reqPlan *plan.RequestPlan,
 	runtimeConfig config.RuntimeConfig,
 	outputGraph *outputmodules.Graph,
 	execoutStorage *execout.Configs,
@@ -33,14 +33,6 @@ func BuildParallelProcessor(
 	storeConfigs store.ConfigMap,
 	traceID string,
 ) (*ParallelProcessor, error) {
-	reqPlan := plan.BuildTier1RequestPlan(
-		reqDetails.ProductionMode,
-		runtimeConfig.SubrequestsSplitSize,
-		outputGraph.LowestInitBlock(),
-		reqDetails.ResolvedStartBlockNum,
-		reqDetails.LinearHandoffBlockNum,
-		reqDetails.StopBlockNum,
-	)
 
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream)
@@ -100,8 +92,7 @@ func BuildParallelProcessor(
 			ctx,
 			requestedModule,
 			walker,
-			reqDetails.ResolvedStartBlockNum,
-			reqDetails.LinearHandoffBlockNum,
+			reqPlan.WriteExecOut,
 			stream,
 		)
 	}

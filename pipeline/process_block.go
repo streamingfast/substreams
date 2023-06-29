@@ -216,7 +216,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 	//fmt.Println("accumulated time for all modules", exec.Timer, "avg", sumDuration/time.Duration(sumCount))
 
 	if reqDetails.ShouldReturnProgressMessages() {
-		if reqDetails.IsSubRequest {
+		if reqDetails.IsTier2Request {
 			forceSend := (clock.Number+1)%p.runtimeConfig.CacheSaveInterval == 0
 
 			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {

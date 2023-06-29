@@ -29,6 +29,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline"
@@ -271,7 +272,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, "tier1")
+	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType)
 	if err != nil {
@@ -323,7 +324,16 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	// needs to be produced.
 	// But it seems a bit more involved in here.
 
-	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
+	reqPlan := plan.BuildTier1RequestPlan(
+		requestDetails.ProductionMode,
+		s.runtimeConfig.SubrequestsSplitSize,
+		outputGraph.LowestInitBlock(),
+		requestDetails.ResolvedStartBlockNum,
+		requestDetails.LinearHandoffBlockNum,
+		requestDetails.StopBlockNum,
+	)
+
+	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
 	if requestDetails.LinearHandoffBlockNum == request.StopBlockNum {

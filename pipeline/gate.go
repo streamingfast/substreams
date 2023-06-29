@@ -18,7 +18,7 @@ type gate struct {
 func newGate(ctx context.Context) *gate {
 	reqDetails := reqctx.Details(ctx)
 	return &gate{
-		disabled:             reqDetails.IsSubRequest,
+		disabled:             reqDetails.IsTier2Request,
 		requestStartBlockNum: reqDetails.ResolvedStartBlockNum,
 	}
 }

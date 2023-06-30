@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/golang/protobuf v1.5.3
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
@@ -51,7 +51,7 @@ require (
 	github.com/rs/cors v1.8.3
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
-	github.com/streamingfast/dauth v0.0.0-20230620204019-1ccc85cf767d
+	github.com/streamingfast/dauth v0.0.0-20230630134904-f19ce9a5b859
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
 	github.com/streamingfast/dmetering v0.0.0-20230620155208-31b97a817964

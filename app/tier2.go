@@ -113,6 +113,9 @@ func (a *Tier2App) IsReady(ctx context.Context) bool {
 	if a.IsTerminating() {
 		return false
 	}
+	if !a.modules.Authenticator.Ready(ctx) {
+		return false
+	}
 
 	return a.isReady.Load()
 }

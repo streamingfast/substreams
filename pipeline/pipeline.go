@@ -8,7 +8,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"go.opentelemetry.io/otel"
-	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams"
@@ -45,6 +44,7 @@ type Pipeline struct {
 	outputGraph     *outputmodules.Graph
 	loadedModules   map[uint32]wasm.Module
 	moduleExecutors [][]exec.ModuleExecutor // Staged module executors
+	executionStages outputmodules.ExecutionStages
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
@@ -71,7 +71,6 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	tier    string
 	traceID string
 }
 
@@ -84,7 +83,6 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc func(substreams.ResponseFromAnyTier) error,
-	tier string,
 	traceID string,
 	opts ...Option,
 ) *Pipeline {
@@ -99,17 +97,16 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
-		tier:            tier,
 		traceID:         traceID,
 	}
 	for _, opt := range opts {
 		opt(pipe)
 	}
-	pipe.registerHandlers(ctx)
+	pipe.init(ctx)
 	return pipe
 }
 
-func (p *Pipeline) registerHandlers(ctx context.Context) (err error) {
+func (p *Pipeline) init(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
@@ -119,18 +116,36 @@ func (p *Pipeline) registerHandlers(ctx context.Context) (err error) {
 	})
 
 	p.setupProcessingModule(reqDetails)
+
+	stagedModules := p.outputGraph.StagedUsedModules()
+
+	// truncate stages to highest scheduled stage
+	if highest := p.highestStage; highest != nil {
+		if len(stagedModules) < *highest+1 {
+			return fmt.Errorf("invalid stage %d, there aren't that many", highest)
+		}
+		stagedModules = stagedModules[0 : *highest+1]
+	}
+	p.executionStages = stagedModules
+
 	return nil
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	logger := reqctx.Logger(ctx)
 
-	var storeMap store.Map
-	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
-	if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
+	storeMap, err := p.setupSubrequestStores(ctx)
+	if err != nil {
 		return fmt.Errorf("subrequest stores setup failed: %w", err)
 	}
+
 	p.stores.SetStoreMap(storeMap)
+
+	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
+
+	if err := p.buildWASM(ctx); err != nil {
+		return fmt.Errorf("building tier2 wasm module tree: %w", err)
+	}
 
 	return nil
 }
@@ -145,26 +160,11 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 		storeMap = p.setupEmptyStores(ctx)
 	}
 	p.stores.SetStoreMap(storeMap)
-	return nil
-}
 
-func (p *Pipeline) InitWASM(ctx context.Context) (err error) {
-
-	// TODO(abourget): Build the Module Executor list: this could be done lazily, but the outputmodules.Graph,
-	//  and cache the latest if all block boundaries
-	//  are still clear.
-
-	stagedModules := p.outputGraph.StagedUsedModules()
-
-	// truncate stages to highest scheduled stage
-	if highest := p.highestStage; highest != nil {
-		if len(stagedModules) < *highest+1 {
-			return fmt.Errorf("invalid stage %d, there aren't that many", highest)
-		}
-		stagedModules = stagedModules[0 : *highest+1]
+	if err := p.buildWASM(ctx); err != nil {
+		return fmt.Errorf("building tier1 wasm module tree: %w", err)
 	}
-
-	return p.buildWASM(ctx, stagedModules)
+	return nil
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {
@@ -183,37 +183,43 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 }
 
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/pipeline/store_setup", p.tier))
+	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier2/store_setup")
 	defer span.EndWithErr(&err)
 
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 
-	outputModuleName := reqDetails.OutputModule
-
-	ttrace.SpanContextFromContext(context.Background())
 	storeMap = store.NewMap()
 
-	// TODO: loop through stages here, and setup Full stores for all stages
-	// prior to the one we're running, and prep only PartialKVs
-	// for the requested stage.
-	for name, storeConfig := range p.stores.configs {
-		if name == outputModuleName {
-			// FIXME: in the new scheduler, we can set multiple partial stores, because
-			// they are all produced at the same stage.
-			partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
-			storeMap.Set(partialStore)
-		} else {
-			fullStore := storeConfig.NewFullKV(logger)
+	lastStage := len(p.executionStages) - 1
+	for stageIdx, stage := range p.executionStages {
+		isLastStage := stageIdx == lastStage
+		layer := stage.LastLayer()
+		if !layer.IsStoreLayer() {
+			continue
+		}
+		for _, mod := range layer {
+			storeConfig := p.stores.configs[mod.Name]
 
-			if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
-				file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
-				if err := fullStore.Load(ctx, file); err != nil {
-					return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
+			if isLastStage {
+				partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
+				storeMap.Set(partialStore)
+
+			} else {
+				fullStore := storeConfig.NewFullKV(logger)
+
+				if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
+					file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
+					// FIXME: run debugging session with conditional breakpoint
+					// `request.Stage == 1 && request.StartBlockNum == 20`
+					// in tier2.go: on the call to InitTier2Stores.
+					// Things stall in this LOAD command:
+					if err := fullStore.Load(ctx, file); err != nil {
+						return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
+					}
 				}
+				storeMap.Set(fullStore)
 			}
-
-			storeMap.Set(fullStore)
 		}
 	}
 
@@ -232,8 +238,9 @@ func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
 
 // runParallelProcess
 func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(p.ctx, fmt.Sprintf("substreams/%s/pipeline/parallel_process", p.tier))
+	ctx, span := reqctx.WithSpan(p.ctx, "substreams/pipeline/tier1/parallel_process")
 	defer span.EndWithErr(&err)
+
 	reqDetails := reqctx.Details(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
@@ -407,12 +414,17 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 // them over there.
 // moduleExecutorsInitialized bool
 // moduleExecutors            []exec.ModuleExecutor
-func (p *Pipeline) buildWASM(ctx context.Context, stages outputmodules.ExecutionStages) error {
+func (p *Pipeline) buildWASM(ctx context.Context) error {
+
+	// TODO(abourget): Build the Module Executor list: this could be done lazily, but the outputmodules.Graph,
+	//  and cache the latest if all block boundaries
+	//  are still clear.
+
 	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	loadedModules := make(map[uint32]wasm.Module)
-	for _, stage := range stages {
+	for _, stage := range p.executionStages {
 		for _, layer := range stage {
 			for _, module := range layer {
 				if _, exists := loadedModules[module.BinaryIndex]; exists {
@@ -431,7 +443,7 @@ func (p *Pipeline) buildWASM(ctx context.Context, stages outputmodules.Execution
 	p.loadedModules = loadedModules
 
 	var stagedModuleExecutors [][]exec.ModuleExecutor
-	for _, stage := range stages {
+	for _, stage := range p.executionStages {
 		for _, layer := range stage {
 			var moduleExecutors []exec.ModuleExecutor
 			for _, module := range layer {

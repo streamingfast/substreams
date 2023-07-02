@@ -195,7 +195,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 
 	outputModule := outputGraph.OutputModule()
 	execOutWriter := execout.NewWriter(
@@ -223,7 +223,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		"tier2",
 		// This must always be the parent/global trace id, the one that comes from tier1
 		parentTraceID,
 		opts...,
@@ -241,10 +240,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	)
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
-	}
-
-	if err := pipe.InitWASM(ctx); err != nil {
-		return fmt.Errorf("error building pipeline WASM: %w", err)
 	}
 
 	var streamErr error

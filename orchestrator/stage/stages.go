@@ -3,6 +3,7 @@ package stage
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -62,6 +63,7 @@ func NewStages(
 		traceID:       traceID,
 		segmenter:     segmenter,
 		segmentOffset: segmenter.IndexForStartBlock(outputGraph.LowestInitBlock()),
+		logger:        reqctx.Logger(ctx),
 	}
 	for idx, stageLayer := range stagedModules {
 		mods := stageLayer.LastLayer()
@@ -154,23 +156,33 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	}
 
 	stage := s.stages[stageIdx]
+	if stage.kind != KindStore {
+		fmt.Println("TRYM: kindnot store")
+		return nil
+	}
+
 	mergeUnit := stage.nextUnit()
 
 	if mergeUnit.Segment > s.segmenter.LastIndex() {
+		fmt.Println("TRYM: past last segment")
+
 		return nil // We're done here.
 	}
 
 	if s.getState(mergeUnit) != UnitPartialPresent {
+		fmt.Println("TRYM: wasn't in partial state")
 		return nil
 	}
 
 	if !s.previousUnitComplete(mergeUnit) {
+		fmt.Println("TRYM: prev unit not complete")
 		return nil
 	}
 
 	s.MarkSegmentMerging(mergeUnit)
 
 	return func() loop.Msg {
+		fmt.Println("TRYM: launching multiSquash", stage, mergeUnit)
 		if err := s.multiSquash(stage, mergeUnit); err != nil {
 			return MsgMergeFailed{Unit: mergeUnit, Error: err}
 		}
@@ -290,4 +302,26 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		}
 	}
 	return out, nil
+}
+
+func (s *Stages) StatesString() string {
+	out := strings.Builder{}
+	for i := 0; i < len(s.stages); i++ {
+		if s.stages[i].kind == KindMap {
+			out.WriteString("M:")
+		} else {
+			out.WriteString("S:")
+		}
+		for _, segment := range s.segmentStates {
+			out.WriteString(map[UnitState]string{
+				UnitPending:        ".",
+				UnitPartialPresent: "P",
+				UnitScheduled:      "S",
+				UnitMerging:        "M",
+				UnitCompleted:      "C",
+			}[segment[i]])
+		}
+		out.WriteString("\n")
+	}
+	return out.String()
 }

@@ -272,7 +272,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType)
 	if err != nil {
@@ -301,7 +301,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		"tier1",
 		tracing.GetTraceID(ctx).String(),
 		opts...,
 	)
@@ -338,10 +337,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 	if requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
 		return pipe.OnStreamTerminated(ctx, nil)
-	}
-
-	if err := pipe.InitWASM(ctx); err != nil {
-		return fmt.Errorf("error building pipeline WASM: %w", err)
 	}
 
 	var streamErr error

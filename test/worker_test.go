@@ -45,6 +45,7 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("start_block_num", request.StartBlockNum),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
+		zap.Int("stage", unit.Stage),
 	)
 
 	return func() loop.Msg {
@@ -55,6 +56,7 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 			zap.String("output_module", request.OutputModule),
 			zap.Uint64("start_block_num", request.StartBlockNum),
 			zap.Uint64("stop_block_num", request.StopBlockNum),
+			zap.Int("stage", unit.Stage),
 		)
 
 		return work.MsgJobSucceeded{Unit: unit, Worker: w}

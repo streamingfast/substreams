@@ -90,38 +90,42 @@ func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
 
 // A list of units that we can schedule, that might include some mappers and a store,
 // or the last module could be an exeuction layer with only a map.
-type ExecutionStages []stageLayers
+type ExecutionStages []StageLayers
+
+func (e ExecutionStages) LastStage() StageLayers {
+	return e[len(e)-1]
+}
 
 // For a given execution stage, the layers of execution, for example:
 // a layer of mappers, followed by a layer of stores.
-type stageLayers []layerModules
+type StageLayers []LayerModules
 
-func (l stageLayers) isStoreStage() bool {
+func (l StageLayers) isStoreStage() bool {
 	return l.LastLayer().IsStoreLayer()
 }
 
-func (l stageLayers) LastLayer() layerModules {
+func (l StageLayers) LastLayer() LayerModules {
 	return l[len(l)-1]
 }
 
 // The list of modules in a given layer of either maps or stores. A given layer
 // will always be comprised of only the same kind of modules.
-type layerModules []*pbsubstreams.Module
+type LayerModules []*pbsubstreams.Module
 
-func (l layerModules) IsStoreLayer() bool {
+func (l LayerModules) IsStoreLayer() bool {
 	return l[0].GetKindStore() != nil
 }
 
 func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 	seen := map[string]bool{}
 
-	var layers stageLayers
+	var layers StageLayers
 
 	for i := 0; ; i++ {
 		if len(seen) == len(mods) {
 			break
 		}
-		var layer layerModules
+		var layer LayerModules
 	modLoop:
 		for _, mod := range mods {
 			switch mod.Kind.(type) {
@@ -169,7 +173,7 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 	}
 
 	lastLayerIndex := len(layers) - 1
-	var newStage stageLayers
+	var newStage StageLayers
 	for idx, layer := range layers {
 		isLastStage := idx == lastLayerIndex
 		isStoreLayer := layer.IsStoreLayer()

@@ -62,7 +62,8 @@ func (s *Scheduler) Init() loop.Cmd {
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
-	fmt.Printf("UPDATE: %T %v\n", msg, msg)
+	fmt.Printf("Scheduler message: %T %v\n", msg, msg)
+	fmt.Print(s.Stages.StatesString())
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
@@ -75,6 +76,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case work.MsgScheduleNextJob:
+
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil {
 			return nil
@@ -85,6 +87,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 		worker := s.WorkerPool.Borrow()
 
+		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
 		return loop.Batch(
 			worker.Work(s.ctx, workUnit, workRange, s.stream),
 			work.CmdScheduleNextJob(),

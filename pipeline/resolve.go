@@ -57,6 +57,7 @@ func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest
 		OutputModule:          request.OutputModule,
 		ProductionMode:        true,
 		IsTier2Request:        true,
+		Tier2Stage:            int(request.Stage),
 		StopBlockNum:          request.StopBlockNum,
 		LinearHandoffBlockNum: request.StopBlockNum,
 		ResolvedStartBlockNum: request.StartBlockNum,

@@ -223,8 +223,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		// This must always be the parent/global trace id, the one that comes from tier1
 		"tier2",
+		// This must always be the parent/global trace id, the one that comes from tier1
 		parentTraceID,
 		opts...,
 	)
@@ -233,10 +233,11 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		requestStats.Start(10 * time.Second)
 		defer requestStats.Shutdown()
 	}
-	logger.Info("initializing pipeline",
+	logger.Info("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("output_module", request.OutputModule),
+		zap.Uint32("stage", request.Stage),
 	)
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)

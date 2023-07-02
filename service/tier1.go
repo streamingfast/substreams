@@ -310,7 +310,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestStats.Start(10 * time.Second)
 		defer requestStats.Shutdown()
 	}
-	logger.Info("initializing pipeline",
+	logger.Info("initializing tier1 pipeline",
 		zap.Int64("request_start_block", request.StartBlockNum),
 		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),

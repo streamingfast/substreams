@@ -57,18 +57,18 @@ func NewStages(
 	logger := reqctx.Logger(ctx)
 
 	stagedModules := outputGraph.StagedUsedModules()
-	lastIndex := len(stagedModules) - 1
 	out = &Stages{
 		ctx:           ctx,
 		traceID:       traceID,
 		segmenter:     segmenter,
 		segmentOffset: segmenter.IndexForStartBlock(outputGraph.LowestInitBlock()),
 	}
-	for idx, mods := range stagedModules {
-		isLastStage := idx == lastIndex
-		kind := stageKind(mods)
-		if kind == KindMap && !isLastStage {
-			continue
+	for idx, stageLayer := range stagedModules {
+		mods := stageLayer.LastLayer()
+
+		kind := KindMap
+		if mods.IsStoreLayer() {
+			kind = KindStore
 		}
 
 		var moduleStates []*ModuleState
@@ -96,7 +96,7 @@ func (s *Stages) AllStagesFinished() bool {
 	}
 
 	for idx, stage := range s.stages {
-		if stage.kind == KindMap {
+		if stage.kind != KindStore {
 			continue
 		}
 		if s.getState(Unit{Segment: lastSegment, Stage: idx}) != UnitCompleted {
@@ -129,7 +129,10 @@ func (s *Stages) InitialProgressMessages() map[string]block.Ranges {
 
 func (s *Stages) CmdStartMerge() loop.Cmd {
 	var cmds []loop.Cmd
-	for idx := range s.stages {
+	for idx, stage := range s.stages {
+		if stage.kind != KindStore {
+			continue
+		}
 		cmds = append(cmds, s.CmdTryMerge(idx))
 	}
 	return loop.Batch(cmds...)

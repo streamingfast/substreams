@@ -60,6 +60,6 @@ func stageKind(mods []*pbsubstreams.Module) Kind {
 type Kind int
 
 const (
-	KindMap = iota
+	KindMap = Kind(iota)
 	KindStore
 )

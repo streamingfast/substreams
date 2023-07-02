@@ -156,7 +156,7 @@ func (p *Pipeline) InitWASM(ctx context.Context) (err error) {
 
 	stagedModules := p.outputGraph.StagedUsedModules()
 
-	// truncate stages to highest
+	// truncate stages to highest scheduled stage
 	if highest := p.highestStage; highest != nil {
 		if len(stagedModules) < *highest+1 {
 			return fmt.Errorf("invalid stage %d, there aren't that many", highest)
@@ -407,80 +407,85 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 // them over there.
 // moduleExecutorsInitialized bool
 // moduleExecutors            []exec.ModuleExecutor
-func (p *Pipeline) buildWASM(ctx context.Context, stages [][]*pbsubstreams.Module) error {
+func (p *Pipeline) buildWASM(ctx context.Context, stages outputmodules.ExecutionStages) error {
 	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	loadedModules := make(map[uint32]wasm.Module)
 	for _, stage := range stages {
-		for _, module := range stage {
-			if _, exists := loadedModules[module.BinaryIndex]; exists {
-				continue
+		for _, layer := range stage {
+			for _, module := range layer {
+				if _, exists := loadedModules[module.BinaryIndex]; exists {
+					continue
+				}
+				code := reqModules.Binaries[module.BinaryIndex]
+				m, err := p.wasmRuntime.NewModule(ctx, code.Content)
+				if err != nil {
+					return fmt.Errorf("new wasm module: %w", err)
+				}
+				loadedModules[module.BinaryIndex] = m
 			}
-			code := reqModules.Binaries[module.BinaryIndex]
-			m, err := p.wasmRuntime.NewModule(ctx, code.Content)
-			if err != nil {
-				return fmt.Errorf("new wasm module: %w", err)
-			}
-			loadedModules[module.BinaryIndex] = m
 		}
 	}
+
 	p.loadedModules = loadedModules
 
 	var stagedModuleExecutors [][]exec.ModuleExecutor
 	for _, stage := range stages {
-		var moduleExecutors []exec.ModuleExecutor
-		for _, module := range stage {
-			inputs, err := p.renderWasmInputs(module)
-			if err != nil {
-				return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
-			}
-
-			entrypoint := module.BinaryEntrypoint
-			mod := loadedModules[module.BinaryIndex]
-
-			switch kind := module.Kind.(type) {
-			case *pbsubstreams.Module_KindMap_:
-				outType := strings.TrimPrefix(module.Output.Type, "proto:")
-				baseExecutor := exec.NewBaseExecutor(
-					ctx,
-					module.Name,
-					mod,
-					p.wasmRuntime.InstanceCacheEnabled(),
-					inputs,
-					entrypoint,
-					tracer,
-				)
-				executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
-				moduleExecutors = append(moduleExecutors, executor)
-
-			case *pbsubstreams.Module_KindStore_:
-				updatePolicy := kind.KindStore.UpdatePolicy
-				valueType := kind.KindStore.ValueType
-
-				outputStore, found := p.stores.StoreMap.Get(module.Name)
-				if !found {
-					return fmt.Errorf("store %q not found", module.Name)
+		for _, layer := range stage {
+			var moduleExecutors []exec.ModuleExecutor
+			for _, module := range layer {
+				inputs, err := p.renderWasmInputs(module)
+				if err != nil {
+					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
-				inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
 
-				baseExecutor := exec.NewBaseExecutor(
-					ctx,
-					module.Name,
-					mod,
-					p.wasmRuntime.InstanceCacheEnabled(),
-					inputs,
-					entrypoint,
-					tracer,
-				)
-				executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
-				moduleExecutors = append(moduleExecutors, executor)
+				entrypoint := module.BinaryEntrypoint
+				mod := loadedModules[module.BinaryIndex]
 
-			default:
-				panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))
+				switch kind := module.Kind.(type) {
+				case *pbsubstreams.Module_KindMap_:
+					outType := strings.TrimPrefix(module.Output.Type, "proto:")
+					baseExecutor := exec.NewBaseExecutor(
+						ctx,
+						module.Name,
+						mod,
+						p.wasmRuntime.InstanceCacheEnabled(),
+						inputs,
+						entrypoint,
+						tracer,
+					)
+					executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
+					moduleExecutors = append(moduleExecutors, executor)
+
+				case *pbsubstreams.Module_KindStore_:
+					updatePolicy := kind.KindStore.UpdatePolicy
+					valueType := kind.KindStore.ValueType
+
+					outputStore, found := p.stores.StoreMap.Get(module.Name)
+					if !found {
+						return fmt.Errorf("store %q not found", module.Name)
+					}
+					inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
+
+					baseExecutor := exec.NewBaseExecutor(
+						ctx,
+						module.Name,
+						mod,
+						p.wasmRuntime.InstanceCacheEnabled(),
+						inputs,
+						entrypoint,
+						tracer,
+					)
+					executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
+					moduleExecutors = append(moduleExecutors, executor)
+
+				default:
+					panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))
+				}
 			}
+			stagedModuleExecutors = append(stagedModuleExecutors, moduleExecutors)
 		}
-		stagedModuleExecutors = append(stagedModuleExecutors, moduleExecutors)
 	}
 
 	p.moduleExecutors = stagedModuleExecutors

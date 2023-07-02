@@ -24,6 +24,7 @@ type RequestDetails struct {
 
 	ProductionMode bool
 	IsTier2Request bool
+	Tier2Stage     int
 }
 
 func (d *RequestDetails) UniqueIDString() string {
@@ -39,7 +40,10 @@ func (d *RequestDetails) IsOutputModule(modName string) bool {
 // leaf stores we've been asked to produce.  We know the scheduler will have
 // created jobs to produce those stores we're skipping here.
 func (d *RequestDetails) SkipSnapshotSave(modName string) bool {
-	return d.IsTier2Request && !d.IsOutputModule(modName)
+	// TODO: we need to save
+	// func ShouldSaveStoreSnapshot()
+	return !d.IsTier2Request || d.IsOutputModule(modName)
+	//return d.IsTier2Request && !d.IsOutputModule(modName)
 }
 
 func (d *RequestDetails) ShouldReturnWrittenPartials(modName string) bool {

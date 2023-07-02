@@ -9,8 +9,8 @@ import (
 
 type Graph struct {
 	requestModules    *pbsubstreams.Modules
-	usedModules       []*pbsubstreams.Module   // all modules that need to be processed (requested directly or a required module ancestor)
-	stagedUsedModules [][]*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	usedModules       []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	stagedUsedModules ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
 	moduleHashes      *manifest.ModuleHashes
 	stores            []*pbsubstreams.Module // subset of allModules: only the stores
 	lowestInitBlock   uint64
@@ -21,13 +21,13 @@ type Graph struct {
 	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
 }
 
-func (g *Graph) OutputModule() *pbsubstreams.Module          { return g.outputModule }
-func (g *Graph) Stores() []*pbsubstreams.Module              { return g.stores }
-func (g *Graph) UsedModules() []*pbsubstreams.Module         { return g.usedModules }
-func (g *Graph) StagedUsedModules() [][]*pbsubstreams.Module { return g.stagedUsedModules }
-func (g *Graph) IsOutputModule(name string) bool             { return g.outputModule.Name == name }
-func (g *Graph) ModuleHashes() *manifest.ModuleHashes        { return g.moduleHashes }
-func (g *Graph) LowestInitBlock() uint64                     { return g.lowestInitBlock }
+func (g *Graph) OutputModule() *pbsubstreams.Module   { return g.outputModule }
+func (g *Graph) Stores() []*pbsubstreams.Module       { return g.stores }
+func (g *Graph) UsedModules() []*pbsubstreams.Module  { return g.usedModules }
+func (g *Graph) StagedUsedModules() ExecutionStages   { return g.stagedUsedModules }
+func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
+func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
+func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock }
 
 func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{
@@ -88,14 +88,40 @@ func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
 	return lowest
 }
 
-func computeStages(mods []*pbsubstreams.Module) (stages [][]*pbsubstreams.Module) {
+// A list of units that we can schedule, that might include some mappers and a store,
+// or the last module could be an exeuction layer with only a map.
+type ExecutionStages []stageLayers
+
+// For a given execution stage, the layers of execution, for example:
+// a layer of mappers, followed by a layer of stores.
+type stageLayers []layerModules
+
+func (l stageLayers) isStoreStage() bool {
+	return l.LastLayer().IsStoreLayer()
+}
+
+func (l stageLayers) LastLayer() layerModules {
+	return l[len(l)-1]
+}
+
+// The list of modules in a given layer of either maps or stores. A given layer
+// will always be comprised of only the same kind of modules.
+type layerModules []*pbsubstreams.Module
+
+func (l layerModules) IsStoreLayer() bool {
+	return l[0].GetKindStore() != nil
+}
+
+func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 	seen := map[string]bool{}
+
+	var layers stageLayers
 
 	for i := 0; ; i++ {
 		if len(seen) == len(mods) {
 			break
 		}
-		var stage []*pbsubstreams.Module
+		var layer layerModules
 	modLoop:
 		for _, mod := range mods {
 			switch mod.Kind.(type) {
@@ -132,15 +158,29 @@ func computeStages(mods []*pbsubstreams.Module) (stages [][]*pbsubstreams.Module
 				}
 			}
 
-			stage = append(stage, mod)
+			layer = append(layer, mod)
 		}
-		if len(stage) != 0 {
-			stages = append(stages, stage)
-			for _, mod := range stage {
+		if len(layer) != 0 {
+			layers = append(layers, layer)
+			for _, mod := range layer {
 				seen[mod.Name] = true
 			}
 		}
 	}
+
+	lastLayerIndex := len(layers) - 1
+	var newStage stageLayers
+	for idx, layer := range layers {
+		isLastStage := idx == lastLayerIndex
+		isStoreLayer := layer.IsStoreLayer()
+
+		newStage = append(newStage, layer)
+		if isStoreLayer || isLastStage {
+			stages = append(stages, newStage)
+			newStage = nil
+		}
+	}
+
 	return stages
 }
 

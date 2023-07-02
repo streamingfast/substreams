@@ -185,13 +185,20 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		return io.EOF
 	}
 
+	// FIXME: when handling the real-time segment, it's dangerous
+	// to save the stores, as they might have components that get
+	// reverted, and we won't go change the stores then.
+	// So we _shouldn't_ save the stores unless we're in irreversible-only
+	// mode. Basically, tier1 shouldn't save unless it's a StepNewIrreversible
+	// (we're in a historical segment)
+	// When we're in the real-time segment, we shouldn't save anything.
 	if err := p.stores.flushStores(ctx, clock.Number); err != nil {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
 	// note: if we start on a forked cursor, the undo signal will appear BEFORE we send the snapshot
-	if p.gate.shouldSendSnapshot() {
-		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
+	if p.gate.shouldSendSnapshot() && !reqDetails.IsTier2Request {
+		if err := p.sendSnapshots(p.stores.StoreMap, reqDetails.DebugInitialStoreSnapshotForModules); err != nil {
 			return fmt.Errorf("send initial snapshots: %w", err)
 		}
 	}

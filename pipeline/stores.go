@@ -57,7 +57,7 @@ func (s *Stores) resetStores() {
 func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	logger := reqctx.Logger(ctx)
 	reqStats := reqctx.ReqStats(ctx)
-	// FIXME: use Segmenters here, pleaseeee no bounder intervals gna gna gna.
+
 	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isTier2Request, s.bounder.requestStopBlock, blockNum)
 	if len(boundaryIntervals) > 0 {
 		logger.Info("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
@@ -68,7 +68,6 @@ func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 		if err := s.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
 			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
-
 		reqStats.RecordFlush(time.Since(t0))
 	}
 	return nil
@@ -111,7 +110,7 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, b
 	}
 
 	if reqctx.Details(ctx).ShouldReturnWrittenPartials(saveStore.Name()) {
-		s.partialsWritten = append(s.partialsWritten, file.Range)
+		//s.partialsWritten = append(s.partialsWritten, file.Range)
 		reqctx.Logger(ctx).Debug("adding partials written",
 			zap.Stringer("range", file.Range),
 			zap.Stringer("ranges", s.partialsWritten),

@@ -78,8 +78,8 @@ func BuildParallelProcessor(
 	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
 	// for whatever reason,
 
-	execOutSegmenter := reqPlan.WriteOutSegmenter()
-	if execOutSegmenter != nil {
+	if reqPlan.WriteExecOut != nil {
+		execOutSegmenter := reqPlan.WriteOutSegmenter()
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := outputGraph.OutputModule()
 		if requestedModule.GetKindStore() != nil {

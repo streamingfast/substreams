@@ -373,7 +373,7 @@ func TestOneStoreOneMap(t *testing.T) {
 	for idx, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if idx < 2 {
-				// FIXME: remove this skipp
+				// FIXME: remove this skip
 				t.Skip("skipped")
 			}
 

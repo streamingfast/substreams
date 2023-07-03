@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"github.com/streamingfast/bstream"
+	"sync"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -20,6 +21,8 @@ type UndoHandler func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.M
 type ForkHandler struct {
 	reversibleOutputs map[string][]*pbssinternal.ModuleOutput
 	undoHandlers      []UndoHandler
+
+	mu sync.RWMutex
 }
 
 func NewForkHandler() *ForkHandler {
@@ -37,6 +40,9 @@ func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 ) error {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	if moduleOutputs, found := f.reversibleOutputs[clock.Id]; found {
 		for _, h := range f.undoHandlers {
 			h(clock, moduleOutputs)
@@ -46,10 +52,14 @@ func (f *ForkHandler) handleUndo(
 }
 
 func (f *ForkHandler) removeReversibleOutput(blockID string) {
+	f.mu.Lock()
 	delete(f.reversibleOutputs, blockID)
+	f.mu.Unlock()
 }
 
 func (f *ForkHandler) addReversibleOutput(moduleOutput *pbssinternal.ModuleOutput, blockID string) {
-	// TODO: ADD MUTEX
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.reversibleOutputs[blockID] = append(f.reversibleOutputs[blockID], moduleOutput)
 }

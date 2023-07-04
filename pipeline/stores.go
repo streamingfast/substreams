@@ -3,8 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
@@ -49,19 +47,15 @@ func (s *Stores) resetStores() {
 
 func (s *Stores) flushStores(ctx context.Context, blockNum uint64) (err error) {
 	logger := reqctx.Logger(ctx)
-	reqStats := reqctx.ReqStats(ctx)
 	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isSubRequest, s.bounder.requestStopBlock, blockNum)
 	if len(boundaryIntervals) > 0 {
 		logger.Info("flushing boundaries", zap.Uint64s("boundaries", boundaryIntervals))
 	}
 	reqctx.Span(ctx).SetAttributes(attribute.Int("pipeline.stores.boundary_reached", len(boundaryIntervals)))
 	for _, boundaryBlock := range boundaryIntervals {
-		t0 := time.Now()
 		if err := s.saveStoresSnapshots(ctx, boundaryBlock); err != nil {
 			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
-
-		reqStats.RecordFlush(time.Since(t0))
 	}
 	return nil
 }

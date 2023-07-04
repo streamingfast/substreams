@@ -28,7 +28,8 @@ type Tier2Config struct {
 	WASMExtensions  []wasm.WASMExtensioner
 	PipelineOptions []pipeline.PipelineOptioner
 
-	Tracing bool
+	RequestStats bool
+	Tracing      bool
 }
 
 type Tier2App struct {
@@ -81,6 +82,10 @@ func (a *Tier2App) Run() error {
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
+	}
+
+	if a.config.RequestStats {
+		opts = append(opts, service.WithRequestStats())
 	}
 
 	svc := service.NewTier2(

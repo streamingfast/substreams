@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -165,10 +166,12 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					data := readBytes(inst, ptr, length)
 					call := wasm.FromContext(ctx)
 
+					t0 := time.Now()
 					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}
+					reqctx.ReqStats(ctx).RecordWasmExtDuration(importName, time.Since(t0))
 
 					if ctx.Err() == context.Canceled {
 						// Sometimes long-running extensions will come back to a canceled context.

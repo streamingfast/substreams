@@ -43,8 +43,8 @@ type Tier1Config struct {
 	WASMExtensions  []wasm.WASMExtensioner
 	PipelineOptions []pipeline.PipelineOptioner
 
-	DebugRequestsStates bool
-	Tracing             bool
+	RequestStats bool
+	Tracing      bool
 }
 
 type Tier1App struct {
@@ -153,13 +153,16 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
+	if a.config.RequestStats {
+		opts = append(opts, service.WithRequestStats())
+	}
+
 	svc := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,
 		forkableHub,
 		stateStore,
-		a.config.StateBundleSize,
 		a.config.BlockType,
 		a.config.MaxSubrequests,
 		a.config.SubrequestsSize,

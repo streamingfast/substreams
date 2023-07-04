@@ -24,7 +24,6 @@ import (
 func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
-	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 	defer func() {
 		if r := recover(); r != nil {
@@ -53,7 +52,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	finalBlockHeight := obj.(bstream.Stepable).FinalBlockHeight()
 	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
 
-	reqStats.RecordBlock(block.AsRef())
+	reqctx.ReqStats(ctx).RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
 	if err = p.processBlock(ctx, block, clock, cursor, step, finalBlockHeight, reorgJunctionBlock); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated

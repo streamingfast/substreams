@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 #### Added
 
 * Max-subrequests can now be overriden by auth header `X-Sf-Substreams-Parallel-Jobs` (note: if your auth plugin is 'trust', make sure that you filter out this header from public access
+* Request Stats logging. When enable it will log metrics associated to a Tier1 and Tier2 request
 
 #### Fixed
 

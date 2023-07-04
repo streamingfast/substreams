@@ -109,7 +109,6 @@ func (s *StoreSquasher) launch(ctx context.Context) {
 }
 func (s *StoreSquasher) processPartials(ctx context.Context) error {
 	logger := s.logger(ctx)
-	reqStats := reqctx.ReqStats(ctx)
 
 	logger.Info("launching store squasher")
 	metrics.SquashersStarted.Inc()
@@ -133,10 +132,6 @@ func (s *StoreSquasher) processPartials(ctx context.Context) error {
 
 		if err := eg.Wait(); err != nil {
 			return fmt.Errorf("waiting: %w", err)
-		}
-
-		if out.lastExclusiveEndBlock != 0 {
-			reqStats.RecordStoreSquasherProgress(s.name, out.lastExclusiveEndBlock)
 		}
 
 		totalDuration := time.Since(start)

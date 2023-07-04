@@ -3,15 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
-
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
+	"os"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metrics"
@@ -160,12 +158,16 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, true)
-
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
+	}
+
+	if s.runtimeConfig.WithRequestStats {
+		var requestStats metrics.Stats
+		ctx, requestStats = setupRequestStats(ctx, requestDetails, true)
+		defer requestStats.LogAndClose()
 	}
 
 	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
@@ -222,10 +224,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		opts...,
 	)
 
-	if requestStats != nil {
-		requestStats.Start(10 * time.Second)
-		defer requestStats.Shutdown()
-	}
 	logger.Info("initializing pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),

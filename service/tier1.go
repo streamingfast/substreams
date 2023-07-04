@@ -4,11 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
@@ -19,6 +14,9 @@ import (
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
+	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/streamingfast/substreams"
@@ -38,7 +36,6 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -63,8 +60,6 @@ type Tier1Service struct {
 	getHeadBlock        func() (uint64, error)
 }
 
-var workerID atomic.Uint64
-
 func NewTier1(
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
@@ -72,7 +67,6 @@ func NewTier1(
 	hub *hub.ForkableHub,
 
 	stateStore dstore.Store,
-	stateBundleSize uint64,
 
 	blockType string,
 
@@ -253,8 +247,6 @@ func (s *Tier1Service) Blocks(
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	ctx, requestStats := setupRequestStats(ctx, logger, s.runtimeConfig.WithRequestStats, false)
-
 	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
@@ -267,6 +259,12 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 				requestDetails.MaxParallelJobs = ll
 			}
 		}
+	}
+
+	if s.runtimeConfig.WithRequestStats {
+		var requestStats metrics.Stats
+		ctx, requestStats = setupRequestStats(ctx, requestDetails, false)
+		defer requestStats.LogAndClose()
 	}
 
 	traceId := tracing.GetTraceID(ctx).String()
@@ -336,10 +334,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		opts...,
 	)
 
-	if requestStats != nil {
-		requestStats.Start(10 * time.Second)
-		defer requestStats.Shutdown()
-	}
 	logger.Info("initializing pipeline",
 		zap.Int64("request_start_block", request.StartBlockNum),
 		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),
@@ -427,19 +421,17 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	}
 }
 
-func setupRequestStats(ctx context.Context, logger *zap.Logger, withRequestStats, isSubRequest bool) (context.Context, metrics.Stats) {
-	if isSubRequest {
-		wid := workerID.Inc()
-		logger = logger.With(zap.Uint64("worker_id", wid))
-		return reqctx.WithLogger(ctx, logger), metrics.NewNoopStats()
-	}
-
-	// we only want to measure stats when enabled an on the Main request
-	if withRequestStats {
-		stats := metrics.NewReqStats(logger)
-		return reqctx.WithReqStats(ctx, stats), stats
-	}
-	return ctx, metrics.NewNoopStats()
+func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, tier2 bool) (context.Context, metrics.Stats) {
+	logger := reqctx.Logger(ctx)
+	auth := dauth.FromContext(ctx)
+	stats := metrics.NewReqStats(&metrics.Config{
+		UserID:         auth.UserID(),
+		ApiKeyID:       auth.APIKeyID(),
+		Tier2:          tier2,
+		OutputModule:   requestDetails.OutputModule,
+		ProductionMode: requestDetails.ProductionMode,
+	}, logger)
+	return reqctx.WithReqStats(ctx, stats), stats
 }
 
 // toGRPCError turns an `err` into a gRPC error if it's non-nil, in the `nil` case,

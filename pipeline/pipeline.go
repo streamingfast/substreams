@@ -217,12 +217,12 @@ func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, 
 
 	logger.Info("starting parallel processing")
 
-	reqStats.StartParallelProcessing()
+	t0 := time.Now()
 	storeMap, err = parallelProcessor.Run(dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}
-	reqStats.EndParallelProcessing()
+	reqStats.RecordParallelDuration(time.Since(t0))
 
 	p.processingModule = nil
 

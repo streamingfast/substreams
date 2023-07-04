@@ -166,7 +166,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	if s.runtimeConfig.WithRequestStats {
 		var requestStats metrics.Stats
-		ctx, requestStats = setupRequestStats(ctx, requestDetails, true)
+		ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, true)
 		defer requestStats.LogAndClose()
 	}
 

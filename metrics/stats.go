@@ -31,11 +31,12 @@ func (n noopstats) RecordModuleExecDuration(_ time.Duration)        {}
 func (n noopstats) LogAndClose()                                    {}
 
 type Config struct {
-	UserID         string
-	ApiKeyID       string
-	OutputModule   string
-	ProductionMode bool
-	Tier2          bool
+	UserID           string
+	ApiKeyID         string
+	OutputModule     string
+	OutputModuleHash string
+	ProductionMode   bool
+	Tier2            bool
 }
 
 func NewReqStats(config *Config, logger *zap.Logger) Stats {
@@ -91,13 +92,16 @@ func (s *stats) getZapFields() []zap.Field {
 	if s.config.Tier2 {
 		tier = "tier2"
 	}
+
 	out := []zap.Field{
 		zap.String("user_id", s.config.UserID),
 		zap.String("api_key_id", s.config.ApiKeyID),
-		zap.String("output_module", s.config.OutputModule),
+		zap.String("output_module_name", s.config.OutputModule),
+		zap.String("output_module_hash", s.config.OutputModuleHash),
 		zap.Bool("production_mode", s.config.ProductionMode),
 		zap.String("tier", tier),
-		zap.Stringer("block_rate", s.blockRate),
+		zap.String("block_rate_per_sec", s.blockRate.RateString()),
+		zap.Uint64("block_count", s.blockRate.Total()),
 		zap.Duration("parallel_duration", s.llDuration),
 		zap.Duration("module_exec_duration", s.moduleExecDuration),
 	}

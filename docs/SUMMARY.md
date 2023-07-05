@@ -34,6 +34,13 @@
   * [Prometheus](developers-guide/sink-targets/substreams-sink-prometheus.md)
   * [MongoDB](developers-guide/sink-targets/substreams-sink-mongodb.md)
   * [ClickHouse](developers-guide/sink-targets/substreams-sink-clickhouse.md)
+* [Cookbook](developers-guide/cookbook.md)
+  * [Dynamic data sources](developers-guide/cookbook/dynamic-data-sources.md)
+  * [Factory parameterization](developers-guide/cookbook/factory-params.md)
+  * [Advanced parameters](developers-guide/cookbook/advanced-params.md)
+  * [Keys in stores](developers-guide/cookbook/keys-in-stores.md)
+  * [Aggregation windows](developers-guide/cookbook/aggregation windows.md)
+  * [Subgraph entity changes](developers-guide/cookbook/entity-changes.md)
 
 ## Reference & Specs
 

@@ -232,8 +232,9 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/":
 			o.searchEnabled = true
 			cmds = append(cmds, o.searchCtx.InitInput())
-		case "f":
+		case "F":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
+			o.setOutputViewContent(true)
 		case "N":
 			for i := len(o.searchMatchingOutputViewOffsets) - 1; i >= 0; i-- {
 				pos := o.searchMatchingOutputViewOffsets[i]

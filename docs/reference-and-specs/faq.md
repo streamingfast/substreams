@@ -22,7 +22,11 @@ Yes, Substreams compliments and extend the capabilities and functionalities of s
 
 ### **Is it possible to use Substreams for production deployments?**
 
-No, Substreams is provided as a developer preview.
+Yes. Substreams is [generally available](https://streamingfastio.medium.com/substreams-reach-general-availability-48272f6e942e) and used in production at multiple outlets.
+
+### **What's in the Substreams name?**
+
+Substreams is the name of the engine, and of the product. It is to be capitalized and kept plural. One can speak of an individual _module_ or individual _stream_ but in general, when speaking about the engine, you would use the word "_Substreams"_.&#x20;
 
 ### **What is the `substreams` CLI?**
 
@@ -50,7 +54,7 @@ Substreams and Firehose work together to index and process blockchain data. Subs
 
 ### **Is Substreams free?**
 
-Yes, Substreams is an open source project and is available to the public for free.
+Yes, Substreams is an open-source project and there are free (albeit rate-limited) endpoints  available.
 
 ### **How does a developer reach the information returned from a call to Substreams from a web-based UI?**
 

@@ -3,8 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 

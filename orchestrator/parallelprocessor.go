@@ -114,7 +114,7 @@ func BuildParallelProcessor(
 	//  -
 	//  This is an optimization and is not solved herein.
 
-	workerPool := work.NewWorkerPool(ctx, int(runtimeConfig.ParallelSubrequests), runtimeConfig.WorkerFactory)
+	workerPool := work.NewWorkerPool(ctx, reqDetails.MaxParallelJobs, runtimeConfig.WorkerFactory)
 	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{
@@ -134,6 +134,9 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 
 	if b.reqPlan.LinearPipeline != nil {
 		return b.scheduler.FinalStoreMap(b.reqPlan.LinearPipeline.StartBlock)
+			// We must return an error here, otherwise the caller will think that the
+			// execOutputReader is done, and will try to continue with live block!
+			return nil, ctx.Err()
 	}
 
 	return nil, nil

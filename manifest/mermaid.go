@@ -33,7 +33,7 @@ func GenerateMermaidLiveURL(mods *pbsubstreams.Modules) string {
 }
 
 func PrintMermaid(mods *pbsubstreams.Modules) {
-	fmt.Println("Mermaid graph:\n\n```mermaid\ngraph TD;")
+	fmt.Println("Mermaid graph:\n\n```mermaid")
 	fmt.Println(generateMermaidGraph(mods))
 	fmt.Println("```")
 	fmt.Println("")

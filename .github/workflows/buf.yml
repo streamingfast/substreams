@@ -28,15 +28,17 @@ jobs:
         # TODO: Consider enabling this after fixing or ignoring the current linting errors?
         if: false
         uses: bufbuild/buf-lint-action@v1
-          
+
       - name: Check for breaking changes
         if: github.event_name == 'pull_request'
         uses: bufbuild/buf-breaking-action@v1
         with:
+          input: proto
           against: 'https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }}'
 
       - uses: bufbuild/buf-push-action@v1
         if: github.event_name != 'pull_request'
         with:
+          input: proto
           buf_token: ${{ secrets.BUF_TOKEN }}
           draft: ${{ !startsWith(github.ref, 'refs/tags/v') }}

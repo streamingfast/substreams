@@ -6,6 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Backend changes
+
+#### Added
+
+* Max-subrequests can now be overriden by auth header `X-Sf-Substreams-Parallel-Jobs` (note: if your auth plugin is 'trust', make sure that you filter out this header from public access
+* Request Stats logging. When enable it will log metrics associated to a Tier1 and Tier2 request
+* On request, save "substreams.partial.spkg" file to the state cache for debugging purposes.
+* Manifest reader can now read 'partial' spkg files (without protobuf and metadata) with an option.
+
+#### Fixed
+
+* Fixed a bug which caused "live" blocks to be sent while the stream previously received block(s) were historic.
+
+### CLI changes
+
+#### Fixed
+
+* In GUI, module output now shows fields with default values, i.e. `0`, `""`, `false`
+
+## v1.1.7 (https://github.com/streamingfast/substreams/releases/tag/v1.1.7)
+
+### Highlights
+
+Now using `plugin: buf.build/community/neoeinstein-prost-crate:v0.3.1` when generating the Protobuf Rust `mod.rs` which fixes the warning that remote plugins are deprecated.
+
+Previously we were using `remote: buf.build/prost/plugins/crate:v0.3.1-1`. But remote plugins when using https://buf.build (which we use to generate the Protobuf) are now deprecated and will cease to function on July 10th, 2023.
+
+The net effect of this is that if you don't update your Substreams CLI to `1.1.7`, on July 10th 2023 and after, the `substreams protogen` will not work anymore.
+
+## v1.1.6 (https://github.com/streamingfast/substreams/releases/tag/v1.1.6)
+
+### Backend changes
+
+* `substreams-tier1` and `substreams-tier2` are now standalone **Apps**, to be used as such by server implementations (_firehose-ethereum_, etc.)
+
+* `substreams-tier1` now listens to [Connect](https://buf.build/blog/connect-a-better-grpc) protocol, enabling browser-based substreams clients
+
+* **Authentication** has been overhauled to take advantage of https://github.com/streamingfast/dauth, allowing the use of a GRPC-based sidecar or reverse-proxy to provide authentication.
+
+* **Metering** has been overhauled to take advantage of https://github.com/streamingfast/dmetering plugins, allowing the use of a GRPC sidecar or logs to expose usage metrics.
+
+* The **tier2 logs** no longer show a `parent_trace_id`: the `trace_id` is now the same as tier1 jobs. Unique tier2 jobs can be distinguished by their `stage` and `segment`, corresponding to the `output_module_name` and `startblock:stopblock`
+
+### CLI changes
+
+* The `substreams protogen` command now uses this Buf plugin https://buf.build/community/neoeinstein-prost to generate the Rust code for your Substreams definitions.
+
+* The `substreams protogen` command no longer generate the `FILE_DESCRIPTOR_SET` constant which generates an unsued warning in Rust. We don't think nobody relied on having the `FILE_DESCRIPTOR_SET` constant generated, but if it's the case, you can provide your own `buf.gen.yaml` that will be used instead of the generated one when doing `substreams protogen`.
+
+* Added `-H` flag on the `substreams run` command, to set HTTP Headers in the Substreams request.
+
+### Fixed
+
+* Fixed generated `buf.gen.yaml` not being deleted when an error occurs while generating the Rust code.
+
+## [v1.1.5](https://github.com/streamingfast/substreams/releases/tag/v1.1.5)
+
 ### Highlights
 
 This release fixes data determinism issues. This comes at a 20% performance cost but is necessary for integration with The Graph ecosystem.
@@ -14,7 +71,7 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 
 * When upgrading a substreams server to this version, you should delete all existing module caches to benefit from deterministic output
 
-### Added 
+### Added
 
 * Tier1 now records deterministic failures in wasm, "blacklists" identical requests for 10 minutes (by serving them the same InvalidArgument error) with a forced incremental backoff. This prevents accidental bad actors from hogging tier2 resources when their substreams cannot go passed a certain block.
 * Tier1 now sends the ResolvedStartBlock, LinearHandoffBlock and MaxJobWorkers in SessionInit message for the client and gui to show
@@ -25,11 +82,13 @@ This release fixes data determinism issues. This comes at a 20% performance cost
 * When talking to an updated server, the gui will not overflow on a negative start block, using the newly available resolvedStartBlock instead.
 * When running in development mode with a start-block in the future on a cold cache, you would sometimes get invalid "updates" from the store passed down to your modules that depend on them. It did not impact the caches but caused invalid output.
 * The WASM engine was incorrectly reusing memory, preventing deterministic output. It made things go faster, but at the cost of determinism. Memory is now reset between WASM executions on each block.
+* The GUI no longer panics when an invalid output-module is given as argument
 
 ### Changed
 
 * Changed default WASM engine from `wasmtime` to `wazero`, use `SUBSTREAMS_WASM_RUNTIME=wasmtime` to revert to prior engine. Note that `wasmtime` will now run a lot slower than before because resetting the memory in `wasmtime` is more expensive than in `wazero`.
 * Execution of modules is now done in parallel within a single instance, based on a tree of module dependencies.
+* The `substreams gui` and `substreams run` now accept commas inside a `param` value. For example: `substreams run --param=p1=bar,baz,qux --param=p2=foo,baz`. However, you can no longer pass multiple parameters using an ENV variable, or a `.yaml` config file.
 
 ## [v1.1.4](https://github.com/streamingfast/substreams/releases/tag/v1.1.4)
 

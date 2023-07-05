@@ -37,6 +37,7 @@ type RequestConfig struct {
 	StartBlock                  int64
 	StopBlock                   string
 	FinalBlocksOnly             bool
+	Headers                     map[string]string
 	OutputModule                string
 	SubstreamsClientConfig      *client.SubstreamsClientConfig
 	HomeDir                     string
@@ -262,7 +263,7 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
 	}
 
-	stream := streamui.New(req, ssClient, callOpts)
+	stream := streamui.New(req, ssClient, c.Headers, callOpts)
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)

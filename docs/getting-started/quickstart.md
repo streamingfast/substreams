@@ -2,7 +2,7 @@
 description: Get off the ground by using Substreams by StreamingFast
 ---
 
-# Quickstart guide
+# Quickstart
 
 ## Run your first Substreams
 
@@ -27,9 +27,9 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamin
 ```
 {% endcode %}
 
-The [`run`](../reference-and-specs/command-line-interface#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_block` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
+The [`run`](../reference-and-specs/command-line-interface/#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_block` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
 
-{% hint style="note" %}
+{% hint style="info" %}
 **Note**: While Substreams technology is chain-agnostic, you must write your Substreams for a specific chain. In this quickstart, we are using Ethereum as our specific chain, general concepts given in the quick start applied to every Substreams supported chain.
 {% endhint %}
 
@@ -37,10 +37,10 @@ The [`run`](../reference-and-specs/command-line-interface#run) command starts a 
 
 In this section we are going to:
 
-- Create your first Substreams module
-- Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to run the module
+* Create your first Substreams module
+* Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to run the module
 
-{% hint style="note" %}
+{% hint style="info" %}
 **Note**: Before continuing, ensure that your system [meets the basic requirements](../developers-guide/installation-requirements.md) for Substreams development.
 {% endhint %}
 
@@ -73,7 +73,7 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:sf.ethereum.block_meta.v1.BlockMeta
+      type: proto:acme.block_meta.v1.BlockMeta
 ```
 
 ### Create Rust manifest file
@@ -95,8 +95,8 @@ name = "substreams"
 crate-type = ["cdylib"]
 
 [dependencies]
-substreams = "0.5.0"
-substreams-ethereum = "0.9.0"
+substreams = "0.5"
+substreams-ethereum = "0.9"
 prost = "0.11"
 
 [profile.release]
@@ -106,7 +106,7 @@ strip = "debuginfo"
 ```
 
 {% hint style="success" %}
-**Tip**: The `[profile.release]` section can dramatically reduce the size of your wasm code and its loading time in substreams engine. `lto = true` is always beneficial to performance. `opt-level = 'z'` optimizes for size, which results in a reduced "Time To First Byte", in some cases by several seconds, which is usually beneficial, but it may not always be the best choice for performance. [See more info](https://docs.rust-embedded.org/book/unsorted/speed-vs-size.html). We do, however, recommend it.  The `strip = "debuginfo"` will remove useful information from stack traces, but the faster load time still make it a good choice when iterating in development.
+**Tip**: The `[profile.release]` section can dramatically reduce the size of your wasm code and its loading time in substreams engine. `lto = true` is always beneficial to performance. `opt-level = 'z'` optimizes for size, which results in a reduced "Time To First Byte", in some cases by several seconds, which is usually beneficial, but it may not always be the best choice for performance. [See more info](https://docs.rust-embedded.org/book/unsorted/speed-vs-size.html). We do, however, recommend it. The `strip = "debuginfo"` will remove useful information from stack traces, but the faster load time still make it a good choice when iterating in development.
 {% endhint %}
 
 ### Create protobufs
@@ -118,7 +118,7 @@ Copy and paste the content for the example protobuf definition into a new file n
 ```
 syntax = "proto3";
 
-package sf.ethereum.block_meta.v1;
+package acme.block_meta.v1;
 
 message BlockMeta {
   string hash = 1;
@@ -128,25 +128,15 @@ message BlockMeta {
 }
 ```
 
-Use the `substreams protogen` command to generate the Rust code to communicate with the protobuf.
+Use the `substreams protogen` command to generate the Rust code to communicate with the protobuf:
 
 ```bash
-substreams protogen substreams.yaml"
+substreams protogen substreams.yaml --exclude-paths="sf/substreams,google"
 ```
 
-{% hint style="note" %}
-**Note**: You might have noticed that the `substreams protogen substreams.yaml` generate some files that are not referenced, add flag `--exclude-paths="sf/substreams,google` to avoid generating those files which are already provided implicitly for you..
+{% hint style="info" %}
+**Note**: The flag `--exclude-paths="sf/substreams,google"` avoids generating files which are already provided implicitly.
 {% endhint %}
-
-The protobufs generate model must be referenced by a Rust module, to do so, create a file named `mod.rs` within the `src/pb` directory with the following content:
-
-{% code overflow="wrap" %}
-```rust
-#[path = "sf.ethereum.block_meta.v1.rs"]
-#[allow(dead_code)]
-pub mod block_meta;
-```
-{% endcode %}
 
 ### Create Substreams module handlers
 
@@ -158,7 +148,7 @@ To include this example module handler in your module, copy it into a new Rust s
 ```rust
 mod pb;
 
-use pb::block_meta::BlockMeta;
+use pb::acme::block_meta::v1::BlockMeta;
 use substreams::Hex;
 use substreams_ethereum::pb::eth;
 
@@ -183,12 +173,12 @@ cargo build --release --target wasm32-unknown-unknown
 ```
 
 {% hint style="info" %}
-**Note**: If you have a lots of weird compilation errors like `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, see [Rust installation]( ../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) for instructions how to install it.
+**Note**: If you have a lots of weird compilation errors like `cannot find function, tuple struct or tuple variant `Ok` in this scope`, `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, etc. you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, install it with `rustup target add wasm32-unknown-unknown`, see [Rust installation](../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) extra details.
 {% endhint %}
 
 ### Execute
 
-To execute, or run, the example use the `substreams` [`run`](../reference-and-specs/command-line-interface.md#run) command:
+To execute, or run, the example use the [`substreams run`](../reference-and-specs/command-line-interface.md#run) command:
 
 {% code overflow="wrap" %}
 ```bash
@@ -202,7 +192,7 @@ You have successfully created your first Substreams module that extracts data fr
 
 ## Next steps
 
-- [Modules basics](../concepts-and-fundamentals/modules.md)
-- [Substreams fundamentals](../concepts-and-fundamentals/fundamentals.md)
-- [Protobuf schemas](../developers-guide/creating-protobuf-schemas.md)
-- [Substreams Template](https://github.com/streamingfast/substreams-template)
+* [Modules basics](../concepts-and-fundamentals/modules.md)
+* [Substreams fundamentals](../concepts-and-fundamentals/fundamentals.md)
+* [Protobuf schemas](../developers-guide/creating-protobuf-schemas.md)
+* [Substreams Template](https://github.com/streamingfast/substreams-template)

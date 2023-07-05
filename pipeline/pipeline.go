@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -50,7 +51,7 @@ type Pipeline struct {
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 
-	respFunc         func(substreams.ResponseFromAnyTier) error
+	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
 
 	stores         *Stores
@@ -82,7 +83,7 @@ func New(
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
-	respFunc func(substreams.ResponseFromAnyTier) error,
+	respFunc substreams.ResponseFunc,
 	traceID string,
 	opts ...Option,
 ) *Pipeline {
@@ -237,7 +238,7 @@ func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
 
 // runParallelProcess
 func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(p.ctx, "substreams/pipeline/tier1/parallel_process")
+	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier1/parallel_process")
 	defer span.EndWithErr(&err)
 
 	reqDetails := reqctx.Details(ctx)
@@ -249,7 +250,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	}
 
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
-		p.ctx,
+		ctx,
 		reqPlan,
 		p.runtimeConfig,
 		p.outputGraph,
@@ -264,12 +265,12 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 
 	logger.Info("starting parallel processing")
 
-	reqStats.StartParallelProcessing()
-	storeMap, err = parallelProcessor.Run(ctx)
+	t0 := time.Now()
+	storeMap, err = parallelProcessor.Run(dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}
-	reqStats.EndParallelProcessing()
+	reqStats.RecordParallelDuration(time.Since(t0))
 
 	p.processingModule = nil
 
@@ -522,7 +523,7 @@ func returnModuleDataOutputs(
 	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
 	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
-	respFunc func(substreams.ResponseFromAnyTier) error,
+	respFunc substreams.ResponseFunc,
 ) error {
 	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:             clock,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/streamingfast/substreams/storage/execout"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
@@ -17,7 +18,6 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
 
-	reqStats := reqctx.ReqStats(ctx)
 	var err error
 
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "module_execution")
@@ -35,7 +35,6 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	span.SetAttributes(attribute.Bool("substreams.module.cached", cached))
 
 	if cached {
-		reqStats.RecordOutputCacheHit()
 		if err = executor.applyCachedOutput(outputBytes); err != nil {
 			return nil, nil, fmt.Errorf("apply cached output: %w", err)
 		}
@@ -49,12 +48,13 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		moduleOutput.Cached = true
 		return moduleOutput, outputBytes, nil
 	}
-	reqStats.RecordOutputCacheMiss()
 
+	t0 := time.Now()
 	outputBytes, moduleOutput, err := executor.run(ctx, execOutput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("execute: %w", err)
 	}
+	reqctx.ReqStats(ctx).RecordModuleExecDuration(time.Since(t0))
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 

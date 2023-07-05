@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/metadata"
 	"io"
 	"strconv"
 	"strings"
@@ -30,8 +31,9 @@ func init() {
 	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
+	runCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
-	runCmd.Flags().StringSliceP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+	runCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
 	rootCmd.AddCommand(runCmd)
@@ -74,7 +76,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	if err := manifest.ApplyParams(mustGetStringSlice(cmd, "params"), pkg); err != nil {
+	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
 		return err
 	}
 
@@ -171,6 +173,17 @@ func runRun(cmd *cobra.Command, args []string) error {
 		cancel()
 	})
 	defer cancel()
+
+	//parse additional-headers flag
+	additionalHeaders := mustGetStringSlice(cmd, "header")
+	if additionalHeaders != nil {
+		res := parseHeaders(additionalHeaders)
+		headerArray := make([]string, 0, len(res)*2)
+		for k, v := range res {
+			headerArray = append(headerArray, k, v)
+		}
+		streamCtx = metadata.AppendToOutgoingContext(streamCtx, headerArray...)
+	}
 
 	ui.SetRequest(req)
 	ui.Connecting()

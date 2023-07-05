@@ -26,21 +26,25 @@ var protogenCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(protogenCmd)
-	protogenCmd.Flags().StringP("output-path", "o", "src/pb", cli.FlagDescription(`
+
+	flags := protogenCmd.Flags()
+	flags.StringP("output-path", "o", "src/pb", cli.FlagDescription(`
 		Directory to output generated .rs files, if the received <package> argument is a local Substreams manifest file
 		(e.g. a local file ending with .yaml), the output path will be made relative to it
 	`))
-	protogenCmd.Flags().StringArrayP("exclude-paths", "x", []string{}, "Exclude specific files or directories, for example \"proto/a/a.proto\" or \"proto/a\"")
-	protogenCmd.Flags().Bool("generate-mod-rs", true, cli.FlagDescription(`
+	flags.StringArrayP("exclude-paths", "x", []string{}, "Exclude specific files or directories, for example \"proto/a/a.proto\" or \"proto/a\"")
+	flags.Bool("generate-mod-rs", true, cli.FlagDescription(`
 		Generate the protobuf 'mod.rs' file alongside the rust bindings. Include '--generate-mod-rs=false' If you wish to disable this generation.
 		If there is a present 'buf.gen.yaml', consult https://github.com/neoeinstein/protoc-gen-prost/blob/main/protoc-gen-prost-crate/README.md to add 'mod.rs' generation functionality.
 	`))
+	flags.Bool("show-generated-buf-gen", false, "Whether to show the generated buf.gen.yaml file or not")
 }
 
 func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := mustGetString(cmd, "output-path")
 	excludePaths := mustGetStringArray(cmd, "exclude-paths")
 	generateMod := mustGetBool(cmd, "generate-mod-rs")
+	showGeneratedBufGen := mustGetBool(cmd, "show-generated-buf-gen")
 
 	manifestPath := ""
 	if len(args) == 1 {
@@ -64,14 +68,10 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
 
-	// write the manifest to temp location
-	// write buf.gen.yaml with custom stuff
-	// run `buf generate`
-	// remove if we wrote buf.gen.yaml (--keep-buf-gen-yaml)
 	if _, err = manifest.NewModuleGraph(pkg.Modules.Modules); err != nil {
 		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)
-	return generator.GenerateProto(pkg)
+	return generator.GenerateProto(pkg, showGeneratedBufGen)
 }

@@ -133,7 +133,7 @@ func (g *Generator) Generate() (err error) {
 	}
 
 	protoGenerator := NewProtoGenerator(pbFolder, nil, false)
-	err = protoGenerator.GenerateProto(g.pkg)
+	err = protoGenerator.GenerateProto(g.pkg, false)
 	if err != nil {
 		return fmt.Errorf("generating protobuf code: %w", err)
 	}

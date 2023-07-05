@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
@@ -35,6 +36,7 @@ type Stream struct {
 	callOpts       []grpc.CallOption
 	targetEndBlock uint64
 
+	headers       map[string]string
 	ctx           context.Context
 	cancelContext func()
 	conn          pbsubstreamsrpc.Stream_BlocksClient
@@ -42,12 +44,13 @@ type Stream struct {
 	err error
 }
 
-func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, callOpts []grpc.CallOption) *Stream {
+func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, headers map[string]string, callOpts []grpc.CallOption) *Stream {
 	return &Stream{
 		req:            req,
 		targetEndBlock: req.StopBlockNum,
 		client:         client,
 		callOpts:       callOpts,
+		headers:        headers,
 	}
 }
 
@@ -116,6 +119,12 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 
 func (s *Stream) StartStream() tea.Msg {
 	streamCtx, cancel := context.WithCancel(context.Background())
+	headerArray := make([]string, 0, len(s.headers)*2)
+	for k, v := range s.headers {
+		headerArray = append(headerArray, k, v)
+	}
+	streamCtx = metadata.AppendToOutgoingContext(streamCtx, headerArray...)
+
 	s.ctx = streamCtx
 	s.cancelContext = cancel
 

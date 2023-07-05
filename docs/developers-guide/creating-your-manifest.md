@@ -19,7 +19,7 @@ Every Substreams module contains one manifest. The manifest is a YAML-based file
 The manifest from the [Substreams Template example](https://github.com/streamingfast/substreams-template) is used in the Substreams documentation.
 
 {% hint style="info" %}
-**Note**: Learn more about Substreams manifests and different blockchains through the [list of maintained Substreams examples](reference-and-specs/examples.md) provided by StreamingFast
+**Note**: Learn more about Substreams manifests and different blockchains through the [list of maintained Substreams examples](../reference-and-specs/examples.md) provided by StreamingFast
 
 * The [example manifest](https://github.com/streamingfast/substreams-template/blob/develop/substreams.yaml) in the Substreams documentation is specific to the Ethereum blockchain.
 {% endhint %}
@@ -28,11 +28,8 @@ The manifest from the [Substreams Template example](https://github.com/streaming
 ```yaml
 specVersion: v0.1.0
 package:
-  name: 'substreams_example'
+  name: "substreams_template"
   version: v0.1.0
-
-imports:
-  eth: https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg
 
 protobuf:
   files:
@@ -43,7 +40,7 @@ protobuf:
 binaries:
   default:
     type: wasm/rust-v1
-    file: ./target/wasm32-unknown-unknown/release/substreams_example.wasm
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
 
 modules:
   - name: map_transfers
@@ -70,14 +67,6 @@ View the [`substreams.yaml`](https://github.com/streamingfast/substreams-templat
 
 {% hint style="success" %}
 **Tip**: When writing and checking your `substreams.yaml` file, it may help to check your manifest against our [JSON schema](https://json-schema.org/) to ensure there are no problems. JSON schemas can be used in [Jetbrains](https://www.jetbrains.com/help/idea/json.html#ws_json_schema_add_custom) and [VSCode](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml). Our manifest schema can be seen [here](../../schemas/manifest-schema.json).
-{% endhint %}
-
-### `imports.eth`
-
-Substreams consumes blocks and depends on a Substreams [package](../reference-and-specs/packages.md) matching the target blockchain. The package is referenced by `imports.`
-
-{% hint style="info" %}
-**Note**: The Substreams Template references a package specific to the Ethereum blockchain, referenced in the manifest as `ethereum-v0.10.4.spkg`. The Solana SPL Token Transfers manifest references `solana-v0.1.0.spkg`.
 {% endhint %}
 
 ### `protobuf.files`

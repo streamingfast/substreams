@@ -80,6 +80,14 @@ func mustGetStringSlice(cmd *cobra.Command, flagName string) []string {
 	return val
 }
 
+func mustGetStringArray(cmd *cobra.Command, flagName string) []string {
+	val, err := cmd.Flags().GetStringArray(flagName)
+	if err != nil {
+		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
+	}
+	return val
+}
+
 func ReadAPIToken(cmd *cobra.Command, envFlagName string) string {
 	envVar := mustGetString(cmd, envFlagName)
 	value := os.Getenv(envVar)

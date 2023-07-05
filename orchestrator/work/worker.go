@@ -14,7 +14,6 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/streamingfast/substreams/block"
@@ -155,8 +154,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
 
-	ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{"substreams-partial-mode": "true"}))
-
 	w.logger.Info("launching remote worker",
 		zap.Int64("start_block_num", int64(request.StartBlockNum)),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
@@ -198,13 +195,15 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
 	for {
-		select {
-		case <-ctx.Done():
-			return &Result{Error: ctx.Err()}
-		default:
+		resp, err := stream.Recv()
+
+		if err := ctx.Err(); err != nil {
+			if err == context.Canceled {
+				return &Result{}
+			}
+			return &Result{Error: err}
 		}
 
-		resp, err := stream.Recv()
 		if resp != nil {
 			switch r := resp.Type.(type) {
 			case *pbssinternal.ProcessRangeResponse_ProcessedRange:
@@ -220,11 +219,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				}
 
 			case *pbssinternal.ProcessRangeResponse_ProcessedBytes:
-				// commented out while these message are causing issues
-				//bm := tracking.GetBytesMeter(ctx)
-				//bm.AddBytesWritten(int(r.ProcessedBytes.BytesWrittenDelta))
-				//bm.AddBytesRead(int(r.ProcessedBytes.BytesReadDelta))
-				//upstream.RPCProcessedBytes(resp.ModuleName, bm.BytesReadDelta(), bm.BytesWrittenDelta(), bm.BytesRead(), bm.BytesWritten(), 0))
+				/// ignore
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow

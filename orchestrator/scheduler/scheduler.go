@@ -80,15 +80,15 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case work.MsgScheduleNextJob:
+		if !s.WorkerPool.WorkerAvailable() {
+			return nil
+		}
 
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil {
 			return nil
 		}
 
-		if !s.WorkerPool.WorkerAvailable() {
-			return nil
-		}
 		worker := s.WorkerPool.Borrow()
 
 		s.logger.Info("scheduling work", zap.Object("unit", workUnit))

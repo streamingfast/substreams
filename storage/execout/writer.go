@@ -21,14 +21,12 @@ type Writer struct {
 
 	fileWalker   *FileWalker
 	currentFile  *File
-	files        map[string]*File // moduleName => file
 	outputModule string
 }
 
 func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs) *Writer {
 	w := &Writer{
 		wg:           &sync.WaitGroup{},
-		files:        make(map[string]*File),
 		outputModule: outputModule,
 	}
 

@@ -25,5 +25,5 @@ var testConfigs = &Configs{
 func TestNewExecOutputWriterIsSubRequest(t *testing.T) {
 	res := NewWriter(11, 15, "A", testConfigs)
 	require.NotNil(t, res)
-	assert.Equal(t, 15, int(res.files["A"].ExclusiveEndBlock))
+	assert.Equal(t, 15, int(res.fileWalker.segmenter.ExclusiveEndBlock()))
 }

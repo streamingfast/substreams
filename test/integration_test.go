@@ -429,6 +429,25 @@ func Test_SimpleMapModule(t *testing.T) {
 	require.NoError(t, run.Run(t, "test_map"))
 }
 
+func Test_SingleMapModule_FileWalker(t *testing.T) {
+	run := newTestRun(t, 200, 250, 300, "test_map")
+	run.Params = map[string]string{"test_map": "my test params"}
+	run.ProductionMode = true
+	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock + 10,
+		}
+	}
+	run.ParallelSubrequests = 5
+	run.Context = cancelledContext(100 * time.Millisecond)
+
+	// TODO: make sure we're exercising the FileWalker and going through the Scheduler with _no Stores_ to process.
+	// make sure we have those NoOp fields on the stores we don't need to process.
+
+	require.NoError(t, run.Run(t, "test_map"))
+}
+
 func cancelledContext(delay time.Duration) context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {

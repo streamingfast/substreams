@@ -47,9 +47,7 @@ func TestSegmenter_Count(t *testing.T) {
 }
 
 func TestSegmenter_IndexForStartBlock(t *testing.T) {
-	s := Segmenter{
-		interval: 10,
-	}
+	s := Segmenter{interval: 10}
 	assert.Equal(t, 0, s.IndexForStartBlock(5))
 	assert.Equal(t, 0, s.IndexForStartBlock(9))
 	assert.Equal(t, 1, s.IndexForStartBlock(10))
@@ -124,8 +122,16 @@ func TestSegmenter_Range(t *testing.T) {
 	assert.Equal(t, 0, s.FirstIndex())
 	assert.Equal(t, 9, s.LastIndex())
 	assert.Equal(t, ParseRange("90-99"), s.Range(9))
+	assert.False(t, s.EndsOnInterval(9))
 
 	s = NewSegmenter(10, 1, 15)
 	assert.Equal(t, NewRange(10, 15), s.Range(1))
+
+	s = NewSegmenter(10, 1, 20)
+	assert.Equal(t, 2, s.Count())
+	assert.Equal(t, 0, s.FirstIndex())
+	assert.Equal(t, 1, s.LastIndex())
+	assert.Equal(t, ParseRange("10-20"), s.Range(1))
+	assert.True(t, s.EndsOnInterval(1))
 
 }

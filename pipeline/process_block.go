@@ -263,14 +263,14 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
-	// TODO(abourget): get the module executors lazily from the OutputModulesGraph
-	//  this way we skip the buildWASM() in `Init()`.
-	//  Would pave the way towards PATCH'd modules too.
-
 	p.mapModuleOutput = nil
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
-	for _, stage := range p.moduleExecutors {
+	moduleExecutors, err := p.buildModuleExecutors(ctx)
+	if err != nil {
+		return fmt.Errorf("building wasm module tree: %w", err)
+	}
+	for _, stage := range moduleExecutors {
 		//t0 := time.Now()
 
 		if len(stage) < 2 {

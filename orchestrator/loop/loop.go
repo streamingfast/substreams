@@ -25,7 +25,8 @@ func (l *EventLoop) Run(ctx context.Context, initCmd Cmd) (err error) {
 		cmds <- initCmd
 	}
 	// main execution loop
-	done := l.handleCommands(cmds)
+	done := make(chan struct{})
+	go l.handleCommands(done, cmds)
 loop:
 	for {
 		select {
@@ -48,7 +49,7 @@ loop:
 			}()
 		}
 	}
-	<-done
+	close(done)
 	return
 }
 
@@ -79,29 +80,21 @@ func (l *EventLoop) update(msg Msg, cmds chan Cmd) (out Cmd) {
 	return l.updateFunc(msg)
 }
 
-func (l *EventLoop) handleCommands(cmds chan Cmd) chan struct{} {
-	ch := make(chan struct{})
+func (l *EventLoop) handleCommands(done chan struct{}, cmds chan Cmd) {
+	for {
+		select {
+		case <-done:
+			return
 
-	go func() {
-		defer close(ch)
-
-		for {
-			select {
-			case <-l.ctx.Done():
-				return
-
-			case cmd := <-cmds:
-				if cmd == nil {
-					continue
-				}
-
-				go func() {
-					msg := cmd() // this can be long.
-					l.Send(msg)
-				}()
+		case cmd := <-cmds:
+			if cmd == nil {
+				continue
 			}
-		}
-	}()
 
-	return ch
+			go func() {
+				msg := cmd() // this can be long.
+				l.Send(msg)
+			}()
+		}
+	}
 }

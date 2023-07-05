@@ -8,77 +8,104 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 )
 
 func TestNewStages(t *testing.T) {
-	seg := block.NewSegmenter(10, 5, 75)
+	//seg := block.NewSegmenter(10, 5, 75)
+	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75)
+
 	stages := NewStages(
 		context.Background(),
 		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
-		seg,
+		reqPlan,
 		nil,
 		"trace",
 	)
 
-	assert.Equal(t, 8, stages.segmenter.Count()) // from 5 to 75
-	assert.Equal(t, false, stages.segmenter.EndsOnInterval(7))
-	assert.Equal(t, 6, stages.segmenter.IndexForStartBlock(60), "index in range")
-	assert.Equal(t, 8, stages.segmenter.IndexForStartBlock(80), "index out of range still returned here")
-	assert.Nil(t, stages.segmenter.Range(8), "out of range")
+	assert.Equal(t, 8, stages.storeSegmenter.Count()) // from 5 to 75
+	assert.Equal(t, false, stages.storeSegmenter.EndsOnInterval(7))
+	assert.Equal(t, 6, stages.storeSegmenter.IndexForStartBlock(60), "index in range")
+	assert.Equal(t, 8, stages.storeSegmenter.IndexForStartBlock(80), "index out of range still returned here")
+	assert.Nil(t, stages.storeSegmenter.Range(8), "out of range")
 
-	assert.Equal(t, block.ParseRange("5-10"), stages.segmenter.Range(0))
-	assert.Equal(t, block.ParseRange("10-20"), stages.segmenter.Range(1))
-	assert.Equal(t, block.ParseRange("70-75"), stages.segmenter.Range(7))
+	assert.Equal(t, block.ParseRange("5-10"), stages.storeSegmenter.Range(0))
+	assert.Equal(t, block.ParseRange("10-20"), stages.storeSegmenter.Range(1))
+	assert.Equal(t, block.ParseRange("70-75"), stages.storeSegmenter.Range(7))
+}
+
+func TestNewStagesMapNotAlignedWithStoreEndBlock(t *testing.T) {
+	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75)
+	assert.Equal(t, "", reqPlan.String())
+
+	stages := NewStages(
+		context.Background(),
+		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
+		reqPlan,
+		nil,
+		"trace",
+	)
+
+	assert.Equal(t, 8, stages.storeSegmenter.Count()) // from 5 to 75
+	assert.Equal(t, false, stages.storeSegmenter.EndsOnInterval(7))
+	assert.Equal(t, 6, stages.storeSegmenter.IndexForStartBlock(60), "index in range")
+	assert.Equal(t, 8, stages.storeSegmenter.IndexForStartBlock(80), "index out of range still returned here")
+	assert.Nil(t, stages.storeSegmenter.Range(8), "out of range")
+
+	assert.Equal(t, block.ParseRange("5-10"), stages.storeSegmenter.Range(0))
+	assert.Equal(t, block.ParseRange("10-20"), stages.storeSegmenter.Range(1))
+	assert.Equal(t, block.ParseRange("70-75"), stages.storeSegmenter.Range(7))
 }
 
 func TestNewStagesNextJobs(t *testing.T) {
-	seg := block.NewSegmenter(10, 5, 50)
+	//seg := block.NewSegmenter(10, 5, 50)
+	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 50, 50)
 	stages := NewStages(
 		context.Background(),
 		outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5),
-		seg,
+		reqPlan,
 		nil,
 		"trace",
 	)
 
+	stages.allocSegments(0)
+	stages.setState(Unit{Stage: 2, Segment: 0}, UnitNoOp)
+
+	segmentStateEquals(t, stages, `
+S:..
+S:..
+M:N.`)
+
 	j1, _ := stages.NextJob()
-	assert.Equal(t, 2, j1.Stage)
+	assert.Equal(t, 1, j1.Stage)
 	assert.Equal(t, 0, j1.Segment)
 
 	segmentStateEquals(t, stages, `
 S:..
-S:..
-M:S.`)
-
-	stages.forceTransition(0, 2, UnitCompleted)
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:..
 S:S.
-M:C.`)
+M:N.`)
 
 	stages.forceTransition(0, 1, UnitCompleted)
 
 	segmentStateEquals(t, stages, `
 S:..
 S:C.
-M:C.`)
+M:N.`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:S.
 S:C.
-M:C.`)
+M:N.`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:SS
 S:C.
-M:C.`)
+M:N.`)
 
 	stages.forceTransition(0, 0, UnitCompleted)
 	stages.NextJob()
@@ -86,7 +113,7 @@ M:C.`)
 	segmentStateEquals(t, stages, `
 S:CS
 S:C.
-M:CS`)
+M:NS`)
 
 	stages.forceTransition(1, 0, UnitCompleted)
 	stages.NextJob()
@@ -94,28 +121,28 @@ M:CS`)
 	segmentStateEquals(t, stages, `
 S:CC
 S:CS
-M:CS`)
+M:NS`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:CC..
 S:CSS.
-M:CS..`)
+M:NS..`)
 
 	stages.MarkSegmentPartialPresent(id(1, 2))
 
 	segmentStateEquals(t, stages, `
 S:CC..
 S:CSS.
-M:CP..`)
+M:NP..`)
 
 	stages.MarkSegmentMerging(id(1, 2))
 
 	segmentStateEquals(t, stages, `
 S:CC..
 S:CSS.
-M:CM..`)
+M:NM..`)
 
 	stages.markSegmentCompleted(id(1, 2))
 	stages.NextJob()
@@ -123,28 +150,28 @@ M:CM..`)
 	segmentStateEquals(t, stages, `
 S:CCS.
 S:CSS.
-M:CC..`)
+M:NC..`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:CCSS
 S:CSS.
-M:CC..`)
+M:NC..`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:CCSSS...
 S:CSS.....
-M:CC......`)
+M:NC......`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:CCSSSS..
 S:CSS.....
-M:CC......`)
+M:NC......`)
 
 	_, r := stages.NextJob()
 	assert.Nil(t, r)
@@ -153,7 +180,7 @@ M:CC......`)
 	segmentStateEquals(t, stages, `
 S:CCPSSS..
 S:CSS.....
-M:CC......`)
+M:NC......`)
 
 	_, r = stages.NextJob()
 	assert.Nil(t, r)
@@ -162,7 +189,7 @@ M:CC......`)
 	segmentStateEquals(t, stages, `
 S:CCMSSS..
 S:CSS.....
-M:CC......`)
+M:NC......`)
 
 	_, r = stages.NextJob()
 	assert.Nil(t, r)
@@ -171,14 +198,14 @@ M:CC......`)
 	segmentStateEquals(t, stages, `
 S:CCCSSS..
 S:CSS.....
-M:CC......`)
+M:NC......`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
 S:CCCSSS..
 S:CSSS....
-M:CC......`)
+M:NC......`)
 
 	stages.forceTransition(1, 1, UnitCompleted)
 	stages.NextJob()
@@ -186,7 +213,7 @@ M:CC......`)
 	segmentStateEquals(t, stages, `
 S:CCCSSS..
 S:CCSS....
-M:CCS.....`)
+M:NCS.....`)
 
 }
 
@@ -204,8 +231,8 @@ func segmentStateEquals(t *testing.T, s *Stages, segments string) {
 
 func TestStages_previousUnitComplete(t *testing.T) {
 	s := Stages{
-		segmenter:     block.NewSegmenter(10, 100, 200),
-		segmentOffset: 10,
+		storeSegmenter: block.NewSegmenter(10, 100, 200),
+		segmentOffset:  10,
 		segmentStates: []stageStates{
 			{UnitPending, UnitPending},
 			{UnitPending, UnitPending},

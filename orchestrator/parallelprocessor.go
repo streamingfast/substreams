@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
-	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -20,6 +19,7 @@ import (
 
 type ParallelProcessor struct {
 	scheduler *scheduler.Scheduler
+	reqPlan   *plan.RequestPlan
 }
 
 // BuildParallelProcessor is only called on tier1
@@ -37,14 +37,12 @@ func BuildParallelProcessor(
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream)
 
-	storesSegmenter := reqPlan.StoresSegmenter()
-
-	stages := stage.NewStages(ctx, outputGraph, storesSegmenter, storeConfigs, traceID)
+	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs, traceID)
 	sched.Stages = stages
 
 	err := stages.FetchStoresState(
 		ctx,
-		storesSegmenter,
+		reqPlan.StoresSegmenter(),
 		storeConfigs,
 	)
 	if err != nil {
@@ -92,7 +90,7 @@ func BuildParallelProcessor(
 			ctx,
 			requestedModule,
 			walker,
-			reqPlan.WriteExecOut,
+			reqPlan.ReadExecOut,
 			stream,
 		)
 	}
@@ -120,6 +118,7 @@ func BuildParallelProcessor(
 
 	return &ParallelProcessor{
 		scheduler: sched,
+		reqPlan:   reqPlan,
 	}, nil
 }
 
@@ -132,5 +131,9 @@ func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err er
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	return b.scheduler.FinalStoreMap(reqctx.Details(ctx).LinearHandoffBlockNum)
+	if b.reqPlan.LinearPipeline != nil {
+		return b.scheduler.FinalStoreMap(b.reqPlan.LinearPipeline.StartBlock)
+	}
+
+	return nil, nil
 }

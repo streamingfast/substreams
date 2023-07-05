@@ -40,9 +40,7 @@ func (s *Segmenter) WithExclusiveEndBlock(newExclusiveEndBlock uint64) *Segmente
 // Count returns the number of valid segments for the internal range.
 // Use LastIndex to know about the highest index.
 func (s *Segmenter) Count() int {
-	initSegment := s.initialBlock / s.interval
-	lastSegment := s.exclusiveEndBlock / s.interval
-	return int(lastSegment - initSegment + 1)
+	return int(s.LastIndex() - s.FirstIndex() + 1)
 }
 
 func (s *Segmenter) FirstIndex() int {
@@ -51,7 +49,7 @@ func (s *Segmenter) FirstIndex() int {
 }
 
 func (s *Segmenter) LastIndex() int {
-	lastSegment := s.exclusiveEndBlock / s.interval
+	lastSegment := (s.exclusiveEndBlock - 1) / s.interval
 	return int(lastSegment)
 }
 

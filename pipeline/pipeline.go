@@ -102,7 +102,6 @@ func New(
 	for _, opt := range opts {
 		opt(pipe)
 	}
-	pipe.init(ctx)
 	return pipe
 }
 
@@ -132,7 +131,9 @@ func (p *Pipeline) init(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
-	logger := reqctx.Logger(ctx)
+	if err := p.init(ctx); err != nil {
+		return err
+	}
 
 	storeMap, err := p.setupSubrequestStores(ctx)
 	if err != nil {
@@ -141,16 +142,17 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 
 	p.stores.SetStoreMap(storeMap)
 
+	logger := reqctx.Logger(ctx)
 	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
-
-	if err := p.buildWASM(ctx); err != nil {
-		return fmt.Errorf("building tier2 wasm module tree: %w", err)
-	}
 
 	return nil
 }
 
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
+	if err := p.init(ctx); err != nil {
+		return err
+	}
+
 	var storeMap store.Map
 	if reqPlan.BuildStores != nil {
 		if storeMap, err = p.runParallelProcess(ctx, reqPlan); err != nil {
@@ -161,9 +163,6 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 	}
 	p.stores.SetStoreMap(storeMap)
 
-	if err := p.buildWASM(ctx); err != nil {
-		return fmt.Errorf("building tier1 wasm module tree: %w", err)
-	}
 	return nil
 }
 
@@ -245,8 +244,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
-	// TODO(abourget): send `pendingUndoMessage` straight up here
-	if reqDetails.ShouldStreamCachedOutputs() {
+	if reqDetails.ShouldStreamCachedOutputs() && p.pendingUndoMessage != nil {
 		p.respFunc(p.pendingUndoMessage)
 	}
 
@@ -299,6 +297,7 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 	return nil
 }
 
+// TODO: move this to `responses`
 func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.StoreModuleOutput) {
 	deltas := in.GetStoreDeltas()
 	if deltas == nil {
@@ -409,16 +408,13 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-// TODO(abourget): have this being generated and the `buildWASM` by taking
-// this Graph as input, and creating the ModuleExecutors, and caching
-// them over there.
-// moduleExecutorsInitialized bool
-// moduleExecutors            []exec.ModuleExecutor
-func (p *Pipeline) buildWASM(ctx context.Context) error {
-
-	// TODO(abourget): Build the Module Executor list: this could be done lazily, but the outputmodules.Graph,
-	//  and cache the latest if all block boundaries
-	//  are still clear.
+// buildModuleExecutors builds the moduleExecutors, and the loadedModules.
+func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExecutor, error) {
+	if p.moduleExecutors != nil {
+		// Eventually, we can invalidate our catch to accomodate the PATCH
+		// and rebuild all the modules, and tear down the previously loaded ones.
+		return p.moduleExecutors, nil
+	}
 
 	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
@@ -433,7 +429,7 @@ func (p *Pipeline) buildWASM(ctx context.Context) error {
 				code := reqModules.Binaries[module.BinaryIndex]
 				m, err := p.wasmRuntime.NewModule(ctx, code.Content)
 				if err != nil {
-					return fmt.Errorf("new wasm module: %w", err)
+					return nil, fmt.Errorf("new wasm module: %w", err)
 				}
 				loadedModules[module.BinaryIndex] = m
 			}
@@ -449,7 +445,7 @@ func (p *Pipeline) buildWASM(ctx context.Context) error {
 			for _, module := range layer {
 				inputs, err := p.renderWasmInputs(module)
 				if err != nil {
-					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
+					return nil, fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
 
 				entrypoint := module.BinaryEntrypoint
@@ -476,7 +472,7 @@ func (p *Pipeline) buildWASM(ctx context.Context) error {
 
 					outputStore, found := p.stores.StoreMap.Get(module.Name)
 					if !found {
-						return fmt.Errorf("store %q not found", module.Name)
+						return nil, fmt.Errorf("store %q not found", module.Name)
 					}
 					inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
 
@@ -501,6 +497,22 @@ func (p *Pipeline) buildWASM(ctx context.Context) error {
 	}
 
 	p.moduleExecutors = stagedModuleExecutors
+	return stagedModuleExecutors, nil
+}
+
+func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
+	for _, stage := range p.moduleExecutors {
+		for _, executor := range stage {
+			if err := executor.Close(ctx); err != nil {
+				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
+			}
+		}
+	}
+	for idx, mod := range p.loadedModules {
+		if err := mod.Close(ctx); err != nil {
+			return fmt.Errorf("closing wasm module %d: %w", idx, err)
+		}
+	}
 	return nil
 }
 

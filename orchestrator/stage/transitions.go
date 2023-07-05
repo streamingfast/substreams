@@ -79,6 +79,8 @@ stateDiagram-v2
 
     Completed --> [*]
 
+    [*] --> NoOp: no processing needed
+    NoOp --> [*]
 */
 
 // TODO: UnitCompleted might mean two things: the fact a FullKV is on disk,

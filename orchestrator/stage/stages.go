@@ -9,6 +9,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
@@ -34,7 +35,9 @@ type Stages struct {
 	logger  *zap.Logger
 	traceID string
 
-	segmenter *block.Segmenter
+	globalSegmenter *block.Segmenter // This segmenter covers both the stores and the mapper
+	storeSegmenter  *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
+	mapSegmenter    *block.Segmenter // This segmenter covers only what is needed to produce the mapper output for the FileWalker.
 
 	stages []*Stage
 
@@ -51,7 +54,7 @@ type stageStates []UnitState
 func NewStages(
 	ctx context.Context,
 	outputGraph *outputmodules.Graph,
-	segmenter *block.Segmenter,
+	reqPlan *plan.RequestPlan,
 	storeConfigs store.ConfigMap,
 	traceID string,
 ) (out *Stages) {
@@ -59,39 +62,66 @@ func NewStages(
 
 	stagedModules := outputGraph.StagedUsedModules()
 	out = &Stages{
-		ctx:           ctx,
-		traceID:       traceID,
-		segmenter:     segmenter,
-		segmentOffset: segmenter.IndexForStartBlock(outputGraph.LowestInitBlock()),
-		logger:        reqctx.Logger(ctx),
+		ctx:             ctx,
+		traceID:         traceID,
+		logger:          reqctx.Logger(ctx),
+		globalSegmenter: reqPlan.BackprocessSegmenter(),
+	}
+	if reqPlan.BuildStores != nil {
+		out.storeSegmenter = reqPlan.StoresSegmenter()
+	}
+	if reqPlan.WriteExecOut != nil {
+		out.mapSegmenter = reqPlan.WriteOutSegmenter()
 	}
 	for idx, stageLayer := range stagedModules {
 		mods := stageLayer.LastLayer()
+		kind := layerKind(mods)
 
-		kind := KindMap
-		if mods.IsStoreLayer() {
-			kind = KindStore
+		if kind == KindMap && reqPlan.WriteExecOut == nil {
+			continue
+		}
+		if kind == KindStore && reqPlan.BuildStores == nil {
+			continue
+		}
+
+		// TODO: what will happen if we have only a single _mapper_  module, and
+		// no stores? will the BuildStores requestPlan field be defined?
+		// Right now it is, but what if we had it distinct, and clearly distinct everywhere?
+
+		segmenter := reqPlan.StoresSegmenter()
+		if kind == KindMap {
+			segmenter = reqPlan.WriteOutSegmenter()
 		}
 
 		var moduleStates []*ModuleState
-		lowestStageInitBlock := mods[0].InitialBlock
+		stageLowestInitBlock := mods[0].InitialBlock
 		for _, mod := range mods {
 			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
 
-			lowestStageInitBlock = utils.MinOf(lowestStageInitBlock, mod.InitialBlock)
+			stageLowestInitBlock = utils.MinOf(stageLowestInitBlock, mod.InitialBlock)
 		}
 
-		stageSegmenter := segmenter.WithInitialBlock(lowestStageInitBlock)
+		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)
 		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
 		out.stages = append(out.stages, stage)
 	}
+
+	out.initSegmentsOffset(reqPlan)
+
 	return out
 }
 
-func (s *Stages) AllStagesFinished() bool {
-	lastSegment := s.segmenter.LastIndex()
+func layerKind(layer outputmodules.LayerModules) Kind {
+	if layer.IsStoreLayer() {
+		return KindStore
+	}
+	return KindMap
+}
+
+func (s *Stages) AllStoresCompleted() bool {
+	lastSegment := s.storeSegmenter.LastIndex()
 	lastSegmentIndex := lastSegment - s.segmentOffset
 	if lastSegmentIndex >= len(s.segmentStates) {
 		return false
@@ -141,17 +171,17 @@ func (s *Stages) CmdStartMerge() loop.Cmd {
 }
 
 func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
-	if s.AllStagesFinished() {
+	if s.AllStoresCompleted() {
 		// FIXME: this CmdTryMerge function is called once for each stage,
 		// so we could receive multiple such calls, and thus
-		// issue multiple MsgMergeStoresCompleted. But this signal
+		// issue multiple MsgAllStoresCompleted. But this signal
 		// should be unique, once and for all (it is an indicator that the
 		// full job of the Scheduler is done in a way).
 		// Here we risk putting out multiple messages of that kind,
 		// However, it's probably all right, because it produces a QuitMsg
 		// and duplicates of that might just be piled and not read.
 		return func() loop.Msg {
-			return MsgMergeStoresCompleted{}
+			return MsgAllStoresCompleted{}
 		}
 	}
 
@@ -163,7 +193,7 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 
 	mergeUnit := stage.nextUnit()
 
-	if mergeUnit.Segment > s.segmenter.LastIndex() {
+	if mergeUnit.Segment > s.storeSegmenter.LastIndex() {
 		fmt.Println("TRYM: past last segment")
 
 		return nil // We're done here.
@@ -195,12 +225,50 @@ func (s *Stages) MergeCompleted(mergeUnit Unit) {
 	s.markSegmentCompleted(mergeUnit)
 }
 
+// initSegmentsOffset marks the first segments as NoOp if they are not required, for
+// the Stores stages, or the Mapping stage.
+func (s *Stages) initSegmentsOffset(reqPlan *plan.RequestPlan) {
+	firstIndex := s.globalSegmenter.FirstIndex()
+	s.segmentOffset = firstIndex
+	lastStageIndex := len(s.stages) - 1
+
+	// OPTIMIZATION: Let's change the name for `BuildStores` and `ExecOut`. Nowadays, ExecOut is only for
+	// mapper output.. so why not align everything: BuildStores, BuildMap, StreamMap, or WriteStores, WriteMap, ReadMap ?
+	// all ExecOut could become MapOutput ?
+
+	if reqPlan.WriteExecOut != nil {
+		writeOutFirstIndex := reqPlan.WriteOutSegmenter().FirstIndex()
+		for i := firstIndex; i < writeOutFirstIndex; i++ {
+			// take the last stages layer, and mark the NoOp
+			s.allocSegments(i)
+			s.setState(Unit{Segment: i, Stage: lastStageIndex}, UnitNoOp)
+		}
+	}
+	if reqPlan.BuildStores != nil {
+		storesFirstIndex := reqPlan.StoresSegmenter().FirstIndex()
+		for i := firstIndex; i < storesFirstIndex; i++ {
+			// take the last stages layer, and mark the NoOp
+			for idx := range s.stages {
+				if idx == lastStageIndex {
+					continue
+				}
+				s.allocSegments(i)
+				s.setState(Unit{Segment: i, Stage: idx}, UnitNoOp)
+			}
+			// loop all the Stores layers, and mark them all NoOp up to this point.
+		}
+	}
+}
+
 func (s *Stages) getState(u Unit) UnitState {
 	index := u.Segment - s.segmentOffset
 	if index >= len(s.segmentStates) {
 		return UnitPending
+	} else if index < 0 {
+		return UnitNoOp
+	} else {
+		return s.segmentStates[index][u.Stage]
 	}
-	return s.segmentStates[index][u.Stage]
 }
 
 func (s *Stages) setState(u Unit, state UnitState) {
@@ -228,29 +296,32 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	//
 	// OPTIMIZATION: eventually, we can push `segmentsOffset`
 	//  each time contiguous segments are completed for all stages.
-	segmentIdx := s.segmenter.FirstIndex()
-	for {
-		if segmentIdx > s.segmenter.LastIndex() {
-			break
-		}
+
+	for segmentIdx := s.globalSegmenter.FirstIndex(); segmentIdx <= s.globalSegmenter.LastIndex(); segmentIdx++ {
 		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
+			stage := s.stages[stageIdx]
 			unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 			segmentState := s.getState(unit)
 			if segmentState != UnitPending {
 				continue
 			}
-			if segmentIdx < s.stages[stageIdx].segmenter.FirstIndex() {
+			if segmentState == UnitNoOp {
+				continue
+			}
+			if segmentIdx < stage.segmenter.FirstIndex() {
 				// Don't process stages where all modules' initial blocks are only later
 				continue
+			}
+			if segmentIdx > stage.segmenter.LastIndex() {
+				break
 			}
 			if !s.dependenciesCompleted(unit) {
 				continue
 			}
 
 			s.markSegmentScheduled(unit)
-			return unit, s.segmenter.Range(unit.Segment)
+			return unit, stage.segmenter.Range(unit.Segment)
 		}
-		segmentIdx++
 	}
 	return Unit{}, nil
 }
@@ -276,7 +347,8 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 		return true
 	}
 	for i := u.Stage - 1; i >= 0; i-- {
-		if s.getState(Unit{Segment: u.Segment - 1, Stage: i}) != UnitCompleted {
+		state := s.getState(Unit{Segment: u.Segment - 1, Stage: i})
+		if !(state == UnitCompleted || state == UnitNoOp) {
 			return false
 		}
 	}
@@ -284,15 +356,16 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 }
 
 func (s *Stages) previousUnitComplete(u Unit) bool {
-	if u.Segment-s.segmentOffset <= 0 {
-		return true
-	}
-	return s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage}) == UnitCompleted
+	state := s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage})
+	return state == UnitCompleted || state == UnitNoOp
 }
 
 func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	out := store.NewMap()
 	for _, stage := range s.stages {
+		if stage.kind != KindStore {
+			continue
+		}
 		for _, modState := range stage.moduleStates {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			if err != nil {
@@ -319,6 +392,7 @@ func (s *Stages) StatesString() string {
 				UnitScheduled:      "S",
 				UnitMerging:        "M",
 				UnitCompleted:      "C",
+				UnitNoOp:           "N",
 			}[segment[i]])
 		}
 		out.WriteString("\n")

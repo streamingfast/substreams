@@ -112,11 +112,17 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
-		cmds = append(cmds, s.Stages.CmdTryMerge(msg.Stage))
+		cmds = append(cmds,
+			work.CmdScheduleNextJob(),
+			s.Stages.CmdTryMerge(msg.Stage),
+		)
 
-	case stage.MsgMergeStoresCompleted:
+	case stage.MsgAllStoresCompleted:
 		s.storesSyncCompleted = true
-		return s.cmdShutdownWhenComplete()
+		cmds = append(cmds,
+			work.CmdScheduleNextJob(), // in case some mapper jobs need scheduling
+			s.cmdShutdownWhenComplete(),
+		)
 
 	case stage.MsgMergeFailed:
 		cmds = append(cmds, loop.Quit(msg.Error))
@@ -138,7 +144,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	}
 
 	if len(cmds) != 0 {
-		fmt.Printf("Schedule: %T %v\n", cmds, cmds)
+		fmt.Printf("Schedule: %T %+v\n", cmds, cmds)
 	}
 	return loop.Batch(cmds...)
 }

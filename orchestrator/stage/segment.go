@@ -12,6 +12,7 @@ const (
 	UnitScheduled // Means the job was scheduled for execution
 	UnitMerging   // A partial is being merged
 	UnitCompleted // End state. A store has been snapshot for this segment, and we have gone over in the per-request squasher
+	UnitNoOp      // State given to a unit that does not need scheduling. Mostly for map segments where we know in advance we won't consume the output.
 )
 
 // Unit can be used as a key, and points to the respective indexes of

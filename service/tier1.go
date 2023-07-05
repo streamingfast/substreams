@@ -309,14 +309,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestStats.Start(10 * time.Second)
 		defer requestStats.Shutdown()
 	}
-	logger.Info("initializing tier1 pipeline",
-		zap.Int64("request_start_block", request.StartBlockNum),
-		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),
-		zap.Uint64("request_stop_block", request.StopBlockNum),
-		zap.String("request_start_cursor", request.StartCursor),
-		zap.String("resolved_cursor", requestDetails.ResolvedCursor),
-		zap.String("output_module", request.OutputModule),
-	)
 
 	// FIXME: eventually, we could use the `orchestrator/plan.RequestPlan` object to
 	// tackle the `LinearHandoffBlockNum == StopBlockNum`, and the linear segment that
@@ -332,10 +324,20 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestDetails.StopBlockNum,
 	)
 
+	logger.Info("initializing tier1 pipeline",
+		zap.Stringer("plan", reqPlan),
+		zap.Int64("request_start_block", request.StartBlockNum),
+		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),
+		zap.Uint64("request_stop_block", request.StopBlockNum),
+		zap.String("request_start_cursor", request.StartCursor),
+		zap.String("resolved_cursor", requestDetails.ResolvedCursor),
+		zap.String("output_module", request.OutputModule),
+	)
+
 	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
-	if requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
+	if reqPlan.LinearPipeline == nil {
 		return pipe.OnStreamTerminated(ctx, nil)
 	}
 
@@ -343,6 +345,10 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	cursor := requestDetails.ResolvedCursor
 	var cursorIsTarget bool
 	if requestDetails.ResolvedStartBlockNum != requestDetails.LinearHandoffBlockNum {
+		// FIXME(abourget): how is that different from reqPlan.LinearPipeline being set?
+		// and what does the cursor have to do here?
+		// This will also be true when we've done backprocessing.. is the cursor affected
+		// in that case?!
 		cursorIsTarget = true
 	}
 	logger.Info("creating firehose stream",

@@ -34,6 +34,12 @@ type RequestPlan struct {
 	// store snapshots.
 	WriteExecOut *block.Range // Can be nil
 
+	// When WriteExecOut produces files, we might want to start reading
+	// blocks only a bit further down a file (if boundary is at 20,
+	// the request's start block might be 25). This will instruct
+	// the output stream to start at that block number.
+	ReadExecOut *block.Range
+
 	// Range that will be produced by the linear pipeline. Could have no end.
 	LinearPipeline *block.Range
 	// ref: /docs/assets/range_planning.png
@@ -67,8 +73,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 
 		startExecOutAtBlock := utils.MaxOf(resolvedStartBlock, graphInitBlock)
 		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
-		execOutStartBlock := segmenter.Range(startExecOutAtSegment).StartBlock
-		plan.WriteExecOut = block.NewRange(execOutStartBlock, linearHandoffBlock)
+		writeExecOutStartBlock := segmenter.Range(startExecOutAtSegment).StartBlock
+		plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
+		plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
 	} else { /* dev mode */
 		plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
 		plan.WriteExecOut = nil
@@ -80,10 +87,27 @@ func (p *RequestPlan) StoresSegmenter() *block.Segmenter {
 	return block.NewSegmenter(p.segmentInterval, p.BuildStores.StartBlock, p.BuildStores.ExclusiveEndBlock)
 }
 
+func (p *RequestPlan) BackprocessSegmenter() *block.Segmenter {
+	if p.BuildStores == nil {
+		return p.WriteOutSegmenter()
+	} else if p.WriteExecOut == nil {
+		return p.StoresSegmenter()
+	}
+	return block.NewSegmenter(
+		p.segmentInterval,
+		utils.MinOf(p.BuildStores.StartBlock, p.WriteExecOut.StartBlock),
+		utils.MaxOf(p.BuildStores.ExclusiveEndBlock, p.WriteExecOut.ExclusiveEndBlock),
+	)
+}
+
 func (p *RequestPlan) ModuleSegmenter(modInitBlock uint64) *block.Segmenter {
 	return block.NewSegmenter(p.segmentInterval, modInitBlock, p.BuildStores.ExclusiveEndBlock)
 }
 
 func (p *RequestPlan) WriteOutSegmenter() *block.Segmenter {
 	return block.NewSegmenter(p.segmentInterval, p.WriteExecOut.StartBlock, p.WriteExecOut.ExclusiveEndBlock)
+}
+
+func (p *RequestPlan) String() string {
+	return fmt.Sprintf("interval=%d, stores=%s, map_write=%s, map_read=%s, linear=%s", p.segmentInterval, p.BuildStores, p.WriteExecOut, p.ReadExecOut, p.LinearPipeline)
 }

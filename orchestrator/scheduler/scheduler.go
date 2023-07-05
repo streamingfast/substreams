@@ -97,8 +97,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		worker := s.WorkerPool.Borrow()
 
 		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
+		modules := s.Stages.StageModules(workUnit.Stage)
 		return loop.Batch(
-			worker.Work(s.ctx, workUnit, workRange, s.stream),
+			worker.Work(s.ctx, workUnit, workRange, modules, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 

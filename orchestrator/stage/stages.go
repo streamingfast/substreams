@@ -392,3 +392,10 @@ func (s *Stages) StatesString() string {
 	}
 	return out.String()
 }
+
+func (s *Stages) StageModules(stage int) (out []string) {
+	for _, modState := range s.stages[stage].moduleStates {
+		out = append(out, modState.name)
+	}
+	return
+}

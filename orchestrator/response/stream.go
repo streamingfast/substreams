@@ -68,25 +68,27 @@ func (s *Stream) RPCFailedProgressResponse(moduleName, reason string, logs []str
 	})
 }
 
-func (s *Stream) RPCRangeProgressResponse(moduleName string, start, end uint64) error {
-	return s.respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{
-			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					{
-						Name: moduleName,
-						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-							ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-								ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
-									{
-										StartBlock: start,
-										EndBlock:   end,
-									},
-								},
-							},
+func (s *Stream) RPCRangeProgressResponse(moduleNames []string, start, end uint64) error {
+	var mods []*pbsubstreamsrpc.ModuleProgress
+	for _, moduleName := range moduleNames {
+		mods = append(mods, &pbsubstreamsrpc.ModuleProgress{
+			Name: moduleName,
+			Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+				ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+					ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
+						{
+							StartBlock: start,
+							EndBlock:   end,
 						},
 					},
 				},
+			},
+		})
+	}
+	return s.respFunc(&pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Progress{
+			Progress: &pbsubstreamsrpc.ModulesProgress{
+				Modules: mods,
 			},
 		},
 	})

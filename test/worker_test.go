@@ -32,7 +32,7 @@ func (w *TestWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
+func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	w.t.Helper()
 
 	request := work.NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
@@ -42,10 +42,10 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 	ctx = reqctx.WithLogger(ctx, logger)
 
 	logger.Info("worker running test job",
-		zap.String("output_module", request.OutputModule),
+		zap.Strings("stage_modules", moduleNames),
+		zap.Int("stage", unit.Stage),
 		zap.Uint64("start_block_num", request.StartBlockNum),
 		zap.Uint64("stop_block_num", request.StopBlockNum),
-		zap.Int("stage", unit.Stage),
 	)
 
 	return func() loop.Msg {

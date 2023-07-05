@@ -35,10 +35,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd // *Result
+	Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -46,12 +46,12 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, workR
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd
+	f  func(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
-	return f.f(ctx, unit, workRange, upstream)
+func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
+	return f.f(ctx, unit, workRange, moduleNames, upstream)
 }
 
 func (f SimpleWorkerFactory) ID() string {
@@ -91,14 +91,14 @@ func NewRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Ran
 	}
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
+func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	request := NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {
 		var res *Result
 		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-			res = w.work(ctx, request, upstream)
+			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
@@ -136,7 +136,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 	}
 }
 
-func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, upstream *response.Stream) *Result {
+func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, moduleNames []string, upstream *response.Stream) *Result {
 	var err error
 
 	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.StartBlockNum, request.StopBlockNum))
@@ -207,7 +207,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		if resp != nil {
 			switch r := resp.Type.(type) {
 			case *pbssinternal.ProcessRangeResponse_ProcessedRange:
-				err := upstream.RPCRangeProgressResponse(resp.ModuleName, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
+				// push some updates for all those stages, altogether
+				err := upstream.RPCRangeProgressResponse(moduleNames, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
 				if err != nil {
 					if ctx.Err() != nil {
 						return &Result{Error: ctx.Err()}

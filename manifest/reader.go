@@ -46,6 +46,13 @@ func SkipModuleOutputTypeValidationReader() Options {
 	}
 }
 
+func SkipPackageValidationReader() Options {
+	return func(r *Reader) *Reader {
+		r.skipPackageValidation = true
+		return r
+	}
+}
+
 func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Options {
 	return func(r *Reader) *Reader {
 		r.collectProtoDefinitionsFunc = f
@@ -65,6 +72,7 @@ type Reader struct {
 	//options
 	skipSourceCodeImportValidation bool
 	skipModuleOutputTypeValidation bool
+	skipPackageValidation          bool
 
 	constructorErr error
 }
@@ -329,8 +337,10 @@ func (r *Reader) fromContents(contents []byte) (pkg *pbsubstreams.Package, err e
 }
 
 func (r *Reader) validate(pkg *pbsubstreams.Package) error {
-	if err := r.validatePackage(pkg); err != nil {
-		return fmt.Errorf("package validation failed: %w", err)
+	if !r.skipPackageValidation {
+		if err := r.validatePackage(pkg); err != nil {
+			return fmt.Errorf("package validation failed: %w", err)
+		}
 	}
 
 	if err := ValidateModules(pkg.Modules); err != nil {

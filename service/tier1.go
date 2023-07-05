@@ -1,9 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
@@ -14,9 +19,6 @@ import (
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
-	"strconv"
-	"strings"
-	"sync"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/streamingfast/substreams"
@@ -25,6 +27,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -39,6 +42,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 type Tier1Service struct {
@@ -208,6 +212,9 @@ func (s *Tier1Service) Blocks(
 		return err
 	}
 
+	if err := s.writePackage(ctx, request, outputGraph); err != nil {
+		logger.Warn("cannot write package", zap.Error(err))
+	}
 	// On app shutdown, we cancel the running '.blocks()' command,
 	// we catch this situation via IsTerminating() to return a special error.
 	runningContext, cancelRunning := context.WithCancel(ctx)
@@ -241,6 +248,33 @@ func (s *Tier1Service) Blocks(
 	}
 
 	logger.Info("Blocks request completed witout error")
+	return nil
+}
+
+func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph) error {
+	asPackage := &pbsubstreams.Package{
+		Modules:    request.Modules,
+		ModuleMeta: []*pbsubstreams.ModuleMetadata{},
+	}
+
+	cnt, err := proto.Marshal(asPackage)
+	if err != nil {
+		return fmt.Errorf("marshalling package: %w", err)
+	}
+
+	moduleStore, err := s.runtimeConfig.BaseObjectStore.SubStore(outputGraph.ModuleHashes().Get(request.OutputModule))
+	if err != nil {
+		return fmt.Errorf("getting substore: %w", err)
+	}
+	exists, err := moduleStore.FileExists(ctx, "substreams.partial.spkg")
+	if err != nil {
+		return fmt.Errorf("error checking fileExists: %w", err)
+	}
+	if !exists {
+		if err := moduleStore.WriteObject(ctx, "substreams.partial.spkg", bytes.NewReader(cnt)); err != nil {
+			return fmt.Errorf("writing substreams.partial object")
+		}
+	}
 	return nil
 }
 

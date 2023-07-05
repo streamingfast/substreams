@@ -51,7 +51,7 @@ type SimpleWorkerFactory struct {
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Msg {
+func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
 	return f.f(ctx, unit, workRange, upstream)
 }
 

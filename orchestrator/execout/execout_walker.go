@@ -28,6 +28,7 @@ type Walker struct {
 	streamOut  *response.Stream
 	module     *pbsubstreams.Module
 	logger     *zap.Logger
+	working    bool
 }
 
 func NewWalker(
@@ -48,20 +49,28 @@ func NewWalker(
 	}
 }
 
-func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
-	if r.IsCompleted() {
-		return func() loop.Msg {
-			return MsgWalkerCompleted{}
-		}
-	}
+func (r *Walker) MarkNotWorking() {
+	r.working = false
+}
 
+func (r *Walker) MarkWorking() {
+	r.working = true
+}
+
+func (r *Walker) IsWorking() bool {
+	return r.working
+}
+
+func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	file := r.fileWalker.File()
+
 	return func() loop.Msg {
 		time.Sleep(waitBefore)
 
 		err := file.Load(r.ctx)
 		if err == dstore.ErrNotFound {
-			return MsgFileNotPresent{}
+
+			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore)}
 		}
 		if err != nil {
 			return loop.Quit(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
@@ -72,6 +81,17 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 		}
 		return MsgFileDownloaded{}
 	}
+}
+
+func computeNewWait(previousWait time.Duration) time.Duration {
+	if previousWait == 0 {
+		return 500 * time.Millisecond
+	}
+	newWait := previousWait * 2
+	if newWait > 4*time.Second {
+		return 4 * time.Second
+	}
+	return newWait
 }
 
 func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {

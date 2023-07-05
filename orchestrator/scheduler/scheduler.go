@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -50,13 +49,18 @@ func (s *Scheduler) Init() loop.Cmd {
 	var cmds []loop.Cmd
 
 	if s.ExecOutWalker != nil {
-		cmds = append(cmds, execout.CmdMsgStartDownload())
+		cmds = append(cmds, execout.CmdDownloadSegment(0))
 	} else {
 		// This hides the fact that there _was no_ Walker. Could cause
 		// confusing error messages in `cmdShutdownWhenComplete()`.
 		s.outputStreamCompleted = true
 	}
+
 	cmds = append(cmds, work.CmdScheduleNextJob())
+
+	if s.Stages.AllStoresCompleted() {
+		cmds = append(cmds, func() loop.Msg { return stage.MsgAllStoresCompleted{} })
+	}
 
 	cmds = append(cmds, s.Stages.CmdStartMerge())
 
@@ -74,10 +78,14 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.MsgJobSucceeded:
 		s.Stages.MarkSegmentPartialPresent(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
+
 		cmds = append(cmds,
 			s.Stages.CmdTryMerge(msg.Unit.Stage),
 			work.CmdScheduleNextJob(),
 		)
+		if s.ExecOutWalker != nil {
+			cmds = append(cmds, execout.CmdDownloadSegment(0))
+		}
 
 	case work.MsgScheduleNextJob:
 		if !s.WorkerPool.WorkerAvailable() {
@@ -100,20 +108,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.MsgJobFailed:
 		cmds = append(cmds, loop.Quit(msg.Error))
 
-	//case stage.MsgDetectedNewPartial:
-	//	// When we have a polling thing for partials (or etcd instructions
-	//	// to the effect that some partial jobs were produced elsewhere)
-	//	// Again, that other place would need to detect _all stores_ for the
-	//	// given Unit.
-	//	if s.Stages.DetectedPartial(msg.Unit) {
-	//		// cancel running job,
-	//		// if the Unit was Scheduled,
-	//		// then _cancel the job_ somehow
-	//		// and mark it PartialPresent.
-	//		// if it was Pending, then simply schedule the next job
-	//		// and some merging work.
-	//	}
-
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
 		cmds = append(cmds,
@@ -131,15 +125,27 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case stage.MsgMergeFailed:
 		cmds = append(cmds, loop.Quit(msg.Error))
 
-	case execout.MsgStartDownload:
-		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(0))
-
 	case execout.MsgFileNotPresent:
-		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(2*time.Second))
+		s.ExecOutWalker.MarkNotWorking()
+		cmds = append(cmds, execout.CmdDownloadSegment(msg.NextWait))
 
 	case execout.MsgFileDownloaded:
 		s.ExecOutWalker.NextSegment()
-		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(0))
+		s.ExecOutWalker.MarkNotWorking()
+		cmds = append(cmds, execout.CmdDownloadSegment(0))
+
+	case execout.MsgDownloadSegment:
+		if s.ExecOutWalker == nil {
+			return nil
+		}
+		if s.ExecOutWalker.IsWorking() {
+			return nil
+		}
+		s.ExecOutWalker.MarkWorking()
+		if s.ExecOutWalker.IsCompleted() {
+			return execout.CmdWalkerCompleted()
+		}
+		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(msg.Wait))
 
 	case execout.MsgWalkerCompleted:
 		s.outputStreamCompleted = true

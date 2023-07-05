@@ -4,7 +4,6 @@ import (
 	"github.com/abourget/llerrgroup"
 
 	"github.com/streamingfast/substreams/block"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Stage struct {
@@ -48,13 +47,6 @@ func (s *Stage) nextUnit() Unit {
 
 func (s *Stage) markSegmentCompleted(segment int) {
 	s.segmentCompleted = segment
-}
-
-func stageKind(mods []*pbsubstreams.Module) Kind {
-	if mods[0].GetKindStore() != nil {
-		return KindStore
-	}
-	return KindMap
 }
 
 type Kind int

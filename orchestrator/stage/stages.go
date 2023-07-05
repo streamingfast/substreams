@@ -122,10 +122,6 @@ func layerKind(layer outputmodules.LayerModules) Kind {
 
 func (s *Stages) AllStoresCompleted() bool {
 	lastSegment := s.storeSegmenter.LastIndex()
-	lastSegmentIndex := lastSegment - s.segmentOffset
-	if lastSegmentIndex >= len(s.segmentStates) {
-		return false
-	}
 
 	for idx, stage := range s.stages {
 		if stage.kind != KindStore {
@@ -171,6 +167,11 @@ func (s *Stages) CmdStartMerge() loop.Cmd {
 }
 
 func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
+	// TODO: this function needs to be broken into a message and a few
+	// functions, and be called directly within the Scheduler's Update()
+	// function, similar to the CmdDownloadCurrentSegment flow, and the
+	// NextJob thing.
+
 	if s.AllStoresCompleted() {
 		// FIXME: this CmdTryMerge function is called once for each stage,
 		// so we could receive multiple such calls, and thus

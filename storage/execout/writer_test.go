@@ -10,26 +10,20 @@ import (
 var testConfigs = &Configs{
 	execOutputSaveInterval: 10,
 	ConfigMap: map[string]*Config{
-		"A": &Config{
+		"A": {
 			moduleInitialBlock: 5,
 		},
-		"B": &Config{
+		"B": {
 			moduleInitialBlock: 10,
 		},
-		"C": &Config{
+		"C": {
 			moduleInitialBlock: 15,
 		},
 	},
 }
 
-func TestNewExecOutputWriterNotSubrequest(t *testing.T) {
-	res := NewWriter(11, 15, "A", testConfigs, false)
-	require.NotNil(t, res)
-	assert.Equal(t, 20, int(res.files["A"].ExclusiveEndBlock))
-}
-
 func TestNewExecOutputWriterIsSubRequest(t *testing.T) {
-	res := NewWriter(11, 15, "A", testConfigs, true)
+	res := NewWriter(11, 15, "A", testConfigs)
 	require.NotNil(t, res)
 	assert.Equal(t, 15, int(res.files["A"].ExclusiveEndBlock))
 }

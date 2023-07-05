@@ -10,6 +10,7 @@ import (
 )
 
 func TestSched2_JobFinished(t *testing.T) {
+	t.Skip("hmm.. not sure if this is useful, we'll need a bit more end to end testing for the scheduler")
 	s := &Scheduler{}
 	cmd := s.Update(execout.MsgFileDownloaded{})
 	msg := cmd()

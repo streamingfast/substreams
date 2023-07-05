@@ -51,6 +51,9 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("fetch stores storage state: %w", err)
 	}
 
+	fmt.Println("Initial state:")
+	fmt.Print(stages.StatesString())
+
 	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
 		return nil, fmt.Errorf("initial progress: %w", err)
 	}

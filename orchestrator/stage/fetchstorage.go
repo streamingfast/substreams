@@ -40,10 +40,7 @@ func (s *Stages) FetchStoresState(
 			// TODO: what happens to the Unit's state if we don't have
 			// complete sores for all modules within?
 			// We'll need to do the same alignment of Complete stores
-			fullKV := files.LastFullKVSnapshotBefore(upToBlock)
-			if fullKV != nil {
-				// HERE WE should actually just load the CLOSEST to the start
-				// point
+			for _, fullKV := range files.FullKVFiles {
 				segmentIdx := modSegmenter.IndexForEndBlock(fullKV.Range.ExclusiveEndBlock)
 				rng := segmenter.Range(segmentIdx)
 				if rng.ExclusiveEndBlock != fullKV.Range.ExclusiveEndBlock {

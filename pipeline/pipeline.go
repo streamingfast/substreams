@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/dauth"
+
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -253,6 +254,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		ctx,
 		reqPlan,
 		p.runtimeConfig,
+		int(reqDetails.MaxParallelJobs),
 		p.outputGraph,
 		p.execoutStorage,
 		p.respFunc,

@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
@@ -62,15 +63,11 @@ func (s *Stores) flushStores(ctx context.Context, executionStages outputmodules.
 		return nil
 	}
 
-	reqStats := reqctx.ReqStats(ctx)
-
 	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isTier2Request, s.bounder.requestStopBlock, blockNum)
 	for _, boundaryBlock := range boundaryIntervals {
-		t0 := time.Now()
 		if err := s.saveStoresSnapshots(ctx, lastLayer, len(executionStages)-1, boundaryBlock); err != nil {
 			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
-		reqStats.RecordFlush(time.Since(t0))
 	}
 	return nil
 }

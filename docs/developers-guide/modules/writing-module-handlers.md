@@ -94,7 +94,7 @@ const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13
 ```
 {% endcode %}
 
-Define the `map` module.
+Define the `map` module in the Substreams manifest.
 
 {% code title="manifest excerpt" %}
 ```yaml
@@ -160,7 +160,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 ```
 {% endcode %}
 
-Define the `store` module.
+Define the `store` module  in the Substreams manifest.
 
 {% code title="manifest excerpt" %}
 ```yaml
@@ -190,10 +190,10 @@ fn store_transfers(transfers: erc721::Transfers, s: store::StoreAddInt64) {
 {% endcode %}
 
 {% hint style="info" %}
-**Note**: __ the `store` always receives itself as its own last input.
+**Note**: the `store` always receives itself as its own last input.
 {% endhint %}
 
-In the example the `store` module uses an `updatePolicy` set to `add` and a `valueType set` to `int64` yielding a writable `store` typed as `StoreAddInt64`.
+In the example the `store` module uses an `updatePolicy` set to `add` and a `valueType` set to `int64` yielding a writable `store` typed as `StoreAddInt64`.
 
 {% hint style="info" %}
 **Note**: **Store types**

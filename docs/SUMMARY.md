@@ -39,7 +39,7 @@
   * [Factory parameterization](developers-guide/cookbook/factory-params.md)
   * [Advanced parameters](developers-guide/cookbook/advanced-params.md)
   * [Keys in stores](developers-guide/cookbook/keys-in-stores.md)
-  * [Aggregation windows](developers-guide/cookbook/aggregation windows.md)
+  * [Aggregation windows](developers-guide/cookbook/aggregation-windows.md)
   * [Subgraph entity changes](developers-guide/cookbook/entity-changes.md)
 
 ## Reference & Specs

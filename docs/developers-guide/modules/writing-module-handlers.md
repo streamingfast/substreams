@@ -94,7 +94,7 @@ const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13
 ```
 {% endcode %}
 
-Define the `map` module in the substreams manifest.
+Define the `map` module in the Substreams manifest.
 
 {% code title="manifest excerpt" %}
 ```yaml
@@ -160,7 +160,7 @@ fn map_transfers(blk: eth::Block) -> Result<erc721::Transfers, substreams::error
 ```
 {% endcode %}
 
-Define the `store` module  in the substreams manifest.
+Define the `store` module  in the Substreams manifest.
 
 {% code title="manifest excerpt" %}
 ```yaml

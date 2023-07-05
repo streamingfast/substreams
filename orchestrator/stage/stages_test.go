@@ -2,6 +2,7 @@ package stage
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -230,4 +231,27 @@ func TestStages_previousUnitComplete(t *testing.T) {
 	assert.False(t, s.previousUnitComplete(u01)) // u00 not complete
 	s.setState(u00, UnitCompleted)
 	assert.True(t, s.previousUnitComplete(u01)) // u00 is now complete
+}
+
+func TestStages_allocSegments(t *testing.T) {
+	tests := []struct {
+		offset       int
+		allocSegment int
+		expectLen    int
+	}{
+		{10, 11, 2},
+		{0, 11, 12},
+		{5, 1, 0},
+		{5, 5, 1},
+		{1, 5, 5},
+	}
+	for idx, tt := range tests {
+		t.Run(strconv.Itoa(idx), func(t *testing.T) {
+			s := &Stages{
+				segmentOffset: tt.offset,
+			}
+			s.allocSegments(tt.allocSegment)
+			assert.Len(t, s.segmentStates, tt.expectLen)
+		})
+	}
 }

@@ -188,32 +188,26 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 
 	stage := s.stages[stageIdx]
 	if stage.kind != KindStore {
-		fmt.Println("TRYM: kindnot store")
 		return nil
 	}
 
 	mergeUnit := stage.nextUnit()
 
 	if mergeUnit.Segment > s.storeSegmenter.LastIndex() {
-		fmt.Println("TRYM: past last segment")
-
 		return nil // We're done here.
 	}
 
 	if s.getState(mergeUnit) != UnitPartialPresent {
-		fmt.Println("TRYM: wasn't in partial state")
 		return nil
 	}
 
 	if !s.previousUnitComplete(mergeUnit) {
-		fmt.Println("TRYM: prev unit not complete")
 		return nil
 	}
 
 	s.MarkSegmentMerging(mergeUnit)
 
 	return func() loop.Msg {
-		fmt.Println("TRYM: launching multiSquash", stage, mergeUnit)
 		if err := s.multiSquash(stage, mergeUnit); err != nil {
 			return MsgMergeFailed{Unit: mergeUnit, Error: err}
 		}
@@ -328,13 +322,11 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 }
 
 func (s *Stages) allocSegments(segmentIdx int) {
-	if len(s.segmentStates) > segmentIdx-s.segmentOffset {
+	segmentsNeeded := segmentIdx - s.segmentOffset
+	if len(s.segmentStates) > segmentsNeeded {
 		return
 	}
-	by := len(s.segmentStates)
-	if by == 0 {
-		by = 2
-	}
+	by := segmentsNeeded - len(s.segmentStates) + 1
 	for i := 0; i < by; i++ {
 		s.segmentStates = append(s.segmentStates, make([]UnitState, len(s.stages)))
 	}

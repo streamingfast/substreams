@@ -2,9 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"os/exec"
 
 	"go.uber.org/zap"
 
@@ -68,10 +65,10 @@ func (s *Scheduler) Init() loop.Cmd {
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
-	fmt.Printf("Scheduler message: %T %v\n", msg, msg)
-	fmt.Print(s.Stages.StatesString())
-	cmd, _ := exec.Command("bash", "-c", "cd "+os.Getenv("TEST_TEMP_DIR")+"; find .").Output()
-	fmt.Print(string(cmd))
+	//fmt.Printf("Scheduler message: %T %v\n", msg, msg)
+	//fmt.Print(s.Stages.StatesString())
+	//cmd, _ := exec.Command("bash", "-c", "cd "+os.Getenv("TEST_TEMP_DIR")+"; find .").Output()
+	//fmt.Print(string(cmd))
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
@@ -153,9 +150,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	}
 
-	if len(cmds) != 0 {
-		fmt.Printf("Schedule: %T %+v\n", cmds, cmds)
-	}
+	//if len(cmds) != 0 {
+	//	fmt.Printf("Schedule: %T %+v\n", cmds, cmds)
+	//}
 	return loop.Batch(cmds...)
 }
 

@@ -44,6 +44,7 @@ func BuildParallelProcessor(
 		ctx,
 		reqPlan.StoresSegmenter(),
 		storeConfigs,
+		traceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("fetch stores storage state: %w", err)

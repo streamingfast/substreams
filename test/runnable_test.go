@@ -75,6 +75,7 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 
 	testTempDir := t.TempDir()
 	f.TempDir = testTempDir
+	os.Setenv("TEST_TEMP_DIR", f.TempDir)
 
 	ctx, endFunc := withTestTracing(t, ctx, testName)
 	defer endFunc()

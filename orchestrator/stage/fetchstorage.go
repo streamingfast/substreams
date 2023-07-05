@@ -13,6 +13,7 @@ func (s *Stages) FetchStoresState(
 	ctx context.Context,
 	segmenter *block.Segmenter,
 	storeConfigMap store.ConfigMap,
+	traceID string,
 ) error {
 	completes := make(unitMap)
 	partials := make(unitMap)
@@ -61,6 +62,9 @@ func (s *Stages) FetchStoresState(
 					continue
 				}
 				if !rng.Equals(partial.Range) {
+					continue
+				}
+				if traceID != partial.TraceID {
 					continue
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}

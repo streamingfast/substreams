@@ -4,13 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.1.8
 
 ### Backend changes
 
 #### Added
 
-* Max-subrequests can now be overriden by auth header `X-Sf-Substreams-Parallel-Jobs` (note: if your auth plugin is 'trust', make sure that you filter out this header from public access
+* Max-subrequests can now be overridden by auth header `X-Sf-Substreams-Parallel-Jobs` (note: if your auth plugin is 'trust', make sure that you filter out this header from public access
 * Request Stats logging. When enable it will log metrics associated to a Tier1 and Tier2 request
 * On request, save "substreams.partial.spkg" file to the state cache for debugging purposes.
 * Manifest reader can now read 'partial' spkg files (without protobuf and metadata) with an option.

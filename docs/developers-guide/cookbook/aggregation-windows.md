@@ -4,7 +4,7 @@ description: Building and freeing up aggregation windows
 
 # Building and freeing up aggregation windows
 
-Store module key-value storage can hold at most 1GB. It is usually enough if used correctly, but it is still a good idea (and sometimes even necessary) to free up unused keys. It is especially true for cases where you work with aggregation windows.
+Store module key-value storage can hold at most 1 GiB. It is usually enough if used correctly, but it is still a good idea (and sometimes even necessary) to free up unused keys. It is especially true for cases where you work with aggregation windows.
 
 Consider this store module that aggregates hourly trade counter for each token:
 ```rust

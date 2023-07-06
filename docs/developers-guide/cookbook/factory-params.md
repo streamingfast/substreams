@@ -6,9 +6,9 @@ description: Parameterization of a Factory contract
 
 It's quite common for a smart contract to be deployed on different networks or even by different dApps within the same network. Uniswap Factory smart contract is a good example of that.
 
-When running substreams for a dApp, you need to know the smart contract deployment address and for obvious reasons, this address will be different for each deployment.
+When running Substreams for a dApp, you need to know the smart contract deployment address and for obvious reasons, this address will be different for each deployment.
 
-Instead of hard-coding the address in the substreams binary, you can customize it without having to rebuild or even repackage the substreams package. The consumer can then just provide the address as a parameter.
+Instead of hard-coding the address in the Substreams binary, you can customize it without having to rebuild or even repackage the Substreams package. The consumer can then just provide the address as a parameter.
 
 First, you need to add the `params` field as an input. Note that it's always a string and it's always the first input for the module:
 
@@ -50,7 +50,7 @@ pub fn map_pools_created(params: String, block: Block) -> Result<Pools, Error> {
 }
 ```
 
-To pass the parameter to the module using substreams CLI you can use `-p` key:
+To pass the parameter to the module using `substreams` CLI you can use `-p` key:
 
 ```bash
 substreams gui -e $SUBSTREAMS_ENDPOINT map_pools_created -t +1000 -p map_pools_created="1f98431c8ad98523631ae4a59f267346ea31f984"`

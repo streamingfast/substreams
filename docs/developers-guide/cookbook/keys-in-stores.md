@@ -64,7 +64,7 @@ for delta in deltas.into_iter() {
 - `last_segment` & `try_last_segment`
 - `segment_at` & `try_segment_at`
 
-For a full example see [Uniswap V3 substreams](https://github.com/streamingfast/substreams-uniswap-v3/blob/ca90fe3908a76905b43e05f0522e1e9338d88972/src/lib.rs#L1139-L1163)
+For a full example see [Uniswap V3 Substreams](https://github.com/streamingfast/substreams-uniswap-v3/blob/ca90fe3908a76905b43e05f0522e1e9338d88972/src/lib.rs#L1139-L1163)
 
 ## Links
 * [Uniswap-v3 Subgraph and Substreams](https://github.com/streamingfast/substreams-uniswap-v3)

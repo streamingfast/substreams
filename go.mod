@@ -54,7 +54,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20230630134904-f19ce9a5b859
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
-	github.com/streamingfast/dmetering v0.0.0-20230620155208-31b97a817964
+	github.com/streamingfast/dmetering v0.0.0-20230706141508-cd783a0fb671
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9

@@ -181,9 +181,7 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 		// Here we risk putting out multiple messages of that kind,
 		// However, it's probably all right, because it produces a QuitMsg
 		// and duplicates of that might just be piled and not read.
-		return func() loop.Msg {
-			return MsgAllStoresCompleted{}
-		}
+		return CmdAllStoresCompleted()
 	}
 
 	stage := s.stages[stageIdx]
@@ -194,15 +192,15 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 	mergeUnit := stage.nextUnit()
 
 	if mergeUnit.Segment > stage.segmenter.LastIndex() {
-		return nil // We're done here.
+		return CmdMergeNotReady(mergeUnit, "this stage is done")
 	}
 
 	if s.getState(mergeUnit) != UnitPartialPresent {
-		return nil
+		return CmdMergeNotReady(mergeUnit, "next unit's partial isn't present")
 	}
 
 	if !s.previousUnitComplete(mergeUnit) {
-		return nil
+		return CmdMergeNotReady(mergeUnit, "previous unit not complete")
 	}
 
 	s.MarkSegmentMerging(mergeUnit)

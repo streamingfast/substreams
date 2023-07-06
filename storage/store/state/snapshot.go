@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -53,32 +52,4 @@ func (s *storeSnapshots) Sort() {
 
 func (s *storeSnapshots) String() string {
 	return fmt.Sprintf("completes=%s, partials=%s", s.FullKVFiles, s.Partials)
-}
-
-func (s *storeSnapshots) LastFullKVBlock() uint64 {
-	if len(s.FullKVFiles) == 0 {
-		return 0
-	}
-	return s.FullKVFiles[len(s.FullKVFiles)-1].Range.ExclusiveEndBlock
-}
-
-func (s *storeSnapshots) LastFullKVSnapshotBefore(blockNum uint64) *store.FileInfo {
-	for i := len(s.FullKVFiles); i > 0; i-- {
-		comp := s.FullKVFiles[i-1]
-		if comp.Range.ExclusiveEndBlock > blockNum {
-			continue
-		}
-		return comp
-	}
-	return nil
-}
-
-// findPartial returns the partial file that matches the given range, or nil if none matches.
-func (s *storeSnapshots) findPartial(r *block.Range) *store.FileInfo {
-	for _, file := range s.Partials {
-		if r.Equals(file.Range) {
-			return file
-		}
-	}
-	return nil
 }

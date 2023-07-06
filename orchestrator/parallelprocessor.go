@@ -45,6 +45,7 @@ func BuildParallelProcessor(
 		ctx,
 		reqPlan.StoresSegmenter(),
 		storeConfigs,
+		execoutStorage,
 		traceID,
 	)
 	if err != nil {

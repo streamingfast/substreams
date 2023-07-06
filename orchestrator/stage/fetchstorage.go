@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/storage/execout"
+
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/storage/store/state"
 )
@@ -13,6 +16,7 @@ func (s *Stages) FetchStoresState(
 	ctx context.Context,
 	segmenter *block.Segmenter,
 	storeConfigMap store.ConfigMap,
+	execoutConfigs *execout.Configs,
 	traceID string,
 ) error {
 	completes := make(unitMap)
@@ -20,7 +24,25 @@ func (s *Stages) FetchStoresState(
 
 	upToBlock := segmenter.ExclusiveEndBlock()
 
-	// OPTIMIZATION: why load stores if there could be ExecOut data present
+	var mapperName string
+	var mapperFiles execout.FileInfos
+	if lastStage := s.stages[len(s.stages)-1]; lastStage.kind == KindMap {
+		if len(lastStage.moduleStates) != 1 {
+			panic("assertion: mapper stage should contain a single module")
+		}
+
+		mapperName = lastStage.moduleStates[0].name
+		conf := execoutConfigs.ConfigMap[mapperName]
+		// TODO: OPTIMIZATION: get the actual needed range for execOutputs to optimize lookup
+
+		files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(0, upToBlock))
+		if err != nil {
+			return fmt.Errorf("fetching mapper storage state: %w", err)
+		}
+		mapperFiles = files
+	}
+
+	// TODO: OPTIMIZATION: why load stores if there could be ExecOut data present
 	// on disk already, which avoid the need to do _any_ processing whatsoever?
 	state, err := state.FetchState(ctx, storeConfigMap, upToBlock)
 	if err != nil {
@@ -30,6 +52,24 @@ func (s *Stages) FetchStoresState(
 		moduleCount := len(stage.moduleStates)
 
 		if stage.kind == KindMap {
+			if mapperFiles == nil {
+				panic("assertion: no mapper files in fetchStoreStates but got a mapper stage")
+			}
+			if stageIdx != len(s.stages)-1 {
+				panic("assertion: mapper stage is not the last stage")
+			}
+			for _, outputFile := range mapperFiles {
+				segmentIdx := s.mapSegmenter.IndexForEndBlock(outputFile.BlockRange.ExclusiveEndBlock)
+				rng := s.mapSegmenter.Range(segmentIdx)
+				if rng.ExclusiveEndBlock != outputFile.BlockRange.ExclusiveEndBlock {
+					continue
+				}
+				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
+				if allDone := markFound(completes, unit, mapperName, moduleCount); allDone {
+					s.markSegmentCompleted(unit)
+				}
+			}
+
 			continue
 		}
 
@@ -43,7 +83,7 @@ func (s *Stages) FetchStoresState(
 			for _, fullKV := range files.FullKVFiles {
 				segmentIdx := modSegmenter.IndexForEndBlock(fullKV.Range.ExclusiveEndBlock)
 				rng := segmenter.Range(segmentIdx)
-				if rng.ExclusiveEndBlock != fullKV.Range.ExclusiveEndBlock {
+				if rng == nil || rng.ExclusiveEndBlock != fullKV.Range.ExclusiveEndBlock {
 					continue
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}

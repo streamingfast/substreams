@@ -55,7 +55,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 ### **Protobufs for Substreams**
 
-<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler (1) (1).png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/substreams-breakdown-module-handler-and-protobuf.png" alt=""><figcaption><p>Substreams module handlers linked to protobuf</p></figcaption></figure>
 
 [Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 
@@ -63,7 +63,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 * View the Rust module handlers in the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
 
 {% hint style="info" %}
-**Note:** Protobufs include the names of the data objects and the fields contained and accessible within them.
+**Note**: Protobufs include the names of the data objects and the fields contained and accessible within them.
 {% endhint %}
 
 Many protobuf definitions have already been created, such as [the erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), for use by developers creating Substreams data transformation strategies.
@@ -78,12 +78,12 @@ In object-oriented programming terminology, protobufs are the objects or object 
 
 ### **Substreams Rust modules**
 
-<figure><img src="../.gitbook/assets/Screen%20Shot%202022-10-11%20at%202.48.46%20PM%20(1).png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/substreams-breakdown-map-module-handler.png" alt=""><figcaption><p>Writing Rust Modules for Substreams</p></figcaption></figure>
 
 The first step in Substreams development is to design an overall strategy for managing and transforming data. The Substreams engine processes modules by using the relationships defined in the manifest.
 
 {% hint style="info" %}
-**Note**_:_ Substreams modules work together by passing data from one module to another until they finally return an output transformed according to the rules in the manifest, modules, and module handler functions.
+**Note**: Substreams modules work together by passing data from one module to another until they finally return an output transformed according to the rules in the manifest, modules, and module handler functions.
 {% endhint %}
 
 Modules define two types of module handlers: `map` and `store`. These two types work together to sort, sift, temporarily store, and transform blockchain data from `Block` objects and smart contracts for use in data sinks such as databases or subgraphs.

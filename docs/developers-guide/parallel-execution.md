@@ -28,7 +28,7 @@ The amount of parallel execution for the two modes is illustrated in the diagram
 
 The two steps involved during parallel execution are **backward execution and forward execution**.
 
-Backward parallel execution consists of executing in parallel block ranges, from the module's initial block, up to the start block of the request. If the start block of the request matches the module's initial block no backwards execution is performed.
+Backward parallel execution consists of executing in parallel block ranges, from the module's initial block, up to the start block of the request. If the start block of the request matches the module's initial block no backward execution is performed.
 
 Forward parallel execution consists of executing in parallel block ranges from the start block of the request up to last known final block, also called an irreversible block, or the stop block of the request depending on which is smaller. Forward parallel execution significantly improves the performance of Substreams.
 

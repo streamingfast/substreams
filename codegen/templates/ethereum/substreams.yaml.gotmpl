@@ -17,7 +17,7 @@ binaries:
 modules:
   - name: map_events
     kind: map
-    initialBlock: 0
+    initialBlock: {{ .initialBlock }}
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:

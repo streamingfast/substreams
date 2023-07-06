@@ -99,6 +99,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("getting contract ABI: %w", err)
 		}
+		// Wait 5 seconds to avoid Etherscan API rate limit
+		time.Sleep(5 * time.Second)
+
+		// Get contract creation block
+		creationBlockNum, err := GetContractCreationBlock(cmd.Context(), contract)
+		if err != nil {
+			fmt.Printf("Failed getting contract creation block, using 0 instead: %v", err)
+			creationBlockNum = "0"
+		}
 
 		project, err := templates.NewEthereumProject(
 			projectName,
@@ -107,6 +116,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			contract,
 			abi,
 			abiContent,
+			creationBlockNum,
 		)
 		if err != nil {
 			return fmt.Errorf("new ethereum project: %w", err)
@@ -400,4 +410,36 @@ func GetContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI
 	}
 
 	return abiContent, ethABI, nil
+}
+
+func GetContractCreationBlock(ctx context.Context, contract eth.Address) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", contract.Pretty()), nil)
+	if err != nil {
+		return "", fmt.Errorf("new request: %w", err)
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed request to etherscan: %w", err)
+	}
+	defer res.Body.Close()
+
+	type Response struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		Result  []struct {
+			BlockNumber string `json:"blockNumber"`
+		} `json:"result"`
+	}
+
+	var response Response
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return "", fmt.Errorf("unmarshaling: %w", err)
+	}
+
+	if len(response.Result) == 0 {
+		return "", fmt.Errorf("empty trx list")
+	}
+
+	return response.Result[0].BlockNumber, nil
 }

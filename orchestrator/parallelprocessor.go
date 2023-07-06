@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/streamingfast/substreams"
 	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
@@ -52,8 +53,10 @@ func BuildParallelProcessor(
 		return nil, fmt.Errorf("fetch stores storage state: %w", err)
 	}
 
-	fmt.Println("Initial state:")
-	fmt.Print(stages.StatesString())
+	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
+		fmt.Println("Initial state:")
+		fmt.Print(stages.StatesString())
+	}
 
 	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
 		return nil, fmt.Errorf("initial progress: %w", err)

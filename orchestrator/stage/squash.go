@@ -50,7 +50,6 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 // We keep the cache of the latest FullKV store, to speed up things
 // if they are linear
 func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Unit) error {
-	fmt.Println("running singleSquash", mergeUnit)
 	metrics := mergeMetrics{}
 	metrics.start = time.Now()
 

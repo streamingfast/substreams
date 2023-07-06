@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"go.uber.org/zap"
 
@@ -66,8 +67,11 @@ func (s *Scheduler) Init() loop.Cmd {
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
-	fmt.Print(s.Stages.StatesString())
-	fmt.Printf("Scheduler message: %T %v\n", msg, msg)
+
+	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
+		fmt.Print(s.Stages.StatesString())
+		fmt.Printf("Scheduler message: %T %v\n", msg, msg)
+	}
 	//cmd, _ := exec.Command("bash", "-c", "cd "+os.Getenv("TEST_TEMP_DIR")+"; find .").Output()
 	//fmt.Print(string(cmd))
 	var cmds []loop.Cmd

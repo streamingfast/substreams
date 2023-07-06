@@ -6,14 +6,18 @@ STOP_BLOCK ?= +100
 build:
 	cargo build --target wasm32-unknown-unknown --release
 
-.PHONY: stream
-stream: build
+.PHONY: run
+run: build
 	substreams run -e $(ENDPOINT) substreams.yaml map_events -s $(START_BLOCK) -t $(STOP_BLOCK)
+
+.PHONY: gui
+gui: build
+	substreams gui -e $(ENDPOINT) substreams.yaml map_events -s $(START_BLOCK) -t $(STOP_BLOCK)
 
 .PHONY: protogen
 protogen:
 	substreams protogen ./substreams.yaml --exclude-paths="sf/substreams,google"
 
-.PHONY: package
-package: build
-	substreams package substreams.yaml
+.PHONY: pack
+pack: build
+	substreams pack substreams.yaml

@@ -193,7 +193,7 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 
 	mergeUnit := stage.nextUnit()
 
-	if mergeUnit.Segment > s.storeSegmenter.LastIndex() {
+	if mergeUnit.Segment > stage.segmenter.LastIndex() {
 		return nil // We're done here.
 	}
 
@@ -216,8 +216,20 @@ func (s *Stages) CmdTryMerge(stageIdx int) loop.Cmd {
 }
 
 func (s *Stages) MergeCompleted(mergeUnit Unit) {
-	s.stages[mergeUnit.Stage].markSegmentCompleted(mergeUnit.Segment)
 	s.markSegmentCompleted(mergeUnit)
+	s.MoveSegmentCompletedForward(mergeUnit.Stage)
+}
+
+func (s *Stages) MoveSegmentCompletedForward(stageIdx int) {
+	stage := s.stages[stageIdx]
+	for i := stage.segmentCompleted + 1; i < stage.segmenter.LastIndex(); i++ {
+		unit := Unit{Stage: stageIdx, Segment: i}
+		if s.getState(unit) == UnitCompleted {
+			stage.segmentCompleted = i
+		} else {
+			return
+		}
+	}
 }
 
 // initSegmentsOffset marks the first segments as NoOp if they are not required, for

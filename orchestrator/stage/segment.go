@@ -34,6 +34,8 @@ func (s UnitState) String() string {
 		return "Merging"
 	case UnitCompleted:
 		return "Completed"
+	case UnitNoOp:
+		return "NoOp"
 	default:
 		return "Unknown"
 	}

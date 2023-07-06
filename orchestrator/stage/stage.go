@@ -45,10 +45,6 @@ func (s *Stage) nextUnit() Unit {
 	}
 }
 
-func (s *Stage) markSegmentCompleted(segment int) {
-	s.segmentCompleted = segment
-}
-
 type Kind int
 
 const (

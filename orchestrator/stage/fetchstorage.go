@@ -76,6 +76,8 @@ func (s *Stages) FetchStoresState(
 				}
 			}
 		}
+
+		s.MoveSegmentCompletedForward(stageIdx)
 	}
 
 	// loop all stages

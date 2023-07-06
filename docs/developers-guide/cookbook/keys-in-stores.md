@@ -68,4 +68,4 @@ For a full example see [Uniswap V3 Substreams](https://github.com/streamingfast/
 
 ## Links
 * [Uniswap-v3 Subgraph and Substreams](https://github.com/streamingfast/substreams-uniswap-v3)
-* [Key module source code](https://github.com/streamingfast/substreams-rs/blob/develop/substreams/src/key.rs)
+* [Key module documentation](https://docs.rs/substreams/latest/substreams/key/index.html)

@@ -61,7 +61,7 @@ func (s *Stages) FetchStoresState(
 			for _, outputFile := range mapperFiles {
 				segmentIdx := s.mapSegmenter.IndexForEndBlock(outputFile.BlockRange.ExclusiveEndBlock)
 				rng := s.mapSegmenter.Range(segmentIdx)
-				if rng.ExclusiveEndBlock != outputFile.BlockRange.ExclusiveEndBlock {
+				if rng == nil || rng.ExclusiveEndBlock != outputFile.BlockRange.ExclusiveEndBlock {
 					continue
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}

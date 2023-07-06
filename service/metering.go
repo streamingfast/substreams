@@ -19,9 +19,10 @@ func sendMetering(meter dmetering.Meter, userID, apiKeyID, ip, endpoint string, 
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{
-			"egress_bytes":  float64(proto.Size(resp)),
-			"written_bytes": float64(bytesWritten),
-			"read_bytes":    float64(bytesRead),
+			"egress_bytes":   float64(proto.Size(resp)),
+			"written_bytes":  float64(bytesWritten),
+			"read_bytes":     float64(bytesRead),
+			"response_count": 1,
 		},
 		Timestamp: time.Now(),
 	}

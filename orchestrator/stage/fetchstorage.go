@@ -53,7 +53,7 @@ func (s *Stages) FetchStoresState(
 
 		if stage.kind == KindMap {
 			if mapperFiles == nil {
-				panic("assertion: no mapper files in fetchStoreStates but got a mapper stage")
+				continue
 			}
 			if stageIdx != len(s.stages)-1 {
 				panic("assertion: mapper stage is not the last stage")

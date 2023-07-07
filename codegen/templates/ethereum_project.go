@@ -27,15 +27,16 @@ import (
 var ethereumProject embed.FS
 
 type EthereumProject struct {
-	name            string
-	moduleName      string
-	chain           *EthereumChain
-	contractAddress eth.Address
-	events          []codegenEvent
-	abiContent      string
+	name             string
+	moduleName       string
+	chain            *EthereumChain
+	contractAddress  eth.Address
+	events           []codegenEvent
+	abiContent       string
+	creationBlockNum string
 }
 
-func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string) (*EthereumProject, error) {
+func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum string) (*EthereumProject, error) {
 	// We only have one templated file so far, so we can build own model correctly
 	events, err := buildEventModels(abi)
 	if err != nil {
@@ -43,12 +44,13 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, ad
 	}
 
 	return &EthereumProject{
-		name:            name,
-		moduleName:      moduleName,
-		chain:           chain,
-		contractAddress: address,
-		events:          events,
-		abiContent:      abiContent,
+		name:             name,
+		moduleName:       moduleName,
+		chain:            chain,
+		contractAddress:  address,
+		events:           events,
+		abiContent:       abiContent,
+		creationBlockNum: creationBlockNum,
 	}, nil
 }
 
@@ -83,11 +85,12 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 			}
 
 			model := map[string]any{
-				"name":       p.name,
-				"moduleName": p.moduleName,
-				"chain":      p.chain,
-				"address":    p.contractAddress,
-				"events":     p.events,
+				"name":         p.name,
+				"moduleName":   p.moduleName,
+				"chain":        p.chain,
+				"address":      p.contractAddress,
+				"events":       p.events,
+				"initialBlock": p.creationBlockNum,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))

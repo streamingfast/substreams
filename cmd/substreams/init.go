@@ -109,6 +109,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			creationBlockNum = "0"
 		}
 
+		// Printed here because there is a wait time fetching information so it's better to print it before
+		// so the user sees something is happening
+		fmt.Println("Writing project files...")
 		project, err := templates.NewEthereumProject(
 			projectName,
 			moduleName,
@@ -122,7 +125,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("new ethereum project: %w", err)
 		}
 
-		fmt.Println("Writing project files")
 		if err := renderProjectFilesIn(project, absoluteProjectDir); err != nil {
 			return fmt.Errorf("render ethereum project: %w", err)
 		}
@@ -137,7 +139,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return errInitUnsupportedChain
 	}
 
-	fmt.Println("Generating Protobug Rust code")
+	fmt.Println("Generating Protobug Rust code...")
 	if err := protogenSubstreams(absoluteProjectDir); err != nil {
 		return fmt.Errorf("protobug generation: %w", err)
 	}
@@ -148,7 +150,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 }
 
 func protogenSubstreams(absoluteProjectDir string) error {
-	cmd := exec.Command("substreams", "protogen", `--exclude-paths="sf/substreams,google`)
+	cmd := exec.Command("substreams", "protogen", `--exclude-paths`, `sf/substreams,google`)
 	cmd.Dir = absoluteProjectDir
 
 	output, err := cmd.CombinedOutput()

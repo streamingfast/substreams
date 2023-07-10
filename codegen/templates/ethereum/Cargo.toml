@@ -1,10 +1,7 @@
 [package]
 name = "substreams-init-test"
 version = "0.0.1"
-description = "Extraction of all Ethereum events for address bc4ca0eda7647a8ab7c2061c2e118a18a936f13d, see https://etherscan.io/address/bc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
 edition = "2021"
-# repository = ADD REPOSITORY URL HERE
-# license = "Apache 2.0"
 
 [lib]
 name = "substreams"

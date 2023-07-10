@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,7 +79,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 	switch protocol {
 	case codegen.ProtocolEthereum:
-		wantsABI, err := promptTrackContract()
+		isTrackingOwnContract, err := promptTrackContract()
 		if err != nil {
 			return fmt.Errorf("running ABI prompt: %w", err)
 		}
@@ -86,32 +87,36 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		// Default 'Bored Ape Yacht Club' contract.
 		// Used in 'github.com/streamingfast/substreams-template'
 		contract := eth.MustNewAddress("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
+		creationBlockNum := uint64(12287507)
 
-		if wantsABI {
+		if isTrackingOwnContract {
 			contract, err = promptEthereumVerifiedContract()
 			if err != nil {
 				return fmt.Errorf("running contract prompt: %w", err)
 			}
+		} else {
+			fmt.Println("Generating project using Bored Ape Yacht Club contract for demo purposes")
 		}
 
+		fmt.Println("Retrieving contract information (ABI & creation block)")
+
 		// Get contract abiContent & parse
-		abiContent, abi, err := GetContractABI(cmd.Context(), contract)
+		abiContent, abi, err := getContractABI(cmd.Context(), contract)
 		if err != nil {
 			return fmt.Errorf("getting contract ABI: %w", err)
 		}
-		// Wait 5 seconds to avoid Etherscan API rate limit
-		time.Sleep(5 * time.Second)
 
 		// Get contract creation block
-		creationBlockNum, err := GetContractCreationBlock(cmd.Context(), contract)
+
+		// First, wait 5 seconds to avoid Etherscan API rate limit
+		time.Sleep(5 * time.Second)
+		creationBlockNum, err = getContractCreationBlock(cmd.Context(), contract)
 		if err != nil {
 			fmt.Printf("Failed getting contract creation block, using 0 instead: %v", err)
-			creationBlockNum = "0"
+			creationBlockNum = 0
 		}
 
-		// Printed here because there is a wait time fetching information so it's better to print it before
-		// so the user sees something is happening
-		fmt.Println("Writing project files...")
+		fmt.Println("Writing project files")
 		project, err := templates.NewEthereumProject(
 			projectName,
 			moduleName,
@@ -131,7 +136,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 	case codegen.ProtocolOther:
 		fmt.Println()
-		fmt.Println("We haven't added any templates for your selected chain quite yet...")
+		fmt.Println("We haven't added any templates for your selected chain quite yet")
 		fmt.Println()
 		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
 		fmt.Println()
@@ -139,7 +144,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return errInitUnsupportedChain
 	}
 
-	fmt.Println("Generating Protobug Rust code...")
+	fmt.Println("Generating Protobug Rust code")
 	if err := protogenSubstreams(absoluteProjectDir); err != nil {
 		return fmt.Errorf("protobug generation: %w", err)
 	}
@@ -380,7 +385,7 @@ var httpClient = http.Client{
 	Timeout:   30 * time.Second,
 }
 
-func GetContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI, error) {
+func getContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", contract.Pretty()), nil)
 	if err != nil {
 		return "", nil, fmt.Errorf("new request: %w", err)
@@ -414,15 +419,15 @@ func GetContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI
 	return abiContent, ethABI, nil
 }
 
-func GetContractCreationBlock(ctx context.Context, contract eth.Address) (string, error) {
+func getContractCreationBlock(ctx context.Context, contract eth.Address) (uint64, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", contract.Pretty()), nil)
 	if err != nil {
-		return "", fmt.Errorf("new request: %w", err)
+		return 0, fmt.Errorf("new request: %w", err)
 	}
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed request to etherscan: %w", err)
+		return 0, fmt.Errorf("failed request to etherscan: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -436,12 +441,17 @@ func GetContractCreationBlock(ctx context.Context, contract eth.Address) (string
 
 	var response Response
 	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return "", fmt.Errorf("unmarshaling: %w", err)
+		return 0, fmt.Errorf("unmarshaling: %w", err)
 	}
 
 	if len(response.Result) == 0 {
-		return "", fmt.Errorf("empty trx list")
+		return 0, fmt.Errorf("empty result from response %v", response)
 	}
 
-	return response.Result[0].BlockNumber, nil
+	blockNum, err := strconv.ParseUint(response.Result[0].BlockNumber, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing block number: %w", err)
+	}
+
+	return blockNum, nil
 }

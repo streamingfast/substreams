@@ -33,10 +33,10 @@ type EthereumProject struct {
 	contractAddress  eth.Address
 	events           []codegenEvent
 	abiContent       string
-	creationBlockNum string
+	creationBlockNum uint64
 }
 
-func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum string) (*EthereumProject, error) {
+func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum uint64) (*EthereumProject, error) {
 	// We only have one templated file so far, so we can build own model correctly
 	events, err := buildEventModels(abi)
 	if err != nil {
@@ -90,7 +90,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"chain":        p.chain,
 				"address":      p.contractAddress,
 				"events":       p.events,
-				"initialBlock": p.creationBlockNum,
+				"initialBlock": strconv.FormatUint(p.creationBlockNum, 10),
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))

@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 #### Fixed
 
+* `alpha init` reports better progress specially when performing ABI & creation block retrieval.
+
 * `alpha init` command without contracts fixed Protogen command invocation.
 
 ## v1.1.8

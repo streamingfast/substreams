@@ -21,13 +21,21 @@ After you have authenticated, you're ready to [`run`](https://substreams.streami
 **Tip**: The [`substreams` CLI](../reference-and-specs/command-line-interface.md) [**must** **be installed** ](installing-the-cli.md)**to continue**.
 {% endhint %}
 
-{% code title="substreams run" overflow="wrap" %}
+{% code overflow="wrap" %}
+```bash
+$ substreams gui -e mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-ethereum-quickstart/releases/download/1.0.0/substreams-ethereum-quickstart-v1.0.0.spkg map_block --start-block 12292922 --stop-block +1
+```
+{% endcode %}
+
+The [`gui`](../reference-and-specs/command-line-interface/#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_block` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the GUI.
+
+The equivalent `run` command can be used to stream data to the `stdout`, without a graphical user interface:
+
+{% code overflow="wrap" %}
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-ethereum-quickstart/releases/download/1.0.0/substreams-ethereum-quickstart-v1.0.0.spkg map_block --start-block 12292922 --stop-block +1
 ```
 {% endcode %}
-
-The [`run`](../reference-and-specs/command-line-interface/#run) command starts a consumer by using the `--endpoint` serving [a given blockchain](../reference-and-specs/chains-and-endpoints.md), for the [spkg package](../reference-and-specs/packages.md). Processing starts at the given block, then stops after processing one block. The output of the `map_block` [module](../developers-guide/modules/setting-up-handlers.md) is streamed to the requesting client.
 
 {% hint style="info" %}
 **Note**: While Substreams technology is chain-agnostic, you must write your Substreams for a specific chain. In this quickstart, we are using Ethereum as our specific chain, general concepts given in the quick start applied to every Substreams supported chain.
@@ -113,7 +121,7 @@ strip = "debuginfo"
 
 Substreams modules are required to output protobuf encoded messages. The example protobuf definition from the [`substreams-ethereum-quickstart`](https://github.com/streamingfast/substreams-ethereum-quickstart) defines a simple `BlockMeta` message that contains that block's hash, number, parent hash and timestamp all in human readable form.
 
-Copy and paste the content for the example protobuf definition into a new file named [`block_meta.proto`](https://github.com/streamingfast/substreams-ethereum-quickstart/blob/main/proto/block_meta.proto) and save it to a `proto` directory in the root directory of your Substreams module.
+Copy and paste the content for the example protobuf definition into a new file named [`block_meta.proto`](https://github.com/streamingfast/substreams-ethereum-quickstart/blob/main/proto/block\_meta.proto) and save it to a `proto` directory in the root directory of your Substreams module.
 
 ```
 syntax = "proto3";
@@ -173,7 +181,7 @@ cargo build --release --target wasm32-unknown-unknown
 ```
 
 {% hint style="info" %}
-**Note**: If you have a lots of weird compilation errors like `cannot find function, tuple struct or tuple variant `Ok` in this scope`, `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, etc. you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, install it with `rustup target add wasm32-unknown-unknown`, see [Rust installation](../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) extra details.
+**Note**: If you have a lots of weird compilation errors like `cannot find function, tuple struct or tuple variant` Ok `in this scope`, `cannot find macro 'assert' in this scope`, `cannot find tuple struct or tuple variant 'Some' in this scope`, etc. you probably don't have the target `wasm32-unknown-unknown` installed in your Rust environment, install it with `rustup target add wasm32-unknown-unknown`, see [Rust installation](../developers-guide/installation-requirements.md#wasm32-unknown-unknown-target) extra details.
 {% endhint %}
 
 ### Execute

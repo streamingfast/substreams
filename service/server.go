@@ -49,7 +49,7 @@ func ListenTier1(
 	// note: some of these common options don't work with connectWeb
 	options := GetCommonServerOptions(addr, logger, healthcheck)
 
-	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth)))
+	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
 	options = append(options, dgrpcserver.WithConnectStrictContentType(false))
 
 	streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
@@ -77,8 +77,8 @@ func ListenTier2(
 		options = append(options, dgrpcserver.WithServiceDiscoveryURL(serviceDiscoveryURL))
 	}
 	options = append(options,
-		dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth)),
-		dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth)),
+		dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, logger)),
+		dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, logger)),
 	)
 
 	grpcServer := factory.ServerFromOptions(options...)

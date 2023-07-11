@@ -246,7 +246,7 @@ func promptEthereumVerifiedContract() (eth.Address, error) {
 		return eth.MustNewAddress(devInitEthereumTrackedContract), nil
 	}
 
-	return promptT("Verified Ethereum mainnet contract to track", eth.NewAddress, &promptOptions{
+	return promptT("Verified Ethereum contract address to track", eth.NewAddress, &promptOptions{
 		Validate: func(input string) error {
 			_, err := eth.NewAddress(input)
 			if err != nil {

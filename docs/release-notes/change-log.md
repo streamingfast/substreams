@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * `alpha init` command: replace `initialBlock` for generated manifest based on contract creation block.
 
-* `alpha init` prompt Ethereum chain. Added: Mainnet, BNB, Polygon, Goerli, Sepolia.
+* `alpha init` prompt Ethereum chain. Added: Mainnet, BNB, Polygon, Goerli.
 
 #### Fixed
 

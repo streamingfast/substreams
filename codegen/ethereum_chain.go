@@ -8,7 +8,7 @@ package codegen
 // BNB
 // Polygon
 // Goerli
-// Sepolia
+// // Sepolia
 // Other
 //
 // )

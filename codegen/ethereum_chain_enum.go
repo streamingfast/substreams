@@ -20,23 +20,20 @@ const (
 	EthereumChainPolygon
 	// EthereumChainGoerli is a EthereumChain of type Goerli.
 	EthereumChainGoerli
-	// EthereumChainSepolia is a EthereumChain of type Sepolia.
-	EthereumChainSepolia
 	// EthereumChainOther is a EthereumChain of type Other.
 	EthereumChainOther
 )
 
 var ErrInvalidEthereumChain = fmt.Errorf("not a valid EthereumChain, try [%s]", strings.Join(_EthereumChainNames, ", "))
 
-const _EthereumChainName = "MainnetBNBPolygonGoerliSepoliaOther"
+const _EthereumChainName = "MainnetBNBPolygonGoerliOther"
 
 var _EthereumChainNames = []string{
 	_EthereumChainName[0:7],
 	_EthereumChainName[7:10],
 	_EthereumChainName[10:17],
 	_EthereumChainName[17:23],
-	_EthereumChainName[23:30],
-	_EthereumChainName[30:35],
+	_EthereumChainName[23:28],
 }
 
 // EthereumChainNames returns a list of possible string values of EthereumChain.
@@ -51,8 +48,7 @@ var _EthereumChainMap = map[EthereumChain]string{
 	EthereumChainBNB:     _EthereumChainName[7:10],
 	EthereumChainPolygon: _EthereumChainName[10:17],
 	EthereumChainGoerli:  _EthereumChainName[17:23],
-	EthereumChainSepolia: _EthereumChainName[23:30],
-	EthereumChainOther:   _EthereumChainName[30:35],
+	EthereumChainOther:   _EthereumChainName[23:28],
 }
 
 // String implements the Stringer interface.
@@ -79,10 +75,8 @@ var _EthereumChainValue = map[string]EthereumChain{
 	strings.ToLower(_EthereumChainName[10:17]): EthereumChainPolygon,
 	_EthereumChainName[17:23]:                  EthereumChainGoerli,
 	strings.ToLower(_EthereumChainName[17:23]): EthereumChainGoerli,
-	_EthereumChainName[23:30]:                  EthereumChainSepolia,
-	strings.ToLower(_EthereumChainName[23:30]): EthereumChainSepolia,
-	_EthereumChainName[30:35]:                  EthereumChainOther,
-	strings.ToLower(_EthereumChainName[30:35]): EthereumChainOther,
+	_EthereumChainName[23:28]:                  EthereumChainOther,
+	strings.ToLower(_EthereumChainName[23:28]): EthereumChainOther,
 }
 
 // ParseEthereumChain attempts to convert a string to a EthereumChain.

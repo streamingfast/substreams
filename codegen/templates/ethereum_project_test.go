@@ -20,7 +20,7 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 	abi, err := eth.ParseABIFromBytes(abiContent)
 	require.NoError(t, err)
 
-	project, err := NewEthereumProject("substreams-tests", "substreams_tests", EthereumChainsByID["ethereum_mainnet"], eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(abiContent), 123)
+	project, err := NewEthereumProject("substreams-tests", "substreams_tests", EthereumChainsByID["Mainnet"], eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(abiContent), 123)
 	require.NoError(t, err)
 
 	files, err := project.Render()
@@ -82,7 +82,7 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			abi, err := eth.ParseABIFromBytes(tt.args.abi)
 			require.NoError(t, err)
 
-			chain := EthereumChainsByID["ethereum_mainnet"]
+			chain := EthereumChainsByID["Mainnet"]
 
 			project, err := NewEthereumProject("substreams-init-test", "substreams_init_test", chain, eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(tt.args.abi), 123)
 			require.NoError(t, err)

@@ -30,9 +30,11 @@ var (
 	devInitProjectName             = os.Getenv("SUBSTREAMS_DEV_INIT_PROJECT_NAME")
 	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
 	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
+	devInitEthereumChain           = os.Getenv(("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN"))
 )
 
 var errInitUnsupportedChain = errors.New("unsupported chain")
+var errInitUnsupportedProtocol = errors.New("unsupported protocol")
 
 var initCmd = &cobra.Command{
 	Use:   "init [<path>]",
@@ -79,15 +81,31 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 	switch protocol {
 	case codegen.ProtocolEthereum:
-		isTrackingOwnContract, err := promptTrackContract()
+
+		chainSelected, err := promptEthereumChain()
 		if err != nil {
-			return fmt.Errorf("running ABI prompt: %w", err)
+			return fmt.Errorf("running chain prompt: %w", err)
+		}
+		if chainSelected == codegen.EthereumChainOther {
+			fmt.Println()
+			fmt.Println("We haven't added any templates for your selected chain quite yet")
+			fmt.Println()
+			fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
+			fmt.Println()
+			return errInitUnsupportedChain
 		}
 
-		// Default 'Bored Ape Yacht Club' contract.
-		// Used in 'github.com/streamingfast/substreams-template'
-		contract := eth.MustNewAddress("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d")
-		creationBlockNum := uint64(12287507)
+		isTrackingOwnContract, err := promptTrackContract()
+		if err != nil {
+			return fmt.Errorf("running contract address prompt: %w", err)
+		}
+
+		chain := templates.EthereumChainsByID[chainSelected.String()]
+		if chain == nil {
+			return fmt.Errorf("unknown chain: %s", chainSelected.String())
+		}
+
+		contract := eth.MustNewAddress(chain.DefaultContractAddress)
 
 		if isTrackingOwnContract {
 			contract, err = promptEthereumVerifiedContract()
@@ -95,24 +113,23 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("running contract prompt: %w", err)
 			}
 		} else {
-			fmt.Println("Generating project using Bored Ape Yacht Club contract for demo purposes")
+			fmt.Printf("Generating %s project using %s contract for demo purposes\n", chain.DisplayName, chain.DefaultContractName)
 		}
 
-		fmt.Println("Retrieving contract information (ABI & creation block)")
+		fmt.Printf("Retrieving %s contract information (ABI & creation block)\n", chain.DisplayName)
 
 		// Get contract abiContent & parse
-		abiContent, abi, err := getContractABI(cmd.Context(), contract)
+		abiContent, abi, err := getContractABI(cmd.Context(), contract, chain)
 		if err != nil {
-			return fmt.Errorf("getting contract ABI: %w", err)
+			return fmt.Errorf("getting %s contract ABI: %w", chain.DisplayName, err)
 		}
 
 		// Get contract creation block
-
 		// First, wait 5 seconds to avoid Etherscan API rate limit
 		time.Sleep(5 * time.Second)
-		creationBlockNum, err = getContractCreationBlock(cmd.Context(), contract)
+		creationBlockNum, err := getContractCreationBlock(cmd.Context(), contract, chain)
 		if err != nil {
-			fmt.Printf("Failed getting contract creation block, using 0 instead: %v", err)
+			fmt.Printf("getting %s contract creation block, using 0 instead: %v\n", chain.DisplayName, err)
 			creationBlockNum = 0
 		}
 
@@ -120,33 +137,33 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		project, err := templates.NewEthereumProject(
 			projectName,
 			moduleName,
-			templates.EthereumChainsByID["ethereum_mainnet"],
+			chain,
 			contract,
 			abi,
 			abiContent,
 			creationBlockNum,
 		)
 		if err != nil {
-			return fmt.Errorf("new ethereum project: %w", err)
+			return fmt.Errorf("new Ethereum %s project: %w", chain.DisplayName, err)
 		}
 
 		if err := renderProjectFilesIn(project, absoluteProjectDir); err != nil {
-			return fmt.Errorf("render ethereum project: %w", err)
+			return fmt.Errorf("render Ethereum %s project: %w", chain.DisplayName, err)
 		}
 
 	case codegen.ProtocolOther:
 		fmt.Println()
-		fmt.Println("We haven't added any templates for your selected chain quite yet")
+		fmt.Println("We haven't added any templates for your selected protocol quite yet")
 		fmt.Println()
 		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
 		fmt.Println()
 
-		return errInitUnsupportedChain
+		return errInitUnsupportedProtocol
 	}
 
-	fmt.Println("Generating Protobug Rust code")
+	fmt.Println("Generating Protobuf Rust code")
 	if err := protogenSubstreams(absoluteProjectDir); err != nil {
-		return fmt.Errorf("protobug generation: %w", err)
+		return fmt.Errorf("protobuf generation: %w", err)
 	}
 
 	fmt.Printf("Project %q initialized at %q\n", projectName, absoluteWorkingDir)
@@ -229,7 +246,7 @@ func promptEthereumVerifiedContract() (eth.Address, error) {
 		return eth.MustNewAddress(devInitEthereumTrackedContract), nil
 	}
 
-	return promptT("Verified Ethereum mainnet contract to track", eth.NewAddress, &promptOptions{
+	return promptT("Verified Ethereum contract address to track", eth.NewAddress, &promptOptions{
 		Validate: func(input string) error {
 			_, err := eth.NewAddress(input)
 			if err != nil {
@@ -289,6 +306,44 @@ func promptProtocol() (codegen.Protocol, error) {
 	}
 
 	return protocol, nil
+}
+
+func promptEthereumChain() (codegen.EthereumChain, error) {
+	if devInitEthereumChain != "" {
+		// It's ok to panic, we expect the dev to put in a valid Ethereum chain
+		chain, err := codegen.ParseEthereumChain(devInitEthereumChain)
+		if err != nil {
+			panic(fmt.Errorf("invalid chain: %w", err))
+		}
+
+		return chain, nil
+	}
+
+	choice := promptui.Select{
+		Label: "Select Ethereum chain",
+		Items: codegen.EthereumChainNames(),
+		Templates: &promptui.SelectTemplates{
+			Selected: `{{ "Ethereum chain:" | faint }} {{ . }}`,
+		},
+		HideHelp: true,
+	}
+
+	_, selection, err := choice.Run()
+	if err != nil {
+		if errors.Is(err, promptui.ErrInterrupt) {
+			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
+			os.Exit(1)
+		}
+
+		return codegen.EthereumChainOther, fmt.Errorf("running chain prompt: %w", err)
+	}
+
+	var chain codegen.EthereumChain
+	if err := chain.UnmarshalText([]byte(selection)); err != nil {
+		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
+	}
+
+	return chain, nil
 }
 
 type promptOptions struct {
@@ -385,8 +440,8 @@ var httpClient = http.Client{
 	Timeout:   30 * time.Second,
 }
 
-func getContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", contract.Pretty()), nil)
+func getContractABI(ctx context.Context, contract eth.Address, chain *templates.EthereumChain) (string, *eth.ABI, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.Pretty()), nil)
 	if err != nil {
 		return "", nil, fmt.Errorf("new request: %w", err)
 	}
@@ -419,8 +474,8 @@ func getContractABI(ctx context.Context, contract eth.Address) (string, *eth.ABI
 	return abiContent, ethABI, nil
 }
 
-func getContractCreationBlock(ctx context.Context, contract eth.Address) (uint64, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.etherscan.io/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", contract.Pretty()), nil)
+func getContractCreationBlock(ctx context.Context, contract eth.Address, chain *templates.EthereumChain) (uint64, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.Pretty()), nil)
 	if err != nil {
 		return 0, fmt.Errorf("new request: %w", err)
 	}

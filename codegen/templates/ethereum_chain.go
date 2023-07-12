@@ -43,6 +43,14 @@ var EthereumChainsByID = map[string]*EthereumChain{
 		DefaultContractName:    "GETH Token",
 		FirehoseEndpoint:       "goerli.eth.streamingfast.io:443",
 	},
+	"Mumbai": {
+		DisplayName:            "Mumbai Testnet",
+		ExplorerLink:           "https://mumbai.polygonscan.com",
+		ApiEndpoint:            "https://api-mumbai.polygonscan.com",
+		DefaultContractAddress: "0xFCe7187B24FCDc9feFfE428Ec9977240C6F7006D",
+		DefaultContractName:    "USDT Token",
+		FirehoseEndpoint:       "mumbai.streamingfast.io:443",
+	},
 	// "Sepolia": {
 	// 	DisplayName:            "Sepolia Testnet",
 	// 	ExplorerLink:           "https://sepolia.etherscan.io",

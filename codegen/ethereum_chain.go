@@ -8,6 +8,7 @@ package codegen
 // BNB
 // Polygon
 // Goerli
+// Mumbai
 // // Sepolia
 // Other
 //

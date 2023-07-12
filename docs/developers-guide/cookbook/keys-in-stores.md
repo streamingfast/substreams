@@ -9,10 +9,10 @@ We use store modules to aggregate the data in the underlying key-value storage. 
 In most cases, you will encode data into your keys into segmented parts, adding a prefix as namespace for example `user` and `<address>` joined together using a separator.  Segments in a key are conventionally joined with `:` as a separator.
 
 Here are some examples,
-- `Pool:{pool_address}:volumeUSD` - {pool_address} pool total traded USD volume
-- `Token:{token_addr}:volume` - total {token_addr} token volume traded
-- `UniswapDayData:{day_id}:volumeUSD` - {day_id} daily USD trade volume
-- `PoolDayData:{day_id}:{pool_address}:{token_addr}:volumeToken1` - total {day_id} daily volume of {token_addr} token that went through a {pool_address} pool in token1 equivalent
+- `Pool:{pool_address}:volumeUSD` - `{pool_address}` pool total traded USD volume
+- `Token:{token_addr}:volume` - total `{token_addr}` token volume traded
+- `UniswapDayData:{day_id}:volumeUSD` - `{day_id}` daily USD trade volume
+- `PoolDayData:{day_id}:{pool_address}:{token_addr}:volumeToken1` - total `{day_id}` daily volume of `{token_addr}` token that went through a `{pool_address}` pool in token1 equivalent
 
 In the example of a counter store below, we increment transaction counters for different metrics that we could use in the downstream modules:
 ```rust

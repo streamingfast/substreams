@@ -1,0 +1,29 @@
+specVersion: v0.1.0
+package:
+  name: substreams_wasm
+  version: v1.0.0
+
+imports:
+  database: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v1.2.1/substreams-database-change-v1.2.1.spkg
+  eth: https://github.com/streamingfast/firehose-ethereum/releases/download/v1.4.8/ethereum-v1.0.0.spkg
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./substreams.wasm
+
+modules:
+  - name: map_noop
+    kind: map
+    inputs:
+      - params: string
+    output:
+      type: proto:none
+
+  - name: map_block
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+

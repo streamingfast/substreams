@@ -36,6 +36,10 @@ func (f ModuleFactoryFunc) NewModule(ctx context.Context, wasmCode []byte, regis
 // A Module is a cached or pre-compiled version able to generate new isolated
 // instances, and execute calls on them. It lives for the duration of a stream.
 type Module interface {
+	// NewInstance can be used to create up-front a new instance, which will be
+	// cached and reused for the duration execution of ExecuteNewCall.
+	NewInstance(ctx context.Context) (instance Instance, err error)
+
 	// ExecuteNewCall is called once per module execution for each block.
 	// If caching is enabled, the returned Instance will be saved and passed in
 	// as the `cachedInstance` argument upon the next call. In which case, the runtime

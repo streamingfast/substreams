@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 )
 
 // Registry from Substreams's perspective is a singleton that is
@@ -48,9 +50,25 @@ func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, erro
 }
 
 func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
+	runtimeName := "wazero" // default
+
+	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
+		selectedRuntime := runtimes[selectRuntime]
+		if selectedRuntime == nil {
+			panic(fmt.Errorf("could not find wasm runtime specified by `SUBSTREAMS_WASM_RUNTIME` env var: %q", selectRuntime))
+		}
+	} else {
+		zlog.Info("using default wasm runtime", zap.String("runtime", runtimeName))
+	}
+
+	return NewRegistryWithRuntime(runtimeName, extensions, maxFuel)
+}
+
+func NewRegistryWithRuntime(runtimeName string, extensions []WASMExtensioner, maxFuel uint64) *Registry {
 	r := &Registry{
 		maxFuel: maxFuel,
 	}
+
 	for _, ext := range extensions {
 		for ns, exts := range ext.WASMExtensions() {
 			for name, ext := range exts {
@@ -60,26 +78,15 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 	}
 
 	if cache := os.Getenv("SUBSTREAMS_WASM_CACHE_ENABLED"); cache == "true" {
-		zlog.Warn("Running with WASM cache because SUBSTREAMS_WASM_CACHE_ENABLED variable was set -- this will produce non-deterministic output and poison your cache. Never use the WASM cache in production.")
+		zlog.Warn("running with WASM cache because SUBSTREAMS_WASM_CACHE_ENABLED variable was set -- this will produce non-deterministic output and poison your cache. Never use the WASM cache in production.")
 		r.instanceCacheEnabled = true
 	}
-	cacheField := zap.Bool("cache_enabled", r.instanceCacheEnabled)
 
-	runtimeName := "wazero" // default
-	runtime := runtimes[runtimeName]
-	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
-		selectedRuntime := runtimes[selectRuntime]
-		if selectedRuntime == nil {
-			panic(fmt.Errorf("could not find wasm runtime specified by `SUBSTREAMS_WASM_RUNTIME` env var: %q", selectRuntime))
-		} else {
-			runtimeName = selectRuntime
-			runtime = selectedRuntime
-			zlog.Info("using wasm runtime specified by env var", zap.String("runtime", runtimeName), cacheField)
-		}
-	} else {
-		zlog.Info("using default wasm runtime", zap.String("runtime", runtimeName), cacheField)
+	var found bool
+	r.runtimeStack, found = runtimes[runtimeName]
+	if !found {
+		panic(fmt.Errorf("could not find wasm runtime %q (valid values are %q)", runtimeName, strings.Join(maps.Keys(runtimes), ", ")))
 	}
-	r.runtimeStack = runtime
 
 	return r
 }

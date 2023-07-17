@@ -1,0 +1,18 @@
+[package]
+name = "substreams-wasm"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "substreams"
+crate-type = ["cdylib"]
+
+[dependencies]
+substreams = "0.5"
+prost = "0.11"
+prost-types = "0.11"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

@@ -96,8 +96,6 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, b
 	span.SetAttributes(attribute.String("subtreams.store", saveStore.Name()))
 	defer span.EndWithErr(&err)
 
-	fmt.Println("2")
-
 	file, writer, err := saveStore.Save(boundaryBlock)
 	if err != nil {
 		return fmt.Errorf("saving store %q at boundary %d: %w", saveStore.Name(), boundaryBlock, err)

@@ -14,7 +14,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20230621153617-bc715cdb9fd1
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
-	github.com/streamingfast/pbgo v0.0.6-0.20221020131607-255008258d28 // indirect
+	github.com/streamingfast/pbgo v0.0.6-0.20221020131607-255008258d28
 	github.com/stretchr/testify v1.8.3
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.24.0
@@ -35,7 +35,6 @@ require (
 	github.com/charmbracelet/bubbletea v0.23.1
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/charmbracelet/lipgloss v0.6.0
-	github.com/dop251/goja_nodejs v0.0.0-20230602164024-804a84515562
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/google/uuid v1.3.0
@@ -71,11 +70,6 @@ require (
 	golang.org/x/oauth2 v0.8.0
 	google.golang.org/grpc v1.54.0
 	gopkg.in/yaml.v2 v2.4.0
-)
-
-require (
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
-	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 )
 
 require (
@@ -115,7 +109,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
-	github.com/dop251/goja v0.0.0-20230707174833-636fdf960de1
 	github.com/envoyproxy/go-control-plane v0.10.3 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
 	github.com/eoscanada/eos-go v0.9.1-0.20200415144303-2adb25bcdeca // indirect

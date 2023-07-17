@@ -1,16 +1,13 @@
 package main
 
 import (
-	"errors"
 	"os"
 
 	"context"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/wasm"
-	_ "github.com/streamingfast/substreams/wasm/goja"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
@@ -46,7 +43,6 @@ func BenchmarkExecution(b *testing.B) {
 		var reuseInstance = true
 		var freshInstanceEachRun = false
 
-		jsCode := readCode(b, "substreams_ts/index.js")
 		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 
 		for _, config := range []*runtime{
@@ -55,9 +51,6 @@ func BenchmarkExecution(b *testing.B) {
 
 			{"wazero", wasmCode, reuseInstance},
 			{"wazero", wasmCode, freshInstanceEachRun},
-
-			{"goja", jsCode, reuseInstance},
-			{"goja", jsCode, freshInstanceEachRun},
 		} {
 			suffix := "_reuse_instance"
 			if !config.shouldReUseInstance {
@@ -87,11 +80,6 @@ func BenchmarkExecution(b *testing.B) {
 
 					_, err := module.ExecuteNewCall(ctx, call, instance, testCase.arguments)
 					if err != nil {
-						var ex *goja.Exception
-						if errors.As(err, &ex) {
-							require.NoError(b, err, ex.String())
-						}
-
 						require.NoError(b, err)
 					}
 

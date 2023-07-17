@@ -43,3 +43,10 @@ func WithFinalBlocksOnly() Option {
 		p.finalBlocksOnly = true
 	}
 }
+
+func WithHighestStage(stage uint32) Option {
+	return func(p *Pipeline) {
+		s := int(stage)
+		p.highestStage = &s
+	}
+}

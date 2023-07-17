@@ -1,21 +1,15 @@
 package pipeline
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/streamingfast/substreams/storage/store"
 
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/reqctx"
 )
 
-func (p *Pipeline) sendSnapshots(ctx context.Context, storeMap store.Map) error {
-	if reqctx.Details(ctx).IsSubRequest {
-		return nil
-	}
-	snapshotModules := reqctx.Details(ctx).DebugInitialStoreSnapshotForModules
+func (p *Pipeline) sendSnapshots(storeMap store.Map, snapshotModules []string) error {
 	if len(snapshotModules) == 0 {
 		return nil
 	}

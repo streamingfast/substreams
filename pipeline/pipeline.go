@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"go.opentelemetry.io/otel"
-	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dauth"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -45,7 +45,8 @@ type Pipeline struct {
 	wasmRuntime     *wasm.Registry
 	outputGraph     *outputmodules.Graph
 	loadedModules   map[uint32]wasm.Module
-	moduleExecutors [][]exec.ModuleExecutor
+	moduleExecutors [][]exec.ModuleExecutor // Staged module executors
+	executionStages outputmodules.ExecutionStages
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
@@ -61,6 +62,7 @@ type Pipeline struct {
 
 	gate            *gate
 	finalBlocksOnly bool
+	highestStage    *int
 
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef
@@ -71,7 +73,6 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	tier    string
 	traceID string
 }
 
@@ -84,7 +85,6 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc substreams.ResponseFunc,
-	tier string,
 	traceID string,
 	opts ...Option,
 ) *Pipeline {
@@ -99,7 +99,6 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
-		tier:            tier,
 		traceID:         traceID,
 	}
 	for _, opt := range opts {
@@ -108,9 +107,8 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
+func (p *Pipeline) init(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
-	logger := reqctx.Logger(ctx)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
 		for _, modOut := range moduleOutputs {
@@ -120,29 +118,54 @@ func (p *Pipeline) InitStoresAndBackprocess(ctx context.Context) (err error) {
 
 	p.setupProcessingModule(reqDetails)
 
-	var storeMap store.Map
-	if reqDetails.IsSubRequest {
-		logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap))
-		if storeMap, err = p.setupSubrequestStores(ctx); err != nil {
-			return fmt.Errorf("failed to setup subrequest stores: %w", err)
+	stagedModules := p.outputGraph.StagedUsedModules()
+
+	// truncate stages to highest scheduled stage
+	if highest := p.highestStage; highest != nil {
+		if len(stagedModules) < *highest+1 {
+			return fmt.Errorf("invalid stage %d, there aren't that many", highest)
 		}
-	} else {
-		if storeMap, err = p.runParallelProcess(ctx); err != nil {
-			return fmt.Errorf("failed run_parallel_process: %w", err)
-		}
+		stagedModules = stagedModules[0 : *highest+1]
 	}
-	p.stores.SetStoreMap(storeMap)
+	p.executionStages = stagedModules
 
 	return nil
 }
 
-func (p *Pipeline) InitWASM(ctx context.Context) (err error) {
+func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
+	if err := p.init(ctx); err != nil {
+		return err
+	}
 
-	// TODO(abourget): Build the Module Executor list: this could be done lazily, but the outputmodules.Graph,
-	//  and cache the latest if all block boundaries
-	//  are still clear.
+	storeMap, err := p.setupSubrequestStores(ctx)
+	if err != nil {
+		return fmt.Errorf("subrequest stores setup failed: %w", err)
+	}
 
-	return p.buildWASM(ctx, p.outputGraph.StagedUsedModules())
+	p.stores.SetStoreMap(storeMap)
+
+	logger := reqctx.Logger(ctx)
+	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
+
+	return nil
+}
+
+func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
+	if err := p.init(ctx); err != nil {
+		return err
+	}
+
+	var storeMap store.Map
+	if reqPlan.BuildStores != nil {
+		if storeMap, err = p.runParallelProcess(ctx, reqPlan); err != nil {
+			return fmt.Errorf("run_parallel_process failed: %w", err)
+		}
+	} else {
+		storeMap = p.setupEmptyStores(ctx)
+	}
+	p.stores.SetStoreMap(storeMap)
+
+	return nil
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {
@@ -161,55 +184,82 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 }
 
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/pipeline/store_setup", p.tier))
+	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier2/store_setup")
 	defer span.EndWithErr(&err)
 
 	reqDetails := reqctx.Details(ctx)
 	logger := reqctx.Logger(ctx)
 
-	outputModuleName := reqDetails.OutputModule
-
-	ttrace.SpanContextFromContext(context.Background())
 	storeMap = store.NewMap()
 
-	for name, storeConfig := range p.stores.configs {
-		if name == outputModuleName {
-			partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
-			storeMap.Set(partialStore)
-		} else {
-			fullStore := storeConfig.NewFullKV(logger)
+	lastStage := len(p.executionStages) - 1
+	for stageIdx, stage := range p.executionStages {
+		isLastStage := stageIdx == lastStage
+		layer := stage.LastLayer()
+		if !layer.IsStoreLayer() {
+			continue
+		}
+		for _, mod := range layer {
+			storeConfig := p.stores.configs[mod.Name]
 
-			if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
-				file := store.NewCompleteFileInfo(fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
-				if err := fullStore.Load(ctx, file); err != nil {
-					return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
+			if isLastStage {
+				partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
+				storeMap.Set(partialStore)
+
+			} else {
+				fullStore := storeConfig.NewFullKV(logger)
+
+				if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
+					file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
+					// FIXME: run debugging session with conditional breakpoint
+					// `request.Stage == 1 && request.StartBlockNum == 20`
+					// in tier2.go: on the call to InitTier2Stores.
+					// Things stall in this LOAD command:
+					if err := fullStore.Load(ctx, file); err != nil {
+						return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
+					}
 				}
+				storeMap.Set(fullStore)
 			}
-
-			storeMap.Set(fullStore)
 		}
 	}
 
 	return storeMap, nil
 }
 
+func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
+	logger := reqctx.Logger(ctx)
+	storeMap := store.NewMap()
+	for _, storeConfig := range p.stores.configs {
+		fullStore := storeConfig.NewFullKV(logger)
+		storeMap.Set(fullStore)
+	}
+	return storeMap
+}
+
 // runParallelProcess
-func (p *Pipeline) runParallelProcess(ctx context.Context) (storeMap store.Map, err error) {
-	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/pipeline/parallel_process", p.tier))
+func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan) (storeMap store.Map, err error) {
+	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier1/parallel_process")
 	defer span.EndWithErr(&err)
+
 	reqDetails := reqctx.Details(ctx)
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
+	if reqDetails.ShouldStreamCachedOutputs() && p.pendingUndoMessage != nil {
+		p.respFunc(p.pendingUndoMessage)
+	}
+
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		ctx,
-		reqDetails,
+		reqPlan,
 		p.runtimeConfig,
+		int(reqDetails.MaxParallelJobs),
 		p.outputGraph,
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		p.pendingUndoMessage,
+		p.traceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)
@@ -250,6 +300,7 @@ func (p *Pipeline) runPreBlockHooks(ctx context.Context, clock *pbsubstreams.Clo
 	return nil
 }
 
+// TODO: move this to `responses`
 func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.StoreModuleOutput) {
 	deltas := in.GetStoreDeltas()
 	if deltas == nil {
@@ -360,88 +411,111 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-// TODO(abourget): have this being generated and the `buildWASM` by taking
-// this Graph as input, and creating the ModuleExecutors, and caching
-// them over there.
-// moduleExecutorsInitialized bool
-// moduleExecutors            []exec.ModuleExecutor
-func (p *Pipeline) buildWASM(ctx context.Context, stages [][]*pbsubstreams.Module) error {
+// buildModuleExecutors builds the moduleExecutors, and the loadedModules.
+func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExecutor, error) {
+	if p.moduleExecutors != nil {
+		// Eventually, we can invalidate our catch to accomodate the PATCH
+		// and rebuild all the modules, and tear down the previously loaded ones.
+		return p.moduleExecutors, nil
+	}
+
 	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	loadedModules := make(map[uint32]wasm.Module)
-	for _, stage := range stages {
-		for _, module := range stage {
-			if _, exists := loadedModules[module.BinaryIndex]; exists {
-				continue
+	for _, stage := range p.executionStages {
+		for _, layer := range stage {
+			for _, module := range layer {
+				if _, exists := loadedModules[module.BinaryIndex]; exists {
+					continue
+				}
+				code := reqModules.Binaries[module.BinaryIndex]
+				m, err := p.wasmRuntime.NewModule(ctx, code.Content)
+				if err != nil {
+					return nil, fmt.Errorf("new wasm module: %w", err)
+				}
+				loadedModules[module.BinaryIndex] = m
 			}
-			code := reqModules.Binaries[module.BinaryIndex]
-			m, err := p.wasmRuntime.NewModule(ctx, code.Content)
-			if err != nil {
-				return fmt.Errorf("new wasm module: %w", err)
-			}
-			loadedModules[module.BinaryIndex] = m
 		}
 	}
+
 	p.loadedModules = loadedModules
 
 	var stagedModuleExecutors [][]exec.ModuleExecutor
-	for _, stage := range stages {
-		var moduleExecutors []exec.ModuleExecutor
-		for _, module := range stage {
-			inputs, err := p.renderWasmInputs(module)
-			if err != nil {
-				return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
-			}
-
-			entrypoint := module.BinaryEntrypoint
-			mod := loadedModules[module.BinaryIndex]
-
-			switch kind := module.Kind.(type) {
-			case *pbsubstreams.Module_KindMap_:
-				outType := strings.TrimPrefix(module.Output.Type, "proto:")
-				baseExecutor := exec.NewBaseExecutor(
-					ctx,
-					module.Name,
-					mod,
-					p.wasmRuntime.InstanceCacheEnabled(),
-					inputs,
-					entrypoint,
-					tracer,
-				)
-				executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
-				moduleExecutors = append(moduleExecutors, executor)
-
-			case *pbsubstreams.Module_KindStore_:
-				updatePolicy := kind.KindStore.UpdatePolicy
-				valueType := kind.KindStore.ValueType
-
-				outputStore, found := p.stores.StoreMap.Get(module.Name)
-				if !found {
-					return fmt.Errorf("store %q not found", module.Name)
+	for _, stage := range p.executionStages {
+		for _, layer := range stage {
+			var moduleExecutors []exec.ModuleExecutor
+			for _, module := range layer {
+				inputs, err := p.renderWasmInputs(module)
+				if err != nil {
+					return nil, fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
-				inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
 
-				baseExecutor := exec.NewBaseExecutor(
-					ctx,
-					module.Name,
-					mod,
-					p.wasmRuntime.InstanceCacheEnabled(),
-					inputs,
-					entrypoint,
-					tracer,
-				)
-				executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
-				moduleExecutors = append(moduleExecutors, executor)
+				entrypoint := module.BinaryEntrypoint
+				mod := loadedModules[module.BinaryIndex]
 
-			default:
-				panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))
+				switch kind := module.Kind.(type) {
+				case *pbsubstreams.Module_KindMap_:
+					outType := strings.TrimPrefix(module.Output.Type, "proto:")
+					baseExecutor := exec.NewBaseExecutor(
+						ctx,
+						module.Name,
+						mod,
+						p.wasmRuntime.InstanceCacheEnabled(),
+						inputs,
+						entrypoint,
+						tracer,
+					)
+					executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
+					moduleExecutors = append(moduleExecutors, executor)
+
+				case *pbsubstreams.Module_KindStore_:
+					updatePolicy := kind.KindStore.UpdatePolicy
+					valueType := kind.KindStore.ValueType
+
+					outputStore, found := p.stores.StoreMap.Get(module.Name)
+					if !found {
+						return nil, fmt.Errorf("store %q not found", module.Name)
+					}
+					inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
+
+					baseExecutor := exec.NewBaseExecutor(
+						ctx,
+						module.Name,
+						mod,
+						p.wasmRuntime.InstanceCacheEnabled(),
+						inputs,
+						entrypoint,
+						tracer,
+					)
+					executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
+					moduleExecutors = append(moduleExecutors, executor)
+
+				default:
+					panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))
+				}
 			}
+			stagedModuleExecutors = append(stagedModuleExecutors, moduleExecutors)
 		}
-		stagedModuleExecutors = append(stagedModuleExecutors, moduleExecutors)
 	}
 
 	p.moduleExecutors = stagedModuleExecutors
+	return stagedModuleExecutors, nil
+}
+
+func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
+	for _, stage := range p.moduleExecutors {
+		for _, executor := range stage {
+			if err := executor.Close(ctx); err != nil {
+				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
+			}
+		}
+	}
+	for idx, mod := range p.loadedModules {
+		if err := mod.Close(ctx); err != nil {
+			return fmt.Errorf("closing wasm module %d: %w", idx, err)
+		}
+	}
 	return nil
 }
 

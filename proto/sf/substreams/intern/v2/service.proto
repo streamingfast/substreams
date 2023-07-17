@@ -15,6 +15,7 @@ message ProcessRangeRequest {
   uint64 stop_block_num = 2;
   string output_module = 3;
   sf.substreams.v1.Modules modules = 4;
+  uint32 stage = 5; // 0-based index of stage to execute up to
 }
 
 message ProcessRangeResponse {

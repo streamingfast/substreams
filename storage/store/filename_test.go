@@ -18,25 +18,25 @@ func Test_parseFileName(t *testing.T) {
 		{
 			"partial legacy",
 			fmt.Sprintf("%010d-%010d.partial", 100, 0),
-			&FileInfo{Filename: "0000000100-0000000000.partial", Range: block.NewRange(0, 100), TraceID: "", Partial: true},
+			&FileInfo{ModuleName: "test", Filename: "0000000100-0000000000.partial", Range: block.NewRange(0, 100), TraceID: "", Partial: true},
 			true,
 		},
 		{
 			"partial",
 			fmt.Sprintf("%010d-%010d.abcdef.partial", 100, 0),
-			&FileInfo{Filename: "0000000100-0000000000.abcdef.partial", Range: block.NewRange(0, 100), TraceID: "abcdef", Partial: true},
+			&FileInfo{ModuleName: "test", Filename: "0000000100-0000000000.abcdef.partial", Range: block.NewRange(0, 100), TraceID: "abcdef", Partial: true},
 			true,
 		},
 		{
 			"full",
 			fmt.Sprintf("%010d-%010d.kv", 100, 0),
-			&FileInfo{Filename: "0000000100-0000000000.kv", Range: block.NewRange(0, 100), TraceID: "", Partial: false},
+			&FileInfo{ModuleName: "test", Filename: "0000000100-0000000000.kv", Range: block.NewRange(0, 100), TraceID: "", Partial: false},
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := parseFileName(tt.filename)
+			got, got1 := parseFileName("test", tt.filename)
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.want1, got1)
 		})

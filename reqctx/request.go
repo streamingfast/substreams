@@ -23,7 +23,8 @@ type RequestDetails struct {
 	UniqueID              uint64
 
 	ProductionMode bool
-	IsSubRequest   bool
+	IsTier2Request bool
+	Tier2Stage     int
 }
 
 func (d *RequestDetails) UniqueIDString() string {
@@ -34,20 +35,12 @@ func (d *RequestDetails) IsOutputModule(modName string) bool {
 	return modName == d.OutputModule
 }
 
-// Called to determine if we *really* need to save this store snapshot. We don't need
-// when we're doing parallel processing and we are concerned only with writing the
-// leaf stores we've been asked to produce.  We know the scheduler will have
-// created jobs to produce those stores we're skipping here.
-func (d *RequestDetails) SkipSnapshotSave(modName string) bool {
-	return d.IsSubRequest && !d.IsOutputModule(modName)
-}
-
 func (d *RequestDetails) ShouldReturnWrittenPartials(modName string) bool {
-	return d.IsSubRequest && d.IsOutputModule(modName)
+	return d.IsTier2Request && d.IsOutputModule(modName)
 }
 
 func (d *RequestDetails) ShouldReturnProgressMessages() bool {
-	return d.IsSubRequest
+	return d.IsTier2Request
 }
 
 func (d *RequestDetails) ShouldStreamCachedOutputs() bool {

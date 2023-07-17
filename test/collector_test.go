@@ -12,9 +12,7 @@ type responseCollector struct {
 }
 
 func newResponseCollector() *responseCollector {
-	return &responseCollector{
-		responses: []*pbsubstreamsrpc.Response{},
-	}
+	return &responseCollector{}
 }
 
 func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) error {
@@ -23,7 +21,6 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 		c.responses = append(c.responses, resp)
 	case *pbssinternal.ProcessRangeResponse:
 		c.internalResponses = append(c.internalResponses, resp)
-
 	}
 	return nil
 }

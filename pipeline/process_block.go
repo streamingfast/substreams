@@ -184,13 +184,22 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		return io.EOF
 	}
 
-	if err := p.stores.flushStores(ctx, clock.Number); err != nil {
-		return fmt.Errorf("step new irr: stores end of stream: %w", err)
+	// FIXME: when handling the real-time segment, it's dangerous
+	// to save the stores, as they might have components that get
+	// reverted, and we won't go change the stores then.
+	// So we _shouldn't_ save the stores unless we're in irreversible-only
+	// mode. Basically, tier1 shouldn't save unless it's a StepNewIrreversible
+	// (we're in a historical segment)
+	// When we're in the real-time segment, we shouldn't save anything.
+	if reqDetails.IsTier2Request {
+		if err := p.stores.flushStores(ctx, p.executionStages, clock.Number); err != nil {
+			return fmt.Errorf("step new irr: stores end of stream: %w", err)
+		}
 	}
 
 	// note: if we start on a forked cursor, the undo signal will appear BEFORE we send the snapshot
-	if p.gate.shouldSendSnapshot() {
-		if err := p.sendSnapshots(ctx, p.stores.StoreMap); err != nil {
+	if p.gate.shouldSendSnapshot() && !reqDetails.IsTier2Request {
+		if err := p.sendSnapshots(p.stores.StoreMap, reqDetails.DebugInitialStoreSnapshotForModules); err != nil {
 			return fmt.Errorf("send initial snapshots: %w", err)
 		}
 	}
@@ -215,7 +224,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 	//fmt.Println("accumulated time for all modules", exec.Timer, "avg", sumDuration/time.Duration(sumCount))
 
 	if reqDetails.ShouldReturnProgressMessages() {
-		if reqDetails.IsSubRequest {
+		if reqDetails.IsTier2Request {
 			forceSend := (clock.Number+1)%p.runtimeConfig.CacheSaveInterval == 0
 
 			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {
@@ -253,16 +262,16 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
-	// TODO(abourget): get the module executors lazily from the OutputModulesGraph
-	//  this way we skip the buildWASM() in `Init()`.
-	//  Would pave the way towards PATCH'd modules too.
-
 	p.mapModuleOutput = nil
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
-	for _, stage := range p.moduleExecutors {
+	moduleExecutors, err := p.buildModuleExecutors(ctx)
+	if err != nil {
+		return fmt.Errorf("building wasm module tree: %w", err)
+	}
+	for _, stage := range moduleExecutors {
 		//t0 := time.Now()
-		//
+
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))
 			for _, executor := range stage {

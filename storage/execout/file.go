@@ -17,16 +17,17 @@ import (
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
+
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
 )
 
 // A File in `execout` stores, for a given module (with a given hash), the outputs of module execution
 // for _multiple blocks_, based on their block ID.
 type File struct {
 	sync.RWMutex
-	*block.BoundedRange
+	*block.Range
 
 	ModuleName string
 	kv         map[string]*pboutput.Item
@@ -34,27 +35,8 @@ type File struct {
 	logger     *zap.Logger
 }
 
-// NOTE(abourget): this File could be split in a BoundedFile which would know about NextFile() as well the BoundedRange,
-// and the File could know only about its own `targetRange`.  Only if useful in the future.  A File is rarely going to
-// be consumed in isolation, we're interested in the window.
-
-// NextFile initializes a new *File pointing to the next boundary, according to `targetRange`.
-func (c *File) NextFile() *File {
-	nextBoundary := c.BoundedRange.NextBoundary()
-	if nextBoundary.IsEmpty() {
-		return nil
-	}
-	return &File{
-		kv:           make(map[string]*pboutput.Item),
-		ModuleName:   c.ModuleName,
-		store:        c.store,
-		logger:       c.logger,
-		BoundedRange: nextBoundary,
-	}
-}
-
 func (c *File) Filename() string {
-	return computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
+	return computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
 }
 
 func (c *File) SortedItems() (out []*pboutput.Item) {
@@ -115,8 +97,8 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 }
 
 func (c *File) Load(ctx context.Context) error {
-	filename := computeDBinFilename(c.BoundedRange.StartBlock, c.BoundedRange.ExclusiveEndBlock)
-	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.BoundedRange))
+	filename := computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
+	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.Range))
 
 	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		objectReader, err := c.store.OpenObject(ctx, filename)
@@ -141,14 +123,14 @@ func (c *File) Load(ctx context.Context) error {
 
 		c.kv = outputData.Kv
 
-		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.BoundedRange))
+		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.Range))
 		return nil
 	})
 }
 
 func (c *File) Save(ctx context.Context) (func(), error) {
 	if len(c.kv) == 0 {
-		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.BoundedRange))
+		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.Range))
 		return func() {}, nil
 	}
 	filename := c.Filename()
@@ -185,8 +167,8 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 		return nil
 	}
 	enc.AddString("module", c.ModuleName)
-	enc.AddUint64("start_block", c.BoundedRange.StartBlock)
-	enc.AddUint64("end_block", c.BoundedRange.ExclusiveEndBlock)
+	enc.AddUint64("start_block", c.Range.StartBlock)
+	enc.AddUint64("end_block", c.Range.ExclusiveEndBlock)
 	enc.AddInt("kv_count", len(c.kv))
 	return nil
 }

@@ -9,12 +9,13 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/dstore"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/reqctx"
 )
 
 type getBlockFunc func() (uint64, error)
@@ -55,7 +56,8 @@ func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest
 		Modules:               request.Modules,
 		OutputModule:          request.OutputModule,
 		ProductionMode:        true,
-		IsSubRequest:          true,
+		IsTier2Request:        true,
+		Tier2Stage:            int(request.Stage),
 		StopBlockNum:          request.StopBlockNum,
 		LinearHandoffBlockNum: request.StopBlockNum,
 		ResolvedStartBlockNum: request.StartBlockNum,

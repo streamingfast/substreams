@@ -23,17 +23,8 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
 
-	for _, stage := range p.moduleExecutors {
-		for _, executor := range stage {
-			if err := executor.Close(ctx); err != nil {
-				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
-			}
-		}
-	}
-	for idx, mod := range p.loadedModules {
-		if err := mod.Close(ctx); err != nil {
-			return fmt.Errorf("closing wasm module %d: %w", idx, err)
-		}
+	if err := p.cleanUpModuleExecutors(ctx); err != nil {
+		return err
 	}
 
 	p.runPostJobHooks(ctx, p.lastFinalClock)
@@ -61,23 +52,23 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	// block to flush stores supporting holes in chains.
 	// And it will write multiple stores with the same content
 	// when presented with multiple boundaries / ranges.
-	if err := p.stores.flushStores(ctx, reqDetails.StopBlockNum); err != nil {
+	if err := p.stores.flushStores(ctx, p.executionStages, reqDetails.StopBlockNum); err != nil {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
 	p.execOutputCache.Close()
 
-	if p.stores.partialsWritten != nil {
-		p.respFunc(&pbssinternal.ProcessRangeResponse{
-			ModuleName: reqDetails.OutputModule,
-			Type: &pbssinternal.ProcessRangeResponse_Completed{
-				Completed: &pbssinternal.Completed{
-					AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
-					TraceId:            p.traceID,
-				},
-			},
-		})
-	}
+	//if p.stores.partialsWritten != nil {
+	//	p.respFunc(&pbssinternal.ProcessRangeResponse{
+	//		ModuleName: reqDetails.OutputModule,
+	//		Type: &pbssinternal.ProcessRangeResponse_Completed{
+	//			Completed: &pbssinternal.Completed{
+	//				AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
+	//				TraceId:            p.traceID,
+	//			},
+	//		},
+	//	})
+	//}
 
 	return nil
 }

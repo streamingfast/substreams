@@ -153,6 +153,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
+	// FIXME: here, we validate that we have only modules on the same
+	// stage, otherwise we fall back.
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, true, request.Modules)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
@@ -185,20 +187,14 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true, "tier2")
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 
-	// TODO(abourget): why would this start at the LinearHandoffBlockNum ?
-	//  * in direct mode, this would mean we start writing files after the handoff,
-	//    but it's not so useful to write those files, as they're partials
-	//    and the OutputWriter doesn't know if that `initialBlockBoundary` is the  module's init Block?
-	//  *
 	outputModule := outputGraph.OutputModule()
 	execOutWriter := execout.NewWriter(
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.StopBlockNum,
 		outputModule.Name,
 		execOutputConfigs,
-		true,
 	)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
@@ -208,6 +204,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	opts := s.buildPipelineOptions(ctx, request)
 	opts = append(opts, pipeline.WithFinalBlocksOnly())
+	opts = append(opts, pipeline.WithHighestStage(request.Stage))
 
 	pipe := pipeline.New(
 		ctx,
@@ -218,23 +215,19 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		"tier2",
 		// This must always be the parent/global trace id, the one that comes from tier1
 		traceID,
 		opts...,
 	)
 
-	logger.Info("initializing pipeline",
+	logger.Info("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("output_module", request.OutputModule),
+		zap.Uint32("stage", request.Stage),
 	)
-	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
+	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
-	}
-
-	if err := pipe.InitWASM(ctx); err != nil {
-		return fmt.Errorf("error building pipeline WASM: %w", err)
 	}
 
 	var streamErr error

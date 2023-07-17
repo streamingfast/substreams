@@ -6,10 +6,11 @@ import (
 	"io"
 
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/substreams/metrics"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+
+	"github.com/streamingfast/substreams/metrics"
 )
 
 type contextKeyType int

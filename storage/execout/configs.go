@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/dstore"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -42,6 +43,10 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 	}, nil
 }
 
-func (c *Configs) NewFile(moduleName string, targetRange *block.BoundedRange) *File {
+func (c *Configs) NewFile(moduleName string, targetRange *block.Range) *File {
 	return c.ConfigMap[moduleName].NewFile(targetRange)
+}
+
+func (c *Configs) NewFileWalker(moduleName string, segmenter *block.Segmenter) *FileWalker {
+	return c.ConfigMap[moduleName].NewFileWalker(segmenter)
 }

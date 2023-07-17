@@ -3,154 +3,146 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
+	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
+	"github.com/streamingfast/substreams/orchestrator/plan"
+	"github.com/streamingfast/substreams/orchestrator/response"
+	"github.com/streamingfast/substreams/orchestrator/scheduler"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
-	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/storage"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
 type ParallelProcessor struct {
-	plan             *work.Plan
-	scheduler        *Scheduler
-	squasher         *MultiSquasher
-	workerPool       work.WorkerPool
-	execOutputReader *execout.LinearReader
+	scheduler *scheduler.Scheduler
+	reqPlan   *plan.RequestPlan
 }
 
 // BuildParallelProcessor is only called on tier1
 func BuildParallelProcessor(
 	ctx context.Context,
-	reqDetails *reqctx.RequestDetails,
+	reqPlan *plan.RequestPlan,
 	runtimeConfig config.RuntimeConfig,
+	maxParallelJobs int,
 	outputGraph *outputmodules.Graph,
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
-	pendingUndoMessage *pbsubstreamsrpc.Response,
+	traceID string,
 ) (*ParallelProcessor, error) {
-	var execOutputReader *execout.LinearReader
 
-	if reqDetails.ShouldStreamCachedOutputs() {
+	stream := response.New(respFunc)
+	sched := scheduler.New(ctx, stream)
+
+	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs, traceID)
+	sched.Stages = stages
+
+	err := stages.FetchStoresState(
+		ctx,
+		reqPlan.StoresSegmenter(),
+		storeConfigs,
+		execoutStorage,
+		traceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetch stores storage state: %w", err)
+	}
+
+	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
+		fmt.Println("Initial state:")
+		fmt.Print(stages.StatesString())
+	}
+
+	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
+		return nil, fmt.Errorf("initial progress: %w", err)
+	}
+
+	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
+	// cover some of the ranges that we're after.
+	// We don't need to plan work for ranges where we have ExecOut
+	// already.
+	// BUT we'll need to have stores to be able to schedule work after
+	// so there's a mix of FullKV stores and ExecOut files we need
+	// to check.  We can push the `segmentCompleted` based on the
+	// execout files.
+
+	// The previous code did what? Just assumed there was ExecOut files
+	// prior to the latest Complete snapshot?
+
+	// FIXME: Is the state map the final reference for the progress we've made?
+	// Shouldn't that be processed by the scheduler a little bit?
+	// What if we have discovered a bunch of ExecOut files and the scheduler
+	// would decide not to use the very first stores as a sign of what is complete?
+	// Well, perhaps those wouldn't hurt, because here we're _sure_ they're
+	// done and the Scheduler could send Progress messages when the above decision
+	// is taken.
+
+	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
+	// for whatever reason,
+
+	if reqPlan.WriteExecOut != nil {
+		execOutSegmenter := reqPlan.WriteOutSegmenter()
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := outputGraph.OutputModule()
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
-		firstRange := block.NewBoundedRange(requestedModule.InitialBlock, runtimeConfig.CacheSaveInterval, reqDetails.ResolvedStartBlockNum, reqDetails.LinearHandoffBlockNum)
-		requestedModuleCache := execoutStorage.NewFile(requestedModule.Name, firstRange)
-		execOutputReader = execout.NewLinearReader(
-			reqDetails.ResolvedStartBlockNum,
-			reqDetails.LinearHandoffBlockNum,
+
+		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+
+		sched.ExecOutWalker = orchestratorExecout.NewWalker(
+			ctx,
 			requestedModule,
-			requestedModuleCache,
-			respFunc,
-			runtimeConfig.CacheSaveInterval,
-			pendingUndoMessage,
+			walker,
+			reqPlan.ReadExecOut,
+			stream,
 		)
 	}
 
-	// In Dev mode
-	// * The linearHandoff will be set to the startblock (never equal to stopBlock, which is exclusive)
-	// * We will generate stores up to the linearHandoff, even if we end with an incomplete store
-	//
-	// In Prod mode
-	// * If the stop block is in the irreversible segment (far from chain head), it will be equal to linearHandoff, we stop there.
-	// * If the stop block is in the reversible segment (close to chain head), it will higher than linearHandoff, we don't stop there.
-	// * If there is no stop block (== 0), the linearHandoff will be at the end of the irreversible segment, we don't stop there
-	// * If we stop at the linearHandoff, we will only save the stores up to the boundary of the latest complete store.
-	// * On the contrary, if we need to keep going after the linearHandoff, we will need to save the last "incomplete" store.
+	// OPTIMIZE(abourget): take all of the ExecOut files that exist
+	//  and use that to PUSH back what the Stages need to do.
+	//  So the first Segment to process will not necessarily be
+	//  segment == 0.  We'll need the segment JUST prior to be
+	//  processed though, because we need to continue working on
+	//  the future segments.  This interplays with the segment
+	//  just before.
+	//  -
+	//  In other words, if we can stream out the ExecOut directly, we don't need
+	//  to dispatch work to process them at all.  But we'll need
+	//  to have stores ready to continue segments work.
+	//  SO: we can move forward the processing pipeline, provided
+	//  all of the stages can be continued forward after the
+	//  last ExecOut segment: that we have complete stores for the
+	//  segment where ExecOut finishes.
+	//  -
+	//  This is an optimization and is not solved herein.
 
-	stopAtHandoff := reqDetails.LinearHandoffBlockNum == reqDetails.StopBlockNum
-
-	storeLinearHandoffBlockNum := reqDetails.LinearHandoffBlockNum
-	if stopAtHandoff {
-		// we don't need to bring the stores up to handoff block if we stop there
-		storeLinearHandoffBlockNum = lowBoundary(reqDetails.LinearHandoffBlockNum, runtimeConfig.CacheSaveInterval)
-	}
-
-	modulesStateMap, err := storage.BuildModuleStorageStateMap( // ok, I will cut stores up to 800 not 842
-		ctx,
-		storeConfigs,
-		runtimeConfig.CacheSaveInterval,
-		execoutStorage,
-		reqDetails.ResolvedStartBlockNum,
-		reqDetails.LinearHandoffBlockNum,
-		storeLinearHandoffBlockNum,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("build storage map: %w", err)
-	}
-
-	plan, err := work.BuildNewPlan(ctx, modulesStateMap, runtimeConfig.SubrequestsSplitSize, reqDetails.LinearHandoffBlockNum, runtimeConfig.MaxJobsAhead, outputGraph)
-	if err != nil {
-		return nil, fmt.Errorf("build work plan: %w", err)
-	}
-
-	if err := plan.SendInitialProgressMessages(respFunc); err != nil {
-		return nil, fmt.Errorf("send initial progress: %w", err)
-	}
-
-	scheduler := NewScheduler(plan, respFunc, reqDetails.Modules)
-	if err != nil {
-		return nil, err
-	}
-
-	squasher, err := NewMultiSquasher(ctx, runtimeConfig, plan.ModulesStateMap, storeConfigs, storeLinearHandoffBlockNum, scheduler.OnStoreCompletedUntilBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	scheduler.OnStoreJobTerminated = squasher.Squash
-
-	runnerPool := work.NewWorkerPool(ctx, reqDetails.MaxParallelJobs, runtimeConfig.WorkerFactory)
+	workerPool := work.NewWorkerPool(ctx, maxParallelJobs, runtimeConfig.WorkerFactory)
+	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{
-		plan:             plan,
-		scheduler:        scheduler,
-		squasher:         squasher,
-		workerPool:       runnerPool,
-		execOutputReader: execOutputReader,
+		scheduler: sched,
+		reqPlan:   reqPlan,
 	}, nil
 }
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
-	if b.execOutputReader != nil {
-		b.execOutputReader.Launch(ctx)
-	}
-	b.squasher.Launch(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	if err := b.scheduler.Schedule(ctx, b.workerPool); err != nil {
+	initCmd := b.scheduler.Init()
+	if err := b.scheduler.Run(ctx, initCmd); err != nil {
 		return nil, fmt.Errorf("scheduler run: %w", err)
 	}
 
-	storeMap, err = b.squasher.Wait(ctx)
-	if err != nil {
-		return nil, err
+	if b.reqPlan.LinearPipeline != nil {
+		return b.scheduler.FinalStoreMap(b.reqPlan.LinearPipeline.StartBlock)
 	}
 
-	if b.execOutputReader != nil {
-		select {
-		case <-b.execOutputReader.Terminated():
-			if err := b.execOutputReader.Err(); err != nil {
-				return nil, err
-			}
-		case <-ctx.Done():
-			// We must return an error here, otherwise the caller will think that the
-			// execOutputReader is done, and will try to continue with live block!
-			return nil, ctx.Err()
-		}
-	}
-
-	return storeMap, nil
-}
-
-func lowBoundary(blk uint64, bundleSize uint64) uint64 {
-	return blk - (blk % bundleSize)
+	return nil, nil
 }

@@ -258,8 +258,8 @@ func searchOutputsModule(
 		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
 	}
 
-	targetRange := block.NewBoundedRange(module.InitialBlock, saveInterval, startBlock, startBlock-startBlock%saveInterval+saveInterval)
-	outputCache := modStore.NewFile(targetRange)
+	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
+	outputCache := modStore.NewFile(rng)
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
 	if err := outputCache.Load(ctx); err != nil {
 		if err == dstore.ErrNotFound {
@@ -300,7 +300,7 @@ func searchStateModule(
 	}
 	moduleStore := config.NewFullKV(zlog)
 
-	file := store.NewCompleteFileInfo(module.InitialBlock, startBlock)
+	file := store.NewCompleteFileInfo(module.Name, module.InitialBlock, startBlock)
 	if err = moduleStore.Load(ctx, file); err != nil {
 		return fmt.Errorf("unable to load file: %w", err)
 	}

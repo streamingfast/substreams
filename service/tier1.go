@@ -24,6 +24,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
@@ -334,7 +335,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, "tier1")
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType)
 	if err != nil {
@@ -363,12 +364,27 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		"tier1",
 		tracing.GetTraceID(ctx).String(),
 		opts...,
 	)
 
-	logger.Info("initializing pipeline",
+
+	// FIXME: eventually, we could use the `orchestrator/plan.RequestPlan` object to
+	// tackle the `LinearHandoffBlockNum == StopBlockNum`, and the linear segment that
+	// needs to be produced.
+	// But it seems a bit more involved in here.
+
+	reqPlan := plan.BuildTier1RequestPlan(
+		requestDetails.ProductionMode,
+		s.runtimeConfig.SubrequestsSplitSize,
+		outputGraph.LowestInitBlock(),
+		requestDetails.ResolvedStartBlockNum,
+		requestDetails.LinearHandoffBlockNum,
+		requestDetails.StopBlockNum,
+	)
+
+	logger.Info("initializing tier1 pipeline",
+		zap.Stringer("plan", reqPlan),
 		zap.Int64("request_start_block", request.StartBlockNum),
 		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
@@ -377,21 +393,21 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("output_module", request.OutputModule),
 	)
 
-	if err := pipe.InitStoresAndBackprocess(ctx); err != nil {
+	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
-	if requestDetails.LinearHandoffBlockNum == request.StopBlockNum {
+	if reqPlan.LinearPipeline == nil {
 		return pipe.OnStreamTerminated(ctx, nil)
-	}
-
-	if err := pipe.InitWASM(ctx); err != nil {
-		return fmt.Errorf("error building pipeline WASM: %w", err)
 	}
 
 	var streamErr error
 	cursor := requestDetails.ResolvedCursor
 	var cursorIsTarget bool
 	if requestDetails.ResolvedStartBlockNum != requestDetails.LinearHandoffBlockNum {
+		// FIXME(abourget): how is that different from reqPlan.LinearPipeline being set?
+		// and what does the cursor have to do here?
+		// This will also be true when we've done backprocessing.. is the cursor affected
+		// in that case?!
 		cursorIsTarget = true
 	}
 	logger.Info("creating firehose stream",

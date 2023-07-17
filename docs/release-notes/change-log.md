@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Breaking changes
+
+* Tier1 and Tier2 should be upgraded concurrently, but failure to do so will only result in temporary errors until they are at the same version.
+
 ### Backend changes
+
+* Massive refactoring of the scheduler: prevent excessive splitting of jobs, grouping them into stages when they have the same dependencies. This should significantly reduce the required resources for running substreams tier2 workers.
 
 ### CLI changes
 

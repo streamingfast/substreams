@@ -14,7 +14,7 @@ The Substreams Developer's guide explains the process of building a Substreams m
 
 Example Substreams modules for Solana, Aptos, and other chains are available for reference and study. [Find a full list on the examples page](https://substreams.streamingfast.io/reference-and-specs/examples) of the Substreams documentation.
 
-[Read through the fundamentals](../concepts-and-fundamentals/fundamentals.md) and [modules overview](../concepts-and-fundamentals/modules.md) to create a solid foundation of knowledge for Substreams development.
+Read through the [fundamentals](../concepts-and-fundamentals/fundamentals.md) to get a good grasp of what Substreams is first.
 
 ### Substreams examples
 

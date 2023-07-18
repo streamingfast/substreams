@@ -20,7 +20,7 @@ Learn about Substreams in a short, dense 25-minute intro and understand its impa
 A walkthrough of Firehose features, Substreams modules, including a sample Rust module and StreamingFast's vision.
 {% endembed %}
 
-Learn essential facts about Substreams through [reading the Benefits and comparison](concepts-and-fundamentals/benefits.md).
+Learn about the benefits of Substreams, and how it compares to otheressential facts about Substreams through [reading the Benefits and comparison](concepts-and-fundamentals/benefits.md).
 
 The primary ways to use Substreams include:
 

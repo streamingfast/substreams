@@ -28,6 +28,7 @@
 * [Running Substreams](developers-guide/running-substreams.md)
 * [Parallel Execution](developers-guide/parallel-execution.md)
 * [Sink targets](developers-guide/sink-targets/README.md)
+  * [Substreams-powered subgraph](developers-guide/sink-targets/substreams-powered-subgraph.md)
   * [Files](developers-guide/sink-targets/substreams-sink-files.md)
   * [Key/value store](developers-guide/sink-targets/substreams-sink-kv.md)
   * [PostgreSQL](developers-guide/sink-targets/substreams-sink-postgres.md)

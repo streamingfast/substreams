@@ -493,7 +493,7 @@ func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun,
 	segmenter := block.NewSegmenter(10, 0, 0)
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
 	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
-	cmd := worker.Work(ctx, unit, block.NewRange(start, end), nil)
+	cmd := worker.Work(ctx, unit, block.NewRange(start, end), []string{run.ModuleName}, nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)
 	require.True(t, ok)

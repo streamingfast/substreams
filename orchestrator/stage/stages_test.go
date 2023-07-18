@@ -54,32 +54,32 @@ func TestNewStagesNextJobs(t *testing.T) {
 	stages.setState(Unit{Stage: 2, Segment: 0}, UnitNoOp)
 
 	segmentStateEquals(t, stages, `
-S:..
-S:..
-M:N.`)
+S:.
+S:.
+M:N`)
 
 	j1, _ := stages.NextJob()
 	assert.Equal(t, 1, j1.Stage)
 	assert.Equal(t, 0, j1.Segment)
 
 	segmentStateEquals(t, stages, `
-S:..
-S:S.
-M:N.`)
+S:.
+S:S
+M:N`)
 
 	stages.forceTransition(0, 1, UnitCompleted)
 
 	segmentStateEquals(t, stages, `
-S:..
-S:C.
-M:N.`)
+S:.
+S:C
+M:N`)
 
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
-S:S.
-S:C.
-M:N.`)
+S:S
+S:C
+M:N`)
 
 	stages.NextJob()
 
@@ -107,31 +107,31 @@ M:NS`)
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
-S:CC..
-S:CSS.
-M:NS..`)
+S:CC.
+S:CSS
+M:NS.`)
 
 	stages.MarkSegmentPartialPresent(id(1, 2))
 
 	segmentStateEquals(t, stages, `
-S:CC..
-S:CSS.
-M:NP..`)
+S:CC.
+S:CSS
+M:NP.`)
 
 	stages.MarkSegmentMerging(id(1, 2))
 
 	segmentStateEquals(t, stages, `
-S:CC..
-S:CSS.
-M:NM..`)
+S:CC.
+S:CSS
+M:NM.`)
 
 	stages.markSegmentCompleted(id(1, 2))
 	stages.NextJob()
 
 	segmentStateEquals(t, stages, `
-S:CCS.
-S:CSS.
-M:NC..`)
+S:CCS
+S:CSS
+M:NC.`)
 
 	stages.NextJob()
 

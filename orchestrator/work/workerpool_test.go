@@ -16,7 +16,7 @@ import (
 func Test_workerPoolPool_Borrow_Return(t *testing.T) {
 	ctx := context.Background()
 	pi := NewWorkerPool(ctx, 2, func(logger *zap.Logger) Worker {
-		return NewWorkerFactoryFromFunc(func(ctx context.Context, unit stage.Unit, workRange *block.Range, upstream *response.Stream) loop.Cmd {
+		return NewWorkerFactoryFromFunc(func(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
 			return func() loop.Msg {
 				return &Result{}
 			}

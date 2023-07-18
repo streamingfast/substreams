@@ -429,6 +429,37 @@ func Test_SimpleMapModule(t *testing.T) {
 	require.NoError(t, run.Run(t, "test_map"))
 }
 
+func Test_Early(t *testing.T) {
+	run := newTestRun(t, 12, 14, 14, "test_map")
+	run.Params = map[string]string{"test_map": "my test params"}
+	run.ProductionMode = true
+	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock + 10,
+		}
+	}
+	run.ParallelSubrequests = 1
+
+	require.NoError(t, run.Run(t, "test_map"))
+}
+
+func TestEarlyWithEmptyStore(t *testing.T) {
+	run := newTestRun(t, 2, 4, 4, "assert_test_store_delete_prefix")
+	run.ProductionMode = true
+
+	var foundBlock3 bool
+	run.BlockProcessedCallback = func(ctx *execContext) {
+		if ctx.block.Number == 3 {
+			foundBlock3 = true
+		}
+	}
+	run.Context = cancelledContext(2000 * time.Millisecond)
+
+	require.NoError(t, run.Run(t, "assert_test_store_delete_prefix"))
+	require.True(t, foundBlock3)
+}
+
 func Test_SingleMapModule_FileWalker(t *testing.T) {
 	run := newTestRun(t, 200, 250, 300, "test_map")
 	run.Params = map[string]string{"test_map": "my test params"}

@@ -373,13 +373,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	// needs to be produced.
 	// But it seems a bit more involved in here.
 
-	var needsStores bool
-	for _, stageLayer := range outputGraph.StagedUsedModules() {
-		if stageLayer.LastLayer().IsStoreLayer() {
-			needsStores = true
-			break
-		}
-	}
+	scheduleStores := outputGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
 
 	reqPlan := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
@@ -388,7 +382,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
-		needsStores,
+		scheduleStores,
 	)
 
 	logger.Info("initializing tier1 pipeline",

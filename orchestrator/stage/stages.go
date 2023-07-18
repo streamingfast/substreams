@@ -59,8 +59,8 @@ func NewStages(
 	traceID string,
 ) (out *Stages) {
 
-	if reqPlan.BuildStores == nil && reqPlan.WriteExecOut == nil {
-		panic("internal error: new_stages should never be called with a req_plan without execout and buildstores")
+	if !reqPlan.RequiresParallelProcessing() {
+		panic("internal error: new_stages should never be called outside of parallel processing")
 	}
 
 	logger := reqctx.Logger(ctx)
@@ -126,6 +126,9 @@ func layerKind(layer outputmodules.LayerModules) Kind {
 
 func (s *Stages) AllStoresCompleted() bool {
 	if s.storeSegmenter == nil { // no store at all
+		return true
+	}
+	if s.storeSegmenter.ExclusiveEndBlock() == s.storeSegmenter.InitialBlock() { // first segment on a mapper, no store to process
 		return true
 	}
 	lastSegment := s.storeSegmenter.LastIndex()

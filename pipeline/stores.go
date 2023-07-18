@@ -58,6 +58,9 @@ func (s *Stores) resetStores() {
 
 // flushStores is called only for Tier2 request, as to not save reversible stores.
 func (s *Stores) flushStores(ctx context.Context, executionStages outputmodules.ExecutionStages, blockNum uint64) (err error) {
+	if s.StoreMap == nil {
+		return // fast exit for cases without stores or no linear processing
+	}
 	lastLayer := executionStages.LastStage().LastLayer()
 	if !lastLayer.IsStoreLayer() {
 		return nil

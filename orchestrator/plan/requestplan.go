@@ -47,7 +47,11 @@ type RequestPlan struct {
 	segmentInterval uint64
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, needsStores bool) *RequestPlan {
+func (p *RequestPlan) RequiresParallelProcessing() bool {
+	return p.WriteExecOut != nil || p.BuildStores != nil
+}
+
+func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) *RequestPlan {
 	if exclusiveEndBlock != 0 && linearHandoffBlock > exclusiveEndBlock {
 		panic(fmt.Sprintf("invalid linearHandoff %d when building plan, it should always be capped at exclusiveEndBlock %d", linearHandoffBlock, exclusiveEndBlock))
 	}
@@ -73,7 +77,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
 			endStoreBound = segmenter.Range(segmentIdx).StartBlock
 		}
-		if needsStores {
+		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
 		}
 
@@ -83,7 +87,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
 		plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
 	} else { /* dev mode */
-		if needsStores {
+		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
 		}
 		plan.WriteExecOut = nil

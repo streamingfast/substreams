@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"context"
@@ -52,12 +53,12 @@ func BenchmarkExecution(b *testing.B) {
 			{"wazero", wasmCode, reuseInstance},
 			{"wazero", wasmCode, freshInstanceEachRun},
 		} {
-			suffix := "_reuse_instance"
+			instanceKey := "reused"
 			if !config.shouldReUseInstance {
-				suffix = "_fresh_instance"
+				instanceKey = "fresh"
 			}
 
-			b.Run(config.name+"_"+testCase.tag+suffix, func(b *testing.B) {
+			b.Run(fmt.Sprintf("vm=%s,instance=%s,tag=%s", config.name, instanceKey, testCase.tag), func(b *testing.B) {
 				ctx := context.Background()
 
 				wasmRuntime := wasm.NewRegistryWithRuntime(config.name, nil, 0)
